@@ -6,12 +6,13 @@
 import numpy as np
 import sys
 import random
+import copy
 #import imposm.parser as pa
 
 from imposm.parser import OSMParser
 import coordinates
 
-default_height=10
+default_height=12
 level_height = 3
 ground_height = -20
 nb = 0
@@ -19,6 +20,7 @@ nobjects = 0
 first = True
 tile_size_x=500 # -- our tile size in meters
 tile_size_y=500
+#infile = 'dd-altstadt.osm'; total_objects = 158
 #infile = 'altstadt.osm'; total_objects = 2172
 infile = 'xapi-buildings.osm'; total_objects = 20000 # huge!
 
@@ -38,6 +40,29 @@ def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=
 
 def dist(a,b):
     pass
+
+def check_height(building_height, t):
+    if t.v_repeat:
+        tex_y1 = 1.
+        tex_y0 = 1-building_height / t.v_size_meters
+        return True, tex_y0, tex_y1
+    else:
+        # x min_height < height < max_height
+        # x find closest match
+        # - evaluate error
+        # - error acceptable?
+        if building_height >= t.v_splits_meters[0] and building_height <= t.v_size_meters:
+            for i in range(len(t.v_splits_meters)):
+                if t.v_splits_meters[i] >= building_height:
+                    tex_y0 = 1-t.v_splits[i]
+                    print "# height %g storey %i" % (building_height, i)
+                    break
+            tex_y1 = 1.
+            #tex_filename = t.filename + '.png'
+            return True, tex_y0, tex_y1
+        else:
+            return False, 0, 0
+
 
 def write_building(b):
     global first
@@ -67,10 +92,8 @@ def write_building(b):
 
 #    if separate_roof:
 #    out.write('texture "facade_modern1.png"\n')
-    out.write('texture "facade_modern36x36_12.png"\n')
+#    out.write('texture "facade_modern36x36_12.png"\n')
 
-    #out.write("loc 0 0 0\n")
-    out.write("numvert %i\n" % (2*nnodes_ground))
     X = np.zeros((nnodes_ground+1,2))
     lenX = np.zeros((nnodes_ground))
     i = 0
@@ -91,10 +114,6 @@ def write_building(b):
 
     ground_elev = elev(X[0,0], X[0,1])
 
-    for x in X[:-1]:
-        z = ground_elev - 1
-        #out.write("%g %g %g\n" % (y, z, x))
-        out.write("%g %g %g\n" % (x[1], z, x[0]))
 
     try:
         height = float(b.height)
@@ -110,63 +129,87 @@ def write_building(b):
 #        z = float(b.levels) * level_height
         #print "LEVEL", z
 
-    for x in X[:-1]:
-        #out.write("%g %g %g\n" % (y, z, x))
-        out.write("%g %g %g\n" % (x[1], ground_elev + height, x[0]))
-
 #    for r in b.refs:
 #        x, y = transform.toLocal((r.lat, r.lon))
 #        out.write("%g %g %g\n" % (y, z, x))
-
-# TODO: facade handling via texture db
-# name.png
-# size_h_meters
-# size_v_layer
-# n_layers
-# size_v_dach
-#
-
 
     nsurf = nnodes_ground
     if include_roof: nsurf += 1
 
     #repeat_vert = int(height/3)
 
+    # -- texturing facade
+    # - check all walls -- min length?
+    global textures
+    # loop all textures
+    # award points for good matches
+    # pick best match?
+    building_height = height
+    # -- check v: height
+
+    shuffled_t = copy.copy(textures)
+    random.shuffle(shuffled_t)
+    have_texture = False
+    for t in shuffled_t:
+        ok, tex_y0, tex_y1 = check_height(building_height, t)
+        if ok:
+            have_texture = True
+            break
+
+    if have_texture:
+        out.write('texture "%s"\n' % (t.filename+'.png'))
+    else:
+        print "WARNING: no texture height", building_height
+
+    # -- check h: width
+
     # building shorter than facade texture
     # layers > facade_min_layers
     # layers < facade_max_layers
-    building_height = height
-    texture_height = 12*3.
+#    building_height = height
+#    texture_height = 12*3.
 #    if building_height < texture_height:
-    if 1:
-        tex_y0 = 1 - building_height / texture_height
-        tex_y1 = 1
+#    if 1:
+#        tex_y0 = 1 - building_height / texture_height
+#        tex_y1 = 1
 #    else:
 #        tex_y0 = 0
 #        tex_y1 = building_height / texture_height # FIXME
+
+    #out.write("loc 0 0 0\n")
+    out.write("numvert %i\n" % (2*nnodes_ground))
+
+    for x in X[:-1]:
+        z = ground_elev - 1
+        #out.write("%g %g %g\n" % (y, z, x))
+        out.write("%g %g %g\n" % (x[1], z, x[0]))
+
+    for x in X[:-1]:
+        #out.write("%g %g %g\n" % (y, z, x))
+        out.write("%g %g %g\n" % (x[1], ground_elev + height, x[0]))
 
     out.write("numsurf %i\n" % nsurf)
     # -- walls
 
     for i in range(nnodes_ground - 1):
-        repeat_hor = lenX[i] / (12.*3.)
+        tex_x1 = lenX[i] / t.h_size_meters
 
         out.write("SURF 0x0\n")
         out.write("mat %i\n" % mat)
         out.write("refs %i\n" % 4)
         out.write("%i %g %g\n" % (i,                     0,          tex_y0))
-        out.write("%i %g %g\n" % (i + 1,                 repeat_hor, tex_y0))
-        out.write("%i %g %g\n" % (i + 1 + nnodes_ground, repeat_hor, tex_y1))
+        out.write("%i %g %g\n" % (i + 1,                 tex_x1, tex_y0))
+        out.write("%i %g %g\n" % (i + 1 + nnodes_ground, tex_x1, tex_y1))
         out.write("%i %g %g\n" % (i + nnodes_ground,     0,          tex_y1))
 
     # -- closing wall
-    repeat_hor = lenX[nnodes_ground-1] / (12.*3.)
+    tex_x1 = lenX[nnodes_ground-1] /  t.h_size_meters
     out.write("SURF 0x0\n")
     out.write("mat %i\n" % mat)
     out.write("refs %i\n" % 4)
     out.write("%i %g %g\n" % (nnodes_ground - 1, 0,          tex_y0))
-    out.write("%i %g %g\n" % (0,                 repeat_hor, tex_y0))
-    out.write("%i %g %g\n" % (nnodes_ground,     repeat_hor, tex_y1))
+    out.write("%i %g %g\n" % (0,                 tex_x1, tex_y0))
+    out.write("%i %g %g\n" % (nnodes_ground,     tex_x1, tex_y1))
     out.write("%i %g %g\n" % (2*nnodes_ground-1, 0,          tex_y1))
 
     # -- roof
@@ -308,7 +351,7 @@ if 0:
     raster(transform, 'elev.in', -10000, -10000, size_x=20000, size_y=20000, step_x=20, step_y=20)
     sys.exit(0)
 
-class interpolator(object):
+class Interpolator(object):
     def __init__(self, filename):
         # FIXME: use values from header in filename
         elev = np.loadtxt(filename)[:,2:]
@@ -344,9 +387,57 @@ class interpolator(object):
     def shift(self, h):
         self.h += h
 
-elev = interpolator("elev.xml")
-elev.shift(-elev(0,0)) # -- shift to zero height at origin
+class Texture(object):
+#    def __init__(self, filename, h_min, h_max, h_size, h_splits, \
+#                                 v_min, v_max, v_size, v_splits, \
+#                                 has_roof_section):
+    def __init__(self, filename, h_size_meters, h_splits, h_repeat, \
+                                 v_size_meters, v_splits, v_repeat, \
+                                 has_roof_section):
+        self.filename = filename
+        self.has_roof_section = has_roof_section
+        # roof type, color
+#        self.v_min = v_min
+#        self.v_max = v_max
+        self.v_size_meters = v_size_meters
+        self.v_splits = np.array(v_splits)
+        self.v_splits_meters = self.v_splits * self.v_size_meters
+        self.v_repeat = v_repeat
 
+#        self.h_min = h_min
+#        self.h_max = h_max
+        self.h_size_meters = h_size_meters
+        self.h_splits = np.array(h_splits)
+        self.h_splits_meters = self.h_splits * self.h_size_meters
+        self.h_repeat = h_repeat
+
+        # self.type = type
+        # commercial-
+        # - warehouse
+        # - skyscraper
+        # industrial
+        # residential
+        # - old
+        # - modern
+        # european, north_american, south_american, mediterreanian, african, asian
+
+textures = []
+textures.append(Texture('DSCF9495_pow2', 14, (585/2048., 873/2048., 1179/2048., 1480/2048., 1.), True,
+                                         19.4, (1094/2048., 1531/2048., 1.), False, True))
+textures.append(Texture('DSCF9496_pow2', 4.44, (1.), True,
+                                         17.93, (1099/2048., 1521/2048., 1.), False, True))
+
+textures.append(Texture('facade_modern36x36_12', 36., (1.), True,
+                                         36., (158/1024., 234/1024, 312/1024., 388/1024., 465/1024., 542/1024., 619/1024., 697/1024., 773/1024., 870/1024., 1.), True, True))
+
+textures.append(Texture('DSCF9503_pow2', 12.85, (1.), True,
+                                         17.66, (1168/2048., 1560/2048., 1.), False, True))
+
+print textures[0].v_splits_meters
+
+#sys.exit(0)
+elev = Interpolator("elev.xml")
+elev.shift(-elev(0,0)) # -- shift to zero height at origin
 
 minx, miny = transform.toLocal((minlat, minlon))
 maxx, maxy = transform.toLocal((maxlat, maxlon))
@@ -399,7 +490,6 @@ p.parse(infile) # 1500
 #p.parse('xapi-small.osm')
 print "done"
 #sys.exit(0)
-#p.parse('dd-altstadt.osm') # 158 buildings
 #p.parse('map.osm')
 # done
 #print way.buildings
