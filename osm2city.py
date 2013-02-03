@@ -18,6 +18,22 @@ nb = 0
 nobjects = 0
 first = True
 
+tile_size_x=500 # -- our tile size in meters
+tile_size_y=500
+#center_lon=
+#center_lat=
+
+def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
+    # check $FGDATA/Nasal/IOrules
+    f = open(fname, 'w')
+    f.write("# %g %g %g %g %g %g\n" % (x0, y0, size_x, size_y, step_x, step_y))
+    for y in range(y0, y0+size_y, step_y):
+        for x in range(x0, x0+size_x, step_x):
+            lat, lon = transform.toGlobal((x, y))
+            f.write("%1.8f %1.8f %g %g\n" % (lon, lat, x, y))
+        f.write("\n")
+    f.close()
+
 def dist(a,b):
     pass
 
@@ -34,6 +50,7 @@ def write_building(b):
     nb += 1
     global nobjects
     nobjects += 1
+    global elev
 #  if building[0] == 332:
 #    if first: first = False
 #    else:     out.write("kids 1\n")
@@ -62,25 +79,30 @@ def write_building(b):
         crossX += X[i,0]*X[i+1,1] - X[i+1,0]*X[i,1]
     if crossX < 0: X = X[::-1]
 
+    ground_elev = elev(X[0,0], X[0,1])
+
     for x in X[:-1]:
-        z = ground_height
+        z = ground_elev - 1
         #out.write("%g %g %g\n" % (y, z, x))
         out.write("%g %g %g\n" % (x[1], z, x[0]))
 
-    z = default_height
     try:
         height = float(b.height)
     except:
-        height = 0
+        height = 0.
+    if height < 1. and float(b.levels) > 0:
+        height = float(b.levels) * level_height
+    if height < 1.:
+        height = default_height
     # -- try height or levels
-    if height > 1.: z = height
-    elif float(b.levels) > 0:
-        z = float(b.levels) * level_height
+#    if height > 1.: z = height
+#    elif float(b.levels) > 0:
+#        z = float(b.levels) * level_height
         #print "LEVEL", z
 
     for x in X[:-1]:
         #out.write("%g %g %g\n" % (y, z, x))
-        out.write("%g %g %g\n" % (x[1], z, x[0]))
+        out.write("%g %g %g\n" % (x[1], ground_elev + height, x[0]))
 
 #    for r in b.refs:
 #        x, y = transform.toLocal((r.lat, r.lon))
@@ -225,6 +247,49 @@ lat = 51.0377
 
 transform = coordinates.Transformation((lat, lon), hdg = 0)
 #origin = coordinates.Position(transform, [], lat, lon)
+
+if 0:
+    raster(transform, 'elev.in', -5000, -5000, size_x=10000, size_y=10000, step_x=20, step_y=20)
+    sys.exit(0)
+
+class interpolator(object):
+    def __init__(self, filename):
+        elev = np.loadtxt(filename)[:,2:]
+        self.x = elev[:,0]
+        self.y = elev[:,1]
+        self.h = elev[:,2]
+        self.min_x = min(self.x)
+        self.max_x = max(self.x)
+        self.min_y = min(self.y)
+        self.max_y = max(self.y)
+        self.h = self.h.reshape(500,500)
+        self.x = self.x.reshape(500,500)
+        self.y = self.y.reshape(500,500)
+        #print self.h[0,0], self.h[0,1], self.h[0,2]
+        #self.dx = self.h[0,0] - self.x[0,1]
+        self.dx = 20.
+        self.dy = 20.
+
+    def __call__(self, x, y):
+        if x <= self.min_x or x >= self.max_x or \
+           y <= self.min_y or y >= self.max_y: return -9999
+        i = int((x - self.min_x)/self.dx)
+        j = int((y - self.min_y)/self.dy)
+        fx = (x - self.x[j,i])/self.dx
+        fy = (y - self.y[j,i])/self.dy
+        #print fx, fy, i, j
+        h =  (1-fx) * (1-fy) * self.h[j,i] \
+           +    fx  * (1-fy) * self.h[j,i+1] \
+           + (1-fx) *    fy  * self.h[j+1,i] \
+           +    fx  *    fy  * self.h[j+1,i+1]
+        return h
+
+    def shift(self, h):
+        self.h += h
+
+elev = interpolator("elev.xml")
+elev.shift(-elev(0,0)) # -- shift to zero height at origin
+
 
 minx, miny = transform.toLocal((minlat, minlon))
 maxx, maxy = transform.toLocal((maxlat, maxlon))
