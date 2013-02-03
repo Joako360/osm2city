@@ -17,9 +17,11 @@ ground_height = -20
 nb = 0
 nobjects = 0
 first = True
-
 tile_size_x=500 # -- our tile size in meters
 tile_size_y=500
+#infile = 'altstadt.osm'; total_objects = 2172
+infile = 'xapi-buildings.osm'; total_objects = 20000 # huge!
+
 #center_lon=
 #center_lat=
 
@@ -43,11 +45,13 @@ def write_building(b):
     mat = random.randint(0,3)
 
     nnodes_ground = len(b.refs)
-    print nnodes_ground #, b.refs[0].lat, b.refs[0].lon
+#    print nnodes_ground #, b.refs[0].lat, b.refs[0].lon
 
 #for building in allbuildings:
     global nb
     nb += 1
+    print nb
+
     global nobjects
     nobjects += 1
     global elev
@@ -58,15 +62,17 @@ def write_building(b):
     out.write("OBJECT poly\n")
     out.write("name \"b%i\"\n" % nb)
     if nnodes_ground == 4:
-        have_roof_texture = True
-    else: have_roof_texture = False
+        include_roof = False
+    else: include_roof = True
 
-    if have_roof_texture:
-        out.write('texture "roof.png"\n')
+#    if separate_roof:
+#    out.write('texture "facade_modern1.png"\n')
+    out.write('texture "facade_modern36x36_12.png"\n')
 
-    out.write("loc 0 0 0\n")
+    #out.write("loc 0 0 0\n")
     out.write("numvert %i\n" % (2*nnodes_ground))
     X = np.zeros((nnodes_ground+1,2))
+    lenX = np.zeros((nnodes_ground))
     i = 0
     for r in b.refs:
         X[i,0], X[i,1] = transform.toLocal((r.lat, r.lon))
@@ -77,7 +83,11 @@ def write_building(b):
     crossX = 0.
     for i in range(nnodes_ground):
         crossX += X[i,0]*X[i+1,1] - X[i+1,0]*X[i,1]
-    if crossX < 0: X = X[::-1]
+        lenX[i] = ((X[i+1,0]-X[i,0])**2 + (X[i+1,1]-X[i,1])**2)**0.5
+
+    if crossX < 0:
+        X = X[::-1]
+        lenX = lenX[::-1]
 
     ground_elev = elev(X[0,0], X[0,1])
 
@@ -108,44 +118,90 @@ def write_building(b):
 #        x, y = transform.toLocal((r.lat, r.lon))
 #        out.write("%g %g %g\n" % (y, z, x))
 
-    nsurf = nnodes_ground + 1
+# TODO: facade handling via texture db
+# name.png
+# size_h_meters
+# size_v_layer
+# n_layers
+# size_v_dach
+#
+
+
+    nsurf = nnodes_ground
+    if include_roof: nsurf += 1
+
+    #repeat_vert = int(height/3)
+
+    # building shorter than facade texture
+    # layers > facade_min_layers
+    # layers < facade_max_layers
+    building_height = height
+    texture_height = 12*3.
+#    if building_height < texture_height:
+    if 1:
+        tex_y0 = 1 - building_height / texture_height
+        tex_y1 = 1
+#    else:
+#        tex_y0 = 0
+#        tex_y1 = building_height / texture_height # FIXME
+
     out.write("numsurf %i\n" % nsurf)
     # -- walls
+
     for i in range(nnodes_ground - 1):
+        repeat_hor = lenX[i] / (12.*3.)
+
         out.write("SURF 0x0\n")
         out.write("mat %i\n" % mat)
         out.write("refs %i\n" % 4)
-        out.write("%i %g %g\n" % (i, 0, 0))
-        out.write("%i %g %g\n" % (i + 1, 0, 0))
-        out.write("%i %g %g\n" % (i + 1 + nnodes_ground, 0, 0))
-        out.write("%i %g %g\n" % (i + nnodes_ground, 0, 0))
+        out.write("%i %g %g\n" % (i,                     0,          tex_y0))
+        out.write("%i %g %g\n" % (i + 1,                 repeat_hor, tex_y0))
+        out.write("%i %g %g\n" % (i + 1 + nnodes_ground, repeat_hor, tex_y1))
+        out.write("%i %g %g\n" % (i + nnodes_ground,     0,          tex_y1))
 
     # -- closing wall
+    repeat_hor = lenX[nnodes_ground-1] / (12.*3.)
     out.write("SURF 0x0\n")
     out.write("mat %i\n" % mat)
     out.write("refs %i\n" % 4)
-    out.write("%i %i %i\n" % (nnodes_ground - 1, 0, 0))
-    out.write("%i %i %i\n" % (0, 0, 0))
-    out.write("%i %i %i\n" % (nnodes_ground, 0, 0))
-    out.write("%i %i %i\n" % (2*nnodes_ground-1, 0, 0))
+    out.write("%i %g %g\n" % (nnodes_ground - 1, 0,          tex_y0))
+    out.write("%i %g %g\n" % (0,                 repeat_hor, tex_y0))
+    out.write("%i %g %g\n" % (nnodes_ground,     repeat_hor, tex_y1))
+    out.write("%i %g %g\n" % (2*nnodes_ground-1, 0,          tex_y1))
 
     # -- roof
-    out.write("SURF 0x0\n")
-    out.write("mat %i\n" % mat)
-    out.write("refs %i\n" % nnodes_ground)
-
-    if have_roof_texture:
-        # -- textured roof
-        out.write("%i %g %g\n" % (nnodes_ground,   0, 0))
-        out.write("%i %g %g\n" % (nnodes_ground+1, 1, 0))
-        out.write("%i %g %g\n" % (nnodes_ground+2, 1, 1))
-        out.write("%i %g %g\n" % (nnodes_ground+3, 0, 1))
-    else:
+    if include_roof:
+        out.write("SURF 0x0\n")
+        out.write("mat %i\n" % mat)
+        out.write("refs %i\n" % nnodes_ground)
         for i in range(nnodes_ground):
             out.write("%i %g %g\n" % (i+nnodes_ground, 0, 0))
+        out.write("kids 0\n")
+    else:
+        # -- textured roof, a separate object
+        out.write("kids 0\n")
+        out.write("OBJECT poly\n")
+        nb += 1
+        out.write("name \"b%i\"\n" % nb)
+        out.write('texture "roof.png"\n')
 
-    out.write("kids 0\n")
-    #if nb == 250: break
+        #out.write("loc 0 0 0\n")
+        out.write("numvert %i\n" % (nnodes_ground))
+        for x in X[:-1]:
+            z = ground_elev - 1
+            #out.write("%g %g %g\n" % (y, z, x))
+            out.write("%g %g %g\n" % (x[1], ground_elev + height, x[0]))
+        out.write("numsurf %i\n" % 1)
+        out.write("SURF 0x0\n")
+        out.write("mat %i\n" % mat)
+        out.write("refs %i\n" % nnodes_ground)
+        out.write("%i %g %g\n" % (0, 0, 0))
+        out.write("%i %g %g\n" % (1, 1, 0))
+        out.write("%i %g %g\n" % (2, 1, 1))
+        out.write("%i %g %g\n" % (3, 0, 1))
+
+        out.write("kids 0\n")
+#    if nb == 40: break
 
 
 # simple class that handles the parsed OSM data.
@@ -249,11 +305,12 @@ transform = coordinates.Transformation((lat, lon), hdg = 0)
 #origin = coordinates.Position(transform, [], lat, lon)
 
 if 0:
-    raster(transform, 'elev.in', -5000, -5000, size_x=10000, size_y=10000, step_x=20, step_y=20)
+    raster(transform, 'elev.in', -10000, -10000, size_x=20000, size_y=20000, step_x=20, step_y=20)
     sys.exit(0)
 
 class interpolator(object):
     def __init__(self, filename):
+        # FIXME: use values from header in filename
         elev = np.loadtxt(filename)[:,2:]
         self.x = elev[:,0]
         self.y = elev[:,1]
@@ -262,9 +319,9 @@ class interpolator(object):
         self.max_x = max(self.x)
         self.min_y = min(self.y)
         self.max_y = max(self.y)
-        self.h = self.h.reshape(500,500)
-        self.x = self.x.reshape(500,500)
-        self.y = self.y.reshape(500,500)
+        self.h = self.h.reshape(1000,1000)
+        self.x = self.x.reshape(1000,1000)
+        self.y = self.y.reshape(1000,1000)
         #print self.h[0,0], self.h[0,1], self.h[0,2]
         #self.dx = self.h[0,0] - self.x[0,1]
         self.dx = 20.
@@ -301,12 +358,13 @@ MATERIAL "" rgb 0.7  0.7  0.7  amb 0.2 0.2 0.2  emis 0.5 0.5 0.5  spec 0.5 0.5 0
 MATERIAL "" rgb 0.9  0.9  0.9  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
 MATERIAL "" rgb 0.8  0.8  0.8  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
 MATERIAL "" rgb 0.8  0.7  0.7  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
+OBJECT world
 """)
+out.write("kids %i\n" % total_objects)
 
-if 1:
+if 0:
     map_z0 = -1
-    out.write("""OBJECT world
-    kids 10
+    out.write("""
     OBJECT poly
     name "rect"
     texture "xapi.png"
@@ -336,9 +394,8 @@ print "start parsing"
 #p.parse('dd.osm')
 #p.parse('map-dd-neustadt.osm')
 #p.parse('dd-neustadt.osm')
-#p.parse('altstadt.osm') # 1500
+p.parse(infile) # 1500
 #p.parse('xapi.osm') # fails
-p.parse('xapi-buildings.osm') # huge!
 #p.parse('xapi-small.osm')
 print "done"
 #sys.exit(0)
@@ -377,7 +434,7 @@ print "done"
 #for b in way.building_list:
 #    write_building(b)
 
-out.write("kids 0\n")
+#out.write("kids 0\n")
 out.close()
 #    sys.exit(0)
 #numvert 9
