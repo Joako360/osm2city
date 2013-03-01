@@ -25,6 +25,8 @@ class Clusters(object):
         for i in range(self.nx * self.ny):
             self.list.append([])
 
+        print "cluster: %g %g %i %i" % (self.dx, self.dy, self.nx, self.ny)
+
     def cluster_id(self, x, y):
         """return cluster id for given (x, y)"""
         if x < self.minx: x = self.minx
@@ -39,5 +41,18 @@ class Clusters(object):
     def cluster(self, x, y):
         return self.list[self.cluster_id(self, x, y)]
 
-c = Clusters(0,5,2,  0,7,3)
-print c.cluster_id(-1111.999,3)
+    def append(self, x, y, building):
+        id = self.cluster_id(x, y)
+        print "cluster id", id
+        self.list[id].append(building)
+
+    def stats(self):
+        f = open("cluster_stats.dat", "w")
+        for j in range(self.ny):
+            for i in range(self.nx):
+                id = j * self.nx + i
+                f.write("%i %i %i\n" % (i,j,len(self.list[id])))
+            f.write("\n")
+        f.close()
+#c = Clusters(0,5,2,  0,7,3)
+#print c.cluster_id(-1111.999,3)

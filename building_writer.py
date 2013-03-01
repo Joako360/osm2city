@@ -5,13 +5,64 @@ Created on Thu Feb 28 23:18:08 2013
 @author: tom
 """
 import random
+import numpy as np
+import copy
 #nobjects = 0
 nb = 0
 out = ""
 
-def write_building(b):
+class random_number(object):
+    def __init__(self, randtype, min, max):
+        self.min = min
+        self.max = max
+        if randtype == float:
+            self.callback = random.uniform
+        elif randtype == int:
+            self.callback = random.randint
+        else:
+            raise TypeError("randtype must be 'float' or 'int'")
+    def __call__(self):
+        return self.callback(self.min, self.max)
+
+LOD_lists = []
+LOD_lists.append([])
+LOD_lists.append([])
+LOD_lists.append([])
+random_LOD = random_number(int, 0, 2)
+default_height=12
+random_level_height = random_number(float, 3.1, 3.6)
+random_levels = random_number(int, 2, 5)
+
+def check_height(building_height, t):
+    if t.v_repeat:
+        tex_y1 = 1.
+        tex_y0 = 1 - building_height / t.v_size_meters
+        return True, tex_y0, tex_y1
+    else:
+        # x min_height < height < max_height
+        # x find closest match
+        # - evaluate error
+        # - error acceptable?
+        if building_height >= t.v_splits_meters[0] and building_height <= t.v_size_meters:
+            for i in range(len(t.v_splits_meters)):
+                if t.v_splits_meters[i] >= building_height:
+                    tex_y0 = 1-t.v_splits[i]
+                    print "# height %g storey %i" % (building_height, i)
+                    break
+            tex_y1 = 1.
+            #tex_filename = t.filename + '.png'
+            return True, tex_y0, tex_y1
+        else:
+            return False, 0, 0
+
+
+
+def reset_nb():
+    global nb
+    nb = 0
+
+def write_building(b, out, elev, transform, textures):
     global first
-    if len(b.refs) < 3: return
     mat = random.randint(0,3)
 
     nnodes_ground = len(b.refs)
@@ -24,7 +75,7 @@ def write_building(b):
     nb += 1
     print nb
 
-    global elev
+    #global elev
 #  if building[0] == 332:
 #    if first: first = False
 #    else:     out.write("kids 1\n")
@@ -106,7 +157,7 @@ def write_building(b):
 
     # -- texturing facade
     # - check all walls -- min length?
-    global textures
+    #global textures
     # loop all textures
     # award points for good matches
     # pick best match?

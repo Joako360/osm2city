@@ -12,26 +12,11 @@ import copy
 from imposm.parser import OSMParser
 import coordinates
 import itertools
-
-from building_writer import write_building
-
-class random_number(object):
-    def __init__(self, randtype, min, max):
-        self.min = min
-        self.max = max
-        if randtype == float:
-            self.callback = random.uniform
-        elif randtype == int:
-            self.callback = random.randint
-        else:
-            raise TypeError("randtype must be 'float' or 'int'")
-    def __call__(self):
-        return self.callback(self.min, self.max)
+from cluster import Clusters
+from building_writer import write_building, random_number
 
 
-default_height=12
-random_level_height = random_number(float, 3.1, 3.6)
-random_levels = random_number(int, 2, 5)
+
 ground_height = -20
 nb = 0
 nobjects = 0
@@ -43,11 +28,6 @@ tile_size_y=500
 infile = 'xapi-buildings.osm'; total_objects = 200 # huge!
 #infile = 'map.osm'; total_objects = 216 #
 
-LOD_lists = []
-LOD_lists.append([])
-LOD_lists.append([])
-LOD_lists.append([])
-random_LOD = random_number(int, 0, 2)
 
 
 #center_lon=
@@ -67,28 +47,6 @@ def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=
 def dist(a,b):
     pass
 
-def check_height(building_height, t):
-    if t.v_repeat:
-        tex_y1 = 1.
-        tex_y0 = 1 - building_height / t.v_size_meters
-        return True, tex_y0, tex_y1
-    else:
-        # x min_height < height < max_height
-        # x find closest match
-        # - evaluate error
-        # - error acceptable?
-        if building_height >= t.v_splits_meters[0] and building_height <= t.v_size_meters:
-            for i in range(len(t.v_splits_meters)):
-                if t.v_splits_meters[i] >= building_height:
-                    tex_y0 = 1-t.v_splits[i]
-                    print "# height %g storey %i" % (building_height, i)
-                    break
-            tex_y1 = 1.
-            #tex_filename = t.filename + '.png'
-            return True, tex_y0, tex_y1
-        else:
-            return False, 0, 0
-
 
 
 
@@ -105,6 +63,10 @@ class Building(object):
         self.name = name
         self.height = height
         self.levels = levels
+        global transform
+        r = self.refs[0]
+        self.x, self.y = transform.toLocal((r.lat, r.lon))
+
 
 class Coords(object):
     def __init__(self, osm_id, lon, lat):
@@ -153,11 +115,16 @@ class wayExtract(object):
                             _refs.append(coord)
                             break
                 building = Building(osm_id, tags, _refs, _name, _height, _levels)
+                if len(building.refs) < 3: return
+
                 self.building_list.append(building)
                 global nobjects
                 if nobjects == total_objects: raise ValueError
                 nobjects += 1
                 print nobjects
+                global clusters
+
+                clusters.append(building.x, building.y, building)
                 #write_building(building)
 
     def coords(self, coords):
@@ -333,8 +300,6 @@ elev.shift(-elev(0,0)) # -- shift to zero height at origin
 minx, miny = transform.toLocal((minlat, minlon))
 maxx, maxy = transform.toLocal((maxlat, maxlon))
 
-out = open("city.ac", "w")
-
 # RGB mat for LOD testing
 #MATERIAL "" rgb 1.0  0.0  0.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
 #MATERIAL "" rgb 0.0  1.0  0.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
@@ -345,41 +310,44 @@ out = open("city.ac", "w")
 #MATERIAL "" rgb 0.8  0.8  0.8  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
 #MATERIAL "" rgb 0.75 0.75 0.75 amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
 
+def write_ac_header(out, nb):
 
-out.write("""AC3Db
-MATERIAL "" rgb 1.0  1.0  1.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-MATERIAL "" rgb 1.0  1.0  1.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-MATERIAL "" rgb 1.0  1.0  1.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-MATERIAL "" rgb 1.0  1.0  1.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-OBJECT world
-""")
-out.write("kids %i\n" % total_objects)
+    out.write("""AC3Db
+    MATERIAL "" rgb 1.0  1.0  1.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
+    MATERIAL "" rgb 1.0  1.0  1.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
+    MATERIAL "" rgb 1.0  1.0  1.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
+    MATERIAL "" rgb 1.0  1.0  1.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
+    OBJECT world
+    """)
+    out.write("kids %i\n" % nb)
 
-if 0:
-    map_z0 = -1
-    out.write("""
-    OBJECT poly
-    name "rect"
-    texture "xapi.png"
-    numvert 4
-    """)
-    out.write("%g %g %g\n" % (miny, map_z0, minx))
-    out.write("%g %g %g\n" % (miny, map_z0, maxx))
-    out.write("%g %g %g\n" % (maxy, map_z0, maxx))
-    out.write("%g %g %g\n" % (maxy, map_z0, minx))
-    out.write("""numsurf 1
-    SURF 0x0
-    mat 0
-    refs 4
-    0 0 0
-    1 1 0
-    2 1 1
-    3 0 1
-    kids 0
-    """)
+    if 0:
+        map_z0 = -1
+        out.write("""
+        OBJECT poly
+        name "rect"
+        texture "xapi.png"
+        numvert 4
+        """)
+        out.write("%g %g %g\n" % (miny, map_z0, minx))
+        out.write("%g %g %g\n" % (miny, map_z0, maxx))
+        out.write("%g %g %g\n" % (maxy, map_z0, maxx))
+        out.write("%g %g %g\n" % (maxy, map_z0, minx))
+        out.write("""numsurf 1
+        SURF 0x0
+        mat 0
+        refs 4
+        0 0 0
+        1 1 0
+        2 1 1
+        3 0 1
+        kids 0
+        """)
 
 # -----------------------------------------------------------------------------
 
+clusters = Clusters(minx, maxx, 400., miny, maxy, 400.)
+#print clusters.list
 # instantiate counter and parser and start parsing
 way = wayExtract()
 
@@ -402,7 +370,22 @@ except ValueError:
 
 print "nbuildings", len(way.building_list)
 print "done parsing"
-#sys.exit(0)
+clusters.stats()
+
+for i in range(len(clusters.list)):
+    nb = len(clusters.list[i])
+    if not nb: continue
+    # -- open ac and write header
+    out = open("city-%04i.ac" % i, "w")
+    write_ac_header(out, nb)
+    for building in clusters.list[i]:
+        write_building(building, out, elev, transform, textures)
+    out.close()
+
+print "done writing ac's"
+
+
+sys.exit(0)
 #p.parse('map.osm')
 # done
 #print way.buildings
