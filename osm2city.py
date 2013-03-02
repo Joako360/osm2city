@@ -14,7 +14,7 @@ import coordinates
 import itertools
 from cluster import Clusters
 from building_writer import write_building, random_number
-
+from vec2d import vec2d
 
 
 ground_height = -20
@@ -25,7 +25,7 @@ tile_size_x=500 # -- our tile size in meters
 tile_size_y=500
 #infile = 'dd-altstadt.osm'; total_objects = 158
 #infile = 'altstadt.osm'; total_objects = 2172
-infile = 'xapi-buildings.osm'; total_objects = 200 # huge!
+infile = 'xapi-buildings.osm'; total_objects = 1000 # huge!
 #infile = 'map.osm'; total_objects = 216 #
 
 
@@ -65,7 +65,8 @@ class Building(object):
         self.levels = levels
         global transform
         r = self.refs[0]
-        self.x, self.y = transform.toLocal((r.lat, r.lon))
+        self.X = vec2d(transform.toLocal((r.lat, r.lon)))
+        #print "tr X", self.X
 
 
 class Coords(object):
@@ -123,9 +124,7 @@ class wayExtract(object):
                 nobjects += 1
                 print nobjects
                 global clusters
-
-                clusters.append(building.x, building.y, building)
-                #write_building(building)
+                clusters.append(building.X, building)
 
     def coords(self, coords):
         for osm_id, lon, lat in coords:
@@ -297,8 +296,8 @@ elev.shift(-elev(0,0)) # -- shift to zero height at origin
 
 
 
-minx, miny = transform.toLocal((minlat, minlon))
-maxx, maxy = transform.toLocal((maxlat, maxlon))
+min_ = vec2d(transform.toLocal((minlat, minlon)))
+max_ = vec2d(transform.toLocal((maxlat, maxlon)))
 
 # RGB mat for LOD testing
 #MATERIAL "" rgb 1.0  0.0  0.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
@@ -310,15 +309,19 @@ maxx, maxy = transform.toLocal((maxlat, maxlon))
 #MATERIAL "" rgb 0.8  0.8  0.8  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
 #MATERIAL "" rgb 0.75 0.75 0.75 amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
 
+mats = ['MATERIAL "" rgb 1.0  0.0  0.0  amb 0.2 0.2 0.2  emis 1 0 0  spec 0.5 0.5 0.5  shi 10  trans 0',
+        'MATERIAL "" rgb 0.0  1.0  0.0  amb 0.2 0.2 0.2  emis 0 1 0  spec 0.5 0.5 0.5  shi 10  trans 0',
+        'MATERIAL "" rgb 0.0  0.0  1.0  amb 0.2 0.2 0.2  emis 0 0 1  spec 0.5 0.5 0.5  shi 10  trans 0']
+
 def write_ac_header(out, nb):
 
-    out.write("""AC3Db
-    MATERIAL "" rgb 1.0  1.0  1.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-    MATERIAL "" rgb 1.0  1.0  1.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-    MATERIAL "" rgb 1.0  1.0  1.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-    MATERIAL "" rgb 1.0  1.0  1.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-    OBJECT world
-    """)
+#    out.write("""AC3Db
+#    MATERIAL "" rgb 1.0  1.0  1.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
+#    MATERIAL "" rgb 1.0  1.0  1.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
+#    MATERIAL "" rgb 1.0  1.0  1.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
+#    OBJECT world
+#    """)
+    out.write("AC3Db\n%s\nOBJECT world\n" % mats[random.randint(0,2)])
     out.write("kids %i\n" % nb)
 
     if 0:
@@ -346,7 +349,7 @@ def write_ac_header(out, nb):
 
 # -----------------------------------------------------------------------------
 
-clusters = Clusters(minx, maxx, 400., miny, maxy, 400.)
+clusters = Clusters(min_, max_, vec2d(2000.,2000.))
 #print clusters.list
 # instantiate counter and parser and start parsing
 way = wayExtract()
@@ -372,15 +375,30 @@ print "nbuildings", len(way.building_list)
 print "done parsing"
 clusters.stats()
 
-for i in range(len(clusters.list)):
-    nb = len(clusters.list[i])
-    if not nb: continue
-    # -- open ac and write header
-    out = open("city-%04i.ac" % i, "w")
-    write_ac_header(out, nb)
-    for building in clusters.list[i]:
-        write_building(building, out, elev, transform, textures)
-    out.close()
+stg = open("city.stg", "w")
+for l in clusters._clusters:
+    for cl in l:
+        nb = len(cl.objects)
+        if not nb: continue
+
+        # -- get cluster center
+        offset = cl.center
+
+        transform.setOffset((-offset).list())
+        center_lat, center_lon = transform.toGlobal((0,0))
+
+        # -- open ac and write header
+        fname_ac = "city-%04i%04i.ac" % (cl.I.x, cl.I.y)
+        out = open(fname_ac, "w")
+        write_ac_header(out, nb)
+        for building in cl.objects:
+            write_building(building, out, elev, transform, textures)
+        out.close()
+        transform.setOffset((0,0))
+
+        # -- write stg
+        stg.write("OBJECT_STATIC %s %g %g %g %g\n" % (fname_ac, center_lon, center_lat, 114.687, 180))
+stg.close()
 
 print "done writing ac's"
 

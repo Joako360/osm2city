@@ -64,6 +64,7 @@ def reset_nb():
 def write_building(b, out, elev, transform, textures):
     global first
     mat = random.randint(0,3)
+    mat = 0
 
     nnodes_ground = len(b.refs)
 #    print nnodes_ground #, b.refs[0].lat, b.refs[0].lon
