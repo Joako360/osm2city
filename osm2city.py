@@ -212,9 +212,9 @@ class Interpolator(object):
 
     def __call__(self, x, y):
         """compute elevation at (x,y) by linear interpolation"""
-        if self.fake: return 0.
+        #if self.fake: return 0.
         if x <= self.min_x or x >= self.max_x or \
-           y <= self.min_y or y >= self.max_y: return -9999
+           y <= self.min_y or y >= self.max_y: return 1999
         i = int((x - self.min_x)/self.dx)
         j = int((y - self.min_y)/self.dy)
         fx = (x - self.x[j,i])/self.dx
@@ -315,14 +315,15 @@ mats = ['MATERIAL "" rgb 1.0  0.0  0.0  amb 0.2 0.2 0.2  emis 1 0 0  spec 0.5 0.
 
 def write_ac_header(out, nb):
 
-#    out.write("""AC3Db
-#    MATERIAL "" rgb 1.0  1.0  1.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-#    MATERIAL "" rgb 1.0  1.0  1.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-#    MATERIAL "" rgb 1.0  1.0  1.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-#    OBJECT world
-#    """)
-    out.write("AC3Db\n%s\nOBJECT world\n" % mats[random.randint(0,2)])
-    out.write("kids %i\n" % nb)
+    out.write("AC3Db\n")
+#    out.write("%s\n" % mats[random.randint(0,2)])
+    out.write("""
+    MATERIAL "" rgb 1.0  0.0  0.0  amb 0.2 0.2 0.2  emis 1 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
+    MATERIAL "" rgb 0.0  1.0  0.0  amb 0.2 0.2 0.2  emis 0 1 0  spec 0.5 0.5 0.5  shi 10  trans 0
+    MATERIAL "" rgb 0.0  0.0  1.0  amb 0.2 0.2 0.2  emis 0 0 1  spec 0.5 0.5 0.5  shi 10  trans 0
+    """)
+
+    out.write("OBJECT world\nkids %i\n" % nb)
 
     if 0:
         map_z0 = -1
@@ -348,8 +349,54 @@ def write_ac_header(out, nb):
         """)
 
 # -----------------------------------------------------------------------------
+# -- write xml
+def write_xml(fname, LOD_lists):
+    #    - LOD animation
+    xml = open(fname + ".xml", "w")
+    xml.write("""<?xml version="1.0"?>
 
-clusters = Clusters(min_, max_, vec2d(2000.,2000.))
+    <PropertyList>
+    """)
+
+    xml.write("<path>%s.ac</path>" % fname)
+    xml.write("""
+    <animation>
+    <type>range</type>
+    """)
+    for name in LOD_lists[0]:
+        xml.write("<object-name>%s</object-name>\n" % name)
+    xml.write("""
+      <min-m>0</min-m>
+      <max-property>/sim/rendering/static-lod/detailed</max-property>
+     </animation>
+
+     <animation>
+      <type>range</type>
+    """)
+    for name in LOD_lists[1]:
+        xml.write("<object-name>%s</object-name>\n" % name)
+    xml.write("""
+      <min-m>0</min-m>
+      <max-property>/sim/rendering/static-lod/rough</max-property>
+     </animation>
+
+      <animation>
+      <type>range</type>
+    """)
+    for name in LOD_lists[2]:
+        xml.write("<object-name>%s</object-name>\n" % name)
+    xml.write("""
+      <min-m>0</min-m>
+      <max-property>/sim/rendering/static-lod/bare</max-property>
+     </animation>
+
+    </PropertyList>
+    """)
+    xml.close()
+
+# -----------------------------------------------------------------------------
+
+clusters = Clusters(min_, max_, vec2d(1000.,1000.))
 #print clusters.list
 # instantiate counter and parser and start parsing
 way = wayExtract()
@@ -387,17 +434,26 @@ for l in clusters._clusters:
         transform.setOffset((-offset).list())
         center_lat, center_lon = transform.toGlobal((0,0))
 
+        LOD_lists = []
+        LOD_lists.append([])
+        LOD_lists.append([])
+        LOD_lists.append([])
+
+
         # -- open ac and write header
-        fname_ac = "city-%04i%04i.ac" % (cl.I.x, cl.I.y)
-        out = open(fname_ac, "w")
+        fname = "city-%04i%04i" % (cl.I.x, cl.I.y)
+        out = open(fname+".ac", "w")
         write_ac_header(out, nb)
         for building in cl.objects:
-            write_building(building, out, elev, transform, textures)
+            write_building(building, out, elev, transform, textures, LOD_lists)
         out.close()
         transform.setOffset((0,0))
 
+        # -- write xml
+        write_xml(fname, LOD_lists)
+
         # -- write stg
-        stg.write("OBJECT_STATIC %s %g %g %g %g\n" % (fname_ac, center_lon, center_lat, 114.687, 180))
+        stg.write("OBJECT_STATIC %s %g %g %g %g\n" % (fname+".xml", center_lon, center_lat, 114.687, 180))
 stg.close()
 
 print "done writing ac's"
@@ -446,47 +502,3 @@ out.close()
 sys.stderr.write("# origin %15g %15g\n" % (lat, lon))
 sys.stderr.write("# nbuildings %i\n" % nb)
 
-# -- write xml
-#    - LOD animation
-xml = open("city.xml", "w")
-xml.write("""<?xml version="1.0"?>
-
-<PropertyList>
-
- <path>city.ac</path>
-
- <animation>
-  <type>range</type>
-""")
-for name in LOD_lists[0]:
-    xml.write("<object-name>%s</object-name>\n" % name)
-xml.write("""
-  <min-m>0</min-m>
-  <max-property>/sim/rendering/static-lod/detailed</max-property>
- </animation>
-
- <animation>
-  <type>range</type>
-""")
-for name in LOD_lists[1]:
-    xml.write("<object-name>%s</object-name>\n" % name)
-xml.write("""
-  <min-m>0</min-m>
-  <max-property>/sim/rendering/static-lod/rough</max-property>
- </animation>
-
-  <animation>
-  <type>range</type>
-""")
-for name in LOD_lists[2]:
-    xml.write("<object-name>%s</object-name>\n" % name)
-xml.write("""
-  <min-m>0</min-m>
-  <max-property>/sim/rendering/static-lod/bare</max-property>
- </animation>
-
-</PropertyList>
-""")
-
-xml.close()
-print "done writing xml"

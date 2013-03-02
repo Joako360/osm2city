@@ -24,10 +24,6 @@ class random_number(object):
     def __call__(self):
         return self.callback(self.min, self.max)
 
-LOD_lists = []
-LOD_lists.append([])
-LOD_lists.append([])
-LOD_lists.append([])
 random_LOD = random_number(int, 0, 2)
 default_height=12
 random_level_height = random_number(float, 3.1, 3.6)
@@ -61,7 +57,7 @@ def reset_nb():
     global nb
     nb = 0
 
-def write_building(b, out, elev, transform, textures):
+def write_building(b, out, elev, transform, textures, LOD_lists):
     global first
     mat = random.randint(0,3)
     mat = 0
@@ -86,9 +82,8 @@ def write_building(b, out, elev, transform, textures):
     name = "b%i" % nb
     out.write("name \"%s\"\n" % name)
 
-    global LOD_lists
     lod = random_LOD()
-#    mat = lod
+    mat = lod
     LOD_lists[lod].append(name)
 
     if nnodes_ground == 4:
@@ -130,8 +125,8 @@ def write_building(b, out, elev, transform, textures):
             #print X
             #sys.exit(0)
 
-    ground_elev = elev(X[0,0], X[0,1]) # -- interpolate ground elevation at building location
-
+    ground_elev = 3.*elev(X[0,0], X[0,1]) # -- interpolate ground elevation at building location
+    print "ground_elev", ground_elev
 
     try:
         height = float(b.height)
