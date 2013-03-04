@@ -7,9 +7,12 @@ Created on Thu Feb 28 23:18:08 2013
 import random
 import numpy as np
 import copy
+
+from vec2d import vec2d
 #nobjects = 0
 nb = 0
 out = ""
+
 
 class random_number(object):
     def __init__(self, randtype, min, max):
@@ -25,7 +28,7 @@ class random_number(object):
         return self.callback(self.min, self.max)
 
 random_LOD = random_number(int, 0, 2)
-default_height=12
+default_height=12.
 random_level_height = random_number(float, 3.1, 3.6)
 random_levels = random_number(int, 2, 5)
 
@@ -57,10 +60,10 @@ def reset_nb():
     global nb
     nb = 0
 
-def write_building(b, out, elev, transform, textures, LOD_lists):
+def write_building(b, out, elev, transform, offset, textures, LOD_lists):
+    """offset accounts for cluster center"""
     global first
     mat = random.randint(0,3)
-    mat = 0
 
     nnodes_ground = len(b.refs)
 #    print nnodes_ground #, b.refs[0].lat, b.refs[0].lon
@@ -83,9 +86,10 @@ def write_building(b, out, elev, transform, textures, LOD_lists):
     out.write("name \"%s\"\n" % name)
 
     lod = random_LOD()
-    mat = lod
+    # mat = lod
     LOD_lists[lod].append(name)
 
+    # model roof if we have 4 ground nodes
     if nnodes_ground == 4:
         include_roof = False
     else: include_roof = True
@@ -99,6 +103,9 @@ def write_building(b, out, elev, transform, textures, LOD_lists):
     i = 0
     for r in b.refs:
         X[i,0], X[i,1] = transform.toLocal((r.lat, r.lon))
+        X[i,0] -= offset.x # cluster coordinates
+        X[i,1] -= offset.y
+
         i += 1
     X[-1] = X[0] # -- we duplicate last node!
 
@@ -114,7 +121,6 @@ def write_building(b, out, elev, transform, textures, LOD_lists):
 
     # -- renumber nodes such that longest edge is first edge
     if nnodes_ground == 4:
-
         if lenX[0] < lenX[1]:
             #print lenX
             #print X
@@ -125,18 +131,35 @@ def write_building(b, out, elev, transform, textures, LOD_lists):
             #print X
             #sys.exit(0)
 
-    ground_elev = 3.*elev(X[0,0], X[0,1]) # -- interpolate ground elevation at building location
-    print "ground_elev", ground_elev
+    ground_elev = elev(vec2d(X[0]) + offset) # -- interpolate ground elevation at building location
+    #print b.refs[0].lon
+    #ground_elev = 200. + (b.refs[0].lon-13.6483695)*5000.
+    #print "ground_elev", ground_elev
 
+
+    level_height = random_level_height()
+
+    # try height first
+    # catch exceptions, since height might be "5 m" instead of "5"
     try:
         height = float(b.height)
+        b.levels = (height*1.)/level_height
     except:
         height = 0.
-    if height < 1. and float(b.levels) > 0:
-        height = float(b.levels) * random_level_height()
-    if height < 1.:
-        height = random_levels() * random_level_height()
-    # -- try height or levels
+        pass
+
+    if height < 1:
+        # failing that, try levels
+        if float(b.levels) > 0:
+            pass
+            print "have levels", b.levels
+        else:
+            # failing that, use random levels
+            b.levels = random_levels()
+
+    height = float(b.levels) * level_height
+    print "hei", height, b.levels
+
 #    if height > 1.: z = height
 #    elif float(b.levels) > 0:
 #        z = float(b.levels) * level_height
@@ -226,6 +249,8 @@ def write_building(b, out, elev, transform, textures, LOD_lists):
     out.write("%i %g %g\n" % (2*nnodes_ground-1, 0,          tex_y1))
 
     roof_flat = False
+    # -- no gable roof on tall buildings
+    if b.levels > 5: roof_flat = True
 
     # -- roof
     if include_roof:

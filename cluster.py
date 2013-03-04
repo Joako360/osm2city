@@ -38,7 +38,7 @@ class Clusters(object):
         #print self._clusters
 
     def init_cluster(self, I):
-        center = self.min + (I + 0.5) * self.step
+        center = self.min + (I + 0.5) * self.step # in meters
         new_cluster = Cluster(I, center)
         return new_cluster
 

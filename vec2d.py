@@ -6,6 +6,7 @@ Created on Sat Mar  2 12:04:17 2013
 """
 
 class vec2d(object):
+    """A simple 2d vector class. Supports basic arithmetics."""
     def __init__(self, x, y = None):
         #print "got x", x
         #print "got y", y
@@ -15,24 +16,24 @@ class vec2d(object):
         self.x = x
         self.y = y
 
-    def fixtype(self, other):
+    def __fixtype(self, other):
         if type(other) == type(self): return other
         return vec2d(other, other)
 
     def __add__(self, other):
-        other = self.fixtype(other)
+        other = self.__fixtype(other)
         return vec2d(self.x + other.x, self.y + other.y)
 
     def __sub__(self, other):
-        other = self.fixtype(other)
+        other = self.__fixtype(other)
         return vec2d(self.x - other.x, self.y - other.y)
 
     def __mul__(self, other):
-        other = self.fixtype(other)
+        other = self.__fixtype(other)
         return vec2d(self.x * other.x, self.y * other.y)
 
     def __div__(self, other):
-        other = self.fixtype(other)
+        other = self.__fixtype(other)
         return vec2d(self.x / other.x, self.y / other.y)
 
     def __str__(self):
@@ -48,14 +49,15 @@ class vec2d(object):
     def int(self):
         return vec2d(int(self.x), int(self.y))
 
-a = vec2d(1,2)
-b = vec2d(10,10)
-print "a   ", a
-print "b   ", b
-print "a+b ", a+b
-print "a-b ", a-b
-print "a+2 ", a+2
-print "a*b ", a * b
-print "a*2 ", a*2
-print "a/2 ", a/2
-print "a/2.", a/2.
+if __name__ == "__main__":
+    a = vec2d(1,2)
+    b = vec2d(10,10)
+    print "a   ", a
+    print "b   ", b
+    print "a+b ", a+b
+    print "a-b ", a-b
+    print "a+2 ", a+2
+    print "a*b ", a * b
+    print "a*2 ", a*2
+    print "a/2 ", a/2
+    print "a/2.", a/2.

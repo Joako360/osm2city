@@ -25,7 +25,7 @@ tile_size_x=500 # -- our tile size in meters
 tile_size_y=500
 #infile = 'dd-altstadt.osm'; total_objects = 158
 #infile = 'altstadt.osm'; total_objects = 2172
-infile = 'xapi-buildings.osm'; total_objects = 1000 # huge!
+infile = 'xapi-buildings.osm'; total_objects = 30000 # huge!
 #infile = 'map.osm'; total_objects = 216 #
 
 
@@ -181,7 +181,11 @@ transform = coordinates.Transformation((lat, lon), hdg = 0)
 #origin = coordinates.Position(transform, [], lat, lon)
 
 if 0:
-    raster(transform, 'elev.in', -10000, -10000, size_x=20000, size_y=20000, step_x=20, step_y=20)
+    # --- need $FGDATA/Nasal/elev.nas and elev.in
+    #     hide scenery/Objects/e.... folder
+    #     in Nasal console: elev.get()
+    #     data gets written to /tmp/elev.xml
+    raster(transform, 'elev.in', -20000, -20000, size_x=40000, size_y=40000, step_x=20, step_y=20)
     sys.exit(0)
 
 class Interpolator(object):
@@ -202,23 +206,23 @@ class Interpolator(object):
         self.max_x = max(self.x)
         self.min_y = min(self.y)
         self.max_y = max(self.y)
-        self.h = self.h.reshape(1000,1000)
-        self.x = self.x.reshape(1000,1000)
-        self.y = self.y.reshape(1000,1000)
+        self.h = self.h.reshape(2000,2000)
+        self.x = self.x.reshape(2000,2000)
+        self.y = self.y.reshape(2000,2000)
         #print self.h[0,0], self.h[0,1], self.h[0,2]
         #self.dx = self.h[0,0] - self.x[0,1]
         self.dx = 20.
         self.dy = 20.
 
-    def __call__(self, x, y):
+    def __call__(self, p):
         """compute elevation at (x,y) by linear interpolation"""
         #if self.fake: return 0.
-        if x <= self.min_x or x >= self.max_x or \
-           y <= self.min_y or y >= self.max_y: return 1999
-        i = int((x - self.min_x)/self.dx)
-        j = int((y - self.min_y)/self.dy)
-        fx = (x - self.x[j,i])/self.dx
-        fy = (y - self.y[j,i])/self.dy
+        if p.x <= self.min_x or p.x >= self.max_x or \
+           p.y <= self.min_y or p.y >= self.max_y: return 1999
+        i = int((p.x - self.min_x)/self.dx)
+        j = int((p.y - self.min_y)/self.dy)
+        fx = (p.x - self.x[j,i])/self.dx
+        fy = (p.y - self.y[j,i])/self.dy
         #print fx, fy, i, j
         h =  (1-fx) * (1-fy) * self.h[j,i] \
            +    fx  * (1-fy) * self.h[j,i+1] \
@@ -290,9 +294,9 @@ print textures[0].v_splits_meters
 
 #sys.exit(0)
 elev = Interpolator("elev.xml", fake=False)
-print "height at origin", elev(0,0)
+print "height at origin", elev(vec2d(0,0))
 #sys.exit()
-elev.shift(-elev(0,0)) # -- shift to zero height at origin
+elev.shift(-elev(vec2d(0,0))) # -- shift to zero height at origin
 
 
 
@@ -318,9 +322,10 @@ def write_ac_header(out, nb):
     out.write("AC3Db\n")
 #    out.write("%s\n" % mats[random.randint(0,2)])
     out.write("""
-    MATERIAL "" rgb 1.0  0.0  0.0  amb 0.2 0.2 0.2  emis 1 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-    MATERIAL "" rgb 0.0  1.0  0.0  amb 0.2 0.2 0.2  emis 0 1 0  spec 0.5 0.5 0.5  shi 10  trans 0
-    MATERIAL "" rgb 0.0  0.0  1.0  amb 0.2 0.2 0.2  emis 0 0 1  spec 0.5 0.5 0.5  shi 10  trans 0
+    MATERIAL "" rgb 1   1    1 amb 1 1 1  emis 0.1 0.1 0.1  spec 0.5 0.5 0.5  shi 64  trans 0
+    MATERIAL "" rgb .95 1    1 amb 1 1 1  emis 0.1 0.1 0.1  spec 0.5 0.5 0.5  shi 64  trans 0
+    MATERIAL "" rgb 1   0.95 1 amb 1 1 1  emis 0.1 0.1 0.1  spec 0.5 0.5 0.5  shi 64  trans 0
+    MATERIAL "" rgb 1   1    0.95 amb 1 1 1 emis 0.1 0.1 0.1  spec 0.5 0.5 0.5  shi 64  trans 0
     """)
 
     out.write("OBJECT world\nkids %i\n" % nb)
@@ -396,7 +401,7 @@ def write_xml(fname, LOD_lists):
 
 # -----------------------------------------------------------------------------
 
-clusters = Clusters(min_, max_, vec2d(1000.,1000.))
+clusters = Clusters(min_, max_, vec2d(2000.,2000.))
 #print clusters.list
 # instantiate counter and parser and start parsing
 way = wayExtract()
@@ -422,6 +427,7 @@ print "nbuildings", len(way.building_list)
 print "done parsing"
 clusters.stats()
 
+# -- write cluster
 stg = open("city.stg", "w")
 for l in clusters._clusters:
     for cl in l:
@@ -431,8 +437,8 @@ for l in clusters._clusters:
         # -- get cluster center
         offset = cl.center
 
-        transform.setOffset((-offset).list())
-        center_lat, center_lon = transform.toGlobal((0,0))
+        #transform.setOffset((-offset).list())
+        center_lat, center_lon = transform.toGlobal((cl.center.x, cl.center.y))
 
         LOD_lists = []
         LOD_lists.append([])
@@ -445,9 +451,9 @@ for l in clusters._clusters:
         out = open(fname+".ac", "w")
         write_ac_header(out, nb)
         for building in cl.objects:
-            write_building(building, out, elev, transform, textures, LOD_lists)
+            write_building(building, out, elev, transform, offset, textures, LOD_lists)
         out.close()
-        transform.setOffset((0,0))
+        #transform.setOffset((0,0))
 
         # -- write xml
         write_xml(fname, LOD_lists)
