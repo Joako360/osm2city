@@ -60,7 +60,7 @@ def reset_nb():
     global nb
     nb = 0
 
-def write_building(b, out, elev, transform, offset, textures, LOD_lists):
+def write_building(b, out, elev, tile_elev, transform, offset, textures, LOD_lists):
     """offset accounts for cluster center"""
     global first
     mat = random.randint(0,3)
@@ -84,10 +84,6 @@ def write_building(b, out, elev, transform, offset, textures, LOD_lists):
     out.write("OBJECT poly\n")
     name = "b%i" % nb
     out.write("name \"%s\"\n" % name)
-
-    lod = random_LOD()
-    # mat = lod
-    LOD_lists[lod].append(name)
 
     # model roof if we have 4 ground nodes
     if nnodes_ground == 4:
@@ -131,7 +127,7 @@ def write_building(b, out, elev, transform, offset, textures, LOD_lists):
             #print X
             #sys.exit(0)
 
-    ground_elev = elev(vec2d(X[0]) + offset) # -- interpolate ground elevation at building location
+    ground_elev = elev(vec2d(X[0]) + offset) - tile_elev # -- interpolate ground elevation at building location
     #print b.refs[0].lon
     #ground_elev = 200. + (b.refs[0].lon-13.6483695)*5000.
     #print "ground_elev", ground_elev
@@ -143,7 +139,7 @@ def write_building(b, out, elev, transform, offset, textures, LOD_lists):
     # catch exceptions, since height might be "5 m" instead of "5"
     try:
         height = float(b.height)
-        b.levels = (height*1.)/level_height
+        if height > 1.: b.levels = (height*1.)/level_height
     except:
         height = 0.
         pass
@@ -159,6 +155,12 @@ def write_building(b, out, elev, transform, offset, textures, LOD_lists):
 
     height = float(b.levels) * level_height
     print "hei", height, b.levels
+
+    lod = random_LOD()
+    if b.levels > 5: lod = 2 # tall buildings always LOD bare
+    if b.levels < 3: lod = 0 # small buildings always LOD detail
+    # mat = lod
+    LOD_lists[lod].append(name)
 
 #    if height > 1.: z = height
 #    elif float(b.levels) > 0:

@@ -45,6 +45,8 @@ class vec2d(object):
     def list(self):
         return self.x, self.y
 
+    def swap(self):
+        return vec2d(self.y, self.x)
 
     def int(self):
         return vec2d(int(self.x), int(self.y))

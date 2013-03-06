@@ -15,7 +15,7 @@ import itertools
 from cluster import Clusters
 from building_writer import write_building, random_number
 from vec2d import vec2d
-
+import textwrap
 
 ground_height = -20
 nb = 0
@@ -25,7 +25,7 @@ tile_size_x=500 # -- our tile size in meters
 tile_size_y=500
 #infile = 'dd-altstadt.osm'; total_objects = 158
 #infile = 'altstadt.osm'; total_objects = 2172
-infile = 'xapi-buildings.osm'; total_objects = 30000 # huge!
+infile = 'xapi-buildings.osm'; total_objects = 40000 # huge!
 #infile = 'map.osm'; total_objects = 216 #
 
 
@@ -48,10 +48,7 @@ def dist(a,b):
     pass
 
 
-
-
 #    if nb == 40: break
-
 
 # simple class that handles the parsed OSM data.
 
@@ -67,7 +64,6 @@ class Building(object):
         r = self.refs[0]
         self.X = vec2d(transform.toLocal((r.lat, r.lon)))
         #print "tr X", self.X
-
 
 class Coords(object):
     def __init__(self, osm_id, lon, lat):
@@ -102,7 +98,9 @@ class wayExtract(object):
                 if 'name' in tags:
 				_name = tags['name']
                 if 'height' in tags:
-                    _height = tags['height']
+                    _height = tags['height'].replace('m','')
+                elif 'building:height' in tags:
+                    _height = tags['building:height'].replace('m','')
                 if 'building:levels' in tags:
                     _levels = tags['building:levels']
 
@@ -216,7 +214,7 @@ class Interpolator(object):
 
     def __call__(self, p):
         """compute elevation at (x,y) by linear interpolation"""
-        #if self.fake: return 0.
+        if self.fake: return 0.
         if p.x <= self.min_x or p.x >= self.max_x or \
            p.y <= self.min_y or p.y >= self.max_y: return 1999
         i = int((p.x - self.min_x)/self.dx)
@@ -293,11 +291,72 @@ textures.append(Texture('wohnheime_petersburger_pow2', 15.6, (215, 414, 614, 814
 print textures[0].v_splits_meters
 
 #sys.exit(0)
-elev = Interpolator("elev.xml", fake=False)
+elev = Interpolator("elev.xml", fake=False) # -- fake skips actually reading the file, speeding up things
 print "height at origin", elev(vec2d(0,0))
-#sys.exit()
-elev.shift(-elev(vec2d(0,0))) # -- shift to zero height at origin
+print "origin at ", transform.toGlobal((0,0))
 
+
+def write_map(filename, transform, elev, gmin, gmax):
+    lmin = vec2d(transform.toLocal((gmin.x, gmin.y)))
+    lmax = vec2d(transform.toLocal((gmax.x, gmax.y)))
+    map_z0 = 0.
+    elev_offset = elev(vec2d(0,0))
+
+    nx, ny = ((lmax - lmin)/25.).int().list() # 100m raster
+
+    x = np.linspace(lmin.x, lmax.x, nx)
+    y = np.linspace(lmin.y, lmax.y, ny)
+
+    u = np.linspace(0., 1., nx)
+    v = np.linspace(0., 1., ny)
+
+
+    out = open("surface.ac", "w")
+    out.write(textwrap.dedent("""\
+    AC3Db
+    MATERIAL "" rgb 1   1    1 amb 1 1 1  emis 0 0 0  spec 0.5 0.5 0.5  shi 64  trans 0
+    OBJECT world
+    kids 1
+    OBJECT poly
+    name "surface"
+    texture "%s"
+    numvert %i
+    """ % (filename, nx*ny)))
+
+    for j in range(ny):
+        for i in range(nx):
+            out.write("%g %g %g\n" % (y[j], (elev(vec2d(x[i],y[j])) - elev_offset), x[i]))
+
+#    out.write("%g %g %g\n" % (lmin.y, map_z0, lmin.x))
+#    out.write("%g %g %g\n" % (lmin.y, map_z0, lmax.x))
+#    out.write("%g %g %g\n" % (lmax.y, map_z0, lmax.x))
+#    out.write("%g %g %g\n" % (lmax.y, map_z0, lmin.x))
+    out.write("numsurf %i\n" % ((nx-1)*(ny-1)))
+    for j in range(ny-1):
+        for i in range(nx-1):
+            out.write(textwrap.dedent("""\
+            SURF 0x0
+            mat 0
+            refs 4
+            """))
+            out.write("%i %g %g\n" % (i  +j*(nx),     u[i],   v[j]))
+            out.write("%i %g %g\n" % (i+1+j*(nx),     u[i+1], v[j]))
+            out.write("%i %g %g\n" % (i+1+(j+1)*(nx), u[i+1], v[j+1]))
+            out.write("%i %g %g\n" % (i  +(j+1)*(nx), u[i],   v[j+1]))
+#            0 0 0
+#            1 1 0
+#            2 1 1
+#            3 0 1
+    out.write("kids 0\n")
+    out.close()
+    #print "OBJECT_STATIC surface.ac"
+
+#write_map('dresden.png', transform, elev, vec2d(50.9697, 13.667), vec2d(51.1285, 13.8936))
+#write_map('dresden_fine.png', transform, elev, vec2d(51.029, 13.7061), vec2d(51.0891, 13.7861))
+
+#write_map('altstadt.png', transform, elev, vec2d(51.0317900, 13.7149300), vec2d(51.0583100, 13.7551800))
+#sys.exit()
+#elev.shift(-elev(vec2d(0,0))) # -- shift to zero height at origin
 
 
 min_ = vec2d(transform.toLocal((minlat, minlon)))
@@ -437,6 +496,8 @@ for l in clusters._clusters:
         # -- get cluster center
         offset = cl.center
 
+        tile_elev = elev(cl.center)
+
         #transform.setOffset((-offset).list())
         center_lat, center_lon = transform.toGlobal((cl.center.x, cl.center.y))
 
@@ -451,7 +512,7 @@ for l in clusters._clusters:
         out = open(fname+".ac", "w")
         write_ac_header(out, nb)
         for building in cl.objects:
-            write_building(building, out, elev, transform, offset, textures, LOD_lists)
+            write_building(building, out, elev, tile_elev, transform, offset, textures, LOD_lists)
         out.close()
         #transform.setOffset((0,0))
 
@@ -459,7 +520,7 @@ for l in clusters._clusters:
         write_xml(fname, LOD_lists)
 
         # -- write stg
-        stg.write("OBJECT_STATIC %s %g %g %g %g\n" % (fname+".xml", center_lon, center_lat, 114.687, 180))
+        stg.write("OBJECT_STATIC %s %g %g %g %g\n" % (fname+".xml", center_lon, center_lat, tile_elev, 180))
 stg.close()
 
 print "done writing ac's"
