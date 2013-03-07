@@ -264,11 +264,14 @@ def write_building(b, out, elev, tile_elev, transform, offset, textures, LOD_lis
         out.write("kids 0\n")
     else:
         # -- textured roof, a separate object
+        if random.randint(0,1): roof_texture = "roof_tiled_red.png"
+        else: roof_texture = "roof_tiled_black.png"
+
         out.write("kids 1\n")
         out.write("OBJECT poly\n")
         #nb += 1
         out.write("name \"b%i-roof\"\n" % nb)
-        out.write('texture "roof.png"\n')
+        out.write('texture "%s"\n' % roof_texture)
 
         if roof_flat:
             #out.write("loc 0 0 0\n")
@@ -308,30 +311,30 @@ def write_building(b, out, elev, tile_elev, transform, offset, textures, LOD_lis
             out.write("mat %i\n" % mat)
             out.write("refs %i\n" % nnodes_ground)
             out.write("%i %g %g\n" % (0, 0, 0))
-            out.write("%i %g %g\n" % (1, 1, 0))
-            out.write("%i %g %g\n" % (5, 1, 1))
-            out.write("%i %g %g\n" % (4, 0, 1))
+            out.write("%i %g %g\n" % (1, 10, 0))
+            out.write("%i %g %g\n" % (5, 10, 10))
+            out.write("%i %g %g\n" % (4, 0, 10))
 
             out.write("SURF 0x0\n")
             out.write("mat %i\n" % mat)
             out.write("refs %i\n" % nnodes_ground)
             out.write("%i %g %g\n" % (2, 0, 0))
-            out.write("%i %g %g\n" % (3, 1, 0))
-            out.write("%i %g %g\n" % (4, 1, 1))
-            out.write("%i %g %g\n" % (5, 0, 1))
+            out.write("%i %g %g\n" % (3, 10, 0))
+            out.write("%i %g %g\n" % (4, 10, 10))
+            out.write("%i %g %g\n" % (5, 0, 10))
 
             out.write("SURF 0x0\n")
             out.write("mat %i\n" % mat)
             out.write("refs %i\n" % 3)
             out.write("%i %g %g\n" % (1, 0, 0))
-            out.write("%i %g %g\n" % (2, 1, 0))
-            out.write("%i %g %g\n" % (5, 1, 1))
+            out.write("%i %g %g\n" % (2, 10, 0))
+            out.write("%i %g %g\n" % (5, 10, 10))
 
             out.write("SURF 0x0\n")
             out.write("mat %i\n" % mat)
             out.write("refs %i\n" % 3)
             out.write("%i %g %g\n" % (3, 0, 0))
-            out.write("%i %g %g\n" % (0, 1, 0))
-            out.write("%i %g %g\n" % (4, 1, 1))
+            out.write("%i %g %g\n" % (0, 10, 0))
+            out.write("%i %g %g\n" % (4, 10, 10))
 
             out.write("kids 0\n")

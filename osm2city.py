@@ -25,7 +25,7 @@ tile_size_x=500 # -- our tile size in meters
 tile_size_y=500
 #infile = 'dd-altstadt.osm'; total_objects = 158
 #infile = 'altstadt.osm'; total_objects = 2172
-infile = 'xapi-buildings.osm'; total_objects = 40000 # huge!
+infile = 'xapi-buildings.osm'; total_objects = 1000 # huge!
 #infile = 'map.osm'; total_objects = 216 #
 
 
