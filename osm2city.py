@@ -116,6 +116,8 @@ class wayExtract(object):
                 building = Building(osm_id, tags, _refs, _name, _height, _levels)
                 if len(building.refs) < 3: return
 
+                #if len(building.refs) != 4: return # -- testing, 4 corner buildings only
+
                 self.building_list.append(building)
                 global nobjects
                 if nobjects == total_objects: raise ValueError

@@ -264,8 +264,9 @@ def write_building(b, out, elev, tile_elev, transform, offset, textures, LOD_lis
         out.write("kids 0\n")
     else:
         # -- textured roof, a separate object
-        if random.randint(0,1): roof_texture = "roof_tiled_red.png"
-        else: roof_texture = "roof_tiled_black.png"
+        roof_textures = ['roof_black2.png', 'roof_black3.png', 'roof_black3_small_256x128.png', 'roof_tiled_black.png', 'roof_tiled_red.png']
+        roof_texture = roof_textures[random.randint(0,4)]
+        #roof_texture = "test.png"
 
         out.write("kids 1\n")
         out.write("OBJECT poly\n")
@@ -293,48 +294,64 @@ def write_building(b, out, elev, tile_elev, transform, offset, textures, LOD_lis
         else:
             # -- gable roof
             out.write("numvert %i\n" % (nnodes_ground + 2))
+            # -- 4 corners
             for x in X[:-1]:
                 z = ground_elev - 1
                 #out.write("%g %g %g\n" % (y, z, x))
                 out.write("%g %g %g\n" % (x[1], ground_elev + height, x[0]))
-            mid_short_x = 0.5*(X[3][1]+X[0][1])
-            mid_short_z = 0.5*(X[3][0]+X[0][0])
-            # -- normal vector
-            norm = (X[1]-X[0])/lenX[0] * 4.
+            # --
+            #mid_short_x = 0.5*(X[3][1]+X[0][1])
+            #mid_short_z = 0.5*(X[3][0]+X[0][0])
+            # -- tangential vector of long edge
+            inward = 4. # will shift roof top 4m inward
+            roof_height = 3. # 3m
+            tang = (X[1]-X[0])/lenX[0] * inward
 
-            out.write("%g %g %g\n" % (0.5*(X[3][1]+X[0][1]) + norm[1], ground_elev + height + 3, 0.5*(X[3][0]+X[0][0]) + norm[0]))
-            out.write("%g %g %g\n" % (0.5*(X[1][1]+X[2][1]) - norm[1], ground_elev + height + 3, 0.5*(X[1][0]+X[2][0]) - norm[0]))
+            len_roof_top = lenX[0] - 2.*inward
+            len_roof_bottom = 1.*lenX[0]
 
+            out.write("%g %g %g\n" % (0.5*(X[3][1]+X[0][1]) + tang[1], ground_elev + height + roof_height, 0.5*(X[3][0]+X[0][0]) + tang[0]))
+            out.write("%g %g %g\n" % (0.5*(X[1][1]+X[2][1]) - tang[1], ground_elev + height + roof_height, 0.5*(X[1][0]+X[2][0]) - tang[0]))
+
+            roof_texture_size_x = 0.9 # size of roof texture in meters
+            roof_texture_size_y = 0.9
+            repeatx = len_roof_bottom / roof_texture_size_x
+            len_roof_hypo = ((0.5*lenX[1])**2 + roof_height**2)**0.5
+            repeaty = len_roof_hypo / roof_texture_size_y
 
             out.write("numsurf %i\n" % 4)
             out.write("SURF 0x0\n")
             out.write("mat %i\n" % mat)
             out.write("refs %i\n" % nnodes_ground)
             out.write("%i %g %g\n" % (0, 0, 0))
-            out.write("%i %g %g\n" % (1, 10, 0))
-            out.write("%i %g %g\n" % (5, 10, 10))
-            out.write("%i %g %g\n" % (4, 0, 10))
+            out.write("%i %g %g\n" % (1, repeatx, 0))
+            out.write("%i %g %g\n" % (5, repeatx*(1-inward/len_roof_bottom), repeaty))
+            out.write("%i %g %g\n" % (4, repeatx*(inward/len_roof_bottom), repeaty))
 
             out.write("SURF 0x0\n")
             out.write("mat %i\n" % mat)
             out.write("refs %i\n" % nnodes_ground)
             out.write("%i %g %g\n" % (2, 0, 0))
-            out.write("%i %g %g\n" % (3, 10, 0))
-            out.write("%i %g %g\n" % (4, 10, 10))
-            out.write("%i %g %g\n" % (5, 0, 10))
+            out.write("%i %g %g\n" % (3, repeatx, 0))
+            out.write("%i %g %g\n" % (4, repeatx*(1-inward/len_roof_bottom), repeaty))
+            out.write("%i %g %g\n" % (5, repeatx*(inward/len_roof_bottom), repeaty))
 
+            repeatx = lenX[1]/roof_texture_size_x
+            len_roof_hypo = (inward**2 + roof_height**2)**0.5
+            repeaty = len_roof_hypo/roof_texture_size_y
             out.write("SURF 0x0\n")
             out.write("mat %i\n" % mat)
             out.write("refs %i\n" % 3)
             out.write("%i %g %g\n" % (1, 0, 0))
-            out.write("%i %g %g\n" % (2, 10, 0))
-            out.write("%i %g %g\n" % (5, 10, 10))
+            out.write("%i %g %g\n" % (2, repeatx, 0))
+            out.write("%i %g %g\n" % (5, 0.5*repeatx, repeaty))
 
+            repeatx = lenX[3]/roof_texture_size_x
             out.write("SURF 0x0\n")
             out.write("mat %i\n" % mat)
             out.write("refs %i\n" % 3)
             out.write("%i %g %g\n" % (3, 0, 0))
-            out.write("%i %g %g\n" % (0, 10, 0))
-            out.write("%i %g %g\n" % (4, 10, 10))
+            out.write("%i %g %g\n" % (0, repeatx, 0))
+            out.write("%i %g %g\n" % (4, 0.5*repeatx, repeaty))
 
             out.write("kids 0\n")
