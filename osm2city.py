@@ -16,6 +16,9 @@ from cluster import Clusters
 from building_writer import write_building, random_number
 from vec2d import vec2d
 import textwrap
+#import pdb
+
+from textures import Texture
 
 ground_height = -20
 nb = 0
@@ -233,64 +236,38 @@ class Interpolator(object):
     def shift(self, h):
         self.h += h
 
-class Texture(object):
-#    def __init__(self, filename, h_min, h_max, h_size, h_splits, \
-#                                 v_min, v_max, v_size, v_splits, \
-#                                 has_roof_section):
-    def __init__(self, filename, h_size_meters, h_splits, h_repeat, \
-                                 v_size_meters, v_splits, v_repeat, \
-                                 has_roof_section):
-        self.filename = filename
-        self.has_roof_section = has_roof_section
-        # roof type, color
-#        self.v_min = v_min
-#        self.v_max = v_max
-        self.v_size_meters = v_size_meters
-        self.v_splits = np.array(v_splits, dtype=np.float)
-        if len(self.v_splits) > 1:
-# FIXME            test for not type list
-            self.v_splits /= self.v_splits[-1]
-        self.v_splits_meters = self.v_splits * self.v_size_meters
-        self.v_repeat = v_repeat
-
-#        self.h_min = h_min
-#        self.h_max = h_max
-        self.h_size_meters = h_size_meters
-        self.h_splits = np.array(h_splits, dtype=np.float)
-        print "h1", self.h_splits
-        print "h2", h_splits
-
-        if h_splits == None:
-            self.h_splits = 1.
-        elif len(self.h_splits) > 1:
-            self.h_splits /= self.h_splits[-1]
-        self.h_splits_meters = self.h_splits * self.h_size_meters
-        self.h_repeat = h_repeat
-
-        # self.type = type
-        # commercial-
-        # - warehouse
-        # - skyscraper
-        # industrial
-        # residential
-        # - old
-        # - modern
-        # european, north_american, south_american, mediterreanian, african, asian
 
 textures = []
-textures.append(Texture('DSCF9495_pow2', 14, (585, 873, 1179, 1480, 2048), True,
-                                         19.4, (1094, 1531, 2048), False, True))
-textures.append(Texture('DSCF9496_pow2', 4.44, None, True,
-                                         17.93, (1099, 1521, 2048), False, True))
+textures.append(Texture('facade', 'DSCF9495_pow2',
+                        14, (585, 873, 1179, 1480, 2048), True,
+                        19.4, (1094, 1531, 2048), False, True))
+textures.append(Texture('facade', 'DSCF9496_pow2',
+                        4.44, None, True,
+                        17.93, (1099, 1521, 2048), False, True))
+textures.append(Texture('facade', 'facade_modern36x36_12',
+                        36., (None), True,
+                        36., (158, 234, 312, 388, 465, 542, 619, 697, 773, 870, 1024), True, True))
 
-textures.append(Texture('facade_modern36x36_12', 36., (None), True,
-                                         36., (158, 234, 312, 388, 465, 542, 619, 697, 773, 870, 1024), True, True))
+textures.append(Texture('facade', 'DSCF9503_pow2',
+                        12.85, None, True,
+                        17.66, (1168, 1560, 2048), False, True))
+textures.append(Texture('facade', 'wohnheime_petersburger_pow2',
+                        15.6, (215, 414, 614, 814, 1024), True,
+                        15.6, (112, 295, 477, 660, 843, 1024), True, True))
 
-textures.append(Texture('DSCF9503_pow2', 12.85, None, True,
-                                         17.66, (1168, 1560, 2048), False, True))
-textures.append(Texture('wohnheime_petersburger_pow2', 15.6, (215, 414, 614, 814, 1024), True,
-                                                       15.6, (112, 295, 477, 660, 843, 1024), True, True))
-print textures[0].v_splits_meters
+textures.append(Texture('roof', 'roof_tiled_black',
+                         1.20, None, True, 0.60, None, True, provides={}))
+#print textures[0].v_splits_meters
+textures.append(Texture('roof', 'roof_tiled_red',
+                         1.0, None, True, 0.88, None, True, provides={}))
+textures.append(Texture('roof', 'roof_black2',
+                         1.07, None, True, 0.69, None, True, provides={}))
+textures.append(Texture('roof', 'roof_black3_small_256x128',
+                         0.25, None, True, 0.12, None, True, provides={}))
+textures.append(Texture('roof', 'roof_black3',
+                         0.6, None, True, 0.41, None, True, provides={}))
+
+
 
 #sys.exit(0)
 elev = Interpolator("elev.xml", fake=False) # -- fake skips actually reading the file, speeding up things

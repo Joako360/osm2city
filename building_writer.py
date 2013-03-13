@@ -9,6 +9,7 @@ import numpy as np
 import copy
 
 from vec2d import vec2d
+from textures import find_matching_texture
 #nobjects = 0
 nb = 0
 out = ""
@@ -33,7 +34,8 @@ random_level_height = random_number(float, 3.1, 3.6)
 random_levels = random_number(int, 2, 5)
 
 def check_height(building_height, t):
-    if t.v_repeat:
+    if t.cls != 'facade': return False, 0, 0
+    if t.v_can_repeat:
         tex_y1 = 1.
         tex_y0 = 1 - building_height / t.v_size_meters
         return True, tex_y0, tex_y1
@@ -264,9 +266,13 @@ def write_building(b, out, elev, tile_elev, transform, offset, textures, LOD_lis
         out.write("kids 0\n")
     else:
         # -- textured roof, a separate object
-        roof_textures = ['roof_black2.png', 'roof_black3.png', 'roof_black3_small_256x128.png', 'roof_tiled_black.png', 'roof_tiled_red.png']
-        roof_texture = roof_textures[random.randint(0,4)]
+        #roof_textures = ['roof_black2.png', 'roof_black3.png', 'roof_black3_small_256x128.png', 'roof_tiled_black.png', 'roof_tiled_red.png']
+        #roof_texture = roof_textures[random.randint(0,4)]
         #roof_texture = "test.png"
+
+        roof_texture = find_matching_texture('roof', textures).filename + '.png'
+
+        if roof_flat: roof_texture = 'roof_flat'
 
         out.write("kids 1\n")
         out.write("OBJECT poly\n")
