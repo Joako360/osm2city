@@ -34,7 +34,12 @@ random_level_height = random_number(float, 3.1, 3.6)
 random_levels = random_number(int, 2, 5)
 
 def check_height(building_height, t):
-    if t.cls != 'facade': return False, 0, 0
+    """check if a texture t fits the building height (h)
+       v-repeatable textures are repeated to fit h
+       For non-repeatable textures,
+       - check if h is within the texture's limits (minheight, maxheight)
+       -
+    """
     if t.v_can_repeat:
         tex_y1 = 1.
         tex_y0 = 1 - building_height / t.v_size_meters
@@ -54,6 +59,7 @@ def check_height(building_height, t):
             #tex_filename = t.filename + '.png'
             return True, tex_y0, tex_y1
         else:
+            print "building_height %g outside %g %g" % (building_height, t.v_splits_meters[0], t.v_size_meters)
             return False, 0, 0
 
 
@@ -62,7 +68,7 @@ def reset_nb():
     global nb
     nb = 0
 
-def write_building(b, out, elev, tile_elev, transform, offset, textures, LOD_lists):
+def write_building(b, out, elev, tile_elev, transform, offset, facades, roofs, LOD_lists):
     """offset accounts for cluster center"""
     global first
     mat = random.randint(0,3)
@@ -87,14 +93,48 @@ def write_building(b, out, elev, tile_elev, transform, offset, textures, LOD_lis
     name = "b%i" % nb
     out.write("name \"%s\"\n" % name)
 
-    # model roof if we have 4 ground nodes
+    level_height = random_level_height()
+
+    # try height first
+    # catch exceptions, since height might be "5 m" instead of "5"
+    try:
+        height = float(b.height)
+        if height > 1.: b.levels = (height*1.)/level_height
+    except:
+        height = 0.
+        pass
+
+    if height < 1:
+        # failing that, try levels
+        if float(b.levels) > 0:
+            pass
+            print "have levels", b.levels
+        else:
+            # failing that, use random levels
+            b.levels = random_levels()
+
+    height = float(b.levels) * level_height
+    print "hei", height, b.levels
+
+    lod = random_LOD()
+    if b.levels > 5: lod = 2 # tall buildings always LOD bare
+    if b.levels < 3: lod = 0 # small buildings always LOD detail
+    # mat = lod
+    LOD_lists[lod].append(name)
+
+
+    # -- model roof if we have 4 ground nodes
     if nnodes_ground == 4:
         include_roof = False
     else: include_roof = True
 
-#    if separate_roof:
-#    out.write('texture "facade_modern1.png"\n')
-#    out.write('texture "facade_modern36x36_12.png"\n')
+    roof_flat = False
+    # -- no gable roof on tall buildings
+    if b.levels > 5: roof_flat = True
+
+    requires = []
+    if not include_roof and not roof_flat:
+        requires.append('facade:age:old')
 
     X = np.zeros((nnodes_ground+1,2))
     lenX = np.zeros((nnodes_ground))
@@ -135,34 +175,6 @@ def write_building(b, out, elev, tile_elev, transform, offset, textures, LOD_lis
     #print "ground_elev", ground_elev
 
 
-    level_height = random_level_height()
-
-    # try height first
-    # catch exceptions, since height might be "5 m" instead of "5"
-    try:
-        height = float(b.height)
-        if height > 1.: b.levels = (height*1.)/level_height
-    except:
-        height = 0.
-        pass
-
-    if height < 1:
-        # failing that, try levels
-        if float(b.levels) > 0:
-            pass
-            print "have levels", b.levels
-        else:
-            # failing that, use random levels
-            b.levels = random_levels()
-
-    height = float(b.levels) * level_height
-    print "hei", height, b.levels
-
-    lod = random_LOD()
-    if b.levels > 5: lod = 2 # tall buildings always LOD bare
-    if b.levels < 3: lod = 0 # small buildings always LOD detail
-    # mat = lod
-    LOD_lists[lod].append(name)
 
 #    if height > 1.: z = height
 #    elif float(b.levels) > 0:
@@ -187,19 +199,20 @@ def write_building(b, out, elev, tile_elev, transform, offset, textures, LOD_lis
     building_height = height
     # -- check v: height
 
-    shuffled_t = copy.copy(textures)
+    facade_candidates = facades.find_candidates(requires, 0.)
+    shuffled_t = copy.copy(facade_candidates)
     random.shuffle(shuffled_t)
-    have_texture = False
+    facade_texture = None
     for t in shuffled_t:
         ok, tex_y0, tex_y1 = check_height(building_height, t)
         if ok:
-            have_texture = True
+            facade_texture = t
             break
 
-    if have_texture:
-        out.write('texture "%s"\n' % (t.filename+'.png'))
+    if facade_texture:
+        out.write('texture "%s"\n' % (facade_texture.filename+'.png'))
     else:
-        print "WARNING: no texture height", building_height
+        print "WARNING: no texture height", building_height, requires
 
     # -- check h: width
 
@@ -232,7 +245,7 @@ def write_building(b, out, elev, tile_elev, transform, offset, textures, LOD_lis
     # -- walls
 
     for i in range(nnodes_ground - 1):
-        tex_x1 = lenX[i] / t.h_size_meters
+        tex_x1 = lenX[i] / facade_texture.h_size_meters # -- just repeat texture to fit length
 
         out.write("SURF 0x0\n")
         out.write("mat %i\n" % mat)
@@ -243,7 +256,7 @@ def write_building(b, out, elev, tile_elev, transform, offset, textures, LOD_lis
         out.write("%i %g %g\n" % (i + nnodes_ground,     0,          tex_y1))
 
     # -- closing wall
-    tex_x1 = lenX[nnodes_ground-1] /  t.h_size_meters
+    tex_x1 = lenX[nnodes_ground-1] /  facade_texture.h_size_meters
     out.write("SURF 0x0\n")
     out.write("mat %i\n" % mat)
     out.write("refs %i\n" % 4)
@@ -251,10 +264,6 @@ def write_building(b, out, elev, tile_elev, transform, offset, textures, LOD_lis
     out.write("%i %g %g\n" % (0,                 tex_x1, tex_y0))
     out.write("%i %g %g\n" % (nnodes_ground,     tex_x1, tex_y1))
     out.write("%i %g %g\n" % (2*nnodes_ground-1, 0,          tex_y1))
-
-    roof_flat = False
-    # -- no gable roof on tall buildings
-    if b.levels > 5: roof_flat = True
 
     # -- roof
     if include_roof:
@@ -270,15 +279,20 @@ def write_building(b, out, elev, tile_elev, transform, offset, textures, LOD_lis
         #roof_texture = roof_textures[random.randint(0,4)]
         #roof_texture = "test.png"
 
-        roof_texture = find_matching_texture('roof', textures).filename + '.png'
+        roof_texture = roofs.find_matching(facade_texture.requires)
+        #roof_texture = find_matching_texture('roof', textures).filename + '.png'
 
-        if roof_flat: roof_texture = 'roof_flat'
 
         out.write("kids 1\n")
         out.write("OBJECT poly\n")
         #nb += 1
         out.write("name \"b%i-roof\"\n" % nb)
-        out.write('texture "%s"\n' % roof_texture)
+
+        if roof_flat:
+            roof_texture = 'roof_flat' # FIXME: use requires!
+            out.write('texture "%s"\n' % 'roof_flat.png')
+        else:
+            out.write('texture "%s"\n' % (roof_texture.filename + '.png'))
 
         if roof_flat:
             #out.write("loc 0 0 0\n")
@@ -319,8 +333,8 @@ def write_building(b, out, elev, tile_elev, transform, offset, textures, LOD_lis
             out.write("%g %g %g\n" % (0.5*(X[3][1]+X[0][1]) + tang[1], ground_elev + height + roof_height, 0.5*(X[3][0]+X[0][0]) + tang[0]))
             out.write("%g %g %g\n" % (0.5*(X[1][1]+X[2][1]) - tang[1], ground_elev + height + roof_height, 0.5*(X[1][0]+X[2][0]) - tang[0]))
 
-            roof_texture_size_x = 0.9 # size of roof texture in meters
-            roof_texture_size_y = 0.9
+            roof_texture_size_x = roof_texture.h_size_meters # size of roof texture in meters
+            roof_texture_size_y = roof_texture.v_size_meters
             repeatx = len_roof_bottom / roof_texture_size_x
             len_roof_hypo = ((0.5*lenX[1])**2 + roof_height**2)**0.5
             repeaty = len_roof_hypo / roof_texture_size_y

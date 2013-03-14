@@ -18,7 +18,12 @@ from vec2d import vec2d
 import textwrap
 #import pdb
 
-from textures import Texture
+import textures as tex
+
+tex.init()
+print tex.facades
+print tex.roofs
+#from textures import Texture
 
 ground_height = -20
 nb = 0
@@ -27,8 +32,8 @@ first = True
 tile_size_x=500 # -- our tile size in meters
 tile_size_y=500
 #infile = 'dd-altstadt.osm'; total_objects = 158
-#infile = 'altstadt.osm'; total_objects = 2172
-infile = 'xapi-buildings.osm'; total_objects = 1000 # huge!
+infile = 'altstadt.osm'; total_objects = 500 # 2172
+infile = 'xapi-buildings.osm'; total_objects = 5000 # huge!
 #infile = 'map.osm'; total_objects = 216 #
 
 
@@ -237,35 +242,6 @@ class Interpolator(object):
         self.h += h
 
 
-textures = []
-textures.append(Texture('facade', 'DSCF9495_pow2',
-                        14, (585, 873, 1179, 1480, 2048), True,
-                        19.4, (1094, 1531, 2048), False, True))
-textures.append(Texture('facade', 'DSCF9496_pow2',
-                        4.44, None, True,
-                        17.93, (1099, 1521, 2048), False, True))
-textures.append(Texture('facade', 'facade_modern36x36_12',
-                        36., (None), True,
-                        36., (158, 234, 312, 388, 465, 542, 619, 697, 773, 870, 1024), True, True))
-
-textures.append(Texture('facade', 'DSCF9503_pow2',
-                        12.85, None, True,
-                        17.66, (1168, 1560, 2048), False, True))
-textures.append(Texture('facade', 'wohnheime_petersburger_pow2',
-                        15.6, (215, 414, 614, 814, 1024), True,
-                        15.6, (112, 295, 477, 660, 843, 1024), True, True))
-
-textures.append(Texture('roof', 'roof_tiled_black',
-                         1.20, None, True, 0.60, None, True, provides={}))
-#print textures[0].v_splits_meters
-textures.append(Texture('roof', 'roof_tiled_red',
-                         1.0, None, True, 0.88, None, True, provides={}))
-textures.append(Texture('roof', 'roof_black2',
-                         1.07, None, True, 0.69, None, True, provides={}))
-textures.append(Texture('roof', 'roof_black3_small_256x128',
-                         0.25, None, True, 0.12, None, True, provides={}))
-textures.append(Texture('roof', 'roof_black3',
-                         0.6, None, True, 0.41, None, True, provides={}))
 
 
 
@@ -491,7 +467,7 @@ for l in clusters._clusters:
         out = open(fname+".ac", "w")
         write_ac_header(out, nb)
         for building in cl.objects:
-            write_building(building, out, elev, tile_elev, transform, offset, textures, LOD_lists)
+            write_building(building, out, elev, tile_elev, transform, offset, tex.facades, tex.roofs, LOD_lists)
         out.close()
         #transform.setOffset((0,0))
 
