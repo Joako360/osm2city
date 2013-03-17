@@ -10,16 +10,26 @@ import random
 class TextureManager(object):
     def __init__(self,cls):
         self.__l = []
-        self.__cls = cls
+        self.__cls = cls # -- class (roof, facade, ...)
 
     def append(self, t):
-        # -- prepend each item in t.provides with class name
-        t.provides = [self.__cls + ':' + i for i in t.provides]
+        # -- prepend each item in t.provides with class name,
+        #    except for class-independent keywords: age,region,compat
+        new_provides = []
+        for item in t.provides:
+            if item.split(':')[0] in ('age', 'region', 'compat'):
+                new_provides.append(item)
+            else:
+                new_provides.append(self.__cls + ':' + item)
+        #t.provides = [self.__cls + ':' + i for i in t.provides]
+        t.provides = new_provides
         self.__l.append(t)
 
     def find_matching(self, requires = []):
         candidates = self.find_candidates(requires)
-        if len(candidates) == 0: return None
+        if len(candidates) == 0:
+            print "WARNING: no matching texture for <%s>", requires
+            return None
         return candidates[random.randint(0, len(candidates)-1)]
 
     def find_candidates(self, requires = []):
@@ -147,34 +157,50 @@ def init():
                             14, (585, 873, 1179, 1480, 2048), True,
                             19.4, (1094, 1531, 2048), False, True,
                             requires=['roof:color:black'],
-                            provides=['shape:residential','age:old']))
+                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
     facades.append(Texture('DSCF9496_pow2',
                             4.44, None, True,
                             17.93, (1099, 1521, 2048), False, True,
                             requires=['roof:color:black'],
-                            provides=['shape:residential','age:old']))
+                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
     facades.append(Texture('facade_modern36x36_12',
                             36., (None), True,
                             36., (158, 234, 312, 388, 465, 542, 619, 697, 773, 870, 1024), True, True,
-                            provides=['shape:urban','shape:residential','age:modern']))
+                            provides=['shape:urban','shape:residential','age:modern',
+                                     'compat:roof-flat']))
 
     facades.append(Texture('DSCF9503_pow2',
                             12.85, None, True,
                             17.66, (1168, 1560, 2048), False, True,
                             requires=['roof:color:black'],
-                            provides=['shape:residential','age:old']))
+                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
     facades.append(Texture('wohnheime_petersburger_pow2',
                             15.6, (215, 414, 614, 814, 1024), True,
                             15.6, (112, 295, 477, 660, 843, 1024), True, True,
-                            provides=['shape:urban','shape:residential','age:modern']))
+                            provides=['shape:urban','shape:residential','age:modern',
+                                     'compat:roof-flat']))
 
     facades.append(Texture('facade_modern1',
                            2.5, None, True,
                            2.8, None, True,
-                           provides=['shape:urban','shape:residential','age:modern','age:old']))
+                           provides=['shape:urban','shape:residential','age:modern','age:old',
+                                     'compat:roof-flat']))
+
+    facades.append(Texture('DSCF9710_pow2',
+                           29.9, (284,556,874,1180,1512,1780,2048), True,
+                           19.8, (173,329,490,645,791,1024), False, True,
+                           provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
+    facades.append(Texture('DSCF9678_no_roof_items_pow2',
+                           10.4, (97,152,210,299,355,411,512), True,
+                           15.5, (132,211,310,512), False, True,
+                           provides=['shape:residential','shape:commercial','age:modern','compat:roof-flat']))
+    facades.append(Texture('DSCF9726_noroofsec_pow2',
+                           15.1, (321,703,1024), True,
+                           9.6, (227,512), False, True,
+                           provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
 
     roofs = TextureManager('roof')
@@ -184,15 +210,18 @@ def init():
                              1.0, None, True, 0.88, None, True, provides=['color:red']))
     roofs.append(Texture('roof_black2',
                              1.07, None, True, 0.69, None, True, provides=['color:black']))
-    roofs.append(Texture('roof_black3_small_256x128',
-                             0.25, None, True, 0.12, None, True, provides=['color:black']))
+#    roofs.append(Texture('roof_black3_small_256x128',
+#                             0.25, None, True, 0.12, None, True, provides=['color:black']))
     roofs.append(Texture('roof_black3',
                              0.6, None, True, 0.41, None, True, provides=['color:black']))
 
     print roofs[0].provides
     print "black roofs: ", [str(i) for i in roofs.find_candidates(['roof:color:black'])]
     print "red   roofs: ", [str(i) for i in roofs.find_candidates(['roof:color:red'])]
-    print "old facades: ", [str(i) for i in facades.find_candidates(['facade:shape:residential','facade:age:old'])]
+    print "old facades: "
+    for i in facades.find_candidates(['facade:shape:residential','age:old']):
+        print i, i.v_splits * i.v_size_meters
+    #print facades[0].provides
 
 if __name__ == "__main__":
     init()

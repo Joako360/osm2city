@@ -7,7 +7,6 @@ import numpy as np
 import sys
 import random
 import copy
-#import imposm.parser as pa
 
 from imposm.parser import OSMParser
 import coordinates
@@ -23,7 +22,6 @@ import textures as tex
 tex.init()
 print tex.facades
 print tex.roofs
-#from textures import Texture
 
 ground_height = -20
 nb = 0
@@ -32,14 +30,13 @@ first = True
 tile_size_x=500 # -- our tile size in meters
 tile_size_y=500
 #infile = 'dd-altstadt.osm'; total_objects = 158
-infile = 'altstadt.osm'; total_objects = 500 # 2172
-infile = 'xapi-buildings.osm'; total_objects = 5000 # huge!
+#infile = 'altstadt.osm'; total_objects = 500 # 2172
+infile = 'xapi-buildings.osm'; total_objects = 50000 # huge!
+#p.parse('xapi.osm') # fails
+#p.parse('xapi-small.osm')
+
 #infile = 'map.osm'; total_objects = 216 #
 
-
-
-#center_lon=
-#center_lat=
 
 def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
     # check $FGDATA/Nasal/IOrules
@@ -56,11 +53,9 @@ def dist(a,b):
     pass
 
 
-#    if nb == 40: break
-
-# simple class that handles the parsed OSM data.
 
 class Building(object):
+    """simple class that handles the parsed OSM data."""
     def __init__(self, osm_id, tags, refs, name, height, levels):
         self.osm_id = osm_id
         self.tags = tags
@@ -90,8 +85,7 @@ class wayExtract(object):
         self.maxlat = -91.
 
     def ways(self, ways):
-        # callback method for ways
-        #print "-"*80
+        """callback method for ways"""
         for osm_id, tags, refs in ways:
             #print nb
             #print "-"*10
@@ -282,10 +276,6 @@ def write_map(filename, transform, elev, gmin, gmax):
         for i in range(nx):
             out.write("%g %g %g\n" % (y[j], (elev(vec2d(x[i],y[j])) - elev_offset), x[i]))
 
-#    out.write("%g %g %g\n" % (lmin.y, map_z0, lmin.x))
-#    out.write("%g %g %g\n" % (lmin.y, map_z0, lmax.x))
-#    out.write("%g %g %g\n" % (lmax.y, map_z0, lmax.x))
-#    out.write("%g %g %g\n" % (lmax.y, map_z0, lmin.x))
     out.write("numsurf %i\n" % ((nx-1)*(ny-1)))
     for j in range(ny-1):
         for i in range(nx-1):
@@ -434,8 +424,6 @@ try:
     p.parse(infile)
 except ValueError:
     pass
-#p.parse('xapi.osm') # fails
-#p.parse('xapi-small.osm')
 
 print "nbuildings", len(way.building_list)
 print "done parsing"
@@ -480,28 +468,8 @@ stg.close()
 
 print "done writing ac's"
 
-
 sys.exit(0)
-#p.parse('map.osm')
-# done
-#print way.buildings
-#print way.building_list
 
-
-#lat = way.building_list[0].refs[0].lat
-#lon = way.building_list[0].refs[0].lon
-
-# -- use transform from above
-#transform = coordinates.Transformation((lat, lon), hdg = 0)
-#origin = coordinates.Position(transform, [], lat, lon)
-
-# -- get ground nodes for each building
-
-#print """AC3Db
-#MATERIAL "" rgb 1 1 1  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-#OBJECT world
-#kids 1
-#"""
 
 #    print
 #    if b.name == 'Frauenkirche':
@@ -511,13 +479,7 @@ sys.exit(0)
 #            print vertices[v][0], vertices[v][1]
 #        sys.exit(0)
 
-#print vertices
-
-#for b in way.building_list:
-#    write_building(b)
-
 #out.write("kids 0\n")
-out.close()
 #    sys.exit(0)
 #numvert 9
 #

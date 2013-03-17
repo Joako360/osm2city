@@ -70,28 +70,21 @@ def reset_nb():
 
 def write_building(b, out, elev, tile_elev, transform, offset, facades, roofs, LOD_lists):
     """offset accounts for cluster center"""
+# am anfang geometrieanalyse
+# - ort: urban, residential, rural
+# - region: europe, asia...
+# - layers: 1-2, 3-5, hi-rise
+# - roof-shape: flat, gable
+# - age: old, modern
+
+# - facade raussuchen
+#   requires: compat:flat-roof
+
     global first
     mat = random.randint(0,3)
 
     nnodes_ground = len(b.refs)
 #    print nnodes_ground #, b.refs[0].lat, b.refs[0].lon
-
-#for building in allbuildings:
-    global nb
-#    global nobjects
-
-    nb += 1
-    print nb
-
-    #global elev
-#  if building[0] == 332:
-#    if first: first = False
-#    else:     out.write("kids 1\n")
-
-
-    out.write("OBJECT poly\n")
-    name = "b%i" % nb
-    out.write("name \"%s\"\n" % name)
 
     level_height = random_level_height()
 
@@ -116,25 +109,51 @@ def write_building(b, out, elev, tile_elev, transform, offset, facades, roofs, L
     height = float(b.levels) * level_height
     print "hei", height, b.levels
 
+    if height < 3.4:
+        print "Skipping small building with height < 3.4"
+        return
+
+    global nb
+    nb += 1
+    print nb
+    out.write("OBJECT poly\n")
+    name = "b%i" % nb
+    out.write("name \"%s\"\n" % name)
+
     lod = random_LOD()
     if b.levels > 5: lod = 2 # tall buildings always LOD bare
     if b.levels < 3: lod = 0 # small buildings always LOD detail
     # mat = lod
     LOD_lists[lod].append(name)
 
+    # -- roof is controlled by two flags:
+    #    bool roof_separate: whether or not to include roof as separate model
+    #      useful for
+    #      - gable roof
+    #      - roof with add-ons: AC
+    #    replace by roof_type? flat  --> no separate model
+    #                          gable --> separate model
+    #                          ACs         -"-
+
+    roof_separate = False
+    roof_flat = True
 
     # -- model roof if we have 4 ground nodes
     if nnodes_ground == 4:
-        include_roof = False
-    else: include_roof = True
+        roof_separate = True
+        roof_flat = False  # -- gable roof
 
-    roof_flat = False
+
     # -- no gable roof on tall buildings
-    if b.levels > 5: roof_flat = True
+    if b.levels > 5:
+        roof_flat = True
+        roof_separate = False
+        # FIXME: roof_ACs = True
 
     requires = []
-    if not include_roof and not roof_flat:
-        requires.append('facade:age:old')
+    if roof_separate and not roof_flat:
+        requires.append('age:old')
+        requires.append('compat:roof-gable')
 
     X = np.zeros((nnodes_ground+1,2))
     lenX = np.zeros((nnodes_ground))
@@ -186,7 +205,7 @@ def write_building(b, out, elev, tile_elev, transform, offset, facades, roofs, L
 #        out.write("%g %g %g\n" % (y, z, x))
 
     nsurf = nnodes_ground
-    if include_roof: nsurf += 1
+    if not roof_separate: nsurf += 1 # -- because roof will be part of base model
 
     #repeat_vert = int(height/3)
 
@@ -266,7 +285,7 @@ def write_building(b, out, elev, tile_elev, transform, offset, facades, roofs, L
     out.write("%i %g %g\n" % (2*nnodes_ground-1, 0,          tex_y1))
 
     # -- roof
-    if include_roof:
+    if not roof_separate:
         out.write("SURF 0x0\n")
         out.write("mat %i\n" % mat)
         out.write("refs %i\n" % nnodes_ground)
@@ -275,17 +294,10 @@ def write_building(b, out, elev, tile_elev, transform, offset, facades, roofs, L
         out.write("kids 0\n")
     else:
         # -- textured roof, a separate object
-        #roof_textures = ['roof_black2.png', 'roof_black3.png', 'roof_black3_small_256x128.png', 'roof_tiled_black.png', 'roof_tiled_red.png']
-        #roof_texture = roof_textures[random.randint(0,4)]
-        #roof_texture = "test.png"
-
         roof_texture = roofs.find_matching(facade_texture.requires)
-        #roof_texture = find_matching_texture('roof', textures).filename + '.png'
-
 
         out.write("kids 1\n")
         out.write("OBJECT poly\n")
-        #nb += 1
         out.write("name \"b%i-roof\"\n" % nb)
 
         if roof_flat:
@@ -375,3 +387,4 @@ def write_building(b, out, elev, tile_elev, transform, offset, facades, roofs, L
             out.write("%i %g %g\n" % (4, 0.5*repeatx, repeaty))
 
             out.write("kids 0\n")
+
