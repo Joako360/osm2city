@@ -3,6 +3,12 @@
 """read osm file, print 2d view in ac3d format to stdout"""
 
 
+# TODO:
+# - read original .stg, don't place OSM buildings where there's a static model
+# - use geometry library
+# - fix empty backyards
+# - simplify buildings
+
 import numpy as np
 import sys
 import random
@@ -15,7 +21,7 @@ from cluster import Clusters
 from building_writer import write_building, random_number
 from vec2d import vec2d
 import textwrap
-#import pdb
+import pdb
 
 import textures as tex
 
@@ -30,8 +36,8 @@ first = True
 tile_size_x=500 # -- our tile size in meters
 tile_size_y=500
 #infile = 'dd-altstadt.osm'; total_objects = 158
-#infile = 'altstadt.osm'; total_objects = 500 # 2172
-infile = 'xapi-buildings.osm'; total_objects = 50000 # huge!
+infile = 'altstadt.osm'; total_objects = 2000 # 2172
+#infile = 'xapi-buildings.osm'; total_objects = 30000 # huge!
 #p.parse('xapi.osm') # fails
 #p.parse('xapi-small.osm')
 
@@ -326,6 +332,7 @@ def write_ac_header(out, nb):
     out.write("AC3Db\n")
 #    out.write("%s\n" % mats[random.randint(0,2)])
     out.write("""
+    MATERIAL "" rgb 0.7  0.7  0.7 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
     MATERIAL "" rgb 1   1    1 amb 1 1 1  emis 0.1 0.1 0.1  spec 0.5 0.5 0.5  shi 64  trans 0
     MATERIAL "" rgb .95 1    1 amb 1 1 1  emis 0.1 0.1 0.1  spec 0.5 0.5 0.5  shi 64  trans 0
     MATERIAL "" rgb 1   0.95 1 amb 1 1 1  emis 0.1 0.1 0.1  spec 0.5 0.5 0.5  shi 64  trans 0

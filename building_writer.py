@@ -43,7 +43,7 @@ def check_height(building_height, t):
     if t.v_can_repeat:
         tex_y1 = 1.
         tex_y0 = 1 - building_height / t.v_size_meters
-        return True, tex_y0, tex_y1
+        return tex_y0, tex_y1
     else:
         # x min_height < height < max_height
         # x find closest match
@@ -57,10 +57,10 @@ def check_height(building_height, t):
                     break
             tex_y1 = 1.
             #tex_filename = t.filename + '.png'
-            return True, tex_y0, tex_y1
+            return tex_y0, tex_y1
         else:
-            print "building_height %g outside %g %g" % (building_height, t.v_splits_meters[0], t.v_size_meters)
-            return False, 0, 0
+            raise ValueError("SHOULD NOT HAPPEN! building_height %g outside %g %g" % (building_height, t.v_splits_meters[0], t.v_size_meters))
+            return 0, 0
 
 
 
@@ -81,7 +81,8 @@ def write_building(b, out, elev, tile_elev, transform, offset, facades, roofs, L
 #   requires: compat:flat-roof
 
     global first
-    mat = random.randint(0,3)
+    mat = random.randint(1,4)
+    roof_mat = 0
 
     nnodes_ground = len(b.refs)
 #    print nnodes_ground #, b.refs[0].lat, b.refs[0].lon
@@ -218,15 +219,12 @@ def write_building(b, out, elev, tile_elev, transform, offset, facades, roofs, L
     building_height = height
     # -- check v: height
 
-    facade_candidates = facades.find_candidates(requires, 0.)
-    shuffled_t = copy.copy(facade_candidates)
-    random.shuffle(shuffled_t)
     facade_texture = None
-    for t in shuffled_t:
-        ok, tex_y0, tex_y1 = check_height(building_height, t)
-        if ok:
-            facade_texture = t
-            break
+    facade_texture = facades.find_matching(requires, building_height)
+#    shuffled_t = copy.copy(facade_candidates)
+#    random.shuffle(shuffled_t)
+#    for t in shuffled_t:
+    tex_y0, tex_y1 = check_height(building_height, facade_texture)
 
     if facade_texture:
         out.write('texture "%s"\n' % (facade_texture.filename+'.png'))
@@ -287,7 +285,7 @@ def write_building(b, out, elev, tile_elev, transform, offset, facades, roofs, L
     # -- roof
     if not roof_separate:
         out.write("SURF 0x0\n")
-        out.write("mat %i\n" % mat)
+        out.write("mat %i\n" % roof_mat)
         out.write("refs %i\n" % nnodes_ground)
         for i in range(nnodes_ground):
             out.write("%i %g %g\n" % (i+nnodes_ground, 0, 0))

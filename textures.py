@@ -46,12 +46,33 @@ class TextureManager(object):
         return self.__l[i]
 
 class FacadeManager(TextureManager):
-    def find_candidates(self, requires = [], building_height = 10.):
-        return TextureManager.find_candidates(self, requires)
+    def find_matching(self, requires, building_height):
+        candidates = self.find_candidates(requires, building_height)
+        if len(candidates) == 0:
+            print "WARNING: no matching texture for <%s>", requires
+            return None
+        return candidates[random.randint(0, len(candidates)-1)]
 
-    def find_matching(self, requires = [], building_height = 10.):
-        return TextureManager.find_matching(self, requires)
-        # FIXME: check height
+    def find_candidates(self, requires, building_height):
+        candidates = TextureManager.find_candidates(self, requires)
+#        print "\ncands", [str(t.filename) for t in candidates]
+        # -- check height
+#        print " Candidates:"
+        new_candidates = []
+        for t in candidates:
+#            print "  <<<", t.filename
+#            print "     building_height", building_height
+#            print "     min/max", t.height_min, t.height_max
+            if building_height < t.height_min or building_height > t.height_max:
+#                print "  KICKED"
+                continue
+            new_candidates.append(t)
+
+#                candidates.remove(t)
+#        print "remaining cands", [str(t.filename) for t in new_candidates]
+        return new_candidates
+
+
 #
 #
 #tex_facade = facades.find_matching(building_height, ["shape:residential", "age:modern"])
@@ -101,11 +122,14 @@ class Texture(object):
                  h_size_meters, h_splits, h_can_repeat, \
                  v_size_meters, v_splits, v_can_repeat, \
                  has_roof_section = False, \
+                 height_min = 0, height_max = 9999, \
                  provides = {}, requires = {}):
         self.filename = filename
         self.provides = provides
         self.requires = requires
         self.has_roof_section = has_roof_section
+        self.height_min = height_min
+        self.height_max = height_max
         # roof type, color
 #        self.v_min = v_min
 #        self.v_max = v_max
@@ -118,6 +142,10 @@ class Texture(object):
             self.v_splits /= self.v_splits[-1]
         self.v_splits_meters = self.v_splits * self.v_size_meters
         self.v_can_repeat = v_can_repeat
+
+        if not self.v_can_repeat:
+            self.height_min = self.v_splits_meters[0]
+            self.height_max = self.v_size_meters
 
 #        self.h_min = h_min
 #        self.h_max = h_max
@@ -180,23 +208,27 @@ def init():
     facades.append(Texture('wohnheime_petersburger_pow2',
                             15.6, (215, 414, 614, 814, 1024), True,
                             15.6, (112, 295, 477, 660, 843, 1024), True, True,
+                            height_min = 15.,
                             provides=['shape:urban','shape:residential','age:modern',
                                      'compat:roof-flat']))
 
     facades.append(Texture('facade_modern1',
                            2.5, None, True,
                            2.8, None, True,
-                           provides=['shape:urban','shape:residential','age:modern','age:old',
+                           height_min = 15.,
+                           provides=['shape:urban','shape:residential','age:modern',
                                      'compat:roof-flat']))
 
     facades.append(Texture('DSCF9710_pow2',
                            29.9, (284,556,874,1180,1512,1780,2048), True,
                            19.8, (173,329,490,645,791,1024), False, True,
                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
+
     facades.append(Texture('DSCF9678_no_roof_items_pow2',
                            10.4, (97,152,210,299,355,411,512), True,
                            15.5, (132,211,310,512), False, True,
                            provides=['shape:residential','shape:commercial','age:modern','compat:roof-flat']))
+
     facades.append(Texture('DSCF9726_noroofsec_pow2',
                            15.1, (321,703,1024), True,
                            9.6, (227,512), False, True,
@@ -209,7 +241,7 @@ def init():
     roofs.append(Texture('roof_tiled_red',
                              1.0, None, True, 0.88, None, True, provides=['color:red']))
     roofs.append(Texture('roof_black2',
-                             1.07, None, True, 0.69, None, True, provides=['color:black']))
+                             1.39, None, True, 0.89, None, True, provides=['color:black']))
 #    roofs.append(Texture('roof_black3_small_256x128',
 #                             0.25, None, True, 0.12, None, True, provides=['color:black']))
     roofs.append(Texture('roof_black3',
@@ -219,9 +251,14 @@ def init():
     print "black roofs: ", [str(i) for i in roofs.find_candidates(['roof:color:black'])]
     print "red   roofs: ", [str(i) for i in roofs.find_candidates(['roof:color:red'])]
     print "old facades: "
-    for i in facades.find_candidates(['facade:shape:residential','age:old']):
+    for i in facades.find_candidates(['facade:shape:residential','age:old'], 10):
         print i, i.v_splits * i.v_size_meters
     #print facades[0].provides
 
 if __name__ == "__main__":
     init()
+    cands = facades.find_candidates([], 14)
+    print "cands ar", cands
+    for t in cands:
+        print "%5.2g  %s" % (t.height_min, t.filename)
+
