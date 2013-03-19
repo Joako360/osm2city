@@ -81,7 +81,8 @@ def write_building(b, out, elev, tile_elev, transform, offset, facades, roofs, L
 #   requires: compat:flat-roof
 
     global first
-    mat = random.randint(1,4)
+    #mat = random.randint(1,4)
+    mat = 0
     roof_mat = 0
 
     nnodes_ground = len(b.refs)

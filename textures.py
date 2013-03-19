@@ -199,9 +199,14 @@ def init():
                             provides=['shape:urban','shape:residential','age:modern',
                                      'compat:roof-flat']))
 
-    facades.append(Texture('DSCF9503_pow2',
+#    facades.append(Texture('DSCF9503_pow2',
+#                            12.85, None, True,
+#                            17.66, (1168, 1560, 2048), False, True,
+#                            requires=['roof:color:black'],
+#                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
+    facades.append(Texture('DSCF9503_noroofsec_pow2',
                             12.85, None, True,
-                            17.66, (1168, 1560, 2048), False, True,
+                            17.66, (556,1015,1474,2048), False, True,
                             requires=['roof:color:black'],
                             provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
@@ -212,17 +217,24 @@ def init():
                             provides=['shape:urban','shape:residential','age:modern',
                                      'compat:roof-flat']))
 
-    facades.append(Texture('facade_modern1',
-                           2.5, None, True,
-                           2.8, None, True,
-                           height_min = 15.,
-                           provides=['shape:urban','shape:residential','age:modern',
-                                     'compat:roof-flat']))
+# -- this just looks ugly
+#    facades.append(Texture('facade_modern1',
+#                           2.5, None, True,
+#                           2.8, None, True,
+#                           height_min = 15.,
+#                           provides=['shape:urban','shape:residential','age:modern',
+#                                     'compat:roof-flat']))
 
-    facades.append(Texture('DSCF9710_pow2',
-                           29.9, (284,556,874,1180,1512,1780,2048), True,
-                           19.8, (173,329,490,645,791,1024), False, True,
+#    facades.append(Texture('DSCF9710_pow2',
+#                           29.9, (284,556,874,1180,1512,1780,2048), True,
+#                           19.8, (173,329,490,645,791,1024), False, True,
+#                           provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
+
+    facades.append(Texture('DSCF9710_noroofsec_pow2',
+                           29.9, (142,278,437,590,756,890,1024), True,
+                           19.8, (130,216,297,387,512), False, True,
                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
+
 
     facades.append(Texture('DSCF9678_no_roof_items_pow2',
                            10.4, (97,152,210,299,355,411,512), True,
