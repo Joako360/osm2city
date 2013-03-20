@@ -193,6 +193,12 @@ def init():
                             requires=['roof:color:black'],
                             provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
+    facades.append(Texture('LZ_old_bright_bc2',
+                            17.9, (345,807,1023,1236,1452,1686,2048), True,
+                            14.8, (558,1005,1446,2048), False, True,
+                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
+
+
     facades.append(Texture('facade_modern36x36_12',
                             36., (None), True,
                             36., (158, 234, 312, 388, 465, 542, 619, 697, 773, 870, 1024), True, True,
