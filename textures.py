@@ -258,12 +258,13 @@ def init():
                              1.20, None, True, 0.60, None, True, provides=['color:black']))
     roofs.append(Texture('roof_tiled_red',
                              1.0, None, True, 0.88, None, True, provides=['color:red']))
-    roofs.append(Texture('roof_black2',
-                             1.39, None, True, 0.89, None, True, provides=['color:black']))
+#    roofs.append(Texture('roof_black2',
+#                             1.39, None, True, 0.89, None, True, provides=['color:black']))
+#    roofs.append(Texture('roof_black3',
+#                             0.6, None, True, 0.41, None, True, provides=['color:black']))
+
 #    roofs.append(Texture('roof_black3_small_256x128',
 #                             0.25, None, True, 0.12, None, True, provides=['color:black']))
-    roofs.append(Texture('roof_black3',
-                             0.6, None, True, 0.41, None, True, provides=['color:black']))
 
     print roofs[0].provides
     print "black roofs: ", [str(i) for i in roofs.find_candidates(['roof:color:black'])]

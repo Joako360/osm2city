@@ -36,12 +36,14 @@ print tex.roofs
 ground_height = -20
 nb = 0
 nobjects = 0
+from building_writer import stats
+
 first = True
 tile_size_x=500 # -- our tile size in meters
 tile_size_y=500
 #infile = 'dd-altstadt.osm'; total_objects = 158
-#infile = 'altstadt.osm'; total_objects = 2000 # 2172
-infile = 'xapi-buildings.osm'; total_objects = 10000 # huge!
+#infile = 'altstadt.osm'; total_objects = 200 # 2172
+infile = 'xapi-buildings.osm'; total_objects = 20000 # huge!
 #p.parse('xapi.osm') # fails
 #p.parse('xapi-small.osm')
 
@@ -343,6 +345,7 @@ def write_ac_header(out, nb):
 #    out.write("%s\n" % mats[random.randint(0,2)])
     out.write(textwrap.dedent(
  """MATERIAL "" rgb 1   1   1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
+    MATERIAL "" rgb 1   0   0 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
  """))
 #    MATERIAL "" rgb 1   1    1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
 #    MATERIAL "" rgb .95 1    1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
@@ -485,6 +488,9 @@ stg.close()
 
 print "done writing ac's"
 
+
+stats.print_summary()
+stats.out.close()
 sys.exit(0)
 
 
