@@ -13,6 +13,31 @@
 # - more complicated roof geometries
 # -
 
+"""
+osm2city.py aims at generating 3D city models for FG, using OSM data.
+Currently, it generates 3D textured buildings, much like bob.pl.
+However, it has a somewhat more advanced texture manager, and comes with a
+number of facade/roof textures.
+
+- cluster a number of buildings into a single .ac files
+- LOD animation based on building height and area
+- terrain elevation probing: places buildings at correct elevation
+
+You should disable random buildings.
+"""
+
+# -- new design:
+# - parse OSM -> return a list of building objects
+# - read relevant stgs
+# - analyze buildings
+#   - calculate area
+#   - location clash with stg static models? drop building
+#   - analyze surrounding: similar shaped buildings nearby? will get same texture
+#   - set building type, roof type etc
+#   - decide LOD
+# - write clusters
+
+
 import numpy as np
 import sys
 import random
@@ -42,8 +67,8 @@ first = True
 tile_size_x=500 # -- our tile size in meters
 tile_size_y=500
 #infile = 'dd-altstadt.osm'; total_objects = 158
-#infile = 'altstadt.osm'; total_objects = 200 # 2172
-infile = 'xapi-buildings.osm'; total_objects = 20000 # huge!
+infile = 'altstadt.osm'; total_objects = 200 # 2172
+#infile = 'xapi-buildings.osm'; total_objects = 20000 # huge!
 #p.parse('xapi.osm') # fails
 #p.parse('xapi-small.osm')
 
@@ -69,7 +94,8 @@ def dist(a,b):
 
 
 class Building(object):
-    """simple class that handles the parsed OSM data."""
+    """Central object class.
+       Holds all data relevant for a building. Coordinates, type, area, ..."""
     def __init__(self, osm_id, tags, refs, name, height, levels):
         self.osm_id = osm_id
         self.tags = tags
@@ -77,6 +103,7 @@ class Building(object):
         self.name = name
         self.height = height
         self.levels = levels
+        self.area = 0
         global transform
         r = self.refs[0]
         self.X = vec2d(transform.toLocal((r.lat, r.lon)))
