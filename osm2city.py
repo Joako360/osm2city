@@ -12,6 +12,10 @@
 # - put tall, large buildings in LOD bare, and small buildings in LOD detail
 # - more complicated roof geometries
 # -
+# for release
+# - respect static models
+# - correct stg id
+# -
 
 """
 osm2city.py aims at generating 3D city models for FG, using OSM data.
@@ -48,26 +52,31 @@ import coordinates
 import itertools
 from cluster import Clusters
 from building_writer import write_building, random_number
+from building_writer import stats
 from vec2d import vec2d
 import textwrap
 import pdb
 
 import textures as tex
+import stg
+import tools
 
 tex.init()
 print tex.facades
 print tex.roofs
 
+# -- defaults
 ground_height = -20
 nb = 0
 nobjects = 0
+buildings = [] # -- master list, holds all buildings
 from building_writer import stats
 
 first = True
 tile_size_x=500 # -- our tile size in meters
 tile_size_y=500
-#infile = 'dd-altstadt.osm'; total_objects = 158
-infile = 'altstadt.osm'; total_objects = 200 # 2172
+infile = 'dd-altstadt.osm'; total_objects = 158
+#infile = 'altstadt.osm'; total_objects = 100 # 2172
 #infile = 'xapi-buildings.osm'; total_objects = 20000 # huge!
 #p.parse('xapi.osm') # fails
 #p.parse('xapi-small.osm')
@@ -77,16 +86,6 @@ skiplist = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
           "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
           "Residenzschloss Dresden"]
 
-def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
-    # check $FGDATA/Nasal/IOrules
-    f = open(fname, 'w')
-    f.write("# %g %g %g %g %g %g\n" % (x0, y0, size_x, size_y, step_x, step_y))
-    for y in range(y0, y0+size_y, step_y):
-        for x in range(x0, x0+size_x, step_x):
-            lat, lon = transform.toGlobal((x, y))
-            f.write("%1.8f %1.8f %g %g\n" % (lon, lat, x, y))
-        f.write("\n")
-    f.close()
 
 def dist(a,b):
     pass
@@ -117,8 +116,7 @@ class Coords(object):
 
 class wayExtract(object):
     def __init__(self):
-        self.buildings = 0
-        self.building_list = []
+        self.buildings = []
         self.coords_list = []
         self.minlon = 181.
         self.maxlon = -181.
@@ -133,7 +131,6 @@ class wayExtract(object):
             #print tags, refs
             if 'building' in tags:
 
-                self.buildings += 1
                 #print "got building", osm_id, tags, refs
                 #print "done\n\n"
                 _name = ""
@@ -165,13 +162,13 @@ class wayExtract(object):
 
                 #if len(building.refs) != 4: return # -- testing, 4 corner buildings only
 
-                self.building_list.append(building)
-                global nobjects
-                if nobjects == total_objects: raise ValueError
-                nobjects += 1
-                print nobjects
-                global clusters
-                clusters.append(building.X, building)
+                self.buildings.append(building)
+#                global stats
+                if stats.objects == total_objects: raise ValueError
+                stats.objects += 1
+                print stats.objects
+                #global clusters
+                #clusters.append(building.X, building)
 
     def coords(self, coords):
         for osm_id, lon, lat in coords:
@@ -235,57 +232,9 @@ if 0:
     raster(transform, 'elev.in', -20000, -20000, size_x=40000, size_y=40000, step_x=20, step_y=20)
     sys.exit(0)
 
-class Interpolator(object):
-    """load elevation data from file, interpolate"""
-    def __init__(self, filename, fake=False):
-        # FIXME: use values from header in filename
-        if fake:
-            self.fake = True
-            self.h = 0.
-            return
-        else:
-            self.fake = False
-        elev = np.loadtxt(filename)[:,2:]
-        self.x = elev[:,0]
-        self.y = elev[:,1]
-        self.h = elev[:,2]
-        self.min_x = min(self.x)
-        self.max_x = max(self.x)
-        self.min_y = min(self.y)
-        self.max_y = max(self.y)
-        self.h = self.h.reshape(2000,2000)
-        self.x = self.x.reshape(2000,2000)
-        self.y = self.y.reshape(2000,2000)
-        #print self.h[0,0], self.h[0,1], self.h[0,2]
-        #self.dx = self.h[0,0] - self.x[0,1]
-        self.dx = 20.
-        self.dy = 20.
-
-    def __call__(self, p):
-        """compute elevation at (x,y) by linear interpolation"""
-        if self.fake: return 0.
-        if p.x <= self.min_x or p.x >= self.max_x or \
-           p.y <= self.min_y or p.y >= self.max_y: return 1999
-        i = int((p.x - self.min_x)/self.dx)
-        j = int((p.y - self.min_y)/self.dy)
-        fx = (p.x - self.x[j,i])/self.dx
-        fy = (p.y - self.y[j,i])/self.dy
-        #print fx, fy, i, j
-        h =  (1-fx) * (1-fy) * self.h[j,i] \
-           +    fx  * (1-fy) * self.h[j,i+1] \
-           + (1-fx) *    fy  * self.h[j+1,i] \
-           +    fx  *    fy  * self.h[j+1,i+1]
-        return h
-
-    def shift(self, h):
-        self.h += h
-
-
-
-
 
 #sys.exit(0)
-elev = Interpolator("elev.xml", fake=False) # -- fake skips actually reading the file, speeding up things
+elev = tools.Interpolator("elev.xml", fake=False) # -- fake skips actually reading the file, speeding up things
 print "height at origin", elev(vec2d(0,0))
 print "origin at ", transform.toGlobal((0,0))
 
@@ -451,8 +400,11 @@ def write_xml(fname, LOD_lists):
     xml.close()
 
 # -----------------------------------------------------------------------------
+# here we go!
+# -----------------------------------------------------------------------------
 
-clusters = Clusters(min_, max_, vec2d(2000.,2000.))
+# - parse OSM -> return a list of building objects
+
 #print clusters.list
 # instantiate counter and parser and start parsing
 way = wayExtract()
@@ -472,11 +424,29 @@ try:
 except ValueError:
     pass
 
-print "nbuildings", len(way.building_list)
+print "nbuildings", len(way.buildings)
 print "done parsing"
+buildings = way.buildings
+
+
+# - read relevant stgs
+stg.read()  # FIXME: dummy
+
+# - analyze buildings
+#   - calculate area
+#   - location clash with stg static models? drop building
+#   - analyze surrounding: similar shaped buildings nearby? will get same texture
+#   - set building type, roof type etc
+#   - decide LOD
+# b_lib.analyze(buildings)
+
+# -- now put buildings into clusters
+clusters = Clusters(min_, max_, vec2d(2000.,2000.))
+for b in buildings:
+    clusters.append(b.X, b)
 clusters.stats()
 
-# -- write cluster
+# - write clusters
 stg = open("city.stg", "w")
 for l in clusters._clusters:
     for cl in l:
@@ -519,20 +489,3 @@ print "done writing ac's"
 stats.print_summary()
 stats.out.close()
 sys.exit(0)
-
-
-#    print
-#    if b.name == 'Frauenkirche':
-#        print "FK"
-#        print thisbuilding
-#        for v in thisbuilding:
-#            print vertices[v][0], vertices[v][1]
-#        sys.exit(0)
-
-#out.write("kids 0\n")
-#    sys.exit(0)
-#numvert 9
-#
-sys.stderr.write("# origin %15g %15g\n" % (lat, lon))
-sys.stderr.write("# nbuildings %i\n" % nb)
-
