@@ -61,10 +61,6 @@ import textures as tex
 import stg_io
 import tools
 
-tex.init()
-print tex.facades
-print tex.roofs
-
 # -- defaults
 ground_height = -20
 
@@ -73,9 +69,9 @@ buildings = [] # -- master list, holds all buildings
 first = True
 tile_size_x=500 # -- our tile size in meters
 tile_size_y=500
-infile = 'dd-altstadt.osm'; total_objects = 158
+#infile = 'dd-altstadt.osm'; total_objects = 158
 #infile = 'altstadt.osm'; total_objects = 100 # 2172
-#infile = 'xapi-buildings.osm'; total_objects = 20000 # huge!
+infile = 'xapi-buildings.osm'; total_objects = 2000 # huge!
 #p.parse('xapi.osm') # fails
 #p.parse('xapi-small.osm')
 
@@ -102,6 +98,7 @@ class Building(object):
         global transform
         r = self.refs[0]
         self.anchor = vec2d(transform.toLocal((r.lat, r.lon)))
+        self.roof_texture = None
 
         #print "tr X", self.X
 
@@ -398,12 +395,13 @@ def write_xml(fname, LOD_lists):
 
 if __name__ == "__main__":
 
-#    from tools import stats
 #    global stats
-    print ">> stats", tools.stats
     tools.init()
-    print ">> stats", tools.stats
     tools.stats.print_summary()
+
+    tex.init()
+    #print tex.facades
+    #print tex.roofs
 
     elev = tools.Interpolator("elev.xml", fake=False) # -- fake skips actually reading the file, speeding up things
     print "height at origin", elev(vec2d(0,0))
@@ -445,7 +443,7 @@ if __name__ == "__main__":
     #   - analyze surrounding: similar shaped buildings nearby? will get same texture
     #   - set building type, roof type etc
     #   - decide LOD
-    building_lib.analyse(buildings, static_objects)
+    buildings = building_lib.analyse(buildings, static_objects, transform, elev, tex.facades, tex.roofs)
 
     # -- now put buildings into clusters
     clusters = Clusters(min_, max_, vec2d(2000.,2000.))
@@ -478,7 +476,7 @@ if __name__ == "__main__":
             out = open(fname+".ac", "w")
             write_ac_header(out, nb)
             for building in cl.objects:
-                building_lib.write(building, out, elev, tile_elev, transform, offset, tex.facades, tex.roofs, LOD_lists)
+                building_lib.write(building, out, elev, tile_elev, transform, offset, LOD_lists)
             out.close()
             #transform.setOffset((0,0))
 

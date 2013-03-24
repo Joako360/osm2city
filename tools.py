@@ -10,6 +10,7 @@ Created on Sat Mar 23 18:42:23 2013
 import numpy as np
 import sys
 import textwrap
+
 stats = None
 
 class Interpolator(object):
@@ -80,11 +81,9 @@ class Stats(object):
         self.out = open("small.dat", "w")
 
     def count(self, area):
-        print "COUTNING", area,
         for i in range(len(self.area_levels))[::-1]:
             if area >= self.area_levels[i]:
                 self.area_above[i] += 1
-                print self.area_above[i]
                 return i
         self.area_above[0] += 1
         return 0
@@ -99,7 +98,7 @@ class Stats(object):
         """ % (self.objects, self.skipped, self.vertices, self.surfaces)))
         for i in range(len(self.area_levels)):
             out.write(" %5g m^2  %5i\n" % (self.area_levels[i], self.area_above[i]))
-        print self
+        #print self
 
 def init():
     global stats
