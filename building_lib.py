@@ -20,51 +20,19 @@ import sys
 import textwrap
 import plot
 
-class Stats(object):
-    def __init__(self):
-        self.objects = 0
-        self.skipped = 0
-        self.buildings_in_LOD = np.zeros(3)
-        self.area_levels = np.array([1,10,20,50,100,200,500,1000,2000,5000,10000,20000,50000])
-        self.area_above = np.zeros_like(self.area_levels)
-        self.vertices = 0
-        self.surfaces = 0
-        self.out = open("small.dat", "w")
-
-    def count(self, area):
-        for i in range(len(self.area_levels))[::-1]:
-            if area >= self.area_levels[i]:
-                self.area_above[i] += 1
-                return i
-        self.area_above[0] += 1
-        return 0
-
-    def print_summary(self):
-        out = sys.stdout
-        out.write(textwrap.dedent("""
-        total buildings %i
-        skipped         %i
-        vertices        %i
-        surfaces        %i
-        """ % (self.objects, self.skipped, self.vertices, self.surfaces)))
-        for i in range(len(self.area_levels)):
-            out.write("> %5g m^2  %5i\n" % (self.area_levels[i], self.area_above[i]))
-
-stats = Stats()
+import tools
 
 def write_and_count_numvert(out, numvert):
     """write numvert tag to .ac, update stats"""
     out.write("numvert %i\n" % numvert)
-    global stats
-    stats.vertices += numvert
+    #global stats
+    tools.stats.vertices += numvert
 
 def write_and_count_numsurf(out, numsurf):
     """write numsurf tag to .ac, update stats"""
     out.write("numsurf %i\n" % numsurf)
-    global stats
-    stats.surfaces += numsurf
-
-
+    #global stats
+    tools.stats.surfaces += numsurf
 
 class random_number(object):
     def __init__(self, randtype, min, max):
@@ -119,8 +87,11 @@ def reset_nb():
     global nb
     nb = 0
 
+def analyse(buildings, static_objects):
+    """analyse all buildings"""
+    pass
 
-def write_building(b, out, elev, tile_elev, transform, offset, facades, roofs, LOD_lists):
+def write(b, out, elev, tile_elev, transform, offset, facades, roofs, LOD_lists):
     """offset accounts for cluster center"""
 # am anfang geometrieanalyse
 # - ort: urban, residential, rural
@@ -132,8 +103,9 @@ def write_building(b, out, elev, tile_elev, transform, offset, facades, roofs, L
 # - facade raussuchen
 #   requires: compat:flat-roof
 
-    global first
+#    global first
     global stats
+
     #mat = random.randint(1,4)
     mat = 0
     roof_mat = 0
@@ -240,8 +212,9 @@ def write_building(b, out, elev, tile_elev, transform, offset, facades, roofs, L
 #    stats.out.write("\n")
 #    stats.out.write('# '+str(list(r.coords)))
 #    stats.out.write("\n\n")
-
-    stats.count(p.area)
+    print "Stats obj", tools.stats
+    tools.stats.count(p.area)
+    tools.stats.print_summary()
 #    if p.area < 200.:
 #        print "small?", p.area
 #

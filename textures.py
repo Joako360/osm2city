@@ -276,6 +276,7 @@ def init():
 
 if __name__ == "__main__":
     init()
+    bla
     cands = facades.find_candidates([], 14)
     print "cands ar", cands
     for t in cands:

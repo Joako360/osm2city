@@ -41,6 +41,7 @@ You should disable random buildings.
 #   - decide LOD
 # - write clusters
 
+import pdb
 
 import numpy as np
 import sys
@@ -51,14 +52,13 @@ from imposm.parser import OSMParser
 import coordinates
 import itertools
 from cluster import Clusters
-from building_writer import write_building, random_number
-from building_writer import stats
+import building_lib
+#from building_writer import write_building, random_number
 from vec2d import vec2d
 import textwrap
-import pdb
 
 import textures as tex
-import stg
+import stg_io
 import tools
 
 tex.init()
@@ -67,10 +67,8 @@ print tex.roofs
 
 # -- defaults
 ground_height = -20
-nb = 0
-nobjects = 0
+
 buildings = [] # -- master list, holds all buildings
-from building_writer import stats
 
 first = True
 tile_size_x=500 # -- our tile size in meters
@@ -90,8 +88,6 @@ skiplist = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
 def dist(a,b):
     pass
 
-
-
 class Building(object):
     """Central object class.
        Holds all data relevant for a building. Coordinates, type, area, ..."""
@@ -105,7 +101,8 @@ class Building(object):
         self.area = 0
         global transform
         r = self.refs[0]
-        self.X = vec2d(transform.toLocal((r.lat, r.lon)))
+        self.anchor = vec2d(transform.toLocal((r.lat, r.lon)))
+
         #print "tr X", self.X
 
 class Coords(object):
@@ -164,9 +161,9 @@ class wayExtract(object):
 
                 self.buildings.append(building)
 #                global stats
-                if stats.objects == total_objects: raise ValueError
-                stats.objects += 1
-                print stats.objects
+                if tools.stats.objects == total_objects: raise ValueError
+                tools.stats.objects += 1
+                print tools.stats.objects
                 #global clusters
                 #clusters.append(building.X, building)
 
@@ -234,10 +231,6 @@ if 0:
 
 
 #sys.exit(0)
-elev = tools.Interpolator("elev.xml", fake=False) # -- fake skips actually reading the file, speeding up things
-print "height at origin", elev(vec2d(0,0))
-print "origin at ", transform.toGlobal((0,0))
-
 
 def write_map(filename, transform, elev, gmin, gmax):
     lmin = vec2d(transform.toLocal((gmin.x, gmin.y)))
@@ -403,89 +396,101 @@ def write_xml(fname, LOD_lists):
 # here we go!
 # -----------------------------------------------------------------------------
 
-# - parse OSM -> return a list of building objects
+if __name__ == "__main__":
 
-#print clusters.list
-# instantiate counter and parser and start parsing
-way = wayExtract()
+#    from tools import stats
+#    global stats
+    print ">> stats", tools.stats
+    tools.init()
+    print ">> stats", tools.stats
+    tools.stats.print_summary()
 
-#p = OSMParser(concurrency=4, ways_callback=way.ways, coords_callback=way.coords )
-p = OSMParser(concurrency=4, coords_callback=way.coords )
-print "start parsing coords"
-p.parse(infile)
-print "done parsing"
-print "ncords:", len(way.coords_list)
-print "bounds:", way.minlon, way.maxlon, way.minlat, way.maxlat
+    elev = tools.Interpolator("elev.xml", fake=False) # -- fake skips actually reading the file, speeding up things
+    print "height at origin", elev(vec2d(0,0))
+    print "origin at ", transform.toGlobal((0,0))
 
-p = OSMParser(concurrency=4, ways_callback=way.ways)
-print "start parsing ways"
-try:
+
+
+    # - parse OSM -> return a list of building objects
+
+    #print clusters.list
+    # instantiate counter and parser and start parsing
+    way = wayExtract()
+
+    #p = OSMParser(concurrency=4, ways_callback=way.ways, coords_callback=way.coords )
+    p = OSMParser(concurrency=4, coords_callback=way.coords )
+    print "start parsing coords"
     p.parse(infile)
-except ValueError:
-    pass
+    print "done parsing"
+    print "ncords:", len(way.coords_list)
+    print "bounds:", way.minlon, way.maxlon, way.minlat, way.maxlat
 
-print "nbuildings", len(way.buildings)
-print "done parsing"
-buildings = way.buildings
+    p = OSMParser(concurrency=4, ways_callback=way.ways)
+    print "start parsing ways"
+    try:
+        p.parse(infile)
+    except ValueError:
+        pass
 
+    print "nbuildings", len(way.buildings)
+    print "done parsing"
+    buildings = way.buildings
 
-# - read relevant stgs
-stg.read()  # FIXME: dummy
+    # - read relevant stgs
+    static_objects = stg_io.Stg("e013n51/3171138.stg")
 
-# - analyze buildings
-#   - calculate area
-#   - location clash with stg static models? drop building
-#   - analyze surrounding: similar shaped buildings nearby? will get same texture
-#   - set building type, roof type etc
-#   - decide LOD
-# b_lib.analyze(buildings)
+    # - analyze buildings
+    #   - calculate area
+    #   - location clash with stg static models? drop building
+    #   - analyze surrounding: similar shaped buildings nearby? will get same texture
+    #   - set building type, roof type etc
+    #   - decide LOD
+    building_lib.analyse(buildings, static_objects)
 
-# -- now put buildings into clusters
-clusters = Clusters(min_, max_, vec2d(2000.,2000.))
-for b in buildings:
-    clusters.append(b.X, b)
-clusters.stats()
+    # -- now put buildings into clusters
+    clusters = Clusters(min_, max_, vec2d(2000.,2000.))
+    for b in buildings:
+        clusters.append(b.anchor, b)
+    clusters.stats()
+    # - write clusters
+    stg = open("city.stg", "w")
+    for l in clusters._clusters:
+        for cl in l:
+            nb = len(cl.objects)
+            if not nb: continue
 
-# - write clusters
-stg = open("city.stg", "w")
-for l in clusters._clusters:
-    for cl in l:
-        nb = len(cl.objects)
-        if not nb: continue
+            # -- get cluster center
+            offset = cl.center
 
-        # -- get cluster center
-        offset = cl.center
+            tile_elev = elev(cl.center)
 
-        tile_elev = elev(cl.center)
+            #transform.setOffset((-offset).list())
+            center_lat, center_lon = transform.toGlobal((cl.center.x, cl.center.y))
 
-        #transform.setOffset((-offset).list())
-        center_lat, center_lon = transform.toGlobal((cl.center.x, cl.center.y))
-
-        LOD_lists = []
-        LOD_lists.append([])
-        LOD_lists.append([])
-        LOD_lists.append([])
-
-
-        # -- open ac and write header
-        fname = "city-%04i%04i" % (cl.I.x, cl.I.y)
-        out = open(fname+".ac", "w")
-        write_ac_header(out, nb)
-        for building in cl.objects:
-            write_building(building, out, elev, tile_elev, transform, offset, tex.facades, tex.roofs, LOD_lists)
-        out.close()
-        #transform.setOffset((0,0))
-
-        # -- write xml
-        write_xml(fname, LOD_lists)
-
-        # -- write stg
-        stg.write("OBJECT_STATIC %s %g %g %g %g\n" % (fname+".xml", center_lon, center_lat, tile_elev, 180))
-stg.close()
-
-print "done writing ac's"
+            LOD_lists = []
+            LOD_lists.append([])
+            LOD_lists.append([])
+            LOD_lists.append([])
 
 
-stats.print_summary()
-stats.out.close()
-sys.exit(0)
+            # -- open ac and write header
+            fname = "city-%04i%04i" % (cl.I.x, cl.I.y)
+            out = open(fname+".ac", "w")
+            write_ac_header(out, nb)
+            for building in cl.objects:
+                building_lib.write(building, out, elev, tile_elev, transform, offset, tex.facades, tex.roofs, LOD_lists)
+            out.close()
+            #transform.setOffset((0,0))
+
+            # -- write xml
+            write_xml(fname, LOD_lists)
+
+            # -- write stg
+            stg.write("OBJECT_STATIC %s %g %g %g %g\n" % (fname+".xml", center_lon, center_lat, tile_elev, 180))
+    stg.close()
+
+    print "done writing ac's"
+
+    tools.stats.print_summary()
+    tools.stats.out.close()
+    sys.exit(0)

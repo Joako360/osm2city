@@ -8,6 +8,9 @@ Created on Sat Mar 23 18:42:23 2013
 @author: tom
 """
 import numpy as np
+import sys
+import textwrap
+stats = None
 
 class Interpolator(object):
     """load elevation data from file, interpolate"""
@@ -64,3 +67,41 @@ def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=
             f.write("%1.8f %1.8f %g %g\n" % (lon, lat, x, y))
         f.write("\n")
     f.close()
+
+class Stats(object):
+    def __init__(self):
+        self.objects = 0
+        self.skipped = 0
+        self.buildings_in_LOD = np.zeros(3)
+        self.area_levels = np.array([1,10,20,50,100,200,500,1000,2000,5000,10000,20000,50000])
+        self.area_above = np.zeros_like(self.area_levels)
+        self.vertices = 0
+        self.surfaces = 0
+        self.out = open("small.dat", "w")
+
+    def count(self, area):
+        print "COUTNING", area,
+        for i in range(len(self.area_levels))[::-1]:
+            if area >= self.area_levels[i]:
+                self.area_above[i] += 1
+                print self.area_above[i]
+                return i
+        self.area_above[0] += 1
+        return 0
+
+    def print_summary(self):
+        out = sys.stdout
+        out.write(textwrap.dedent("""
+        total buildings %i
+        skipped         %i
+        vertices        %i
+        surfaces        %i
+        """ % (self.objects, self.skipped, self.vertices, self.surfaces)))
+        for i in range(len(self.area_levels)):
+            out.write(" %5g m^2  %5i\n" % (self.area_levels[i], self.area_above[i]))
+        print self
+
+def init():
+    global stats
+    stats = Stats()
+    print "tools: init", stats
