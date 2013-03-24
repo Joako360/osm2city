@@ -33,7 +33,7 @@ class Stg:
             alt = float(splitted[4])
             r = Coords(-1, lon, lat)
             hdg = float(splitted[5])
-            objs.append(Building(osm_id=-1, tags=-1, refs=[r], name="", height=0, levels=0))
+            objs.append(Building(osm_id=-1, tags=-1, refs=[r], name=path, height=0, levels=0, stg_typ = typ, stg_hdg = hdg))
         f.close()
         return objs
 

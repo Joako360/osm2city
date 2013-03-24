@@ -72,7 +72,7 @@ def check_height(building_height, t):
             for i in range(len(t.v_splits_meters)):
                 if t.v_splits_meters[i] >= building_height:
                     tex_y0 = 1-t.v_splits[i]
-                    print "# height %g storey %i" % (building_height, i)
+                    #print "# height %g storey %i" % (building_height, i)
                     break
             tex_y1 = 1.
             #tex_filename = t.filename + '.png'
@@ -87,6 +87,44 @@ def reset_nb():
     global nb
     nb = 0
 
+def get_nodes_from_acs(objs, path_prefix):
+    """load all .ac, extract nodes"""
+    # FIXME: use real ac3d reader: https://github.com/majic79/Blender-AC3D/blob/master/io_scene_ac3d/import_ac3d.py
+    # FIXME: don't skip .xml
+
+    nodes=np.array([[0,0]])
+
+    for b in objs:
+        if b.name.endswith(".ac") and b.stg_typ == "OBJECT_STATIC":
+            print "READ", b.name
+            try:
+                ac = open(path_prefix + b.name, 'r')
+            except:
+                continue
+            lines = ac.readlines()
+            i = 0
+            while (i < len(lines)):
+                if lines[i].startswith('numvert'):
+                    line = lines[i]
+                    numvert = int(line.split()[1])
+                    #print "numvert", numvert
+                    for j in range(numvert):
+                        i += 1
+                        splitted = lines[i].split()
+                        node = np.array([[float(splitted[0]),
+                                          float(splitted[2])]])
+                        #stg_hdg
+
+                        node += b.anchor.list()
+                        nodes = np.append(nodes, node,0)
+                i += 1
+
+            ac.close()
+            #print "------"
+    print "nodes: ", nodes.shape
+
+    return nodes
+
 
 
 def analyse(buildings, static_objects, transform, elev, facades, roofs):
@@ -99,6 +137,17 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
     We're in global coordinates
     """
+    # -- build KDtree for static models
+    from scipy.spatial import KDTree
+
+    s = get_nodes_from_acs(static_objects.objs, "e013n51/")
+#    s = np.zeros((len(static_objects.objs), 2))
+#    i = 0
+#    for b in static_objects.objs:
+#        s[i] = b.anchor.list()
+#        i += 1
+    static_tree = KDTree(s, leafsize=10) # -- switch to brute force at 10
+
     new_buildings = []
     for b in buildings:
     # am anfang geometrieanalyse
@@ -136,16 +185,17 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             # failing that, try levels
             if float(b.levels) > 0:
                 pass
-                print "have levels", b.levels
+                #print "have levels", b.levels
             else:
                 # failing that, use random levels
                 b.levels = random_levels()
 
         b.height = float(b.levels) * level_height
-        print "hei", b.height, b.levels
+        #print "hei", b.height, b.levels
 
         if b.height < 3.4:
             print "Skipping small building with height < 3.4"
+            tools.stats.skipped_small += 1
             continue
 
 
@@ -208,11 +258,35 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 lenX = np.roll(lenX, 1)
                 X[0] = X[-1]
 
+        # -- static objects nearby?
+        # FIXME: which radius? Or use centroid point?
+        #radius = max(lenX)
+        radius = 1.
+        #nearby = static_tree.query_ball_point(X, radius)
+        nearby = []
+        # FIXME: why now all nearby??
+
+        if b.name == "Semperoper":
+            bla
+
+        if len(nearby):
+            try:
+                print "Static objects nearby. Skipping ", b.name
+            except:
+                print "FIXME: Encoding problem", b.name.encode('ascii', 'ignore')
+            #for n in nearby:
+            #    print static_objects.objs[n].name,
+            #print
+            tools.stats.skipped_nearby += 1
+            continue
+
+
         # -- shapely stuff
         #    - compute area
         r = LinearRing(list(X))
         p = Polygon(r)
         tools.stats.count(p.area)
+
 
         #tools.stats.print_summary()
     #    if p.area < 200.:
@@ -251,7 +325,10 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
     global nb
     nb += 1
-    print nb
+    #print nb
+    if nb % 100 == 0: print nb
+    else: print ".",
+
     out.write("OBJECT poly\n")
     name = "b%i" % nb
     out.write("name \"%s\"\n" % name)

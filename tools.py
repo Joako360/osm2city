@@ -72,7 +72,8 @@ def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=
 class Stats(object):
     def __init__(self):
         self.objects = 0
-        self.skipped = 0
+        self.skipped_small = 0
+        self.skipped_nearby = 0
         self.buildings_in_LOD = np.zeros(3)
         self.area_levels = np.array([1,10,20,50,100,200,500,1000,2000,5000,10000,20000,50000])
         self.area_above = np.zeros_like(self.area_levels)
@@ -92,10 +93,13 @@ class Stats(object):
         out = sys.stdout
         out.write(textwrap.dedent("""
         total buildings %i
-        skipped         %i
+        skipped
+          small         %i
+          nearby        %i
         vertices        %i
         surfaces        %i
-        """ % (self.objects, self.skipped, self.vertices, self.surfaces)))
+        """ % (self.objects, self.skipped_small, self.skipped_nearby,
+               self.vertices, self.surfaces)))
         for i in range(len(self.area_levels)):
             out.write(" %5g m^2  %5i\n" % (self.area_levels[i], self.area_above[i]))
         #print self

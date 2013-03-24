@@ -17,6 +17,10 @@
 # - correct stg id
 # -
 
+# FIXME:
+# - pythonic way of i = 0; for b in refs: bla[i] = b
+# why need hdg=180 in transform? If hdg=0, cluster is broken
+
 """
 osm2city.py aims at generating 3D city models for FG, using OSM data.
 Currently, it generates 3D textured buildings, much like bob.pl.
@@ -41,7 +45,7 @@ You should disable random buildings.
 #   - decide LOD
 # - write clusters
 
-import pdb
+#import pdb
 
 import numpy as np
 import sys
@@ -69,9 +73,9 @@ buildings = [] # -- master list, holds all buildings
 first = True
 tile_size_x=500 # -- our tile size in meters
 tile_size_y=500
-#infile = 'dd-altstadt.osm'; total_objects = 158
+infile = 'dd-altstadt.osm'; total_objects = 158
 #infile = 'altstadt.osm'; total_objects = 100 # 2172
-infile = 'xapi-buildings.osm'; total_objects = 2000 # huge!
+#infile = 'xapi-buildings.osm'; total_objects = 2000 # huge!
 #p.parse('xapi.osm') # fails
 #p.parse('xapi-small.osm')
 
@@ -87,11 +91,13 @@ def dist(a,b):
 class Building(object):
     """Central object class.
        Holds all data relevant for a building. Coordinates, type, area, ..."""
-    def __init__(self, osm_id, tags, refs, name, height, levels):
+    def __init__(self, osm_id, tags, refs, name, height, levels, stg_typ = None, stg_hdg = None):
         self.osm_id = osm_id
         self.tags = tags
         self.refs = refs
-        self.name = name
+        self.name = name        # stg: name
+        self.stg_typ = stg_typ  # stg: OBJECT_SHARED or _STATIC
+        self.stg_hdg = stg_hdg
         self.height = height
         self.levels = levels
         self.area = 0
@@ -215,7 +221,7 @@ maxlon=13.88
 lon = 13.7467
 lat = 51.0377
 
-transform = coordinates.Transformation((lat, lon), hdg = 0)
+transform = coordinates.Transformation((lat, lon), hdg = 0) # FIXME: is Transformation screwed bec. we need hdg=180?
 #origin = coordinates.Position(transform, [], lat, lon)
 
 if 0:
@@ -461,6 +467,7 @@ if __name__ == "__main__":
             offset = cl.center
 
             tile_elev = elev(cl.center)
+            print "TILE E", tile_elev
 
             #transform.setOffset((-offset).list())
             center_lat, center_lon = transform.toGlobal((cl.center.x, cl.center.y))
