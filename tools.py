@@ -74,16 +74,22 @@ class Stats(object):
         self.objects = 0
         self.skipped_small = 0
         self.skipped_nearby = 0
+        self.skipped_texture = 0
         self.buildings_in_LOD = np.zeros(3)
         self.area_levels = np.array([1,10,20,50,100,200,500,1000,2000,5000,10000,20000,50000])
         self.area_above = np.zeros_like(self.area_levels)
         self.vertices = 0
         self.surfaces = 0
-        self.out = open("small.dat", "w")
+        self.out = None
 
-    def count(self, area):
+    def count(self, b):
+        """update stats (vertices, surfaces, area) with given building's data
+        """
+        self.vertices += b.vertices
+        self.surfaces += b.surfaces
+        self.objects += 1
         for i in range(len(self.area_levels))[::-1]:
-            if area >= self.area_levels[i]:
+            if b.area >= self.area_levels[i]:
                 self.area_above[i] += 1
                 return i
         self.area_above[0] += 1
@@ -96,10 +102,12 @@ class Stats(object):
         skipped
           small         %i
           nearby        %i
+          texture       %i
         vertices        %i
         surfaces        %i
-        """ % (self.objects, self.skipped_small, self.skipped_nearby,
+        """ % (self.objects, self.skipped_small, self.skipped_nearby, self.skipped_texture,
                self.vertices, self.surfaces)))
+        out.write("above\n")
         for i in range(len(self.area_levels)):
             out.write(" %5g m^2  %5i\n" % (self.area_levels[i], self.area_above[i]))
         #print self

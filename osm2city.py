@@ -73,9 +73,9 @@ buildings = [] # -- master list, holds all buildings
 first = True
 tile_size_x=500 # -- our tile size in meters
 tile_size_y=500
-infile = 'dd-altstadt.osm'; total_objects = 158
+#infile = 'dd-altstadt.osm'; total_objects = 158
 #infile = 'altstadt.osm'; total_objects = 100 # 2172
-#infile = 'xapi-buildings.osm'; total_objects = 2000 # huge!
+infile = 'xapi-buildings.osm'; total_objects = 30000 # huge!
 #p.parse('xapi.osm') # fails
 #p.parse('xapi-small.osm')
 
@@ -101,6 +101,8 @@ class Building(object):
         self.height = height
         self.levels = levels
         self.area = 0
+        self.vertices = 0
+        self.surfaces = 0
         global transform
         r = self.refs[0]
         self.anchor = vec2d(transform.toLocal((r.lat, r.lon)))
@@ -455,7 +457,8 @@ if __name__ == "__main__":
     clusters = Clusters(min_, max_, vec2d(2000.,2000.))
     for b in buildings:
         clusters.append(b.anchor, b)
-    clusters.stats()
+
+    clusters.write_stats()
     # - write clusters
     stg = open("city.stg", "w")
     for l in clusters._clusters:
@@ -494,8 +497,7 @@ if __name__ == "__main__":
             stg.write("OBJECT_STATIC %s %g %g %g %g\n" % (fname+".xml", center_lon, center_lat, tile_elev, 180))
     stg.close()
 
-    print "done writing ac's"
 
     tools.stats.print_summary()
-    tools.stats.out.close()
+    print "done."
     sys.exit(0)

@@ -22,17 +22,15 @@ import plot
 
 import tools
 
-def write_and_count_numvert(out, numvert):
+def write_and_count_numvert(out, building, numvert):
     """write numvert tag to .ac, update stats"""
     out.write("numvert %i\n" % numvert)
-    #global stats
-    tools.stats.vertices += numvert
+    building.vertices += numvert
 
-def write_and_count_numsurf(out, numsurf):
+def write_and_count_numsurf(out, building, numsurf):
     """write numsurf tag to .ac, update stats"""
     out.write("numsurf %i\n" % numsurf)
-    #global stats
-    tools.stats.surfaces += numsurf
+    building.surfaces += numsurf
 
 class random_number(object):
     def __init__(self, randtype, min, max):
@@ -285,7 +283,12 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         #    - compute area
         r = LinearRing(list(X))
         p = Polygon(r)
-        tools.stats.count(p.area)
+        b.area = p.area
+
+        if b.area < 10.: # FIXME use limits.area_min:
+            print "Skipping small building (area)"
+            tools.stats.skipped_small += 1
+            continue
 
 
         #tools.stats.print_summary()
@@ -301,10 +304,15 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
         # FIXME: again facade stuff?
         b.facade_texture = facades.find_matching(requires, b.height)
+        if not b.facade_texture:
+            tools.stats.skipped_texture += 1
+            print "Skipping building (no matching texture)"
+            continue
+
         if b.roof_separate:
             b.roof_texture = roofs.find_matching(b.facade_texture.requires)
 
-        # -- finally
+        # -- finally: append building to new list
         b.X = X
         b.lenX = lenX
         new_buildings.append(b)
@@ -314,6 +322,8 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     """offset accounts for cluster center
        now actually write building.
+       While writing, accumulate some statistics
+       (totals stored in global stats object, individually also in building)
     """
     X = b.X
     lenX = b.lenX
@@ -334,7 +344,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     out.write("name \"%s\"\n" % name)
 
     lod = random_LOD()
-    if b.area < 200: lod = 0
+    if b.area < 150: lod = 0
     if b.area > 1000: lod = 2
     if b.levels > 5: lod = 2 # tall buildings always LOD bare
     #if b.levels < 3: lod = 0 # small buildings always LOD detail
@@ -382,7 +392,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 #        tex_y1 = building_height / texture_height # FIXME
 
     #out.write("loc 0 0 0\n")
-    write_and_count_numvert(out, 2*nnodes_ground)
+    write_and_count_numvert(out, b, 2*nnodes_ground)
 
     i = 0
     for r in b.refs:
@@ -405,7 +415,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         #out.write("%g %g %g\n" % (y, z, x))
         out.write("%g %g %g\n" % (x[1], ground_elev + b.height, x[0]))
 
-    write_and_count_numsurf(out, nsurf)
+    write_and_count_numsurf(out, b, nsurf)
     # -- walls
 
     for i in range(nnodes_ground - 1):
@@ -452,12 +462,12 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
         if b.roof_flat:
             #out.write("loc 0 0 0\n")
-            write_and_count_numvert(out, nnodes_ground)
+            write_and_count_numvert(out, b, nnodes_ground)
             for x in X[:-1]:
                 z = ground_elev - 1
                 #out.write("%g %g %g\n" % (y, z, x))
                 out.write("%g %g %g\n" % (x[1], ground_elev + height, x[0]))
-            write_and_count_numsurf(out, 1)
+            write_and_count_numsurf(out, b, 1)
             out.write("SURF 0x0\n")
             out.write("mat %i\n" % mat)
             out.write("refs %i\n" % nnodes_ground)
@@ -469,7 +479,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             out.write("kids 0\n")
         else:
             # -- gable roof
-            write_and_count_numvert(out, nnodes_ground + 2)
+            write_and_count_numvert(out, b, nnodes_ground + 2)
             # -- 4 corners
             for x in X[:-1]:
                 z = ground_elev - 1
@@ -495,7 +505,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             len_roof_hypo = ((0.5*lenX[1])**2 + roof_height**2)**0.5
             repeaty = len_roof_hypo / roof_texture_size_y
 
-            write_and_count_numsurf(out, 4)
+            write_and_count_numsurf(out, b, 4)
             out.write("SURF 0x0\n")
             out.write("mat %i\n" % b.mat)
             out.write("refs %i\n" % nnodes_ground)
@@ -531,4 +541,6 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             out.write("%i %g %g\n" % (4, 0.5*repeatx, repeaty))
 
             out.write("kids 0\n")
+
+    tools.stats.count(b)
 

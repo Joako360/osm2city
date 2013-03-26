@@ -5,6 +5,8 @@ Created on Thu Feb 28 23:39:23 2013
 @author: tom
 """
 from vec2d import vec2d
+import tools
+
 
 class Cluster(object):
     def __init__(self, I, center):
@@ -12,6 +14,7 @@ class Cluster(object):
         self.objects = []
         self.I = I
         self.center = center # -- center in local coord
+        self.stats = tools.Stats()
 
     def __str__(self):
         print "cl", self.I
@@ -64,8 +67,9 @@ class Clusters(object):
         #print "appending at pos", X
         #print "  to ", self(X)
         self(X).objects.append(obj)
+        self(X).stats.count(obj)
 
-    def stats(self):
+    def write_stats(self):
         f = open("cluster_stats.dat", "w")
         for j in range(self.n.y):
             for i in range(self.n.x):
