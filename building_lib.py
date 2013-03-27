@@ -7,6 +7,7 @@ Created on Thu Feb 28 23:18:08 2013
 import random
 import numpy as np
 import copy
+import pdb
 
 from vec2d import vec2d
 from textures import find_matching_texture
@@ -19,7 +20,7 @@ from shapely.geometry.polygon import LinearRing
 import sys
 import textwrap
 import plot
-
+from math import sin, cos, radians
 import tools
 
 def write_and_count_numvert(out, building, numvert):
@@ -90,7 +91,7 @@ def get_nodes_from_acs(objs, path_prefix):
     # FIXME: use real ac3d reader: https://github.com/majic79/Blender-AC3D/blob/master/io_scene_ac3d/import_ac3d.py
     # FIXME: don't skip .xml
 
-    nodes=np.array([[0,0]])
+    all_nodes = np.array([[0,0]])
 
     for b in objs:
         if b.name.endswith(".ac") and b.stg_typ == "OBJECT_STATIC":
@@ -99,6 +100,11 @@ def get_nodes_from_acs(objs, path_prefix):
                 ac = open(path_prefix + b.name, 'r')
             except:
                 continue
+            angle = radians(b.stg_hdg)
+            R = np.array([[cos(angle), -sin(angle)],
+                          [sin(angle),  cos(angle)]])
+
+            ac_nodes = np.array([[0,0]])
             lines = ac.readlines()
             i = 0
             while (i < len(lines)):
@@ -109,20 +115,35 @@ def get_nodes_from_acs(objs, path_prefix):
                     for j in range(numvert):
                         i += 1
                         splitted = lines[i].split()
-                        node = np.array([[float(splitted[0]),
-                                          float(splitted[2])]])
+                        node = np.array([-float(splitted[2]),
+                                         -float(splitted[0])])
+
+                        node = R.dot(node).reshape(1,2)
+                        ac_nodes = np.append(ac_nodes, node, 0)
                         #stg_hdg
 
-                        node += b.anchor.list()
-                        nodes = np.append(nodes, node,0)
                 i += 1
-
             ac.close()
+
+#            ac_nodes = R.dot(ac_nodes)
+            ac_nodes += b.anchor.list()
+            all_nodes = np.append(all_nodes, ac_nodes, 0)
             #print "------"
-    print "nodes: ", nodes.shape
 
-    return nodes
+    return all_nodes
 
+def test_ac_load():
+    import stg_io
+    static_objects = stg_io.Stg("e013n51/3171138.stg")
+    s = get_nodes_from_acs(static_objects.objs, "e013n51/")
+    np.savetxt("nodes.dat", s)
+#    out = open("nodes.dat", "w")
+#    for n in s:
+#            out.write("\n")
+#        else: out.write("%g %g\n" % (n[0], n[1]))
+
+#    out.close()
+    #print s
 
 
 def analyse(buildings, static_objects, transform, elev, facades, roofs):
@@ -139,6 +160,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
     from scipy.spatial import KDTree
 
     s = get_nodes_from_acs(static_objects.objs, "e013n51/")
+    np.savetxt("nodes.dat", s)
 #    s = np.zeros((len(static_objects.objs), 2))
 #    i = 0
 #    for b in static_objects.objs:
@@ -238,6 +260,11 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             X[i,0], X[i,1] = transform.toLocal((r.lat, r.lon))
             i += 1
 
+        # -- write nodes to separate debug file
+        for i in range(b.nnodes_ground):
+            tools.stats.debug1.write("%g %g\n" % (X[i,0], X[i,1]))
+
+
         X[-1] = X[0] # -- we duplicate last node!
 
         # -- fix inverted faces
@@ -259,17 +286,23 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         # -- static objects nearby?
         # FIXME: which radius? Or use centroid point?
         #radius = max(lenX)
-        radius = 1.
-        #nearby = static_tree.query_ball_point(X, radius)
-        nearby = []
-        # FIXME: why now all nearby??
+        radius = 5.
+        # -- query_ball_point may return funny lists [[], [], .. ]
+        #    filter these
+        nearby = static_tree.query_ball_point(X, radius)
+        nearby = [x for x in nearby if x]
 
-        if b.name == "Semperoper":
-            bla
+#        if b.name == "Semperoper":
+#            bla
 
         if len(nearby):
+            for i in range(b.nnodes_ground):
+                tools.stats.debug2.write("%g %g\n" % (X[i,0], X[i,1]))
+#            print "nearby:", nearby
+#            for n in nearby:
+#                print "-->", s[n]
             try:
-                print "Static objects nearby. Skipping ", b.name
+                print "Static objects nearby. Skipping ", b.name, len(nearby)
             except:
                 print "FIXME: Encoding problem", b.name.encode('ascii', 'ignore')
             #for n in nearby:
@@ -336,8 +369,8 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     global nb
     nb += 1
     #print nb
-    if nb % 100 == 0: print nb
-    else: print ".",
+    if nb % 70 == 0: print nb
+    else: sys.stdout.write(".")
 
     out.write("OBJECT poly\n")
     name = "b%i" % nb
@@ -482,7 +515,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             for x in X[:-1]:
                 z = ground_elev - 1
                 #out.write("%g %g %g\n" % (y, z, x))
-                out.write("%g %g %g\n" % (x[1], ground_elev + b.height, x[0]))
+                out.write("%g %g %g\n" % (-x[1], ground_elev + b.height, -x[0]))
             # --
             #mid_short_x = 0.5*(X[3][1]+X[0][1])
             #mid_short_z = 0.5*(X[3][0]+X[0][0])
@@ -494,8 +527,8 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             len_roof_top = lenX[0] - 2.*inward
             len_roof_bottom = 1.*lenX[0]
 
-            out.write("%g %g %g\n" % (0.5*(X[3][1]+X[0][1]) + tang[1], ground_elev + height + roof_height, 0.5*(X[3][0]+X[0][0]) + tang[0]))
-            out.write("%g %g %g\n" % (0.5*(X[1][1]+X[2][1]) - tang[1], ground_elev + height + roof_height, 0.5*(X[1][0]+X[2][0]) - tang[0]))
+            out.write("%g %g %g\n" % (-(0.5*(X[3][1]+X[0][1]) + tang[1]), ground_elev + height + roof_height, -(0.5*(X[3][0]+X[0][0]) + tang[0])))
+            out.write("%g %g %g\n" % (-(0.5*(X[1][1]+X[2][1]) - tang[1]), ground_elev + height + roof_height, -(0.5*(X[1][0]+X[2][0]) - tang[0])))
 
             roof_texture_size_x = roof_texture.h_size_meters # size of roof texture in meters
             roof_texture_size_y = roof_texture.v_size_meters
@@ -542,3 +575,5 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
     tools.stats.count(b)
 
+if __name__ == "__main__":
+    test_ac_load()

@@ -68,15 +68,16 @@ import tools
 
 # -- defaults
 ground_height = -20
+no_elev = False # -- skip elevation interpolation
 
 buildings = [] # -- master list, holds all buildings
 
 first = True
 tile_size_x=500 # -- our tile size in meters
 tile_size_y=500
-infile = 'dd-altstadt.osm'; total_objects = 158
+#infile = 'dd-altstadt.osm'; total_objects = 158
 #infile = 'altstadt.osm'; total_objects = 100 # 2172
-#infile = 'xapi-buildings.osm'; total_objects = 30000 # huge!
+infile = 'xapi-buildings.osm'; total_objects = 50000 # huge!
 #p.parse('xapi.osm') # fails
 #p.parse('xapi-small.osm')
 
@@ -169,7 +170,9 @@ class wayExtract(object):
 #                global stats
                 if tools.stats.objects == total_objects: raise ValueError
                 tools.stats.objects += 1
-                print tools.stats.objects
+
+                if tools.stats.objects % 70 == 0: print tools.stats.objects
+                else: sys.stdout.write(".")
                 #global clusters
                 #clusters.append(building.X, building)
 
@@ -412,7 +415,8 @@ if __name__ == "__main__":
     #print tex.facades
     #print tex.roofs
 
-    elev = tools.Interpolator("elev.xml", fake=False) # -- fake skips actually reading the file, speeding up things
+    print "reading elevation data"
+    elev = tools.Interpolator("elev.xml", fake=no_elev) # -- fake skips actually reading the file, speeding up things
     print "height at origin", elev(vec2d(0,0))
     print "origin at ", transform.toGlobal((0,0))
 
@@ -439,12 +443,16 @@ if __name__ == "__main__":
     except ValueError:
         pass
 
+    tools.stats.print_summary()
+
     print "nbuildings", len(way.buildings)
     print "done parsing"
     buildings = way.buildings
 
     # - read relevant stgs
     static_objects = stg_io.Stg("e013n51/3171138.stg")
+    tools.stats.debug1 = open("debug1.dat", "w")
+    tools.stats.debug2 = open("debug2.dat", "w")
 
     # - analyze buildings
     #   - calculate area
@@ -453,6 +461,7 @@ if __name__ == "__main__":
     #   - set building type, roof type etc
     #   - decide LOD
     buildings = building_lib.analyse(buildings, static_objects, transform, elev, tex.facades, tex.roofs)
+    tools.stats.print_summary()
 
     # -- now put buildings into clusters
     clusters = Clusters(min_, max_, vec2d(2000.,2000.))
@@ -498,7 +507,8 @@ if __name__ == "__main__":
             stg.write("OBJECT_STATIC %s %g %g %g %g\n" % (fname+".xml", center_lon, center_lat, tile_elev, 0))
     stg.close()
 
-
+    tools.stats.debug1.close()
+    tools.stats.debug2.close()
     tools.stats.print_summary()
     print "done."
     sys.exit(0)

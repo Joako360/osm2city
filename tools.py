@@ -87,7 +87,7 @@ class Stats(object):
         """
         self.vertices += b.vertices
         self.surfaces += b.surfaces
-        self.objects += 1
+        # self.objects += 1 # skipped because we count buildings while OSM parsing
         for i in range(len(self.area_levels))[::-1]:
             if b.area >= self.area_levels[i]:
                 self.area_above[i] += 1
