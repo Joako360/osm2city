@@ -61,6 +61,7 @@ import building_lib
 #from building_writer import write_building, random_number
 from vec2d import vec2d
 import textwrap
+import cPickle
 
 import textures as tex
 import stg_io
@@ -68,16 +69,16 @@ import tools
 
 # -- defaults
 ground_height = -20
-no_elev = False # -- skip elevation interpolation
-
+no_elev = True # -- skip elevation interpolation
+use_pkl = False
 buildings = [] # -- master list, holds all buildings
 
 first = True
 tile_size_x=500 # -- our tile size in meters
 tile_size_y=500
 #infile = 'dd-altstadt.osm'; total_objects = 158
-#infile = 'altstadt.osm'; total_objects = 100 # 2172
-infile = 'xapi-buildings.osm'; total_objects = 50000 # huge!
+#infile = 'altstadt.osm'; total_objects = 10000 # 2172
+infile = 'xapi-buildings.osm'; total_objects = 100000 # huge!
 #p.parse('xapi.osm') # fails
 #p.parse('xapi-small.osm')
 
@@ -421,33 +422,41 @@ if __name__ == "__main__":
     print "origin at ", transform.toGlobal((0,0))
 
 
-
-    # - parse OSM -> return a list of building objects
-
-    #print clusters.list
-    # instantiate counter and parser and start parsing
-    way = wayExtract()
-
-    #p = OSMParser(concurrency=4, ways_callback=way.ways, coords_callback=way.coords )
-    p = OSMParser(concurrency=4, coords_callback=way.coords )
-    print "start parsing coords"
-    p.parse(infile)
-    print "done parsing"
-    print "ncords:", len(way.coords_list)
-    print "bounds:", way.minlon, way.maxlon, way.minlat, way.maxlat
-
-    p = OSMParser(concurrency=4, ways_callback=way.ways)
-    print "start parsing ways"
-    try:
+    if not use_pkl:
+        # - parse OSM -> return a list of building objects
+        way = wayExtract()
+        #p = OSMParser(concurrency=4, ways_callback=way.ways, coords_callback=way.coords )
+        p = OSMParser(concurrency=4, coords_callback=way.coords )
+        print "start parsing coords"
         p.parse(infile)
-    except ValueError:
-        pass
+        print "done parsing"
+        print "ncords:", len(way.coords_list)
+        print "bounds:", way.minlon, way.maxlon, way.minlat, way.maxlat
 
-    tools.stats.print_summary()
+        p = OSMParser(concurrency=4, ways_callback=way.ways)
+        print "start parsing ways"
+        try:
+            p.parse(infile)
+        except ValueError:
+            pass
 
-    print "nbuildings", len(way.buildings)
-    print "done parsing"
-    buildings = way.buildings
+        tools.stats.print_summary()
+
+        print "nbuildings", len(way.buildings)
+        print "done parsing"
+        buildings = way.buildings
+
+        # -- pickle here
+        fpickle = open('data.pkl', 'wb')
+        cPickle.dump(buildings, fpickle, -1)
+        fpickle.close()
+    else:
+        fpickle = open('data.pkl', 'rb')
+        buildings = cPickle.load(fpickle)
+        fpickle.close()
+        print "unpickled %g buildings " % (len(buildings))
+        tools.stats.objects = len(buildings)
+
 
     # - read relevant stgs
     static_objects = stg_io.Stg("e013n51/3171138.stg")
