@@ -408,12 +408,11 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
     for x in X[:-1]:
         z = ground_elev - 1
-        #out.write("%g %g %g\n" % (y, z, x))
-        out.write("%g %g %g\n" % (x[1], z, x[0]))
+        out.write("%g %g %g\n" % (-x[1], z, -x[0]))
+
 
     for x in X[:-1]:
-        #out.write("%g %g %g\n" % (y, z, x))
-        out.write("%g %g %g\n" % (x[1], ground_elev + b.height, x[0]))
+        out.write("%g %g %g\n" % (-x[1], ground_elev + b.height, -x[0]))
 
     write_and_count_numsurf(out, b, nsurf)
     # -- walls
@@ -465,8 +464,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             write_and_count_numvert(out, b, nnodes_ground)
             for x in X[:-1]:
                 z = ground_elev - 1
-                #out.write("%g %g %g\n" % (y, z, x))
-                out.write("%g %g %g\n" % (x[1], ground_elev + height, x[0]))
+                out.write("%g %g %g\n" % (-x[1], ground_elev + height, -x[0]))
             write_and_count_numsurf(out, b, 1)
             out.write("SURF 0x0\n")
             out.write("mat %i\n" % mat)

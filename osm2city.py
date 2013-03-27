@@ -11,7 +11,8 @@
 # - lights
 # - put tall, large buildings in LOD bare, and small buildings in LOD detail
 # - more complicated roof geometries
-# -
+# - cmd line switches
+
 # for release
 # - respect static models
 # - correct stg id
@@ -73,9 +74,9 @@ buildings = [] # -- master list, holds all buildings
 first = True
 tile_size_x=500 # -- our tile size in meters
 tile_size_y=500
-#infile = 'dd-altstadt.osm'; total_objects = 158
+infile = 'dd-altstadt.osm'; total_objects = 158
 #infile = 'altstadt.osm'; total_objects = 100 # 2172
-infile = 'xapi-buildings.osm'; total_objects = 30000 # huge!
+#infile = 'xapi-buildings.osm'; total_objects = 30000 # huge!
 #p.parse('xapi.osm') # fails
 #p.parse('xapi-small.osm')
 
@@ -494,7 +495,7 @@ if __name__ == "__main__":
             write_xml(fname, LOD_lists)
 
             # -- write stg
-            stg.write("OBJECT_STATIC %s %g %g %g %g\n" % (fname+".xml", center_lon, center_lat, tile_elev, 180))
+            stg.write("OBJECT_STATIC %s %g %g %g %g\n" % (fname+".xml", center_lon, center_lat, tile_elev, 0))
     stg.close()
 
 
