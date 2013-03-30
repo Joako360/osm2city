@@ -18,8 +18,11 @@ inf="/usr/share/games/FlightGear/Scenery/Objects/w130n30/w122n37/958440.stg"
 #        return "%s %s %g %g %g %g" % (self.typ, self.path, self.lon, self.lat, self.alt, self.hdg)
 
 class Stg:
-    def __init__(self, filename):
-        self.objs = self.read(filename)
+    def __init__(self, filenames):
+        self.objs = []
+        for filename in filenames:
+            print "stg read", filename
+            self.objs += self.read(filename)
 
     def read(self, filename):
         objs = []

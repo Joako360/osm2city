@@ -4,23 +4,25 @@
 
 
 # TODO:
-# - use geometry library
+# x use geometry library
 # - read original .stg, don't place OSM buildings when there's a static model near/within
 # - fix empty backyards
 # - simplify buildings
 # - lights
-# - put tall, large buildings in LOD bare, and small buildings in LOD detail
+# x put tall, large buildings in LOD bare, and small buildings in LOD detail
 # - more complicated roof geometries
 # - cmd line switches
 
 # for release
 # - respect static models
-# - correct stg id
+# x correct stg id
 # -
+# - city center??
 
 # FIXME:
 # - pythonic way of i = 0; for b in refs: bla[i] = b
-# why need hdg=180 in transform? If hdg=0, cluster is broken
+# - x,y = transform(lon, lat)
+# x why need hdg=180 in transform? If hdg=0, cluster is broken
 
 """
 osm2city.py aims at generating 3D city models for FG, using OSM data.
@@ -46,7 +48,7 @@ You should disable random buildings.
 #   - decide LOD
 # - write clusters
 
-#import pdb
+import pdb
 
 import numpy as np
 import sys
@@ -66,11 +68,12 @@ import cPickle
 import textures as tex
 import stg_io
 import tools
+import calc_tile
 
 # -- defaults
 ground_height = -20
-no_elev = True # -- skip elevation interpolation
-use_pkl = False
+no_elev = False # -- skip elevation interpolation
+use_pkl = False #True
 buildings = [] # -- master list, holds all buildings
 
 first = True
@@ -85,7 +88,7 @@ infile = 'xapi-buildings.osm'; total_objects = 100000 # huge!
 #infile = 'map.osm'; total_objects = 216 #
 skiplist = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
           "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
-          "Residenzschloss Dresden"]
+          "Residenzschloss Dresden", "Fernsehturm", "Fernsehturm Dresden"]
 
 
 def dist(a,b):
@@ -426,14 +429,14 @@ if __name__ == "__main__":
         # - parse OSM -> return a list of building objects
         way = wayExtract()
         #p = OSMParser(concurrency=4, ways_callback=way.ways, coords_callback=way.coords )
-        p = OSMParser(concurrency=4, coords_callback=way.coords )
+        p = OSMParser(concurrency=1, coords_callback=way.coords)
         print "start parsing coords"
         p.parse(infile)
         print "done parsing"
         print "ncords:", len(way.coords_list)
         print "bounds:", way.minlon, way.maxlon, way.minlat, way.maxlat
 
-        p = OSMParser(concurrency=4, ways_callback=way.ways)
+        p = OSMParser(concurrency=1, ways_callback=way.ways)
         print "start parsing ways"
         try:
             p.parse(infile)
@@ -452,14 +455,14 @@ if __name__ == "__main__":
         fpickle.close()
     else:
         fpickle = open('data.pkl', 'rb')
-        buildings = cPickle.load(fpickle)
+        buildings = cPickle.load(fpickle) #[:150]
         fpickle.close()
         print "unpickled %g buildings " % (len(buildings))
         tools.stats.objects = len(buildings)
 
 
     # - read relevant stgs
-    static_objects = stg_io.Stg("e013n51/3171138.stg")
+    static_objects = stg_io.Stg(("e013n51/3171138.stg", "e013n51/3171139.stg"))
     tools.stats.debug1 = open("debug1.dat", "w")
     tools.stats.debug2 = open("debug2.dat", "w")
 
@@ -473,13 +476,12 @@ if __name__ == "__main__":
     tools.stats.print_summary()
 
     # -- now put buildings into clusters
-    clusters = Clusters(min_, max_, vec2d(2000.,2000.))
+    clusters = Clusters(min_, max_, vec2d(1000.,1000.))
     for b in buildings:
         clusters.append(b.anchor, b)
 
     clusters.write_stats()
     # - write clusters
-    stg = open("city.stg", "w")
     for l in clusters._clusters:
         for cl in l:
             nb = len(cl.objects)
@@ -489,9 +491,8 @@ if __name__ == "__main__":
             offset = cl.center
 
             tile_elev = elev(cl.center)
-            print "TILE E", tile_elev
+            #print "TILE E", tile_elev
 
-            #transform.setOffset((-offset).list())
             center_lat, center_lon = transform.toGlobal((cl.center.x, cl.center.y))
 
             LOD_lists = []
@@ -507,14 +508,17 @@ if __name__ == "__main__":
             for building in cl.objects:
                 building_lib.write(building, out, elev, tile_elev, transform, offset, LOD_lists)
             out.close()
-            #transform.setOffset((0,0))
 
             # -- write xml
             write_xml(fname, LOD_lists)
 
             # -- write stg
+            tile_index = calc_tile.tile_index(center_lon, center_lat)
+            #stg_fname = "%07i.stg" % tile_index
+            stg_fname = "city.stg"
+            stg = open(stg_fname, "a")
             stg.write("OBJECT_STATIC %s %g %g %g %g\n" % (fname+".xml", center_lon, center_lat, tile_elev, 0))
-    stg.close()
+            stg.close()
 
     tools.stats.debug1.close()
     tools.stats.debug2.close()

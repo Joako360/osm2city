@@ -81,6 +81,7 @@ class Stats(object):
         self.vertices = 0
         self.surfaces = 0
         self.out = None
+        self.LOD = np.zeros(3)
 
     def count(self, b):
         """update stats (vertices, surfaces, area) with given building's data
@@ -95,18 +96,30 @@ class Stats(object):
         self.area_above[0] += 1
         return 0
 
+    def count_LOD(self, lod):
+        self.LOD[lod] += 1
+
     def print_summary(self):
         out = sys.stdout
+        total_written = self.LOD.sum()
         out.write(textwrap.dedent("""
         total buildings %i
+        written         %i
         skipped
           small         %i
           nearby        %i
           texture       %i
         vertices        %i
         surfaces        %i
-        """ % (self.objects, self.skipped_small, self.skipped_nearby, self.skipped_texture,
-               self.vertices, self.surfaces)))
+        LOD detail      %i (%2.0f)
+        LOD med         %i (%2.0f)
+        LOD bare        %i (%2.0f)
+        """ % (self.objects, total_written,
+               self.skipped_small, self.skipped_nearby, self.skipped_texture,
+               self.vertices, self.surfaces,
+               self.LOD[0], 100.*self.LOD[0]/total_written,
+               self.LOD[1], 100.*self.LOD[1]/total_written,
+               self.LOD[2], 100.*self.LOD[2]/total_written)))
         out.write("above\n")
         for i in range(len(self.area_levels)):
             out.write(" %5g m^2  %5i\n" % (self.area_levels[i], self.area_above[i]))

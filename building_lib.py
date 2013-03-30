@@ -46,7 +46,13 @@ class random_number(object):
     def __call__(self):
         return self.callback(self.min, self.max)
 
-random_LOD = random_number(int, 0, 2)
+#random_LOD = random_number(int, 0, 2)
+def random_LOD():
+    r = random.uniform(0,1)
+    if r < 0.5: return 0
+    if r < 0.8: return 1
+    return 2
+
 default_height=12.
 random_level_height = random_number(float, 3.1, 3.6)
 random_levels = random_number(int, 2, 5)
@@ -134,7 +140,7 @@ def get_nodes_from_acs(objs, path_prefix):
 
 def test_ac_load():
     import stg_io
-    static_objects = stg_io.Stg("e013n51/3171138.stg")
+    static_objects = stg_io.Stg(("e013n51/3171138.stg", "e013n51/3171139.stg"))
     s = get_nodes_from_acs(static_objects.objs, "e013n51/")
     np.savetxt("nodes.dat", s)
 #    out = open("nodes.dat", "w")
@@ -318,10 +324,17 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         p = Polygon(r)
         b.area = p.area
 
-        if b.area < 10.: # FIXME use limits.area_min:
+        # OBJECT_STATIC frauenkirche.ac 13.7416 51.05192 115.33 117
+        fk = transform.toLocal((51.05192, 13.7416))
+        if ((X[i,0] - fk[0])**2 + (X[i,1] - fk[1])**2) > 1000000:
+            continue
+
+        if b.area < 20. or (b.area < 200. and random.uniform(0,1) < 0.3):
+        #if b.area < 20. : # FIXME use limits.area_min:
             print "Skipping small building (area)"
             tools.stats.skipped_small += 1
             continue
+
 
 
         #tools.stats.print_summary()
@@ -378,10 +391,12 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
     lod = random_LOD()
     if b.area < 150: lod = 0
-    if b.area > 1000: lod = 2
+    if b.area > 500: lod = 2
     if b.levels > 5: lod = 2 # tall buildings always LOD bare
     #if b.levels < 3: lod = 0 # small buildings always LOD detail
     # mat = lod
+    tools.stats.count_LOD(lod)
+
     LOD_lists[lod].append(name)
 
 
@@ -574,6 +589,8 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             out.write("kids 0\n")
 
     tools.stats.count(b)
+
+
 
 if __name__ == "__main__":
     test_ac_load()
