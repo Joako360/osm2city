@@ -16,6 +16,22 @@ class vec2d(object):
         self.x = x
         self.y = y
 
+    @property
+    def lon(self):
+        return self.x
+
+    @lon.setter
+    def lon(self, value):
+        self.x = value
+
+    @property
+    def lat(self):
+        return self.y
+
+    @lat.setter
+    def lat(self, value):
+        self.y = value
+
     def __fixtype(self, other):
         if type(other) == type(self): return other
         return vec2d(other, other)
@@ -61,5 +77,11 @@ if __name__ == "__main__":
     print "a+2 ", a+2
     print "a*b ", a * b
     print "a*2 ", a*2
+    # print "2*a ", 2*a --> fails!
     print "a/2 ", a/2
     print "a/2.", a/2.
+
+    print a.x, a.y
+    print a.lon, a.lat
+    a.lon = 4
+    print a.x, a.lon

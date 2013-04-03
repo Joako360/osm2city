@@ -181,42 +181,42 @@ def init():
     global roofs
     facades = FacadeManager('facade')
 
-    facades.append(Texture('DSCF9495_pow2',
+    facades.append(Texture('tex/DSCF9495_pow2',
                             14, (585, 873, 1179, 1480, 2048), True,
                             19.4, (1094, 1531, 2048), False, True,
                             requires=['roof:color:black'],
                             provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
-    facades.append(Texture('DSCF9496_pow2',
+    facades.append(Texture('tex/DSCF9496_pow2',
                             4.44, None, True,
                             17.93, (1099, 1521, 2048), False, True,
                             requires=['roof:color:black'],
                             provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
-    facades.append(Texture('LZ_old_bright_bc2',
+    facades.append(Texture('tex/LZ_old_bright_bc2',
                             17.9, (345,807,1023,1236,1452,1686,2048), True,
                             14.8, (558,1005,1446,2048), False, True,
                             provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
 
-    facades.append(Texture('facade_modern36x36_12',
+    facades.append(Texture('tex/facade_modern36x36_12',
                             36., (None), True,
                             36., (158, 234, 312, 388, 465, 542, 619, 697, 773, 870, 1024), True, True,
                             provides=['shape:urban','shape:residential','age:modern',
                                      'compat:roof-flat']))
 
-#    facades.append(Texture('DSCF9503_pow2',
+#    facades.append(Texture('tex/DSCF9503_pow2',
 #                            12.85, None, True,
 #                            17.66, (1168, 1560, 2048), False, True,
 #                            requires=['roof:color:black'],
 #                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
-    facades.append(Texture('DSCF9503_noroofsec_pow2',
+    facades.append(Texture('tex/DSCF9503_noroofsec_pow2',
                             12.85, None, True,
                             17.66, (556,1015,1474,2048), False, True,
                             requires=['roof:color:black'],
                             provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
-    facades.append(Texture('wohnheime_petersburger_pow2',
+    facades.append(Texture('tex/wohnheime_petersburger_pow2',
                             15.6, (215, 414, 614, 814, 1024), True,
                             15.6, (112, 295, 477, 660, 843, 1024), True, True,
                             height_min = 15.,
@@ -224,46 +224,46 @@ def init():
                                      'compat:roof-flat']))
 
 # -- this just looks ugly
-#    facades.append(Texture('facade_modern1',
+#    facades.append(Texture('tex/facade_modern1',
 #                           2.5, None, True,
 #                           2.8, None, True,
 #                           height_min = 15.,
 #                           provides=['shape:urban','shape:residential','age:modern',
 #                                     'compat:roof-flat']))
 
-#    facades.append(Texture('DSCF9710_pow2',
+#    facades.append(Texture('tex/DSCF9710_pow2',
 #                           29.9, (284,556,874,1180,1512,1780,2048), True,
 #                           19.8, (173,329,490,645,791,1024), False, True,
 #                           provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
-    facades.append(Texture('DSCF9710_noroofsec_pow2',
+    facades.append(Texture('tex/DSCF9710_noroofsec_pow2',
                            29.9, (142,278,437,590,756,890,1024), True,
                            19.8, (130,216,297,387,512), False, True,
                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
 
-    facades.append(Texture('DSCF9678_no_roof_items_pow2',
+    facades.append(Texture('tex/DSCF9678_no_roof_items_pow2',
                            10.4, (97,152,210,299,355,411,512), True,
                            15.5, (132,211,310,512), False, True,
                            provides=['shape:residential','shape:commercial','age:modern','compat:roof-flat']))
 
-    facades.append(Texture('DSCF9726_noroofsec_pow2',
+    facades.append(Texture('tex/DSCF9726_noroofsec_pow2',
                            15.1, (321,703,1024), True,
                            9.6, (227,512), False, True,
                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
 
     roofs = TextureManager('roof')
-    roofs.append(Texture('roof_tiled_black',
+    roofs.append(Texture('tex/roof_tiled_black',
                              1.20, None, True, 0.60, None, True, provides=['color:black']))
-    roofs.append(Texture('roof_tiled_red',
+    roofs.append(Texture('tex/roof_tiled_red',
                              1.0, None, True, 0.88, None, True, provides=['color:red']))
-#    roofs.append(Texture('roof_black2',
+#    roofs.append(Texture('tex/roof_black2',
 #                             1.39, None, True, 0.89, None, True, provides=['color:black']))
-#    roofs.append(Texture('roof_black3',
+#    roofs.append(Texture('tex/roof_black3',
 #                             0.6, None, True, 0.41, None, True, provides=['color:black']))
 
-#    roofs.append(Texture('roof_black3_small_256x128',
+#    roofs.append(Texture('tex/roof_black3_small_256x128',
 #                             0.25, None, True, 0.12, None, True, provides=['color:black']))
 
     print roofs[0].provides

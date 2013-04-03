@@ -13,6 +13,9 @@ import textwrap
 
 stats = None
 
+import vec2d
+import coordinates
+
 class Interpolator(object):
     """load elevation data from file, interpolate"""
     def __init__(self, filename, fake=False):
@@ -23,27 +26,36 @@ class Interpolator(object):
             return
         else:
             self.fake = False
+        f = open(filename, "r")
+        x0, y0, size_x, size_y, step_x, step_y = [float(i) for i in f.readline().split()[1:]]
+        ny = len(np.arange(y0, y0+size_y, step_y))
+        nx = len(np.arange(x0, x0+size_x, step_x))
+
         elev = np.loadtxt(filename)[:,2:]
+        f.close()
         self.x = elev[:,0]
         self.y = elev[:,1]
         self.h = elev[:,2]
+        if nx * ny != len(self.x):
+            raise ValueError("expected %i, but read %i lines." % (nx*ny, len(self.x)))
+
         self.min_x = min(self.x)
         self.max_x = max(self.x)
         self.min_y = min(self.y)
         self.max_y = max(self.y)
-        self.h = self.h.reshape(2000,2000)
-        self.x = self.x.reshape(2000,2000)
-        self.y = self.y.reshape(2000,2000)
+        self.h = self.h.reshape(ny, nx)
+        self.x = self.x.reshape(ny, nx)
+        self.y = self.y.reshape(ny, nx)
         #print self.h[0,0], self.h[0,1], self.h[0,2]
-        #self.dx = self.h[0,0] - self.x[0,1]
-        self.dx = 20.
-        self.dy = 20.
+        self.dx = self.x[0,1] - self.x[0,0]
+        self.dy = self.y[1,0] - self.y[0,0]
+        print "dx, dy", self.dx, self.dy
 
     def __call__(self, p):
         """compute elevation at (x,y) by linear interpolation"""
         if self.fake: return 0.
         if p.x <= self.min_x or p.x >= self.max_x or \
-           p.y <= self.min_y or p.y >= self.max_y: return 1999
+           p.y <= self.min_y or p.y >= self.max_y: return self.h[0,0] #-9999
         i = int((p.x - self.min_x)/self.dx)
         j = int((p.y - self.min_y)/self.dy)
         fx = (p.x - self.x[j,i])/self.dx
@@ -58,16 +70,92 @@ class Interpolator(object):
     def shift(self, h):
         self.h += h
 
+#11.16898,47.20837,11.79108,47.38161
+
+
+def raster_glob(cmin, cmax):
+    from vec2d import vec2d
+#    center = (cmax - cmin)
+#    center.x *= 0.5
+#    center.y *= 0.5
+    center = (cmin + cmax) * 0.5
+    transform = coordinates.Transformation((center.x, center.y), hdg = 0)
+    lmin = vec2d(transform.toLocal(cmin.list()))
+    lmax = vec2d(transform.toLocal(cmax.list()))
+    delta = (lmax - lmin)*0.5
+#    dx = 5000
+#    dy = 4000
+    print "bla", delta
+    raster(transform, "elev.in", -delta.x, -delta.y, 2*delta.x, 2*delta.y, step_x=10, step_y=10)
+
 def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
+    # --- need $FGDATA/Nasal/elev.nas and elev.in
+    #     hide scenery/Objects/e.... folder
+    #     in Nasal console: elev.get()
+    #     data gets written to /tmp/elev.xml
+
     # check $FGDATA/Nasal/IOrules
     f = open(fname, 'w')
     f.write("# %g %g %g %g %g %g\n" % (x0, y0, size_x, size_y, step_x, step_y))
-    for y in range(y0, y0+size_y, step_y):
-        for x in range(x0, x0+size_x, step_x):
-            lat, lon = transform.toGlobal((x, y))
+    for y in np.arange(y0, y0+size_y, step_y):
+        for x in np.arange(x0, x0+size_x, step_x):
+            lon, lat = transform.toGlobal((x, y))
             f.write("%1.8f %1.8f %g %g\n" % (lon, lat, x, y))
         f.write("\n")
     f.close()
+
+def write_map(filename, transform, elev, gmin, gmax):
+    lmin = vec2d.vec2d(transform.toLocal((gmin.x, gmin.y)))
+    lmax = vec2d.vec2d(transform.toLocal((gmax.x, gmax.y)))
+    map_z0 = 0.
+    elev_offset = elev(vec2d.vec2d(0,0))
+    print "offset", elev_offset
+
+    nx, ny = ((lmax - lmin)/100.).int().list() # 100m raster
+
+    x = np.linspace(lmin.x, lmax.x, nx)
+    y = np.linspace(lmin.y, lmax.y, ny)
+
+    u = np.linspace(0., 1., nx)
+    v = np.linspace(0., 1., ny)
+
+
+    out = open("surface.ac", "w")
+    out.write(textwrap.dedent("""\
+    AC3Db
+    MATERIAL "" rgb 1   1    1 amb 1 1 1  emis 0 0 0  spec 0.5 0.5 0.5  shi 64  trans 0
+    OBJECT world
+    kids 1
+    OBJECT poly
+    name "surface"
+    texture "%s"
+    numvert %i
+    """ % (filename, nx*ny)))
+
+    for j in range(ny):
+        for i in range(nx):
+            out.write("%g %g %g\n" % (y[j], (elev(vec2d.vec2d(x[i],y[j])) - elev_offset), x[i]))
+
+    out.write("numsurf %i\n" % ((nx-1)*(ny-1)))
+    for j in range(ny-1):
+        for i in range(nx-1):
+            out.write(textwrap.dedent("""\
+            SURF 0x0
+            mat 0
+            refs 4
+            """))
+            out.write("%i %g %g\n" % (i  +j*(nx),     u[i],   v[j]))
+            out.write("%i %g %g\n" % (i+1+j*(nx),     u[i+1], v[j]))
+            out.write("%i %g %g\n" % (i+1+(j+1)*(nx), u[i+1], v[j+1]))
+            out.write("%i %g %g\n" % (i  +(j+1)*(nx), u[i],   v[j+1]))
+#            0 0 0
+#            1 1 0
+#            2 1 1
+#            3 0 1
+    out.write("kids 0\n")
+    out.close()
+    #print "OBJECT_STATIC surface.ac"
+
 
 class Stats(object):
     def __init__(self):
@@ -129,3 +217,8 @@ def init():
     global stats
     stats = Stats()
     print "tools: init", stats
+
+if __name__ == "__main__":
+    #raster_glob(vec2d.vec2d(11.3874,47.2629), vec2d.vec2d(11.3886,47.2636))
+    raster_glob(vec2d.vec2d(11.16898,47.20837), vec2d.vec2d(11.79108,47.38161))
+

@@ -1,17 +1,20 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """read osm file, print 2d view in ac3d format to stdout"""
+#import pdb
 
 
 # TODO:
 # x use geometry library
-# - read original .stg, don't place OSM buildings when there's a static model near/within
+# - read original .stg+.xml, don't place OSM buildings when there's a static model near/within
+# - read relations tag
 # - fix empty backyards
 # - simplify buildings
 # - lights
 # x put tall, large buildings in LOD bare, and small buildings in LOD detail
 # - more complicated roof geometries
 # - cmd line switches
+# - put roofs into separate LOD?
 
 # for release
 # - respect static models
@@ -23,6 +26,13 @@
 # - pythonic way of i = 0; for b in refs: bla[i] = b
 # - x,y = transform(lon, lat)
 # x why need hdg=180 in transform? If hdg=0, cluster is broken
+
+# LOWI:
+# - floating buildings
+# - LOD?
+# - rename textures
+# - respect ac
+
 
 """
 osm2city.py aims at generating 3D city models for FG, using OSM data.
@@ -48,7 +58,6 @@ You should disable random buildings.
 #   - decide LOD
 # - write clusters
 
-import pdb
 
 import numpy as np
 import sys
@@ -73,23 +82,29 @@ import calc_tile
 # -- defaults
 ground_height = -20
 no_elev = False # -- skip elevation interpolation
-use_pkl = False #True
+if len(sys.argv) > 1:
+    no_elev = int(sys.argv[1])
+use_pkl = True
 buildings = [] # -- master list, holds all buildings
 
 first = True
-tile_size_x=500 # -- our tile size in meters
-tile_size_y=500
+tile_size=500 # -- our tile size in meters
+
 #infile = 'dd-altstadt.osm'; total_objects = 158
 #infile = 'altstadt.osm'; total_objects = 10000 # 2172
-infile = 'xapi-buildings.osm'; total_objects = 100000 # huge!
+#infile = 'xapi-buildings.osm'; total_objects = 100000 # huge!
 #p.parse('xapi.osm') # fails
 #p.parse('xapi-small.osm')
+#infile = 'eddc-all.osm'; total_objects = 100000 # huge!
+
+infile = 'LOWI/buidings-xapi.osm'; total_objects = 1000 # huge!
+
 
 #infile = 'map.osm'; total_objects = 216 #
 skiplist = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
           "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
           "Residenzschloss Dresden", "Fernsehturm", "Fernsehturm Dresden"]
-
+#skiplist = []
 
 def dist(a,b):
     pass
@@ -111,7 +126,7 @@ class Building(object):
         self.surfaces = 0
         global transform
         r = self.refs[0]
-        self.anchor = vec2d(transform.toLocal((r.lat, r.lon)))
+        self.anchor = vec2d(transform.toLocal((r.lon, r.lat)))
         self.roof_texture = None
 
         #print "tr X", self.X
@@ -228,11 +243,21 @@ maxlon=13.88
 #lat = 0.5*(minlat + maxlat)
 #lon = 0.5*(minlon + maxlon)
 
-lon = 13.7467
-lat = 51.0377
+cmin = vec2d(11.16898,47.20837) # -- LOWI
+cmax = vec2d(11.79108,47.38161)
+center = (cmin + cmax)*0.5
+#minlon, minlat = 11.32109513, 47.22690253
+#maxlon, maxlat = 11.45363857, 47.29885247
+#lon, lat = 13.7467, 51.0377 # -- EDDC
 
-transform = coordinates.Transformation((lat, lon), hdg = 0) # FIXME: is Transformation screwed bec. we need hdg=180?
-#origin = coordinates.Position(transform, [], lat, lon)
+transform = coordinates.Transformation(center.list(), hdg = 0)
+
+#min_ = vec2d(transform.toLocal((minlon, minlat)))
+#max_ = vec2d(transform.toLocal((maxlon, maxlat)))
+
+#min_ = vec2d(-5000,-4000)
+#max_ = vec2d( 5000, 4000)
+#origin = coordinates.Position(transform, [], lon, lat)
 
 if 0:
     # --- need $FGDATA/Nasal/elev.nas and elev.in
@@ -242,59 +267,8 @@ if 0:
     raster(transform, 'elev.in', -20000, -20000, size_x=40000, size_y=40000, step_x=20, step_y=20)
     sys.exit(0)
 
+print transform.toGlobal(cmin.list()), transform.toGlobal(cmax.list())
 
-#sys.exit(0)
-
-def write_map(filename, transform, elev, gmin, gmax):
-    lmin = vec2d(transform.toLocal((gmin.x, gmin.y)))
-    lmax = vec2d(transform.toLocal((gmax.x, gmax.y)))
-    map_z0 = 0.
-    elev_offset = elev(vec2d(0,0))
-
-    nx, ny = ((lmax - lmin)/25.).int().list() # 100m raster
-
-    x = np.linspace(lmin.x, lmax.x, nx)
-    y = np.linspace(lmin.y, lmax.y, ny)
-
-    u = np.linspace(0., 1., nx)
-    v = np.linspace(0., 1., ny)
-
-
-    out = open("surface.ac", "w")
-    out.write(textwrap.dedent("""\
-    AC3Db
-    MATERIAL "" rgb 1   1    1 amb 1 1 1  emis 0 0 0  spec 0.5 0.5 0.5  shi 64  trans 0
-    OBJECT world
-    kids 1
-    OBJECT poly
-    name "surface"
-    texture "%s"
-    numvert %i
-    """ % (filename, nx*ny)))
-
-    for j in range(ny):
-        for i in range(nx):
-            out.write("%g %g %g\n" % (y[j], (elev(vec2d(x[i],y[j])) - elev_offset), x[i]))
-
-    out.write("numsurf %i\n" % ((nx-1)*(ny-1)))
-    for j in range(ny-1):
-        for i in range(nx-1):
-            out.write(textwrap.dedent("""\
-            SURF 0x0
-            mat 0
-            refs 4
-            """))
-            out.write("%i %g %g\n" % (i  +j*(nx),     u[i],   v[j]))
-            out.write("%i %g %g\n" % (i+1+j*(nx),     u[i+1], v[j]))
-            out.write("%i %g %g\n" % (i+1+(j+1)*(nx), u[i+1], v[j+1]))
-            out.write("%i %g %g\n" % (i  +(j+1)*(nx), u[i],   v[j+1]))
-#            0 0 0
-#            1 1 0
-#            2 1 1
-#            3 0 1
-    out.write("kids 0\n")
-    out.close()
-    #print "OBJECT_STATIC surface.ac"
 
 #write_map('dresden.png', transform, elev, vec2d(50.9697, 13.667), vec2d(51.1285, 13.8936))
 #write_map('dresden_fine.png', transform, elev, vec2d(51.029, 13.7061), vec2d(51.0891, 13.7861))
@@ -304,8 +278,6 @@ def write_map(filename, transform, elev, gmin, gmax):
 #elev.shift(-elev(vec2d(0,0))) # -- shift to zero height at origin
 
 
-min_ = vec2d(transform.toLocal((minlat, minlon)))
-max_ = vec2d(transform.toLocal((maxlat, maxlon)))
 
 # RGB mat for LOD testing
 #MATERIAL "" rgb 1.0  0.0  0.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
@@ -420,9 +392,11 @@ if __name__ == "__main__":
     #print tex.roofs
 
     print "reading elevation data"
-    elev = tools.Interpolator("elev.xml", fake=no_elev) # -- fake skips actually reading the file, speeding up things
+    elev = tools.Interpolator("LOWI/elev.xml", fake=no_elev) # -- fake skips actually reading the file, speeding up things
     print "height at origin", elev(vec2d(0,0))
     print "origin at ", transform.toGlobal((0,0))
+
+    #tools.write_map('dresden.png', transform, elev, vec2d(minlon, minlat), vec2d(maxlon, maxlat))
 
 
     if not use_pkl:
@@ -434,7 +408,7 @@ if __name__ == "__main__":
         p.parse(infile)
         print "done parsing"
         print "ncords:", len(way.coords_list)
-        print "bounds:", way.minlon, way.maxlon, way.minlat, way.maxlat
+        print "bounds:", way.minlon, way.minlat, way.maxlon, way.maxlat
 
         p = OSMParser(concurrency=1, ways_callback=way.ways)
         print "start parsing ways"
@@ -454,7 +428,7 @@ if __name__ == "__main__":
         cPickle.dump(buildings, fpickle, -1)
         fpickle.close()
     else:
-        fpickle = open('data.pkl', 'rb')
+        fpickle = open('LOWI/buildings.pkl', 'rb')
         buildings = cPickle.load(fpickle) #[:150]
         fpickle.close()
         print "unpickled %g buildings " % (len(buildings))
@@ -476,16 +450,19 @@ if __name__ == "__main__":
     tools.stats.print_summary()
 
     # -- now put buildings into clusters
-    clusters = Clusters(min_, max_, vec2d(1000.,1000.))
+    lmin = vec2d(transform.toLocal(cmin.list()))
+    lmax = vec2d(transform.toLocal(cmax.list()))
+    clusters = Clusters(lmin, lmax, vec2d(tile_size, tile_size))
     for b in buildings:
+        print "an ", b.anchor
         clusters.append(b.anchor, b)
 
     clusters.write_stats()
     # - write clusters
-    for l in clusters._clusters:
+    for l in clusters._clusters:  # FIXME: why 2 loops here??
         for cl in l:
             nb = len(cl.objects)
-            if not nb: continue
+            if nb < 5: continue # skip almost empty clusters
 
             # -- get cluster center
             offset = cl.center
@@ -493,7 +470,7 @@ if __name__ == "__main__":
             tile_elev = elev(cl.center)
             #print "TILE E", tile_elev
 
-            center_lat, center_lon = transform.toGlobal((cl.center.x, cl.center.y))
+            center_lon, center_lat = transform.toGlobal((cl.center.x, cl.center.y))
 
             LOD_lists = []
             LOD_lists.append([])

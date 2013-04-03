@@ -194,7 +194,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         b.roof_mat = 0
 
         b.nnodes_ground = len(b.refs)
-    #    print nnodes_ground #, b.refs[0].lat, b.refs[0].lon
+    #    print nnodes_ground #, b.refs[0].lon, b.refs[0].lat
 
         level_height = random_level_height()
 
@@ -249,6 +249,9 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             b.roof_separate = False
             # FIXME: roof_ACs = True
 
+#        b.roof_flat = True
+#        b.roof_separate = False
+
         requires = []
         if b.roof_separate and not b.roof_flat:
             requires.append('age:old')
@@ -263,7 +266,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         lenX = np.zeros((b.nnodes_ground))
         i = 0
         for r in b.refs:
-            X[i,0], X[i,1] = transform.toLocal((r.lat, r.lon))
+            X[i,0], X[i,1] = transform.toLocal((r.lon, r.lat))
             i += 1
 
         # -- write nodes to separate debug file
@@ -301,7 +304,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 #        if b.name == "Semperoper":
 #            bla
 
-        if len(nearby):
+        if len(nearby) == -1:
             for i in range(b.nnodes_ground):
                 tools.stats.debug2.write("%g %g\n" % (X[i,0], X[i,1]))
 #            print "nearby:", nearby
@@ -325,17 +328,21 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         b.area = p.area
 
         # OBJECT_STATIC frauenkirche.ac 13.7416 51.05192 115.33 117
-        fk = transform.toLocal((51.05192, 13.7416))
-        if ((X[i,0] - fk[0])**2 + (X[i,1] - fk[1])**2) > 1000000:
-            continue
+        #fk = transform.toLocal((51.05192, 13.7416))
+        #if ((X[i,0] - fk[0])**2 + (X[i,1] - fk[1])**2) > 1000000:
+        #    continue
 
-        if b.area < 20. or (b.area < 200. and random.uniform(0,1) < 0.3):
+        # -- skipping 30% of under 200 sqm buildings
+        if b.area < 20. or (b.area < 200. and random.uniform(0,1) < 0.5):
         #if b.area < 20. : # FIXME use limits.area_min:
             print "Skipping small building (area)"
             tools.stats.skipped_small += 1
             continue
 
-
+        # -- skip buildings outside elevation raster
+        if elev(vec2d(X[0])) == -9999:
+            print "-9999"
+            continue
 
         #tools.stats.print_summary()
     #    if p.area < 200.:
