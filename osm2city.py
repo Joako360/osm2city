@@ -46,6 +46,10 @@ number of facade/roof textures.
 
 You should disable random buildings.
 """
+# development hints:
+# variables
+# b: a building instance
+
 
 # -- new design:
 # - parse OSM -> return a list of building objects
@@ -82,13 +86,16 @@ import calc_tile
 # -- defaults
 ground_height = -20
 no_elev = False # -- skip elevation interpolation
+#no_elev = True # -- skip elevation interpolation
+
 if len(sys.argv) > 1:
     no_elev = int(sys.argv[1])
 use_pkl = True
+#use_pkl = False
 buildings = [] # -- master list, holds all buildings
 
 first = True
-tile_size=500 # -- our tile size in meters
+tile_size=1000 # -- our tile size in meters
 
 #infile = 'dd-altstadt.osm'; total_objects = 158
 #infile = 'altstadt.osm'; total_objects = 10000 # 2172
@@ -96,8 +103,8 @@ tile_size=500 # -- our tile size in meters
 #p.parse('xapi.osm') # fails
 #p.parse('xapi-small.osm')
 #infile = 'eddc-all.osm'; total_objects = 100000 # huge!
-
-infile = 'LOWI/buidings-xapi.osm'; total_objects = 1000 # huge!
+prefix="LOWI/"
+infile = prefix + 'buidings-xapi.osm'; total_objects = 40000 # huge!
 
 
 #infile = 'map.osm'; total_objects = 216 #
@@ -116,7 +123,7 @@ class Building(object):
         self.osm_id = osm_id
         self.tags = tags
         self.refs = refs
-        self.name = name        # stg: name
+        self.name = name.encode('ascii', 'ignore')     # stg: name
         self.stg_typ = stg_typ  # stg: OBJECT_SHARED or _STATIC
         self.stg_hdg = stg_hdg
         self.height = height
@@ -227,11 +234,11 @@ class wayExtract(object):
 #maxlat=51.0564600
 #maxlon=13.7467600
 
-# -- xapi.osm
-minlat=50.96
-minlon=13.63
-maxlat=51.17
-maxlon=13.88
+if prefix == "EDDC/":
+    cmin=vec2d(13.63, 50.96)
+    cmax=vec2d(13.88, 51.17)
+    center = vec2d(13.7467, 51.0377) # -- EDDC
+
 #
 ## -- neustadt.osm
 #minlat=51.0628700
@@ -243,12 +250,12 @@ maxlon=13.88
 #lat = 0.5*(minlat + maxlat)
 #lon = 0.5*(minlon + maxlon)
 
-cmin = vec2d(11.16898,47.20837) # -- LOWI
-cmax = vec2d(11.79108,47.38161)
-center = (cmin + cmax)*0.5
+if prefix == "LOWI/":
+    cmin = vec2d(11.16898,47.20837) # -- LOWI
+    cmax = vec2d(11.79108,47.38161)
+    center = (cmin + cmax)*0.5
 #minlon, minlat = 11.32109513, 47.22690253
 #maxlon, maxlat = 11.45363857, 47.29885247
-#lon, lat = 13.7467, 51.0377 # -- EDDC
 
 transform = coordinates.Transformation(center.list(), hdg = 0)
 
@@ -334,13 +341,11 @@ def write_ac_header(out, nb):
 # -----------------------------------------------------------------------------
 # -- write xml
 def write_xml(fname, LOD_lists):
-    #    - LOD animation
+    #  -- LOD animation
     xml = open(fname + ".xml", "w")
     xml.write("""<?xml version="1.0"?>
-
     <PropertyList>
     """)
-
     xml.write("<path>%s.ac</path>" % fname)
     xml.write("""
     <animation>
@@ -350,9 +355,8 @@ def write_xml(fname, LOD_lists):
         xml.write("<object-name>%s</object-name>\n" % name)
     xml.write("""
       <min-m>0</min-m>
-      <max-property>/sim/rendering/static-lod/detailed</max-property>
+      <max-property>/sim/rendering/static-lod/bare</max-property>
      </animation>
-
      <animation>
       <type>range</type>
     """)
@@ -362,7 +366,6 @@ def write_xml(fname, LOD_lists):
       <min-m>0</min-m>
       <max-property>/sim/rendering/static-lod/rough</max-property>
      </animation>
-
       <animation>
       <type>range</type>
     """)
@@ -370,12 +373,12 @@ def write_xml(fname, LOD_lists):
         xml.write("<object-name>%s</object-name>\n" % name)
     xml.write("""
       <min-m>0</min-m>
-      <max-property>/sim/rendering/static-lod/bare</max-property>
+      <max-property>/sim/rendering/static-lod/detailed</max-property>
      </animation>
-
     </PropertyList>
     """)
     xml.close()
+
 
 # -----------------------------------------------------------------------------
 # here we go!
@@ -392,7 +395,7 @@ if __name__ == "__main__":
     #print tex.roofs
 
     print "reading elevation data"
-    elev = tools.Interpolator("LOWI/elev.xml", fake=no_elev) # -- fake skips actually reading the file, speeding up things
+    elev = tools.Interpolator(prefix + "elev.xml", fake=no_elev) # -- fake skips actually reading the file, speeding up things
     print "height at origin", elev(vec2d(0,0))
     print "origin at ", transform.toGlobal((0,0))
 
@@ -428,8 +431,8 @@ if __name__ == "__main__":
         cPickle.dump(buildings, fpickle, -1)
         fpickle.close()
     else:
-        fpickle = open('LOWI/buildings.pkl', 'rb')
-        buildings = cPickle.load(fpickle) #[:150]
+        fpickle = open(prefix + 'buildings.pkl', 'rb')
+        buildings = cPickle.load(fpickle)[:total_objects]
         fpickle.close()
         print "unpickled %g buildings " % (len(buildings))
         tools.stats.objects = len(buildings)
@@ -447,15 +450,19 @@ if __name__ == "__main__":
     #   - set building type, roof type etc
     #   - decide LOD
     buildings = building_lib.analyse(buildings, static_objects, transform, elev, tex.facades, tex.roofs)
+
     tools.stats.print_summary()
 
     # -- now put buildings into clusters
     lmin = vec2d(transform.toLocal(cmin.list()))
     lmax = vec2d(transform.toLocal(cmax.list()))
-    clusters = Clusters(lmin, lmax, vec2d(tile_size, tile_size))
+    clusters = Clusters(lmin, lmax, tile_size)
     for b in buildings:
-        print "an ", b.anchor
+        #print "an ", b.anchor
         clusters.append(b.anchor, b)
+
+    building_lib.decide_LOD(buildings)
+    clusters.transfer_buildings()
 
     clusters.write_stats()
     # - write clusters
@@ -466,6 +473,11 @@ if __name__ == "__main__":
 
             # -- get cluster center
             offset = cl.center
+
+#            print "\ncl offset", offset
+#            for b in cl.objects:
+                #print (b.anchor - offset), "    ", b.anchor
+
 
             tile_elev = elev(cl.center)
             #print "TILE E", tile_elev
@@ -482,8 +494,8 @@ if __name__ == "__main__":
             fname = "city-%04i%04i" % (cl.I.x, cl.I.y)
             out = open(fname+".ac", "w")
             write_ac_header(out, nb)
-            for building in cl.objects:
-                building_lib.write(building, out, elev, tile_elev, transform, offset, LOD_lists)
+            for b in cl.objects:
+                building_lib.write(b, out, elev, tile_elev, transform, offset, LOD_lists)
             out.close()
 
             # -- write xml

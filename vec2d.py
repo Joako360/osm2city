@@ -4,6 +4,7 @@ Created on Sat Mar  2 12:04:17 2013
 
 @author: tom
 """
+import numpy as np
 
 class vec2d(object):
     """A simple 2d vector class. Supports basic arithmetics."""
@@ -57,6 +58,15 @@ class vec2d(object):
 
     def __neg__(self):
         return vec2d(-self.x, -self.y)
+
+    def __abs__(self):
+        return vec2d(abs(self.x), abs(self.y))
+
+    def sign(self):
+        return vec2d(np.sign((self.x, self.y)))
+
+    def __lt__(self, other):
+        return vec2d(self.x < other.x, self.y < other.y)
 
     def list(self):
         return self.x, self.y

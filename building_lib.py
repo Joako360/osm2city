@@ -49,9 +49,9 @@ class random_number(object):
 #random_LOD = random_number(int, 0, 2)
 def random_LOD():
     r = random.uniform(0,1)
-    if r < 0.5: return 0
-    if r < 0.8: return 1
-    return 2
+    #if r < 0.7: return 2   # -- 60% detail
+    if r < 0.7: return 1  #    25% rough
+    return 0               #    15% bare
 
 default_height=12.
 random_level_height = random_number(float, 3.1, 3.6)
@@ -372,12 +372,25 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
     return new_buildings
 
+
+def decide_LOD(buildings):
+    for b in buildings:
+        lod = random_LOD()
+        if b.area < 150: lod = 2
+        if b.area > 500: lod = 0
+        if b.levels > 5: lod = 0 # tall buildings always LOD bare
+        #if b.levels < 3: lod = 2 # small buildings always LOD detail
+        # mat = lod
+        b.LOD = lod
+        tools.stats.count_LOD(lod)
+
 def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     """offset accounts for cluster center
        now actually write building.
        While writing, accumulate some statistics
        (totals stored in global stats object, individually also in building)
     """
+
     X = b.X
     lenX = b.lenX
     height = b.height
@@ -395,17 +408,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     out.write("OBJECT poly\n")
     name = "b%i" % nb
     out.write("name \"%s\"\n" % name)
-
-    lod = random_LOD()
-    if b.area < 150: lod = 0
-    if b.area > 500: lod = 2
-    if b.levels > 5: lod = 2 # tall buildings always LOD bare
-    #if b.levels < 3: lod = 0 # small buildings always LOD detail
-    # mat = lod
-    tools.stats.count_LOD(lod)
-
-    LOD_lists[lod].append(name)
-
+    LOD_lists[b.LOD].append(name)
 
     nsurf = nnodes_ground
     if not roof_separate: nsurf += 1 # -- because roof will be part of base model
