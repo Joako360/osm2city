@@ -50,8 +50,8 @@ class random_number(object):
 def random_LOD():
     r = random.uniform(0,1)
     #if r < 0.7: return 2   # -- 60% detail
-    if r < 0.7: return 1  #    25% rough
-    return 0               #    15% bare
+    if r < 0.7: return 1  #    70% rough
+    return 0              #    30% bare
 
 default_height=12.
 random_level_height = random_number(float, 3.1, 3.6)
@@ -93,18 +93,41 @@ def reset_nb():
     nb = 0
 
 def get_nodes_from_acs(objs, path_prefix):
-    """load all .ac, extract nodes"""
+    """load all .ac and .xml, extract nodes"""
     # FIXME: use real ac3d reader: https://github.com/majic79/Blender-AC3D/blob/master/io_scene_ac3d/import_ac3d.py
     # FIXME: don't skip .xml
+    # skip own .ac city-*.xml
 
     all_nodes = np.array([[0,0]])
 
+#    for b in objs:
+#        if b.name.endswith(".xml") and b.stg_typ == "OBJECT_STATIC":
+#            print "READ xml", b.name
+#            try:
+#                xml = open(path_prefix + b.name, 'r')
+#            except:
+#                continue
+#            # first occurence of <path>name.ac</path>
+#
+#            lines = ac.readlines()
+#            xml.close()
+
+
+
     for b in objs:
-        if b.name.endswith(".ac") and b.stg_typ == "OBJECT_STATIC":
-            print "READ", b.name
+        fname = b.name
+        #print "in objs <%s>" % b.name
+        if fname.endswith(".xml"):
+            if fname.startswith("city-"): continue
+            fname = fname.replace(".xml", ".ac")
+        #print "now <%s> %s" % (fname, b.stg_typ)
+
+        if fname.endswith(".ac") and b.stg_typ == "OBJECT_STATIC":
+            print "READ_AC", b.name
             try:
-                ac = open(path_prefix + b.name, 'r')
+                ac = open(path_prefix + fname, 'r')
             except:
+                print "can't open", fname
                 continue
             angle = radians(b.stg_hdg)
             R = np.array([[cos(angle), -sin(angle)],
@@ -158,14 +181,15 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
     - location clash with stg static models? drop building
     - analyze surrounding: similar shaped buildings nearby? will get same texture
     - set building type, roof type etc
-    - decide LOD
 
     We're in global coordinates
     """
     # -- build KDtree for static models
     from scipy.spatial import KDTree
 
-    s = get_nodes_from_acs(static_objects.objs, "e013n51/")
+    #s = get_nodes_from_acs(static_objects.objs, "e013n51/")
+    s = get_nodes_from_acs(static_objects.objs, "e011n47/")
+
     np.savetxt("nodes.dat", s)
 #    s = np.zeros((len(static_objects.objs), 2))
 #    i = 0
@@ -304,7 +328,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 #        if b.name == "Semperoper":
 #            bla
 
-        if len(nearby) == -1:
+        if len(nearby):
             for i in range(b.nnodes_ground):
                 tools.stats.debug2.write("%g %g\n" % (X[i,0], X[i,1]))
 #            print "nearby:", nearby
@@ -332,7 +356,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         #if ((X[i,0] - fk[0])**2 + (X[i,1] - fk[1])**2) > 1000000:
         #    continue
 
-        # -- skipping 30% of under 200 sqm buildings
+        # -- skipping 50% of under 200 sqm buildings
         if b.area < 20. or (b.area < 200. and random.uniform(0,1) < 0.5):
         #if b.area < 20. : # FIXME use limits.area_min:
             print "Skipping small building (area)"
@@ -376,7 +400,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 def decide_LOD(buildings):
     for b in buildings:
         lod = random_LOD()
-        if b.area < 150: lod = 2
+        if b.area < 150: lod = 1
         if b.area > 500: lod = 0
         if b.levels > 5: lod = 0 # tall buildings always LOD bare
         #if b.levels < 3: lod = 2 # small buildings always LOD detail

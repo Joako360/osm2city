@@ -28,9 +28,10 @@ class Stg:
         objs = []
         f = open(filename)
         for line in f.readlines():
-            if line.startswith('#'): continue
+            if line.startswith('#') or line.lstrip() == "": continue
             splitted = line.split()
             typ, path  = splitted[0:2]
+            print "stg:", typ, path
             lon = float(splitted[2])
             lat = float(splitted[3])
             alt = float(splitted[4])

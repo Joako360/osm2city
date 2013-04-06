@@ -102,19 +102,19 @@ self._clusters[I.x][I.y]
         for j in range(self.n.y):
             for i in range(self.n.x):
                 cluster = self._clusters[i][j]
-                print i, j, cluster.center
+                #print i, j, cluster.center
                 for b in cluster.objects:
-                    if b.LOD == 1:
-                        norm_coord = (b.anchor - cluster.center) / self.size
-                        rnd = vec2d(np.random.uniform(0,1,2))
-                        out = norm_coord.sign() * (rnd < abs(norm_coord)).int()
-                        ni = int(i + out.x)
-                        nj = int(j + out.y)
-                        ni = clamp(ni, 0, self.n.x-1)
-                        nj = clamp(nj, 0, self.n.y-1)
-                    else:
-                        ni = i
-                        nj = j
+#                    if b.LOD == 1:
+                    norm_coord = (b.anchor - cluster.center) / self.size
+                    rnd = vec2d(np.random.uniform(0,1,2))
+                    out = norm_coord.sign() * (rnd < abs(norm_coord)).int()
+                    ni = int(i + out.x)
+                    nj = int(j + out.y)
+                    ni = clamp(ni, 0, self.n.x-1)
+                    nj = clamp(nj, 0, self.n.y-1)
+#                    else:
+#                        ni = i
+#                        nj = j
 
                     newclusters[ni][nj].objects.append(b)
                     f.write("%4.0f %4.0f %i %i %i %i %i %i\n" %

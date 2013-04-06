@@ -343,40 +343,42 @@ def write_ac_header(out, nb):
 def write_xml(fname, LOD_lists):
     #  -- LOD animation
     xml = open(fname + ".xml", "w")
-    xml.write("""<?xml version="1.0"?>
-    <PropertyList>
-    """)
+    xml.write("""<?xml version="1.0"?>\n<PropertyList>\n""")
     xml.write("<path>%s.ac</path>" % fname)
-    xml.write("""
+    xml.write(textwrap.dedent("""
     <animation>
-    <type>range</type>
-    """)
+      <type>range</type>
+    """))
     for name in LOD_lists[0]:
-        xml.write("<object-name>%s</object-name>\n" % name)
-    xml.write("""
+        xml.write("    <object-name>%s</object-name>\n" % name)
+    xml.write(textwrap.dedent("""
       <min-m>0</min-m>
       <max-property>/sim/rendering/static-lod/bare</max-property>
+    </animation>
+
+    <animation>
+       <type>range</type>
+    """))
+    for name in LOD_lists[1]:
+        xml.write("    <object-name>%s</object-name>\n" % name)
+    xml.write(textwrap.dedent("""
+       <min-m>0</min-m>
+       <max-property>/sim/rendering/static-lod/rough</max-property>
      </animation>
+
+     <!--
      <animation>
       <type>range</type>
-    """)
-    for name in LOD_lists[1]:
-        xml.write("<object-name>%s</object-name>\n" % name)
-    xml.write("""
-      <min-m>0</min-m>
-      <max-property>/sim/rendering/static-lod/rough</max-property>
-     </animation>
-      <animation>
-      <type>range</type>
-    """)
+    """))
     for name in LOD_lists[2]:
-        xml.write("<object-name>%s</object-name>\n" % name)
-    xml.write("""
+        xml.write("    <object-name>%s</object-name>\n" % name)
+    xml.write(textwrap.dedent("""
       <min-m>0</min-m>
       <max-property>/sim/rendering/static-lod/detailed</max-property>
      </animation>
+    -->
     </PropertyList>
-    """)
+    """))
     xml.close()
 
 
@@ -439,7 +441,8 @@ if __name__ == "__main__":
 
 
     # - read relevant stgs
-    static_objects = stg_io.Stg(("e013n51/3171138.stg", "e013n51/3171139.stg"))
+    #static_objects = stg_io.Stg(["e013n51/3171138.stg", "e013n51/3171139.stg"])
+    static_objects = stg_io.Stg(["e011n47/3138129.stg"])
     tools.stats.debug1 = open("debug1.dat", "w")
     tools.stats.debug2 = open("debug2.dat", "w")
 
@@ -466,6 +469,13 @@ if __name__ == "__main__":
 
     clusters.write_stats()
     # - write clusters
+
+    stg_fname = "city.stg"
+    stg = open(stg_fname, "w")
+    stg.write("# osm2city\n#\n")
+    stg.close()
+
+
     for l in clusters._clusters:  # FIXME: why 2 loops here??
         for cl in l:
             nb = len(cl.objects)
@@ -504,7 +514,6 @@ if __name__ == "__main__":
             # -- write stg
             tile_index = calc_tile.tile_index(center_lon, center_lat)
             #stg_fname = "%07i.stg" % tile_index
-            stg_fname = "city.stg"
             stg = open(stg_fname, "a")
             stg.write("OBJECT_STATIC %s %g %g %g %g\n" % (fname+".xml", center_lon, center_lat, tile_elev, 0))
             stg.close()
