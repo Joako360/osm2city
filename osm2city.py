@@ -85,6 +85,7 @@ import calc_tile
 # -- defaults
 no_elev = False # -- skip elevation interpolation
 #no_elev = True # -- skip elevation interpolation
+check_overlap = True # -- check for overlap with static models
 
 if len(sys.argv) > 1:
     no_elev = int(sys.argv[1])
@@ -94,7 +95,6 @@ buildings = [] # -- master list, holds all buildings
 
 tile_size=1000 # -- our tile size in meters
 
-#infile = 'altstadt.osm'; total_objects = 10000 # 2172
 #infile = 'xapi-buildings.osm'; total_objects = 100000 # huge!
 #infile = 'eddc-all.osm'; total_objects = 100000 # huge!
 #infile = 'map.osm'; total_objects = 216 #
@@ -102,11 +102,17 @@ prefix="LOWI"
 infile = prefix + '/buidings-xapi.osm'; total_objects = 45000 # huge!
 
 # devel
-infile = 'dd-altstadt.osm'; total_objects = 158
-tile_size=2000 # -- our tile size in meters
-no_elev = True
-prefix = "EDDC"
-check_nearby = False
+check_overlap = False
+
+if False:
+    use_pkl = False    #infile = 'dd-altstadt.osm'; total_objects = 158
+    #infile = 'map.osm'; total_objects = 216 #
+    infile = "dd-altstadt.osm"
+    #infile = 'altstadt.osm'; total_objects = 10000 # 2172
+    tile_size=2000 # -- our tile size in meters
+    #no_elev = True
+    prefix = "EDDC"
+    check_overlap = False
 
 skiplist = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
           "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
@@ -340,6 +346,32 @@ def write_xml(fname, LOD_lists):
     xml = open(fname + ".xml", "w")
     xml.write("""<?xml version="1.0"?>\n<PropertyList>\n""")
     xml.write("<path>%s.ac</path>" % fname)
+
+    # FIXME: use Effect/Building? What's the difference?
+    xml.write(textwrap.dedent("""
+    <effect>
+      <inherits-from>Effects/model-combined-deferred</inherits-from>
+      <parameters>
+        <lightmap-enabled type="int">1</lightmap-enabled>
+        <texture n="3">
+          <image>LOWI_studenthouse_panorama_LM.png</image>
+          <wrap-s>repeat</wrap-s>
+        </texture>
+        <lightmap-factor type="float" n="0">
+          <use>/scenery/LOWI/garage[0]/door[0]/position-norm</use>
+        </lightmap-factor>
+      </parameters>
+          """))
+#          <value>0.5</value>
+
+    for name in LOD_lists[0]:
+        if name.find("roof") < 0:
+            xml.write("  <object-name>%s</object-name>\n" % name)
+    for name in LOD_lists[1]:
+        if name.find("roof") < 0:
+            xml.write("  <object-name>%s</object-name>\n" % name)
+    xml.write("</effect>\n")
+
     xml.write(textwrap.dedent("""
     <animation>
       <type>range</type>
@@ -437,7 +469,7 @@ if __name__ == "__main__":
 
     # - read relevant stgs
     #static_objects = stg_io.Stg(["e013n51/3171138.stg", "e013n51/3171139.stg"])
-    if check_nearby:
+    if check_overlap:
         static_objects = stg_io.Stg(["e011n47/3138129.stg"])
     else:
         static_objects = None
