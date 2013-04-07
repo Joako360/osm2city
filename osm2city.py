@@ -6,35 +6,32 @@
 
 # TODO:
 # x use geometry library
-# - read original .stg+.xml, don't place OSM buildings when there's a static model near/within
-# - read relations tag
-# - fix empty backyards
-# - simplify buildings
+# x read original .stg+.xml, don't place OSM buildings when there's a static model near/within
+# - put roofs into separate LOD
 # - lights
+# - read relations tag == fix empty backyards
+# - simplify buildings
 # x put tall, large buildings in LOD bare, and small buildings in LOD detail
 # - more complicated roof geometries
 # - cmd line switches
-# - put roofs into separate LOD?
 
-# for release
-# - respect static models
-# x correct stg id
-# -
 # - city center??
 
 # FIXME:
 # - pythonic way of i = 0; for b in refs: bla[i] = b
-# - x,y = transform(lon, lat)
+# x x,y = transform(lon, lat)
 # x why need hdg=180 in transform? If hdg=0, cluster is broken
 
 # LOWI:
 # - floating buildings
 # - LOD?
 # - rename textures
-# - respect ac
+# x respect ac
 
 # cmd line
 # - skip nearby check
+# - fake elev
+# - log level
 
 """
 osm2city.py aims at generating 3D city models for FG, using OSM data.
@@ -97,7 +94,6 @@ buildings = [] # -- master list, holds all buildings
 
 tile_size=1000 # -- our tile size in meters
 
-#infile = 'dd-altstadt.osm'; total_objects = 158
 #infile = 'altstadt.osm'; total_objects = 10000 # 2172
 #infile = 'xapi-buildings.osm'; total_objects = 100000 # huge!
 #infile = 'eddc-all.osm'; total_objects = 100000 # huge!
@@ -105,6 +101,12 @@ tile_size=1000 # -- our tile size in meters
 prefix="LOWI"
 infile = prefix + '/buidings-xapi.osm'; total_objects = 45000 # huge!
 
+# devel
+infile = 'dd-altstadt.osm'; total_objects = 158
+tile_size=2000 # -- our tile size in meters
+no_elev = True
+prefix = "EDDC"
+check_nearby = False
 
 skiplist = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
           "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
@@ -435,7 +437,10 @@ if __name__ == "__main__":
 
     # - read relevant stgs
     #static_objects = stg_io.Stg(["e013n51/3171138.stg", "e013n51/3171139.stg"])
-    static_objects = stg_io.Stg(["e011n47/3138129.stg"])
+    if check_nearby:
+        static_objects = stg_io.Stg(["e011n47/3138129.stg"])
+    else:
+        static_objects = None
     tools.stats.debug1 = open("debug1.dat", "w")
     tools.stats.debug2 = open("debug2.dat", "w")
 
