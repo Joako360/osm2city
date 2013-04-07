@@ -103,8 +103,8 @@ tile_size=1000 # -- our tile size in meters
 #p.parse('xapi.osm') # fails
 #p.parse('xapi-small.osm')
 #infile = 'eddc-all.osm'; total_objects = 100000 # huge!
-prefix="LOWI/"
-infile = prefix + 'buidings-xapi.osm'; total_objects = 40000 # huge!
+prefix="LOWI"
+infile = prefix + '/buidings-xapi.osm'; total_objects = 40000 # huge!
 
 
 #infile = 'map.osm'; total_objects = 216 #
@@ -112,9 +112,6 @@ skiplist = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
           "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
           "Residenzschloss Dresden", "Fernsehturm", "Fernsehturm Dresden"]
 #skiplist = []
-
-def dist(a,b):
-    pass
 
 class Building(object):
     """Central object class.
@@ -234,7 +231,7 @@ class wayExtract(object):
 #maxlat=51.0564600
 #maxlon=13.7467600
 
-if prefix == "EDDC/":
+if prefix == "EDDC":
     cmin=vec2d(13.63, 50.96)
     cmax=vec2d(13.88, 51.17)
     center = vec2d(13.7467, 51.0377) # -- EDDC
@@ -250,7 +247,7 @@ if prefix == "EDDC/":
 #lat = 0.5*(minlat + maxlat)
 #lon = 0.5*(minlon + maxlon)
 
-if prefix == "LOWI/":
+if prefix == "LOWI":
     cmin = vec2d(11.16898,47.20837) # -- LOWI
     cmax = vec2d(11.79108,47.38161)
     center = (cmin + cmax)*0.5
@@ -397,7 +394,7 @@ if __name__ == "__main__":
     #print tex.roofs
 
     print "reading elevation data"
-    elev = tools.Interpolator(prefix + "elev.xml", fake=no_elev) # -- fake skips actually reading the file, speeding up things
+    elev = tools.Interpolator(prefix + "/elev.xml", fake=no_elev) # -- fake skips actually reading the file, speeding up things
     print "height at origin", elev(vec2d(0,0))
     print "origin at ", transform.toGlobal((0,0))
 
@@ -433,7 +430,7 @@ if __name__ == "__main__":
         cPickle.dump(buildings, fpickle, -1)
         fpickle.close()
     else:
-        fpickle = open(prefix + 'buildings.pkl', 'rb')
+        fpickle = open(prefix + '/buildings.pkl', 'rb')
         buildings = cPickle.load(fpickle)[:total_objects]
         fpickle.close()
         print "unpickled %g buildings " % (len(buildings))
@@ -470,13 +467,9 @@ if __name__ == "__main__":
     clusters.write_stats()
     # - write clusters
 
-    stg_fname = "city.stg"
-    stg = open(stg_fname, "w")
-    stg.write("# osm2city\n#\n")
-    stg.close()
+    stg_fp_dict = {}    # -- dictionary of stg file pointers
 
-
-    for l in clusters._clusters:  # FIXME: why 2 loops here??
+    for l in clusters._clusters:  # two loops here because '2d-array': list of lists
         for cl in l:
             nb = len(cl.objects)
             if nb < 5: continue # skip almost empty clusters
@@ -499,9 +492,8 @@ if __name__ == "__main__":
             LOD_lists.append([])
             LOD_lists.append([])
 
-
             # -- open ac and write header
-            fname = "city-%04i%04i" % (cl.I.x, cl.I.y)
+            fname = prefix+"city%02i%02i" % (cl.I.x, cl.I.y)
             out = open(fname+".ac", "w")
             write_ac_header(out, nb)
             for b in cl.objects:
@@ -513,10 +505,18 @@ if __name__ == "__main__":
 
             # -- write stg
             tile_index = calc_tile.tile_index(center_lon, center_lat)
-            #stg_fname = "%07i.stg" % tile_index
-            stg = open(stg_fname, "a")
+            stg_fname = "%07i.stg" % tile_index
+            if not stg_fname in stg_fp_dict:
+                stg = open(stg_fname, "w")
+                stg.write("# osm2city\n#\n")
+                stg_fp_dict[stg_fname] = stg
+            else:
+                stg = stg_fp_dict[stg_fname]
+
             stg.write("OBJECT_STATIC %s %g %g %g %g\n" % (fname+".xml", center_lon, center_lat, tile_elev, 0))
-            stg.close()
+
+    for stg in stg_fp_dict.values():
+        stg.close()
 
     tools.stats.debug1.close()
     tools.stats.debug2.close()
