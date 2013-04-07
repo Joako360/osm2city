@@ -33,6 +33,8 @@
 # - rename textures
 # - respect ac
 
+# cmd line
+# - skip nearby check
 
 """
 osm2city.py aims at generating 3D city models for FG, using OSM data.
@@ -84,7 +86,6 @@ import tools
 import calc_tile
 
 # -- defaults
-ground_height = -20
 no_elev = False # -- skip elevation interpolation
 #no_elev = True # -- skip elevation interpolation
 
@@ -94,20 +95,17 @@ use_pkl = True
 #use_pkl = False
 buildings = [] # -- master list, holds all buildings
 
-first = True
 tile_size=1000 # -- our tile size in meters
 
 #infile = 'dd-altstadt.osm'; total_objects = 158
 #infile = 'altstadt.osm'; total_objects = 10000 # 2172
 #infile = 'xapi-buildings.osm'; total_objects = 100000 # huge!
-#p.parse('xapi.osm') # fails
-#p.parse('xapi-small.osm')
 #infile = 'eddc-all.osm'; total_objects = 100000 # huge!
-prefix="LOWI"
-infile = prefix + '/buidings-xapi.osm'; total_objects = 40000 # huge!
-
-
 #infile = 'map.osm'; total_objects = 216 #
+prefix="LOWI"
+infile = prefix + '/buidings-xapi.osm'; total_objects = 45000 # huge!
+
+
 skiplist = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
           "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
           "Residenzschloss Dresden", "Fernsehturm", "Fernsehturm Dresden"]
@@ -301,10 +299,8 @@ def write_ac_header(out, nb):
 
     out.write("AC3Db\n")
 #    out.write("%s\n" % mats[random.randint(0,2)])
-    out.write(textwrap.dedent(
- """MATERIAL "" rgb 1   1   1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
-    MATERIAL "" rgb 1   0   0 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
- """))
+    out.write("""MATERIAL "" rgb 1   1   1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0\n""")
+    out.write("""MATERIAL "" rgb 1   0   0 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0\n""")
 #    MATERIAL "" rgb 1   1    1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
 #    MATERIAL "" rgb .95 1    1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
 #    MATERIAL "" rgb 1   0.95 1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
@@ -347,32 +343,32 @@ def write_xml(fname, LOD_lists):
       <type>range</type>
     """))
     for name in LOD_lists[0]:
-        xml.write("    <object-name>%s</object-name>\n" % name)
-    xml.write(textwrap.dedent("""
-      <min-m>0</min-m>
+        xml.write("  <object-name>%s</object-name>\n" % name)
+    xml.write(textwrap.dedent(
+    """      <min-m>0</min-m>
       <max-property>/sim/rendering/static-lod/bare</max-property>
     </animation>
 
     <animation>
-       <type>range</type>
+      <type>range</type>
     """))
     for name in LOD_lists[1]:
-        xml.write("    <object-name>%s</object-name>\n" % name)
-    xml.write(textwrap.dedent("""
-       <min-m>0</min-m>
-       <max-property>/sim/rendering/static-lod/rough</max-property>
-     </animation>
+        xml.write("  <object-name>%s</object-name>\n" % name)
+    xml.write(textwrap.dedent(
+    """      <min-m>0</min-m>
+      <max-property>/sim/rendering/static-lod/rough</max-property>
+    </animation>
 
-     <!--
-     <animation>
+    <!--
+    <animation>
       <type>range</type>
     """))
     for name in LOD_lists[2]:
-        xml.write("    <object-name>%s</object-name>\n" % name)
+        xml.write("  <object-name>%s</object-name>\n" % name)
     xml.write(textwrap.dedent("""
       <min-m>0</min-m>
       <max-property>/sim/rendering/static-lod/detailed</max-property>
-     </animation>
+    </animation>
     -->
     </PropertyList>
     """))
@@ -449,7 +445,7 @@ if __name__ == "__main__":
     #   - analyze surrounding: similar shaped buildings nearby? will get same texture
     #   - set building type, roof type etc
     #   - decide LOD
-    buildings = building_lib.analyse(buildings, static_objects, transform, elev, tex.facades, tex.roofs)
+    buildings = building_lib.analyse(buildings, static_objects, transform, elev, tex.facades, tex.roofs, prefix+"city")
 
     tools.stats.print_summary()
 
@@ -483,6 +479,9 @@ if __name__ == "__main__":
 
 
             tile_elev = elev(cl.center)
+            if tile_elev == -9999:
+                print "Skipping tile elev = -9999"
+                continue # skip tile with improper elev
             #print "TILE E", tile_elev
 
             center_lon, center_lat = transform.toGlobal((cl.center.x, cl.center.y))

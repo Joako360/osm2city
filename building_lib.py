@@ -92,7 +92,7 @@ def reset_nb():
     global nb
     nb = 0
 
-def get_nodes_from_acs(objs, path_prefix):
+def get_nodes_from_acs(objs, path_prefix, model_prefix):
     """load all .ac and .xml, extract nodes"""
     # FIXME: use real ac3d reader: https://github.com/majic79/Blender-AC3D/blob/master/io_scene_ac3d/import_ac3d.py
     # FIXME: don't skip .xml
@@ -118,7 +118,7 @@ def get_nodes_from_acs(objs, path_prefix):
         fname = b.name
         #print "in objs <%s>" % b.name
         if fname.endswith(".xml"):
-            if fname.startswith("city-"): continue
+            if fname.startswith(model_prefix): continue
             fname = fname.replace(".xml", ".ac")
         #print "now <%s> %s" % (fname, b.stg_typ)
 
@@ -175,7 +175,7 @@ def test_ac_load():
     #print s
 
 
-def analyse(buildings, static_objects, transform, elev, facades, roofs):
+def analyse(buildings, static_objects, transform, elev, facades, roofs, model_prefix):
     """analyse all buildings
     - calculate area
     - location clash with stg static models? drop building
@@ -188,7 +188,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
     from scipy.spatial import KDTree
 
     #s = get_nodes_from_acs(static_objects.objs, "e013n51/")
-    s = get_nodes_from_acs(static_objects.objs, "e011n47/")
+    s = get_nodes_from_acs(static_objects.objs, "e011n47/", model_prefix)
 
     np.savetxt("nodes.dat", s)
 #    s = np.zeros((len(static_objects.objs), 2))
@@ -219,67 +219,6 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
         b.nnodes_ground = len(b.refs)
     #    print nnodes_ground #, b.refs[0].lon, b.refs[0].lat
-
-        level_height = random_level_height()
-
-        # try OSM height first
-        # catch exceptions, since height might be "5 m" instead of "5"
-        try:
-            height = float(b.height)
-            if height > 1.: b.levels = (height*1.)/level_height
-        except:
-            height = 0.
-            pass
-
-        if height < 1:
-            # failing that, try levels
-            if float(b.levels) > 0:
-                pass
-                #print "have levels", b.levels
-            else:
-                # failing that, use random levels
-                b.levels = random_levels()
-
-        b.height = float(b.levels) * level_height
-        #print "hei", b.height, b.levels
-
-        if b.height < 3.4:
-            print "Skipping small building with height < 3.4"
-            tools.stats.skipped_small += 1
-            continue
-
-
-        # -- roof is controlled by two flags:
-        #    bool b.roof_separate: whether or not to include roof as separate model
-        #      useful for
-        #      - gable roof
-        #      - roof with add-ons: AC
-        #    replace by roof_type? flat  --> no separate model
-        #                          gable --> separate model
-        #                          ACs         -"-
-
-        b.roof_separate = False
-        b.roof_flat = True
-
-        # -- model roof if we have 4 ground nodes
-        if b.nnodes_ground == 4:
-            b.roof_separate = True
-            b.roof_flat = False  # -- gable roof
-
-
-        # -- no gable roof on tall buildings
-        if b.levels > 5:
-            roof_flat = True
-            b.roof_separate = False
-            # FIXME: roof_ACs = True
-
-#        b.roof_flat = True
-#        b.roof_separate = False
-
-        requires = []
-        if b.roof_separate and not b.roof_flat:
-            requires.append('age:old')
-            requires.append('compat:roof-gable')
 
         # -- get geometry right
         #    - transform to global coord
@@ -316,6 +255,75 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 lenX = np.roll(lenX, 1)
                 X[0] = X[-1]
 
+        # -- shapely: compute area
+        r = LinearRing(list(X))
+        p = Polygon(r)
+        b.area = p.area
+
+
+        level_height = random_level_height()
+
+        # try OSM height first
+        # catch exceptions, since height might be "5 m" instead of "5"
+        try:
+            height = float(b.height)
+            if height > 1.: b.levels = (height*1.)/level_height
+        except:
+            height = 0.
+            pass
+
+        # failing that, try OSM levels
+        if height < 1:
+            if float(b.levels) > 0:
+                pass
+                #print "have levels", b.levels
+            else:
+                # failing that, use random levels
+                b.levels = random_levels()
+                if b.area < 40: b.levels = min(b.levels, 2)
+
+        b.height = float(b.levels) * level_height
+        #print "hei", b.height, b.levels
+
+        if b.height < 3.4:
+            print "Skipping small building with height < 3.4"
+            tools.stats.skipped_small += 1
+            continue
+
+
+        # -- roof is controlled by two flags:
+        #    bool b.roof_separate: whether or not to include roof as separate model
+        #      useful for
+        #      - gable roof
+        #      - roof with add-ons: AC
+        #    replace by roof_type? flat  --> no separate model
+        #                          gable --> separate model
+        #                          ACs         -"-
+
+        b.roof_separate = False
+        b.roof_flat = True
+
+        # -- model roof if we have 4 ground nodes and area below 1000m2
+        if b.nnodes_ground == 4 and b.area < 1000:
+            b.roof_separate = True
+            b.roof_flat = False  # -- gable roof
+
+
+        # -- no gable roof on tall buildings
+        if b.levels > 5:
+            roof_flat = True
+            b.roof_separate = False
+            # FIXME: roof_ACs = True
+
+#        b.roof_flat = True
+#        b.roof_separate = False
+
+        requires = []
+        if b.roof_separate and not b.roof_flat:
+            requires.append('age:old')
+            requires.append('compat:roof-gable')
+
+
         # -- static objects nearby?
         # FIXME: which radius? Or use centroid point?
         #radius = max(lenX)
@@ -344,22 +352,10 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             tools.stats.skipped_nearby += 1
             continue
 
-
-        # -- shapely stuff
-        #    - compute area
-        r = LinearRing(list(X))
-        p = Polygon(r)
-        b.area = p.area
-
-        # OBJECT_STATIC frauenkirche.ac 13.7416 51.05192 115.33 117
-        #fk = transform.toLocal((51.05192, 13.7416))
-        #if ((X[i,0] - fk[0])**2 + (X[i,1] - fk[1])**2) > 1000000:
-        #    continue
-
         # -- skipping 50% of under 200 sqm buildings
-        if b.area < 20. or (b.area < 200. and random.uniform(0,1) < 0.5):
+        if b.area < 30. or (b.area < 200. and random.uniform(0,1) < 0.5):
         #if b.area < 20. : # FIXME use limits.area_min:
-            print "Skipping small building (area)"
+            #print "Skipping small building (area)"
             tools.stats.skipped_small += 1
             continue
 
@@ -490,11 +486,9 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
     for x in X[:-1]:
         z = ground_elev - 1
-        out.write("%g %g %g\n" % (-x[1], z, -x[0]))
-
-
+        out.write("%1.2f %1.2f %1.2f\n" % (-x[1], z, -x[0]))
     for x in X[:-1]:
-        out.write("%g %g %g\n" % (-x[1], ground_elev + b.height, -x[0]))
+        out.write("%1.2f %1.2f %1.2f\n" % (-x[1], ground_elev + b.height, -x[0]))
 
     write_and_count_numsurf(out, b, nsurf)
     # -- walls
@@ -546,7 +540,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             write_and_count_numvert(out, b, nnodes_ground)
             for x in X[:-1]:
                 z = ground_elev - 1
-                out.write("%g %g %g\n" % (-x[1], ground_elev + height, -x[0]))
+                out.write("%1.2f %1.2f %1.2f\n" % (-x[1], ground_elev + height, -x[0]))
             write_and_count_numsurf(out, b, 1)
             out.write("SURF 0x0\n")
             out.write("mat %i\n" % mat)
@@ -563,8 +557,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             # -- 4 corners
             for x in X[:-1]:
                 z = ground_elev - 1
-                #out.write("%g %g %g\n" % (y, z, x))
-                out.write("%g %g %g\n" % (-x[1], ground_elev + b.height, -x[0]))
+                out.write("%1.2f %1.2f %1.2f\n" % (-x[1], ground_elev + b.height, -x[0]))
             # --
             #mid_short_x = 0.5*(X[3][1]+X[0][1])
             #mid_short_z = 0.5*(X[3][0]+X[0][0])
@@ -576,8 +569,8 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             len_roof_top = lenX[0] - 2.*inward
             len_roof_bottom = 1.*lenX[0]
 
-            out.write("%g %g %g\n" % (-(0.5*(X[3][1]+X[0][1]) + tang[1]), ground_elev + height + roof_height, -(0.5*(X[3][0]+X[0][0]) + tang[0])))
-            out.write("%g %g %g\n" % (-(0.5*(X[1][1]+X[2][1]) - tang[1]), ground_elev + height + roof_height, -(0.5*(X[1][0]+X[2][0]) - tang[0])))
+            out.write("%1.2f %1.2f %1.2f\n" % (-(0.5*(X[3][1]+X[0][1]) + tang[1]), ground_elev + height + roof_height, -(0.5*(X[3][0]+X[0][0]) + tang[0])))
+            out.write("%1.2f %1.2f %1.2f\n" % (-(0.5*(X[1][1]+X[2][1]) - tang[1]), ground_elev + height + roof_height, -(0.5*(X[1][0]+X[2][0]) - tang[0])))
 
             roof_texture_size_x = roof_texture.h_size_meters # size of roof texture in meters
             roof_texture_size_y = roof_texture.v_size_meters
