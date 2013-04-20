@@ -99,11 +99,10 @@ tile_size=1000 # -- our tile size in meters
 #infile = 'eddc-all.osm'; total_objects = 100000 # huge!
 #infile = 'map.osm'; total_objects = 216 #
 prefix="LOWI"
-infile = prefix + '/buidings-xapi.osm'; total_objects = 45000 # huge!
+infile = prefix + '/buidings-xapi.osm'; total_objects = 5000 # huge!
 
 # devel
 check_overlap = False
-
 if False:
     use_pkl = False    #infile = 'dd-altstadt.osm'; total_objects = 158
     #infile = 'map.osm'; total_objects = 216 #
@@ -137,7 +136,9 @@ class Building(object):
         global transform
         r = self.refs[0]
         self.anchor = vec2d(transform.toLocal((r.lon, r.lat)))
+        self.facade_texture = None
         self.roof_texture = None
+        self.ac_name = None
 
         #print "tr X", self.X
 
@@ -341,37 +342,48 @@ def write_ac_header(out, nb):
 
 # -----------------------------------------------------------------------------
 # -- write xml
-def write_xml(fname, LOD_lists):
+def write_xml(fname, LOD_lists, LM_dict):
     #  -- LOD animation
     xml = open(fname + ".xml", "w")
     xml.write("""<?xml version="1.0"?>\n<PropertyList>\n""")
     xml.write("<path>%s.ac</path>" % fname)
 
+    # -- lightmap
     # FIXME: use Effect/Building? What's the difference?
-    xml.write(textwrap.dedent("""
-    <effect>
-      <inherits-from>Effects/model-combined-deferred</inherits-from>
-      <parameters>
-        <lightmap-enabled type="int">1</lightmap-enabled>
-        <texture n="3">
-          <image>LOWI_studenthouse_panorama_LM.png</image>
-          <wrap-s>repeat</wrap-s>
-        </texture>
-        <lightmap-factor type="float" n="0">
-          <use>/scenery/LOWI/garage[0]/door[0]/position-norm</use>
-        </lightmap-factor>
-      </parameters>
-          """))
-#          <value>0.5</value>
+    for texture in LM_dict.keys():
+        xml.write(textwrap.dedent("""
+        <effect>
+          <inherits-from>Effects/model-combined-deferred</inherits-from>
+          <parameters>
+            <lightmap-enabled type="int">1</lightmap-enabled>
+            <texture n="3">
+              <image>%s_LM.png</image>
+              <wrap-s>repeat</wrap-s>
+            </texture>
+            <lightmap-factor type="float" n="0">1.0</lightmap-factor>
+          </parameters>
+              """ % texture.filename))
+#          <image>tex/LZ_old_bright_bc2_LM.png</image>
+#          <image>tex/DSCF9495_rect_seamless_LM.png</image>
+#          <image>LOWI_studenthouse_panorama_LM.png</image>
+#        <lightmap-color type="vec3d" n="0"> 0.3 0.3 0.3 </lightmap-color>
+#        <lightmap-color type="vec3d" n="1"> 1.0 1.0 1.0 </lightmap-color>
+#        <lightmap-factor type="float" n="0"><use>/scenery/LOWI/garage[0]/door[0]/position-norm</use></lightmap-factor>
+#        <lightmap-factor type="float" n="0">1.0</lightmap-factor>
+#        <lightmap-factor type="float" n="1">1.0</lightmap-factor>
+#        <lightmap-factor type="float" n="2">1.0</lightmap-factor>
+#
 
-    for name in LOD_lists[0]:
-        if name.find("roof") < 0:
-            xml.write("  <object-name>%s</object-name>\n" % name)
-    for name in LOD_lists[1]:
-        if name.find("roof") < 0:
-            xml.write("  <object-name>%s</object-name>\n" % name)
-    xml.write("</effect>\n")
+        for b in LM_dict[texture]:
+    #        if name.find("roof") < 0:
+                xml.write("  <object-name>%s</object-name>\n" % b.ac_name)
+#    for name in LOD_lists[1]:
+#        if name.find("roof") < 0:
+#            xml.write("  <object-name>%s</object-name>\n" % name)
+        xml.write("</effect>\n")
 
+
+    # -- LOD animation
     xml.write(textwrap.dedent("""
     <animation>
       <type>range</type>
@@ -536,8 +548,10 @@ if __name__ == "__main__":
                 building_lib.write(b, out, elev, tile_elev, transform, offset, LOD_lists)
             out.close()
 
+            LM_dict = building_lib.make_lightmap_dict(cl.objects)
+
             # -- write xml
-            write_xml(fname, LOD_lists)
+            write_xml(fname, LOD_lists, LM_dict)
 
             # -- write stg
             tile_index = calc_tile.tile_index(center_lon, center_lat)

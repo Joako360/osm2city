@@ -391,6 +391,15 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, model_pr
 
     return new_buildings
 
+def make_lightmap_dict(buildings):
+    """make a dictionary: map texture to objects"""
+    dict = {}
+    for b in buildings:
+        key = b.facade_texture
+        if not dict.has_key(key):
+            dict[key] = []
+        dict[key].append(b)
+    return dict
 
 def decide_LOD(buildings):
     for b in buildings:
@@ -425,9 +434,9 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     else: sys.stdout.write(".")
 
     out.write("OBJECT poly\n")
-    name = "b%i" % nb
-    out.write("name \"%s\"\n" % name)
-    LOD_lists[b.LOD].append(name)
+    b.ac_name = "b%i" % nb
+    out.write("name \"%s\"\n" % b.ac_name)
+    LOD_lists[b.LOD].append(b.ac_name)
 
     nsurf = nnodes_ground
     if not roof_separate: nsurf += 1 # -- because roof will be part of base model
