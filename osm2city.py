@@ -349,38 +349,44 @@ def write_xml(fname, LOD_lists, LM_dict):
     xml.write("<path>%s.ac</path>" % fname)
 
     # -- lightmap
+    #    not all textures have lightmaps yet
+    LMs_avail = ['tex/DSCF9495_pow2', 'tex/DSCF9503_noroofsec_pow2', 'tex/LZ_old_bright_bc2']
+
     # FIXME: use Effect/Building? What's the difference?
     for texture in LM_dict.keys():
-        xml.write(textwrap.dedent("""
-        <effect>
-          <inherits-from>Effects/model-combined-deferred</inherits-from>
-          <parameters>
-            <lightmap-enabled type="int">1</lightmap-enabled>
-            <texture n="3">
-              <image>%s_LM.png</image>
-              <wrap-s>repeat</wrap-s>
-            </texture>
-            <lightmap-factor type="float" n="0">1.0</lightmap-factor>
-          </parameters>
-              """ % texture.filename))
-#          <image>tex/LZ_old_bright_bc2_LM.png</image>
-#          <image>tex/DSCF9495_rect_seamless_LM.png</image>
-#          <image>LOWI_studenthouse_panorama_LM.png</image>
-#        <lightmap-color type="vec3d" n="0"> 0.3 0.3 0.3 </lightmap-color>
-#        <lightmap-color type="vec3d" n="1"> 1.0 1.0 1.0 </lightmap-color>
-#        <lightmap-factor type="float" n="0"><use>/scenery/LOWI/garage[0]/door[0]/position-norm</use></lightmap-factor>
-#        <lightmap-factor type="float" n="0">1.0</lightmap-factor>
-#        <lightmap-factor type="float" n="1">1.0</lightmap-factor>
-#        <lightmap-factor type="float" n="2">1.0</lightmap-factor>
-#
+#        print texture.filename
+#        print LMs_avail
+        if texture.filename in LMs_avail:
+            xml.write(textwrap.dedent("""
+            <effect>
+              <inherits-from>Effects/model-combined-deferred</inherits-from>
+              <parameters>
+                <lightmap-enabled type="int">1</lightmap-enabled>
+                <texture n="3">
+                  <image>%s_LM.png</image>
+                  <wrap-s>repeat</wrap-s>
+                </texture>
+                <lightmap-factor type="float" n="0">1.0</lightmap-factor>
+              </parameters>
+                  """ % texture.filename))
+    #          <image>tex/LZ_old_bright_bc2_LM.png</image>
+    #          <image>tex/DSCF9495_rect_seamless_LM.png</image>
+    #          <image>LOWI_studenthouse_panorama_LM.png</image>
+    #        <lightmap-color type="vec3d" n="0"> 0.3 0.3 0.3 </lightmap-color>
+    #        <lightmap-color type="vec3d" n="1"> 1.0 1.0 1.0 </lightmap-color>
+    #        <lightmap-factor type="float" n="0"><use>/scenery/LOWI/garage[0]/door[0]/position-norm</use></lightmap-factor>
+    #        <lightmap-factor type="float" n="0">1.0</lightmap-factor>
+    #        <lightmap-factor type="float" n="1">1.0</lightmap-factor>
+    #        <lightmap-factor type="float" n="2">1.0</lightmap-factor>
+    #
 
-        for b in LM_dict[texture]:
+            for b in LM_dict[texture]:
+        #        if name.find("roof") < 0:
+                    xml.write("  <object-name>%s</object-name>\n" % b.ac_name)
+    #    for name in LOD_lists[1]:
     #        if name.find("roof") < 0:
-                xml.write("  <object-name>%s</object-name>\n" % b.ac_name)
-#    for name in LOD_lists[1]:
-#        if name.find("roof") < 0:
-#            xml.write("  <object-name>%s</object-name>\n" % name)
-        xml.write("</effect>\n")
+    #            xml.write("  <object-name>%s</object-name>\n" % name)
+            xml.write("</effect>\n")
 
 
     # -- LOD animation

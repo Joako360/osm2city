@@ -187,11 +187,12 @@ def init():
                             requires=['roof:color:black'],
                             provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
-    facades.append(Texture('tex/DSCF9496_pow2',
-                            4.44, None, True,
-                            17.93, (1099, 1521, 2048), False, True,
-                            requires=['roof:color:black'],
-                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
+    # -- just two windows. Looks rather boring. But maybe we need a very narrow texture?
+#    facades.append(Texture('tex/DSCF9496_pow2',
+#                            4.44, None, True,
+#                            17.93, (1099, 1521, 2048), False, True,
+#                            requires=['roof:color:black'],
+#                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
     facades.append(Texture('tex/LZ_old_bright_bc2',
                             17.9, (345,807,1023,1236,1452,1686,2048), True,
