@@ -217,7 +217,7 @@ def init():
                             requires=['roof:color:black'],
                             provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
-    facades.append(Texture('tex/wohnheime_petersburger_pow2',
+    facades.append(Texture('tex/wohnheime_petersburger',
                             15.6, (215, 414, 614, 814, 1024), True,
                             15.6, (112, 295, 477, 660, 843, 1024), True, True,
                             height_min = 15.,
@@ -237,13 +237,13 @@ def init():
 #                           19.8, (173,329,490,645,791,1024), False, True,
 #                           provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
-    facades.append(Texture('tex/DSCF9710_noroofsec_pow2',
+    facades.append(Texture('tex/DSCF9710',
                            29.9, (142,278,437,590,756,890,1024), True,
                            19.8, (130,216,297,387,512), False, True,
                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
 
-    facades.append(Texture('tex/DSCF9678_no_roof_items_pow2',
+    facades.append(Texture('tex/DSCF9678_pow2',
                            10.4, (97,152,210,299,355,411,512), True,
                            15.5, (132,211,310,512), False, True,
                            provides=['shape:residential','shape:commercial','age:modern','compat:roof-flat']))

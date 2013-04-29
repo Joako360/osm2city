@@ -99,7 +99,8 @@ tile_size=1000 # -- our tile size in meters
 #infile = 'eddc-all.osm'; total_objects = 100000 # huge!
 #infile = 'map.osm'; total_objects = 216 #
 prefix="LOWI"
-infile = prefix + '/buidings-xapi.osm'; total_objects = 5000 # huge!
+#prefix="EDDC"
+infile = prefix + '/xapi-buildings.osm'; total_objects = 50000 # huge!
 
 # devel
 check_overlap = False
@@ -239,8 +240,8 @@ class wayExtract(object):
 #maxlon=13.7467600
 
 if prefix == "EDDC":
-    cmin=vec2d(13.63, 50.96)
-    cmax=vec2d(13.88, 51.17)
+    cmin = vec2d(13.63, 50.96)
+    cmax = vec2d(13.88, 51.17)
     center = vec2d(13.7467, 51.0377) # -- EDDC
 
 #
@@ -350,7 +351,7 @@ def write_xml(fname, LOD_lists, LM_dict):
 
     # -- lightmap
     #    not all textures have lightmaps yet
-    LMs_avail = ['tex/DSCF9495_pow2', 'tex/DSCF9503_noroofsec_pow2', 'tex/LZ_old_bright_bc2']
+    LMs_avail = ['tex/DSCF9495_pow2', 'tex/DSCF9503_noroofsec_pow2', 'tex/LZ_old_bright_bc2', 'tex/DSCF9678_pow2', 'tex/DSCF9710', 'tex/wohnheime_petersburger']
 
     # FIXME: use Effect/Building? What's the difference?
     for texture in LM_dict.keys():
