@@ -103,7 +103,7 @@ prefix="LOWI"
 infile = prefix + '/xapi-buildings.osm'; total_objects = 50000 # huge!
 
 # devel
-check_overlap = False
+#check_overlap = False
 if False:
     use_pkl = False    #infile = 'dd-altstadt.osm'; total_objects = 158
     #infile = 'map.osm'; total_objects = 216 #
@@ -139,6 +139,7 @@ class Building(object):
         self.anchor = vec2d(transform.toLocal((r.lon, r.lat)))
         self.facade_texture = None
         self.roof_texture = None
+        self.roof_separate = False
         self.ac_name = None
 
         #print "tr X", self.X
@@ -259,6 +260,7 @@ if prefix == "LOWI":
     cmin = vec2d(11.16898,47.20837) # -- LOWI
     cmax = vec2d(11.79108,47.38161)
     center = (cmin + cmax)*0.5
+    #tile_size=8000
 #minlon, minlat = 11.32109513, 47.22690253
 #maxlon, maxlat = 11.45363857, 47.29885247
 
@@ -366,10 +368,12 @@ def write_xml(fname, LOD_lists, LM_dict):
                 <texture n="3">
                   <image>%s_LM.png</image>
                   <wrap-s>repeat</wrap-s>
+                  <wrap-t>repeat</wrap-t>
                 </texture>
-                <lightmap-factor type="float" n="0">1.0</lightmap-factor>
+                <lightmap-factor type="float" n="0"><use>/scenery/LOWI/garage[0]/door[0]/position-norm</use></lightmap-factor>
               </parameters>
                   """ % texture.filename))
+#                  "tex/DSCF9495_pow2"))
     #          <image>tex/LZ_old_bright_bc2_LM.png</image>
     #          <image>tex/DSCF9495_rect_seamless_LM.png</image>
     #          <image>LOWI_studenthouse_panorama_LM.png</image>
@@ -379,6 +383,10 @@ def write_xml(fname, LOD_lists, LM_dict):
     #        <lightmap-factor type="float" n="0">1.0</lightmap-factor>
     #        <lightmap-factor type="float" n="1">1.0</lightmap-factor>
     #        <lightmap-factor type="float" n="2">1.0</lightmap-factor>
+#                <lightmap-color type="vec3d" n="3"> 1 0 0 </lightmap-color>
+#                <lightmap-color type="vec3d" n="0"> 0 1 0 </lightmap-color>
+#                <lightmap-color type="vec3d" n="1"> 0 0 1 </lightmap-color>
+#                <lightmap-factor type="float" n="0">1.0</lightmap-factor>
     #
 
             for b in LM_dict[texture]:
@@ -533,6 +541,10 @@ if __name__ == "__main__":
 #            for b in cl.objects:
                 #print (b.anchor - offset), "    ", b.anchor
 
+            # -- count roofs == separate objects
+            nroofs = 0
+            for b in cl.objects:
+                if b.roof_separate: nroofs += 1
 
             tile_elev = elev(cl.center)
             if tile_elev == -9999:
@@ -550,7 +562,7 @@ if __name__ == "__main__":
             # -- open ac and write header
             fname = prefix+"city%02i%02i" % (cl.I.x, cl.I.y)
             out = open(fname+".ac", "w")
-            write_ac_header(out, nb)
+            write_ac_header(out, nb + nroofs)
             for b in cl.objects:
                 building_lib.write(b, out, elev, tile_elev, transform, offset, LOD_lists)
             out.close()

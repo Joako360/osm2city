@@ -56,6 +56,7 @@ def random_LOD():
 default_height=12.
 random_level_height = random_number(float, 3.1, 3.6)
 random_levels = random_number(int, 2, 5)
+#random_levels = random_number(int, 8, 30)
 
 def check_height(building_height, t):
     """check if a texture t fits the building height (h)
@@ -533,7 +534,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     else:
         # -- textured roof, a separate object
 
-        out.write("kids 1\n")
+        out.write("kids 0\n")
         out.write("OBJECT poly\n")
         out.write("name \"b%i-roof\"\n" % nb)
 
