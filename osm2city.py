@@ -344,7 +344,7 @@ def write_ac_header(out, nb):
 
 # -----------------------------------------------------------------------------
 # -- write xml
-def write_xml(fname, LOD_lists, LM_dict):
+def write_xml(fname, LOD_lists, LM_dict, buildings):
     #  -- LOD animation
     xml = open(fname + ".xml", "w")
     xml.write("""<?xml version="1.0"?>\n<PropertyList>\n""")
@@ -395,6 +395,28 @@ def write_xml(fname, LOD_lists, LM_dict):
     #            xml.write("  <object-name>%s</object-name>\n" % name)
             xml.write("</effect>\n")
 
+    # -- hi-rise building position lights
+    for b in buildings:
+        if b.levels > 30:
+
+            if len(b.refs) > 6: step = 2
+            else: step = 1
+            for i in range(0, len(b.refs), step):
+              xo = b.X[i,0]# - offset.x # -- b.X already in cluster coordinates
+              yo = b.X[i,1]# - offset.y
+              zo = b.ceiling + 1.5
+              # <path>cursor.ac</path>
+              xml.write(textwrap.dedent("""
+                <model>
+                  <path>../../../Models/Effects/pos_lamp_red_light_2st.xml</path>
+                  <offsets>
+                    <x-m>%g</x-m>
+                    <y-m>%g</y-m>
+                    <z-m>%g</z-m>
+                    <pitch-deg> 0.00</pitch-deg>
+                    <heading-deg>0.0 </heading-deg>
+                  </offsets>
+                </model>""" % (-yo, xo, zo) ))  # -- I just don't get those coordinate systems.
 
     # -- LOD animation
     xml.write(textwrap.dedent("""
@@ -535,7 +557,7 @@ if __name__ == "__main__":
             # -- get cluster center
             offset = cl.center
 
-#            print "\ncl offset", offset
+            print "\ncl offset", offset
 #            for b in cl.objects:
                 #print (b.anchor - offset), "    ", b.anchor
 
@@ -568,7 +590,7 @@ if __name__ == "__main__":
             LM_dict = building_lib.make_lightmap_dict(cl.objects)
 
             # -- write xml
-            write_xml(fname, LOD_lists, LM_dict)
+            write_xml(fname, LOD_lists, LM_dict, cl.objects)
 
             # -- write stg
             tile_index = calc_tile.tile_index(center_lon, center_lat)

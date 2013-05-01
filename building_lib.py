@@ -56,7 +56,7 @@ def random_LOD():
 default_height=12.
 random_level_height = random_number(float, 3.1, 3.6)
 random_levels = random_number(int, 2, 5)
-#random_levels = random_number(int, 8, 30)
+random_levels_skyscraper = random_number(int, 10, 60)
 
 def check_height(building_height, t):
     """check if a texture t fits the building height (h)
@@ -262,8 +262,18 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, model_pr
         p = Polygon(r)
         b.area = p.area
 
-
         level_height = random_level_height()
+
+        # -- LOWI year 2525
+        if True:
+            if b.area > 2000:
+                b.levels = random_levels_skyscraper()
+                b.height = float(b.levels) * level_height
+
+#            if b.area < 8000. or (b.area < 500. and random.uniform(0,1) < 0.5):
+            if b.area < 200. or (b.area < 500. and random.uniform(0,1) < 0.5):
+                tools.stats.skipped_small += 1
+                continue
 
         # try OSM height first
         # catch exceptions, since height might be "5 m" instead of "5"
@@ -292,6 +302,12 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, model_pr
             tools.stats.skipped_small += 1
             continue
 
+        # -- skipping 50% of under 200 sqm buildings
+        if b.area < 30. or (b.area < 200. and random.uniform(0,1) < 0.5):
+        #if b.area < 20. : # FIXME use limits.area_min:
+            #print "Skipping small building (area)"
+            tools.stats.skipped_small += 1
+            continue
 
         # -- roof is controlled by two flags:
         #    bool b.roof_separate: whether or not to include roof as separate model
@@ -351,13 +367,6 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, model_pr
                 #print
                 tools.stats.skipped_nearby += 1
                 continue
-
-        # -- skipping 50% of under 200 sqm buildings
-        if b.area < 30. or (b.area < 200. and random.uniform(0,1) < 0.5):
-        #if b.area < 20. : # FIXME use limits.area_min:
-            #print "Skipping small building (area)"
-            tools.stats.skipped_small += 1
-            continue
 
         # -- skip buildings outside elevation raster
         if elev(vec2d(X[0])) == -9999:
@@ -483,7 +492,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
     i = 0
     for r in b.refs:
-        X[i,0] -= offset.x # cluster coordinates
+        X[i,0] -= offset.x # cluster coordinates. NB: this changes building coordinates!
         X[i,1] -= offset.y
         i += 1
 
@@ -498,6 +507,8 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         out.write("%1.2f %1.2f %1.2f\n" % (-x[1], z, -x[0]))
     for x in X[:-1]:
         out.write("%1.2f %1.2f %1.2f\n" % (-x[1], ground_elev + b.height, -x[0]))
+
+    b.ceiling = ground_elev + b.height
 
     write_and_count_numsurf(out, b, nsurf)
     # -- walls
