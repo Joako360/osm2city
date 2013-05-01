@@ -260,7 +260,6 @@ if prefix == "LOWI":
     cmin = vec2d(11.16898,47.20837) # -- LOWI
     cmax = vec2d(11.79108,47.38161)
     center = (cmin + cmax)*0.5
-    #tile_size=8000
 #minlon, minlat = 11.32109513, 47.22690253
 #maxlon, maxlat = 11.45363857, 47.29885247
 
@@ -312,7 +311,7 @@ def write_ac_header(out, nb):
     out.write("AC3Db\n")
 #    out.write("%s\n" % mats[random.randint(0,2)])
     out.write("""MATERIAL "" rgb 1   1   1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0\n""")
-    out.write("""MATERIAL "" rgb 1   0   0 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0\n""")
+#    out.write("""MATERIAL "" rgb 1   0   0 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0\n""")
 #    MATERIAL "" rgb 1   1    1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
 #    MATERIAL "" rgb .95 1    1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
 #    MATERIAL "" rgb 1   0.95 1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
@@ -360,34 +359,33 @@ def write_xml(fname, LOD_lists, LM_dict):
 #        print texture.filename
 #        print LMs_avail
         if texture.filename in LMs_avail:
+#            xml.write(textwrap.dedent("""
+#            <effect>
+#              <inherits-from>Effects/model-combined-deferred</inherits-from>
+#              <parameters>
+#                <lightmap-enabled type="int">1</lightmap-enabled>
+#                <texture n="3">
+#                  <image>%s_LM.png</image>
+#                  <wrap-s>repeat</wrap-s>
+#                  <wrap-t>repeat</wrap-t>
+#                </texture>
+#                <lightmap-factor type="float" n="0"><use>/scenery/LOWI/garage[0]/door[0]/position-norm</use></lightmap-factor>
+#              </parameters>
+#                  """ % texture.filename))
+#                  "tex/DSCF9495_pow2"))
+
             xml.write(textwrap.dedent("""
             <effect>
-              <inherits-from>Effects/model-combined-deferred</inherits-from>
+              <inherits-from>cityLM</inherits-from>
               <parameters>
-                <lightmap-enabled type="int">1</lightmap-enabled>
+                <lightmap-factor type="float" n="0"><use>/scenery/LOWI/garage[0]/door[0]/position-norm</use></lightmap-factor>
                 <texture n="3">
                   <image>%s_LM.png</image>
                   <wrap-s>repeat</wrap-s>
                   <wrap-t>repeat</wrap-t>
                 </texture>
-                <lightmap-factor type="float" n="0"><use>/scenery/LOWI/garage[0]/door[0]/position-norm</use></lightmap-factor>
               </parameters>
                   """ % texture.filename))
-#                  "tex/DSCF9495_pow2"))
-    #          <image>tex/LZ_old_bright_bc2_LM.png</image>
-    #          <image>tex/DSCF9495_rect_seamless_LM.png</image>
-    #          <image>LOWI_studenthouse_panorama_LM.png</image>
-    #        <lightmap-color type="vec3d" n="0"> 0.3 0.3 0.3 </lightmap-color>
-    #        <lightmap-color type="vec3d" n="1"> 1.0 1.0 1.0 </lightmap-color>
-    #        <lightmap-factor type="float" n="0"><use>/scenery/LOWI/garage[0]/door[0]/position-norm</use></lightmap-factor>
-    #        <lightmap-factor type="float" n="0">1.0</lightmap-factor>
-    #        <lightmap-factor type="float" n="1">1.0</lightmap-factor>
-    #        <lightmap-factor type="float" n="2">1.0</lightmap-factor>
-#                <lightmap-color type="vec3d" n="3"> 1 0 0 </lightmap-color>
-#                <lightmap-color type="vec3d" n="0"> 0 1 0 </lightmap-color>
-#                <lightmap-color type="vec3d" n="1"> 0 0 1 </lightmap-color>
-#                <lightmap-factor type="float" n="0">1.0</lightmap-factor>
-    #
 
             for b in LM_dict[texture]:
         #        if name.find("roof") < 0:
