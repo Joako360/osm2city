@@ -41,6 +41,8 @@ class random_number(object):
             self.callback = random.uniform
         elif randtype == int:
             self.callback = random.randint
+        elif randtype == 'gauss':
+            self.callback = random.gauss
         else:
             raise TypeError("randtype must be 'float' or 'int'")
     def __call__(self):
@@ -56,7 +58,8 @@ def random_LOD():
 default_height=12.
 random_level_height = random_number(float, 3.1, 3.6)
 random_levels = random_number(int, 2, 5)
-random_levels_skyscraper = random_number(int, 10, 60)
+#random_levels_skyscraper = random_number(int, 10, 60)
+random_levels_skyscraper = random_number('gauss', 35, 10)
 
 def check_height(building_height, t):
     """check if a texture t fits the building height (h)
@@ -266,12 +269,12 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, model_pr
 
         # -- LOWI year 2525
         if True:
-            if b.area > 2000:
-                b.levels = random_levels_skyscraper()
+            if b.area >= 1500:
+                b.levels = int(random_levels_skyscraper())
                 b.height = float(b.levels) * level_height
 
-#            if b.area < 8000. or (b.area < 500. and random.uniform(0,1) < 0.5):
-            if b.area < 200. or (b.area < 500. and random.uniform(0,1) < 0.5):
+            if b.area < 1500:
+            #if b.area < 200. or (b.area < 500. and random.uniform(0,1) < 0.5):
                 tools.stats.skipped_small += 1
                 continue
 

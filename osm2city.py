@@ -399,11 +399,11 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
     for b in buildings:
         if b.levels > 30:
 
-            if len(b.refs) > 6: step = 2
-            else: step = 1
-            for i in range(0, len(b.refs), step):
-              xo = b.X[i,0]# - offset.x # -- b.X already in cluster coordinates
-              yo = b.X[i,1]# - offset.y
+#            step = max(len(b.refs)/4, 1)
+#            for i in range(0, len(b.refs), step):
+            for i in np.arange(0,len(b.refs),len(b.refs)/4.):
+              xo = b.X[int(i+0.5), 0]# - offset.x # -- b.X already in cluster coordinates
+              yo = b.X[int(i+0.5), 1]# - offset.y
               zo = b.ceiling + 1.5
               # <path>cursor.ac</path>
               xml.write(textwrap.dedent("""
