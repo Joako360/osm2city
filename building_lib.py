@@ -78,14 +78,28 @@ def check_height(building_height, t):
         # - evaluate error
         # - error acceptable?
         if building_height >= t.v_splits_meters[0] and building_height <= t.v_size_meters:
-            for i in range(len(t.v_splits_meters)):
-                if t.v_splits_meters[i] >= building_height:
-                    tex_y0 = 1-t.v_splits[i]
-                    #print "# height %g storey %i" % (building_height, i)
-                    break
-            tex_y1 = 1.
+#            print "--->"
+            if t.v_split_from_bottom:
+#                print "from bottom"
+                for i in range(len(t.v_splits_meters)):
+                    if t.v_splits_meters[i] >= building_height:
+#                        print "bot trying %g >= %g ?" % (t.v_splits_meters[i],  building_height)
+                        tex_y0 = 0
+                        tex_y1 = t.v_splits[i]
+                        #print "# height %g storey %i" % (building_height, i)
+                        return tex_y0, tex_y1
+            else:
+#                print "from top"
+#                print "got", t.v_splits_meters
+                for i in range(len(t.v_splits_meters)-2, -1, -1):
+#                    print "%i top trying %g >= %g ?" % (i, t.v_splits_meters[-1] - t.v_splits_meters[i],  building_height)
+                    if t.v_splits_meters[-1] - t.v_splits_meters[i] >= building_height:
+                         # FIXME: probably a bug. Should use distance to height?
+                        tex_y0 = t.v_splits[i]
+                        tex_y1 = 1.
+                        return tex_y0, tex_y1
             #tex_filename = t.filename + '.png'
-            return tex_y0, tex_y1
+            raise ValueError("SHOULD NOT HAPPEN! found no tex_y0, tex_y1 (building_height %g splits %s %g)" % (building_height, str(t.v_splits_meters), t.v_size_meters))
         else:
             raise ValueError("SHOULD NOT HAPPEN! building_height %g outside %g %g" % (building_height, t.v_splits_meters[0], t.v_size_meters))
             return 0, 0
@@ -268,7 +282,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, model_pr
         level_height = random_level_height()
 
         # -- LOWI year 2525
-        if True:
+        if False:
             if b.area >= 1500:
                 b.levels = int(random_levels_skyscraper())
                 b.height = float(b.levels) * level_height
@@ -306,7 +320,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, model_pr
             continue
 
         # -- skipping 50% of under 200 sqm buildings
-        if b.area < 30. or (b.area < 200. and random.uniform(0,1) < 0.5):
+        if b.area < 50. or (b.area < 200. and random.uniform(0,1) < 0.5):
         #if b.area < 20. : # FIXME use limits.area_min:
             #print "Skipping small building (area)"
             tools.stats.skipped_small += 1
@@ -327,7 +341,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, model_pr
         # -- model roof if we have 4 ground nodes and area below 1000m2
         if b.nnodes_ground == 4 and b.area < 1000:
             b.roof_separate = True
-            b.roof_flat = False  # -- gable roof
+            b.roof_flat = False  # -- pitched roof
 
 
         # -- no gable roof on tall buildings
@@ -575,7 +589,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
             out.write("kids 0\n")
         else:
-            # -- gable roof
+            # -- pitched roof
             write_and_count_numvert(out, b, nnodes_ground + 2)
             # -- 4 corners
             for x in X[:-1]:

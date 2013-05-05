@@ -123,6 +123,7 @@ class Texture(object):
                  v_size_meters, v_splits, v_can_repeat, \
                  has_roof_section = False, \
                  height_min = 0, height_max = 9999, \
+                 v_split_from_bottom = False, \
                  provides = {}, requires = {}):
         self.filename = filename
         self.provides = provides
@@ -130,17 +131,25 @@ class Texture(object):
         self.has_roof_section = has_roof_section
         self.height_min = height_min
         self.height_max = height_max
+        self.v_split_from_bottom = v_split_from_bottom
         # roof type, color
 #        self.v_min = v_min
 #        self.v_max = v_max
         self.v_size_meters = v_size_meters
-        self.v_splits = np.array(v_splits, dtype=np.float)
-        if v_splits == None:
+        if v_splits != None:
+            v_splits.insert(0,0)
+            self.v_splits = np.array(v_splits, dtype=np.float)
+            if len(self.v_splits) > 1:
+                # FIXME            test for not type list
+                self.v_splits /= self.v_splits[-1]
+#                print self.v_splits
+                # -- Gimp origin is upper left, convert to OpenGL lower left
+                self.v_splits = (1. - self.v_splits)[::-1]
+#                print self.v_splits
+        else:
             self.v_splits = 1.
-        elif len(self.v_splits) > 1:
-# FIXME            test for not type list
-            self.v_splits /= self.v_splits[-1]
         self.v_splits_meters = self.v_splits * self.v_size_meters
+
         self.v_can_repeat = v_can_repeat
 
         if not self.v_can_repeat:
@@ -183,10 +192,21 @@ def init():
 
     if True:
         facades.append(Texture('tex/DSCF9495_pow2',
-                                14, (585, 873, 1179, 1480, 2048), True,
-                                19.4, (1094, 1531, 2048), False, True,
+                                14, [585, 873, 1179, 1480, 2048], True,
+                                19.4, [274, 676, 1114, 1542, 2048], False, True,
                                 requires=['roof:color:black'],
                                 provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
+
+#                                19.4, [1094, 1531, 2048], False, True,
+
+        facades.append(Texture('tex/DSCF9495_pow2',
+                                14, [585, 873, 1179, 1480, 2048], True,
+                                19.4, [274, 676, 1114, 1542, 2048], False, True,
+                                height_max = 13.,
+                                v_split_from_bottom = True,
+                                requires=['roof:color:red'],
+                                provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
+    if True:
 
         # -- just two windows. Looks rather boring. But maybe we need a very narrow texture?
     #    facades.append(Texture('tex/DSCF9496_pow2',
@@ -196,14 +216,14 @@ def init():
     #                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
         facades.append(Texture('tex/LZ_old_bright_bc2',
-                                17.9, (345,807,1023,1236,1452,1686,2048), True,
-                                14.8, (558,1005,1446,2048), False, True,
+                                17.9, [345,807,1023,1236,1452,1686,2048], True,
+                                14.8, [558,1005,1446,2048], False, True,
                                 provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
 
         facades.append(Texture('tex/facade_modern36x36_12',
-                                36., (None), True,
-                                36., (158, 234, 312, 388, 465, 542, 619, 697, 773, 870, 1024), True, True,
+                                36., [None], True,
+                                36., [158, 234, 312, 388, 465, 542, 619, 697, 773, 870, 1024], True, True,
                                 provides=['shape:urban','shape:residential','age:modern',
                                          'compat:roof-flat']))
 
@@ -214,7 +234,7 @@ def init():
     #                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
         facades.append(Texture('tex/DSCF9503_noroofsec_pow2',
                                 12.85, None, True,
-                                17.66, (556,1015,1474,2048), False, True,
+                                17.66, [556,1015,1474,2048], False, True,
                                 requires=['roof:color:black'],
                                 provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
@@ -232,29 +252,29 @@ def init():
     #                           provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
         facades.append(Texture('tex/DSCF9710',
-                               29.9, (142,278,437,590,756,890,1024), True,
-                               19.8, (130,216,297,387,512), False, True,
+                               29.9, [142,278,437,590,756,890,1024], True,
+                               19.8, [130,216,297,387,512], False, True,
                                provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
 
         facades.append(Texture('tex/DSCF9678_pow2',
-                               10.4, (97,152,210,299,355,411,512), True,
-                               15.5, (132,211,310,512), False, True,
+                               10.4, [97,152,210,299,355,411,512], True,
+                               15.5, [132,211,310,512], False, True,
                                provides=['shape:residential','shape:commercial','age:modern','compat:roof-flat']))
 
         facades.append(Texture('tex/DSCF9726_noroofsec_pow2',
-                               15.1, (321,703,1024), True,
-                               9.6, (227,512), False, True,
+                               15.1, [321,703,1024], True,
+                               9.6, [227,512], False, True,
                                provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
-    facades.append(Texture('tex/wohnheime_petersburger',
-                            15.6, (215, 414, 614, 814, 1024), True,
-                            15.6, (112, 295, 477, 660, 843, 1024), True, True,
-                            height_min = 15.,
-                            provides=['shape:urban','shape:residential','age:modern',
-                                     'compat:roof-flat']))
-#                            provides=['shape:urban','shape:residential','age:modern','age:old',
-#                                     'compat:roof-flat','compat:roof-gable']))
+        facades.append(Texture('tex/wohnheime_petersburger',
+                                15.6, [215, 414, 614, 814, 1024], True,
+                                15.6, [112, 295, 477, 660, 843, 1024], True, True,
+                                height_min = 15.,
+                                provides=['shape:urban','shape:residential','age:modern',
+                                         'compat:roof-flat']))
+    #                            provides=['shape:urban','shape:residential','age:modern','age:old',
+    #                                     'compat:roof-flat','compat:roof-gable']))
 
 
 
@@ -282,7 +302,6 @@ def init():
 
 if __name__ == "__main__":
     init()
-    bla
     cands = facades.find_candidates([], 14)
     print "cands ar", cands
     for t in cands:

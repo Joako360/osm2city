@@ -87,8 +87,12 @@ no_elev = False # -- skip elevation interpolation
 #no_elev = True # -- skip elevation interpolation
 check_overlap = True # -- check for overlap with static models
 
-if len(sys.argv) > 1:
-    no_elev = int(sys.argv[1])
+if '-e' in sys.argv:
+    no_elev = True
+if '-c' in sys.argv:
+    check_overlap = False
+# -t #
+
 use_pkl = True
 #use_pkl = False
 buildings = [] # -- master list, holds all buildings
@@ -140,6 +144,7 @@ class Building(object):
         self.facade_texture = None
         self.roof_texture = None
         self.roof_separate = False
+        self.roof_flat = True
         self.ac_name = None
 
         #print "tr X", self.X
@@ -359,21 +364,6 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
 #        print texture.filename
 #        print LMs_avail
         if texture.filename in LMs_avail:
-#            xml.write(textwrap.dedent("""
-#            <effect>
-#              <inherits-from>Effects/model-combined-deferred</inherits-from>
-#              <parameters>
-#                <lightmap-enabled type="int">1</lightmap-enabled>
-#                <texture n="3">
-#                  <image>%s_LM.png</image>
-#                  <wrap-s>repeat</wrap-s>
-#                  <wrap-t>repeat</wrap-t>
-#                </texture>
-#                <lightmap-factor type="float" n="0"><use>/scenery/LOWI/garage[0]/door[0]/position-norm</use></lightmap-factor>
-#              </parameters>
-#                  """ % texture.filename))
-#                  "tex/DSCF9495_pow2"))
-
             xml.write(textwrap.dedent("""
             <effect>
               <inherits-from>cityLM</inherits-from>
@@ -531,6 +521,8 @@ if __name__ == "__main__":
     #   - decide LOD
     buildings = building_lib.analyse(buildings, static_objects, transform, elev, tex.facades, tex.roofs, prefix+"city")
 
+    #tools.write_gp(buildings)
+
     tools.stats.print_summary()
 
     # -- now put buildings into clusters
@@ -557,7 +549,7 @@ if __name__ == "__main__":
             # -- get cluster center
             offset = cl.center
 
-            print "\ncl offset", offset
+            #print "\ncl offset", offset
 #            for b in cl.objects:
                 #print (b.anchor - offset), "    ", b.anchor
 

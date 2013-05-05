@@ -156,6 +156,16 @@ def write_map(filename, transform, elev, gmin, gmax):
     out.close()
     #print "OBJECT_STATIC surface.ac"
 
+def write_gp(buildings):
+    gp = open("buildings.dat", "w")
+    for b in buildings:
+        gp.write("# %s\n" % b.osm_id)
+        for x in b.X:
+            gp.write("%g %g\n" % (x[0], x[1]))
+        gp.write("\n")
+
+    gp.close()
+
 
 class Stats(object):
     def __init__(self):
@@ -168,6 +178,7 @@ class Stats(object):
         self.area_above = np.zeros_like(self.area_levels)
         self.vertices = 0
         self.surfaces = 0
+        self.have_pitched_roof = 0
         self.out = None
         self.LOD = np.zeros(3)
 
@@ -176,6 +187,7 @@ class Stats(object):
         """
         self.vertices += b.vertices
         self.surfaces += b.surfaces
+        self.have_pitched_roof += not b.roof_flat
         # self.objects += 1 # skipped because we count buildings while OSM parsing
         for i in range(len(self.area_levels))[::-1]:
             if b.area >= self.area_levels[i]:
@@ -197,6 +209,7 @@ class Stats(object):
           small         %i
           nearby        %i
           texture       %i
+        pitched roof    %i
         vertices        %i
         surfaces        %i
         LOD bare        %i (%2.0f)
@@ -204,6 +217,7 @@ class Stats(object):
         LOD detail      %i (%2.0f)
         """ % (self.objects, total_written,
                self.skipped_small, self.skipped_nearby, self.skipped_texture,
+               self.have_pitched_roof,
                self.vertices, self.surfaces,
                self.LOD[0], 100.*self.LOD[0]/total_written,
                self.LOD[1], 100.*self.LOD[1]/total_written,
