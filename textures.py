@@ -292,12 +292,13 @@ def init():
 #    roofs.append(Texture('tex/roof_black3_small_256x128',
 #                             0.25, None, True, 0.12, None, True, provides=['color:black']))
 
-    print roofs[0].provides
-    print "black roofs: ", [str(i) for i in roofs.find_candidates(['roof:color:black'])]
-    print "red   roofs: ", [str(i) for i in roofs.find_candidates(['roof:color:red'])]
-    print "old facades: "
-    for i in facades.find_candidates(['facade:shape:residential','age:old'], 10):
-        print i, i.v_splits * i.v_size_meters
+    if False:
+        print roofs[0].provides
+        print "black roofs: ", [str(i) for i in roofs.find_candidates(['roof:color:black'])]
+        print "red   roofs: ", [str(i) for i in roofs.find_candidates(['roof:color:red'])]
+        print "old facades: "
+        for i in facades.find_candidates(['facade:shape:residential','age:old'], 10):
+            print i, i.v_splits * i.v_size_meters
     #print facades[0].provides
 
 if __name__ == "__main__":

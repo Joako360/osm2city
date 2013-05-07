@@ -146,6 +146,7 @@ class Building(object):
         self.roof_separate = False
         self.roof_flat = True
         self.ac_name = None
+        self.ceiling = 0.
 
         #print "tr X", self.X
 
@@ -389,9 +390,7 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
     for b in buildings:
         if b.levels > 30:
 
-#            step = max(len(b.refs)/4, 1)
-#            for i in range(0, len(b.refs), step):
-            for i in np.arange(0,len(b.refs),len(b.refs)/4.):
+            for i in np.arange(0, b.nnodes_ground, b.nnodes_ground/4.):
               xo = b.X[int(i+0.5), 0]# - offset.x # -- b.X already in cluster coordinates
               yo = b.X[int(i+0.5), 1]# - offset.y
               zo = b.ceiling + 1.5

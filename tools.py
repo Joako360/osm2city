@@ -181,6 +181,8 @@ class Stats(object):
         self.have_pitched_roof = 0
         self.out = None
         self.LOD = np.zeros(3)
+        self.nodes_ground = 0
+        self.nodes_simplified = 0
 
     def count(self, b):
         """update stats (vertices, surfaces, area) with given building's data
@@ -210,6 +212,8 @@ class Stats(object):
           nearby        %i
           texture       %i
         pitched roof    %i
+        ground nodes    %i
+          simplified    %i
         vertices        %i
         surfaces        %i
         LOD bare        %i (%2.0f)
@@ -218,6 +222,7 @@ class Stats(object):
         """ % (self.objects, total_written,
                self.skipped_small, self.skipped_nearby, self.skipped_texture,
                self.have_pitched_roof,
+               self.nodes_ground, self.nodes_simplified,
                self.vertices, self.surfaces,
                self.LOD[0], 100.*self.LOD[0]/total_written,
                self.LOD[1], 100.*self.LOD[1]/total_written,

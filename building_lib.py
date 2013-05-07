@@ -15,8 +15,9 @@ from textures import find_matching_texture
 nb = 0
 out = ""
 
-from shapely.geometry import Polygon
-from shapely.geometry.polygon import LinearRing
+import shapely.geometry as shg
+#from shapely.geometry import Polygon
+#from shapely.geometry.polygon import LinearRing
 import sys
 import textwrap
 import plot
@@ -192,6 +193,14 @@ def test_ac_load():
 #    out.close()
     #print s
 
+def simplify(X, threshold):
+    ring = shg.polygon.LinearRing(list(X))
+    p = shg.Polygon(ring)
+    p_simple = p.simplify(threshold)
+    X_simple = np.array(p_simple.exterior.coords.xy).transpose()
+    nodes_lost = X.shape[0] - X_simple.shape[0]
+    return X_simple, p_simple, nodes_lost
+
 
 def analyse(buildings, static_objects, transform, elev, facades, roofs, model_prefix):
     """analyse all buildings
@@ -245,7 +254,6 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, model_pr
         #    - fix inverted faces
         #    - compute area
         X = np.zeros((b.nnodes_ground+1,2))
-        lenX = np.zeros((b.nnodes_ground))
         i = 0
         for r in b.refs:
             X[i,0], X[i,1] = transform.toLocal((r.lon, r.lat))
@@ -258,11 +266,28 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, model_pr
 
         X[-1] = X[0] # -- we duplicate last node!
 
-        # -- fix inverted faces
+        # -- shapely: compute area
+#        r = LinearRing(list(X))
+#        p = Polygon(r)
+        simplify_threshold = 1.0
+        X, p, nodes_simplified = simplify(X, simplify_threshold)
+        b.area = p.area
+        b.nnodes_ground = X.shape[0] - 1
+#        if b.nnodes_ground < 3:
+#            pass
+        tools.stats.nodes_simplified += nodes_simplified
+        tools.stats.nodes_ground += b.nnodes_ground
+
+
+        # -- fix inverted faces and compute edge length
+        lenX = np.zeros((b.nnodes_ground))
         crossX = 0.
         for i in range(b.nnodes_ground):
             crossX += X[i,0]*X[i+1,1] - X[i+1,0]*X[i,1]
             lenX[i] = ((X[i+1,0]-X[i,0])**2 + (X[i+1,1]-X[i,1])**2)**0.5
+
+#        print "len", len(lenX), b.nnodes_ground, X.shape
+#        print lenX
         if crossX < 0:
             X = X[::-1]
             lenX = lenX[::-1]
@@ -273,11 +298,6 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, model_pr
                 X = np.roll(X, 1, axis=0)
                 lenX = np.roll(lenX, 1)
                 X[0] = X[-1]
-
-        # -- shapely: compute area
-        r = LinearRing(list(X))
-        p = Polygon(r)
-        b.area = p.area
 
         level_height = random_level_height()
 
@@ -329,7 +349,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, model_pr
         # -- roof is controlled by two flags:
         #    bool b.roof_separate: whether or not to include roof as separate model
         #      useful for
-        #      - gable roof
+        #      - pitched roof
         #      - roof with add-ons: AC
         #    replace by roof_type? flat  --> no separate model
         #                          gable --> separate model
@@ -507,11 +527,9 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     #out.write("loc 0 0 0\n")
     write_and_count_numvert(out, b, 2*nnodes_ground)
 
-    i = 0
-    for r in b.refs:
+    for i in range(b.nnodes_ground + 1):
         X[i,0] -= offset.x # cluster coordinates. NB: this changes building coordinates!
         X[i,1] -= offset.y
-        i += 1
 
     ground_elev = elev(vec2d(X[0]) + offset) - tile_elev # -- interpolate ground elevation at building location
     #print b.refs[0].lon
@@ -540,6 +558,8 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         out.write("%i %g %g\n" % (i + 1,                 tex_x1, tex_y0))
         out.write("%i %g %g\n" % (i + 1 + nnodes_ground, tex_x1, tex_y1))
         out.write("%i %g %g\n" % (i + nnodes_ground,     0,          tex_y1))
+
+    #return OK
 
     # -- closing wall
     tex_x1 = lenX[nnodes_ground-1] /  facade_texture.h_size_meters
