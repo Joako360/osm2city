@@ -9,6 +9,8 @@ It's at a rather early stage of development, and currently not very user-friendl
 
 It has been tested with Dresden, Germany (EDDC) and Innsbruck, Austria (LOWI). Both areas are now populated with about 50,000 buildings. Rendering this in FG is quite demanding. The FG process eats ~2.8GB RAM when flying in those areas, the download is ~50 MB each. 
 
+== Status 05/2013 ==
+Please see the development repository at: https://gitorious.org/fg-radi/osm2city
 == Features ==
 * reads buildings from OSM. Honors height and level tags.
 * reads existing .stg, won't place OSM building if there's a static model nearby
@@ -26,15 +28,21 @@ It has been tested with Dresden, Germany (EDDC) and Innsbruck, Austria (LOWI). B
 
 == Planned Features ==
 * make command line interface. Currently, everything is hard-coded.
+* also parse OSM 'relation' tag and create 'buildings with holes'
+* more complex roof shapes, put these into separate LOD
+:* 2013/05: got permission from Olivier Teboul to use his python implementation of the straight skeleton algorithm
+* more complex facade generation. Currently, all sides get same texture
 * Rembrandt lighting
 * put shared models if/where OSM indicates so: gas stations...
 * use residential/industrial/commercial tags/areas. ATM, all is residential.
-* more complex roof shapes, put these into separate LOD
-* more complex facade generation. Currently, all sides get same texture
 * geometry cleanup, simplify too complex buildings (what is "too complex"?)
+:* 2013/05: started: now we use shapely's simplify method for that
 * use more LOD levels, write them to different .ac so users can easily reduce building density, therefore improve performance
+:* 2013/05: started: now roofs go into separate LOD
 :* put large buildings into one ac, sort/rate buildings by stand-out-ness
 :* then ship light/med/full .stg
+* mid-term: develop this into a city-engine that procedurally generates a city based on OSM roads.
+* long-term: integrate into FG to do all this on the fly.
 
 == Ideas ==
 * nearby hi-rise objects of similar shape get same texture? Probably too special a feature.
@@ -54,10 +62,11 @@ It has been tested with Dresden, Germany (EDDC) and Innsbruck, Austria (LOWI). B
 == Improve fps ==
 * adjust LOD range in FG
 * use less buildings: increase min_area, LOD_percentage
-(- use smaller tiles? Tradeoff between distance calculations/xml parsing and GPU)
+(- use larger/smaller tiles? Tradeoff between distance calculations/xml parsing and GPU)
 
 == Contributing ==
-How you could get involved: take [[Howto:Create_textures_from_photos|pictures]] of buildings where you live! I'm especially interested in south-east asian style architecture, as I'm planning to populate Hong Kong Kai Tak (VHXX) in the future.
+You know some python? Or you're keen on writing docs? Or just want to use osm2city, but got stuck somewhere? Contact radi on the FG forum.
+None of the above? Take [[Howto:Create_textures_from_photos|pictures]] of buildings where you live! I'm especially interested in south-east asian style architecture, as I'm planning to populate Hong Kong Kai Tak (VHXX) in the future.
 
 == Related ==
 * [[Random Buildings]]
