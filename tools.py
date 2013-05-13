@@ -216,9 +216,9 @@ class Stats(object):
           simplified    %i
         vertices        %i
         surfaces        %i
-        LOD bare        %i (%2.0f)
-        LOD rough       %i (%2.0f)
-        LOD detail      %i (%2.0f)
+        LOD bare        %i (%2.0f %%)
+        LOD rough       %i (%2.0f %%)
+        LOD detail      %i (%2.0f %%)
         """ % (self.objects, total_written,
                self.skipped_small, self.skipped_nearby, self.skipped_texture,
                self.have_pitched_roof,

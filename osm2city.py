@@ -408,38 +408,49 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
                 </model>""" % (-yo, xo, zo) ))  # -- I just don't get those coordinate systems.
 
     # -- LOD animation
+    #    no longer use bare (reserved for terrain)
+    #    instead use rough, detail, roof
     xml.write(textwrap.dedent("""
     <animation>
       <type>range</type>
+      <min-m>0</min-m>
+      <max-property>/sim/rendering/static-lod/rough</max-property>
     """))
     for name in LOD_lists[0]:
         xml.write("  <object-name>%s</object-name>\n" % name)
     xml.write(textwrap.dedent(
-    """      <min-m>0</min-m>
-      <max-property>/sim/rendering/static-lod/bare</max-property>
-    </animation>
+    """    </animation>
 
     <animation>
       <type>range</type>
+      <min-m>0</min-m>
+      <max-property>/sim/rendering/static-lod/detailed</max-property>
     """))
     for name in LOD_lists[1]:
         xml.write("  <object-name>%s</object-name>\n" % name)
     xml.write(textwrap.dedent(
-    """      <min-m>0</min-m>
-      <max-property>/sim/rendering/static-lod/rough</max-property>
-    </animation>
+    """    </animation>
 
-    <!--
     <animation>
       <type>range</type>
+      <min-m>0</min-m>
+      <max-property>/sim/rendering/static-lod/roof</max-property>
     """))
     for name in LOD_lists[2]:
         xml.write("  <object-name>%s</object-name>\n" % name)
-    xml.write(textwrap.dedent("""
-      <min-m>0</min-m>
-      <max-property>/sim/rendering/static-lod/detailed</max-property>
-    </animation>
-    -->
+    xml.write(textwrap.dedent(
+    """    </animation>
+
+    <animation>
+      <type>range</type>
+      <min-property>/sim/rendering/static-lod/roof</min-property>
+      <max-property>/sim/rendering/static-lod/rough</max-property>
+    """))
+    for name in LOD_lists[3]:
+        xml.write("  <object-name>%s</object-name>\n" % name)
+    xml.write(textwrap.dedent(
+    """    </animation>
+
     </PropertyList>
     """))
     xml.close()
@@ -555,7 +566,7 @@ if __name__ == "__main__":
             # -- count roofs == separate objects
             nroofs = 0
             for b in cl.objects:
-                if b.roof_separate: nroofs += 1
+                if b.roof_separate: nroofs += 2  # we have 2 different LOD models for each roof
 
             tile_elev = elev(cl.center)
             if tile_elev == -9999:
@@ -566,6 +577,7 @@ if __name__ == "__main__":
             center_lon, center_lat = transform.toGlobal((cl.center.x, cl.center.y))
 
             LOD_lists = []
+            LOD_lists.append([]) # rough, detail, roof, roof-flat
             LOD_lists.append([])
             LOD_lists.append([])
             LOD_lists.append([])

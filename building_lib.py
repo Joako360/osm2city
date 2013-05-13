@@ -572,7 +572,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     out.write("%i %g %g\n" % (2*nnodes_ground-1, 0,          tex_y1))
 
     # -- roof
-    if not b.roof_separate:
+    if not b.roof_separate:   # -- flat roof
         out.write("SURF 0x0\n")
         out.write("mat %i\n" % b.roof_mat)
         out.write("refs %i\n" % nnodes_ground)
@@ -581,34 +581,35 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         out.write("kids 0\n")
     else:
         # -- textured roof, a separate object
-
+        roof_ac_name = "b%i-roof" % nb
         out.write("kids 0\n")
         out.write("OBJECT poly\n")
-        out.write("name \"b%i-roof\"\n" % nb)
+        out.write('name "%s"' % roof_ac_name)
+#        LOD_lists[b.LOD].append(roof_ac_name)
+        LOD_lists[2].append(roof_ac_name)  # roof always LOD detail?
 
         if b.roof_flat:
-            roof_texture = 'roof_flat' # FIXME: use requires!
             out.write('texture "%s"\n' % 'roof_flat.png')
         else:
             out.write('texture "%s"\n' % (roof_texture.filename + '.png'))
 
-        if b.roof_flat:
-            #out.write("loc 0 0 0\n")
-            write_and_count_numvert(out, b, nnodes_ground)
-            for x in X[:-1]:
-                z = ground_elev - 1
-                out.write("%1.2f %1.2f %1.2f\n" % (-x[1], ground_elev + height, -x[0]))
-            write_and_count_numsurf(out, b, 1)
-            out.write("SURF 0x0\n")
-            out.write("mat %i\n" % mat)
-            out.write("refs %i\n" % nnodes_ground)
-            out.write("%i %g %g\n" % (0, 0, 0))
-            out.write("%i %g %g\n" % (1, 1, 0))
-            out.write("%i %g %g\n" % (2, 1, 1))
-            out.write("%i %g %g\n" % (3, 0, 1))
-
-            out.write("kids 0\n")
-        else:
+#        if b.roof_flat:
+#            #out.write("loc 0 0 0\n")
+#            write_and_count_numvert(out, b, nnodes_ground)
+#            for x in X[:-1]:
+#                z = ground_elev - 1
+#                out.write("%1.2f %1.2f %1.2f\n" % (-x[1], ground_elev + height, -x[0]))
+#            write_and_count_numsurf(out, b, 1)
+#            out.write("SURF 0x0\n")
+#            out.write("mat %i\n" % mat)
+#            out.write("refs %i\n" % nnodes_ground)
+#            out.write("%i %g %g\n" % (0, 0, 0))
+#            out.write("%i %g %g\n" % (1, 1, 0))
+#            out.write("%i %g %g\n" % (2, 1, 1))
+#            out.write("%i %g %g\n" % (3, 0, 1))
+#
+#            out.write("kids 0\n")
+        if True:
             # -- pitched roof
             write_and_count_numvert(out, b, nnodes_ground + 2)
             # -- 4 corners
@@ -669,6 +670,30 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             out.write("%i %g %g\n" % (3, 0, 0))
             out.write("%i %g %g\n" % (0, repeatx, 0))
             out.write("%i %g %g\n" % (4, 0.5*repeatx, repeaty))
+
+            out.write("kids 0\n")
+
+            # -- LOD flat model
+            roof_ac_name_flat = "b%i-flat" % nb
+            out.write("kids 0\n")
+            out.write("OBJECT poly\n")
+            out.write('name "%s"' % roof_ac_name_flat)
+            LOD_lists[3].append(roof_ac_name_flat)
+
+            out.write('texture "%s"\n' % (roof_texture.filename + '.png'))
+
+            write_and_count_numvert(out, b, nnodes_ground)
+            for x in X[:-1]:
+                z = ground_elev - 1
+                out.write("%1.2f %1.2f %1.2f\n" % (-x[1], ground_elev + height, -x[0]))
+            write_and_count_numsurf(out, b, 1)
+            out.write("SURF 0x0\n")
+            out.write("mat %i\n" % b.mat)
+            out.write("refs %i\n" % nnodes_ground)
+            out.write("%i %g %g\n" % (0, 0, 0))
+            out.write("%i %g %g\n" % (1, 1, 0))
+            out.write("%i %g %g\n" % (2, 1, 1))
+            out.write("%i %g %g\n" % (3, 0, 1))
 
             out.write("kids 0\n")
 

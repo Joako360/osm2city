@@ -1,0 +1,55 @@
+total buildings 62978
+written         61923
+skipped
+  small         1007
+  nearby        44
+  texture       4
+vertices        935802
+surfaces        529824
+LOD detail      40980 (66)
+LOD med         7524 (12)
+LOD bare        13419 (22)
+above
+     1 m^2      0
+    10 m^2      0
+    20 m^2   4480
+    50 m^2  11123
+   100 m^2  22675
+   200 m^2  16403
+   500 m^2   4380
+  1000 m^2   1899
+  2000 m^2    733
+  5000 m^2    166
+ 10000 m^2     49
+ 20000 m^2     13
+ 50000 m^2      2
+done.
+---
+skip 30% under 200qm:
+
+total buildings 62978
+written         50324
+skipped
+  small         12607
+  nearby        44
+  texture       3
+vertices        773440
+surfaces        437044
+LOD detail      30847 (61)
+LOD med         6664 (13)
+LOD bare        12813 (25)
+above
+     1 m^2      0
+    10 m^2      0
+    20 m^2   3117
+    50 m^2   7750
+   100 m^2  15815
+   200 m^2  16400
+   500 m^2   4381
+  1000 m^2   1897
+  2000 m^2    733
+  5000 m^2    167
+ 10000 m^2     49
+ 20000 m^2     13
+ 50000 m^2      2
+done.
