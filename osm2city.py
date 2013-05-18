@@ -7,6 +7,7 @@
 # TODO:
 # x use geometry library
 # x read original .stg+.xml, don't place OSM buildings when there's a static model near/within
+# - compute static_object stg's on the fly
 # - put roofs into separate LOD
 # - lights
 # - read relations tag == fix empty backyards
@@ -84,7 +85,6 @@ import calc_tile
 
 # -- defaults
 no_elev = False # -- skip elevation interpolation
-#no_elev = True # -- skip elevation interpolation
 check_overlap = True # -- check for overlap with static models
 
 if '-e' in sys.argv:
@@ -107,7 +107,6 @@ prefix="LOWI"
 infile = prefix + '/xapi-buildings.osm'; total_objects = 50000 # huge!
 
 # devel
-#check_overlap = False
 if False:
     use_pkl = False    #infile = 'dd-altstadt.osm'; total_objects = 158
     #infile = 'map.osm'; total_objects = 216 #
@@ -118,6 +117,7 @@ if False:
     prefix = "EDDC"
     check_overlap = False
 
+# -- skip buildings that match these names
 skiplist = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
           "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
           "Residenzschloss Dresden", "Fernsehturm", "Fernsehturm Dresden"]
@@ -168,9 +168,6 @@ class wayExtract(object):
     def ways(self, ways):
         """callback method for ways"""
         for osm_id, tags, refs in ways:
-            #print nb
-            #print "-"*10
-            #print tags, refs
             if 'building' in tags:
 
                 #print "got building", osm_id, tags, refs
@@ -257,34 +254,13 @@ if prefix == "EDDC":
 #minlon=13.7436400
 #maxlat=51.0715500
 #maxlon=13.7563400
-#
-# -- origin
-#lat = 0.5*(minlat + maxlat)
-#lon = 0.5*(minlon + maxlon)
 
 if prefix == "LOWI":
     cmin = vec2d(11.16898,47.20837) # -- LOWI
     cmax = vec2d(11.79108,47.38161)
     center = (cmin + cmax)*0.5
-#minlon, minlat = 11.32109513, 47.22690253
-#maxlon, maxlat = 11.45363857, 47.29885247
 
 transform = coordinates.Transformation(center.list(), hdg = 0)
-
-#min_ = vec2d(transform.toLocal((minlon, minlat)))
-#max_ = vec2d(transform.toLocal((maxlon, maxlat)))
-
-#min_ = vec2d(-5000,-4000)
-#max_ = vec2d( 5000, 4000)
-#origin = coordinates.Position(transform, [], lon, lat)
-
-if 0:
-    # --- need $FGDATA/Nasal/elev.nas and elev.in
-    #     hide scenery/Objects/e.... folder
-    #     in Nasal console: elev.get()
-    #     data gets written to /tmp/elev.xml
-    raster(transform, 'elev.in', -20000, -20000, size_x=40000, size_y=40000, step_x=20, step_y=20)
-    sys.exit(0)
 
 print transform.toGlobal(cmin.list()), transform.toGlobal(cmax.list())
 
@@ -362,8 +338,6 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
 
     # FIXME: use Effect/Building? What's the difference?
     for texture in LM_dict.keys():
-#        print texture.filename
-#        print LMs_avail
         if texture.filename in LMs_avail:
             xml.write(textwrap.dedent("""
             <effect>
@@ -386,7 +360,7 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
     #            xml.write("  <object-name>%s</object-name>\n" % name)
             xml.write("</effect>\n")
 
-    # -- hi-rise building position lights
+    # -- hi-rise building position lights. ATM, works for LOWI, only.
     for b in buildings:
         if b.levels > 30:
 
@@ -462,13 +436,10 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
 
 if __name__ == "__main__":
 
-#    global stats
     tools.init()
     tools.stats.print_summary()
 
     tex.init()
-    #print tex.facades
-    #print tex.roofs
 
     print "reading elevation data"
     elev = tools.Interpolator(prefix + "/elev.xml", fake=no_elev) # -- fake skips actually reading the file, speeding up things
@@ -502,8 +473,9 @@ if __name__ == "__main__":
         print "done parsing"
         buildings = way.buildings
 
-        # -- pickle here
-        fpickle = open('data.pkl', 'wb')
+        # -- cache parsed data. To prevent accidentally overwriting, 
+        #    write to local dir, while we later read from $PREFIX/buildings.pkl
+        fpickle = open('buildings.pkl', 'wb')
         cPickle.dump(buildings, fpickle, -1)
         fpickle.close()
     else:
@@ -514,10 +486,10 @@ if __name__ == "__main__":
         tools.stats.objects = len(buildings)
 
 
-    # - read relevant stgs
-    #static_objects = stg_io.Stg(["e013n51/3171138.stg", "e013n51/3171139.stg"])
+    # - read relevant stgs FIXME: calculate this!
     if check_overlap:
         static_objects = stg_io.Stg(["e011n47/3138129.stg"])
+        #static_objects = stg_io.Stg(["e013n51/3171138.stg", "e013n51/3171139.stg"])
     else:
         static_objects = None
     tools.stats.debug1 = open("debug1.dat", "w")

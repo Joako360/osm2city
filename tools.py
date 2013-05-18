@@ -238,6 +238,6 @@ def init():
     print "tools: init", stats
 
 if __name__ == "__main__":
-    #raster_glob(vec2d.vec2d(11.3874,47.2629), vec2d.vec2d(11.3886,47.2636))
+    # W,S,E,N coordinates
     raster_glob(vec2d.vec2d(11.16898,47.20837), vec2d.vec2d(11.79108,47.38161))
 
