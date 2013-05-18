@@ -1,4 +1,5 @@
-get huge data from OSM:
+getting (huge) data from OSM
+----------------------
 http://wiki.openstreetmap.org/wiki/Overpass_API/XAPI_Compatibility_Layer
 
 XAPI URL Builder: A GUI for BBox
@@ -8,6 +9,36 @@ www.overpass-api.de/api/xapi?map?bbox=13.63,50.96,13.88,51.17
 EDDC www.overpass-api.de/api/xapi?*[building=*][bbox=13.63,50.96,13.88,51.17]
 LOWI www.overpass-api.de/api/xapi?*[building=*][bbox=11.16898,47.20837,11.79108,47.38161]
 
+
+hard-coded stuff that should go into input file
+-----------------------------------------------
+lon/lat for area
+OSM data file name
+total_objects
+pkl file name
+elevation data file name
+outfile prefix
+tile size
+default_height
+Limits: 
+  random_level_height min/max
+  random_levels min/max
+  random_levels_skyscraper min/max, gaussian distribution?
+  min building area
+  min height
+  LOD classes/percentages/area limits
+  min height/levels for position light
+  min object count/tile
+  simplify threshold (min building edge length)
+  min area for a given number of floors
+  percentage of small buildings skipped
+  max area for pitched roofs
+  min dist to static buildings
+roof creation paramters
+
+
+Tile size vs. frame rate
+------------------------
 with LOD
 tile
 size	fps
@@ -20,12 +51,14 @@ w/o LOD
 6 fps
 
 no roofs at all: 17-18fps
----
+
+
 Any significant gains with one texture only? Or skipping pitched roofs (putting them in separate LOD later)?
 ==> one texture only +1 fps
 ==> no pitched roofs +4 fps
 
 benchmark LOWI
+--------------
 
 airport="LOWI --offset-azimuth=260 --heading=265 --offset-distance=4.0 --in-air --altitude=3000"
 aircraft=ufo

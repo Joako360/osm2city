@@ -7,10 +7,24 @@ Written in python 2.7, developed on Linux
 
 It's at a rather early stage of development, and currently not very user-friendly. You probably should know some python if you want to use it yourself. But it produces realistic city layouts (after all, it uses realistic data). The whole process -- from scratch to flying in FG -- for a city the size of LOWI takes perhaps one hour, including maybe a total of 15 mins manual work.
 
-It has been tested with Dresden, Germany (EDDC) and Innsbruck, Austria (LOWI). Both areas are now populated with about 50,000 buildings. Rendering this in FG is quite demanding. The FG process eats ~2.8GB RAM when flying in those areas, the download is ~50 MB each. 
+It has been tested with Dresden, Germany (EDDC) and Innsbruck, Austria (LOWI). Both areas are now populated with about 50,000 buildings. Rendering this in FG is quite demanding. The FG process eats ~2.8GB RAM when flying in those areas, the download is ~50 MB each.
 
 == Status 05/2013 ==
 Please see the development repository at: https://gitorious.org/fg-radi/osm2city
+
+Currently data is processed offline before hand. Basically, it parses the OSM
+xml, generates a list of building outlines, discards some based on their area,
+simplifies the outlines, clusters them into ~500x500m blocks and different LODs,
+then writes .ac, .xml, and .stgs. OSM parsing is by far the most expensive,
+easily taking 10 minutes for 50k buildings. Once that's done, the remaining
+parts take maybe 1 minute in total. 
+
+At the moment, the code knows only the floor plans. No streets, no runways, no
+land-use. But it'll certainly process such data in the future, and then could
+use some heuristics (some OSM buildings are labeled "Terminal 1" or so) to apply
+terminal/hangar textures to buildings at airports. This way we could rather easily populate some airports with
+'semi-generic' terminal/hangar buildings.
+
 == Features ==
 * reads buildings from OSM. Honors height and level tags.
 * reads existing .stg, won't place OSM building if there's a static model nearby
@@ -23,6 +37,7 @@ Please see the development repository at: https://gitorious.org/fg-radi/osm2city
 :* find matching texture for given building (number of levels, modern/old building, etc)
 :* find matching roof texture for given facade texture
 * basic lightmap support
+* position lights on tall buildings
 * shows statistics on processed buildings
 * writes .ac, .xml, .stg
 
@@ -48,16 +63,38 @@ Please see the development repository at: https://gitorious.org/fg-radi/osm2city
 * nearby hi-rise objects of similar shape get same texture? Probably too special a feature.
 * bump map/reflection effects?
 * a mode that generally uses shared models? If we find a shared models of matching floorplan, use this instead of creating a new, individual building? Will break clusters.
+* a terrasync-like thing? Users get OSM buildings
+(where available) on-the-fly? Might be quite costly in terms of runtime performance and bandwidth. The OSM download (buildings only!) is
+~40MB for the 25x25km LOWI area.
+
+== Install ==
+* copy elev.nas to $FGDATA/Nasal/
 
 == Workflow ==
-* get osm data (wget line)
+
+* decide on a region you want to populate. Get its lon/lat coordinates.
+* create project directory, say LOWI/
+* get corresponding OSM data in OSM's native .xml format.
+There are several options to get OSM data. From command line: [CODE] wget www.overpass-api.de/api/xapi?*[building=*][bbox=11.16898,47.20837,11.79108,47.38161]
+Put this data into LOWI/
 * probe elevation for this area:
-:* make elev.in
-:* run FG: nasal console: elev.get() -> execute. Might take a long time, depending on the area scanned.
-:* produces elev.xml (which is actually just plain 5 column data: lon,lat,x,y,elevation)
+: * enter lon/lat for your area in the call to raster_glob() near tools.py:241 
+: * run tools.py, this will create a file elev.in. Copy elev.in to $FGDATA/Nasal/
+: * hide scenery/Objects/e.... folder, to prevent probing elevation on top of existing objects
+: * run FG, open nasal console, enter: elev.get(), press execute. Might take a long time, depending on the area scanned. This will write elevation data to /tmp/elev.xml (which is actually just plain 5 column data: lon,lat,x,y,elevation). Put elev.xml into LOWI/
+
+* set up osm2city.py (near top of file)
+:* set prefix to LOWI/
+:* set infile to your OSM .xml data. You can give a maximum number of objects to be parsed via total_objects = ..
+:* enter list of .stg paths which should be checked for existing objects in your area (FIME: we can easily compute this on the fly)
+   near osm2city.py:493  static_objects = stg_io.Stg(["e011n47/3138129.stg", "e011n47/3138128.stg"])
+
 * run osm2city.py
-:* the first run parses OSM data. This again takes quite long, but the result is written to disk. Next startup is much faster.
-* run install.sh
+:* the first run parses OSM data. This again takes quite looong (10 minutes or more for 50k buildings), but the result is written to file data.pkl. Next startup is much faster.
+:* move buildings.pkl to LOWI/buildings.pkl
+:* if all goes well, you should now have lots of files like LOWIcity0101.ac and their corresponding .xml files, along with .stg files
+* adjust and run install.sh
+:* this will install .ac, .xml, .stg files
 
 == Improve fps ==
 * adjust LOD range in FG
@@ -69,6 +106,7 @@ You know some python? Or you're keen on writing docs? Or just want to use osm2ci
 None of the above? Take [[Howto:Create_textures_from_photos|pictures]] of buildings where you live! I'm especially interested in south-east asian style architecture, as I'm planning to populate Hong Kong Kai Tak (VHXX) in the future.
 
 == Related ==
+* [http://www.mail-archive.com/flightgear-devel@lists.sourceforge.net/msg40092.html Osm2city.py]
 * [[Random Buildings]]
 * http://flightgear.org/forums/viewtopic.php?f=5&t=19625
 * [http://flightgear.org/forums/viewtopic.php?f=38&t=8837 PixelCity]
