@@ -17,7 +17,7 @@ def bucket_span(lat):
     if alat >= 22: return .25
     return .125
 
-def tile_index(lon, lat):
+def tile_index((lon, lat)):
     tile_width = bucket_span(lat)
 
     EPSILON = 0.0000001
