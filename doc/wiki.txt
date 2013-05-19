@@ -12,7 +12,7 @@ It has been tested with Dresden, Germany (EDDC) and Innsbruck, Austria (LOWI). B
 == Status 05/2013 ==
 Please see the development repository at: https://gitorious.org/fg-radi/osm2city
 
-Currently data is processed offline before hand. Basically, it parses the OSM
+Currently data is processed offline beforehand. Basically, it parses the OSM
 xml, generates a list of building outlines, discards some based on their area,
 simplifies the outlines, clusters them into ~500x500m blocks and different LODs,
 then writes .ac, .xml, and .stgs. OSM parsing is by far the most expensive,
@@ -75,26 +75,27 @@ terminal/hangar textures to buildings at airports. This way we could rather easi
 * decide on a region you want to populate. Get its lon/lat coordinates.
 * create project directory, say LOWI/
 * get corresponding OSM data in OSM's native .xml format.
-There are several options to get OSM data. From command line: [CODE] wget www.overpass-api.de/api/xapi?*[building=*][bbox=11.16898,47.20837,11.79108,47.38161]
+There are several options to get OSM data. From command line:
+ wget www.overpass-api.de/api/xapi?*[building=*][bbox=11.16898,47.20837,11.79108,47.38161]
 Put this data into LOWI/
 * probe elevation for this area:
-: * enter lon/lat for your area in the call to raster_glob() near tools.py:241 
-: * run tools.py, this will create a file elev.in. Copy elev.in to $FGDATA/Nasal/
-: * hide scenery/Objects/e.... folder, to prevent probing elevation on top of existing objects
-: * run FG, open nasal console, enter: elev.get(), press execute. Might take a long time, depending on the area scanned. This will write elevation data to /tmp/elev.xml (which is actually just plain 5 column data: lon,lat,x,y,elevation). Put elev.xml into LOWI/
+:* enter lon/lat for your area in the call to raster_glob() near tools.py:241 
+:* run tools.py, this will create a file elev.in. Copy elev.in to $FGDATA/Nasal/
+:* hide scenery/Objects/e.... folder, to prevent probing elevation on top of existing objects
+:* run FG, open nasal console, enter: elev.get(), press execute. Might take a long time, depending on the area scanned. This will write elevation data to /tmp/elev.xml (which is actually just plain 5 column data: lon,lat,x,y,elevation). Put elev.xml into LOWI/
 
 * set up osm2city.py (near top of file)
 :* set prefix to LOWI/
 :* set infile to your OSM .xml data. You can give a maximum number of objects to be parsed via total_objects = ..
-:* enter list of .stg paths which should be checked for existing objects in your area (FIME: we can easily compute this on the fly)
-   near osm2city.py:493  static_objects = stg_io.Stg(["e011n47/3138129.stg", "e011n47/3138128.stg"])
+:* enter list of .stg paths which should be checked for existing objects in your area. Near osm2city.py:493  
+ static_objects = stg_io.Stg(["e011n47/3138129.stg", "e011n47/3138128.stg"])
+(FIXME: we could easily compute this on the fly)
 
 * run osm2city.py
 :* the first run parses OSM data. This again takes quite looong (10 minutes or more for 50k buildings), but the result is written to file data.pkl. Next startup is much faster.
 :* move buildings.pkl to LOWI/buildings.pkl
 :* if all goes well, you should now have lots of files like LOWIcity0101.ac and their corresponding .xml files, along with .stg files
-* adjust and run install.sh
-:* this will install .ac, .xml, .stg files
+* adjust and run install.sh, this will install .ac, .xml, .stg files
 
 == Improve fps ==
 * adjust LOD range in FG
