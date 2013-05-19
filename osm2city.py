@@ -260,9 +260,9 @@ if prefix == "LOWI":
     cmax = vec2d(11.79108,47.38161)
     center = (cmin + cmax)*0.5
 
-transform = coordinates.Transformation(center.list(), hdg = 0)
+transform = coordinates.Transformation(center, hdg = 0)
 
-print transform.toGlobal(cmin.list()), transform.toGlobal(cmax.list())
+print transform.toGlobal(cmin), transform.toGlobal(cmax)
 
 
 #write_map('dresden.png', transform, elev, vec2d(50.9697, 13.667), vec2d(51.1285, 13.8936))
