@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """read osm file, print 2d view in ac3d format to stdout"""
-#import pdb
+import pdb
 
 
 # TODO:
@@ -104,7 +104,7 @@ tile_size=1000 # -- our tile size in meters
 #infile = 'map.osm'; total_objects = 216 #
 prefix="LOWI"
 #prefix="EDDC"
-infile = prefix + '/xapi-buildings.osm'; total_objects = 50000 # huge!
+infile = prefix + '/xapi-buildings.osm'; total_objects = 100 # huge!
 
 # devel
 if False:
@@ -486,12 +486,27 @@ if __name__ == "__main__":
         tools.stats.objects = len(buildings)
 
 
-    # - read relevant stgs FIXME: calculate this!
+    # -- create clusters
+    lmin = vec2d(transform.toLocal(cmin))
+    lmax = vec2d(transform.toLocal(cmax))
+    clusters = Clusters(lmin, lmax, tile_size)
+    
     if check_overlap:
-        static_objects = stg_io.Stg(["e011n47/3138129.stg"])
+        # -- make list of relevant tiles
+        #    we check the tile_index at each cluster's center
+        tiles = []
+        for cl in clusters:
+            tile_index = calc_tile.tile_index(transform.toGlobal(cl.center))
+            if tile_index not in tiles:
+                tiles.append(tile_index)
+        print "%i relevant tiles: " % len(tiles), tiles
+
+        #static_objects = stg_io.Stg(["e011n47/3138129.stg"])
         #static_objects = stg_io.Stg(["e013n51/3171138.stg", "e013n51/3171139.stg"])
+        static_objects = stg_io.Stg(tiles)
     else:
         static_objects = None
+
     tools.stats.debug1 = open("debug1.dat", "w")
     tools.stats.debug2 = open("debug2.dat", "w")
 
@@ -508,9 +523,6 @@ if __name__ == "__main__":
     tools.stats.print_summary()
 
     # -- now put buildings into clusters
-    lmin = vec2d(transform.toLocal(cmin.list()))
-    lmax = vec2d(transform.toLocal(cmax.list()))
-    clusters = Clusters(lmin, lmax, tile_size)
     for b in buildings:
         #print "an ", b.anchor
         clusters.append(b.anchor, b)
@@ -523,8 +535,7 @@ if __name__ == "__main__":
 
     stg_fp_dict = {}    # -- dictionary of stg file pointers
 
-    for l in clusters._clusters:  # two loops here because '2d-array': list of lists
-        for cl in l:
+    for cl in clusters:
             nb = len(cl.objects)
             if nb < 5: continue # skip almost empty clusters
 
@@ -546,7 +557,6 @@ if __name__ == "__main__":
                 continue # skip tile with improper elev
             #print "TILE E", tile_elev
 
-            center_lon, center_lat = transform.toGlobal((cl.center.x, cl.center.y))
 
             LOD_lists = []
             LOD_lists.append([]) # rough, detail, roof, roof-flat
@@ -568,16 +578,17 @@ if __name__ == "__main__":
             write_xml(fname, LOD_lists, LM_dict, cl.objects)
 
             # -- write stg
-            tile_index = calc_tile.tile_index(center_lon, center_lat)
+            center_global = vec2d(transform.toGlobal(cl.center))
+            tile_index = calc_tile.tile_index(center_global)
             stg_fname = "%07i.stg" % tile_index
             if not stg_fname in stg_fp_dict:
                 stg = open(stg_fname, "w")
-                stg.write("# osm2city\n#\n")
+                stg.write("# osm2city\n# do not edit below this line\n#\n")
                 stg_fp_dict[stg_fname] = stg
             else:
                 stg = stg_fp_dict[stg_fname]
 
-            stg.write("OBJECT_STATIC %s %g %g %g %g\n" % (fname+".xml", center_lon, center_lat, tile_elev, 0))
+            stg.write("OBJECT_STATIC %s %g %g %g %g\n" % (fname+".xml", center_global.lon, center_global.lat, tile_elev, 0))
 
     for stg in stg_fp_dict.values():
         stg.close()
