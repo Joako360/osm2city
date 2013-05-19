@@ -34,7 +34,8 @@ class Clusters(object):
         self.n = (self.delta / size).int() + 1
 
         #self.list = []
-        self._clusters = [[self.init_cluster(vec2d(i,j)) for j in range(self.n.y)] for i in range(self.n.x)]
+        self._clusters = [[self.init_cluster(vec2d(i,j)) 
+          for j in range(self.n.y)] for i in range(self.n.x)]
 #        for i in range(self.nx * self.ny):
 #            self.list.append([])
 
@@ -68,6 +69,13 @@ class Clusters(object):
         #print "  I=(%s)" % I
 
         return self._clusters[I.x][I.y]
+
+    #def __len__(self):
+    #    return len(self._clusters)
+    
+    def __iter__(self):
+        for each_list in self._clusters: 
+            for item in each_list: yield item
 
     def append(self, anchor, obj):
         #print "appending at pos", X
