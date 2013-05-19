@@ -70,6 +70,10 @@ class vec2d(object):
 
     def list(self):
         return self.x, self.y
+    
+    def __iter__(self):
+        yield(self.x)
+        yield(self.y)
 
     def swap(self):
         return vec2d(self.y, self.x)
@@ -95,3 +99,8 @@ if __name__ == "__main__":
     print a.lon, a.lat
     a.lon = 4
     print a.x, a.lon
+    
+    print "a  ", a
+    for i in a:
+        print " y", i
+
