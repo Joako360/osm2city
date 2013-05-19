@@ -87,9 +87,8 @@ Put this data into LOWI/
 * set up osm2city.py (near top of file)
 :* set prefix to LOWI/
 :* set infile to your OSM .xml data. You can give a maximum number of objects to be parsed via total_objects = ..
-:* enter list of .stg paths which should be checked for existing objects in your area. Near osm2city.py:493  
- static_objects = stg_io.Stg(["e011n47/3138129.stg", "e011n47/3138128.stg"])
-(FIXME: we could easily compute this on the fly)
+<del>:* enter list of .stg paths which should be checked for existing objects in your area. Near osm2city.py:493</del>
+(FIXED: we compute this on the fly now)
 
 * run osm2city.py
 :* the first run parses OSM data. This again takes quite looong (10 minutes or more for 50k buildings), but the result is written to file data.pkl. Next startup is much faster.
