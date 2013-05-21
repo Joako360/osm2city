@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-shamelessly copied from calc-tile.pl
+shamelessly translated from calc-tile.pl
 """
-
+import os
 from math import floor, trunc
+
 def bucket_span(lat):
     """Latitude Range -> Tile Width (deg)"""
     alat = abs(lat)
@@ -16,6 +17,29 @@ def bucket_span(lat):
     if alat >= 62: return .5
     if alat >= 22: return .25
     return .125
+
+def format_lon (lon):
+    """Format longitude as e/w."""
+    if lon < 0.:
+        return "w%03d" % int(0. - lon)
+    else:
+        return "e%03d" % int(lon)
+
+def format_lat (lat):
+    """Format latitude as n/s."""
+    if lat < 0.:
+        return "s%02d" % int(0. - lat)
+    else:
+        return "n%02d" % int(lat)
+
+def directory_name ((lon, lat)):
+    """Generate the directory name for a location."""
+    lon_floor = floor(lon)
+    lat_floor = floor(lat)
+    lon_chunk = floor(lon/10.0) * 10
+    lat_chunk = floor(lat/10.0) * 10
+    return format_lon(lon_chunk) + format_lat(lat_chunk) + os.sep \
+         + format_lon(lon_floor) + format_lat(lat_floor)
 
 def tile_index((lon, lat)):
     tile_width = bucket_span(lat)
@@ -55,4 +79,5 @@ if __name__ == "__main__":
                           (13.775, 51.9638889, 3171195),
                           (0.258094, 29.226081, 2956745),
                           (-2.216667, 30.008333, 2907651)):
-        print tile_index(lon, lat) - idx
+        print tile_index([lon, lat]) - idx
+        print directory_name([lon, lat])
