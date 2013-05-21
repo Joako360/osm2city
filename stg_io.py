@@ -6,38 +6,37 @@ Created on Sat Mar 23 18:32:18 2013
 @author: tom
 """
 
-#def read():
-#    return None
-
+import os
+import string
 from osm2city import Building, Coords
-
-inf="/usr/share/games/FlightGear/Scenery/Objects/w130n30/w122n37/958440.stg"
-
 
 #    def __str__(self):
 #        return "%s %s %g %g %g %g" % (self.typ, self.path, self.lon, self.lat, self.alt, self.hdg)
 
 class Stg:
-    def __init__(self, filenames):
+    def __init__(self, stgs_with_path):
         self.objs = []
-        for filename in filenames:
-            print "stg read", filename
-            self.objs += self.read(filename)
+        for path, stg in stgs_with_path:
+            #print "stg read", path, stg
+            fgscenery = "/mnt/home/tom/fgfs/Scenery"
+            self.objs += self.read(fgscenery + os.sep + "Objects" + os.sep + path, stg)
 
-    def read(self, filename):
+    def read(self, path, stg):
         objs = []
-        f = open(filename)
+        print "stg read", path + stg
+
+        f = open(path + stg)
         for line in f.readlines():
             if line.startswith('#') or line.lstrip() == "": continue
             splitted = line.split()
-            typ, path  = splitted[0:2]
-            print "stg:", typ, path
+            typ, ac_path  = splitted[0:2]
+            print "stg:", typ, path + ac_path
             lon = float(splitted[2])
             lat = float(splitted[3])
             alt = float(splitted[4])
             r = Coords(-1, lon, lat)
             hdg = float(splitted[5])
-            objs.append(Building(osm_id=-1, tags=-1, refs=[r], name=path, height=0, levels=0, stg_typ = typ, stg_hdg = hdg))
+            objs.append(Building(osm_id=-1, tags=-1, refs=[r], name=path + ac_path, height=0, levels=0, stg_typ = typ, stg_hdg = hdg))
         f.close()
         return objs
 

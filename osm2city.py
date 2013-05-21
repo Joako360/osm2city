@@ -65,6 +65,7 @@ You should disable random buildings.
 
 import numpy as np
 import sys
+import os
 import random
 import copy
 
@@ -437,8 +438,6 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
 if __name__ == "__main__":
 
     tools.init()
-    tools.stats.print_summary()
-
     tex.init()
 
     print "reading elevation data"
@@ -492,18 +491,22 @@ if __name__ == "__main__":
     clusters = Clusters(lmin, lmax, tile_size)
     
     if check_overlap:
-        # -- make list of relevant tiles
+        # -- make list of relevant stgs and their full path
         #    we check the tile_index at each cluster's center
-        tiles = []
+        stgs_with_path = []
+        #if True: # -- debug
+        #    center_global = [-4.412768, 48.4463626]
         for cl in clusters:
-            tile_index = calc_tile.tile_index(transform.toGlobal(cl.center))
-            if tile_index not in tiles:
-                tiles.append(tile_index)
-        print "%i relevant tiles: " % len(tiles), tiles
-
-        #static_objects = stg_io.Stg(["e011n47/3138129.stg"])
-        #static_objects = stg_io.Stg(["e013n51/3171138.stg", "e013n51/3171139.stg"])
-        static_objects = stg_io.Stg(tiles)
+            center_global = transform.toGlobal(cl.center)
+            stg = [calc_tile.directory_name(center_global) + os.sep,
+                    "%07i.stg" % calc_tile.tile_index(center_global) ]
+            if stg not in stgs_with_path:
+                stgs_with_path.append(stg)
+        print "%i relevant tiles: " % len(stgs_with_path), stgs_with_path
+        
+        # FIXME: make static_objects a simple list of objects, rather than a class?
+        #        then loop stgs here
+        static_objects = stg_io.Stg(stgs_with_path)
     else:
         static_objects = None
 

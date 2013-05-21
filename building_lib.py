@@ -111,7 +111,7 @@ def reset_nb():
     global nb
     nb = 0
 
-def get_nodes_from_acs(objs, path_prefix, model_prefix):
+def get_nodes_from_acs(objs, model_prefix):
     """load all .ac and .xml, extract nodes"""
     # FIXME: use real ac3d reader: https://github.com/majic79/Blender-AC3D/blob/master/io_scene_ac3d/import_ac3d.py
     # FIXME: don't skip .xml
@@ -141,10 +141,11 @@ def get_nodes_from_acs(objs, path_prefix, model_prefix):
             fname = fname.replace(".xml", ".ac")
         #print "now <%s> %s" % (fname, b.stg_typ)
 
+        # FIXME: also read OBJECT_SHARED
         if fname.endswith(".ac") and b.stg_typ == "OBJECT_STATIC":
             print "READ_AC", b.name
             try:
-                ac = open(path_prefix + fname, 'r')
+                ac = open(fname, 'r')
             except:
                 print "can't open", fname
                 continue
@@ -216,7 +217,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, model_pr
 
     #s = get_nodes_from_acs(static_objects.objs, "e013n51/")
     if static_objects:
-        s = get_nodes_from_acs(static_objects.objs, "e011n47/", model_prefix)
+        s = get_nodes_from_acs(static_objects.objs, model_prefix)
 
         np.savetxt("nodes.dat", s)
 #    s = np.zeros((len(static_objects.objs), 2))
