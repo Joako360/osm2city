@@ -69,7 +69,7 @@ class vec2d(object):
         return vec2d(self.x < other.x, self.y < other.y)
 
     def list(self):
-        print "deprecated call to vec2d.list(). Use __iter__ instead."
+        print "deprecated call to vec2d.list(). Iterate instead."
         return self.x, self.y
     
     def __iter__(self):
