@@ -13,9 +13,9 @@ from osm2city import Building, Coords
 #    def __str__(self):
 #        return "%s %s %g %g %g %g" % (self.typ, self.path, self.lon, self.lat, self.alt, self.hdg)
 
-fgscenery = "/mnt/home/tom/fgfs/Scenery"
+fgscenery = "/home/tom/daten/fgfs/home/Scenery-devel"
 
-def read(path, stg):
+def read(path, stg, prefix):
     """Accepts a scenery sub-path, as in 'w010n40/w005n48/', plus an .stg file name.
        In the future, take care of multiple scenery paths here.
        Returns list of Buildings representing static/shared objects in .stg, with full path.
@@ -29,16 +29,17 @@ def read(path, stg):
         if line.startswith('#') or line.lstrip() == "": continue
         splitted = line.split()
         typ, ac_path  = splitted[0:2]
-        print "stg:", typ, path + ac_path
         lon = float(splitted[2])
         lat = float(splitted[3])
         alt = float(splitted[4])
         r = Coords(-1, lon, lat)
         hdg = float(splitted[5])
-        objs.append(Building(osm_id=-1, tags=-1, refs=[r], name=path + ac_path, height=0, levels=0, stg_typ = typ, stg_hdg = hdg))
+        if not ac_path.startswith(prefix + 'city'):
+            #print "stg:", typ, path + ac_path
+            objs.append(Building(osm_id=-1, tags=-1, refs=[r], name=path + ac_path, height=0, levels=0, stg_typ = typ, stg_hdg = hdg))
     f.close()
     return objs
-    
+
 
 #class Stg:
 #    def __init__(self, stgs_with_path):

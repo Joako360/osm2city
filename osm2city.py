@@ -105,7 +105,7 @@ tile_size=1000 # -- our tile size in meters
 #infile = 'map.osm'; total_objects = 216 #
 prefix="LOWI"
 #prefix="EDDC"
-infile = prefix + '/xapi-buildings.osm'; total_objects = 100 # huge!
+infile = prefix + '/xapi-buildings.osm'; total_objects = 50000 # huge!
 
 # devel
 if False:
@@ -472,7 +472,7 @@ if __name__ == "__main__":
         print "done parsing"
         buildings = way.buildings
 
-        # -- cache parsed data. To prevent accidentally overwriting, 
+        # -- cache parsed data. To prevent accidentally overwriting,
         #    write to local dir, while we later read from $PREFIX/buildings.pkl
         fpickle = open('buildings.pkl', 'wb')
         cPickle.dump(buildings, fpickle, -1)
@@ -489,7 +489,7 @@ if __name__ == "__main__":
     lmin = vec2d(transform.toLocal(cmin))
     lmax = vec2d(transform.toLocal(cmax))
     clusters = Clusters(lmin, lmax, tile_size)
-    
+
     if check_overlap:
         # -- find relevant tiles by checking tile_index at center of each cluster.
         #    Then read objects from .stgs
@@ -503,7 +503,7 @@ if __name__ == "__main__":
 
             if stg not in stgs:
                 stgs.append(stg)
-                static_objects.extend(stg_io.read(path, stg))
+                static_objects.extend(stg_io.read(path, stg, prefix))
 
         print "read %i objects from %i tiles" % (len(static_objects), len(stgs)), stgs
     else:
