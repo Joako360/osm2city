@@ -491,22 +491,21 @@ if __name__ == "__main__":
     clusters = Clusters(lmin, lmax, tile_size)
     
     if check_overlap:
-        # -- make list of relevant stgs and their full path
-        #    we check the tile_index at each cluster's center
-        stgs_with_path = []
-        #if True: # -- debug
-        #    center_global = [-4.412768, 48.4463626]
+        # -- find relevant tiles by checking tile_index at center of each cluster.
+        #    Then read objects from .stgs
+        stgs = []
+        static_objects = []
         for cl in clusters:
             center_global = transform.toGlobal(cl.center)
-            stg = [calc_tile.directory_name(center_global) + os.sep,
-                    "%07i.stg" % calc_tile.tile_index(center_global) ]
-            if stg not in stgs_with_path:
-                stgs_with_path.append(stg)
-        print "%i relevant tiles: " % len(stgs_with_path), stgs_with_path
-        
-        # FIXME: make static_objects a simple list of objects, rather than a class?
-        #        then loop stgs here
-        static_objects = stg_io.Stg(stgs_with_path)
+            # center_global = [-4.412768, 48.4463626] # -- debug
+            path = calc_tile.directory_name(center_global)
+            stg = "%07i.stg" % calc_tile.tile_index(center_global)
+
+            if stg not in stgs:
+                stgs.append(stg)
+                static_objects.extend(stg_io.read(path, stg))
+
+        print "read %i objects from %i tiles" % (len(static_objects), len(stgs)), stgs
     else:
         static_objects = None
 

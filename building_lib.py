@@ -217,7 +217,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, model_pr
 
     #s = get_nodes_from_acs(static_objects.objs, "e013n51/")
     if static_objects:
-        s = get_nodes_from_acs(static_objects.objs, model_prefix)
+        s = get_nodes_from_acs(static_objects, model_prefix)
 
         np.savetxt("nodes.dat", s)
 #    s = np.zeros((len(static_objects.objs), 2))
