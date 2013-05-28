@@ -25,3 +25,15 @@ class Parameters(object):
         # The distance between raster points for the derived elevation map (x is horizontal, y is vertical)
         self.elev_raster_x = 10
         self.elev_raster_y = 10
+        
+        # The scenery folder (typically a geographic name or the ICAO code of the airport
+        self.prefix = "LSZR"
+        self.path_to_scenery = "/home/vanosten/bin/fgfs_scenery/customscenery/LSZR" # the full path to the scenery folder without trailing slash. Last folder should be equal to prefix
+        
+        self.no_elev = False # -- skip elevation interpolation
+        self.check_overlap = False # -- check for overlap with static models. The scenery folder needs to contain a "Objects" folder
+        self.use_pkl = False # -- read from already existing converted OSM building data in file system for faster load
+        self.tile_size = 1000 # -- the tile size in meters for clustering of buildings
+        self.total_objects = 50000 # the maximum number of buildings to read from osm data
+        self.osmfile = "lszr.osm" # -- the file name of the file with osm data. Should reside in path_to_scenery
+

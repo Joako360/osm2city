@@ -84,31 +84,33 @@ import stg_io
 import tools
 import calc_tile
 
-# -- defaults
-no_elev = False # -- skip elevation interpolation
-check_overlap = True # -- check for overlap with static models
+from parameters import Parameters
 
-if '-e' in sys.argv:
+# -- defaults
+no_elev = False # -- skip elevation interpolation; FIXME: remove from here and module -> Parameters
+check_overlap = True # -- check for overlap with static models; FIXME: remove from here and module -> Parameters
+
+if '-e' in sys.argv: #FIXME: remove from here and module -> Parameters
     no_elev = True
 if '-c' in sys.argv:
     check_overlap = False
 # -t #
 
-use_pkl = True
+use_pkl = True #FIXME: remove from here and module -> Parameters
 #use_pkl = False
 buildings = [] # -- master list, holds all buildings
 
-tile_size=1000 # -- our tile size in meters
+tile_size=1000 # -- our tile size in meters; FIXME: remove from here and module -> Parameters
 
 #infile = 'xapi-buildings.osm'; total_objects = 100000 # huge!
 #infile = 'eddc-all.osm'; total_objects = 100000 # huge!
 #infile = 'map.osm'; total_objects = 216 #
-prefix="LOWI"
+prefix="LOWI" # FIXME: remove from here and module -> Parameters
 #prefix="EDDC"
-infile = prefix + '/xapi-buildings.osm'; total_objects = 50000 # huge!
+infile = prefix + '/xapi-buildings.osm'; total_objects = 50000 # huge! # FIXME: remove from here and module -> Parameters
 
 # devel
-if False:
+if False: # FIXME: remove -> Parameters
     use_pkl = False    #infile = 'dd-altstadt.osm'; total_objects = 158
     #infile = 'map.osm'; total_objects = 216 #
     infile = "dd-altstadt.osm"
@@ -158,13 +160,14 @@ class Coords(object):
         self.lat = lat
 
 class wayExtract(object):
-    def __init__(self):
+    def __init__(self, total_objects):
         self.buildings = []
         self.coords_list = []
         self.minlon = 181.
         self.maxlon = -181.
         self.minlat = 91.
         self.maxlat = -91.
+        self.total_objects = total_objects
 
     def ways(self, ways):
         """callback method for ways"""
@@ -204,7 +207,7 @@ class wayExtract(object):
 
                 self.buildings.append(building)
 #                global stats
-                if tools.stats.objects == total_objects: raise ValueError
+                if tools.stats.objects == self.total_objects: raise ValueError
                 tools.stats.objects += 1
 
                 if tools.stats.objects % 70 == 0: print tools.stats.objects
@@ -244,7 +247,7 @@ class wayExtract(object):
 #maxlat=51.0564600
 #maxlon=13.7467600
 
-if prefix == "EDDC":
+if prefix == "EDDC": # FIXME: remove -> part of Parameters and __main__
     cmin = vec2d(13.63, 50.96)
     cmax = vec2d(13.88, 51.17)
     center = vec2d(13.7467, 51.0377) # -- EDDC
@@ -256,14 +259,14 @@ if prefix == "EDDC":
 #maxlat=51.0715500
 #maxlon=13.7563400
 
-if prefix == "LOWI":
+if prefix == "LOWI": # FIXME: remove -> part of Parameters and __main__
     cmin = vec2d(11.16898,47.20837) # -- LOWI
     cmax = vec2d(11.79108,47.38161)
     center = (cmin + cmax)*0.5
 
-transform = coordinates.Transformation(center, hdg = 0)
+transform = coordinates.Transformation(center, hdg = 0) #FIXME: remove, replaced by variable in __main__
 
-print transform.toGlobal(cmin), transform.toGlobal(cmax)
+print transform.toGlobal(cmin), transform.toGlobal(cmax) # FIXME: remove (see above)
 
 
 #write_map('dresden.png', transform, elev, vec2d(50.9697, 13.667), vec2d(51.1285, 13.8936))
@@ -366,11 +369,11 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
         if b.levels > 30:
 
             for i in np.arange(0, b.nnodes_ground, b.nnodes_ground/4.):
-              xo = b.X[int(i+0.5), 0]# - offset.x # -- b.X already in cluster coordinates
-              yo = b.X[int(i+0.5), 1]# - offset.y
-              zo = b.ceiling + 1.5
-              # <path>cursor.ac</path>
-              xml.write(textwrap.dedent("""
+                xo = b.X[int(i+0.5), 0]# - offset.x # -- b.X already in cluster coordinates
+                yo = b.X[int(i+0.5), 1]# - offset.y
+                zo = b.ceiling + 1.5
+                # <path>cursor.ac</path>
+                xml.write(textwrap.dedent("""
                 <model>
                   <path>../../../Models/Effects/pos_lamp_red_light_2st.xml</path>
                   <offsets>
@@ -439,22 +442,32 @@ if __name__ == "__main__":
 
     tools.init()
     tex.init()
+    
+    params = Parameters()
+    
+    # prepare translation to local coordinates
+    cmin = vec2d(params.boundary_west, params.boundary_south)
+    cmax = vec2d(params.boundary_east, params.boundary_north)
+    center = (cmin + cmax)*0.5
+    transform = coordinates.Transformation(center, hdg = 0)
+    print transform.toGlobal(cmin), transform.toGlobal(cmax)
+
 
     print "reading elevation data"
-    elev = tools.Interpolator(prefix + "/elev.xml", fake=no_elev) # -- fake skips actually reading the file, speeding up things
+    elev = tools.Interpolator(params.prefix + os.sep + "elev.xml", fake=params.no_elev) # -- fake skips actually reading the file, speeding up things
     print "height at origin", elev(vec2d(0,0))
     print "origin at ", transform.toGlobal((0,0))
 
     #tools.write_map('dresden.png', transform, elev, vec2d(minlon, minlat), vec2d(maxlon, maxlat))
 
 
-    if not use_pkl:
+    if not params.use_pkl:
         # - parse OSM -> return a list of building objects
-        way = wayExtract()
+        way = wayExtract(params.total_objects)
         #p = OSMParser(concurrency=4, ways_callback=way.ways, coords_callback=way.coords )
         p = OSMParser(concurrency=1, coords_callback=way.coords)
         print "start parsing coords"
-        p.parse(infile)
+        p.parse(params.prefix + os.sep + params.osmfile)
         print "done parsing"
         print "ncords:", len(way.coords_list)
         print "bounds:", way.minlon, way.minlat, way.maxlon, way.maxlat
@@ -462,7 +475,7 @@ if __name__ == "__main__":
         p = OSMParser(concurrency=1, ways_callback=way.ways)
         print "start parsing ways"
         try:
-            p.parse(infile)
+            p.parse(params.prefix + os.sep + params.osmfile)
         except ValueError:
             pass
 
@@ -478,8 +491,8 @@ if __name__ == "__main__":
         cPickle.dump(buildings, fpickle, -1)
         fpickle.close()
     else:
-        fpickle = open(prefix + '/buildings.pkl', 'rb')
-        buildings = cPickle.load(fpickle)[:total_objects]
+        fpickle = open(params.prefix + '/buildings.pkl', 'rb')
+        buildings = cPickle.load(fpickle)[:params.total_objects]
         fpickle.close()
         print "unpickled %g buildings " % (len(buildings))
         tools.stats.objects = len(buildings)
@@ -488,9 +501,9 @@ if __name__ == "__main__":
     # -- create clusters
     lmin = vec2d(transform.toLocal(cmin))
     lmax = vec2d(transform.toLocal(cmax))
-    clusters = Clusters(lmin, lmax, tile_size)
+    clusters = Clusters(lmin, lmax, params.tile_size)
 
-    if check_overlap:
+    if params.check_overlap:
         # -- find relevant tiles by checking tile_index at center of each cluster.
         #    Then read objects from .stgs
         stgs = []
@@ -503,7 +516,7 @@ if __name__ == "__main__":
 
             if stg not in stgs:
                 stgs.append(stg)
-                static_objects.extend(stg_io.read(path, stg, prefix))
+                static_objects.extend(stg_io.read(path, stg, params.prefix, params.path_to_scenery))
 
         print "read %i objects from %i tiles" % (len(static_objects), len(stgs)), stgs
     else:
@@ -567,7 +580,7 @@ if __name__ == "__main__":
             LOD_lists.append([])
 
             # -- open ac and write header
-            fname = prefix+"city%02i%02i" % (cl.I.x, cl.I.y)
+            fname = params.prefix+"city%02i%02i" % (cl.I.x, cl.I.y)
             out = open(fname+".ac", "w")
             write_ac_header(out, nb + nroofs)
             for b in cl.objects:

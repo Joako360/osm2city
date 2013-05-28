@@ -13,9 +13,7 @@ from osm2city import Building, Coords
 #    def __str__(self):
 #        return "%s %s %g %g %g %g" % (self.typ, self.path, self.lon, self.lat, self.alt, self.hdg)
 
-fgscenery = "/home/tom/daten/fgfs/home/Scenery-devel"
-
-def read(path, stg, prefix):
+def read(path, stg, prefix, fgscenery):
     """Accepts a scenery sub-path, as in 'w010n40/w005n48/', plus an .stg file name.
        In the future, take care of multiple scenery paths here.
        Returns list of Buildings representing static/shared objects in .stg, with full path.
