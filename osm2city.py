@@ -120,7 +120,7 @@ if False: # FIXME: remove -> Parameters
     prefix = "EDDC"
     check_overlap = False
 
-# -- skip buildings that match these names
+# -- skip buildings that match these names; FIXME: remove as part of Parameters
 skiplist = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
           "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
           "Residenzschloss Dresden", "Fernsehturm", "Fernsehturm Dresden"]
@@ -160,14 +160,14 @@ class Coords(object):
         self.lat = lat
 
 class wayExtract(object):
-    def __init__(self, total_objects):
+    def __init__(self, params):
         self.buildings = []
         self.coords_list = []
         self.minlon = 181.
         self.maxlon = -181.
         self.minlat = 91.
         self.maxlat = -91.
-        self.total_objects = total_objects
+        self.params = params #from parameters.py -> Parameters
 
     def ways(self, ways):
         """callback method for ways"""
@@ -181,7 +181,7 @@ class wayExtract(object):
                 _levels = 0
                 if 'name' in tags:
                     _name = tags['name']
-                    if _name in skiplist:
+                    if _name in self.params.skiplist:
                         print "SKIPPING", _name
                         return
                 if 'height' in tags:
@@ -207,7 +207,7 @@ class wayExtract(object):
 
                 self.buildings.append(building)
 #                global stats
-                if tools.stats.objects == self.total_objects: raise ValueError
+                if tools.stats.objects == self.params.total_objects: raise ValueError
                 tools.stats.objects += 1
 
                 if tools.stats.objects % 70 == 0: print tools.stats.objects
@@ -463,7 +463,7 @@ if __name__ == "__main__":
 
     if not params.use_pkl:
         # - parse OSM -> return a list of building objects
-        way = wayExtract(params.total_objects)
+        way = wayExtract(params)
         #p = OSMParser(concurrency=4, ways_callback=way.ways, coords_callback=way.coords )
         p = OSMParser(concurrency=1, coords_callback=way.coords)
         print "start parsing coords"

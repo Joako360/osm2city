@@ -36,4 +36,9 @@ class Parameters(object):
         self.tile_size = 1000 # -- the tile size in meters for clustering of buildings
         self.total_objects = 50000 # the maximum number of buildings to read from osm data
         self.osmfile = "lszr.osm" # -- the file name of the file with osm data. Should reside in path_to_scenery
+        
+        self.skiplist = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
+          "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
+          "Residenzschloss Dresden", "Fernsehturm", "Fernsehturm Dresden"] # the buildings in OSM to skip
+
 
