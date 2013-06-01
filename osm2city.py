@@ -84,13 +84,14 @@ import stg_io
 import tools
 import calc_tile
 
+import parameters
 from parameters import Parameters
 
 # -- defaults
 no_elev = False # -- skip elevation interpolation; FIXME: remove from here and module -> Parameters
 check_overlap = True # -- check for overlap with static models; FIXME: remove from here and module -> Parameters
 
-if '-e' in sys.argv: #FIXME: remove from here and module -> Parameters
+if '-e' in sys.argv: #FIXME: remove from here and module -> Parameters and argumentparser in main()
     no_elev = True
 if '-c' in sys.argv:
     check_overlap = False
@@ -439,11 +440,29 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    #Parse arguments and eventually override Parameters
+    import argparse
+    parser = argparse.ArgumentParser(description="osm2city is a script to read OSM data and create buildings in Flightgear")
+    parser.add_argument("-f", "--file", dest="filename",
+                      help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
+    parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
+    parser.add_argument("-c", dest="c", action="store_true", help="do not check for overlapping with static objects")
+    args = parser.parse_args()
 
+    if args.filename is None:
+        params = Parameters()
+    else:
+        params = parameters.readFromFile(args.filename)
+    if args.e:
+        params.no_elev = True
+    if args.c:
+        params.check_overlap = False
+        
+    print params.printParams()
+
+    #initialize modules
     tools.init()
     tex.init()
-    
-    params = Parameters()
     
     # prepare translation to local coordinates
     cmin = vec2d(params.boundary_west, params.boundary_south)

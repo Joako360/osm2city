@@ -16,6 +16,7 @@ stats = None
 import vec2d
 import coordinates
 
+import parameters
 from parameters import Parameters
 
 class Interpolator(object):
@@ -234,6 +235,17 @@ def init():
     print "tools: init", stats
 
 if __name__ == "__main__":
-    params = Parameters()
+    #Parse arguments and eventually override Parameters
+    import argparse
+    parser = argparse.ArgumentParser(description="tools prepares an elevation grid for Nasal script and then osm2city")
+    parser.add_argument("-f", "--file", dest="filename",
+                      help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
+    args = parser.parse_args()
+
+    if args.filename is None:
+        params = Parameters()
+    else:
+        params = parameters.readFromFile(args.filename)
+    print params.printParams()
     raster_glob(params)
 
