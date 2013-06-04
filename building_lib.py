@@ -95,7 +95,7 @@ def check_height(building_height, t):
                 for i in range(len(t.v_splits_meters)-2, -1, -1):
 #                    print "%i top trying %g >= %g ?" % (i, t.v_splits_meters[-1] - t.v_splits_meters[i],  building_height)
                     if t.v_splits_meters[-1] - t.v_splits_meters[i] >= building_height:
-                         # FIXME: probably a bug. Should use distance to height?
+                        # FIXME: probably a bug. Should use distance to height?
                         tex_y0 = t.v_splits[i]
                         tex_y1 = 1.
                         return tex_y0, tex_y1
@@ -203,7 +203,7 @@ def simplify(X, threshold):
     return X_simple, p_simple, nodes_lost
 
 
-def analyse(buildings, static_objects, transform, elev, facades, roofs, model_prefix):
+def analyse(buildings, static_objects, transform, elev, facades, roofs, params):
     """analyse all buildings
     - calculate area
     - location clash with stg static models? drop building
@@ -217,7 +217,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, model_pr
 
     #s = get_nodes_from_acs(static_objects.objs, "e013n51/")
     if static_objects:
-        s = get_nodes_from_acs(static_objects, model_prefix)
+        s = get_nodes_from_acs(static_objects, params.prefix+"city")
 
         np.savetxt("nodes.dat", s)
 #    s = np.zeros((len(static_objects.objs), 2))
@@ -335,13 +335,13 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, model_pr
         b.height = float(b.levels) * level_height
         #print "hei", b.height, b.levels
 
-        if b.height < 3.4:
-            print "Skipping small building with height < 3.4"
+        if b.height < params.building_min_height:
+            print "Skipping small building with height < building_min_height parameter"
             tools.stats.skipped_small += 1
             continue
 
-        # -- skipping 50% of under 200 sqm buildings
-        if b.area < 50. or (b.area < 200. and random.uniform(0,1) < 0.5):
+        # -- skipping buildings smaller than min_area plus a percentage of buildings under a certain area
+        if b.area < params.building_min_area or (b.area < params.building_reduce_threshhold and random.uniform(0,1) < params.building_reduce_rate):
         #if b.area < 20. : # FIXME use limits.area_min:
             #print "Skipping small building (area)"
             tools.stats.skipped_small += 1
@@ -367,7 +367,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, model_pr
 
         # -- no gable roof on tall buildings
         if b.levels > 5:
-            roof_flat = True
+            b.roof_flat = True
             b.roof_separate = False
             # FIXME: roof_ACs = True
 
@@ -441,13 +441,13 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, model_pr
 
 def make_lightmap_dict(buildings):
     """make a dictionary: map texture to objects"""
-    dict = {}
+    lightmap_dict = {}
     for b in buildings:
         key = b.facade_texture
-        if not dict.has_key(key):
-            dict[key] = []
-        dict[key].append(b)
-    return dict
+        if not lightmap_dict.has_key(key):
+            lightmap_dict[key] = []
+        lightmap_dict[key].append(b)
+    return lightmap_dict
 
 def decide_LOD(buildings):
     for b in buildings:
