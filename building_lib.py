@@ -335,13 +335,13 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, model_pr
         b.height = float(b.levels) * level_height
         #print "hei", b.height, b.levels
 
-        if b.height < 1.4:
+        if b.height < 3.4:
             print "Skipping small building with height < 3.4"
             tools.stats.skipped_small += 1
             continue
 
         # -- skipping 50% of under 200 sqm buildings
-        if b.area < 30.: #or (b.area < 200. and random.uniform(0,1) < 0.01):
+        if b.area < 50. or (b.area < 200. and random.uniform(0,1) < 0.5):
         #if b.area < 20. : # FIXME use limits.area_min:
             #print "Skipping small building (area)"
             tools.stats.skipped_small += 1
