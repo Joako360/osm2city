@@ -48,6 +48,7 @@ class Parameters(object):
         self.building_min_area = 50.0 # The minimum area for a building to be included in output
         self.building_reduce_threshhold = 200.0 # The threshold area of a building below which a rate of buildings get reduced from output
         self.building_reduce_rate = 0.5 # The rate (between 0 and 1) of buildings below a threshold which get reduced randomly in output
+        self.building_simplify_tolerance = 1.0 # All points in the simplified building will be within the tolerance distance of the original geometry. 
 
     def printParams(self):
         '''
@@ -132,6 +133,10 @@ class Parameters(object):
             floatValue = parseFloat('building_reduce_rate', paramDict['building_reduce_rate'])
             if None is not floatValue:
                 self.building_reduce_rate = floatValue
+        if 'building_simplify_tolerance' in paramDict:
+            floatValue = parseFloat('building_simplify_tolerance', paramDict['building_simplify_tolerance'])
+            if None is not floatValue:
+                self.building_simplify_tolerance = floatValue
 
 def parseList(stringValue):
     '''
