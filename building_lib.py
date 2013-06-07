@@ -270,8 +270,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, params):
         # -- shapely: compute area
 #        r = LinearRing(list(X))
 #        p = Polygon(r)
-        simplify_threshold = 1.0
-        X, p, nodes_simplified = simplify(X, simplify_threshold)
+        X, p, nodes_simplified = simplify(X, params.building_simplify_tolerance)
         b.area = p.area
         b.nnodes_ground = X.shape[0] - 1
 #        if b.nnodes_ground < 3:
