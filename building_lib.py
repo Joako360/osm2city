@@ -585,7 +585,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         roof_ac_name = "b%i-roof" % nb
         out.write("kids 0\n")
         out.write("OBJECT poly\n")
-        out.write('name "%s"' % roof_ac_name)
+        out.write('name "%s"\n' % roof_ac_name)
 #        LOD_lists[b.LOD].append(roof_ac_name)
         LOD_lists[2].append(roof_ac_name)  # roof always LOD detail?
 
@@ -672,13 +672,12 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             out.write("%i %g %g\n" % (0, repeatx, 0))
             out.write("%i %g %g\n" % (4, 0.5*repeatx, repeaty))
 
-            out.write("kids 0\n")
 
             # -- LOD flat model
             roof_ac_name_flat = "b%i-flat" % nb
             out.write("kids 0\n")
             out.write("OBJECT poly\n")
-            out.write('name "%s"' % roof_ac_name_flat)
+            out.write('name "%s"\n' % roof_ac_name_flat)
             LOD_lists[3].append(roof_ac_name_flat)
 
             out.write('texture "%s"\n' % (roof_texture.filename + '.png'))
