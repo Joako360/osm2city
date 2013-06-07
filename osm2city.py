@@ -550,7 +550,7 @@ if __name__ == "__main__":
     #   - analyze surrounding: similar shaped buildings nearby? will get same texture
     #   - set building type, roof type etc
     #   - decide LOD
-    buildings = building_lib.analyse(buildings, static_objects, transform, elev, tex.facades, tex.roofs, prefix+"city")
+    buildings = building_lib.analyse(buildings, static_objects, transform, elev, tex.facades, tex.roofs, params)
 
     #tools.write_gp(buildings)
 

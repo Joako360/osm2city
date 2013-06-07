@@ -11,7 +11,7 @@ import types
 class Parameters(object):
     '''
     Central place to store parameters / settings / variables in osm2city.
-    TODO: load from file and write to file
+    All lenght, height etc. parameters are in meters, square meters (m2) etc.
     '''
 
     def __init__(self):
@@ -42,6 +42,12 @@ class Parameters(object):
         self.skiplist = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
           "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
           "Residenzschloss Dresden", "Fernsehturm", "Fernsehturm Dresden"] # the buildings in OSM to skip
+        
+        # Parameters which influence the number of buildings from OSM taken to output
+        self.building_min_height = 3.4 # The minimum height of a building to be included in output
+        self.building_min_area = 50.0 # The minimum area for a building to be included in output
+        self.building_reduce_threshhold = 200.0 # The threshold area of a building below which a rate of buildings get reduced from output
+        self.building_reduce_rate = 0.5 # The rate (between 0 and 1) of buildings below a threshold which get reduced randomly in output
 
     def printParams(self):
         '''
@@ -110,6 +116,22 @@ class Parameters(object):
                 self.osmfile = paramDict['osmfile']
         if 'skiplist' in paramDict:
             self.skiplist = parseList(paramDict['skiplist'])
+        if 'building_min_height' in paramDict:
+            floatValue = parseFloat('building_min_height', paramDict['building_min_height'])
+            if None is not floatValue:
+                self.building_min_height = floatValue
+        if 'building_min_area' in paramDict:
+            floatValue = parseFloat('building_min_area', paramDict['building_min_area'])
+            if None is not floatValue:
+                self.building_min_area = floatValue
+        if 'building_reduce_threshhold' in paramDict:
+            floatValue = parseFloat('building_reduce_threshhold', paramDict['building_reduce_threshhold'])
+            if None is not floatValue:
+                self.building_reduce_threshhold = floatValue
+        if 'building_reduce_rate' in paramDict:
+            floatValue = parseFloat('building_reduce_rate', paramDict['building_reduce_rate'])
+            if None is not floatValue:
+                self.building_reduce_rate = floatValue
 
 def parseList(stringValue):
     '''
