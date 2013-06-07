@@ -23,6 +23,7 @@ import textwrap
 import plot
 from math import sin, cos, radians
 import tools
+import parameters
 
 def write_and_count_numvert(out, building, numvert):
     """write numvert tag to .ac, update stats"""
@@ -203,7 +204,7 @@ def simplify(X, threshold):
     return X_simple, p_simple, nodes_lost
 
 
-def analyse(buildings, static_objects, transform, elev, facades, roofs, params):
+def analyse(buildings, static_objects, transform, elev, facades, roofs):
     """analyse all buildings
     - calculate area
     - location clash with stg static models? drop building
@@ -217,7 +218,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, params):
 
     #s = get_nodes_from_acs(static_objects.objs, "e013n51/")
     if static_objects:
-        s = get_nodes_from_acs(static_objects, params.prefix+"city")
+        s = get_nodes_from_acs(static_objects, parameters.PREFIX + "city")
 
         np.savetxt("nodes.dat", s)
 #    s = np.zeros((len(static_objects.objs), 2))
@@ -270,7 +271,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, params):
         # -- shapely: compute area
 #        r = LinearRing(list(X))
 #        p = Polygon(r)
-        X, p, nodes_simplified = simplify(X, params.building_simplify_tolerance)
+        X, p, nodes_simplified = simplify(X, parameters.BUILDING_SIMPLIFY_TOLERANCE)
         b.area = p.area
         b.nnodes_ground = X.shape[0] - 1
 #        if b.nnodes_ground < 3:
@@ -334,13 +335,13 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs, params):
         b.height = float(b.levels) * level_height
         #print "hei", b.height, b.levels
 
-        if b.height < params.building_min_height:
+        if b.height < parameters.BUILDING_MIN_HEIGHT:
             print "Skipping small building with height < building_min_height parameter"
             tools.stats.skipped_small += 1
             continue
 
         # -- skipping buildings smaller than min_area plus a percentage of buildings under a certain area
-        if b.area < params.building_min_area or (b.area < params.building_reduce_threshhold and random.uniform(0,1) < params.building_reduce_rate):
+        if b.area < parameters.BUILDING_MIN_AREA or (b.area < parameters.BUILDING_REDUCE_THRESHOLD and random.uniform(0,1) < parameters.BUILDING_REDUCE_RATE):
         #if b.area < 20. : # FIXME use limits.area_min:
             #print "Skipping small building (area)"
             tools.stats.skipped_small += 1

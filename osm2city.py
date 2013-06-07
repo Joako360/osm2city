@@ -85,7 +85,6 @@ import tools
 import calc_tile
 
 import parameters
-from parameters import Parameters
 
 # -- defaults
 no_elev = False # -- skip elevation interpolation; FIXME: remove from here and module -> Parameters
@@ -161,14 +160,13 @@ class Coords(object):
         self.lat = lat
 
 class wayExtract(object):
-    def __init__(self, params):
+    def __init__(self):
         self.buildings = []
         self.coords_list = []
         self.minlon = 181.
         self.maxlon = -181.
         self.minlat = 91.
         self.maxlat = -91.
-        self.params = params #from parameters.py -> Parameters
 
     def ways(self, ways):
         """callback method for ways"""
@@ -182,7 +180,7 @@ class wayExtract(object):
                 _levels = 0
                 if 'name' in tags:
                     _name = tags['name']
-                    if _name in self.params.skiplist:
+                    if _name in parameters.SKIP_LIST:
                         print "SKIPPING", _name
                         return
                 if 'height' in tags:
@@ -208,7 +206,7 @@ class wayExtract(object):
 
                 self.buildings.append(building)
 #                global stats
-                if tools.stats.objects == self.params.total_objects: raise ValueError
+                if tools.stats.objects == parameters.TOTAL_OBJECTS: raise ValueError
                 tools.stats.objects += 1
 
                 if tools.stats.objects % 70 == 0: print tools.stats.objects
@@ -449,44 +447,42 @@ if __name__ == "__main__":
     parser.add_argument("-c", dest="c", action="store_true", help="do not check for overlapping with static objects")
     args = parser.parse_args()
 
-    if args.filename is None:
-        params = Parameters()
-    else:
-        params = parameters.readFromFile(args.filename)
+    if args.filename is not None:
+        parameters.readFromFile(args.filename)
     if args.e:
-        params.no_elev = True
+        parameters.NO_ELEV = True
     if args.c:
-        params.check_overlap = False
+        parameters.CHECK_OVERLAP = False
         
-    print params.printParams()
+    print parameters.printParams()
 
     #initialize modules
     tools.init()
     tex.init()
     
     # prepare translation to local coordinates
-    cmin = vec2d(params.boundary_west, params.boundary_south)
-    cmax = vec2d(params.boundary_east, params.boundary_north)
+    cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
+    cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
     center = (cmin + cmax)*0.5
     transform = coordinates.Transformation(center, hdg = 0)
     print transform.toGlobal(cmin), transform.toGlobal(cmax)
 
 
     print "reading elevation data"
-    elev = tools.Interpolator(params.prefix + os.sep + "elev.xml", fake=params.no_elev) # -- fake skips actually reading the file, speeding up things
+    elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.xml", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
     print "height at origin", elev(vec2d(0,0))
     print "origin at ", transform.toGlobal((0,0))
 
     #tools.write_map('dresden.png', transform, elev, vec2d(minlon, minlat), vec2d(maxlon, maxlat))
 
 
-    if not params.use_pkl:
+    if not parameters.USE_PKL:
         # - parse OSM -> return a list of building objects
-        way = wayExtract(params)
+        way = wayExtract()
         #p = OSMParser(concurrency=4, ways_callback=way.ways, coords_callback=way.coords )
         p = OSMParser(concurrency=1, coords_callback=way.coords)
         print "start parsing coords"
-        p.parse(params.prefix + os.sep + params.osmfile)
+        p.parse(parameters.PREFIX + os.sep + parameters.OSM_FILE)
         print "done parsing"
         print "ncords:", len(way.coords_list)
         print "bounds:", way.minlon, way.minlat, way.maxlon, way.maxlat
@@ -494,7 +490,7 @@ if __name__ == "__main__":
         p = OSMParser(concurrency=1, ways_callback=way.ways)
         print "start parsing ways"
         try:
-            p.parse(params.prefix + os.sep + params.osmfile)
+            p.parse(parameters.PREFIX + os.sep + parameters.OSM_FILE)
         except ValueError:
             pass
 
@@ -510,8 +506,8 @@ if __name__ == "__main__":
         cPickle.dump(buildings, fpickle, -1)
         fpickle.close()
     else:
-        fpickle = open(params.prefix + '/buildings.pkl', 'rb')
-        buildings = cPickle.load(fpickle)[:params.total_objects]
+        fpickle = open(parameters.PREFIX + '/buildings.pkl', 'rb')
+        buildings = cPickle.load(fpickle)[:parameters.TOTAL_OBJECTS]
         fpickle.close()
         print "unpickled %g buildings " % (len(buildings))
         tools.stats.objects = len(buildings)
@@ -520,9 +516,9 @@ if __name__ == "__main__":
     # -- create clusters
     lmin = vec2d(transform.toLocal(cmin))
     lmax = vec2d(transform.toLocal(cmax))
-    clusters = Clusters(lmin, lmax, params.tile_size)
+    clusters = Clusters(lmin, lmax, parameters.TILE_SIZE)
 
-    if params.check_overlap:
+    if parameters.CHECK_OVERLAP:
         # -- find relevant tiles by checking tile_index at center of each cluster.
         #    Then read objects from .stgs
         stgs = []
@@ -535,7 +531,7 @@ if __name__ == "__main__":
 
             if stg not in stgs:
                 stgs.append(stg)
-                static_objects.extend(stg_io.read(path, stg, params.prefix, params.path_to_scenery))
+                static_objects.extend(stg_io.read(path, stg, parameters.PREFIX, parameters.PATH_TO_SCENERY))
 
         print "read %i objects from %i tiles" % (len(static_objects), len(stgs)), stgs
     else:
@@ -550,7 +546,7 @@ if __name__ == "__main__":
     #   - analyze surrounding: similar shaped buildings nearby? will get same texture
     #   - set building type, roof type etc
     #   - decide LOD
-    buildings = building_lib.analyse(buildings, static_objects, transform, elev, tex.facades, tex.roofs, params)
+    buildings = building_lib.analyse(buildings, static_objects, transform, elev, tex.facades, tex.roofs)
 
     #tools.write_gp(buildings)
 
@@ -599,7 +595,7 @@ if __name__ == "__main__":
             LOD_lists.append([])
 
             # -- open ac and write header
-            fname = params.prefix+"city%02i%02i" % (cl.I.x, cl.I.y)
+            fname = parameters.PREFIX + "city%02i%02i" % (cl.I.x, cl.I.y)
             out = open(fname+".ac", "w")
             write_ac_header(out, nb + nroofs)
             for b in cl.objects:

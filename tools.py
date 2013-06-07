@@ -17,7 +17,6 @@ import vec2d
 import coordinates
 
 import parameters
-from parameters import Parameters
 
 class Interpolator(object):
     """load elevation data from file, interpolate"""
@@ -74,16 +73,16 @@ class Interpolator(object):
         self.h += h
 
 
-def raster_glob(params):
-    cmin = vec2d.vec2d(params.boundary_west, params.boundary_south)
-    cmax = vec2d.vec2d(params.boundary_east, params.boundary_north)
+def raster_glob():
+    cmin = vec2d.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
+    cmax = vec2d.vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
     center = (cmin + cmax) * 0.5
     transform = coordinates.Transformation((center.x, center.y), hdg = 0)
     lmin = vec2d.vec2d(transform.toLocal(cmin.__iter__()))
     lmax = vec2d.vec2d(transform.toLocal(cmax.__iter__()))
     delta = (lmax - lmin)*0.5
     print "Distance from middle to boundary in meters (x, y):", delta
-    raster(transform, "elev.in", -delta.x, -delta.y, 2*delta.x, 2*delta.y, params.elev_raster_x, params.elev_raster_y)
+    raster(transform, "elev.in", -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
 
 def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
     # --- need $FGDATA/Nasal/elev.nas and elev.in
@@ -242,10 +241,8 @@ if __name__ == "__main__":
                       help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
     args = parser.parse_args()
 
-    if args.filename is None:
-        params = Parameters()
-    else:
-        params = parameters.readFromFile(args.filename)
-    print params.printParams()
-    raster_glob(params)
+    if args.filename is not None:
+        parameters.readFromFile(args.filename)
+    print parameters.printParams()
+    raster_glob()
 
