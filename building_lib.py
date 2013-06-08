@@ -57,11 +57,15 @@ def random_LOD():
     if r < 0.7: return 1  #    70% rough
     return 0              #    30% bare
 
-default_height=12.
-random_level_height = random_number(float, 3.1, 3.6)
-random_levels = random_number(int, 2, 5)
-#random_levels_skyscraper = random_number(int, 10, 60)
-random_levels_skyscraper = random_number('gauss', 35, 10)
+def random_level_height(place="city"):
+    """ Calculates the height for each level of a building based on place and random factor"""
+    #FIXME: other places (e.g. village)
+    return random.uniform(parameters.BUILDING_CITY_LEVEL_HEIGHT_MIN, parameters.BUILDING_CITY_LEVEL_HEIGHT_MAX)
+
+def random_levels(place="city"):
+    """ Calculates the number of building levels based on place and random factor"""
+    #FIXME: other places
+    return random.randint(parameters.BUILDING_CITY_LEVELS_MIN, parameters.BUILDING_CITY_LEVELS_MAX)
 
 def check_height(building_height, t):
     """check if a texture t fits the building height (h)
@@ -279,7 +283,6 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         tools.stats.nodes_simplified += nodes_simplified
         tools.stats.nodes_ground += b.nnodes_ground
 
-
         # -- fix inverted faces and compute edge length
         lenX = np.zeros((b.nnodes_ground))
         crossX = 0.
@@ -300,90 +303,18 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 lenX = np.roll(lenX, 1)
                 X[0] = X[-1]
 
-        level_height = random_level_height()
-
-        # -- LOWI year 2525
-        if False:
-            if b.area >= 1500:
-                b.levels = int(random_levels_skyscraper())
-                b.height = float(b.levels) * level_height
-
-            if b.area < 1500:
-            #if b.area < 200. or (b.area < 500. and random.uniform(0,1) < 0.5):
-                tools.stats.skipped_small += 1
-                continue
-
-        # try OSM height first
-        # catch exceptions, since height might be "5 m" instead of "5"
-        try:
-            height = float(b.height)
-            if height > 1.: b.levels = (height*1.)/level_height
-        except:
-            height = 0.
-            pass
-
-        # failing that, try OSM levels
-        if height < 1:
-            if float(b.levels) > 0:
-                pass
-                #print "have levels", b.levels
-            else:
-                # failing that, use random levels
-                b.levels = random_levels()
-                if b.area < 40: b.levels = min(b.levels, 2)
-
-        b.height = float(b.levels) * level_height
-        #print "hei", b.height, b.levels
-
-        if b.height < parameters.BUILDING_MIN_HEIGHT:
-            print "Skipping small building with height < building_min_height parameter"
-            tools.stats.skipped_small += 1
+        # ***********************
+        # skip buildings outside elevation raster
+        # ***********************
+        if elev(vec2d(X[0])) == -9999:
+            print "-9999"
             continue
 
-        # -- skipping buildings smaller than min_area plus a percentage of buildings under a certain area
-        if b.area < parameters.BUILDING_MIN_AREA or (b.area < parameters.BUILDING_REDUCE_THRESHOLD and random.uniform(0,1) < parameters.BUILDING_REDUCE_RATE):
-        #if b.area < 20. : # FIXME use limits.area_min:
-            #print "Skipping small building (area)"
-            tools.stats.skipped_small += 1
-            continue
-
-        # -- roof is controlled by two flags:
-        #    bool b.roof_separate: whether or not to include roof as separate model
-        #      useful for
-        #      - pitched roof
-        #      - roof with add-ons: AC
-        #    replace by roof_type? flat  --> no separate model
-        #                          gable --> separate model
-        #                          ACs         -"-
-
-        b.roof_separate = False
-        b.roof_flat = True
-
-        # -- model roof if we have 4 ground nodes and area below 1000m2
-        if b.nnodes_ground == 4 and b.area < 1000:
-            b.roof_separate = True
-            b.roof_flat = False  # -- pitched roof
-
-
-        # -- no gable roof on tall buildings
-        if b.levels > 5:
-            b.roof_flat = True
-            b.roof_separate = False
-            # FIXME: roof_ACs = True
-
-#        b.roof_flat = True
-#        b.roof_separate = False
-
-        requires = []
-        if b.roof_separate and not b.roof_flat:
-            requires.append('age:old')
-            requires.append('compat:roof-gable')
-
-
-        # -- static objects nearby?
-        # FIXME: which radius? Or use centroid point?
-        #radius = max(lenX)
-        radius = 5.
+        # ***********************
+        # Check for static objects nearby
+        # ***********************
+        # FIXME: which radius? Or use centroid point? make radius a parameter
+        radius = 5. # alternative: radius = max(lenX)
         # -- query_ball_point may return funny lists [[], [], .. ]
         #    filter these
         if static_objects:
@@ -406,10 +337,62 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 tools.stats.skipped_nearby += 1
                 continue
 
-        # -- skip buildings outside elevation raster
-        if elev(vec2d(X[0])) == -9999:
-            print "-9999"
+        # *************
+        # Check area
+        # *************
+        if False == analyse_area(buildings, b):
+            tools.stats.skipped_small += 1
             continue
+
+        # ***********************
+        # Work on height and levels
+        # ***********************
+                # -- LOWI year 2525
+        if False:
+            if b.area >= 1500:
+                b.levels = int(random.gauss(35, 10)) # random_number(int, 10, 60)
+                b.height = float(b.levels) * random_level_height()
+            if b.area < 1500:
+            #if b.area < 200. or (b.area < 500. and random.uniform(0,1) < 0.5):
+                tools.stats.skipped_small += 1
+                continue
+
+        analyse_level_height(b)
+
+        if b.height < parameters.BUILDING_MIN_HEIGHT:
+            print "Skipping small building with height < building_min_height parameter"
+            tools.stats.skipped_small += 1
+            continue
+
+        # ***********************
+        # Work on roof
+        # ***********************
+        # -- roof is controlled by two flags:
+        #    bool b.roof_separate: whether or not to include roof as separate model
+        #      useful for
+        #      - pitched roof
+        #      - roof with add-ons: AC
+        #    replace by roof_type? flat  --> no separate model
+        #                          gable --> separate model
+        #                          ACs         -"-
+        b.roof_separate = False
+        b.roof_flat = True
+
+        # -- model roof if we have 4 ground nodes and area below 1000m2
+        if b.nnodes_ground == 4 and b.area < 1000:
+            b.roof_separate = True
+            b.roof_flat = False  # -- pitched roof
+
+        # -- no gable roof on tall buildings
+        if b.levels > 5:
+            b.roof_flat = True
+            b.roof_separate = False
+            # FIXME: roof_ACs = True
+
+        requires = []
+        if b.roof_separate and not b.roof_flat:
+            requires.append('age:old')
+            requires.append('compat:roof-gable')
 
         #tools.stats.print_summary()
     #    if p.area < 200.:
@@ -438,6 +421,48 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         new_buildings.append(b)
 
     return new_buildings
+
+def analyse_area(buildings, building):
+    """Checks whether a given building's area is too small for inclusion.
+    FIXME: Exclusion might be skipped if the building touches another building (i.e. an annex)
+    Returns true if the building should be included (i.e. area is big enough etc.)
+    """
+    if building.area < parameters.BUILDING_MIN_AREA or (building.area < parameters.BUILDING_REDUCE_THRESHOLD
+                                                  and random.uniform(0,1) < parameters.BUILDING_REDUCE_RATE):
+        #if parameters.BUILDING_REDUCE_CHECK_TOUCH:
+            #for k in buildings:
+                #if k.touches(building): # using Shapely, but buildings have no polygon currently
+                    #return True
+        return False
+    return True
+
+def analyse_level_height(building):
+    """Determines total height (and number of levels) of a building based on OSM values and other logic"""
+    level_height = random_level_height()
+
+    # try OSM height first
+    # catch exceptions, since height might be "5 m" instead of "5"
+    try:
+        height = float(building.height)
+        if height > 1.:
+            building.levels = (height * 1.)/level_height
+    except:
+        height = 0.
+        pass
+
+    # failing that, try OSM levels
+    if height < 1:
+        if float(building.levels) > 0:
+            pass
+            #print "have levels", b.levels
+        else:
+            # failing that, use random levels
+            building.levels = random_levels()
+            if building.area < parameters.BUILDING_MIN_AREA:
+                building.levels = min(building.levels, 2)
+
+    building.height = float(building.levels) * level_height
+
 
 def make_lightmap_dict(buildings):
     """make a dictionary: map texture to objects"""

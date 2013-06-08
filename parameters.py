@@ -44,11 +44,19 @@ SKIP_LIST = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
   "Residenzschloss Dresden", "Fernsehturm", "Fernsehturm Dresden"]
 
 # Parameters which influence the number of buildings from OSM taken to output
-BUILDING_MIN_HEIGHT = 3.4 # The minimum height of a building to be included in output
+BUILDING_MIN_HEIGHT = 3.4 # The minimum height of a building to be included in output (does not include roof)
 BUILDING_MIN_AREA = 50.0 # The minimum area for a building to be included in output
 BUILDING_REDUCE_THRESHOLD = 200.0 # The threshold area of a building below which a rate of buildings get reduced from output
 BUILDING_REDUCE_RATE = 0.5 # The rate (between 0 and 1) of buildings below a threshold which get reduced randomly in output
+BUILDING_REDUCE_CHECK_TOUCH = False # Before removing a building due to area check whether it is touching another building and therefore should be kept
 BUILDING_SIMPLIFY_TOLERANCE = 1.0 # All points in the simplified building will be within the tolerance distance of the original geometry. 
+
+# Parameters which influence the height of buildings in info in OSM not available
+BUILDING_CITY_LEVELS_MIN = 2
+BUILDING_CITY_LEVELS_MAX = 5
+BUILDING_CITY_LEVEL_HEIGHT_MIN = 3.1
+BUILDING_CITY_LEVEL_HEIGHT_MAX = 3.6
+# FIXME: same parameters for place = town, village, suburb
 
 def setParameters(paramDict):
     '''
@@ -139,11 +147,34 @@ def setParameters(paramDict):
         floatValue = parseFloat('BUILDING_REDUCE_RATE', paramDict['BUILDING_REDUCE_RATE'])
         if None is not floatValue:
             BUILDING_REDUCE_RATE = floatValue
+    global BUILDING_REDUCE_CHECK_TOUCH
+    if 'BUILDING_REDUCE_CHECK_TOUCH' in paramDict:
+        BUILDING_REDUCE_CHECK_TOUCH = parseBool(paramDict['BUILDING_REDUCE_CHECK_TOUCH'])
     global BUILDING_SIMPLIFY_TOLERANCE
     if 'BUILDING_SIMPLIFY_TOLERANCE' in paramDict:
         floatValue = parseFloat('BUILDING_SIMPLIFY_TOLERANCE', paramDict['BUILDING_SIMPLIFY_TOLERANCE'])
         if None is not floatValue:
             BUILDING_SIMPLIFY_TOLERANCE = floatValue
+    global BUILDING_CITY_LEVELS_MIN
+    if 'BUILDING_CITY_LEVELS_MIN' in paramDict:
+        intValue = parseInt('BUILDING_CITY_LEVELS_MIN', paramDict['BUILDING_CITY_LEVELS_MIN'])
+        if None is not intValue:
+            BUILDING_CITY_LEVELS_MIN = intValue
+    global BUILDING_CITY_LEVELS_MAX
+    if 'BUILDING_CITY_LEVELS_MAX' in paramDict:
+        intValue = parseInt('BUILDING_CITY_LEVELS_MAX', paramDict['BUILDING_CITY_LEVELS_MAX'])
+        if None is not intValue:
+            BUILDING_CITY_LEVELS_MAX = intValue
+    global BUILDING_CITY_LEVEL_HEIGHT_MIN
+    if 'BUILDING_CITY_LEVEL_HEIGHT_MIN' in paramDict:
+        floatValue = parseFloat('BUILDING_CITY_LEVEL_HEIGHT_MIN', paramDict['BUILDING_CITY_LEVEL_HEIGHT_MIN'])
+        if None is not floatValue:
+            BUILDING_CITY_LEVEL_HEIGHT_MIN = floatValue
+    global BUILDING_CITY_LEVEL_HEIGHT_MAX
+    if 'BUILDING_CITY_LEVEL_HEIGHT_MAX' in paramDict:
+        floatValue = parseFloat('BUILDING_CITY_LEVEL_HEIGHT_MAX', paramDict['BUILDING_CITY_LEVEL_HEIGHT_MAX'])
+        if None is not floatValue:
+            BUILDING_CITY_LEVEL_HEIGHT_MAX = floatValue
 
 def printParams():
     '''

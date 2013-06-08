@@ -132,7 +132,7 @@ class Building(object):
     def __init__(self, osm_id, tags, refs, name, height, levels, stg_typ = None, stg_hdg = None):
         self.osm_id = osm_id
         self.tags = tags
-        self.refs = refs
+        self.refs = refs # the referenced coordinate nodes
         self.name = name.encode('ascii', 'ignore')     # stg: name
         self.stg_typ = stg_typ  # stg: OBJECT_SHARED or _STATIC
         self.stg_hdg = stg_hdg
