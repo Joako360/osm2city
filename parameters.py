@@ -51,11 +51,14 @@ BUILDING_REDUCE_RATE = 0.5 # The rate (between 0 and 1) of buildings below a thr
 BUILDING_REDUCE_CHECK_TOUCH = False # Before removing a building due to area check whether it is touching another building and therefore should be kept
 BUILDING_SIMPLIFY_TOLERANCE = 1.0 # All points in the simplified building will be within the tolerance distance of the original geometry. 
 
-# Parameters which influence the height of buildings in info in OSM not available
-BUILDING_CITY_LEVELS_MIN = 2
-BUILDING_CITY_LEVELS_MAX = 5
-BUILDING_CITY_LEVEL_HEIGHT_MIN = 3.1
-BUILDING_CITY_LEVEL_HEIGHT_MAX = 3.6
+# Parameters which influence the height of buildings in info in OSM not available.
+# It uses a triangular distribution (see http://en.wikipedia.org/wiki/Triangular_distribution)
+BUILDING_CITY_LEVELS_LOW = 2.0
+BUILDING_CITY_LEVELS_MODE = 3.5
+BUILDING_CITY_LEVELS_HEIGH = 5.0
+BUILDING_CITY_LEVEL_HEIGHT_LOW = 3.1
+BUILDING_CITY_LEVEL_HEIGHT_MODE = 3.3
+BUILDING_CITY_LEVEL_HEIGHT_HEIGH = 3.6
 # FIXME: same parameters for place = town, village, suburb
 
 def setParameters(paramDict):
@@ -155,26 +158,36 @@ def setParameters(paramDict):
         floatValue = parseFloat('BUILDING_SIMPLIFY_TOLERANCE', paramDict['BUILDING_SIMPLIFY_TOLERANCE'])
         if None is not floatValue:
             BUILDING_SIMPLIFY_TOLERANCE = floatValue
-    global BUILDING_CITY_LEVELS_MIN
-    if 'BUILDING_CITY_LEVELS_MIN' in paramDict:
-        intValue = parseInt('BUILDING_CITY_LEVELS_MIN', paramDict['BUILDING_CITY_LEVELS_MIN'])
-        if None is not intValue:
-            BUILDING_CITY_LEVELS_MIN = intValue
-    global BUILDING_CITY_LEVELS_MAX
-    if 'BUILDING_CITY_LEVELS_MAX' in paramDict:
-        intValue = parseInt('BUILDING_CITY_LEVELS_MAX', paramDict['BUILDING_CITY_LEVELS_MAX'])
-        if None is not intValue:
-            BUILDING_CITY_LEVELS_MAX = intValue
-    global BUILDING_CITY_LEVEL_HEIGHT_MIN
-    if 'BUILDING_CITY_LEVEL_HEIGHT_MIN' in paramDict:
-        floatValue = parseFloat('BUILDING_CITY_LEVEL_HEIGHT_MIN', paramDict['BUILDING_CITY_LEVEL_HEIGHT_MIN'])
+    global BUILDING_CITY_LEVELS_LOW
+    if 'BUILDING_CITY_LEVELS_LOW' in paramDict:
+        floatValue = parseFloat('BUILDING_CITY_LEVELS_LOW', paramDict['BUILDING_CITY_LEVELS_LOW'])
         if None is not floatValue:
-            BUILDING_CITY_LEVEL_HEIGHT_MIN = floatValue
-    global BUILDING_CITY_LEVEL_HEIGHT_MAX
-    if 'BUILDING_CITY_LEVEL_HEIGHT_MAX' in paramDict:
-        floatValue = parseFloat('BUILDING_CITY_LEVEL_HEIGHT_MAX', paramDict['BUILDING_CITY_LEVEL_HEIGHT_MAX'])
+            BUILDING_CITY_LEVELS_LOW = floatValue
+    global BUILDING_CITY_LEVELS_MODE
+    if 'BUILDING_CITY_LEVELS_MODE' in paramDict:
+        floatValue = parseFloat('BUILDING_CITY_LEVELS_MODE', paramDict['BUILDING_CITY_LEVELS_MODE'])
         if None is not floatValue:
-            BUILDING_CITY_LEVEL_HEIGHT_MAX = floatValue
+            BUILDING_CITY_LEVELS_MODE = floatValue
+    global BUILDING_CITY_LEVELS_HEIGH
+    if 'BUILDING_CITY_LEVELS_HEIGH' in paramDict:
+        floatValue = parseFloat('BUILDING_CITY_LEVELS_HEIGH', paramDict['BUILDING_CITY_LEVELS_HEIGH'])
+        if None is not floatValue:
+            BUILDING_CITY_LEVELS_HEIGH = floatValue
+    global BUILDING_CITY_LEVEL_HEIGHT_LOW
+    if 'BUILDING_CITY_LEVEL_HEIGHT_LOW' in paramDict:
+        floatValue = parseFloat('BUILDING_CITY_LEVEL_HEIGHT_LOW', paramDict['BUILDING_CITY_LEVEL_HEIGHT_LOW'])
+        if None is not floatValue:
+            BUILDING_CITY_LEVEL_HEIGHT_LOW = floatValue
+    global BUILDING_CITY_LEVEL_HEIGHT_MODE
+    if 'BUILDING_CITY_LEVEL_HEIGHT_MODE' in paramDict:
+        floatValue = parseFloat('BUILDING_CITY_LEVEL_HEIGHT_MODE', paramDict['BUILDING_CITY_LEVEL_HEIGHT_MODE'])
+        if None is not floatValue:
+            BUILDING_CITY_LEVEL_HEIGHT_MODE = floatValue
+    global BUILDING_CITY_LEVEL_HEIGHT_HEIGH
+    if 'BUILDING_CITY_LEVEL_HEIGHT_HEIGH' in paramDict:
+        floatValue = parseFloat('BUILDING_CITY_LEVEL_HEIGHT_HEIGH', paramDict['BUILDING_CITY_LEVEL_HEIGHT_HEIGH'])
+        if None is not floatValue:
+            BUILDING_CITY_LEVEL_HEIGHT_HEIGH = floatValue
 
 def printParams():
     '''

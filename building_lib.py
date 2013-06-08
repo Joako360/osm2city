@@ -60,12 +60,16 @@ def random_LOD():
 def random_level_height(place="city"):
     """ Calculates the height for each level of a building based on place and random factor"""
     #FIXME: other places (e.g. village)
-    return random.uniform(parameters.BUILDING_CITY_LEVEL_HEIGHT_MIN, parameters.BUILDING_CITY_LEVEL_HEIGHT_MAX)
+    return random.triangular(parameters.BUILDING_CITY_LEVEL_HEIGHT_LOW
+                          , parameters.BUILDING_CITY_LEVEL_HEIGHT_HEIGH
+                          , parameters.BUILDING_CITY_LEVEL_HEIGHT_MODE)
 
 def random_levels(place="city"):
     """ Calculates the number of building levels based on place and random factor"""
     #FIXME: other places
-    return random.randint(parameters.BUILDING_CITY_LEVELS_MIN, parameters.BUILDING_CITY_LEVELS_MAX)
+    return int(round(random.triangular(parameters.BUILDING_CITY_LEVELS_LOW
+                          , parameters.BUILDING_CITY_LEVELS_HEIGH
+                          , parameters.BUILDING_CITY_LEVELS_MODE)))
 
 def check_height(building_height, t):
     """check if a texture t fits the building height (h)
