@@ -1,0 +1,50 @@
+# -- map
+# <bounds minlat="51.0599350" minlon="13.7415360" maxlat="51.0632660" maxlon="13.7452480"/>
+#minlat=51.0599350
+#minlon=13.7415360
+#maxlat=51.0632660
+#maxlon=13.7452480
+
+# -- altstadt
+# <bounds minlat="51.0317900" minlon="13.7149300" maxlat="51.0583100" maxlon="13.7551800"/>
+#minlat=51.0317900
+#minlon=13.7149300
+#maxlat=51.0583100
+#maxlon=13.7551800
+
+# -- dd-altstadt
+# <bounds minlat="51.0459700" minlon="13.7325800" maxlat="51.0564600" maxlon="13.7467600"/>
+#minlat=51.0459700
+#minlon=13.7325800
+#maxlat=51.0564600
+#maxlon=13.7467600
+
+if False:
+  if prefix == "EDDC": # FIXME: remove -> part of Parameters and __main__
+    cmin = vec2d(13.63, 50.96)
+    cmax = vec2d(13.88, 51.17)
+    center = vec2d(13.7467, 51.0377) # -- EDDC
+
+#
+## -- neustadt.osm
+#minlat=51.0628700
+#minlon=13.7436400
+#maxlat=51.0715500
+#maxlon=13.7563400
+
+if False:
+  if prefix == "LOWI": # FIXME: remove -> part of Parameters and __main__
+    cmin = vec2d(11.16898,47.20837) # -- LOWI
+    cmax = vec2d(11.79108,47.38161)
+
+# devel
+if False: # FIXME: remove -> Parameters
+    use_pkl = False    #infile = 'dd-altstadt.osm'; total_objects = 158
+    #infile = 'map.osm'; total_objects = 216 #
+    infile = "dd-altstadt.osm"
+    #infile = 'altstadt.osm'; total_objects = 10000 # 2172
+    tile_size=2000 # -- our tile size in meters
+    #no_elev = True
+    prefix = "EDDC"
+    check_overlap = False
+
