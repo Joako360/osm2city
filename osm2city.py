@@ -385,32 +385,22 @@ if __name__ == "__main__":
         parameters.NO_ELEV = True
     if args.c:
         parameters.CHECK_OVERLAP = False
-        
+
     print parameters.printParams()
 
     # -- initialize modules
     tools.init()
     tex.init()
-    
-<<<<<<< HEAD
+
     # prepare translation to local coordinates
     cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
     cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
-=======
-    # -- prepare translation to local coordinates
-    cmin = vec2d(params.boundary_west, params.boundary_south)
-    cmax = vec2d(params.boundary_east, params.boundary_north)
->>>>>>> osm2city/master
     center = (cmin + cmax)*0.5
     transform = coordinates.Transformation(center, hdg = 0)
     print transform.toGlobal(cmin), transform.toGlobal(cmax)
 
     print "reading elevation data"
-<<<<<<< HEAD
     elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.xml", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
-=======
-    elev = tools.Interpolator(params.prefix + os.sep + "elev.xml", fake = params.no_elev) # -- fake skips actually reading the file, speeding up things
->>>>>>> osm2city/master
     print "height at origin", elev(vec2d(0,0))
     print "origin at ", transform.toGlobal((0,0))
 

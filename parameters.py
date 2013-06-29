@@ -37,7 +37,7 @@ TILE_SIZE = 1000
 # the maximum number of buildings to read from osm data
 TOTAL_OBJECTS = 50000
 # the file name of the file with osm data. Should reside in PATH_TO_SCENERY
-OSM_FILE = "mylszr.osm" 
+OSM_FILE = "mylszr.osm"
 # the buildings in OSM to skip
 SKIP_LIST = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
   "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
@@ -49,7 +49,7 @@ BUILDING_MIN_AREA = 50.0 # The minimum area for a building to be included in out
 BUILDING_REDUCE_THRESHOLD = 200.0 # The threshold area of a building below which a rate of buildings get reduced from output
 BUILDING_REDUCE_RATE = 0.5 # The rate (between 0 and 1) of buildings below a threshold which get reduced randomly in output
 BUILDING_REDUCE_CHECK_TOUCH = False # Before removing a building due to area check whether it is touching another building and therefore should be kept
-BUILDING_SIMPLIFY_TOLERANCE = 1.0 # All points in the simplified building will be within the tolerance distance of the original geometry. 
+BUILDING_SIMPLIFY_TOLERANCE = 1.0 # All points in the simplified building will be within the tolerance distance of the original geometry.
 
 # Parameters which influence the height of buildings in info in OSM not available.
 # It uses a triangular distribution (see http://en.wikipedia.org/wiki/Triangular_distribution)
@@ -62,132 +62,27 @@ BUILDING_CITY_LEVEL_HEIGHT_HEIGH = 3.6
 # FIXME: same parameters for place = town, village, suburb
 
 def setParameters(paramDict):
-    '''
-    Sets the parameter values from a dictionary read by function readFromFile.
-    If a parameter is not in the dictionary or cannot be parsed, then a default is chosen.
-    '''
-    global BOUNDARY_WEST
-    if 'BOUNDARY_WEST' in paramDict:
-        floatValue = parseFloat('BOUNDARY_WEST', paramDict['BOUNDARY_WEST'])
-        if None is not floatValue:
-            BOUNDARY_WEST = floatValue
-    global BOUNDARY_SOUTH
-    if 'BOUNDARY_SOUTH' in paramDict:
-        floatValue = parseFloat('BOUNDARY_SOUTH', paramDict['BOUNDARY_SOUTH'])
-        if None is not floatValue:
-            BOUNDARY_SOUTH = floatValue
-    global BOUNDARY_EAST
-    if 'BOUNDARY_EAST' in paramDict:
-        floatValue = parseFloat('BOUNDARY_EAST', paramDict['BOUNDARY_EAST'])
-        if None is not floatValue:
-            BOUNDARY_EAST = floatValue
-    global BOUNDARY_NORTH
-    if 'BOUNDARY_NORTH' in paramDict:
-        floatValue = parseFloat('BOUNDARY_NORTH', paramDict['BOUNDARY_NORTH'])
-        if None is not floatValue:
-            BOUNDARY_NORTH = floatValue
-    global ELEV_RASTER_X
-    if 'ELEV_RASTER_X' in paramDict:
-        intValue = parseInt('ELEV_RASTER_X', paramDict['ELEV_RASTER_X'])
-        if None is not intValue:
-            ELEV_RASTER_X = intValue
-    global ELEV_RASTER_Y
-    if 'ELEV_RASTER_Y' in paramDict:
-        intValue = parseInt('ELEV_RASTER_Y', paramDict['ELEV_RASTER_Y'])
-        if None is not intValue:
-            ELEV_RASTER_Y = intValue
-    global PREFIX
-    if 'PREFIX' in paramDict:
-        if None is not paramDict['PREFIX']:
-            PREFIX = paramDict['PREFIX']
-    global PATH_TO_SCENERY
-    if 'PATH_TO_SCENERY' in paramDict:
-        if None is not paramDict['PATH_TO_SCENERY']:
-            PATH_TO_SCENERY = paramDict['PATH_TO_SCENERY']
-    global NO_ELEV
-    if 'NO_ELEV' in paramDict:
-        NO_ELEV = parseBool(paramDict['NO_ELEV'])
-    global CHECK_OVERLAP
-    if 'CHECK_OVERLAP' in paramDict:
-        CHECK_OVERLAP = parseBool(paramDict['CHECK_OVERLAP'])
-    global USE_PKL
-    if 'USE_PKL' in paramDict:
-        USE_PKL = parseBool(paramDict['USE_PKL'])
-    global TILE_SIZE
-    if 'TILE_SIZE' in paramDict:
-        intValue = parseInt('TILE_SIZE', paramDict['TILE_SIZE'])
-        if None is not intValue:
-            TILE_SIZE = intValue
-    global TOTAL_OBJECTS
-    if 'TOTAL_OBJECTS' in paramDict:
-        intValue = parseInt('TOTAL_OBJECTS', paramDict['TOTAL_OBJECTS'])
-        if None is not intValue:
-            TOTAL_OBJECTS = intValue
-    global OSM_FILE
-    if 'OSM_FILE' in paramDict:
-        if None is not paramDict['OSM_FILE']:
-            OSM_FILE = paramDict['OSM_FILE']
-    global SKIP_LIST
-    if 'SKIP_LIST' in paramDict:
-        SKIP_LIST = parseList(paramDict['SKIP_LIST'])
-    global BUILDING_MIN_HEIGHT
-    if 'BUILDING_MIN_HEIGHT' in paramDict:
-        floatValue = parseFloat('BUILDING_MIN_HEIGHT', paramDict['BUILDING_MIN_HEIGHT'])
-        if None is not floatValue:
-            BUILDING_MIN_HEIGHT = floatValue
-    global BUILDING_MIN_AREA
-    if 'BUILDING_MIN_AREA' in paramDict:
-        floatValue = parseFloat('BUILDING_MIN_AREA', paramDict['BUILDING_MIN_AREA'])
-        if None is not floatValue:
-            BUILDING_MIN_AREA = floatValue
-    global BUILDING_REDUCE_THRESHOLD
-    if 'BUILDING_REDUCE_THRESHOLD' in paramDict:
-        floatValue = parseFloat('BUILDING_REDUCE_THRESHOLD', paramDict['BUILDING_REDUCE_THRESHOLD'])
-        if None is not floatValue:
-            BUILDING_REDUCE_THRESHOLD = floatValue
-    global BUILDING_REDUCE_RATE
-    if 'BUILDING_REDUCE_RATE' in paramDict:
-        floatValue = parseFloat('BUILDING_REDUCE_RATE', paramDict['BUILDING_REDUCE_RATE'])
-        if None is not floatValue:
-            BUILDING_REDUCE_RATE = floatValue
-    global BUILDING_REDUCE_CHECK_TOUCH
-    if 'BUILDING_REDUCE_CHECK_TOUCH' in paramDict:
-        BUILDING_REDUCE_CHECK_TOUCH = parseBool(paramDict['BUILDING_REDUCE_CHECK_TOUCH'])
-    global BUILDING_SIMPLIFY_TOLERANCE
-    if 'BUILDING_SIMPLIFY_TOLERANCE' in paramDict:
-        floatValue = parseFloat('BUILDING_SIMPLIFY_TOLERANCE', paramDict['BUILDING_SIMPLIFY_TOLERANCE'])
-        if None is not floatValue:
-            BUILDING_SIMPLIFY_TOLERANCE = floatValue
-    global BUILDING_CITY_LEVELS_LOW
-    if 'BUILDING_CITY_LEVELS_LOW' in paramDict:
-        floatValue = parseFloat('BUILDING_CITY_LEVELS_LOW', paramDict['BUILDING_CITY_LEVELS_LOW'])
-        if None is not floatValue:
-            BUILDING_CITY_LEVELS_LOW = floatValue
-    global BUILDING_CITY_LEVELS_MODE
-    if 'BUILDING_CITY_LEVELS_MODE' in paramDict:
-        floatValue = parseFloat('BUILDING_CITY_LEVELS_MODE', paramDict['BUILDING_CITY_LEVELS_MODE'])
-        if None is not floatValue:
-            BUILDING_CITY_LEVELS_MODE = floatValue
-    global BUILDING_CITY_LEVELS_HEIGH
-    if 'BUILDING_CITY_LEVELS_HEIGH' in paramDict:
-        floatValue = parseFloat('BUILDING_CITY_LEVELS_HEIGH', paramDict['BUILDING_CITY_LEVELS_HEIGH'])
-        if None is not floatValue:
-            BUILDING_CITY_LEVELS_HEIGH = floatValue
-    global BUILDING_CITY_LEVEL_HEIGHT_LOW
-    if 'BUILDING_CITY_LEVEL_HEIGHT_LOW' in paramDict:
-        floatValue = parseFloat('BUILDING_CITY_LEVEL_HEIGHT_LOW', paramDict['BUILDING_CITY_LEVEL_HEIGHT_LOW'])
-        if None is not floatValue:
-            BUILDING_CITY_LEVEL_HEIGHT_LOW = floatValue
-    global BUILDING_CITY_LEVEL_HEIGHT_MODE
-    if 'BUILDING_CITY_LEVEL_HEIGHT_MODE' in paramDict:
-        floatValue = parseFloat('BUILDING_CITY_LEVEL_HEIGHT_MODE', paramDict['BUILDING_CITY_LEVEL_HEIGHT_MODE'])
-        if None is not floatValue:
-            BUILDING_CITY_LEVEL_HEIGHT_MODE = floatValue
-    global BUILDING_CITY_LEVEL_HEIGHT_HEIGH
-    if 'BUILDING_CITY_LEVEL_HEIGHT_HEIGH' in paramDict:
-        floatValue = parseFloat('BUILDING_CITY_LEVEL_HEIGHT_HEIGH', paramDict['BUILDING_CITY_LEVEL_HEIGHT_HEIGH'])
-        if None is not floatValue:
-            BUILDING_CITY_LEVEL_HEIGHT_HEIGH = floatValue
+    for k in paramDict:
+        if k in globals():
+            if isinstance(globals()[k], types.BooleanType):
+                globals()[k] = paramDict[k]
+            elif isinstance(globals()[k], types.FloatType):
+                floatValue = parseFloat(k, paramDict[k])
+                if None is not floatValue:
+                    globals()[k] = floatValue
+            elif isinstance(globals()[k], types.IntType):
+                intValue = parseInt(k, paramDict[k])
+                if None is not intValue:
+                    globals()[k] = intValue
+            elif isinstance(globals()[k], types.StringType):
+                if None is not paramDict[k]:
+                    globals()[k] = paramDict[k]
+            elif isinstance(globals()[k], types.ListType):
+                globals()[k] = parseList(paramDict[k])
+            else:
+                print "Parameter", k, "has an unknown type/value:" , paramDict[k]
+        else:
+            print "The following parameter does not exist:", k
 
 def printParams():
     '''
