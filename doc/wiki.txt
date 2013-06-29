@@ -29,7 +29,7 @@ terminal/hangar textures to buildings at airports. This way we could rather easi
 * reads buildings from OSM. Honors height and level tags.
 * reads existing .stg, won't place OSM building if there's a static model nearby
 * reads pre-calculated terrain elevation: places buildings at correct elevation
-* LOD animation based on building height and area
+* LOD animation based on building height and area (see below)
 * cluster a number of buildings into a single .ac files. Clusters overlap to alleviate sharp LOD borders
 * basic sloped roof generation
 * texture manager: DB of facade/roof textures
@@ -40,6 +40,11 @@ terminal/hangar textures to buildings at airports. This way we could rather easi
 * position lights on tall buildings
 * shows statistics on processed buildings
 * writes .ac, .xml, .stg
+
+== LOD Scheme ==
+FlightGear knows three standard LOD: bare, rough and detail. 'Bare' sets the drawing distance of the terrain, which may easily be 50 km or more. Drawing buildings 50 km out makes little sense, so we shouldn't use this level here. Of the remaining two standard levels, 'rough' is used for large and/or tall buildings, and 'detail' for smaller ones. 
+
+In the near future, osm2city will generate more complex roof shapes. This will increase the poly count further, and I believe it's a good idea to use another LOD 'roof' for complex roofs. Fortunately, we can change every aspect of FlightGear, and adding another LOD is easy. Use the command line 'TODO' to set the distance for 'roof'. If you want to adjust it via the GUI, copy static-lod.xml (from osm2city's git repo) to $FGDATA/gui/dialogs.
 
 == Planned Features ==
 * make command line interface. Currently, everything is hard-coded.

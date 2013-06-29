@@ -1,6 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""read osm file, print 2d view in ac3d format to stdout"""
+"""
+osm2city.py aims at generating 3D city models for FG, using OSM data.
+Currently, it generates 3D textured buildings, much like bob.pl.
+However, it has a somewhat more advanced texture manager, and comes with a
+number of facade/roof textures.
+
+- cluster a number of buildings into a single .ac files
+- LOD animation based on building height and area
+- terrain elevation probing: places buildings at correct elevation
+
+You should disable random buildings.
+"""
+
 import pdb
 
 
@@ -20,8 +32,7 @@ import pdb
 
 # FIXME:
 # - pythonic way of i = 0; for b in refs: bla[i] = b
-# x x,y = transform(lon, lat)
-# x why need hdg=180 in transform? If hdg=0, cluster is broken
+# - off-by-one error in building counter
 
 # LOWI:
 # - floating buildings
@@ -34,22 +45,15 @@ import pdb
 # - fake elev
 # - log level
 
-"""
-osm2city.py aims at generating 3D city models for FG, using OSM data.
-Currently, it generates 3D textured buildings, much like bob.pl.
-However, it has a somewhat more advanced texture manager, and comes with a
-number of facade/roof textures.
-
-- cluster a number of buildings into a single .ac files
-- LOD animation based on building height and area
-- terrain elevation probing: places buildings at correct elevation
-
-You should disable random buildings.
-"""
 # development hints:
 # variables
 # b: a building instance
-
+#
+# coding style
+# - indend 4 spaces, avoid tabulators
+# - variable names: use underscores (my_long_variable), avoid CamelCase
+# - capitalize class names: class Interpolator(object):
+# - comments: code # -- comment
 
 # -- new design:
 # - parse OSM -> return a list of building objects
@@ -86,45 +90,13 @@ import calc_tile
 
 import parameters
 
-# -- defaults
-no_elev = False # -- skip elevation interpolation; FIXME: remove from here and module -> Parameters
-check_overlap = True # -- check for overlap with static models; FIXME: remove from here and module -> Parameters
-
-if '-e' in sys.argv: #FIXME: remove from here and module -> Parameters and argumentparser in main()
-    no_elev = True
-if '-c' in sys.argv:
-    check_overlap = False
-# -t #
-
-use_pkl = True #FIXME: remove from here and module -> Parameters
-#use_pkl = False
 buildings = [] # -- master list, holds all buildings
 
-tile_size=1000 # -- our tile size in meters; FIXME: remove from here and module -> Parameters
-
-#infile = 'xapi-buildings.osm'; total_objects = 100000 # huge!
-#infile = 'eddc-all.osm'; total_objects = 100000 # huge!
-#infile = 'map.osm'; total_objects = 216 #
-prefix="LOWI" # FIXME: remove from here and module -> Parameters
-#prefix="EDDC"
-infile = prefix + '/xapi-buildings.osm'; total_objects = 50000 # huge! # FIXME: remove from here and module -> Parameters
-
-# devel
-if False: # FIXME: remove -> Parameters
-    use_pkl = False    #infile = 'dd-altstadt.osm'; total_objects = 158
-    #infile = 'map.osm'; total_objects = 216 #
-    infile = "dd-altstadt.osm"
-    #infile = 'altstadt.osm'; total_objects = 10000 # 2172
-    tile_size=2000 # -- our tile size in meters
-    #no_elev = True
-    prefix = "EDDC"
-    check_overlap = False
-
 # -- skip buildings that match these names; FIXME: remove as part of Parameters
-skiplist = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
-          "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
-          "Residenzschloss Dresden", "Fernsehturm", "Fernsehturm Dresden"]
-#skiplist = []
+#skiplist = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
+#          "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
+#          "Residenzschloss Dresden", "Fernsehturm", "Fernsehturm Dresden"]
+skiplist = []
 
 class Building(object):
     """Central object class.
@@ -225,47 +197,7 @@ class wayExtract(object):
 
 
 # -----------------------------------------------------------------------------
-# -- map
-# <bounds minlat="51.0599350" minlon="13.7415360" maxlat="51.0632660" maxlon="13.7452480"/>
-#minlat=51.0599350
-#minlon=13.7415360
-#maxlat=51.0632660
-#maxlon=13.7452480
 
-# -- altstadt
-# <bounds minlat="51.0317900" minlon="13.7149300" maxlat="51.0583100" maxlon="13.7551800"/>
-#minlat=51.0317900
-#minlon=13.7149300
-#maxlat=51.0583100
-#maxlon=13.7551800
-
-# -- dd-altstadt
-# <bounds minlat="51.0459700" minlon="13.7325800" maxlat="51.0564600" maxlon="13.7467600"/>
-#minlat=51.0459700
-#minlon=13.7325800
-#maxlat=51.0564600
-#maxlon=13.7467600
-
-if prefix == "EDDC": # FIXME: remove -> part of Parameters and __main__
-    cmin = vec2d(13.63, 50.96)
-    cmax = vec2d(13.88, 51.17)
-    center = vec2d(13.7467, 51.0377) # -- EDDC
-
-#
-## -- neustadt.osm
-#minlat=51.0628700
-#minlon=13.7436400
-#maxlat=51.0715500
-#maxlon=13.7563400
-
-if prefix == "LOWI": # FIXME: remove -> part of Parameters and __main__
-    cmin = vec2d(11.16898,47.20837) # -- LOWI
-    cmax = vec2d(11.79108,47.38161)
-    center = (cmin + cmax)*0.5
-
-transform = coordinates.Transformation(center, hdg = 0) #FIXME: remove, replaced by variable in __main__
-
-print transform.toGlobal(cmin), transform.toGlobal(cmax) # FIXME: remove (see above)
 
 
 #write_map('dresden.png', transform, elev, vec2d(50.9697, 13.667), vec2d(51.1285, 13.8936))
@@ -438,9 +370,9 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    #Parse arguments and eventually override Parameters
+    # -- Parse arguments and eventually override Parameters
     import argparse
-    parser = argparse.ArgumentParser(description="osm2city is a script to read OSM data and create buildings in Flightgear")
+    parser = argparse.ArgumentParser(description="osm2city reads OSM data and creates buildings for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                       help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
     parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
@@ -456,20 +388,29 @@ if __name__ == "__main__":
         
     print parameters.printParams()
 
-    #initialize modules
+    # -- initialize modules
     tools.init()
     tex.init()
     
+<<<<<<< HEAD
     # prepare translation to local coordinates
     cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
     cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
+=======
+    # -- prepare translation to local coordinates
+    cmin = vec2d(params.boundary_west, params.boundary_south)
+    cmax = vec2d(params.boundary_east, params.boundary_north)
+>>>>>>> osm2city/master
     center = (cmin + cmax)*0.5
     transform = coordinates.Transformation(center, hdg = 0)
     print transform.toGlobal(cmin), transform.toGlobal(cmax)
 
-
     print "reading elevation data"
+<<<<<<< HEAD
     elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.xml", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
+=======
+    elev = tools.Interpolator(params.prefix + os.sep + "elev.xml", fake = params.no_elev) # -- fake skips actually reading the file, speeding up things
+>>>>>>> osm2city/master
     print "height at origin", elev(vec2d(0,0))
     print "origin at ", transform.toGlobal((0,0))
 
