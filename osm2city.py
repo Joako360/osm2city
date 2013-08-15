@@ -380,13 +380,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.filename is not None:
-        parameters.readFromFile(args.filename)
+        parameters.read_from_file(args.filename)
     if args.e:
         parameters.NO_ELEV = True
     if args.c:
         parameters.CHECK_OVERLAP = False
 
-    print parameters.printParams()
+    parameters.show()
 
     # -- initialize modules
     tools.init()

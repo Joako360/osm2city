@@ -11,48 +11,48 @@ Created on May 27, 2013
 import sys
 import types
 
-# The boundary of the scenery in degrees (use "." not ","). The example below is from LSZR.
+# -- Boundary of the scenery in degrees (use "." not ","). The example below is from LSZR.
 BOUNDARY_WEST = 9.54
 BOUNDARY_SOUTH = 47.48
 BOUNDARY_EAST = 9.58
 BOUNDARY_NORTH = 47.50
 
-# The distance between raster points for the derived elevation map (x is horizontal, y is vertical)
+# -- Distance between raster points for the derived elevation map (x is horizontal, y is vertical)
 ELEV_RASTER_X = 10
 ELEV_RASTER_Y = 10
 
-# The scenery folder (typically a geographic name or the ICAO code of the airport
+# -- Scenery folder (typically a geographic name or the ICAO code of the airport
 PREFIX = "LSZR"
-# the full path to the scenery folder without trailing slash. Last folder should be equal to PREFIX
+# -- Full path to the scenery folder without trailing slash. Last folder should be equal to PREFIX
 PATH_TO_SCENERY = "/home/vanosten/bin/fgfs_scenery/customscenery/LSZR"
 
-# skip elevation interpolation
+# -- skip elevation interpolation
 NO_ELEV = False
-# check for overlap with static models. The scenery folder needs to contain a "Objects" folder
+# -- check for overlap with static models. The scenery folder needs to contain an "Objects" folder
 CHECK_OVERLAP = False
-# read from already existing converted OSM building data in file system for faster load
+# -- read from already existing converted OSM building data in file system for faster load
 USE_PKL = False
-# the tile size in meters for clustering of buildings
+# -- tile size in meters for clustering of buildings
 TILE_SIZE = 1000
-# the maximum number of buildings to read from osm data
+# -- maximum number of buildings to read from OSM data
 TOTAL_OBJECTS = 50000
-# the file name of the file with osm data. Should reside in PATH_TO_SCENERY
+# -- file name of the file with OSM data. Should reside in PATH_TO_SCENERY
 OSM_FILE = "mylszr.osm"
-# the buildings in OSM to skip
+# -- skip reading names buildings from OSM
 SKIP_LIST = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
   "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
   "Residenzschloss Dresden", "Fernsehturm", "Fernsehturm Dresden"]
 
-# Parameters which influence the number of buildings from OSM taken to output
-BUILDING_MIN_HEIGHT = 3.4 # The minimum height of a building to be included in output (does not include roof)
-BUILDING_MIN_AREA = 50.0 # The minimum area for a building to be included in output
-BUILDING_REDUCE_THRESHOLD = 200.0 # The threshold area of a building below which a rate of buildings get reduced from output
-BUILDING_REDUCE_RATE = 0.5 # The rate (between 0 and 1) of buildings below a threshold which get reduced randomly in output
-BUILDING_REDUCE_CHECK_TOUCH = False # Before removing a building due to area check whether it is touching another building and therefore should be kept
-BUILDING_SIMPLIFY_TOLERANCE = 1.0 # All points in the simplified building will be within the tolerance distance of the original geometry.
+# -- Parameters which influence the number of buildings from OSM taken to output
+BUILDING_MIN_HEIGHT = 3.4 # -- minimum height of a building to be included in output (does not include roof)
+BUILDING_MIN_AREA = 50.0 # -- minimum area for a building to be included in output
+BUILDING_REDUCE_THRESHOLD = 200.0 # -- threshold area of a building below which a rate of buildings gets reduced from output
+BUILDING_REDUCE_RATE = 0.5 # -- rate (between 0 and 1) of buildings below a threshold which get reduced randomly in output
+BUILDING_REDUCE_CHECK_TOUCH = False # -- before removing a building due to area, check whether it is touching another building and therefore should be kept
+BUILDING_SIMPLIFY_TOLERANCE = 1.0 # -- all points in the simplified building will be within the tolerance distance of the original geometry.
 
-# Parameters which influence the height of buildings in info in OSM not available.
-# It uses a triangular distribution (see http://en.wikipedia.org/wiki/Triangular_distribution)
+# -- Parameters which influence the height of buildings if no info from OSM is available.
+#    It uses a triangular distribution (see http://en.wikipedia.org/wiki/Triangular_distribution)
 BUILDING_CITY_LEVELS_LOW = 2.0
 BUILDING_CITY_LEVELS_MODE = 3.5
 BUILDING_CITY_LEVELS_HEIGH = 5.0
@@ -61,30 +61,30 @@ BUILDING_CITY_LEVEL_HEIGHT_MODE = 3.3
 BUILDING_CITY_LEVEL_HEIGHT_HEIGH = 3.6
 # FIXME: same parameters for place = town, village, suburb
 
-def setParameters(paramDict):
+def set_parameters(paramDict):
     for k in paramDict:
         if k in globals():
             if isinstance(globals()[k], types.BooleanType):
                 globals()[k] = paramDict[k]
             elif isinstance(globals()[k], types.FloatType):
-                floatValue = parseFloat(k, paramDict[k])
+                floatValue = parse_float(k, paramDict[k])
                 if None is not floatValue:
                     globals()[k] = floatValue
             elif isinstance(globals()[k], types.IntType):
-                intValue = parseInt(k, paramDict[k])
+                intValue = parse_int(k, paramDict[k])
                 if None is not intValue:
                     globals()[k] = intValue
             elif isinstance(globals()[k], types.StringType):
                 if None is not paramDict[k]:
                     globals()[k] = paramDict[k]
             elif isinstance(globals()[k], types.ListType):
-                globals()[k] = parseList(paramDict[k])
+                globals()[k] = parse_list(paramDict[k])
             else:
                 print "Parameter", k, "has an unknown type/value:" , paramDict[k]
         else:
-            print "The following parameter does not exist:", k
+            print "Ignoring unknown parameter", k
 
-def printParams():
+def show():
     '''
     Prints all parameters as key = value
     '''
@@ -103,7 +103,7 @@ def printParams():
     print '------'
 
 
-def parseList(stringValue):
+def parse_list(stringValue):
     '''
     Tries to parse a string containing comma separated values and returns a list
     '''
@@ -114,7 +114,7 @@ def parseList(stringValue):
             myList[index] = myList[index].strip()
     return myList
 
-def parseFloat(key, stringValue):
+def parse_float(key, stringValue):
     '''
     Tries to parse a string and get a float. If it is not possible, then None is returned.
     On parse exception the key and the value are printed to console
@@ -126,7 +126,7 @@ def parseFloat(key, stringValue):
         print 'Unable to convert', stringValue, 'to decimal number. Relates to key', key
     return floatValue
 
-def parseInt(key, stringValue):
+def parse_int(key, stringValue):
     '''
     Tries to parse a string and get an int. If it is not possible, then None is returned.
     On parse exception the key and the value are printed to console
@@ -138,7 +138,7 @@ def parseInt(key, stringValue):
         print 'Unable to convert', stringValue, 'to number. Relates to key', key
     return intValue
 
-def parseBool(stringValue):
+def parse_bool(stringValue):
     '''
     Tries to parse a string and get a boolean. If it is not possible, then False is returned.
     '''
@@ -146,23 +146,30 @@ def parseBool(stringValue):
         return True
     return False
 
-def readFromFile(filename):
+def read_from_file(filename):
     print 'Reading parameters from file:', filename
     try:
-        file_object = open(filename, 'r')
+        f = open(filename, 'r')
         paramDict = {}
-        for line in file_object:
-            if 0 == len(line.strip()) or line.startswith('#'): # lines starting with # are treated as comments
-                continue
-            else:
-                pair = line.split('=',1)
-                key = pair[0].strip()
-                value = None
-                if 2 == len(pair):
-                    value = pair[1].strip()
-                paramDict[key] = value
-        setParameters(paramDict)
-        file_object.close()
+        full_line = ""
+        for line in f:
+            line = line.strip()
+            # -- ignore empty lines and lines starting with #
+            if line == "" or line.startswith("#"): continue
+
+            full_line += line  # -- allow for multi-line lists
+            if line.endswith(","): continue
+
+            pair = full_line.split("=", 1)
+            key = pair[0].strip().upper()
+            value = None
+            if 2 == len(pair):
+                value = pair[1].strip()
+            paramDict[key] = value
+            full_line = ""
+                
+        set_parameters(paramDict)
+        f.close()
     except IOError, reason:
         print "Error processing file with parameters:", reason
         sys.exit(1)
