@@ -67,7 +67,7 @@ def set_parameters(paramDict):
     for k in paramDict:
         if k in globals():
             if isinstance(globals()[k], types.BooleanType):
-                globals()[k] = paramDict[k]
+                globals()[k] = parse_bool(k, paramDict[k])
             elif isinstance(globals()[k], types.FloatType):
                 floatValue = parse_float(k, paramDict[k])
                 if None is not floatValue:
@@ -140,12 +140,16 @@ def parse_int(key, stringValue):
         print 'Unable to convert', stringValue, 'to number. Relates to key', key
     return intValue
 
-def parse_bool(stringValue):
+def parse_bool(key, stringValue):
     '''
     Tries to parse a string and get a boolean. If it is not possible, then False is returned.
     '''
-    if stringValue.lower() in ("yes", "true"):
+    if stringValue.lower() in ("yes", "true", "on", "1"):
         return True
+    if stringValue.lower() in ("no", "false", "off", "0"):
+        return False
+    print "Boolean value %s for %s not understood. Assuming False." % (stringValue, key)
+    # FIXME: bail out if not understood!
     return False
 
 def read_from_file(filename):
