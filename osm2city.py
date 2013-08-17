@@ -370,7 +370,7 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    # -- Parse arguments and eventually override Parameters
+    # -- Parse arguments. Command line overrides config file.
     import argparse
     parser = argparse.ArgumentParser(description="osm2city reads OSM data and creates buildings for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
@@ -381,10 +381,11 @@ if __name__ == "__main__":
 
     if args.filename is not None:
         parameters.read_from_file(args.filename)
+
     if args.e:
         parameters.NO_ELEV = True
     if args.c:
-        parameters.CHECK_OVERLAP = False
+        parameters.OVERLAP_CHECK = False
 
     parameters.show()
 
@@ -392,7 +393,7 @@ if __name__ == "__main__":
     tools.init()
     tex.init()
 
-    # prepare translation to local coordinates
+    # -- prepare transformation to local coordinates
     cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
     cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
     center = (cmin + cmax)*0.5
@@ -408,7 +409,7 @@ if __name__ == "__main__":
 
 
     if not parameters.USE_PKL:
-        # - parse OSM -> return a list of building objects
+        # -- parse OSM, return list of building objects
         way = wayExtract()
         #p = OSMParser(concurrency=4, ways_callback=way.ways, coords_callback=way.coords )
         p = OSMParser(concurrency=1, coords_callback=way.coords)
@@ -437,6 +438,7 @@ if __name__ == "__main__":
         cPickle.dump(buildings, fpickle, -1)
         fpickle.close()
     else:
+        # -- load list of building objects from previously cached file
         fpickle = open(parameters.PREFIX + '/buildings.pkl', 'rb')
         buildings = cPickle.load(fpickle)[:parameters.TOTAL_OBJECTS]
         fpickle.close()
@@ -449,9 +451,11 @@ if __name__ == "__main__":
     lmax = vec2d(transform.toLocal(cmax))
     clusters = Clusters(lmin, lmax, parameters.TILE_SIZE)
 
-    if parameters.CHECK_OVERLAP:
-        # -- find relevant tiles by checking tile_index at center of each cluster.
-        #    Then read objects from .stgs
+    if parameters.OVERLAP_CHECK:
+        # -- read static/shared objects in our area from .stg(s)
+        #    Tiles are assumed to be much larger than clusters.
+        #    Loop all clusters, find relevant tile by checking tile_index at center of each cluster.
+        #    Then read objects from .stg. 
         stgs = []
         static_objects = []
         for cl in clusters:
@@ -474,9 +478,8 @@ if __name__ == "__main__":
     # - analyze buildings
     #   - calculate area
     #   - location clash with stg static models? drop building
-    #   - analyze surrounding: similar shaped buildings nearby? will get same texture
+    #   - TODO: analyze surrounding: similar shaped buildings nearby? will get same texture
     #   - set building type, roof type etc
-    #   - decide LOD
     buildings = building_lib.analyse(buildings, static_objects, transform, elev, tex.facades, tex.roofs)
 
     #tools.write_gp(buildings)
@@ -492,7 +495,8 @@ if __name__ == "__main__":
     clusters.transfer_buildings()
 
     clusters.write_stats()
-    # - write clusters
+
+    # -- write clusters
 
     stg_fp_dict = {}    # -- dictionary of stg file pointers
 
@@ -525,7 +529,7 @@ if __name__ == "__main__":
             LOD_lists.append([])
             LOD_lists.append([])
 
-            # -- open ac and write header
+            # -- open .ac and write header
             fname = parameters.PREFIX + "city%02i%02i" % (cl.I.x, cl.I.y)
             out = open(fname+".ac", "w")
             write_ac_header(out, nb + nroofs)

@@ -25,6 +25,7 @@ class Interpolator(object):
         if fake:
             self.fake = True
             self.h = 0.
+            print "FAKE!"
             return
         else:
             self.fake = False
@@ -169,6 +170,7 @@ class Stats(object):
         self.skipped_small = 0
         self.skipped_nearby = 0
         self.skipped_texture = 0
+        self.skipped_no_elev = 0
         self.buildings_in_LOD = np.zeros(3)
         self.area_levels = np.array([1,10,20,50,100,200,500,1000,2000,5000,10000,20000,50000])
         self.area_above = np.zeros_like(self.area_levels)
@@ -206,7 +208,8 @@ class Stats(object):
         skipped
           small         %i
           nearby        %i
-          texture       %i
+          no elevation  %i
+          no texture    %i
         pitched roof    %i
         ground nodes    %i
           simplified    %i
@@ -216,7 +219,7 @@ class Stats(object):
         LOD rough       %i (%2.0f %%)
         LOD detail      %i (%2.0f %%)
         """ % (self.objects, total_written,
-               self.skipped_small, self.skipped_nearby, self.skipped_texture,
+               self.skipped_small, self.skipped_nearby, self.skipped_no_elev, self.skipped_texture,
                self.have_pitched_roof,
                self.nodes_ground, self.nodes_simplified,
                self.vertices, self.surfaces,

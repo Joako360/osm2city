@@ -16,7 +16,7 @@ from osm2city import Building, Coords
 def read(path, stg, prefix, fgscenery):
     """Accepts a scenery sub-path, as in 'w010n40/w005n48/', plus an .stg file name.
        In the future, take care of multiple scenery paths here.
-       Returns list of Buildings representing static/shared objects in .stg, with full path.
+       Returns list of buildings representing static/shared objects in .stg, with full path.
     """
     objs = []
     path = fgscenery + os.sep + 'Objects' + os.sep + path + os.sep

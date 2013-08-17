@@ -120,8 +120,8 @@ def reset_nb():
     global nb
     nb = 0
 
-def get_nodes_from_acs(objs, model_prefix):
-    """load all .ac and .xml, extract nodes"""
+def get_nodes_from_acs(objs, own_prefix):
+    """load all .ac and .xml, extract nodes, skipping own .ac starting with own_prefix"""
     # FIXME: use real ac3d reader: https://github.com/majic79/Blender-AC3D/blob/master/io_scene_ac3d/import_ac3d.py
     # FIXME: don't skip .xml
     # skip own .ac city-*.xml
@@ -146,11 +146,11 @@ def get_nodes_from_acs(objs, model_prefix):
         fname = b.name
         #print "in objs <%s>" % b.name
         if fname.endswith(".xml"):
-            if fname.startswith(model_prefix): continue
+            if fname.startswith(own_prefix): continue
             fname = fname.replace(".xml", ".ac")
         #print "now <%s> %s" % (fname, b.stg_typ)
 
-        # FIXME: also read OBJECT_SHARED
+        # FIXME: also read OBJECT_SHARED.
         if fname.endswith(".ac") and b.stg_typ == "OBJECT_STATIC":
             print "READ_AC", b.name
             try:
@@ -219,7 +219,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
     - analyze surrounding: similar shaped buildings nearby? will get same texture
     - set building type, roof type etc
 
-    We're in global coordinates
+    On entry, we're in global coordinates. Change to local coordinates.
     """
     # -- build KDtree for static models
     from scipy.spatial import KDTree
@@ -238,19 +238,16 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
     new_buildings = []
     for b in buildings:
-    # am anfang geometrieanalyse
-    # - ort: urban, residential, rural
-    # - region: europe, asia...
-    # - layers: 1-2, 3-5, hi-rise
-    # - roof-shape: flat, gable
-    # - age: old, modern
-
-    # - facade raussuchen
-    #   requires: compat:flat-roof
-
-    #    global first
-        #global stats
-
+        # am anfang geometrieanalyse
+        # - ort: urban, residential, rural
+        # - region: europe, asia...
+        # - layers: 1-2, 3-5, hi-rise
+        # - roof-shape: flat, gable
+        # - age: old, modern
+    
+        # - facade raussuchen
+        #   requires: compat:flat-roof
+    
         #mat = random.randint(1,4)
         b.mat = 0
         b.roof_mat = 0
@@ -259,7 +256,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
     #    print nnodes_ground #, b.refs[0].lon, b.refs[0].lat
 
         # -- get geometry right
-        #    - transform to global coord
+        #    - transform to local coord
         #    - compute edge lengths
         #    - fix inverted faces
         #    - compute area
@@ -300,58 +297,33 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             X = X[::-1]
             lenX = lenX[::-1]
 
-        # -- renumber nodes such that longest edge is first
+        # -- re-number nodes such that longest edge is first
         if b.nnodes_ground == 4:
             if lenX[0] < lenX[1]:
                 X = np.roll(X, 1, axis=0)
                 lenX = np.roll(lenX, 1)
                 X[0] = X[-1]
 
-        # ***********************
-        # skip buildings outside elevation raster
-        # ***********************
+        # -- skip buildings outside elevation raster
         if elev(vec2d(X[0])) == -9999:
             print "-9999"
+            tools.stats.skipped_no_elev += 1
             continue
 
-        # ***********************
-        # Check for static objects nearby
-        # ***********************
-        # FIXME: which radius? Or use centroid point? make radius a parameter
-        radius = 5. # alternative: radius = max(lenX)
-        # -- query_ball_point may return funny lists [[], [], .. ]
-        #    filter these
-        if static_objects:
-            nearby = static_tree.query_ball_point(X, radius)
-            nearby = [x for x in nearby if x]
+        # -- check for nearby static objects
+        if static_objects and is_static_object_nearby(b, static_tree):
+            tools.stats.skipped_nearby += 1
+            continue
+        
 
-            if len(nearby):
-                for i in range(b.nnodes_ground):
-                    tools.stats.debug2.write("%g %g\n" % (X[i,0], X[i,1]))
-    #            print "nearby:", nearby
-    #            for n in nearby:
-    #                print "-->", s[n]
-                try:
-                    print "Static objects nearby. Skipping ", b.name, len(nearby)
-                except:
-                    print "FIXME: Encoding problem", b.name.encode('ascii', 'ignore')
-                #for n in nearby:
-                #    print static_objects.objs[n].name,
-                #print
-                tools.stats.skipped_nearby += 1
-                continue
-
-        # *************
-        # Check area
-        # *************
-        if False == analyse_area(buildings, b):
+        # -- check area
+        if not is_large_enough(b, buildings):
             tools.stats.skipped_small += 1
             continue
 
-        # ***********************
-        # Work on height and levels
-        # ***********************
-                # -- LOWI year 2525
+        # -- work on height and levels
+        
+        # -- LOWI year 2525: generate a 'futuristic' city of skyscrapers
         if False:
             if b.area >= 1500:
                 b.levels = int(random.gauss(35, 10)) # random_number(int, 10, 60)
@@ -361,33 +333,31 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 tools.stats.skipped_small += 1
                 continue
 
-        analyse_level_height(b)
+        compute_height_and_levels(b)
 
         if b.height < parameters.BUILDING_MIN_HEIGHT:
             print "Skipping small building with height < building_min_height parameter"
             tools.stats.skipped_small += 1
             continue
 
-        # ***********************
-        # Work on roof
-        # ***********************
-        # -- roof is controlled by two flags:
+        # -- Work on roof
+        #    roof is controlled by two flags:
         #    bool b.roof_separate: whether or not to include roof as separate model
         #      useful for
         #      - pitched roof
-        #      - roof with add-ons: AC
+        #      - roof with add-ons: AC (TODO)
         #    replace by roof_type? flat  --> no separate model
         #                          gable --> separate model
         #                          ACs         -"-
-        b.roof_separate = False
         b.roof_flat = True
+        b.roof_separate = False
 
-        # -- model roof if we have 4 ground nodes and area below 1000m2
+        # -- pitched roof if we have 4 ground nodes and area below 1000m2
         if b.nnodes_ground == 4 and b.area < 1000:
+            b.roof_flat = False
             b.roof_separate = True
-            b.roof_flat = False  # -- pitched roof
 
-        # -- no gable roof on tall buildings
+        # -- no pitched roof on tall buildings
         if b.levels > 5:
             b.roof_flat = True
             b.roof_separate = False
@@ -396,7 +366,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         requires = []
         if b.roof_separate and not b.roof_flat:
             requires.append('age:old')
-            requires.append('compat:roof-gable')
+            requires.append('compat:roof-pitched')
 
         #tools.stats.print_summary()
     #    if p.area < 200.:
@@ -409,13 +379,12 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             #plot.linear_ring(LinearRing(X))
             #sys.exit(0)
 
-        # FIXME: again facade stuff?
+        # -- determine facade and roof textures
         b.facade_texture = facades.find_matching(requires, b.height)
         if not b.facade_texture:
             tools.stats.skipped_texture += 1
             print "Skipping building (no matching texture)"
             continue
-
         if b.roof_separate:
             b.roof_texture = roofs.find_matching(b.facade_texture.requires)
 
@@ -426,46 +395,73 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
     return new_buildings
 
-def analyse_area(buildings, building):
+def is_static_object_nearby(b, static_tree):
+    """check for static/shared objects close to given building"""
+    # FIXME: which radius? Or use centroid point? make radius a parameter
+    radius = parameters.OVERLAP_RADIUS # alternative: radius = max(lenX)
+
+    # -- query_ball_point may return funny lists [[], [], .. ]
+    #    filter these
+    nearby = static_tree.query_ball_point(X, radius)
+    nearby = [x for x in nearby if x]
+
+    if len(nearby):
+        for i in range(b.nnodes_ground):
+            tools.stats.debug2.write("%g %g\n" % (X[i,0], X[i,1]))
+#            print "nearby:", nearby
+#            for n in nearby:
+#                print "-->", s[n]
+        try:
+            print "Static objects nearby. Skipping ", b.name, len(nearby)
+        except:
+            print "FIXME: Encoding problem", b.name.encode('ascii', 'ignore')
+        #for n in nearby:
+        #    print static_objects.objs[n].name,
+        #print
+        return True
+    return False
+
+
+def is_large_enough(b, buildings):
     """Checks whether a given building's area is too small for inclusion.
     FIXME: Exclusion might be skipped if the building touches another building (i.e. an annex)
     Returns true if the building should be included (i.e. area is big enough etc.)
     """
-    if building.area < parameters.BUILDING_MIN_AREA or (building.area < parameters.BUILDING_REDUCE_THRESHOLD
-                                                  and random.uniform(0,1) < parameters.BUILDING_REDUCE_RATE):
+    if b.area < parameters.BUILDING_MIN_AREA or \
+       (b.area < parameters.BUILDING_REDUCE_THRESHOLD and random.uniform(0,1) < parameters.BUILDING_REDUCE_RATE):
         #if parameters.BUILDING_REDUCE_CHECK_TOUCH:
             #for k in buildings:
-                #if k.touches(building): # using Shapely, but buildings have no polygon currently
+                #if k.touches(b): # using Shapely, but buildings have no polygon currently
                     #return True
         return False
     return True
 
-def analyse_level_height(building):
+def compute_height_and_levels(b):
     """Determines total height (and number of levels) of a building based on OSM values and other logic"""
     level_height = random_level_height()
 
-    # try OSM height first
-    # catch exceptions, since height might be "5 m" instead of "5"
+    # -- try OSM height first
+    #    catch exceptions, since height might be "5 m" instead of "5"
     try:
-        height = float(building.height)
+        height = float(b.height.replace('m', ''))
         if height > 1.:
-            building.levels = (height * 1.)/level_height
+            b.levels = (height * 1.)/level_height
     except:
         height = 0.
         pass
 
-    # failing that, try OSM levels
+    # -- failing that, try OSM levels
     if height < 1:
-        if float(building.levels) > 0:
+        if float(b.levels) > 0:
             pass
             #print "have levels", b.levels
         else:
-            # failing that, use random levels
-            building.levels = random_levels()
-            if building.area < parameters.BUILDING_MIN_AREA:
-                building.levels = min(building.levels, 2)
+            # -- failing that, use random levels
+            b.levels = random_levels()
+            if b.area < parameters.BUILDING_MIN_AREA:
+                b.levels = min(b.levels, 2)
 
-    building.height = float(building.levels) * level_height
+    b.height = float(b.levels) * level_height
 
 
 def make_lightmap_dict(buildings):

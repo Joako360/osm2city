@@ -29,7 +29,9 @@ PATH_TO_SCENERY = "/home/vanosten/bin/fgfs_scenery/customscenery/LSZR"
 # -- skip elevation interpolation
 NO_ELEV = False
 # -- check for overlap with static models. The scenery folder needs to contain an "Objects" folder
-CHECK_OVERLAP = False
+OVERLAP_CHECK = False
+OVERLAP_RADIUS = 5
+
 # -- read from already existing converted OSM building data in file system for faster load
 USE_PKL = False
 # -- tile size in meters for clustering of buildings
