@@ -163,8 +163,8 @@ class Texture(object):
         print "h1", self.h_splits
         print "h2", h_splits
 
-        if h_splits == None:
-            self.h_splits = 1.
+        if h_splits == None or h_splits == []:
+            self.h_splits = np.array([1.])
         elif len(self.h_splits) > 1:
             self.h_splits /= self.h_splits[-1]
         self.h_splits_meters = self.h_splits * self.h_size_meters
@@ -181,6 +181,10 @@ class Texture(object):
         # - old
         # - modern
         # european, north_american, south_american, mediterreanian, african, asian
+    def closest_h_match(self, frac):
+        return self.h_splits[np.abs(self.h_splits - frac).argmin()]
+        #self.h_splits[np.abs(self.h_splits - frac).argmin()]
+        #bla
 
 # pitched roof: requires = facade:age:old
 
@@ -222,7 +226,7 @@ def init():
 
 
         facades.append(Texture('tex/facade_modern36x36_12',
-                                36., [None], True,
+                                36., [], True,
                                 36., [158, 234, 312, 388, 465, 542, 619, 697, 773, 870, 1024], True, True,
                                 provides=['shape:urban','shape:residential','age:modern',
                                          'compat:roof-flat']))
@@ -233,7 +237,7 @@ def init():
     #                            requires=['roof:color:black'],
     #                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
         facades.append(Texture('tex/DSCF9503_noroofsec_pow2',
-                                12.85, None, True,
+                                12.85, [], True,
                                 17.66, [556,1015,1474,2048], False, True,
                                 requires=['roof:color:black'],
                                 provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
@@ -267,7 +271,7 @@ def init():
                                9.6, [227,512], False, True,
                                provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
 
-        facades.append(Texture('tex/wohnheime_petersburger',
+        facades.append(Texture('tex/wohnheime_petersburger_pow2',
                                 15.6, [215, 414, 614, 814, 1024], True,
                                 15.6, [112, 295, 477, 660, 843, 1024], True, True,
                                 height_min = 15.,
@@ -281,16 +285,16 @@ def init():
 
     roofs = TextureManager('roof')
     roofs.append(Texture('tex/roof_tiled_black',
-                             1.20, None, True, 0.60, None, True, provides=['color:black']))
+                             1.20, [], True, 0.60, [], True, provides=['color:black']))
     roofs.append(Texture('tex/roof_tiled_red',
-                             1.0, None, True, 0.88, None, True, provides=['color:red']))
+                             1.0, [], True, 0.88, [], True, provides=['color:red']))
 #    roofs.append(Texture('tex/roof_black2',
-#                             1.39, None, True, 0.89, None, True, provides=['color:black']))
+#                             1.39, [], True, 0.89, [], True, provides=['color:black']))
 #    roofs.append(Texture('tex/roof_black3',
-#                             0.6, None, True, 0.41, None, True, provides=['color:black']))
+#                             0.6, [], True, 0.41, [], True, provides=['color:black']))
 
 #    roofs.append(Texture('tex/roof_black3_small_256x128',
-#                             0.25, None, True, 0.12, None, True, provides=['color:black']))
+#                             0.25, [], True, 0.12, [], True, provides=['color:black']))
 
     if False:
         print roofs[0].provides

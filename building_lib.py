@@ -82,6 +82,7 @@ def check_height(building_height, t):
         tex_y1 = 1.
         tex_y0 = 1 - building_height / t.v_size_meters
         return tex_y0, tex_y1
+        # FIXME: respect v_splits
     else:
         # x min_height < height < max_height
         # x find closest match
@@ -574,8 +575,17 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     write_and_count_numsurf(out, b, nsurf)
     # -- walls
 
+    import math
     for i in range(nnodes_ground - 1):
-        tex_x1 = lenX[i] / facade_texture.h_size_meters # -- just repeat texture to fit length
+        if False:        
+            tex_x1 = lenX[i] / facade_texture.h_size_meters # -- simply repeat texture to fit length
+        else:
+            # FIXME: respect facade texture split_h
+            #FIXME: there is a nan in facade_textures.h_splits of tex/facade_modern36x36_12
+            a = lenX[i] / facade_texture.h_size_meters
+            ia = int(a)
+            frac = a - ia
+            tex_x1 = facade_texture.closest_h_match(frac) + ia
 
         out.write("SURF 0x0\n")
         out.write("mat %i\n" % b.mat)
