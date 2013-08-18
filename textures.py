@@ -271,7 +271,7 @@ def init():
                                9.6, [227,512], False, True,
                                provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
 
-        facades.append(Texture('tex/wohnheime_petersburger_pow2',
+        facades.append(Texture('tex/wohnheime_petersburger',
                                 15.6, [215, 414, 614, 814, 1024], True,
                                 15.6, [112, 295, 477, 660, 843, 1024], True, True,
                                 height_min = 15.,
