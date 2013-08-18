@@ -92,11 +92,15 @@ import parameters
 
 buildings = [] # -- master list, holds all buildings
 
+global transform
+transform = coordinates.Transformation(vec2d(0,0), hdg = 0)
+
 # -- skip buildings that match these names; FIXME: remove as part of Parameters
 #skiplist = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
 #          "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
 #          "Residenzschloss Dresden", "Fernsehturm", "Fernsehturm Dresden"]
 skiplist = []
+
 
 class Building(object):
     """Central object class.
@@ -397,6 +401,7 @@ if __name__ == "__main__":
     cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
     cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
     center = (cmin + cmax)*0.5
+    global transform
     transform = coordinates.Transformation(center, hdg = 0)
     print transform.toGlobal(cmin), transform.toGlobal(cmax)
 
@@ -455,7 +460,7 @@ if __name__ == "__main__":
         # -- read static/shared objects in our area from .stg(s)
         #    Tiles are assumed to be much larger than clusters.
         #    Loop all clusters, find relevant tile by checking tile_index at center of each cluster.
-        #    Then read objects from .stg. 
+        #    Then read objects from .stg.
         stgs = []
         static_objects = []
         for cl in clusters:

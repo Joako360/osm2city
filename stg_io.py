@@ -8,7 +8,7 @@ Created on Sat Mar 23 18:32:18 2013
 
 import os
 import string
-from osm2city import Building, Coords
+from osm2city import Building, Coords, transform
 
 #    def __str__(self):
 #        return "%s %s %g %g %g %g" % (self.typ, self.path, self.lon, self.lat, self.alt, self.hdg)

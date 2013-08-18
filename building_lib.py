@@ -193,9 +193,10 @@ def get_nodes_from_acs(objs, own_prefix):
 
 def test_ac_load():
     import stg_io
-    static_objects = stg_io.Stg(("e013n51/3171138.stg", "e013n51/3171139.stg"))
-    s = get_nodes_from_acs(static_objects.objs, "e013n51/")
-    np.savetxt("nodes.dat", s)
+    # FIXME: this is probably broken
+    #static_objects = stg_io.read("e010n50/e013n51", ["3171138.stg", "3171139.stg"], parameters.PREFIX, parameters.PATH_TO_SCENERY)
+    #s = get_nodes_from_acs(static_objects.objs, "e013n51/")
+    #np.savetxt("nodes.dat", s)
 #    out = open("nodes.dat", "w")
 #    for n in s:
 #            out.write("\n")
@@ -245,10 +246,10 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         # - layers: 1-2, 3-5, hi-rise
         # - roof-shape: flat, gable
         # - age: old, modern
-    
+
         # - facade raussuchen
         #   requires: compat:flat-roof
-    
+
         #mat = random.randint(1,4)
         b.mat = 0
         b.roof_mat = 0
@@ -312,10 +313,10 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             continue
 
         # -- check for nearby static objects
-        if static_objects and is_static_object_nearby(b, static_tree):
+        if static_objects and is_static_object_nearby(b, X, static_tree):
             tools.stats.skipped_nearby += 1
             continue
-        
+
 
         # -- check area
         if not is_large_enough(b, buildings):
@@ -323,7 +324,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             continue
 
         # -- work on height and levels
-        
+
         # -- LOWI year 2525: generate a 'futuristic' city of skyscrapers
         if False:
             if b.area >= 1500:
@@ -396,7 +397,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
     return new_buildings
 
-def is_static_object_nearby(b, static_tree):
+def is_static_object_nearby(b, X, static_tree):
     """check for static/shared objects close to given building"""
     # FIXME: which radius? Or use centroid point? make radius a parameter
     radius = parameters.OVERLAP_RADIUS # alternative: radius = max(lenX)
@@ -577,7 +578,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
     import math
     for i in range(nnodes_ground - 1):
-        if False:        
+        if False:
             tex_x1 = lenX[i] / facade_texture.h_size_meters # -- simply repeat texture to fit length
         else:
             # FIXME: respect facade texture split_h
