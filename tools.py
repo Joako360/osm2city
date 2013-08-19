@@ -34,11 +34,12 @@ class Interpolator(object):
         ny = len(np.arange(y0, y0+size_y, step_y))
         nx = len(np.arange(x0, x0+size_x, step_x))
 
-        elev = np.loadtxt(filename)[:,2:]
+        #elev = np.loadtxt(filename)[:,2:]
+        elev = np.loadtxt(filename)
         f.close()
         self.x = elev[:,0]
         self.y = elev[:,1]
-        self.h = elev[:,2]
+        self.h = elev[:,4]
         if nx * ny != len(self.x):
             raise ValueError("expected %i, but read %i lines." % (nx*ny, len(self.x)))
 
@@ -57,6 +58,8 @@ class Interpolator(object):
     def __call__(self, p):
         """compute elevation at (x,y) by linear interpolation"""
         if self.fake: return 0.
+        global transform
+        p = vec2d.vec2d(transform.toGlobal(p))
         if p.x <= self.min_x or p.x >= self.max_x or \
            p.y <= self.min_y or p.y >= self.max_y: return -9999
         i = int((p.x - self.min_x)/self.dx)
@@ -231,7 +234,10 @@ class Stats(object):
             out.write(" %5g m^2  %5i\n" % (self.area_levels[i], self.area_above[i]))
         #print self
 
-def init():
+def init(new_transform):
+    global transform
+    transform = new_transform
+
     global stats
     stats = Stats()
     print "tools: init", stats

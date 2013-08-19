@@ -92,9 +92,6 @@ import parameters
 
 buildings = [] # -- master list, holds all buildings
 
-global transform
-transform = coordinates.Transformation(vec2d(0,0), hdg = 0)
-
 # -- skip buildings that match these names; FIXME: remove as part of Parameters
 #skiplist = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
 #          "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
@@ -117,9 +114,8 @@ class Building(object):
         self.area = 0
         self.vertices = 0
         self.surfaces = 0
-        global transform
         r = self.refs[0]
-        self.anchor = vec2d(transform.toLocal((r.lon, r.lat)))
+        self.anchor = vec2d(tools.transform.toLocal((r.lon, r.lat)))
         self.facade_texture = None
         self.roof_texture = None
         self.roof_separate = False
@@ -394,21 +390,19 @@ if __name__ == "__main__":
     parameters.show()
 
     # -- initialize modules
-    tools.init()
     tex.init()
 
     # -- prepare transformation to local coordinates
     cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
     cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
     center = (cmin + cmax)*0.5
-    global transform
-    transform = coordinates.Transformation(center, hdg = 0)
-    print transform.toGlobal(cmin), transform.toGlobal(cmax)
+    tools.init(coordinates.Transformation(center, hdg = 0))
+    print tools.transform.toGlobal(cmin), tools.transform.toGlobal(cmax)
 
     print "reading elevation data"
     elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.xml", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
     print "height at origin", elev(vec2d(0,0))
-    print "origin at ", transform.toGlobal((0,0))
+    print "origin at ", tools.transform.toGlobal((0,0))
 
     #tools.write_map('dresden.png', transform, elev, vec2d(minlon, minlat), vec2d(maxlon, maxlat))
 
@@ -452,8 +446,8 @@ if __name__ == "__main__":
 
 
     # -- create clusters
-    lmin = vec2d(transform.toLocal(cmin))
-    lmax = vec2d(transform.toLocal(cmax))
+    lmin = vec2d(tools.transform.toLocal(cmin))
+    lmax = vec2d(tools.transform.toLocal(cmax))
     clusters = Clusters(lmin, lmax, parameters.TILE_SIZE)
 
     if parameters.OVERLAP_CHECK:
@@ -464,7 +458,7 @@ if __name__ == "__main__":
         stgs = []
         static_objects = []
         for cl in clusters:
-            center_global = transform.toGlobal(cl.center)
+            center_global = tools.transform.toGlobal(cl.center)
             # center_global = [-4.412768, 48.4463626] # -- debug
             path = calc_tile.directory_name(center_global)
             stg = "%07i.stg" % calc_tile.tile_index(center_global)
@@ -485,7 +479,7 @@ if __name__ == "__main__":
     #   - location clash with stg static models? drop building
     #   - TODO: analyze surrounding: similar shaped buildings nearby? will get same texture
     #   - set building type, roof type etc
-    buildings = building_lib.analyse(buildings, static_objects, transform, elev, tex.facades, tex.roofs)
+    buildings = building_lib.analyse(buildings, static_objects, tools.transform, elev, tex.facades, tex.roofs)
 
     #tools.write_gp(buildings)
 
@@ -539,7 +533,7 @@ if __name__ == "__main__":
             out = open(fname+".ac", "w")
             write_ac_header(out, nb + nroofs)
             for b in cl.objects:
-                building_lib.write(b, out, elev, tile_elev, transform, offset, LOD_lists)
+                building_lib.write(b, out, elev, tile_elev, tools.transform, offset, LOD_lists)
             out.close()
 
             LM_dict = building_lib.make_lightmap_dict(cl.objects)
@@ -548,7 +542,7 @@ if __name__ == "__main__":
             write_xml(fname, LOD_lists, LM_dict, cl.objects)
 
             # -- write stg
-            center_global = vec2d(transform.toGlobal(cl.center))
+            center_global = vec2d(tools.transform.toGlobal(cl.center))
             tile_index = calc_tile.tile_index(center_global)
             stg_fname = "%07i.stg" % tile_index
             if not stg_fname in stg_fp_dict:
