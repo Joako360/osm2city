@@ -8,7 +8,9 @@ Created on Sat Mar 23 18:32:18 2013
 
 import os
 import string
-from osm2city import Building, Coords, transform
+#from osm2city import Building, Coords
+import osm2city
+#, transform
 
 #    def __str__(self):
 #        return "%s %s %g %g %g %g" % (self.typ, self.path, self.lon, self.lat, self.alt, self.hdg)
@@ -22,20 +24,25 @@ def read(path, stg, prefix, fgscenery):
     path = fgscenery + os.sep + 'Objects' + os.sep + path + os.sep
     print "stg: reading", path + stg
 
-    f = open(path + stg)
-    for line in f.readlines():
-        if line.startswith('#') or line.lstrip() == "": continue
-        splitted = line.split()
-        typ, ac_path  = splitted[0:2]
-        lon = float(splitted[2])
-        lat = float(splitted[3])
-        alt = float(splitted[4])
-        r = Coords(-1, lon, lat)
-        hdg = float(splitted[5])
-        if not ac_path.startswith(prefix + 'city'):
-            #print "stg:", typ, path + ac_path
-            objs.append(Building(osm_id=-1, tags=-1, refs=[r], name=path + ac_path, height=0, levels=0, stg_typ = typ, stg_hdg = hdg))
-    f.close()
+    try:
+        f = open(path + stg)
+        for line in f.readlines():
+            if line.startswith('#') or line.lstrip() == "": continue
+            splitted = line.split()
+            typ, ac_path  = splitted[0:2]
+            lon = float(splitted[2])
+            lat = float(splitted[3])
+            alt = float(splitted[4])
+            r = osm2city.Coords(-1, lon, lat)
+            hdg = float(splitted[5])
+            if not ac_path.startswith(prefix + 'city'):
+                #print "stg:", typ, path + ac_path
+                objs.append(osm2city.Building(osm_id=-1, tags=-1, refs=[r], name=path + ac_path, height=0, levels=0, stg_typ = typ, stg_hdg = hdg))
+        f.close()
+    except IOError, reason:
+        print "stg_io:read: Ignoring unreadable file %s" % reason
+        return []
+
     return objs
 
 
