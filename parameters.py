@@ -63,6 +63,8 @@ BUILDING_CITY_LEVEL_HEIGHT_MODE = 3.3
 BUILDING_CITY_LEVEL_HEIGHT_HEIGH = 3.6
 # FIXME: same parameters for place = town, village, suburb
 
+OBSTRUCTION_LIGHT_MIN_LEVELS = 15 # -- put obstruction lights on buildings with >= given levels
+
 def set_parameters(paramDict):
     for k in paramDict:
         if k in globals():
@@ -173,7 +175,7 @@ def read_from_file(filename):
                 value = pair[1].strip()
             paramDict[key] = value
             full_line = ""
-                
+
         set_parameters(paramDict)
         f.close()
     except IOError, reason:

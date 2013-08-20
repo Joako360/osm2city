@@ -156,11 +156,11 @@ class wayExtract(object):
                         print "SKIPPING", _name
                         return
                 if 'height' in tags:
-                    _height = tags['height'].replace('m','')
+                    _height = float(tags['height'].replace('m',''))
                 elif 'building:height' in tags:
-                    _height = tags['building:height'].replace('m','')
+                    _height = float(tags['building:height'].replace('m',''))
                 if 'building:levels' in tags:
-                    _levels = tags['building:levels']
+                    _levels = int(tags['building:levels'])
 
                 if refs[0] == refs[-1]: refs = refs[0:-1] # -- kick last ref if it coincides with first
 
@@ -296,12 +296,9 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
     #            xml.write("  <object-name>%s</object-name>\n" % name)
             xml.write("</effect>\n")
 
-    # -- hi-rise building position lights. ATM, works for LOWI, only.
+    # -- put obstruction lights on hi-rise buildings
     for b in buildings:
-#        print "levels, height", b.levels, b.height,
-        if b.levels > 30:
-#            print "YES"
-#            bla
+        if b.levels >= parameters.OBSTRUCTION_LIGHT_MIN_LEVELS:
             for i in np.arange(0, b.nnodes_ground, b.nnodes_ground/4.):
                 xo = b.X[int(i+0.5), 0]# - offset.x # -- b.X already in cluster coordinates
                 yo = b.X[int(i+0.5), 1]# - offset.y
@@ -318,8 +315,6 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
                     <heading-deg>0.0 </heading-deg>
                   </offsets>
                 </model>""" % (-yo, xo, zo) ))  # -- I just don't get those coordinate systems.
-        else:
-            print
 
     # -- LOD animation
     #    no longer use bare (reserved for terrain)
