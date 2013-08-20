@@ -274,11 +274,12 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
     # FIXME: use Effect/Building? What's the difference?
     for texture in LM_dict.keys():
         if texture.filename in LMs_avail:
+#                <lightmap-factor type="float" n="0"><use>/scenery/LOWI/garage[0]/door[0]/position-norm</use></lightmap-factor>
             xml.write(textwrap.dedent("""
             <effect>
               <inherits-from>cityLM</inherits-from>
               <parameters>
-                <lightmap-factor type="float" n="0"><use>/scenery/LOWI/garage[0]/door[0]/position-norm</use></lightmap-factor>
+                <lightmap-enabled type="int">1</lightmap-enabled>
                 <texture n="3">
                   <image>%s_LM.png</image>
                   <wrap-s>repeat</wrap-s>
@@ -297,8 +298,10 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
 
     # -- hi-rise building position lights. ATM, works for LOWI, only.
     for b in buildings:
+#        print "levels, height", b.levels, b.height,
         if b.levels > 30:
-
+#            print "YES"
+#            bla
             for i in np.arange(0, b.nnodes_ground, b.nnodes_ground/4.):
                 xo = b.X[int(i+0.5), 0]# - offset.x # -- b.X already in cluster coordinates
                 yo = b.X[int(i+0.5), 1]# - offset.y
@@ -306,7 +309,7 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
                 # <path>cursor.ac</path>
                 xml.write(textwrap.dedent("""
                 <model>
-                  <path>../../../Models/Effects/pos_lamp_red_light_2st.xml</path>
+                  <path>Models/Effects/pos_lamp_red_light_2st.xml</path>
                   <offsets>
                     <x-m>%g</x-m>
                     <y-m>%g</y-m>
@@ -315,6 +318,8 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
                     <heading-deg>0.0 </heading-deg>
                   </offsets>
                 </model>""" % (-yo, xo, zo) ))  # -- I just don't get those coordinate systems.
+        else:
+            print
 
     # -- LOD animation
     #    no longer use bare (reserved for terrain)
