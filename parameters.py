@@ -40,6 +40,7 @@ TILE_SIZE = 1000
 TOTAL_OBJECTS = 50000
 # -- file name of the file with OSM data. Should reside in PATH_TO_SCENERY
 OSM_FILE = "mylszr.osm"
+CONCURRENCY = 1 # -- number of parallel OSM parsing threads
 # -- skip reading names buildings from OSM
 SKIP_LIST = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
   "Frauenkirche", "Coselpalais", "Palais im Großen Garten",

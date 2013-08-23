@@ -418,14 +418,14 @@ if __name__ == "__main__":
         # -- parse OSM, return list of building objects
         way = wayExtract()
         #p = OSMParser(concurrency=4, ways_callback=way.ways, coords_callback=way.coords )
-        p = OSMParser(concurrency=1, coords_callback=way.coords)
+        p = OSMParser(concurrency=parameters.CONCURRENCY, coords_callback=way.coords)
         print "start parsing coords"
         p.parse(parameters.PREFIX + os.sep + parameters.OSM_FILE)
         print "done parsing"
         print "ncords:", len(way.coords_list)
         print "bounds:", way.minlon, way.minlat, way.maxlon, way.maxlat
 
-        p = OSMParser(concurrency=1, ways_callback=way.ways)
+        p = OSMParser(concurrency=parameters.CONCURRENCY, ways_callback=way.ways)
         print "start parsing ways"
         try:
             p.parse(parameters.PREFIX + os.sep + parameters.OSM_FILE)
