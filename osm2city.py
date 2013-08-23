@@ -145,24 +145,32 @@ class wayExtract(object):
         for osm_id, tags, refs in ways:
             if 'building' in tags:
 
-                #print "got building", osm_id, tags, refs
+                #print "got building", osm_id, tags
                 #print "done\n\n"
+                if refs[0] == refs[-1]: refs = refs[0:-1] # -- kick last ref if it coincides with first
+
                 _name = ""
                 _height = 0
                 _levels = 0
-                if 'name' in tags:
-                    _name = tags['name']
-                    if _name in parameters.SKIP_LIST:
-                        print "SKIPPING", _name
-                        return
-                if 'height' in tags:
-                    _height = float(tags['height'].replace('m',''))
-                elif 'building:height' in tags:
-                    _height = float(tags['building:height'].replace('m',''))
-                if 'building:levels' in tags:
-                    _levels = int(tags['building:levels'])
-
-                if refs[0] == refs[-1]: refs = refs[0:-1] # -- kick last ref if it coincides with first
+                
+                # -- funny things might happen while parsing OSM
+                try:               
+                    if 'name' in tags:
+                        _name = tags['name']
+                        #print "%s" % _name
+                        if _name in parameters.SKIP_LIST:
+                            print "SKIPPING", _name
+                            return
+                    if 'height' in tags:
+                        _height = float(tags['height'].replace('m',''))
+                    elif 'building:height' in tags:
+                        _height = float(tags['building:height'].replace('m',''))
+                    if 'building:levels' in tags:
+                        _levels = float(tags['building:levels'])
+                except:
+                    print "\nFailed to parse building", osm_id, tags, refs
+                    tools.stats.parse_errors += 1
+                    return
 
                 # -- find ref in coords
                 _refs = []
@@ -171,21 +179,20 @@ class wayExtract(object):
                         if coord.osm_id == ref:
                             _refs.append(coord)
                             break
+                    
                 building = Building(osm_id, tags, _refs, _name, _height, _levels)
                 if len(building.refs) < 3: return
 
                 #if len(building.refs) != 4: return # -- testing, 4 corner buildings only
 
                 self.buildings.append(building)
-#                global stats
-                if tools.stats.objects == parameters.TOTAL_OBJECTS: raise ValueError
+
                 tools.stats.objects += 1
+                if tools.stats.objects == parameters.TOTAL_OBJECTS: raise ValueError
 
                 if tools.stats.objects % 70 == 0: print tools.stats.objects
                 else: sys.stdout.write(".")
-                #global clusters
-                #clusters.append(building.X, building)
-
+                
     def coords(self, coords):
         for osm_id, lon, lat in coords:
             #print '%s %.4f %.4f' % (osm_id, lon, lat)

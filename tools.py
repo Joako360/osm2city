@@ -171,6 +171,7 @@ def write_gp(buildings):
 class Stats(object):
     def __init__(self):
         self.objects = 0
+        self.parse_errors = 0
         self.skipped_small = 0
         self.skipped_nearby = 0
         self.skipped_texture = 0
@@ -208,6 +209,7 @@ class Stats(object):
         total_written = self.LOD.sum()
         out.write(textwrap.dedent("""
         total buildings %i
+        parse errors    %i
         written         %i
         skipped
           small         %i
@@ -222,7 +224,7 @@ class Stats(object):
         LOD bare        %i (%2.0f %%)
         LOD rough       %i (%2.0f %%)
         LOD detail      %i (%2.0f %%)
-        """ % (self.objects, total_written,
+        """ % (self.objects, self.parse_errors, total_written,
                self.skipped_small, self.skipped_nearby, self.skipped_no_elev, self.skipped_texture,
                self.have_pitched_roof,
                self.nodes_ground, self.nodes_simplified,
