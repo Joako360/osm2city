@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 tools.py
@@ -85,7 +86,7 @@ def raster_glob():
     lmin = vec2d.vec2d(transform.toLocal(cmin.__iter__()))
     lmax = vec2d.vec2d(transform.toLocal(cmax.__iter__()))
     delta = (lmax - lmin)*0.5
-    print "Distance from middle to boundary in meters (x, y):", delta
+    print "Distance from center to boundary in meters (x, y):", delta
     raster(transform, "elev.in", -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
 
 def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
@@ -251,7 +252,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.filename is not None:
-        parameters.readFromFile(args.filename)
-    print parameters.printParams()
+        parameters.read_from_file(args.filename)
+    parameters.show()
     raster_glob()
 
