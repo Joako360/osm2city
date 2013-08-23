@@ -16,7 +16,7 @@ stats = None
 
 import vec2d
 import coordinates
-
+import calc_tile
 import parameters
 
 class Interpolator(object):
@@ -87,7 +87,21 @@ def raster_glob():
     lmax = vec2d.vec2d(transform.toLocal(cmax.__iter__()))
     delta = (lmax - lmin)*0.5
     print "Distance from center to boundary in meters (x, y):", delta
+    print "Creating elev.in ..."
     raster(transform, "elev.in", -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
+    
+    path = calc_tile.directory_name(center)
+    msg = textwrap.dedent("""
+    Done. You should now
+    - copy elev.in to $FGDATA/Nasal/
+    - hide the scenery folder Objects/%s to prevent probing on top of existing objects
+    - start FG, open Nasal console, enter 'elev.get()', press execute. This will create /tmp/elev.xml
+    - once that's done, copy /tmp/elev.xml to your $PREFIX folder
+    - unhide the scenery folder
+    """ % path)
+    print msg
+
+
 
 def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
     # --- need $FGDATA/Nasal/elev.nas and elev.in
