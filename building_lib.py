@@ -488,10 +488,10 @@ def decide_LOD(buildings):
         tools.stats.count_LOD(lod)
 
 def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
-    """offset accounts for cluster center
-       now actually write building.
+    """now actually write building.
        While writing, accumulate some statistics
        (totals stored in global stats object, individually also in building)
+       offset accounts for cluster center
     """
 
     X = b.X
