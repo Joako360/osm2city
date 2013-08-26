@@ -11,6 +11,11 @@ Created on May 27, 2013
 import sys
 import types
 
+# -- default parameters. Config file overrides these.
+
+# -- Scenery folder (typically a geographic name or the ICAO code of the airport
+PREFIX = "LSZR"
+
 # -- Boundary of the scenery in degrees (use "." not ","). The example below is from LSZR.
 BOUNDARY_WEST = 9.54
 BOUNDARY_SOUTH = 47.48
@@ -21,41 +26,35 @@ BOUNDARY_NORTH = 47.50
 ELEV_RASTER_X = 10
 ELEV_RASTER_Y = 10
 
-# -- Scenery folder (typically a geographic name or the ICAO code of the airport
-PREFIX = "LSZR"
-
-
-# -- Full path to the scenery folder without trailing slash. There should be 
+# -- Full path to the scenery folder without trailing slash. There must be
 #    an OBJECTS/ folder below PATH_TO_SCENERY
 PATH_TO_SCENERY = "/home/user/fgfs/scenery/"
 
-# -- skip elevation interpolation
-NO_ELEV = False
-# -- check for overlap with static models. The scenery folder needs to contain an "Objects" folder
+NO_ELEV = False             # -- skip elevation interpolation
+
+# -- check for overlap with static models. The scenery folder must contain an "Objects" folder
 OVERLAP_CHECK = False
 OVERLAP_RADIUS = 5
 
-# -- instead of parsing the OSM file, read a previously created cache file $PREFIX/buildings.pkl
-USE_PKL = False
-# -- tile size in meters for clustering of buildings
-TILE_SIZE = 1000
-# -- maximum number of buildings to read from OSM data
-MAX_OBJECTS = 50000
-# -- file name of the file with OSM data. Should reside in PATH_TO_SCENERY
-OSM_FILE = "mylszr.osm"
-CONCURRENCY = 1 # -- number of parallel OSM parsing threads
-# -- skip reading names buildings from OSM
+TILE_SIZE = 1000            # -- tile size in meters for clustering of buildings
+
+OSM_FILE = "buildings.osm"  # -- file name of the file with OSM data. Must reside in $PREFIX
+MAX_OBJECTS = 50000         # -- maximum number of buildings to read from OSM data
+CONCURRENCY = 1             # -- number of parallel OSM parsing threads
+USE_PKL = False             # -- instead of parsing the OSM file, read a previously created cache file $PREFIX/buildings.pkl
+
+# -- skip reading named buildings from OSM (in case there's already a static model for these, and the overlap check fails)
 SKIP_LIST = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
   "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
   "Residenzschloss Dresden", "Fernsehturm", "Fernsehturm Dresden"]
 
 # -- Parameters which influence the number of buildings from OSM taken to output
-BUILDING_MIN_HEIGHT = 3.4 # -- minimum height of a building to be included in output (does not include roof)
-BUILDING_MIN_AREA = 50.0 # -- minimum area for a building to be included in output
-BUILDING_REDUCE_THRESHOLD = 200.0 # -- threshold area of a building below which a rate of buildings gets reduced from output
-BUILDING_REDUCE_RATE = 0.5 # -- rate (between 0 and 1) of buildings below a threshold which get reduced randomly in output
+BUILDING_MIN_HEIGHT = 3.4           # -- minimum height of a building to be included in output (does not include roof)
+BUILDING_MIN_AREA = 50.0            # -- minimum area for a building to be included in output
+BUILDING_REDUCE_THRESHOLD = 200.0   # -- threshold area of a building below which a rate of buildings gets reduced from output
+BUILDING_REDUCE_RATE = 0.5          # -- rate (between 0 and 1) of buildings below a threshold which get reduced randomly in output
 BUILDING_REDUCE_CHECK_TOUCH = False # -- before removing a building due to area, check whether it is touching another building and therefore should be kept
-BUILDING_SIMPLIFY_TOLERANCE = 1.0 # -- all points in the simplified building will be within the tolerance distance of the original geometry.
+BUILDING_SIMPLIFY_TOLERANCE = 1.0   # -- all points in the simplified building will be within the tolerance distance of the original geometry.
 
 # -- Parameters which influence the height of buildings if no info from OSM is available.
 #    It uses a triangular distribution (see http://en.wikipedia.org/wiki/Triangular_distribution)
@@ -76,8 +75,9 @@ LOD_ALWAYS_BARE_ABOVE_LEVELS = 10   # -- really tall buildings will be LOD bare
 LOD_ALWAYS_DETAIL_BELOW_LEVELS = 3  # -- below this number of levels, buildings will always be LOD detail
 LOD_PERCENTAGE_DETAIL = 0.5         # -- of the remaining buildings, this percentage will be LOD detail,
                                     #    the rest will be LOD rough.
+                                    
+OBSTRUCTION_LIGHT_MIN_LEVELS = 15   # -- put obstruction lights on buildings with >= given levels
 
-OBSTRUCTION_LIGHT_MIN_LEVELS = 15 # -- put obstruction lights on buildings with >= given levels
 
 def set_parameters(paramDict):
     for k in paramDict:
