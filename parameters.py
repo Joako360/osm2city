@@ -175,9 +175,9 @@ def read_from_file(filename):
         paramDict = {}
         full_line = ""
         for line in f:
-            line = line.strip()
-            # -- ignore empty lines and lines starting with #
-            if line == "" or line.startswith("#"): continue
+            # -- ignore comments and empty lines
+            line = line.split('#')[0].strip()
+            if line == "": continue
 
             full_line += line  # -- allow for multi-line lists
             if line.endswith(","): continue
