@@ -50,13 +50,6 @@ class random_number(object):
     def __call__(self):
         return self.callback(self.min, self.max)
 
-#random_LOD = random_number(int, 0, 2)
-def random_LOD():
-    r = random.uniform(0,1)
-    #if r < 0.7: return 2   # -- 60% detail
-    if r < 0.7: return 1  #    70% rough
-    return 0              #    30% bare
-
 def random_level_height(place="city"):
     """ Calculates the height for each level of a building based on place and random factor"""
     #FIXME: other places (e.g. village)
@@ -477,12 +470,18 @@ def make_lightmap_dict(buildings):
     return lightmap_dict
 
 def decide_LOD(buildings):
+    """Decide on the building's LOD based on area, number of levels, and some randomness."""
     for b in buildings:
-        lod = random_LOD()
-        if b.area < 150: lod = 1
-        if b.area > 500: lod = 0
-        if b.levels > 5: lod = 0 # tall buildings always LOD bare
-        #if b.levels < 3: lod = 2 # small buildings always LOD detail
+        r = random.uniform(0,1)
+        if r < parameters.LOD_PERCENTAGE_DETAIL: lod = 2  # -- detail
+        else: lod = 1                                     #    rough
+
+        if b.levels > parameters.LOD_ALWAYS_ROUGH_ABOVE_LEVELS:  lod = 1  #    tall buildings        -> rough
+        if b.levels > parameters.LOD_ALWAYS_BARE_ABOVE_LEVELS:   lod = 0  # -- really tall buildings -> bare
+        if b.levels < parameters.LOD_ALWAYS_DETAIL_BELOW_LEVELS: lod = 2  #    small buildings       -> detail
+
+        if b.area < parameters.LOD_ALWAYS_DETAIL_BELOW_AREA:     lod = 2
+        if b.area > parameters.LOD_ALWAYS_ROUGH_ABOVE_AREA:      lod = 1
         # mat = lod
         b.LOD = lod
         tools.stats.count_LOD(lod)

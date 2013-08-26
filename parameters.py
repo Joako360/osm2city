@@ -67,7 +67,15 @@ BUILDING_CITY_LEVEL_HEIGHT_MODE = 3.3
 BUILDING_CITY_LEVEL_HEIGHT_HEIGH = 3.6
 # FIXME: same parameters for place = town, village, suburb
 
-LOD_PERCENTAGE_ROUGH = 0.7
+# -- the more buildings end up in LOD rough or bare, the more work for your GPU.
+#    Increasing any of the following parameters will decrease GPU load.
+LOD_ALWAYS_DETAIL_BELOW_AREA = 150  # -- below this area, buildings will always be LOD detail
+LOD_ALWAYS_ROUGH_ABOVE_AREA = 500   # -- above this area, buildings will always be LOD rough
+LOD_ALWAYS_ROUGH_ABOVE_LEVELS = 6   # -- above this number of levels, buildings will always be LOD rough
+LOD_ALWAYS_BARE_ABOVE_LEVELS = 10   # -- really tall buildings will be LOD bare  
+LOD_ALWAYS_DETAIL_BELOW_LEVELS = 3  # -- below this number of levels, buildings will always be LOD detail
+LOD_PERCENTAGE_DETAIL = 0.5         # -- of the remaining buildings, this percentage will be LOD detail,
+                                    #    the rest will be LOD rough.
 
 OBSTRUCTION_LIGHT_MIN_LEVELS = 15 # -- put obstruction lights on buildings with >= given levels
 
