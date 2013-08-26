@@ -5,7 +5,7 @@ Take openstreetmap floorplans, create 3d buildings ready for use in FlightGear.
 Development [https://gitorious.org/fg-radi/osm2city repository] on gitorous.
 Written in python 2.7, developed on Linux
 
-It's at a rather early stage of development, and currently not very user-friendly. You probably should know some python if you want to use it yourself. But it produces realistic city layouts (after all, it uses realistic data). The whole process -- from scratch to flying in FG -- for a city the size of LOWI takes perhaps one hour, including maybe a total of 15 mins manual work.
+It's at a rather early stage of development. There's no GUI, everything is controlled by an input file. <del>You probably should know some python if you want to use it yourself.</del> But it produces realistic city layouts (after all, it uses realistic data). The whole process -- from scratch to flying in FG -- for a city the size of LOWI takes perhaps one hour, including maybe a total of 15 mins manual work.
 
 It has been tested with Dresden, Germany (EDDC) and Innsbruck, Austria (LOWI). Both areas are now populated with about 50,000 buildings. Rendering this in FG is quite demanding. The FG process eats ~2.8GB RAM when flying in those areas, the download is ~50 MB each.
 
@@ -37,17 +37,18 @@ terminal/hangar textures to buildings at airports. This way we could rather easi
 :* find matching texture for given building (number of levels, modern/old building, etc)
 :* find matching roof texture for given facade texture
 * basic lightmap support
-* position lights on tall buildings
+* obstruction lights on tall buildings
 * shows statistics on processed buildings
 * writes .ac, .xml, .stg
 
 == LOD Scheme ==
-FlightGear knows three standard LOD: bare, rough and detail. 'Bare' sets the drawing distance of the terrain, which may easily be 50 km or more. Drawing buildings 50 km out makes little sense, so we shouldn't use this level here. Of the remaining two standard levels, 'rough' is used for large and/or tall buildings, and 'detail' for smaller ones. 
+FlightGear knows three standard LOD: bare, rough and detail. 'Bare' sets the drawing distance of the terrain, which may easily be 50 km or more. Drawing buildings 50 km out makes little sense (unless they are ''really'' tall), so we shouldn't use this level here. Of the remaining two standard levels, 'rough' is used for large and/or tall buildings, and 'detail' for smaller ones. 
 
-In the near future, osm2city will generate more complex roof shapes. This will increase the poly count further, and I believe it's a good idea to use another LOD 'roof' for complex roofs. Fortunately, we can change every aspect of FlightGear, and adding another LOD is easy. Use the command line 'TODO' to set the distance for 'roof'. If you want to adjust it via the GUI, copy static-lod.xml (from osm2city's git repo) to $FGDATA/gui/dialogs.
+In the near future, osm2city will generate more complex roof shapes. This will increase the poly count further, and I believe it's a good idea to use another LOD 'roof' for complex roofs. Fortunately, we can change every aspect of FlightGear, and adding another LOD is easy. Use the FG command line 'TODO' to set the distance for 'roof'. If you want to adjust it via FG's GUI, copy static-lod.xml (from osm2city's git repo) to $FGDATA/gui/dialogs.
 
 == Planned Features ==
 * make command line interface. Currently, everything is hard-coded.
+:* 2013/08: now uses parameters file, thanks to forum user vanosten
 * also parse OSM 'relation' tag and create 'buildings with holes'
 * more complex roof shapes, put these into separate LOD
 :* 2013/05: got permission from Olivier Teboul to use his python implementation of the straight skeleton algorithm
@@ -76,34 +77,47 @@ In the near future, osm2city will generate more complex roof shapes. This will i
 * copy elev.nas to $FGDATA/Nasal/
 
 == Workflow ==
+There are five main steps:
+* get OSM data
+* adjust input file
+* create elevation grid, run FG to probe elevation data
+* run osm2city
+* install the generated scenery
 
+We'll now walk through these steps in detail:
 * decide on a region you want to populate. Get its lon/lat coordinates.
-* create project directory, say LOWI/
-* get corresponding OSM data in OSM's native .xml format.
+* create a project directory. We will use LOWI/ in this example.
+* get corresponding OSM data in its native .xml format.
 There are several options to get OSM data. From command line:
  wget www.overpass-api.de/api/xapi?*[building=*][bbox=11.16898,47.20837,11.79108,47.38161]
-Put this data into LOWI/
-* probe elevation for this area:
-:* enter lon/lat for your area in the call to raster_glob() near tools.py:241 
+Put this data into LOWI/buildings.osm
+(FIXME: we need also OSM relations, since some buildings use it. Exporting only buildings from OSM, as in the overpass-api example, will skip these.)
+* Now adjust the input file. Copy the template params.ini to LOWI/. Edit this file, adjusting (at least) the following (check comments in params.ini):
+:* PREFIX = LOWI (the project directory)
+:* BOUNDARY_EAST, BOUNDARY_NORTH, BOUNDARY_SOUTH, BOUNDARY_WEST
+:* OSM_FILE = buildings.osm
+:* set PATH_TO_SCENERY to a standard FG_SCENERY path. Suppose the area you want to populate is /home/user/fgfs/scenery/Objects/e010n40/e011n47/, PATH_TO_SCENERY would then be /home/user/fgfs/scenery/ .
+:* you might want to set MAX_OBJECTS to a small number (say, 100) for your first try. This will limit the number of buildings parsed, and speed up the whole process.
+
+* probe elevation for this region:
+:* <del>enter lon/lat for your area in the call to raster_glob() near tools.py:241</del> (FIXED: now read from input file)
 :* run tools.py, this will create a file elev.in. Copy elev.in to $FGDATA/Nasal/
-:* hide scenery/Objects/e.... folder, to prevent probing elevation on top of existing objects
-:* run FG, open nasal console, enter: elev.get(), press execute. Might take a long time, depending on the area scanned. This will write elevation data to /tmp/elev.xml (which is actually just plain 5 column data: lon,lat,x,y,elevation). Put elev.xml into LOWI/
+:* tools.py will tell you to hide a certain scenery/Objects/... folder, to prevent probing elevation on top of existing objects
+:* run FG, open debug->nasal console, enter: elev.get(), press execute. Might take a long time, depending on the area scanned. This will write elevation data to /tmp/elev.xml (which is actually just plain 5 column data: lon,lat,x,y,elevation). Put elev.xml into LOWI/
 
-* set up osm2city.py (near top of file)
-:* set prefix to LOWI/
-:* set infile to your OSM .xml data. You can give a maximum number of objects to be parsed via total_objects = ..
-<del>:* enter list of .stg paths which should be checked for existing objects in your area. Near osm2city.py:493</del>
-(FIXED: we compute this on the fly now)
+* <del>set up osm2city.py (near top of file)</del>
+:* <del>set prefix to LOWI/</del>
+:* <del>set infile to your OSM .xml data. You can give a maximum number of objects to be parsed via total_objects = ..</del>
+:* <del>enter list of .stg paths which should be checked for existing objects in your area. Near osm2city.py:493</del>
+(FIXED: now read from input file)
 
-* run osm2city.py
-:* the first run parses OSM data. This again takes quite looong (10 minutes or more for 50k buildings), but the result is written to file data.pkl. Next startup is much faster.
-:* move buildings.pkl to LOWI/buildings.pkl
-:* if all goes well, you should now have lots of files like LOWIcity0101.ac and their corresponding .xml files, along with .stg files
-* adjust and run install.sh, this will install .ac, .xml, .stg files
+* run osm2city.py. Parsing OSM data again takes quite looong (10 minutes or more for 50k buildings), but the result is cached to file buildings.pkl. Next startup will be much faster if you move buildings.pkl to LOWI/buildings.pkl and set USE_PKL = 1.
+If all goes well, you should now have lots of files like LOWIcity0101.ac and their corresponding .xml files, along with .stg files.
+* adjust and run install.sh, this will install .ac, .xml, .stg files.
 
-== Improve fps ==
-* adjust LOD range in FG
-* use less buildings: increase min_area, LOD_percentage
+== Improve frame rate ==
+* adjust LOD ranges in FG
+* decrease MAX_OBJECTS, increase LOD_*
 (- use larger/smaller tiles? Tradeoff between distance calculations/xml parsing and GPU)
 
 == Contributing ==
