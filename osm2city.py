@@ -188,7 +188,7 @@ class wayExtract(object):
                 self.buildings.append(building)
 
                 tools.stats.objects += 1
-                if tools.stats.objects == parameters.TOTAL_OBJECTS: raise ValueError
+                if tools.stats.objects == parameters.MAX_OBJECTS: raise ValueError
 
                 if tools.stats.objects % 70 == 0: print tools.stats.objects
                 else: sys.stdout.write(".")
@@ -446,7 +446,7 @@ if __name__ == "__main__":
     else:
         # -- load list of building objects from previously cached file
         fpickle = open(parameters.PREFIX + '/buildings.pkl', 'rb')
-        buildings = cPickle.load(fpickle)[:parameters.TOTAL_OBJECTS]
+        buildings = cPickle.load(fpickle)[:parameters.MAX_OBJECTS]
         fpickle.close()
         print "unpickled %g buildings " % (len(buildings))
         tools.stats.objects = len(buildings)
@@ -472,7 +472,8 @@ if __name__ == "__main__":
 
             if stg not in stgs:
                 stgs.append(stg)
-                static_objects.extend(stg_io.read(path, stg, parameters.PREFIX, parameters.PATH_TO_SCENERY))
+                static_objects.extend(stg_io.read(path, stg, parameters.PREFIX, 
+                                                  parameters.PATH_TO_SCENERY))
 
         print "read %i objects from %i tiles" % (len(static_objects), len(stgs)), stgs
     else:

@@ -23,8 +23,11 @@ ELEV_RASTER_Y = 10
 
 # -- Scenery folder (typically a geographic name or the ICAO code of the airport
 PREFIX = "LSZR"
-# -- Full path to the scenery folder without trailing slash. Last folder should be equal to PREFIX
-PATH_TO_SCENERY = "/home/vanosten/bin/fgfs_scenery/customscenery/LSZR"
+
+
+# -- Full path to the scenery folder without trailing slash. There should be 
+#    an OBJECTS/ folder below PATH_TO_SCENERY
+PATH_TO_SCENERY = "/home/user/fgfs/scenery/"
 
 # -- skip elevation interpolation
 NO_ELEV = False
@@ -32,12 +35,12 @@ NO_ELEV = False
 OVERLAP_CHECK = False
 OVERLAP_RADIUS = 5
 
-# -- read from already existing converted OSM building data in file system for faster load
+# -- instead of parsing the OSM file, read a previously created cache file $PREFIX/buildings.pkl
 USE_PKL = False
 # -- tile size in meters for clustering of buildings
 TILE_SIZE = 1000
 # -- maximum number of buildings to read from OSM data
-TOTAL_OBJECTS = 50000
+MAX_OBJECTS = 50000
 # -- file name of the file with OSM data. Should reside in PATH_TO_SCENERY
 OSM_FILE = "mylszr.osm"
 CONCURRENCY = 1 # -- number of parallel OSM parsing threads
@@ -63,6 +66,8 @@ BUILDING_CITY_LEVEL_HEIGHT_LOW = 3.1
 BUILDING_CITY_LEVEL_HEIGHT_MODE = 3.3
 BUILDING_CITY_LEVEL_HEIGHT_HEIGH = 3.6
 # FIXME: same parameters for place = town, village, suburb
+
+LOD_PERCENTAGE_ROUGH = 0.7
 
 OBSTRUCTION_LIGHT_MIN_LEVELS = 15 # -- put obstruction lights on buildings with >= given levels
 
