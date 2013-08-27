@@ -44,7 +44,9 @@ terminal/hangar textures to buildings at airports. This way we could rather easi
 == LOD Scheme ==
 FlightGear knows three standard LOD: bare, rough and detail. 'Bare' sets the drawing distance of the terrain, which may easily be 50 km or more. Drawing buildings 50 km out makes little sense (unless they are ''really'' tall), so we shouldn't use this level here. Of the remaining two standard levels, 'rough' is used for large and/or tall buildings, and 'detail' for smaller ones. 
 
-In the near future, osm2city will generate more complex roof shapes. This will increase the poly count further, and I believe it's a good idea to use another LOD 'roof' for complex roofs. Fortunately, we can change every aspect of FlightGear, and adding another LOD is easy. Use the FG command line 'TODO' to set the distance for 'roof'. If you want to adjust it via FG's GUI, copy static-lod.xml (from osm2city's git repo) to $FGDATA/gui/dialogs.
+In the near future, osm2city will generate more complex roof shapes. This will increase the poly count further, and I believe it's a good idea to use another LOD 'roof' for complex roofs. Fortunately, we can change every aspect of FlightGear, and adding another LOD is easy. Use the FG command line
+ --prop:double:/sim/rendering/static-lod/roof=2000
+to set the distance for 'roof' to 2 km. If you want to adjust it via FG's GUI, copy static-lod.xml (from osm2city's git repo) to $FGDATA/gui/dialogs.
 
 == Planned Features ==
 * make command line interface. Currently, everything is hard-coded.
@@ -88,10 +90,9 @@ We'll now walk through these steps in detail:
 * decide on a region you want to populate. Get its lon/lat coordinates.
 * create a project directory. We will use LOWI/ in this example.
 * get corresponding OSM data in its native .xml format.
-There are several options to get OSM data. From command line:
- wget www.overpass-api.de/api/xapi?*[building=*][bbox=11.16898,47.20837,11.79108,47.38161]
+There are several options to get OSM data. You may find the [http://harrywood.co.uk/maps/uixapi/xapi.html XAPI Query Builder] helpful, it will generate a download URL that you can fetch with wget:
+ wget -O buildings.osm http://www.overpass-api.de/api/xapi?map?bbox=11.16898,47.20837,11.79108,47.38161
 Put this data into LOWI/buildings.osm
-(FIXME: we need also OSM relations, since some buildings use it. Exporting only buildings from OSM, as in the overpass-api example, will skip these.)
 * Now adjust the input file. Copy the template params.ini to LOWI/. Edit this file, adjusting (at least) the following (check comments in params.ini):
 :* PREFIX = LOWI (the project directory)
 :* BOUNDARY_EAST, BOUNDARY_NORTH, BOUNDARY_SOUTH, BOUNDARY_WEST
