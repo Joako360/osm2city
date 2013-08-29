@@ -170,7 +170,7 @@ def get_nodes_from_acs(objs, own_prefix):
                         node = np.array([-float(splitted[2]),
                                          -float(splitted[0])])
 
-                        node = R.dot(node).reshape(1,2)
+                        node = np.dot(R, node).reshape(1,2)
                         ac_nodes = np.append(ac_nodes, node, 0)
                         #stg_hdg
 
