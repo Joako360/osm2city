@@ -247,8 +247,12 @@ class Stats(object):
                self.LOD[1], 100.*self.LOD[1]/total_written,
                self.LOD[2], 100.*self.LOD[2]/total_written)))
         out.write("above\n")
+        max_area_above = self.area_above.max()
+        if max_area_above < 1: max_area_above = 1
+        print "max", max_area_above
         for i in range(len(self.area_levels)):
-            out.write(" %5g m^2  %5i\n" % (self.area_levels[i], self.area_above[i]))
+            out.write(" %5g m^2  %5i |%s\n" % (self.area_levels[i], self.area_above[i], \
+                      "#"*int(56. * self.area_above[i]/max_area_above)))
         #print self
 
 def init(new_transform):
