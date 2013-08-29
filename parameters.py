@@ -13,7 +13,7 @@ import types
 
 # -- default parameters. Config file overrides these.
 
-# -- Scenery folder (typically a geographic name or the ICAO code of the airport
+# -- Scenery folder, typically a geographic name or the ICAO code of the airport
 PREFIX = "LSZR"
 
 # -- Boundary of the scenery in degrees (use "." not ","). The example below is from LSZR.
@@ -28,12 +28,16 @@ ELEV_RASTER_Y = 10
 
 # -- Full path to the scenery folder without trailing slash. There must be
 #    an OBJECTS/ folder below PATH_TO_SCENERY
-PATH_TO_SCENERY = "/home/user/fgfs/scenery/"
+PATH_TO_SCENERY = "/home/user/fgfs/scenery"
+
+# -- write .stg, .ac, .xml to this path. If empty, data is automatically written to correct location 
+#    in $PATH_TO_SCENERY
+PATH_TO_OUTPUT = ""
 
 NO_ELEV = False             # -- skip elevation interpolation
 
 # -- check for overlap with static models. The scenery folder must contain an "Objects" folder
-OVERLAP_CHECK = False
+OVERLAP_CHECK = True
 OVERLAP_RADIUS = 5
 
 TILE_SIZE = 1000            # -- tile size in meters for clustering of buildings
@@ -66,7 +70,7 @@ BUILDING_CITY_LEVEL_HEIGHT_MODE = 3.3
 BUILDING_CITY_LEVEL_HEIGHT_HEIGH = 3.6
 # FIXME: same parameters for place = town, village, suburb
 
-# -- the more buildings end up in LOD rough or bare, the more work for your GPU.
+# -- The more buildings end up in LOD rough or bare, the more work for your GPU.
 #    Increasing any of the following parameters will decrease GPU load.
 LOD_ALWAYS_DETAIL_BELOW_AREA = 150  # -- below this area, buildings will always be LOD detail
 LOD_ALWAYS_ROUGH_ABOVE_AREA = 500   # -- above this area, buildings will always be LOD rough

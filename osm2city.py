@@ -99,6 +99,7 @@ buildings = [] # -- master list, holds all buildings
 skiplist = []
 
 
+
 class Building(object):
     """Central object class.
        Holds all data relevant for a building. Coordinates, type, area, ..."""
@@ -131,6 +132,7 @@ class Coords(object):
         self.lon = lon
         self.lat = lat
 
+#import multiprocessing
 class wayExtract(object):
     def __init__(self):
         self.buildings = []
@@ -144,6 +146,9 @@ class wayExtract(object):
         """callback method for ways"""
         for osm_id, tags, refs in ways:
             if 'building' in tags:
+                
+#                p = multiprocessing.current_process()
+#                print 'running:', p.name, p.pid
 
                 #print "got building", osm_id, tags
                 #print "done\n\n"
@@ -188,7 +193,9 @@ class wayExtract(object):
                 self.buildings.append(building)
 
                 tools.stats.objects += 1
-                if tools.stats.objects == parameters.MAX_OBJECTS: raise ValueError
+                if tools.stats.objects >= parameters.MAX_OBJECTS: 
+                    raise ValueError
+                    #return
 
                 if tools.stats.objects % 70 == 0: print tools.stats.objects
                 else: sys.stdout.write(".")
@@ -413,11 +420,11 @@ if __name__ == "__main__":
 
     #tools.write_map('dresden.png', transform, elev, vec2d(minlon, minlat), vec2d(maxlon, maxlat))
 
-
+    # -- now read OSM data. Either parse OSM xml, or read a previously cached .pkl file
+    #    End result is 'buildings', a list of building objects
     if not parameters.USE_PKL:
-        # -- parse OSM, return list of building objects
+        # -- parse OSM, return 
         way = wayExtract()
-        #p = OSMParser(concurrency=4, ways_callback=way.ways, coords_callback=way.coords )
         p = OSMParser(concurrency=parameters.CONCURRENCY, coords_callback=way.coords)
         print "start parsing coords"
         p.parse(parameters.PREFIX + os.sep + parameters.OSM_FILE)
@@ -432,7 +439,7 @@ if __name__ == "__main__":
         except ValueError:
             pass
 
-        tools.stats.print_summary()
+        #tools.stats.print_summary()
 
         print "nbuildings", len(way.buildings)
         print "done parsing"
@@ -452,7 +459,7 @@ if __name__ == "__main__":
         tools.stats.objects = len(buildings)
 
 
-    # -- create clusters
+    # -- create (empty) clusters
     lmin = vec2d(tools.transform.toLocal(cmin))
     lmax = vec2d(tools.transform.toLocal(cmax))
     clusters = Clusters(lmin, lmax, parameters.TILE_SIZE)
@@ -529,16 +536,27 @@ if __name__ == "__main__":
                 continue # skip tile with improper elev
             #print "TILE E", tile_elev
 
-
             LOD_lists = []
             LOD_lists.append([]) # rough, detail, roof, roof-flat
             LOD_lists.append([])
             LOD_lists.append([])
             LOD_lists.append([])
 
+            # -- prepare output path
+            center_global = vec2d(tools.transform.toGlobal(cl.center))
+            if parameters.PATH_TO_OUTPUT:
+                path = parameters.PATH_TO_OUTPUT
+            else:
+                path = parameters.PATH_TO_SCENERY
+            path += os.sep + 'Objects' + os.sep + calc_tile.directory_name(center_global) + os.sep
+            try:
+                os.makedirs(path)
+            except OSError:
+                pass                   
+
             # -- open .ac and write header
             fname = parameters.PREFIX + "city%02i%02i" % (cl.I.x, cl.I.y)
-            out = open(fname+".ac", "w")
+            out = open(path + fname+".ac", "w")
             write_ac_header(out, nb + nroofs)
             for b in cl.objects:
                 building_lib.write(b, out, elev, tile_elev, tools.transform, offset, LOD_lists)
@@ -547,15 +565,15 @@ if __name__ == "__main__":
             LM_dict = building_lib.make_lightmap_dict(cl.objects)
 
             # -- write xml
-            write_xml(fname, LOD_lists, LM_dict, cl.objects)
+            write_xml(path + fname, LOD_lists, LM_dict, cl.objects)
 
             # -- write stg
-            center_global = vec2d(tools.transform.toGlobal(cl.center))
             tile_index = calc_tile.tile_index(center_global)
-            stg_fname = "%07i.stg" % tile_index
+            stg_fname = path + "%07i.stg" % tile_index
             if not stg_fname in stg_fp_dict:
-                stg = open(stg_fname, "w")
-                stg.write("# osm2city\n# do not edit below this line\n#\n")
+                stg_io.uninstall_ours(stg_fname)
+                stg = open(stg_fname, "a")
+                stg.write("%s\n# do not edit below this line\n#\n" % stg_io.our_magic)
                 stg_fp_dict[stg_fname] = stg
             else:
                 stg = stg_fp_dict[stg_fname]
@@ -568,5 +586,5 @@ if __name__ == "__main__":
     tools.stats.debug1.close()
     tools.stats.debug2.close()
     tools.stats.print_summary()
-    print "done."
+    print "done. If program does not exit at this point, press CTRL+C."
     sys.exit(0)

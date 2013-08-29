@@ -15,6 +15,8 @@ import osm2city
 #    def __str__(self):
 #        return "%s %s %g %g %g %g" % (self.typ, self.path, self.lon, self.lat, self.alt, self.hdg)
 
+our_magic = "# osm2city"
+
 def read(path, stg, prefix, fgscenery):
     """Accepts a scenery sub-path, as in 'w010n40/w005n48/', plus an .stg file name.
        In the future, take care of multiple scenery paths here.
@@ -35,7 +37,7 @@ def read(path, stg, prefix, fgscenery):
             alt = float(splitted[4])
             r = osm2city.Coords(-1, lon, lat)
             hdg = float(splitted[5])
-            if not ac_path.startswith(prefix + 'city'):
+            if not ac_path.startswith(prefix + 'city'):  # -- skip own entries
                 #print "stg:", typ, path + ac_path
                 objs.append(osm2city.Building(osm_id=-1, tags=-1, refs=[r], name=path + ac_path, height=0, levels=0, stg_typ = typ, stg_hdg = hdg))
         f.close()
@@ -44,6 +46,23 @@ def read(path, stg, prefix, fgscenery):
         return []
 
     return objs
+
+def uninstall_ours(stg_fname):
+    """Uninstall previous osm2city data from .stg.
+       Read full .stg to memory, Write everything except ours back to .stg, sync.
+    """
+    try:
+        stg = open(stg_fname, "r")
+        lines = stg.readlines()
+        stg.close()
+        stg = open(stg_fname, "w")
+        for line in lines:
+            if line.startswith(our_magic): break
+            stg.write(line)
+        stg.flush()
+        stg.close()
+    except IOError, reason:
+        print "error uninstalling %s: %s" % (stg_fname, reason)
 
 
 #class Stg:
