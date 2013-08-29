@@ -144,9 +144,7 @@ class wayExtract(object):
 
     def ways(self, ways):
         """callback method for ways"""
-        #sys.stdout.write(".")
-        #return
-        #print ">>> one call", len(ways)
+#        print ">>> one call", len(ways)
 
         for osm_id, tags, refs in ways:
             if 'building' in tags:
@@ -172,7 +170,7 @@ class wayExtract(object):
                         #print "%s" % _name
                         if _name in parameters.SKIP_LIST:
                             print "SKIPPING", _name
-                            return
+                            continue
                     if 'height' in tags:
                         _height = float(tags['height'].replace('m',''))
                     elif 'building:height' in tags:
@@ -182,7 +180,7 @@ class wayExtract(object):
                 except:
                     print "\nFailed to parse building", osm_id, tags, refs
                     tools.stats.parse_errors += 1
-                    return
+                    continue
 
                 # -- find ref in coords
                 _refs = []
@@ -192,7 +190,7 @@ class wayExtract(object):
                             _refs.append(coord)
                             break
                 
-                if len(_refs) < 3: return
+                if len(_refs) < 3: continue
                 #if len(building.refs) != 4: return # -- testing, 4 corner buildings only
 
                 # -- all checks OK: accept building
@@ -591,3 +589,6 @@ if __name__ == "__main__":
     tools.stats.print_summary()
     print "done. If program does not exit at this point, press CTRL+C."
     sys.exit(0)
+
+
+# python -m cProfile -s time ./osm2city.py -f ULLL/params.ini -e -c
