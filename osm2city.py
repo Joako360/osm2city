@@ -144,8 +144,15 @@ class wayExtract(object):
 
     def ways(self, ways):
         """callback method for ways"""
+        #sys.stdout.write(".")
+        #return
+        #print ">>> one call", len(ways)
+
         for osm_id, tags, refs in ways:
             if 'building' in tags:
+                if tools.stats.objects >= parameters.MAX_OBJECTS: 
+                    #raise ValueError
+                    return
                 
 #                p = multiprocessing.current_process()
 #                print 'running:', p.name, p.pid
@@ -184,21 +191,17 @@ class wayExtract(object):
                         if coord.osm_id == ref:
                             _refs.append(coord)
                             break
-                    
-                building = Building(osm_id, tags, _refs, _name, _height, _levels)
-                if len(building.refs) < 3: return
-
+                
+                if len(_refs) < 3: return
                 #if len(building.refs) != 4: return # -- testing, 4 corner buildings only
 
-                self.buildings.append(building)
-
+                # -- all checks OK: accept building
                 tools.stats.objects += 1
-                if tools.stats.objects >= parameters.MAX_OBJECTS: 
-                    raise ValueError
-                    #return
-
+                building = Building(osm_id, tags, _refs, _name, _height, _levels)
+                self.buildings.append(building)
                 if tools.stats.objects % 70 == 0: print tools.stats.objects
                 else: sys.stdout.write(".")
+
                 
     def coords(self, coords):
         for osm_id, lon, lat in coords:
