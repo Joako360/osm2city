@@ -152,9 +152,9 @@ class wayExtract(object):
         _name = ""
         _height = 0
         _levels = 0
-        
+
         # -- funny things might happen while parsing OSM
-        try:               
+        try:
             if 'name' in tags:
                 _name = tags['name']
                 #print "%s" % _name
@@ -179,7 +179,7 @@ class wayExtract(object):
                 if coord.osm_id == ref:
                     _refs.append(coord)
                     break
-        
+
         if len(_refs) < 3: return False
         #if len(building.refs) != 4: return # -- testing, 4 corner buildings only
 
@@ -193,7 +193,7 @@ class wayExtract(object):
 
     def relations(self, relations):
         for osm_id, tags, members in relations:
-            if tools.stats.objects >= parameters.MAX_OBJECTS: 
+            if tools.stats.objects >= parameters.MAX_OBJECTS:
                 return
             if 'building' in tags:
                 #print "rel: ", osm_id, tags #, members
@@ -214,12 +214,12 @@ class wayExtract(object):
         for osm_id, tags, refs in ways:
             self.way_list.append(Way(osm_id, tags, refs))
             if 'building' in tags:
-                if tools.stats.objects >= parameters.MAX_OBJECTS: 
+                if tools.stats.objects >= parameters.MAX_OBJECTS:
                     return
-                    
+
                 self.make_building_from_way(osm_id, tags, refs)
 
-                
+
     def coords(self, coords):
         for osm_id, lon, lat in coords:
             #print '%s %.4f %.4f' % (osm_id, lon, lat)
@@ -357,7 +357,7 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
     <animation>
       <type>range</type>
       <min-m>0</min-m>
-      <max-property>/sim/rendering/static-lod/rough</max-property>
+      <max-property>/sim/rendering/static-lod/bare</max-property>
     """))
     for name in LOD_lists[0]:
         xml.write("  <object-name>%s</object-name>\n" % name)
@@ -367,7 +367,7 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
     <animation>
       <type>range</type>
       <min-m>0</min-m>
-      <max-property>/sim/rendering/static-lod/detailed</max-property>
+      <max-property>/sim/rendering/static-lod/rough</max-property>
     """))
     for name in LOD_lists[1]:
         xml.write("  <object-name>%s</object-name>\n" % name)
@@ -377,9 +377,19 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
     <animation>
       <type>range</type>
       <min-m>0</min-m>
-      <max-property>/sim/rendering/static-lod/roof</max-property>
+      <max-property>/sim/rendering/static-lod/detailed</max-property>
     """))
     for name in LOD_lists[2]:
+        xml.write("  <object-name>%s</object-name>\n" % name)
+    xml.write(textwrap.dedent(
+    """    </animation>
+
+    <animation>
+      <type>range</type>
+      <min-m>0</min-m>
+      <max-property>/sim/rendering/static-lod/roof</max-property>
+    """))
+    for name in LOD_lists[3]:
         xml.write("  <object-name>%s</object-name>\n" % name)
     xml.write(textwrap.dedent(
     """    </animation>
@@ -389,7 +399,7 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
       <min-property>/sim/rendering/static-lod/roof</min-property>
       <max-property>/sim/rendering/static-lod/rough</max-property>
     """))
-    for name in LOD_lists[3]:
+    for name in LOD_lists[4]:
         xml.write("  <object-name>%s</object-name>\n" % name)
     xml.write(textwrap.dedent(
     """    </animation>
@@ -443,7 +453,7 @@ if __name__ == "__main__":
     # -- now read OSM data. Either parse OSM xml, or read a previously cached .pkl file
     #    End result is 'buildings', a list of building objects
     if not parameters.USE_PKL:
-        # -- parse OSM, return 
+        # -- parse OSM, return
         way = wayExtract()
         p = OSMParser(concurrency=parameters.CONCURRENCY, coords_callback=way.coords)
         print "start parsing coords"
@@ -498,7 +508,7 @@ if __name__ == "__main__":
 
             if stg not in stgs:
                 stgs.append(stg)
-                static_objects.extend(stg_io.read(path, stg, parameters.PREFIX, 
+                static_objects.extend(stg_io.read(path, stg, parameters.PREFIX,
                                                   parameters.PATH_TO_SCENERY))
 
         print "read %i objects from %i tiles" % (len(static_objects), len(stgs)), stgs
@@ -556,10 +566,11 @@ if __name__ == "__main__":
             #print "TILE E", tile_elev
 
             LOD_lists = []
-            LOD_lists.append([]) # rough, detail, roof, roof-flat
-            LOD_lists.append([])
-            LOD_lists.append([])
-            LOD_lists.append([])
+            LOD_lists.append([]) # bare
+            LOD_lists.append([]) # rough
+            LOD_lists.append([]) # detail
+            LOD_lists.append([]) # roof
+            LOD_lists.append([]) # roof-flat
 
             # -- prepare output path
             center_global = vec2d(tools.transform.toGlobal(cl.center))
@@ -571,7 +582,7 @@ if __name__ == "__main__":
             try:
                 os.makedirs(path)
             except OSError:
-                pass                   
+                pass
 
             # -- open .ac and write header
             fname = parameters.PREFIX + "city%02i%02i" % (cl.I.x, cl.I.y)

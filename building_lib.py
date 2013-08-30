@@ -616,15 +616,16 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             out.write("%i %g %g\n" % (i+nnodes_ground, 0, 0))
         out.write("kids 0\n")
     else:
-        # -- textured roof, a separate object
+        # -- roof is a separate object
         roof_ac_name = "b%i-roof" % nb
         out.write("kids 0\n")
         out.write("OBJECT poly\n")
         out.write('name "%s"\n' % roof_ac_name)
 #        LOD_lists[b.LOD].append(roof_ac_name)
-        LOD_lists[2].append(roof_ac_name)  # roof always LOD detail?
+        LOD_lists[3].append(roof_ac_name)  # -- roof in separate LOD
 
         if b.roof_flat:
+            # FIXME: still have flat AND separate roof?? Doesn't seem so.
             out.write('texture "%s"\n' % 'roof_flat.png')
         else:
             out.write('texture "%s"\n' % (roof_texture.filename + '.png'))
@@ -713,7 +714,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             out.write("kids 0\n")
             out.write("OBJECT poly\n")
             out.write('name "%s"\n' % roof_ac_name_flat)
-            LOD_lists[3].append(roof_ac_name_flat)
+            LOD_lists[4].append(roof_ac_name_flat)
 
             out.write('texture "%s"\n' % (roof_texture.filename + '.png'))
 

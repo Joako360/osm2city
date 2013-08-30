@@ -89,7 +89,7 @@ def raster_glob():
     print "Distance from center to boundary in meters (x, y):", delta
     print "Creating elev.in ..."
     raster(transform, "elev.in", -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
-    
+
     path = calc_tile.directory_name(center)
     msg = textwrap.dedent("""
     Done. You should now
@@ -249,7 +249,6 @@ class Stats(object):
         out.write("above\n")
         max_area_above = self.area_above.max()
         if max_area_above < 1: max_area_above = 1
-        print "max", max_area_above
         for i in range(len(self.area_levels)):
             out.write(" %5g m^2  %5i |%s\n" % (self.area_levels[i], self.area_above[i], \
                       "#"*int(56. * self.area_above[i]/max_area_above)))
