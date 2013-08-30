@@ -92,13 +92,6 @@ import parameters
 
 buildings = [] # -- master list, holds all buildings
 
-# -- skip buildings that match these names; FIXME: remove as part of Parameters
-#skiplist = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
-#          "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
-#          "Residenzschloss Dresden", "Fernsehturm", "Fernsehturm Dresden"]
-skiplist = []
-
-
 
 class Building(object):
     """Central object class.
@@ -126,85 +119,111 @@ class Building(object):
 
         #print "tr X", self.X
 
-class Coords(object):
+class Coord(object):
     def __init__(self, osm_id, lon, lat):
         self.osm_id = osm_id
         self.lon = lon
         self.lat = lat
 
+class Way(object):
+    def __init__(self, osm_id, tags, refs):
+        self.osm_id = osm_id
+        self.tags = tags
+        self.refs = refs
+
 #import multiprocessing
 class wayExtract(object):
     def __init__(self):
         self.buildings = []
-        self.coords_list = []
+        self.coord_list = []
+        self.way_list = []
         self.minlon = 181.
         self.maxlon = -181.
         self.minlat = 91.
         self.maxlat = -91.
 
+    def make_building_from_way(self, osm_id, tags, refs):
+#       p = multiprocessing.current_process()
+#       print 'running:', p.name, p.pid
+        #print "got building", osm_id, tags
+        #print "done\n\n"
+        if refs[0] == refs[-1]: refs = refs[0:-1] # -- kick last ref if it coincides with first
+
+        _name = ""
+        _height = 0
+        _levels = 0
+        
+        # -- funny things might happen while parsing OSM
+        try:               
+            if 'name' in tags:
+                _name = tags['name']
+                #print "%s" % _name
+                if _name in parameters.SKIP_LIST:
+                    print "SKIPPING", _name
+                    return False
+            if 'height' in tags:
+                _height = float(tags['height'].replace('m',''))
+            elif 'building:height' in tags:
+                _height = float(tags['building:height'].replace('m',''))
+            if 'building:levels' in tags:
+                _levels = float(tags['building:levels'])
+        except:
+            print "\nFailed to parse building", osm_id, tags, refs
+            tools.stats.parse_errors += 1
+            return False
+
+        # -- find ref in coords
+        _refs = []
+        for ref in refs:
+            for coord in self.coord_list:
+                if coord.osm_id == ref:
+                    _refs.append(coord)
+                    break
+        
+        if len(_refs) < 3: return False
+        #if len(building.refs) != 4: return # -- testing, 4 corner buildings only
+
+        # -- all checks OK: accept building
+        self.buildings.append(Building(osm_id, tags, _refs, _name, _height, _levels))
+        tools.stats.objects += 1
+        if tools.stats.objects % 70 == 0: print tools.stats.objects
+        else: sys.stdout.write(".")
+        return True
+
+
+    def relations(self, relations):
+        for osm_id, tags, members in relations:
+            if tools.stats.objects >= parameters.MAX_OBJECTS: 
+                return
+            if 'building' in tags:
+                #print "rel: ", osm_id, tags #, members
+                for ref, typ, role in members:
+#                    if typ == 'way' and role == 'inner':
+                    if typ == 'way' and role == 'outer':
+                        for way in self.way_list:
+                            if way.osm_id == ref:
+                                self.make_building_from_way(way.osm_id, dict(way.tags.items() + tags.items()), way.refs)
+                                print "FIXME: skipping possible 'inner' way(s) of relation %i" % osm_id
+ #                               print "corr way: ", way
+                                break
+
+
     def ways(self, ways):
         """callback method for ways"""
 #        print ">>> one call", len(ways)
-
         for osm_id, tags, refs in ways:
+            self.way_list.append(Way(osm_id, tags, refs))
             if 'building' in tags:
                 if tools.stats.objects >= parameters.MAX_OBJECTS: 
-                    #raise ValueError
                     return
-                
-#                p = multiprocessing.current_process()
-#                print 'running:', p.name, p.pid
-
-                #print "got building", osm_id, tags
-                #print "done\n\n"
-                if refs[0] == refs[-1]: refs = refs[0:-1] # -- kick last ref if it coincides with first
-
-                _name = ""
-                _height = 0
-                _levels = 0
-                
-                # -- funny things might happen while parsing OSM
-                try:               
-                    if 'name' in tags:
-                        _name = tags['name']
-                        #print "%s" % _name
-                        if _name in parameters.SKIP_LIST:
-                            print "SKIPPING", _name
-                            continue
-                    if 'height' in tags:
-                        _height = float(tags['height'].replace('m',''))
-                    elif 'building:height' in tags:
-                        _height = float(tags['building:height'].replace('m',''))
-                    if 'building:levels' in tags:
-                        _levels = float(tags['building:levels'])
-                except:
-                    print "\nFailed to parse building", osm_id, tags, refs
-                    tools.stats.parse_errors += 1
-                    continue
-
-                # -- find ref in coords
-                _refs = []
-                for ref in refs:
-                    for coord in self.coords_list:
-                        if coord.osm_id == ref:
-                            _refs.append(coord)
-                            break
-                
-                if len(_refs) < 3: continue
-                #if len(building.refs) != 4: return # -- testing, 4 corner buildings only
-
-                # -- all checks OK: accept building
-                tools.stats.objects += 1
-                building = Building(osm_id, tags, _refs, _name, _height, _levels)
-                self.buildings.append(building)
-                if tools.stats.objects % 70 == 0: print tools.stats.objects
-                else: sys.stdout.write(".")
+                    
+                self.make_building_from_way(osm_id, tags, refs)
 
                 
     def coords(self, coords):
         for osm_id, lon, lat in coords:
             #print '%s %.4f %.4f' % (osm_id, lon, lat)
-            self.coords_list.append(Coords(osm_id, lon, lat))
+            self.coord_list.append(Coord(osm_id, lon, lat))
             if lon > self.maxlon: self.maxlon = lon
             if lon < self.minlon: self.minlon = lon
             if lat > self.maxlat: self.maxlat = lat
@@ -430,15 +449,14 @@ if __name__ == "__main__":
         print "start parsing coords"
         p.parse(parameters.PREFIX + os.sep + parameters.OSM_FILE)
         print "done parsing"
-        print "ncords:", len(way.coords_list)
+        print "ncords:", len(way.coord_list)
         print "bounds:", way.minlon, way.minlat, way.maxlon, way.maxlat
 
+        print "start parsing ways and relations"
         p = OSMParser(concurrency=parameters.CONCURRENCY, ways_callback=way.ways)
-        print "start parsing ways"
-        try:
-            p.parse(parameters.PREFIX + os.sep + parameters.OSM_FILE)
-        except ValueError:
-            pass
+        p.parse(parameters.PREFIX + os.sep + parameters.OSM_FILE)
+        p = OSMParser(concurrency=parameters.CONCURRENCY, relations_callback=way.relations)
+        p.parse(parameters.PREFIX + os.sep + parameters.OSM_FILE)
 
         #tools.stats.print_summary()
 
