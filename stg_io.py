@@ -29,17 +29,17 @@ def read(path, stg, prefix, fgscenery):
     try:
         f = open(path + stg)
         for line in f.readlines():
+            if line.startswith(our_magic): break
             if line.startswith('#') or line.lstrip() == "": continue
             splitted = line.split()
             typ, ac_path  = splitted[0:2]
             lon = float(splitted[2])
             lat = float(splitted[3])
             alt = float(splitted[4])
-            r = osm2city.Coords(-1, lon, lat)
+            r = osm2city.Coord(-1, lon, lat)
             hdg = float(splitted[5])
-            if not ac_path.startswith(prefix + 'city'):  # -- skip own entries
                 #print "stg:", typ, path + ac_path
-                objs.append(osm2city.Building(osm_id=-1, tags=-1, refs=[r], name=path + ac_path, height=0, levels=0, stg_typ = typ, stg_hdg = hdg))
+            objs.append(osm2city.Building(osm_id=-1, tags=-1, refs=[r], name=path + ac_path, height=0, levels=0, stg_typ = typ, stg_hdg = hdg))
         f.close()
     except IOError, reason:
         print "stg_io:read: Ignoring unreadable file %s" % reason
