@@ -30,7 +30,7 @@ ELEV_RASTER_Y = 10
 #    an OBJECTS/ folder below PATH_TO_SCENERY
 PATH_TO_SCENERY = "/home/user/fgfs/scenery"
 
-# -- write .stg, .ac, .xml to this path. If empty, data is automatically written to correct location 
+# -- write .stg, .ac, .xml to this path. If empty, data is automatically written to correct location
 #    in $PATH_TO_SCENERY
 PATH_TO_OUTPUT = ""
 
@@ -75,11 +75,11 @@ BUILDING_CITY_LEVEL_HEIGHT_HEIGH = 3.6
 LOD_ALWAYS_DETAIL_BELOW_AREA = 150  # -- below this area, buildings will always be LOD detail
 LOD_ALWAYS_ROUGH_ABOVE_AREA = 500   # -- above this area, buildings will always be LOD rough
 LOD_ALWAYS_ROUGH_ABOVE_LEVELS = 6   # -- above this number of levels, buildings will always be LOD rough
-LOD_ALWAYS_BARE_ABOVE_LEVELS = 10   # -- really tall buildings will be LOD bare  
+LOD_ALWAYS_BARE_ABOVE_LEVELS = 10   # -- really tall buildings will be LOD bare
 LOD_ALWAYS_DETAIL_BELOW_LEVELS = 3  # -- below this number of levels, buildings will always be LOD detail
 LOD_PERCENTAGE_DETAIL = 0.5         # -- of the remaining buildings, this percentage will be LOD detail,
                                     #    the rest will be LOD rough.
-                                    
+
 OBSTRUCTION_LIGHT_MIN_LEVELS = 15   # -- put obstruction lights on buildings with >= given levels
 
 
@@ -133,7 +133,7 @@ def parse_list(stringValue):
     if None is not stringValue:
         myList = stringValue.split(',')
         for index in range(len(myList)):
-            myList[index] = myList[index].strip()
+            myList[index] = myList[index].strip().strip('"\'')
     return myList
 
 def parse_float(key, stringValue):
