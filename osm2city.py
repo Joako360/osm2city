@@ -152,6 +152,7 @@ class wayExtract(object):
         _name = ""
         _height = 0
         _levels = 0
+        _layer = 99
 
         # -- funny things might happen while parsing OSM
         try:
@@ -167,10 +168,17 @@ class wayExtract(object):
                 _height = float(tags['building:height'].replace('m',''))
             if 'building:levels' in tags:
                 _levels = float(tags['building:levels'])
+            if 'layer' in tags:
+                _layer = int(tags['layer'])
         except:
             print "\nFailed to parse building", osm_id, tags, refs
             tools.stats.parse_errors += 1
             return False
+
+        # -- simple (silly?) heuristics to 'respect' layers
+        if _layer == 0: return False
+        if _layer < 99 and _height == 0 and _levels == 0:
+            _levels = _layer + 2
 
         # -- find ref in coords
         _refs = []
@@ -203,6 +211,7 @@ class wayExtract(object):
                         for way in self.way_list:
                             if way.osm_id == ref:
                                 self.make_building_from_way(way.osm_id, dict(way.tags.items() + tags.items()), way.refs)
+                                self.way_list.remove(way) # -- way could have a 'building' tag. Prevent processing this twice
                                 print "FIXME: skipping possible 'inner' way(s) of relation %i" % osm_id
  #                               print "corr way: ", way
                                 break
@@ -212,12 +221,14 @@ class wayExtract(object):
         """callback method for ways"""
 #        print ">>> one call", len(ways)
         for osm_id, tags, refs in ways:
+            if tools.stats.objects >= parameters.MAX_OBJECTS: return
             self.way_list.append(Way(osm_id, tags, refs))
-            if 'building' in tags:
-                if tools.stats.objects >= parameters.MAX_OBJECTS:
-                    return
 
-                self.make_building_from_way(osm_id, tags, refs)
+    def process_ways(self):
+        for way in self.way_list:
+            if 'building' in way.tags:
+                if tools.stats.objects >= parameters.MAX_OBJECTS: return
+                self.make_building_from_way(way.osm_id, way.tags, way.refs)
 
 
     def coords(self, coords):
@@ -467,7 +478,7 @@ if __name__ == "__main__":
         p.parse(parameters.PREFIX + os.sep + parameters.OSM_FILE)
         p = OSMParser(concurrency=parameters.CONCURRENCY, relations_callback=way.relations)
         p.parse(parameters.PREFIX + os.sep + parameters.OSM_FILE)
-
+        way.process_ways()
         #tools.stats.print_summary()
 
         print "nbuildings", len(way.buildings)
