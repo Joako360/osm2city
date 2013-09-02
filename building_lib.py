@@ -204,6 +204,9 @@ def simplify(X, threshold):
     p_simple = p.simplify(threshold)
     X_simple = np.array(p_simple.exterior.coords.xy).transpose()
     nodes_lost = X.shape[0] - X_simple.shape[0]
+    print "XX", X[0,0], X[0,1]
+    print "RR", ring.coords[0][0], ring.coords[0][1]
+    print "--"
     return X_simple, p_simple, nodes_lost
 
 
@@ -255,28 +258,48 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         #    - compute edge lengths
         #    - fix inverted faces
         #    - compute area
-        X = np.zeros((b.nnodes_ground+1,2))
+        _X = np.zeros((b.nnodes_ground+1,2))
         i = 0
         for r in b.refs:
-            X[i,0], X[i,1] = transform.toLocal((r.lon, r.lat))
+            _X[i,0], _X[i,1] = transform.toLocal((r.lon, r.lat))
             i += 1
 
         # -- write nodes to separate debug file
         for i in range(b.nnodes_ground):
-            tools.stats.debug1.write("%g %g\n" % (X[i,0], X[i,1]))
+            tools.stats.debug1.write("%g %g\n" % (_X[i,0], _X[i,1]))
 
 
-        X[-1] = X[0] # -- we duplicate last node!
+        _X[-1] = _X[0] # -- we duplicate last node!
+
+        # -- create shapely object
+        ring = shg.polygon.LinearRing(list(_X))
+        b.polygon = shg.Polygon(ring)
+        p_simple = b.polygon.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
+        X = np.array(p_simple.exterior.coords.xy).transpose()
+        #nodes_lost = X.shape[0] - X_simple.shape[0]
+#        print "XX", _X[0,0], _X[0,1]
+        print "XX", _X[0], _X[1]
+        print "RR", ring.coords[0][0], ring.coords[0][1]
+        print "PP", b.polygon.exterior.coords.xy
+        b.xx = b.polygon.exterior.coords.xy
+        print "xx", b.xx[0][0], b.xx[1][0]
+        bla
+        b.xx[0][0] = 5.
+        print "sam!", b.xx[0][0]
+        print "sam?", b.polygon.exterior.coords.xy[0][0]
+        print "--"
+        #return X_simple, p_simple, nodes_lost
+
 
         # -- shapely: compute area
 #        r = LinearRing(list(X))
 #        p = Polygon(r)
-        X, p, nodes_simplified = simplify(X, parameters.BUILDING_SIMPLIFY_TOLERANCE)
-        b.area = p.area
+        #X, p, nodes_simplified = simplify(X, parameters.BUILDING_SIMPLIFY_TOLERANCE)
+        #b.area = p.area
         b.nnodes_ground = X.shape[0] - 1
 #        if b.nnodes_ground < 3:
 #            pass
-        tools.stats.nodes_simplified += nodes_simplified
+        tools.stats.nodes_simplified += 0 #nodes_simplified
         tools.stats.nodes_ground += b.nnodes_ground
 
         # -- fix inverted faces and compute edge length
