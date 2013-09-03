@@ -248,7 +248,6 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         b.mat = 0
         b.roof_mat = 0
 
-        b.nnodes_ground = len(b.X)
     #    print nnodes_ground #, b.refs[0].lon, b.refs[0].lat
 
         # -- get geometry right
@@ -267,19 +266,18 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
 
         # -- write nodes to separate debug file
-        for i in range(b.nnodes_ground):
+        for i in range(b._nnodes_ground):
             tools.stats.debug1.write("%g %g\n" % (X[i,0], X[i,1]))
 
         # -- shapely: compute area
 #        r = LinearRing(list(X))
 #        p = Polygon(r)
         #X, nnodes_simplified = simplify(X, parameters.BUILDING_SIMPLIFY_TOLERANCE)
-        b.nnodes_ground = len(X)
 
 #        if b.nnodes_ground < 3:
 #            pass
         #tools.stats.nodes_simplified += nnodes_simplified
-        tools.stats.nodes_ground += b.nnodes_ground
+        tools.stats.nodes_ground += b._nnodes_ground
 
         # -- fix inverted faces
         #crossX = 0.
@@ -289,13 +287,13 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         #   X = X[::-1]
 
         # -- compute edge length
-        lenX = np.zeros((b.nnodes_ground))
-        for i in range(b.nnodes_ground-1):
+        lenX = np.zeros((b.nnodes_outer))
+        for i in range(b.nnodes_outer-1):
             lenX[i] = ((X[i+1,0]-X[i,0])**2 + (X[i+1,1]-X[i,1])**2)**0.5
         lenX[-1] = ((X[0,0]-X[-1,0])**2 + (X[0,1]-X[-1,1])**2)**0.5
 
         # -- re-number nodes such that longest edge is first
-        if b.nnodes_ground == 4:
+        if b.nnodes_outer == 4:
             if lenX[0] < lenX[1]:
                 X = np.roll(X, 1, axis=0)
                 lenX = np.roll(lenX, 1)
@@ -355,7 +353,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         b.roof_separate = False
 
         # -- pitched roof if we have 4 ground nodes and area below 1000m2
-        if b.nnodes_ground == 4 and b.area < 1000:
+        if b._nnodes_ground == 4 and b.area < 1000:
             b.roof_flat = False
             b.roof_separate = True
 
@@ -406,7 +404,7 @@ def is_static_object_nearby(b, X, static_tree):
     nearby = [x for x in nearby if x]
 
     if len(nearby):
-        for i in range(b.nnodes_ground):
+        for i in range(b.nnodes_outer):
             tools.stats.debug2.write("%g %g\n" % (X[i,0], X[i,1]))
 #            print "nearby:", nearby
 #            for n in nearby:
@@ -507,12 +505,34 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
        offset accounts for cluster center
     """
 
+    def write_and_count_vert(out, b):
+        """write numvert tag to .ac, update stats"""
+        numvert = 2 * b._nnodes_ground
+        out.write("numvert %i\n" % numvert)
+        b.vertices += numvert
+
+        b.ground_elev = elev(vec2d(X[0]) + offset) - tile_elev # -- interpolate ground elevation at building location
+        #print b.refs[0].lon
+        #ground_elev = 200. + (b.refs[0].lon-13.6483695)*5000.
+        #print "ground_elev", ground_elev
+
+        for x in X:
+            z = b.ground_elev - 1
+            out.write("%1.2f %1.2f %1.2f\n" % (-x[1], z, -x[0]))
+        for x in X:
+            out.write("%1.2f %1.2f %1.2f\n" % (-x[1], b.ground_elev + b.height, -x[0]))
+        b.ceiling = b.ground_elev + b.height
+    # ----
+
     X = np.array(b.X)
+    for i in range(b.nnodes_outer):
+        X[i,0] -= offset.x # cluster coordinates. NB: this changes building coordinates!
+        X[i,1] -= offset.y
+
     lenX = b.lenX
     height = b.height
     roof_texture = b.roof_texture
     facade_texture = b.facade_texture
-    nnodes_ground = b.nnodes_ground
     roof_separate = b.roof_separate
 
     global nb
@@ -526,7 +546,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     out.write("name \"%s\"\n" % b.ac_name)
     LOD_lists[b.LOD].append(b.ac_name)
 
-    nsurf = nnodes_ground
+    nsurf = b.nnodes_outer
     if not roof_separate: nsurf += 1 # -- because roof will be part of base model
 
     #repeat_vert = int(height/3)
@@ -566,31 +586,14 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 #        tex_y1 = building_height / texture_height # FIXME
 
     #out.write("loc 0 0 0\n")
-    write_and_count_numvert(out, b, 2*nnodes_ground)
+    write_and_count_vert(out, b)
 
-    for i in range(b.nnodes_ground):
-        X[i,0] -= offset.x # cluster coordinates. NB: this changes building coordinates!
-        X[i,1] -= offset.y
-
-    ground_elev = elev(vec2d(X[0]) + offset) - tile_elev # -- interpolate ground elevation at building location
-    #print b.refs[0].lon
-    #ground_elev = 200. + (b.refs[0].lon-13.6483695)*5000.
-    #print "ground_elev", ground_elev
-
-
-    for x in X:
-        z = ground_elev - 1
-        out.write("%1.2f %1.2f %1.2f\n" % (-x[1], z, -x[0]))
-    for x in X:
-        out.write("%1.2f %1.2f %1.2f\n" % (-x[1], ground_elev + b.height, -x[0]))
-
-    b.ceiling = ground_elev + b.height
 
     write_and_count_numsurf(out, b, nsurf)
     # -- walls
 
     import math
-    for i in range(nnodes_ground - 1):
+    for i in range(b.nnodes_outer - 1):
         if False:
             tex_x1 = lenX[i] / facade_texture.h_size_meters # -- simply repeat texture to fit length
         else:
@@ -606,28 +609,28 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         out.write("refs %i\n" % 4)
         out.write("%i %g %g\n" % (i,                     0,          tex_y0))
         out.write("%i %g %g\n" % (i + 1,                 tex_x1, tex_y0))
-        out.write("%i %g %g\n" % (i + 1 + nnodes_ground, tex_x1, tex_y1))
-        out.write("%i %g %g\n" % (i + nnodes_ground,     0,          tex_y1))
+        out.write("%i %g %g\n" % (i + 1 + b.nnodes_outer, tex_x1, tex_y1))
+        out.write("%i %g %g\n" % (i + b.nnodes_outer,     0,          tex_y1))
 
     #return OK
 
     # -- closing wall
-    tex_x1 = lenX[nnodes_ground-1] /  facade_texture.h_size_meters
+    tex_x1 = lenX[b.nnodes_outer-1] /  facade_texture.h_size_meters
     out.write("SURF 0x0\n")
     out.write("mat %i\n" % b.mat)
     out.write("refs %i\n" % 4)
-    out.write("%i %g %g\n" % (nnodes_ground - 1, 0,          tex_y0))
+    out.write("%i %g %g\n" % (b.nnodes_outer - 1, 0,          tex_y0))
     out.write("%i %g %g\n" % (0,                 tex_x1, tex_y0))
-    out.write("%i %g %g\n" % (nnodes_ground,     tex_x1, tex_y1))
-    out.write("%i %g %g\n" % (2*nnodes_ground-1, 0,          tex_y1))
+    out.write("%i %g %g\n" % (b.nnodes_outer,     tex_x1, tex_y1))
+    out.write("%i %g %g\n" % (2*b.nnodes_outer-1, 0,          tex_y1))
 
     # -- roof
     if not b.roof_separate:   # -- flat roof
         out.write("SURF 0x0\n")
         out.write("mat %i\n" % b.roof_mat)
-        out.write("refs %i\n" % nnodes_ground)
-        for i in range(nnodes_ground):
-            out.write("%i %g %g\n" % (i+nnodes_ground, 0, 0))
+        out.write("refs %i\n" % b.nnodes_outer)
+        for i in range(b.nnodes_outer):
+            out.write("%i %g %g\n" % (i+b.nnodes_outer, 0, 0))
         out.write("kids 0\n")
     else:
         # -- roof is a separate object
@@ -646,14 +649,14 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
 #        if b.roof_flat:
 #            #out.write("loc 0 0 0\n")
-#            write_and_count_numvert(out, b, nnodes_ground)
+#            write_and_count_numvert(out, b, b.nnodes_outer)
 #            for x in X[:-1]:
 #                z = ground_elev - 1
 #                out.write("%1.2f %1.2f %1.2f\n" % (-x[1], ground_elev + height, -x[0]))
 #            write_and_count_numsurf(out, b, 1)
 #            out.write("SURF 0x0\n")
 #            out.write("mat %i\n" % mat)
-#            out.write("refs %i\n" % nnodes_ground)
+#            out.write("refs %i\n" % b.nnodes_outer)
 #            out.write("%i %g %g\n" % (0, 0, 0))
 #            out.write("%i %g %g\n" % (1, 1, 0))
 #            out.write("%i %g %g\n" % (2, 1, 1))
@@ -662,11 +665,11 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 #            out.write("kids 0\n")
         if True:
             # -- pitched roof
-            write_and_count_numvert(out, b, nnodes_ground + 2)
+            write_and_count_numvert(out, b, b.nnodes_outer + 2)
             # -- 4 corners
             for x in X:
-                z = ground_elev - 1
-                out.write("%1.2f %1.2f %1.2f\n" % (-x[1], ground_elev + b.height, -x[0]))
+                z = b.ground_elev - 1
+                out.write("%1.2f %1.2f %1.2f\n" % (-x[1], b.ground_elev + b.height, -x[0]))
             # --
             #mid_short_x = 0.5*(X[3][1]+X[0][1])
             #mid_short_z = 0.5*(X[3][0]+X[0][0])
@@ -678,8 +681,8 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             len_roof_top = lenX[0] - 2.*inward
             len_roof_bottom = 1.*lenX[0]
 
-            out.write("%1.2f %1.2f %1.2f\n" % (-(0.5*(X[3][1]+X[0][1]) + tang[1]), ground_elev + height + roof_height, -(0.5*(X[3][0]+X[0][0]) + tang[0])))
-            out.write("%1.2f %1.2f %1.2f\n" % (-(0.5*(X[1][1]+X[2][1]) - tang[1]), ground_elev + height + roof_height, -(0.5*(X[1][0]+X[2][0]) - tang[0])))
+            out.write("%1.2f %1.2f %1.2f\n" % (-(0.5*(X[3][1]+X[0][1]) + tang[1]), b.ground_elev + height + roof_height, -(0.5*(X[3][0]+X[0][0]) + tang[0])))
+            out.write("%1.2f %1.2f %1.2f\n" % (-(0.5*(X[1][1]+X[2][1]) - tang[1]), b.ground_elev + height + roof_height, -(0.5*(X[1][0]+X[2][0]) - tang[0])))
 
             roof_texture_size_x = roof_texture.h_size_meters # size of roof texture in meters
             roof_texture_size_y = roof_texture.v_size_meters
@@ -690,7 +693,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             write_and_count_numsurf(out, b, 4)
             out.write("SURF 0x0\n")
             out.write("mat %i\n" % b.mat)
-            out.write("refs %i\n" % nnodes_ground)
+            out.write("refs %i\n" % b.nnodes_outer)
             out.write("%i %g %g\n" % (0, 0, 0))
             out.write("%i %g %g\n" % (1, repeatx, 0))
             out.write("%i %g %g\n" % (5, repeatx*(1-inward/len_roof_bottom), repeaty))
@@ -698,7 +701,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
             out.write("SURF 0x0\n")
             out.write("mat %i\n" % b.mat)
-            out.write("refs %i\n" % nnodes_ground)
+            out.write("refs %i\n" % b.nnodes_outer)
             out.write("%i %g %g\n" % (2, 0, 0))
             out.write("%i %g %g\n" % (3, repeatx, 0))
             out.write("%i %g %g\n" % (4, repeatx*(1-inward/len_roof_bottom), repeaty))
@@ -732,14 +735,14 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
             out.write('texture "%s"\n' % (roof_texture.filename + '.png'))
 
-            write_and_count_numvert(out, b, nnodes_ground)
+            write_and_count_numvert(out, b, b.nnodes_outer)
             for x in X:
-                z = ground_elev - 1
-                out.write("%1.2f %1.2f %1.2f\n" % (-x[1], ground_elev + height, -x[0]))
+                z = b.ground_elev - 1
+                out.write("%1.2f %1.2f %1.2f\n" % (-x[1], b.ground_elev + height, -x[0]))
             write_and_count_numsurf(out, b, 1)
             out.write("SURF 0x0\n")
             out.write("mat %i\n" % b.mat)
-            out.write("refs %i\n" % nnodes_ground)
+            out.write("refs %i\n" % b.nnodes_outer)
             out.write("%i %g %g\n" % (0, 0, 0))
             out.write("%i %g %g\n" % (1, 1, 0))
             out.write("%i %g %g\n" % (2, 1, 1))

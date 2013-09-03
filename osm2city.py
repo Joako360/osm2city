@@ -136,8 +136,22 @@ class Building(object):
         return list(self.polygon.exterior.coords)[:-1]
 
     @property
+    def _nnodes_ground(self):
+        n = len(self.polygon.exterior.coords) - 1
+        for item in self.polygon.interiors:
+            n += len(item.coords) - 1
+        return n
+
+    @property
+    def nnodes_outer(self):
+        return len(self.polygon.exterior.coords) - 1
+
+    @property
     def area(self):
         return self.polygon.area
+
+#    def translate(self, offset)
+#        shapely.affinity.translate(geom, xoff=0.0, yoff=0.0, zoff=0.0)
 
         #print "tr X", self.X
 
