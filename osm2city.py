@@ -103,7 +103,7 @@ class Building(object):
                  stg_typ = None, stg_hdg = None, inner_coords_list = []):
         self.osm_id = osm_id
         self.tags = tags
-        self.coords = coords # the referenced (outer) coordinate objects
+        self.coords = coords # (outer) local coordinate objects
         self.inner_coords_list = inner_coords_list
         self.name = name.encode('ascii', 'ignore')     # stg: name
         self.stg_typ = stg_typ  # stg: OBJECT_SHARED or _STATIC
@@ -112,8 +112,7 @@ class Building(object):
         self.levels = levels
         self.vertices = 0
         self.surfaces = 0
-        c = self.coords[0]
-        self.anchor = vec2d(tools.transform.toLocal((c.lon, c.lat)))
+        self.anchor = vec2d([x for x in self.coords[0]])
         self.facade_texture = None
         self.roof_texture = None
         self.roof_separate = False
@@ -165,13 +164,13 @@ class wayExtract(object):
         self.minlat = 91.
         self.maxlat = -91.
 
-    def refs_to_coords(self, refs):
-        """accept a list of osm refs, return a list of lon, lat coordinates"""
+    def refs_to_local_coords(self, refs):
+        """accept a list of osm refs, return a list of local coordinates"""
         coords = []
         for ref in refs:
             for c in self.coord_list:
                 if c.osm_id == ref:
-                    coords.append(c)
+                    coords.append(tools.transform.toLocal((c.lon, c.lat)))
                     break
         return coords
 
@@ -214,12 +213,13 @@ class wayExtract(object):
             _levels = _layer + 2
 
         # -- find outer ref in coords
-        outer_coords = self.refs_to_coords(refs)
+        outer_coords = self.refs_to_local_coords(refs)
+        #outer_coords.append(outer_coords[0])
         # -- find inner ref in coords
 
         inner_coords_list = []
         for way in inner_ways:
-            inner_coords_list.append(self.refs_to_coords(way.refs))
+            inner_coords_list.append(self.refs_to_local_coords(way.refs))
         #for item in inner_coords_list:
         #    print "###"
         #    for c in item:

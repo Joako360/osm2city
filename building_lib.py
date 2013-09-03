@@ -258,12 +258,13 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         #    - compute area
 
         # -- array of actual lon, lat coordinates. Last node duplicated.
-        X = np.array([transform.toLocal((c.lon, c.lat)) for c in b.coords + [b.coords[0]]])
+        #X = np.array(b.coords + [b.coords[0]])
+        X = np.array(b.coords)
 #        for item in b.inner_coords_list:
 #            _iX = np.zeros((b.nnodes_ground+1,2))
 #            for c in item:
 #                _iX[i,0], _iX[i,1] = transform.toLocal((c.lon, c.lat))
-                
+
 
         # -- write nodes to separate debug file
         for i in range(b.nnodes_ground):
@@ -273,34 +274,35 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 #        r = LinearRing(list(X))
 #        p = Polygon(r)
         X, nnodes_simplified = simplify(X, parameters.BUILDING_SIMPLIFY_TOLERANCE)
-        b.nnodes_ground = X.shape[0] - 1
+        b.nnodes_ground = X.shape[0]
 #        if b.nnodes_ground < 3:
 #            pass
         tools.stats.nodes_simplified += nnodes_simplified
         tools.stats.nodes_ground += b.nnodes_ground
 
-        # -- fix inverted faces and compute edge length
-        lenX = np.zeros((b.nnodes_ground))
+        # -- fix inverted faces
         crossX = 0.
-        for i in range(b.nnodes_ground):
+        for i in range(b.nnodes_ground-1):
             crossX += X[i,0]*X[i+1,1] - X[i+1,0]*X[i,1]
-            lenX[i] = ((X[i+1,0]-X[i,0])**2 + (X[i+1,1]-X[i,1])**2)**0.5
-
-#        print "len", len(lenX), b.nnodes_ground, X.shape
-#        print lenX
         if crossX < 0:
             X = X[::-1]
-            lenX = lenX[::-1]
+
+        # -- compute edge length
+        lenX = np.zeros((b.nnodes_ground))
+        for i in range(b.nnodes_ground-1):
+            lenX[i] = ((X[i+1,0]-X[i,0])**2 + (X[i+1,1]-X[i,1])**2)**0.5
+        lenX[-1] = ((X[0,0]-X[-1,0])**2 + (X[0,1]-X[-1,1])**2)**0.5
 
         # -- re-number nodes such that longest edge is first
         if b.nnodes_ground == 4:
             if lenX[0] < lenX[1]:
                 X = np.roll(X, 1, axis=0)
                 lenX = np.roll(lenX, 1)
-                X[0] = X[-1]
-                
+
+
+
         # -- make shapely object
-        b.lenX = lenX   # FIXME: compute on the fly, or on set_polygon()? 
+        b.lenX = lenX   # FIXME: compute on the fly, or on set_polygon()?
                         #        Or is there a shapely equivalent?
         b.set_polygon(X)
 
@@ -566,7 +568,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     #out.write("loc 0 0 0\n")
     write_and_count_numvert(out, b, 2*nnodes_ground)
 
-    for i in range(b.nnodes_ground + 1):
+    for i in range(b.nnodes_ground):
         X[i,0] -= offset.x # cluster coordinates. NB: this changes building coordinates!
         X[i,1] -= offset.y
 
@@ -576,10 +578,10 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     #print "ground_elev", ground_elev
 
 
-    for x in X[:-1]:
+    for x in X:
         z = ground_elev - 1
         out.write("%1.2f %1.2f %1.2f\n" % (-x[1], z, -x[0]))
-    for x in X[:-1]:
+    for x in X:
         out.write("%1.2f %1.2f %1.2f\n" % (-x[1], ground_elev + b.height, -x[0]))
 
     b.ceiling = ground_elev + b.height
@@ -662,7 +664,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             # -- pitched roof
             write_and_count_numvert(out, b, nnodes_ground + 2)
             # -- 4 corners
-            for x in X[:-1]:
+            for x in X:
                 z = ground_elev - 1
                 out.write("%1.2f %1.2f %1.2f\n" % (-x[1], ground_elev + b.height, -x[0]))
             # --
@@ -731,7 +733,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             out.write('texture "%s"\n' % (roof_texture.filename + '.png'))
 
             write_and_count_numvert(out, b, nnodes_ground)
-            for x in X[:-1]:
+            for x in X:
                 z = ground_elev - 1
                 out.write("%1.2f %1.2f %1.2f\n" % (-x[1], ground_elev + height, -x[0]))
             write_and_count_numsurf(out, b, 1)
