@@ -74,6 +74,7 @@ import random
 import copy
 
 from imposm.parser import OSMParser
+import shapely.geometry as shg
 import coordinates
 import itertools
 from cluster import Clusters
@@ -95,27 +96,47 @@ buildings = [] # -- master list, holds all buildings
 
 class Building(object):
     """Central object class.
-       Holds all data relevant for a building. Coordinates, type, area, ..."""
-    def __init__(self, osm_id, tags, refs, name, height, levels, stg_typ = None, stg_hdg = None):
+       Holds all data relevant for a building. Coordinates, type, area, ...
+       Read-only access to node coordinates via self.X[node][0|1]
+    """
+    def __init__(self, osm_id, tags, coords, name, height, levels,
+                 stg_typ = None, stg_hdg = None, inner_coords_list = []):
         self.osm_id = osm_id
         self.tags = tags
-        self.refs = refs # the referenced coordinate nodes
+        self.coords = coords # the referenced (outer) coordinate objects
+        self.inner_coords_list = inner_coords_list
         self.name = name.encode('ascii', 'ignore')     # stg: name
         self.stg_typ = stg_typ  # stg: OBJECT_SHARED or _STATIC
         self.stg_hdg = stg_hdg
         self.height = height
         self.levels = levels
-        self.area = 0
         self.vertices = 0
         self.surfaces = 0
-        r = self.refs[0]
-        self.anchor = vec2d(tools.transform.toLocal((r.lon, r.lat)))
+        c = self.coords[0]
+        self.anchor = vec2d(tools.transform.toLocal((c.lon, c.lat)))
         self.facade_texture = None
         self.roof_texture = None
         self.roof_separate = False
         self.roof_flat = True
         self.ac_name = None
         self.ceiling = 0.
+        self.polygon = None
+
+    def set_polygon(self, outer, inner = []):
+        ring = shg.polygon.LinearRing(list(outer))
+        # make linear rings for inner(s)
+        inner_rings = [shg.polygon.LinearRing(list(i)) for i in inner]
+        if inner_rings:
+            print "inner!", inner_rings
+        self.polygon = shg.Polygon(ring, inner_rings)
+
+    @property
+    def X(self):
+        return self.polygon.exterior.coords
+
+    @property
+    def area(self):
+        return self.polygon.area
 
         #print "tr X", self.X
 
@@ -124,6 +145,8 @@ class Coord(object):
         self.osm_id = osm_id
         self.lon = lon
         self.lat = lat
+    def __str__(self):
+        return "%g %g" % (self.lon, self.lat)
 
 class Way(object):
     def __init__(self, osm_id, tags, refs):
@@ -142,7 +165,17 @@ class wayExtract(object):
         self.minlat = 91.
         self.maxlat = -91.
 
-    def make_building_from_way(self, osm_id, tags, refs):
+    def refs_to_coords(self, refs):
+        """accept a list of osm refs, return a list of lon, lat coordinates"""
+        coords = []
+        for ref in refs:
+            for c in self.coord_list:
+                if c.osm_id == ref:
+                    coords.append(c)
+                    break
+        return coords
+
+    def make_building_from_way(self, osm_id, tags, refs, inner_ways = []):
 #       p = multiprocessing.current_process()
 #       print 'running:', p.name, p.pid
         #print "got building", osm_id, tags
@@ -180,26 +213,30 @@ class wayExtract(object):
         if _layer < 99 and _height == 0 and _levels == 0:
             _levels = _layer + 2
 
-        # -- find ref in coords
-        _refs = []
-        for ref in refs:
-            for coord in self.coord_list:
-                if coord.osm_id == ref:
-                    _refs.append(coord)
-                    break
+        # -- find outer ref in coords
+        outer_coords = self.refs_to_coords(refs)
+        # -- find inner ref in coords
 
-        if len(_refs) < 3: return False
+        inner_coords_list = []
+        for way in inner_ways:
+            inner_coords_list.append(self.refs_to_coords(way.refs))
+        #for item in inner_coords_list:
+        #    print "###"
+        #    for c in item:
+        #        print "IC", str(c)
+
+
+        if len(outer_coords) < 3: return False
         #if len(building.refs) != 4: return # -- testing, 4 corner buildings only
 
         # -- all checks OK: accept building
-        self.buildings.append(Building(osm_id, tags, _refs, _name, _height, _levels))
+        self.buildings.append(Building(osm_id, tags, outer_coords, _name, _height, _levels, inner_coords_list = inner_coords_list))
         tools.stats.objects += 1
         if tools.stats.objects % 70 == 0: print tools.stats.objects
         else: sys.stdout.write(".")
         return True
 
-
-    def relations(self, relations):
+    def _relations(self, relations):
         for osm_id, tags, members in relations:
             if tools.stats.objects >= parameters.MAX_OBJECTS:
                 return
@@ -215,6 +252,32 @@ class wayExtract(object):
                                 print "FIXME: skipping possible 'inner' way(s) of relation %i" % osm_id
  #                               print "corr way: ", way
                                 break
+
+    def relations(self, relations):
+        for osm_id, tags, members in relations:
+            if tools.stats.objects >= parameters.MAX_OBJECTS:
+                return
+            if 'building' in tags:
+                outer = None
+                inner_ways = []
+                #print "rel: ", osm_id, tags #, members
+                for ref, typ, role in members:
+#                    if typ == 'way' and role == 'inner':
+                    if typ == 'way':
+                        if role == 'outer':
+                            for way in self.way_list:
+                                if way.osm_id == ref: outer = way
+                        elif role == 'inner':
+                            for way in self.way_list:
+                                if way.osm_id == ref: inner_ways.append(way)
+
+                if outer:
+                    self.make_building_from_way(outer.osm_id,
+                                                dict(outer.tags.items() + tags.items()),
+                                                outer.refs, inner_ways)
+                    self.way_list.remove(outer) # -- way could have a 'building' tag. Prevent processing this twice
+                    print "FIXME: skipping possible 'inner' way(s) of relation %i" % osm_id
+ #                               print "corr way: ", way
 
 
     def ways(self, ways):

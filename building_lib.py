@@ -202,12 +202,10 @@ def simplify(X, threshold):
     ring = shg.polygon.LinearRing(list(X))
     p = shg.Polygon(ring)
     p_simple = p.simplify(threshold)
-    X_simple = np.array(p_simple.exterior.coords.xy).transpose()
-    nodes_lost = X.shape[0] - X_simple.shape[0]
-    print "XX", X[0,0], X[0,1]
-    print "RR", ring.coords[0][0], ring.coords[0][1]
-    print "--"
-    return X_simple, p_simple, nodes_lost
+    #X_simple = np.array(p_simple.exterior.coords.xy).transpose()
+    X_simple = np.array(p_simple.exterior.coords)
+    nnodes_lost = X.shape[0] - X_simple.shape[0]
+    return X_simple, nnodes_lost
 
 
 def analyse(buildings, static_objects, transform, elev, facades, roofs):
@@ -250,7 +248,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         b.mat = 0
         b.roof_mat = 0
 
-        b.nnodes_ground = len(b.refs)
+        b.nnodes_ground = len(b.coords)
     #    print nnodes_ground #, b.refs[0].lon, b.refs[0].lat
 
         # -- get geometry right
@@ -258,48 +256,27 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         #    - compute edge lengths
         #    - fix inverted faces
         #    - compute area
-        _X = np.zeros((b.nnodes_ground+1,2))
-        i = 0
-        for r in b.refs:
-            _X[i,0], _X[i,1] = transform.toLocal((r.lon, r.lat))
-            i += 1
+
+        # -- array of actual lon, lat coordinates. Last node duplicated.
+        X = np.array([transform.toLocal((c.lon, c.lat)) for c in b.coords + [b.coords[0]]])
+#        for item in b.inner_coords_list:
+#            _iX = np.zeros((b.nnodes_ground+1,2))
+#            for c in item:
+#                _iX[i,0], _iX[i,1] = transform.toLocal((c.lon, c.lat))
+                
 
         # -- write nodes to separate debug file
         for i in range(b.nnodes_ground):
-            tools.stats.debug1.write("%g %g\n" % (_X[i,0], _X[i,1]))
-
-
-        _X[-1] = _X[0] # -- we duplicate last node!
-
-        # -- create shapely object
-        ring = shg.polygon.LinearRing(list(_X))
-        b.polygon = shg.Polygon(ring)
-        p_simple = b.polygon.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
-        X = np.array(p_simple.exterior.coords.xy).transpose()
-        #nodes_lost = X.shape[0] - X_simple.shape[0]
-#        print "XX", _X[0,0], _X[0,1]
-        print "XX", _X[0], _X[1]
-        print "RR", ring.coords[0][0], ring.coords[0][1]
-        print "PP", b.polygon.exterior.coords.xy
-        b.xx = b.polygon.exterior.coords.xy
-        print "xx", b.xx[0][0], b.xx[1][0]
-        bla
-        b.xx[0][0] = 5.
-        print "sam!", b.xx[0][0]
-        print "sam?", b.polygon.exterior.coords.xy[0][0]
-        print "--"
-        #return X_simple, p_simple, nodes_lost
-
+            tools.stats.debug1.write("%g %g\n" % (X[i,0], X[i,1]))
 
         # -- shapely: compute area
 #        r = LinearRing(list(X))
 #        p = Polygon(r)
-        #X, p, nodes_simplified = simplify(X, parameters.BUILDING_SIMPLIFY_TOLERANCE)
-        #b.area = p.area
+        X, nnodes_simplified = simplify(X, parameters.BUILDING_SIMPLIFY_TOLERANCE)
         b.nnodes_ground = X.shape[0] - 1
 #        if b.nnodes_ground < 3:
 #            pass
-        tools.stats.nodes_simplified += 0 #nodes_simplified
+        tools.stats.nodes_simplified += nnodes_simplified
         tools.stats.nodes_ground += b.nnodes_ground
 
         # -- fix inverted faces and compute edge length
@@ -321,6 +298,11 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 X = np.roll(X, 1, axis=0)
                 lenX = np.roll(lenX, 1)
                 X[0] = X[-1]
+                
+        # -- make shapely object
+        b.lenX = lenX   # FIXME: compute on the fly, or on set_polygon()? 
+                        #        Or is there a shapely equivalent?
+        b.set_polygon(X)
 
         # -- skip buildings outside elevation raster
         if elev(vec2d(X[0])) == -9999:
@@ -407,8 +389,6 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             b.roof_texture = roofs.find_matching(b.facade_texture.requires)
 
         # -- finally: append building to new list
-        b.X = X
-        b.lenX = lenX
         new_buildings.append(b)
 
     return new_buildings
@@ -509,6 +489,15 @@ def decide_LOD(buildings):
         b.LOD = lod
         tools.stats.count_LOD(lod)
 
+def write_surf_ring(b):
+    # write outer
+    # has inner? if so, write it, too.
+    pass
+
+def write_surf_flat_roof(b):
+    pass
+
+
 def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     """now actually write building.
        While writing, accumulate some statistics
@@ -516,7 +505,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
        offset accounts for cluster center
     """
 
-    X = b.X
+    X = np.array(b.X)
     lenX = b.lenX
     height = b.height
     roof_texture = b.roof_texture
