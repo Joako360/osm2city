@@ -198,12 +198,12 @@ def test_ac_load():
 #    out.close()
     #print s
 
-def simplify(X, threshold):
+def _DEP_simplify(X, threshold):
     ring = shg.polygon.LinearRing(list(X))
     p = shg.Polygon(ring)
     p_simple = p.simplify(threshold)
     #X_simple = np.array(p_simple.exterior.coords.xy).transpose()
-    X_simple = np.array(p_simple.exterior.coords)
+    X_simple = np.array(p_simple.exterior.coords)[:-1]
     nnodes_lost = X.shape[0] - X_simple.shape[0]
     return X_simple, nnodes_lost
 
@@ -248,7 +248,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         b.mat = 0
         b.roof_mat = 0
 
-        b.nnodes_ground = len(b.coords)
+        b.nnodes_ground = len(b.X)
     #    print nnodes_ground #, b.refs[0].lon, b.refs[0].lat
 
         # -- get geometry right
@@ -259,7 +259,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
         # -- array of actual lon, lat coordinates. Last node duplicated.
         #X = np.array(b.coords + [b.coords[0]])
-        X = np.array(b.coords)
+        X = np.array(b.X)
 #        for item in b.inner_coords_list:
 #            _iX = np.zeros((b.nnodes_ground+1,2))
 #            for c in item:
@@ -273,19 +273,20 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         # -- shapely: compute area
 #        r = LinearRing(list(X))
 #        p = Polygon(r)
-        X, nnodes_simplified = simplify(X, parameters.BUILDING_SIMPLIFY_TOLERANCE)
-        b.nnodes_ground = X.shape[0]
+        #X, nnodes_simplified = simplify(X, parameters.BUILDING_SIMPLIFY_TOLERANCE)
+        b.nnodes_ground = len(X)
+
 #        if b.nnodes_ground < 3:
 #            pass
-        tools.stats.nodes_simplified += nnodes_simplified
+        #tools.stats.nodes_simplified += nnodes_simplified
         tools.stats.nodes_ground += b.nnodes_ground
 
         # -- fix inverted faces
-        crossX = 0.
-        for i in range(b.nnodes_ground-1):
-            crossX += X[i,0]*X[i+1,1] - X[i+1,0]*X[i,1]
-        if crossX < 0:
-            X = X[::-1]
+        #crossX = 0.
+        #for i in range(b.nnodes_ground-1):
+        #    crossX += X[i,0]*X[i+1,1] - X[i+1,0]*X[i,1]
+        #if crossX < 0:
+        #   X = X[::-1]
 
         # -- compute edge length
         lenX = np.zeros((b.nnodes_ground))
@@ -301,7 +302,6 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
 
 
-        # -- make shapely object
         b.lenX = lenX   # FIXME: compute on the fly, or on set_polygon()?
                         #        Or is there a shapely equivalent?
         b.set_polygon(X)

@@ -99,12 +99,12 @@ class Building(object):
        Holds all data relevant for a building. Coordinates, type, area, ...
        Read-only access to node coordinates via self.X[node][0|1]
     """
-    def __init__(self, osm_id, tags, coords, name, height, levels,
-                 stg_typ = None, stg_hdg = None, inner_coords_list = []):
+    def __init__(self, osm_id, tags, outer_ring, name, height, levels,
+                 stg_typ = None, stg_hdg = None, inner_rings_list = []):
         self.osm_id = osm_id
         self.tags = tags
-        self.coords = coords # (outer) local coordinate objects
-        self.inner_coords_list = inner_coords_list
+        self.outer_ring = outer_ring # (outer) local linear ring
+        self.inner_rings_list = inner_rings_list
         self.name = name.encode('ascii', 'ignore')     # stg: name
         self.stg_typ = stg_typ  # stg: OBJECT_SHARED or _STATIC
         self.stg_hdg = stg_hdg
@@ -112,26 +112,28 @@ class Building(object):
         self.levels = levels
         self.vertices = 0
         self.surfaces = 0
-        self.anchor = vec2d([x for x in self.coords[0]])
+        self.anchor = vec2d([x for x in self.outer_ring.coords[0]])
         self.facade_texture = None
         self.roof_texture = None
         self.roof_separate = False
         self.roof_flat = True
         self.ac_name = None
         self.ceiling = 0.
-        self.polygon = None
+        self.set_polygon(self.outer_ring)
+        #print list(self.X)
+        #self.polygon = None
 
     def set_polygon(self, outer, inner = []):
-        ring = shg.polygon.LinearRing(list(outer))
+        #ring = shg.polygon.LinearRing(list(outer))
         # make linear rings for inner(s)
-        inner_rings = [shg.polygon.LinearRing(list(i)) for i in inner]
-        if inner_rings:
-            print "inner!", inner_rings
-        self.polygon = shg.Polygon(ring, inner_rings)
+        #inner_rings = [shg.polygon.LinearRing(list(i)) for i in inner]
+        #if inner_rings:
+        #    print "inner!", inner_rings
+        self.polygon = shg.Polygon(outer, inner)
 
     @property
     def X(self):
-        return self.polygon.exterior.coords
+        return list(self.polygon.exterior.coords)[:-1]
 
     @property
     def area(self):
@@ -164,7 +166,7 @@ class wayExtract(object):
         self.minlat = 91.
         self.maxlat = -91.
 
-    def refs_to_local_coords(self, refs):
+    def _DEPRECATED_refs_to_local_coords(self, refs):
         """accept a list of osm refs, return a list of local coordinates"""
         coords = []
         for ref in refs:
@@ -173,6 +175,23 @@ class wayExtract(object):
                     coords.append(tools.transform.toLocal((c.lon, c.lat)))
                     break
         return coords
+
+    def refs_to_simplified_CCW_ring(self, refs):
+        """accept a list of OSM refs, return a simplified, CCW, linear ring"""
+        coords = []
+        for ref in refs:
+            for c in self.coord_list:
+                if c.osm_id == ref:
+                    coords.append(tools.transform.toLocal((c.lon, c.lat)))
+                    break
+        ring = shg.polygon.LinearRing(coords)
+        if not ring.is_ccw:
+            ring.coords = list(ring.coords)[::-1]
+        p = shg.Polygon(ring)
+        p_simple = p.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
+        nnodes_simplified = len(p_simple.exterior.coords) - len(p.exterior.coords)
+        tools.stats.nodes_simplified += nnodes_simplified
+        return p_simple.exterior
 
     def make_building_from_way(self, osm_id, tags, refs, inner_ways = []):
 #       p = multiprocessing.current_process()
@@ -212,25 +231,27 @@ class wayExtract(object):
         if _layer < 99 and _height == 0 and _levels == 0:
             _levels = _layer + 2
 
-        # -- find outer ref in coords
-        outer_coords = self.refs_to_local_coords(refs)
-        #outer_coords.append(outer_coords[0])
-        # -- find inner ref in coords
-
-        inner_coords_list = []
-        for way in inner_ways:
-            inner_coords_list.append(self.refs_to_local_coords(way.refs))
         #for item in inner_coords_list:
         #    print "###"
         #    for c in item:
         #        print "IC", str(c)
 
-
-        if len(outer_coords) < 3: return False
-        #if len(building.refs) != 4: return # -- testing, 4 corner buildings only
+#        if len(refs) != 4: return False# -- testing, 4 corner buildings only
 
         # -- all checks OK: accept building
-        self.buildings.append(Building(osm_id, tags, outer_coords, _name, _height, _levels, inner_coords_list = inner_coords_list))
+
+        # -- find outer ref in coords
+        #outer_coords = self.refs_to_local_coords(refs)
+        outer_ring = self.refs_to_simplified_CCW_ring(refs)
+
+        #outer_coords.append(outer_coords[0])
+        # -- find inner ref in coords
+
+        inner_rings_list = []
+        for way in inner_ways:
+            inner_rings_list.append(self.refs_to_simplified_CCW_ring(way.refs))
+
+        self.buildings.append(Building(osm_id, tags, outer_ring, _name, _height, _levels, inner_rings_list = inner_rings_list))
         tools.stats.objects += 1
         if tools.stats.objects % 70 == 0: print tools.stats.objects
         else: sys.stdout.write(".")
