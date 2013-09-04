@@ -267,26 +267,14 @@ class wayExtract(object):
         if _layer < 99 and _height == 0 and _levels == 0:
             _levels = _layer + 2
 
-        #for item in inner_coords_list:
-        #    print "###"
-        #    for c in item:
-        #        print "IC", str(c)
-
 #        if len(refs) != 4: return False# -- testing, 4 corner buildings only
 
         # -- all checks OK: accept building
 
-        # -- find outer ref in coords
-        #outer_coords = self.refs_to_local_coords(refs)
-        #print "outer?", refs, osm_id
+        # -- make outer and inner rings from refs
         outer_ring = self.refs_to_ring(refs)
-
-        #outer_coords.append(outer_coords[0])
-        # -- find inner ref in coords
-
         inner_rings_list = []
         for way in inner_ways:
-            #print "call", way.refs
             inner_rings_list.append(self.refs_to_ring(way.refs, inner=True))
 
         self.buildings.append(Building(osm_id, tags, outer_ring, _name, _height, _levels, inner_rings_list = inner_rings_list))
@@ -294,23 +282,6 @@ class wayExtract(object):
         if tools.stats.objects % 70 == 0: print tools.stats.objects
         else: sys.stdout.write(".")
         return True
-
-    def _relations(self, relations):
-        for osm_id, tags, members in relations:
-            if tools.stats.objects >= parameters.MAX_OBJECTS:
-                return
-            if 'building' in tags:
-                #print "rel: ", osm_id, tags #, members
-                for ref, typ, role in members:
-#                    if typ == 'way' and role == 'inner':
-                    if typ == 'way' and role == 'outer':
-                        for way in self.way_list:
-                            if way.osm_id == ref:
-                                self.make_building_from_way(way.osm_id, dict(way.tags.items() + tags.items()), way.refs)
-                                self.way_list.remove(way) # -- way could have a 'building' tag. Prevent processing this twice
-                                #print "FIXME: skipping possible 'inner' way(s) of relation %i" % osm_id
- #                               print "corr way: ", way
-                                break
 
     def relations(self, relations):
         for osm_id, tags, members in relations:
@@ -361,7 +332,6 @@ class wayExtract(object):
 
     def ways(self, ways):
         """callback method for ways"""
-#        print ">>> one call", len(ways)
         for osm_id, tags, refs in ways:
             if tools.stats.objects >= parameters.MAX_OBJECTS: return
             self.way_list.append(Way(osm_id, tags, refs))
@@ -686,7 +656,6 @@ if __name__ == "__main__":
 
     # -- now put buildings into clusters
     for b in buildings:
-        #print "an ", b.anchor
         clusters.append(b.anchor, b)
 
     building_lib.decide_LOD(buildings)
@@ -704,10 +673,6 @@ if __name__ == "__main__":
 
             # -- get cluster center
             offset = cl.center
-
-            #print "\ncl offset", offset
-#            for b in cl.objects:
-                #print (b.anchor - offset), "    ", b.anchor
 
             # -- count roofs == separate objects
             nroofs = 0

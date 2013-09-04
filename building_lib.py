@@ -216,11 +216,6 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         s = get_nodes_from_acs(static_objects, parameters.PREFIX + "city")
 
         np.savetxt("nodes.dat", s)
-#    s = np.zeros((len(static_objects.objs), 2))
-#    i = 0
-#    for b in static_objects.objs:
-#        s[i] = b.anchor.list()
-#        i += 1
         static_tree = KDTree(s, leafsize=10) # -- switch to brute force at 10
 
     new_buildings = []
@@ -240,6 +235,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         b.roof_mat = 0
 
         # -- get geometry right
+        #    - simplify
         #    - compute edge lengths
 
         tools.stats.nodes_simplified += b.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
@@ -261,8 +257,6 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         lenX[n-1] = ((Xo[0,0]-Xo[n-1,0])**2 + (Xo[0,1]-Xo[n-1,1])**2)**0.5
 
         if b.inner_rings_list:
-            #Xi = np.array(b.X)
-            print "INNER", len(b.inner_rings_list), b.X_inner
             i0 = b.nnodes_outer
             for interior in b.polygon.interiors:
                 Xi = np.array(interior.coords)[:-1]
@@ -272,7 +266,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 lenX[i0 + n - 1] = ((Xi[0,0]-Xi[n-1,0])**2 + (Xi[0,1]-Xi[n-1,1])**2)**0.5
                 i0 += n
 
-        # -- re-number nodes such that longest edge is first
+        # -- re-number nodes such that longest edge is first -- only on simple buildings
         if b.nnodes_outer == 4 and not b.X_inner:
             if lenX[0] < lenX[1]:
                 Xo = np.roll(Xo, 1, axis=0)
@@ -312,7 +306,6 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             tools.stats.skipped_small += 1
             continue
 
-
         if b.height < parameters.BUILDING_MIN_HEIGHT:
             print "Skipping small building with height < building_min_height parameter"
             tools.stats.skipped_small += 1
@@ -345,17 +338,6 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         if b.roof_separate and not b.roof_flat:
             requires.append('age:old')
             requires.append('compat:roof-pitched')
-
-        #tools.stats.print_summary()
-    #    if p.area < 200.:
-    #        print "small?", p.area
-    #
-    #        mat = 1
-    #        roof_mat = 1
-    #        roof_flat = True
-    #        b.roof_separate = False
-            #plot.linear_ring(LinearRing(X))
-            #sys.exit(0)
 
         # -- determine facade and roof textures
         b.facade_texture = facades.find_matching(requires, b.height)
@@ -633,9 +615,9 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         #   |           |
         #   | 7----4    |  draw 0 1 2 3 - 0 - 6 7 4 5 - 6
         #   | |    |    |
-        #   | 6----5    |  6 is the inner node which is closest to first outer node
+        #   | 6-<<-5    |  6 is the inner node which is closest to first outer node
         #   |/          |
-        #   0-----------1
+        #   0---->>-----1
 
         # -- find inner node i that is closest to first outer node
         xo = shg.Point(b.X_outer[0])
@@ -658,7 +640,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         tools.stats.count(b)
         return
 
-    if no_roof:
+    if no_roof:  # -- a debug thing
         out.write("kids 0\n")
         tools.stats.count(b)
         return
@@ -689,22 +671,6 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         else:
             out.write('texture "%s"\n' % (roof_texture.filename + '.png'))
 
-#        if b.roof_flat:
-#            #out.write("loc 0 0 0\n")
-#            write_and_count_numvert(out, b, b.nnodes_outer)
-#            for x in X[:-1]:
-#                z = ground_elev - 1
-#                out.write("%1.2f %1.2f %1.2f\n" % (-x[1], ground_elev + height, -x[0]))
-#            write_and_count_numsurf(out, b, 1)
-#            out.write("SURF 0x0\n")
-#            out.write("mat %i\n" % mat)
-#            out.write("refs %i\n" % b.nnodes_outer)
-#            out.write("%i %g %g\n" % (0, 0, 0))
-#            out.write("%i %g %g\n" % (1, 1, 0))
-#            out.write("%i %g %g\n" % (2, 1, 1))
-#            out.write("%i %g %g\n" % (3, 0, 1))
-#
-#            out.write("kids 0\n")
         if True:
             # -- pitched roof
             write_and_count_numvert(out, b, b.nnodes_outer + 2)
@@ -766,7 +732,6 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             out.write("%i %g %g\n" % (3, 0, 0))
             out.write("%i %g %g\n" % (0, repeatx, 0))
             out.write("%i %g %g\n" % (4, 0.5*repeatx, repeaty))
-
 
             # -- LOD flat model
             roof_ac_name_flat = "b%i-flat" % nb
