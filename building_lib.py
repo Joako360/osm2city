@@ -254,12 +254,23 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         tools.stats.nodes_ground += b._nnodes_ground
 
         # -- compute edge length
-        lenX = np.ones((b._nnodes_ground))
+        lenX = np.zeros((b._nnodes_ground))
         for i in range(b.nnodes_outer-1):
             lenX[i] = ((Xo[i+1,0]-Xo[i,0])**2 + (Xo[i+1,1]-Xo[i,1])**2)**0.5
         n = b.nnodes_outer
         lenX[n-1] = ((Xo[0,0]-Xo[n-1,0])**2 + (Xo[0,1]-Xo[n-1,1])**2)**0.5
-        print "FIXME: compute lenX for inner rings, too"
+
+        if b.inner_rings_list:
+            #Xi = np.array(b.X)
+            print "INNER", len(b.inner_rings_list), b.X_inner
+            i0 = b.nnodes_outer
+            for interior in b.polygon.interiors:
+                Xi = np.array(interior.coords)[:-1]
+                n = len(Xi)
+                for i in range(n-1):
+                    lenX[i0 + i] = ((Xi[i+1,0]-Xi[i,0])**2 + (Xi[i+1,1]-Xi[i,1])**2)**0.5
+                lenX[i0 + n - 1] = ((Xi[0,0]-Xi[n-1,0])**2 + (Xi[0,1]-Xi[n-1,1])**2)**0.5
+                i0 += n
 
         # -- re-number nodes such that longest edge is first
         if b.nnodes_outer == 4 and not b.X_inner:
@@ -507,8 +518,8 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
             out.write("SURF 0x0\n")
             mat = b.mat
-            if inner:
-                mat = 1
+            #if inner:
+            #    mat = 1
             out.write("mat %i\n" % mat)
             out.write("refs %i\n" % 4)
             out.write("%i %g %g\n" % (i,                     0,          tex_y0))
@@ -519,7 +530,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         #return OK
 
         # -- closing wall
-        tex_x1 = lenX[b.nnodes_outer-1] /  facade_texture.h_size_meters
+        tex_x1 = lenX[v1-1] /  facade_texture.h_size_meters
         out.write("SURF 0x0\n")
         out.write("mat %i\n" % mat)
         out.write("refs %i\n" % 4)
@@ -631,7 +642,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         dists = np.array([shg.Point(xi).distance(xo) for xi in b.polygon.interiors[0].coords])
         #i = dists.argmin()
         out.write("SURF 0x0\n")
-        out.write("mat %i\n" % 2)
+        out.write("mat %i\n" % b.mat)
         out.write("refs %i\n" % (b._nnodes_ground + 2))
 
         for i in range(b._nnodes_ground, b._nnodes_ground + b.nnodes_outer):

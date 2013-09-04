@@ -112,14 +112,17 @@ class Building(object):
         self.levels = levels
         self.vertices = 0
         self.surfaces = 0
-        self.anchor = vec2d([x for x in outer_ring.coords[0]])
+        self.anchor = vec2d(list(outer_ring.coords[0]))
         self.facade_texture = None
         self.roof_texture = None
         self.roof_separate = False
         self.roof_flat = True
         self.ac_name = None
         self.ceiling = 0.
-        self.set_polygon(outer_ring, inner_rings_list)
+        if len(outer_ring.coords) > 2:
+            self.set_polygon(outer_ring, inner_rings_list)
+        else:
+            self.polygon = None
 
     def simplify(self, tolerance):
         original_nodes = self.nnodes_outer + len(self.X_inner)
@@ -412,8 +415,8 @@ def write_ac_header(out, nb):
     out.write("AC3Db\n")
 #    out.write("%s\n" % mats[random.randint(0,2)])
     out.write("""MATERIAL "" rgb 1   1   1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0\n""")
-    out.write("""MATERIAL "" rgb 1   0   0 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0\n""")
-    out.write("""MATERIAL "" rgb 0   1   0 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0\n""")
+#    out.write("""MATERIAL "" rgb 1   0   0 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0\n""")
+#    out.write("""MATERIAL "" rgb 0   1   0 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0\n""")
 #    MATERIAL "" rgb 1   1    1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
 #    MATERIAL "" rgb .95 1    1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
 #    MATERIAL "" rgb 1   0.95 1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0

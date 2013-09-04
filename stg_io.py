@@ -10,6 +10,8 @@ import os
 import string
 #from osm2city import Building, Coords
 import osm2city
+import shapely.geometry as shg
+import tools
 #, transform
 
 #    def __str__(self):
@@ -37,9 +39,10 @@ def read(path, stg, prefix, fgscenery):
             lat = float(splitted[3])
             alt = float(splitted[4])
             r = osm2city.Coord(-1, lon, lat)
+            point = shg.Point(tools.transform.toLocal((r.lon, r.lat)))
             hdg = float(splitted[5])
                 #print "stg:", typ, path + ac_path
-            objs.append(osm2city.Building(osm_id=-1, tags=-1, refs=[r], name=path + ac_path, height=0, levels=0, stg_typ = typ, stg_hdg = hdg))
+            objs.append(osm2city.Building(osm_id=-1, tags=-1, outer_ring = point, name=path + ac_path, height=0, levels=0, stg_typ = typ, stg_hdg = hdg))
         f.close()
     except IOError, reason:
         print "stg_io:read: Ignoring unreadable file %s" % reason
