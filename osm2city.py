@@ -147,11 +147,11 @@ class Building(object):
     @property
     def X_outer(self):
         return list(self.polygon.exterior.coords)[:-1]
-    
-    @property    
+
+    @property
     def X_inner(self):
-        return [coord for interior in self.polygon.interiors for coord in interior.coords[:-1]]
-        
+        return [coord for interior in self.polygon.interiors for coord in list(interior.coords)[:-1]]
+
 
     @property
     def _nnodes_ground(self):  # FIXME: changed behavior. Keep _ until all bugs found
@@ -224,7 +224,7 @@ class wayExtract(object):
         # -- outer -> CCW, inner -> not CCW
         if ring.is_ccw == inner:
             ring.coords = list(ring.coords)[::-1]
-        return ring            
+        return ring
 
     def make_building_from_way(self, osm_id, tags, refs, inner_ways = []):
 #       p = multiprocessing.current_process()
@@ -347,11 +347,11 @@ class wayExtract(object):
                         self.make_building_from_way(outer_ways[0].osm_id,
                                                     all_tags,
                                                     all_outer_refs, inner_ways)
-                        
+
 
                     # -- way could have a 'building' tag. Prevent processing this twice
                     for way in outer_ways:
-                        self.way_list.remove(way) 
+                        self.way_list.remove(way)
                     #print "FIXME: skipping possible 'inner' way(s) of relation %i" % osm_id
  #                               print "corr way: ", way
 

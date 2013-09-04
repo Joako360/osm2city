@@ -257,7 +257,9 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         lenX = np.ones((b._nnodes_ground))
         for i in range(b.nnodes_outer-1):
             lenX[i] = ((Xo[i+1,0]-Xo[i,0])**2 + (Xo[i+1,1]-Xo[i,1])**2)**0.5
-        lenX[-1] = ((Xo[0,0]-Xo[-1,0])**2 + (Xo[0,1]-Xo[-1,1])**2)**0.5
+        n = b.nnodes_outer
+        lenX[n-1] = ((Xo[0,0]-Xo[n-1,0])**2 + (Xo[0,1]-Xo[n-1,1])**2)**0.5
+        print "FIXME: compute lenX for inner rings, too"
 
         # -- re-number nodes such that longest edge is first
         if b.nnodes_outer == 4 and not b.X_inner:
@@ -386,7 +388,7 @@ def is_static_object_nearby(b, X, static_tree):
 
 
 def is_large_enough(b, buildings):
-    """Checks whether a given building's area is too small for inclusion. 
+    """Checks whether a given building's area is too small for inclusion.
     Never drop tall buildings.
     FIXME: Exclusion might be skipped if the building touches another building (i.e. an annex)
     Returns true if the building should be included (i.e. area is big enough etc.)
@@ -402,7 +404,7 @@ def is_large_enough(b, buildings):
     return True
 
 def compute_height_and_levels(b):
-    """Determines total height (and number of levels) of a building based on 
+    """Determines total height (and number of levels) of a building based on
        OSM values and other logic"""
     level_height = random_level_height()
 
@@ -490,7 +492,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     # ----
     def write_ring(out, b, ring, v0, inner = False):
         nnodes_ring = len(ring.coords) - 1
-    
+
         v1 = v0 + nnodes_ring
         for i in range(v0, v1 - 1):
             if False:
@@ -502,7 +504,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
                 ia = int(a)
                 frac = a - ia
                 tex_x1 = facade_texture.closest_h_match(frac) + ia
-    
+
             out.write("SURF 0x0\n")
             mat = b.mat
             if inner:
@@ -513,9 +515,9 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             out.write("%i %g %g\n" % (i + 1,                 tex_x1, tex_y0))
             out.write("%i %g %g\n" % (i + 1 + b._nnodes_ground, tex_x1, tex_y1))
             out.write("%i %g %g\n" % (i     + b._nnodes_ground,     0,          tex_y1))
-    
+
         #return OK
-    
+
         # -- closing wall
         tex_x1 = lenX[b.nnodes_outer-1] /  facade_texture.h_size_meters
         out.write("SURF 0x0\n")
@@ -525,7 +527,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         out.write("%i %g %g\n" % (v0,                 tex_x1, tex_y0))
         out.write("%i %g %g\n" % (v0     + b._nnodes_ground,     tex_x1, tex_y1))
         out.write("%i %g %g\n" % (v1 - 1 + b._nnodes_ground, 0,          tex_y1))
-        
+
         return v1
     # ---
     X = np.array(b.X_outer + b.X_inner)
@@ -554,13 +556,13 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     nsurf = b._nnodes_ground
     #nsurf = b.nnodes_outer
 
-    
-    no_roof = False    
+
+    no_roof = False
 #    if len(b.polygon.interiors) < 2:
 #        no_roof = False
 #    else:
 #        no_roof = True
-        
+
     if (not no_roof) and (not roof_separate): nsurf += 1 # -- because roof will be part of base model
 
     #repeat_vert = int(height/3)
@@ -610,11 +612,11 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         v0 = b.nnodes_outer
         for inner in b.polygon.interiors:
             v0 = write_ring(out, b, inner, v0, True)
-    
+
     # -- write relation roof, for special case of exactly one inner ring
     if len(b.polygon.interiors) == 1:
         #print "one roof"
-        # 
+        #
         #   3-----------2  Outer is CCW : 0 1 2 3
         #   |           |  Inner is CW  : 4 5 6 7
         #   |           |
@@ -623,7 +625,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         #   | 6----5    |  6 is the inner node which is closest to first outer node
         #   |/          |
         #   0-----------1
-        
+
         # -- find inner node i that is closest to first outer node
         xo = shg.Point(b.X_outer[0])
         dists = np.array([shg.Point(xi).distance(xo) for xi in b.polygon.interiors[0].coords])
@@ -631,7 +633,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         out.write("SURF 0x0\n")
         out.write("mat %i\n" % 2)
         out.write("refs %i\n" % (b._nnodes_ground + 2))
-            
+
         for i in range(b._nnodes_ground, b._nnodes_ground + b.nnodes_outer):
             out.write("%i %g %g\n" % (i, 0, 0))
         out.write("%i %g %g\n" % (b._nnodes_ground, 0, 0))
@@ -645,14 +647,14 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         tools.stats.count(b)
         return
 
-    if no_roof: 
+    if no_roof:
         out.write("kids 0\n")
         tools.stats.count(b)
         return
 
     if len(b.polygon.interiors) > 1:
         raise NotImplementedError("Can't yet handle relations with more than one inner way")
-        
+
     # -- roof
     if not b.roof_separate:   # -- flat roof
         out.write("SURF 0x0\n")
@@ -778,7 +780,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             out.write("%i %g %g\n" % (3, 0, 1))
 
             out.write("kids 0\n")
-            
+
     tools.stats.count(b)
 
 if __name__ == "__main__":
