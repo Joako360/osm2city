@@ -103,7 +103,7 @@ class Building(object):
                  stg_typ = None, stg_hdg = None, inner_rings_list = []):
         self.osm_id = osm_id
         self.tags = tags
-        self.outer_ring = outer_ring # (outer) local linear ring
+        #self.outer_ring = outer_ring # (outer) local linear ring
         self.inner_rings_list = inner_rings_list
         self.name = name.encode('ascii', 'ignore')     # stg: name
         self.stg_typ = stg_typ  # stg: OBJECT_SHARED or _STATIC
@@ -112,16 +112,29 @@ class Building(object):
         self.levels = levels
         self.vertices = 0
         self.surfaces = 0
-        self.anchor = vec2d([x for x in self.outer_ring.coords[0]])
+        self.anchor = vec2d([x for x in outer_ring.coords[0]])
         self.facade_texture = None
         self.roof_texture = None
         self.roof_separate = False
         self.roof_flat = True
         self.ac_name = None
         self.ceiling = 0.
-        self.set_polygon(self.outer_ring)
-        #print list(self.X)
-        #self.polygon = None
+        self.set_polygon(outer_ring, inner_rings_list)
+
+    def simplify(self, tolerance):
+        original_nodes = self.nnodes_outer + len(self.X_inner)
+        #print ">> outer nodes", b.nnodes_outer
+        #print ">> inner nodes", len(b.X_inner)
+        #print "total", total_nodes
+        #print "now simply"
+        self.polygon = self.polygon.simplify(tolerance)
+        #print ">> outer nodes", b.nnodes_outer
+        #print ">> inner nodes", len(b.X_inner)
+        nnodes_simplified = original_nodes - (self.nnodes_outer + len(self.X_inner))
+        #print "now", simple_nodes
+        #print "--------------------"
+        return nnodes_simplified
+
 
     def set_polygon(self, outer, inner = []):
         #ring = shg.polygon.LinearRing(list(outer))
@@ -132,11 +145,16 @@ class Building(object):
         self.polygon = shg.Polygon(outer, inner)
 
     @property
-    def X(self):
+    def X_outer(self):
         return list(self.polygon.exterior.coords)[:-1]
+    
+    @property    
+    def X_inner(self):
+        return [coord for interior in self.polygon.interiors for coord in interior.coords[:-1]]
+        
 
     @property
-    def _nnodes_ground(self):
+    def _nnodes_ground(self):  # FIXME: changed behavior. Keep _ until all bugs found
         n = len(self.polygon.exterior.coords) - 1
         for item in self.polygon.interiors:
             n += len(item.coords) - 1
@@ -190,22 +208,23 @@ class wayExtract(object):
                     break
         return coords
 
-    def refs_to_simplified_CCW_ring(self, refs):
-        """accept a list of OSM refs, return a simplified, CCW, linear ring"""
+    def refs_to_ring(self, refs, inner = False):
+        """accept a list of OSM refs, return a linear ring. Also
+           fixes face orientation, depending on inner/outer.
+        """
         coords = []
         for ref in refs:
             for c in self.coord_list:
                 if c.osm_id == ref:
                     coords.append(tools.transform.toLocal((c.lon, c.lat)))
                     break
+        #print "before inner", refs
+        #print "cord", coords
         ring = shg.polygon.LinearRing(coords)
-        if not ring.is_ccw:
+        # -- outer -> CCW, inner -> not CCW
+        if ring.is_ccw == inner:
             ring.coords = list(ring.coords)[::-1]
-        p = shg.Polygon(ring)
-        p_simple = p.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
-        nnodes_simplified = len(p_simple.exterior.coords) - len(p.exterior.coords)
-        tools.stats.nodes_simplified += nnodes_simplified
-        return p_simple.exterior
+        return ring            
 
     def make_building_from_way(self, osm_id, tags, refs, inner_ways = []):
 #       p = multiprocessing.current_process()
@@ -256,14 +275,16 @@ class wayExtract(object):
 
         # -- find outer ref in coords
         #outer_coords = self.refs_to_local_coords(refs)
-        outer_ring = self.refs_to_simplified_CCW_ring(refs)
+        #print "outer?", refs, osm_id
+        outer_ring = self.refs_to_ring(refs)
 
         #outer_coords.append(outer_coords[0])
         # -- find inner ref in coords
 
         inner_rings_list = []
         for way in inner_ways:
-            inner_rings_list.append(self.refs_to_simplified_CCW_ring(way.refs))
+            #print "call", way.refs
+            inner_rings_list.append(self.refs_to_ring(way.refs, inner=True))
 
         self.buildings.append(Building(osm_id, tags, outer_ring, _name, _height, _levels, inner_rings_list = inner_rings_list))
         tools.stats.objects += 1
@@ -284,7 +305,7 @@ class wayExtract(object):
                             if way.osm_id == ref:
                                 self.make_building_from_way(way.osm_id, dict(way.tags.items() + tags.items()), way.refs)
                                 self.way_list.remove(way) # -- way could have a 'building' tag. Prevent processing this twice
-                                print "FIXME: skipping possible 'inner' way(s) of relation %i" % osm_id
+                                #print "FIXME: skipping possible 'inner' way(s) of relation %i" % osm_id
  #                               print "corr way: ", way
                                 break
 
@@ -293,7 +314,7 @@ class wayExtract(object):
             if tools.stats.objects >= parameters.MAX_OBJECTS:
                 return
             if 'building' in tags:
-                outer = None
+                outer_ways = []
                 inner_ways = []
                 #print "rel: ", osm_id, tags #, members
                 for ref, typ, role in members:
@@ -301,17 +322,37 @@ class wayExtract(object):
                     if typ == 'way':
                         if role == 'outer':
                             for way in self.way_list:
-                                if way.osm_id == ref: outer = way
+                                if way.osm_id == ref: outer_ways.append(way)
                         elif role == 'inner':
                             for way in self.way_list:
                                 if way.osm_id == ref: inner_ways.append(way)
 
-                if outer:
-                    self.make_building_from_way(outer.osm_id,
-                                                dict(outer.tags.items() + tags.items()),
-                                                outer.refs, inner_ways)
-                    self.way_list.remove(outer) # -- way could have a 'building' tag. Prevent processing this twice
-                    print "FIXME: skipping possible 'inner' way(s) of relation %i" % osm_id
+                if outer_ways:
+                    #print "len outer ways", len(outer_ways)
+                    all_outer_refs = [ref for way in outer_ways for ref in way.refs]
+                    all_tags = tags
+                    for way in outer_ways:
+                        #print "TAG", way.tags
+                        all_tags = dict(way.tags.items() + all_tags.items())
+                    #print "all tags", all_tags
+                    #all_tags = dict([way.tags for way in outer_ways]) # + tags.items())
+                    #print "all outer refs", all_outer_refs
+                    #dict(outer.tags.items() + tags.items())
+                    if len(inner_ways) > 1:
+                        print "FIXME: ignoring all but first inner way (%i total) of ID %i" % (len(inner_ways), osm_id)
+                        self.make_building_from_way(outer_ways[0].osm_id,
+                                                    all_tags,
+                                                    all_outer_refs, [inner_ways[0]])
+                    else:
+                        self.make_building_from_way(outer_ways[0].osm_id,
+                                                    all_tags,
+                                                    all_outer_refs, inner_ways)
+                        
+
+                    # -- way could have a 'building' tag. Prevent processing this twice
+                    for way in outer_ways:
+                        self.way_list.remove(way) 
+                    #print "FIXME: skipping possible 'inner' way(s) of relation %i" % osm_id
  #                               print "corr way: ", way
 
 
@@ -371,7 +412,8 @@ def write_ac_header(out, nb):
     out.write("AC3Db\n")
 #    out.write("%s\n" % mats[random.randint(0,2)])
     out.write("""MATERIAL "" rgb 1   1   1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0\n""")
-#    out.write("""MATERIAL "" rgb 1   0   0 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0\n""")
+    out.write("""MATERIAL "" rgb 1   0   0 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0\n""")
+    out.write("""MATERIAL "" rgb 0   1   0 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0\n""")
 #    MATERIAL "" rgb 1   1    1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
 #    MATERIAL "" rgb .95 1    1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
 #    MATERIAL "" rgb 1   0.95 1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
@@ -442,9 +484,10 @@ def write_xml(fname, LOD_lists, LM_dict, buildings):
     # -- put obstruction lights on hi-rise buildings
     for b in buildings:
         if b.levels >= parameters.OBSTRUCTION_LIGHT_MIN_LEVELS:
-            for i in np.arange(0, b.nnodes_ground, b.nnodes_ground/4.):
-                xo = b.X[int(i+0.5), 0]# - offset.x # -- b.X already in cluster coordinates
-                yo = b.X[int(i+0.5), 1]# - offset.y
+            Xo = np.array(b.X_outer)
+            for i in np.arange(0, b.nnodes_outer, b.nnodes_outer/4.):
+                xo = Xo[int(i+0.5), 0] - offset.x
+                yo = Xo[int(i+0.5), 1] - offset.y
                 zo = b.ceiling + 1.5
                 # <path>cursor.ac</path>
                 xml.write(textwrap.dedent("""

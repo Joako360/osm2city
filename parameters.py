@@ -59,6 +59,7 @@ BUILDING_REDUCE_THRESHOLD = 200.0   # -- threshold area of a building below whic
 BUILDING_REDUCE_RATE = 0.5          # -- rate (between 0 and 1) of buildings below a threshold which get reduced randomly in output
 BUILDING_REDUCE_CHECK_TOUCH = False # -- before removing a building due to area, check whether it is touching another building and therefore should be kept
 BUILDING_SIMPLIFY_TOLERANCE = 1.0   # -- all points in the simplified building will be within the tolerance distance of the original geometry.
+BUILDING_NEVER_SKIP_LEVELS = 6      # -- buildings that tall will never be skipped
 
 # -- Parameters which influence the height of buildings if no info from OSM is available.
 #    It uses a triangular distribution (see http://en.wikipedia.org/wiki/Triangular_distribution)

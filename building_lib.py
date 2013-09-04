@@ -8,6 +8,7 @@ import random
 import numpy as np
 import copy
 import pdb
+import math
 
 from vec2d import vec2d
 from textures import find_matching_texture
@@ -198,16 +199,6 @@ def test_ac_load():
 #    out.close()
     #print s
 
-def _DEP_simplify(X, threshold):
-    ring = shg.polygon.LinearRing(list(X))
-    p = shg.Polygon(ring)
-    p_simple = p.simplify(threshold)
-    #X_simple = np.array(p_simple.exterior.coords.xy).transpose()
-    X_simple = np.array(p_simple.exterior.coords)[:-1]
-    nnodes_lost = X.shape[0] - X_simple.shape[0]
-    return X_simple, nnodes_lost
-
-
 def analyse(buildings, static_objects, transform, elev, facades, roofs):
     """analyse all buildings
     - calculate area
@@ -237,7 +228,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         # am anfang geometrieanalyse
         # - ort: urban, residential, rural
         # - region: europe, asia...
-        # - layers: 1-2, 3-5, hi-rise
+        # - levels: 1-2, 3-5, hi-rise
         # - roof-shape: flat, gable
         # - age: old, modern
 
@@ -248,77 +239,45 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         b.mat = 0
         b.roof_mat = 0
 
-    #    print nnodes_ground #, b.refs[0].lon, b.refs[0].lat
-
         # -- get geometry right
-        #    - transform to local coord
         #    - compute edge lengths
-        #    - fix inverted faces
-        #    - compute area
 
-        # -- array of actual lon, lat coordinates. Last node duplicated.
-        #X = np.array(b.coords + [b.coords[0]])
-        X = np.array(b.X)
-#        for item in b.inner_coords_list:
-#            _iX = np.zeros((b.nnodes_ground+1,2))
-#            for c in item:
-#                _iX[i,0], _iX[i,1] = transform.toLocal((c.lon, c.lat))
+        tools.stats.nodes_simplified += b.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
 
+        # -- array of local outer coordinates
+        Xo = np.array(b.X_outer)
 
         # -- write nodes to separate debug file
-        for i in range(b._nnodes_ground):
-            tools.stats.debug1.write("%g %g\n" % (X[i,0], X[i,1]))
+        for i in range(b.nnodes_outer):
+            tools.stats.debug1.write("%g %g\n" % (Xo[i,0], Xo[i,1]))
 
-        # -- shapely: compute area
-#        r = LinearRing(list(X))
-#        p = Polygon(r)
-        #X, nnodes_simplified = simplify(X, parameters.BUILDING_SIMPLIFY_TOLERANCE)
-
-#        if b.nnodes_ground < 3:
-#            pass
-        #tools.stats.nodes_simplified += nnodes_simplified
         tools.stats.nodes_ground += b._nnodes_ground
 
-        # -- fix inverted faces
-        #crossX = 0.
-        #for i in range(b.nnodes_ground-1):
-        #    crossX += X[i,0]*X[i+1,1] - X[i+1,0]*X[i,1]
-        #if crossX < 0:
-        #   X = X[::-1]
-
         # -- compute edge length
-        lenX = np.zeros((b.nnodes_outer))
+        lenX = np.ones((b._nnodes_ground))
         for i in range(b.nnodes_outer-1):
-            lenX[i] = ((X[i+1,0]-X[i,0])**2 + (X[i+1,1]-X[i,1])**2)**0.5
-        lenX[-1] = ((X[0,0]-X[-1,0])**2 + (X[0,1]-X[-1,1])**2)**0.5
+            lenX[i] = ((Xo[i+1,0]-Xo[i,0])**2 + (Xo[i+1,1]-Xo[i,1])**2)**0.5
+        lenX[-1] = ((Xo[0,0]-Xo[-1,0])**2 + (Xo[0,1]-Xo[-1,1])**2)**0.5
 
         # -- re-number nodes such that longest edge is first
-        if b.nnodes_outer == 4:
+        if b.nnodes_outer == 4 and not b.X_inner:
             if lenX[0] < lenX[1]:
-                X = np.roll(X, 1, axis=0)
+                Xo = np.roll(Xo, 1, axis=0)
                 lenX = np.roll(lenX, 1)
-
-
+                b.set_polygon(Xo, b.inner_rings_list)
 
         b.lenX = lenX   # FIXME: compute on the fly, or on set_polygon()?
                         #        Or is there a shapely equivalent?
-        b.set_polygon(X)
 
         # -- skip buildings outside elevation raster
-        if elev(vec2d(X[0])) == -9999:
+        if elev(vec2d(Xo[0])) == -9999:
             print "-9999"
             tools.stats.skipped_no_elev += 1
             continue
 
         # -- check for nearby static objects
-        if static_objects and is_static_object_nearby(b, X, static_tree):
+        if static_objects and is_static_object_nearby(b, Xo, static_tree):
             tools.stats.skipped_nearby += 1
-            continue
-
-
-        # -- check area
-        if not is_large_enough(b, buildings):
-            tools.stats.skipped_small += 1
             continue
 
         # -- work on height and levels
@@ -334,6 +293,12 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 continue
 
         compute_height_and_levels(b)
+
+        # -- check area
+        if not is_large_enough(b, buildings):
+            tools.stats.skipped_small += 1
+            continue
+
 
         if b.height < parameters.BUILDING_MIN_HEIGHT:
             print "Skipping small building with height < building_min_height parameter"
@@ -421,10 +386,12 @@ def is_static_object_nearby(b, X, static_tree):
 
 
 def is_large_enough(b, buildings):
-    """Checks whether a given building's area is too small for inclusion.
+    """Checks whether a given building's area is too small for inclusion. 
+    Never drop tall buildings.
     FIXME: Exclusion might be skipped if the building touches another building (i.e. an annex)
     Returns true if the building should be included (i.e. area is big enough etc.)
     """
+    if b.levels >= parameters.BUILDING_NEVER_SKIP_LEVELS: return True
     if b.area < parameters.BUILDING_MIN_AREA or \
        (b.area < parameters.BUILDING_REDUCE_THRESHOLD and random.uniform(0,1) < parameters.BUILDING_REDUCE_RATE):
         #if parameters.BUILDING_REDUCE_CHECK_TOUCH:
@@ -435,7 +402,8 @@ def is_large_enough(b, buildings):
     return True
 
 def compute_height_and_levels(b):
-    """Determines total height (and number of levels) of a building based on OSM values and other logic"""
+    """Determines total height (and number of levels) of a building based on 
+       OSM values and other logic"""
     level_height = random_level_height()
 
     # -- try OSM height first
@@ -489,15 +457,6 @@ def decide_LOD(buildings):
         b.LOD = lod
         tools.stats.count_LOD(lod)
 
-def write_surf_ring(b):
-    # write outer
-    # has inner? if so, write it, too.
-    pass
-
-def write_surf_flat_roof(b):
-    pass
-
-
 def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     """now actually write building.
        While writing, accumulate some statistics
@@ -516,6 +475,12 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         #ground_elev = 200. + (b.refs[0].lon-13.6483695)*5000.
         #print "ground_elev", ground_elev
 
+        #print "LEN", b._nnodes_ground
+        #print "X  ", len(X)
+        #print "Xo  ", len(b.X_outer), b.nnodes_outer
+        #print "Xi  ", len(b.X_inner)
+        #bla
+
         for x in X:
             z = b.ground_elev - 1
             out.write("%1.2f %1.2f %1.2f\n" % (-x[1], z, -x[0]))
@@ -523,10 +488,50 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             out.write("%1.2f %1.2f %1.2f\n" % (-x[1], b.ground_elev + b.height, -x[0]))
         b.ceiling = b.ground_elev + b.height
     # ----
-
-    X = np.array(b.X)
-    for i in range(b.nnodes_outer):
-        X[i,0] -= offset.x # cluster coordinates. NB: this changes building coordinates!
+    def write_ring(out, b, ring, v0, inner = False):
+        nnodes_ring = len(ring.coords) - 1
+    
+        v1 = v0 + nnodes_ring
+        for i in range(v0, v1 - 1):
+            if False:
+                tex_x1 = lenX[i] / facade_texture.h_size_meters # -- simply repeat texture to fit length
+            else:
+                # FIXME: respect facade texture split_h
+                #FIXME: there is a nan in facade_textures.h_splits of tex/facade_modern36x36_12
+                a = lenX[i] / facade_texture.h_size_meters
+                ia = int(a)
+                frac = a - ia
+                tex_x1 = facade_texture.closest_h_match(frac) + ia
+    
+            out.write("SURF 0x0\n")
+            mat = b.mat
+            if inner:
+                mat = 1
+            out.write("mat %i\n" % mat)
+            out.write("refs %i\n" % 4)
+            out.write("%i %g %g\n" % (i,                     0,          tex_y0))
+            out.write("%i %g %g\n" % (i + 1,                 tex_x1, tex_y0))
+            out.write("%i %g %g\n" % (i + 1 + b._nnodes_ground, tex_x1, tex_y1))
+            out.write("%i %g %g\n" % (i     + b._nnodes_ground,     0,          tex_y1))
+    
+        #return OK
+    
+        # -- closing wall
+        tex_x1 = lenX[b.nnodes_outer-1] /  facade_texture.h_size_meters
+        out.write("SURF 0x0\n")
+        out.write("mat %i\n" % mat)
+        out.write("refs %i\n" % 4)
+        out.write("%i %g %g\n" % (v1 - 1, 0,          tex_y0))
+        out.write("%i %g %g\n" % (v0,                 tex_x1, tex_y0))
+        out.write("%i %g %g\n" % (v0     + b._nnodes_ground,     tex_x1, tex_y1))
+        out.write("%i %g %g\n" % (v1 - 1 + b._nnodes_ground, 0,          tex_y1))
+        
+        return v1
+    # ---
+    X = np.array(b.X_outer + b.X_inner)
+#    Xo = np.array(b.X_outer)
+    for i in range(b._nnodes_ground):
+        X[i,0] -= offset.x # -- cluster coordinates. NB: this changes building coordinates!
         X[i,1] -= offset.y
 
     lenX = b.lenX
@@ -546,8 +551,17 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     out.write("name \"%s\"\n" % b.ac_name)
     LOD_lists[b.LOD].append(b.ac_name)
 
-    nsurf = b.nnodes_outer
-    if not roof_separate: nsurf += 1 # -- because roof will be part of base model
+    nsurf = b._nnodes_ground
+    #nsurf = b.nnodes_outer
+
+    
+    no_roof = False    
+#    if len(b.polygon.interiors) < 2:
+#        no_roof = False
+#    else:
+#        no_roof = True
+        
+    if (not no_roof) and (not roof_separate): nsurf += 1 # -- because roof will be part of base model
 
     #repeat_vert = int(height/3)
 
@@ -588,42 +602,57 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     #out.write("loc 0 0 0\n")
     write_and_count_vert(out, b)
 
-
     write_and_count_numsurf(out, b, nsurf)
-    # -- walls
 
-    import math
-    for i in range(b.nnodes_outer - 1):
-        if False:
-            tex_x1 = lenX[i] / facade_texture.h_size_meters # -- simply repeat texture to fit length
-        else:
-            # FIXME: respect facade texture split_h
-            #FIXME: there is a nan in facade_textures.h_splits of tex/facade_modern36x36_12
-            a = lenX[i] / facade_texture.h_size_meters
-            ia = int(a)
-            frac = a - ia
-            tex_x1 = facade_texture.closest_h_match(frac) + ia
-
+    # -- outer and inner walls
+    write_ring(out, b, b.polygon.exterior, 0)
+    if True:
+        v0 = b.nnodes_outer
+        for inner in b.polygon.interiors:
+            v0 = write_ring(out, b, inner, v0, True)
+    
+    # -- write relation roof, for special case of exactly one inner ring
+    if len(b.polygon.interiors) == 1:
+        #print "one roof"
+        # 
+        #   3-----------2  Outer is CCW : 0 1 2 3
+        #   |           |  Inner is CW  : 4 5 6 7
+        #   |           |
+        #   | 7----4    |  draw 0 1 2 3 - 0 - 6 7 4 5 - 6
+        #   | |    |    |
+        #   | 6----5    |  6 is the inner node which is closest to first outer node
+        #   |/          |
+        #   0-----------1
+        
+        # -- find inner node i that is closest to first outer node
+        xo = shg.Point(b.X_outer[0])
+        dists = np.array([shg.Point(xi).distance(xo) for xi in b.polygon.interiors[0].coords])
+        #i = dists.argmin()
         out.write("SURF 0x0\n")
-        out.write("mat %i\n" % b.mat)
-        out.write("refs %i\n" % 4)
-        out.write("%i %g %g\n" % (i,                     0,          tex_y0))
-        out.write("%i %g %g\n" % (i + 1,                 tex_x1, tex_y0))
-        out.write("%i %g %g\n" % (i + 1 + b.nnodes_outer, tex_x1, tex_y1))
-        out.write("%i %g %g\n" % (i + b.nnodes_outer,     0,          tex_y1))
+        out.write("mat %i\n" % 2)
+        out.write("refs %i\n" % (b._nnodes_ground + 2))
+            
+        for i in range(b._nnodes_ground, b._nnodes_ground + b.nnodes_outer):
+            out.write("%i %g %g\n" % (i, 0, 0))
+        out.write("%i %g %g\n" % (b._nnodes_ground, 0, 0))
+        ninner = len(b.X_inner)
+        Xi = np.arange(ninner) + b.nnodes_outer + b._nnodes_ground
+        Xi = np.roll(Xi, dists.argmin())
+        for i in Xi:
+            out.write("%i %g %g\n" % (i, 0, 0))
+        out.write("%i %g %g\n" % (Xi[0], 0, 0))
+        out.write("kids 0\n")
+        tools.stats.count(b)
+        return
 
-    #return OK
+    if no_roof: 
+        out.write("kids 0\n")
+        tools.stats.count(b)
+        return
 
-    # -- closing wall
-    tex_x1 = lenX[b.nnodes_outer-1] /  facade_texture.h_size_meters
-    out.write("SURF 0x0\n")
-    out.write("mat %i\n" % b.mat)
-    out.write("refs %i\n" % 4)
-    out.write("%i %g %g\n" % (b.nnodes_outer - 1, 0,          tex_y0))
-    out.write("%i %g %g\n" % (0,                 tex_x1, tex_y0))
-    out.write("%i %g %g\n" % (b.nnodes_outer,     tex_x1, tex_y1))
-    out.write("%i %g %g\n" % (2*b.nnodes_outer-1, 0,          tex_y1))
-
+    if len(b.polygon.interiors) > 1:
+        raise NotImplementedError("Can't yet handle relations with more than one inner way")
+        
     # -- roof
     if not b.roof_separate:   # -- flat roof
         out.write("SURF 0x0\n")
@@ -749,10 +778,8 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             out.write("%i %g %g\n" % (3, 0, 1))
 
             out.write("kids 0\n")
-
+            
     tools.stats.count(b)
-
-
 
 if __name__ == "__main__":
     test_ac_load()
