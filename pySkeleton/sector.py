@@ -8,7 +8,7 @@
 import math
 import half_line
 from point import Point
-import display
+#import display
 import segment
 import line
 import events
@@ -104,30 +104,31 @@ class Sector:
         return self.h1.getPoint(s)        
         
     
-    def display(self,viewer):
-        self.h1.display(viewer)
-        self.h2.display(viewer)
-        if self.reflex:
-            self.edge.display(viewer,color = 'red')
-        else:
-            self.edge.display(viewer,color='blue')
+    #def display(self,viewer):
+        #self.h1.display(viewer)
+        #self.h2.display(viewer)
+        #if self.reflex:
+            #self.edge.display(viewer,color = 'red')
+        #else:
+            #self.edge.display(viewer,color='blue')
             
-        #display the freedom
-        if viewer.show_info:
-            middle      = (self.edge.pI+self.edge.pF).scale(0.5)
-            direction   = (self.h1.d + self.h2.d).scale(0.5)
-            toDraw      = middle + direction.scale(50)
+        ##display the freedom
+        #if viewer.show_info:
+            #middle      = (self.edge.pI+self.edge.pF).scale(0.5)
+            #direction   = (self.h1.d + self.h2.d).scale(0.5)
+            #toDraw      = middle + direction.scale(50)
             
-            if self.event.isEdgeEvent():
-                color   = "orange"
-            else:
-                color   = "brown"
+            #if self.event.isEdgeEvent():
+                #color   = "orange"
+            #else:
+                #color   = "brown"
                 
-            viewer.canvas.create_text(toDraw.x,
-                                      toDraw.y,
-                                      text="%f" %(self.event.shrinking_distance),
-                                      fill=color,font=("Helvectica", "14"))
+            #viewer.canvas.create_text(toDraw.x,
+                                      #toDraw.y,
+                                      #text="%f" %(self.event.shrinking_distance),
+                                      #fill=color,font=("Helvectica", "14"))
             
-        if self.event.isSplitEvent():
-            self.event.splitted_edge.display(viewer,color='yellow')
-            self.event.reflex_vertex.display(viewer,color='black',radius=6)
+        #if self.event.isSplitEvent():
+            #self.event.splitted_edge.display(viewer,color='yellow')
+            #self.event.reflex_vertex.display(viewer,color='black',radius=6)
+            

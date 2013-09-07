@@ -7,13 +7,13 @@
 
 from point import Point
 import point3D
-import display
+#import display
 import segment
 import sector
 import events
 import copy
 import math
-import rainbow
+#import rainbow
 import mesh
 import graph
 
@@ -152,24 +152,24 @@ class Polygon :
             
         return s
     
-    def display(self,viewer):
-        #find the min and max of speed in the polygon
-        min_speed = min(map(lambda x:x.w,self.edges))
-        max_speed = max(map(lambda x:x.w,self.edges))
-            
-        for i in range(self.n):
-            edge    = self.edges[i]
-            if max_speed == min_speed:
-                c = 'black'
-            else :
-                c = rainbow.Rainbow().get_hexa_color(float(edge.w-min_speed)/float(max_speed-min_speed))
-            edge.display(viewer,color=c,w=4)
-            
-            if viewer.show_info:
-                viewer.canvas.create_text(0.5*(edge.pI.x+edge.pF.x),
-                                          0.5*(edge.pI.y+edge.pF.y),
-                                          text="%i" %(i),
-                                          fill="purple",font=("Helvectica", "16"))
+#    def display(self,viewer):
+#        #find the min and max of speed in the polygon
+#        min_speed = min(map(lambda x:x.w,self.edges))
+#        max_speed = max(map(lambda x:x.w,self.edges))
+#            
+#        for i in range(self.n):
+#            edge    = self.edges[i]
+#            if max_speed == min_speed:
+#                c = 'black'
+#            else :
+#                c = rainbow.Rainbow().get_hexa_color(float(edge.w-min_speed)/float(max_speed-min_speed))
+#            edge.display(viewer,color=c,w=4)
+#            
+#            if viewer.show_info:
+#                viewer.canvas.create_text(0.5*(edge.pI.x+edge.pF.x),
+#                                          0.5*(edge.pI.y+edge.pF.y),
+#                                          text="%i" %(i),
+#                                          fill="purple",font=("Helvectica", "16"))
         
     #===========================================================================
     # Get information on the polygon
@@ -762,11 +762,11 @@ if __name__ == '__main__':
     #p.get_sectors()
 
         
-    viewer = display.Viewer()
-    viewer.polygon = p
-    viewer.display()
-    viewer.mainloop()
-    
+#    viewer = display.Viewer()
+#    viewer.polygon = p
+#    viewer.display()
+#    viewer.mainloop()
+#    
 
     
     

@@ -69,8 +69,8 @@ class Point3D:
         rsp.scalar_prod(float(s))
         return rsp
     
-    def display(self,viewer):
-        """ Display the projection on z = 0 """
-        proj = Point((self.x,self.y))
-        proj.display(viewer)
+    #def display(self,viewer):
+        #""" Display the projection on z = 0 """
+        #proj = Point((self.x,self.y))
+        #proj.display(viewer)
     

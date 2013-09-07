@@ -6,7 +6,7 @@
 #===============================================================================
 
 from point import Point
-import display
+#import display
 import numpy, numpy.linalg
 
 class Hline:
@@ -29,18 +29,18 @@ class Hline:
         """ reverse the direction of the half line"""
         self.d = -self.d
         
-    def display(self,disp):
-        p2 = self.p + self.d.scale(50000)
-        p3 = self.p + self.n.scale(20)
-        
-        #display the point
-        self.p.display(disp,color = 'green', radius = 6)
-        
-        #display the half line itself
-        disp.canvas.create_line(self.p.x, self.p.y, p2.x, p2.y, fill="orange",width=3)
-        
-        #display the normal (orientation)
-        disp.canvas.create_line(self.p.x,self.p.y,p3.x,p3.y,fill="black",width=2)
+#    def display(self,disp):
+#        p2 = self.p + self.d.scale(50000)
+#        p3 = self.p + self.n.scale(20)
+#        
+#        #display the point
+#        self.p.display(disp,color = 'green', radius = 6)
+#        
+#        #display the half line itself
+#        disp.canvas.create_line(self.p.x, self.p.y, p2.x, p2.y, fill="orange",width=3)
+#        
+#        #display the normal (orientation)
+#        disp.canvas.create_line(self.p.x,self.p.y,p3.x,p3.y,fill="black",width=2)
     
     def side(self,p):
         q = p-self.p

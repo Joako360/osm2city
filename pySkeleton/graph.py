@@ -115,16 +115,16 @@ class Arc:
         else:
             return 1
     
-    def display(self,viewer,color='blue'):
-        """
-        Display an arc in a viewer, provided that the values of the nodes are 2D points
-        """
-        try:
-            seg_arc = segment.Segment(self.p1.value,self.p2.value)
-            seg_arc.display(viewer,color)
+    #def display(self,viewer,color='blue'):
+        #"""
+        #Display an arc in a viewer, provided that the values of the nodes are 2D points
+        #"""
+        #try:
+            #seg_arc = segment.Segment(self.p1.value,self.p2.value)
+            #seg_arc.display(viewer,color)
             
-        except:
-            print 'the vertices of the graph don\'t represent 2D points. Impossible to display the graph on a canvas. Try exportPNG if you want to have a graphViz based representation.'
+        #except:
+            #print 'the vertices of the graph don\'t represent 2D points. Impossible to display the graph on a canvas. Try exportPNG if you want to have a graphViz based representation.'
     
     def __repr__(self):
         return self.p1.__repr__() +" -- "+ self.p2.__repr__()
@@ -223,25 +223,25 @@ class Graph:
         dotFile.write("}\n")
         dotFile.close()
         
-    def _exportPNG(self,filename='graph'):
-        """ Export to png, using graphViz"""
-        self.exportDOT(filename)
-        os.system("dot -Tpng %s.dot -o %s.png" %(filename,filename))
-        os.remove("%s.dot" %(filename))
-        os.system('%s.png' %(filename))
-        
-    def display(self,viewer):
-        """
-        Display the graph in a viewer, provided that the values of the nodes are 2D points
-        """
-        for a in self.arcs:
-            a.display(viewer,color = 'orange')
-            
-        for p in self.nodes:
-            viewer.canvas.create_text(p.value.x + 12, p.value.y +12,
-                                      text="%i" %(p.id),
-                                      fill="DarkOrchid4",font=("Helvectica", "14"))
-        
+#    def _exportPNG(self,filename='graph'):
+#        """ Export to png, using graphViz"""
+#        self.exportDOT(filename)
+#        os.system("dot -Tpng %s.dot -o %s.png" %(filename,filename))
+#        os.remove("%s.dot" %(filename))
+#        os.system('%s.png' %(filename))
+#        
+#    def display(self,viewer):
+#        """
+#        Display the graph in a viewer, provided that the values of the nodes are 2D points
+#        """
+#        for a in self.arcs:
+#            a.display(viewer,color = 'orange')
+#            
+#        for p in self.nodes:
+#            viewer.canvas.create_text(p.value.x + 12, p.value.y +12,
+#                                      text="%i" %(p.id),
+#                                      fill="DarkOrchid4",font=("Helvectica", "14"))
+#        
         
     def __str__(self):
         s  = "arcs %s " % self.arcs

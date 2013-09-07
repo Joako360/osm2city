@@ -8,7 +8,7 @@
 from line import Line
 import half_line
 import point
-import display
+#import display
 
 class SegmentError(Exception):pass
 class ParallelSegmentError(SegmentError):pass
@@ -108,27 +108,27 @@ class Segment:
             
         return bisector
     
-    def display(self,disp,color='blue',w=3):
-        """ display the segment on a Tkinter canvas """
+    #def display(self,disp,color='blue',w=3):
+        #""" display the segment on a Tkinter canvas """
                
-        #display the half line itself
-        disp.canvas.create_line(self.pI.x, self.pI.y, self.pF.x, self.pF.y, fill=color,width=w)
+        ##display the half line itself
+        #disp.canvas.create_line(self.pI.x, self.pI.y, self.pF.x, self.pF.y, fill=color,width=w)
         
-        #display both ends
-        self.pI.display(disp)
-        self.pF.display(disp)
+        ##display both ends
+        #self.pI.display(disp)
+        #self.pF.display(disp)
     
 #===============================================================================
-if __name__ == '__main__':
-    s1 = Segment(point.Point((400,300)),point.Point((100,300)),1)
-    s2 = Segment(point.Point((100,100)),point.Point((400,100)),1)
+#if __name__ == '__main__':
+    #s1 = Segment(point.Point((400,300)),point.Point((100,300)),1)
+    #s2 = Segment(point.Point((100,100)),point.Point((400,100)),1)
     
-    h = s1.bisector_with(s2)
-    print h
+    #h = s1.bisector_with(s2)
+    #print h
     
-    viewer = display.Viewer();
-    h.display(viewer)
-    s1.display(viewer,color='red')
-    s2.display(viewer)
-    viewer.mainloop()
+    #viewer = display.Viewer();
+    #h.display(viewer)
+    #s1.display(viewer,color='red')
+    #s2.display(viewer)
+    #viewer.mainloop()
     

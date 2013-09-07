@@ -6,7 +6,7 @@
 #===============================================================================
 
 import point3D
-import rainbow
+#import rainbow
 from vec2d import vec2d
 
 class Mesh:
@@ -47,56 +47,56 @@ class Mesh:
         self.nf += 1
         return self.nf-1
     
-    def sketchup_export(self,filename):
-        """ export the Mesh as a ruby script readable by Google SketchUp """
-        ruby = open(filename,'w')
-        ruby.write("require 'sketchup.rb'\n\n")
-        ruby.write("model = Sketchup.active_model\n")
-        ruby.write("entities = model.entities\n")
-        ruby.write("definitions = model.definitions\n")
-        ruby.write("materials = model.materials\n")
-        
-        ruby.write('compDef = definitions.add "my_mesh"\n')
-        ruby.write("compEnt = compDef.entities\n")
-        ruby.write("points = []\n")
-        
-        for index in range(len(self.vertices)):
-            p = self.vertices[index]
-            ruby.write("points[%i] = Geom::Point3d.new(%f,%f,%f)\n" %(index,p.x,p.y,p.z))
-        ruby.write("\n\n")
-        
-        for f_i in range(len(self.faces)):
-            face = self.faces[f_i]
-            ruby.write("face%i = compEnt.add_face [" %(f_i))
-            for i in range(len(face)-1):
-                if not self.vertices[face[i]] == self.vertices[face[i-1]]:
-                    ruby.write("points[%i]," %(face[i]))
-            
-            ruby.write("points[%i]]\n" %(face[-1]))
-            ruby.write('materials.add "m%i"\n' %(f_i))
-            col = rainbow.Rainbow()
-            r,g,b = col.get(float(f_i)/float(len(self.faces)))
-            ruby.write('materials["m%i"].color = Sketchup::Color.new(%i,%i,%i)\n' %(f_i,r,g,b))
-            ruby.write('face%i.material = materials["m%i"]\n' %(f_i,f_i))
-            ruby.write('face%i.back_material = materials["m%i"]\n' %(f_i,f_i))
-            
-        ruby.write('entities.add_instance definitions["my_mesh"], Geom::Transformation.new\n\n')
+#    def sketchup_export(self,filename):
+#        """ export the Mesh as a ruby script readable by Google SketchUp """
+#        ruby = open(filename,'w')
+#        ruby.write("require 'sketchup.rb'\n\n")
+#        ruby.write("model = Sketchup.active_model\n")
+#        ruby.write("entities = model.entities\n")
+#        ruby.write("definitions = model.definitions\n")
+#        ruby.write("materials = model.materials\n")
+#        
+#        ruby.write('compDef = definitions.add "my_mesh"\n')
+#        ruby.write("compEnt = compDef.entities\n")
+#        ruby.write("points = []\n")
+#        
+#        for index in range(len(self.vertices)):
+#            p = self.vertices[index]
+#            ruby.write("points[%i] = Geom::Point3d.new(%f,%f,%f)\n" %(index,p.x,p.y,p.z))
+#        ruby.write("\n\n")
+#        
+#        for f_i in range(len(self.faces)):
+#            face = self.faces[f_i]
+#            ruby.write("face%i = compEnt.add_face [" %(f_i))
+#            for i in range(len(face)-1):
+#                if not self.vertices[face[i]] == self.vertices[face[i-1]]:
+#                    ruby.write("points[%i]," %(face[i]))
+#            
+#            ruby.write("points[%i]]\n" %(face[-1]))
+#            ruby.write('materials.add "m%i"\n' %(f_i))
+#            col = rainbow.Rainbow()
+#            r,g,b = col.get(float(f_i)/float(len(self.faces)))
+#            ruby.write('materials["m%i"].color = Sketchup::Color.new(%i,%i,%i)\n' %(f_i,r,g,b))
+#            ruby.write('face%i.material = materials["m%i"]\n' %(f_i,f_i))
+#            ruby.write('face%i.back_material = materials["m%i"]\n' %(f_i,f_i))
+#            
+#        ruby.write('entities.add_instance definitions["my_mesh"], Geom::Transformation.new\n\n')
     
-    def ascii_export(self,filename):
-        """ save the mesh in a ASCII file or in ruby , storing the list of vertices and the list of faces """
-        f = open(filename,'w')
-        
-        f.write("%i\n" %(self.nv))
-        for p in self.vertices:
-            f.write("%f %f %f\n" %(p.x,p.y,p.z))
-            
-        f.write("%i\n" %(self.nf))
-        for face in self.faces:
-            for index in face:
-                f.write("%i " %(index))
-            f.write("\n")
-            
-        f.close()
+#    def ascii_export(self,filename):
+#        """ save the mesh in a ASCII file or in ruby , storing the list of vertices and the list of faces """
+#        f = open(filename,'w')
+#        
+#        f.write("%i\n" %(self.nv))
+#        for p in self.vertices:
+#            f.write("%f %f %f\n" %(p.x,p.y,p.z))
+#            
+#        f.write("%i\n" %(self.nf))
+#        for face in self.faces:
+#            for index in face:
+#                f.write("%i " %(index))
+#            f.write("\n")
+#            
+#        f.close()
 
     def ac3d_string(self, name, offset_xy = vec2d(0,0), offset_z = 0., header = False):
         """return mesh as string in a AC3D format"""
@@ -125,29 +125,29 @@ class Mesh:
             
         return s
         
-    def save(self,filename):
-        """ save into ascii or rb depending on the extension """
-        
-        ext = filename.split('.')[-1]
-        if ext =="rb":
-            self.sketchup_export(filename)
-        else:
-            self.ascii_export(filename)
-            #self.ac3d_export(filename)
+#    def save(self,filename):
+#        """ save into ascii or rb depending on the extension """
+#        
+#        ext = filename.split('.')[-1]
+#        if ext =="rb":
+#            self.sketchup_export(filename)
+#        else:
+#            self.ascii_export(filename)
+#            #self.ac3d_export(filename)
   
     
-    def load(self,filename):
-        """ load the mesh from a file """
-        f = open(filename,'r')
-        
-        self.nv = int(f.readline())
-        v       = []
-        for i in range(self.nv):
-            line = map(float,f.readline().split())
-            v.append(point3D.Point3D((line[0],line[1],line[2])))
-            
-        self.nf = int(f.readline())
-        fa      = []
-        for i in range(self.nf):
-            line = map(int,f.readline().split())
-            fa.append(line)
+#    def load(self,filename):
+#        """ load the mesh from a file """
+#        f = open(filename,'r')
+#        
+#        self.nv = int(f.readline())
+#        v       = []
+#        for i in range(self.nv):
+#            line = map(float,f.readline().split())
+#            v.append(point3D.Point3D((line[0],line[1],line[2])))
+#            
+#        self.nf = int(f.readline())
+#        fa      = []
+#        for i in range(self.nf):
+#            line = map(int,f.readline().split())
+#            fa.append(line)

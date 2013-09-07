@@ -327,7 +327,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         # -- pitched, separate roof if we have 4 ground nodes and area below 1000m2
         if not b.polygon.interiors and b.area < 2000:
             if b._nnodes_ground == 4 \
-               or (parameters.EXPERIMENTAL_USE_SKEL and b._nnodes_ground in range(4, 12)):
+               or (parameters.EXPERIMENTAL_USE_SKEL and b._nnodes_ground in range(4, 10)):
                 b.roof_flat = False
                 b.roof_separate = True
         

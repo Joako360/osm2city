@@ -75,21 +75,21 @@ class Line:
         except :
             return False
 
-    def display(self,disp):
-        """ Disp : Display"""
+    #def display(self,disp):
+        #""" Disp : Display"""
 
-        #display the line itself
-        if not self.a==0:
-            disp.canvas.create_line(-self.c*disp.size/self.a+disp.offset,0+disp.offset,
-                                    (-self.b*disp.size-self.c*disp.size)/self.a+disp.offset,disp.size+disp.offset,
-                                    width=5,fill='purple')
+        ##display the line itself
+        #if not self.a==0:
+            #disp.canvas.create_line(-self.c*disp.size/self.a+disp.offset,0+disp.offset,
+                                    #(-self.b*disp.size-self.c*disp.size)/self.a+disp.offset,disp.size+disp.offset,
+                                    #width=5,fill='purple')
             
-        elif not self.b==0:
-            disp.canvas.create_line(0+disp.offset,-self.c*disp.size/self.b+disp.offset,
-                                    disp.size+disp.offset,(-self.a*disp.size-self.c*disp.size)/self.b+disp.offset,
-                                    width=5,fill='purple')
+        #elif not self.b==0:
+            #disp.canvas.create_line(0+disp.offset,-self.c*disp.size/self.b+disp.offset,
+                                    #disp.size+disp.offset,(-self.a*disp.size-self.c*disp.size)/self.b+disp.offset,
+                                    #width=5,fill='purple')
             
-        else:
-            pass       
+        #else:
+            #pass       
         
         

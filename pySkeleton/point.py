@@ -95,8 +95,9 @@ class Point:
         rsp.scalar_prod(float(s))
         return rsp
     
-    def display(self, disp, color='pink',radius = 3):
-        """ display the point self on the viewer disp, using scale s """
-        disp.canvas.create_oval(self.x-radius,self.y-radius,
-                                self.x+radius,self.y+radius,
-                                fill = color)
+    #def display(self, disp, color='pink',radius = 3):
+        #""" display the point self on the viewer disp, using scale s """
+        #disp.canvas.create_oval(self.x-radius,self.y-radius,
+                                #self.x+radius,self.y+radius,
+                                #fill = color)
+                                
