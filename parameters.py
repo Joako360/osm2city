@@ -83,6 +83,7 @@ LOD_PERCENTAGE_DETAIL = 0.5         # -- of the remaining buildings, this percen
 
 OBSTRUCTION_LIGHT_MIN_LEVELS = 15   # -- put obstruction lights on buildings with >= given levels
 
+EXPERIMENTAL_USE_SKEL = 0
 
 def set_parameters(paramDict):
     for k in paramDict:

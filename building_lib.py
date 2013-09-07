@@ -325,8 +325,9 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         b.roof_separate = False
 
         # -- pitched, separate roof if we have 4 ground nodes and area below 1000m2
-        if not b.polygon.interiors and b._nnodes_ground == 4:
-            if b.area < 1000:
+        if not b.polygon.interiors and b.area < 2000:
+            if b._nnodes_ground == 4 \
+               or (parameters.EXPERIMENTAL_USE_SKEL and b._nnodes_ground in range(4, 12)):
                 b.roof_flat = False
                 b.roof_separate = True
         
@@ -667,7 +668,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 #        LOD_lists[b.LOD].append(roof_ac_name)
 
         # -- pitched roof for > 4 ground nodes
-        if False:
+        if parameters.EXPERIMENTAL_USE_SKEL:
             print "ground", b._nnodes_ground
             s = myskeleton.myskel(b, roof_ac_name, offset_xy = offset, offset_z = b.ground_elev + b.height)
             out.write(s)
