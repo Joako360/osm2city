@@ -25,6 +25,7 @@ import plot
 from math import sin, cos, radians
 import tools
 import parameters
+import myskeleton
 
 def write_and_count_numvert(out, building, numvert):
     """write numvert tag to .ac, update stats"""
@@ -323,10 +324,12 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         b.roof_flat = True
         b.roof_separate = False
 
-        # -- pitched roof if we have 4 ground nodes and area below 1000m2
-        if b._nnodes_ground == 4 and b.area < 1000:
-            b.roof_flat = False
-            b.roof_separate = True
+        # -- pitched, separate roof if we have 4 ground nodes and area below 1000m2
+        if not b.polygon.interiors and b._nnodes_ground == 4:
+            if b.area < 1000:
+                b.roof_flat = False
+                b.roof_separate = True
+        
 
         # -- no pitched roof on tall buildings
         if b.levels > 5:
@@ -599,7 +602,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
     write_and_count_numsurf(out, b, nsurf)
 
-    # -- outer and inner walls
+    # -- outer and inner walls (if any)
     write_ring(out, b, b.polygon.exterior, 0)
     if True:
         v0 = b.nnodes_outer
@@ -660,19 +663,27 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         # -- roof is a separate object
         roof_ac_name = "b%i-roof" % nb
         out.write("kids 0\n")
-        out.write("OBJECT poly\n")
-        out.write('name "%s"\n' % roof_ac_name)
-#        LOD_lists[b.LOD].append(roof_ac_name)
         LOD_lists[3].append(roof_ac_name)  # -- roof in separate LOD
+#        LOD_lists[b.LOD].append(roof_ac_name)
 
-        if b.roof_flat:
-            # FIXME: still have flat AND separate roof?? Doesn't seem so.
-            out.write('texture "%s"\n' % 'roof_flat.png')
+        # -- pitched roof for > 4 ground nodes
+        if False:
+            print "ground", b._nnodes_ground
+            s = myskeleton.myskel(b, roof_ac_name, offset_xy = offset, offset_z = b.ground_elev + b.height)
+            out.write(s)
+        
+        # -- pitched roof for exactly 4 ground nodes        
         else:
-            out.write('texture "%s"\n' % (roof_texture.filename + '.png'))
-
-        if True:
-            # -- pitched roof
+            out.write("OBJECT poly\n")
+            out.write('name "%s"\n' % roof_ac_name)
+    
+            if b.roof_flat:
+                # FIXME: still have flat AND separate roof?? Doesn't seem so.
+                out.write('texture "%s"\n' % 'roof_flat.png')
+            else:
+                out.write('texture "%s"\n' % (roof_texture.filename + '.png'))
+    
+            # -- pitched roof for 4 ground nodes
             write_and_count_numvert(out, b, b.nnodes_outer + 2)
             # -- 4 corners
             for x in X:
@@ -732,16 +743,17 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             out.write("%i %g %g\n" % (3, 0, 0))
             out.write("%i %g %g\n" % (0, repeatx, 0))
             out.write("%i %g %g\n" % (4, 0.5*repeatx, repeaty))
+        out.write("kids 0\n")
 
-            # -- LOD flat model
+        # -- LOD flat model
+        if False:
             roof_ac_name_flat = "b%i-flat" % nb
-            out.write("kids 0\n")
             out.write("OBJECT poly\n")
             out.write('name "%s"\n' % roof_ac_name_flat)
             LOD_lists[4].append(roof_ac_name_flat)
-
+    
             out.write('texture "%s"\n' % (roof_texture.filename + '.png'))
-
+    
             write_and_count_numvert(out, b, b.nnodes_outer)
             for x in X:
                 z = b.ground_elev - 1
@@ -754,7 +766,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             out.write("%i %g %g\n" % (1, 1, 0))
             out.write("%i %g %g\n" % (2, 1, 1))
             out.write("%i %g %g\n" % (3, 0, 1))
-
+    
             out.write("kids 0\n")
 
     tools.stats.count(b)

@@ -650,6 +650,12 @@ if __name__ == "__main__":
     #   - set building type, roof type etc
     buildings = building_lib.analyse(buildings, static_objects, tools.transform, elev, tex.facades, tex.roofs)
 
+    # -- skeleton testing
+    #  export PYTHONPATH=pySkeleton/
+#    import myskeleton
+ #   myskeleton.myskel(buildings[0])
+  #  sys.exit(0)
+    
     #tools.write_gp(buildings)
 
     tools.stats.print_summary()
