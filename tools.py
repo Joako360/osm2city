@@ -181,6 +181,43 @@ def write_gp(buildings):
 
     gp.close()
 
+def write_one_gp(b, filename):
+    npv = np.array(b.X_outer)
+    minx = min(npv[:,0])
+    maxx = max(npv[:,0])
+    miny = min(npv[:,1])
+    maxy = max(npv[:,1])
+    dx = 0.1*(maxx - minx)
+    minx -= dx    
+    maxx += dx    
+    dy = 0.1*(maxy - miny)
+    miny -= dy 
+    maxy += dy    
+    
+    gp = open(filename + '.gp', 'w')
+#    term = "postscript enh eps"
+#    ext = ".eps"
+    term = "png"
+    ext = "png"
+    gp.write(textwrap.dedent("""
+    set term %s
+    set out '%s.%s'
+    set xrange [%g:%g]
+    set yrange [%g:%g]
+    set title "%s"
+    unset key
+    """ % (term, filename, ext, minx, maxx, miny, maxy, b.osm_id)))
+    i = 0
+    for v in b.X_outer:
+        i += 1
+        gp.write('set label "%i" at %g, %g\n' % (i, v[0], v[1]))
+
+
+    gp.write("plot '-' w lp\n")
+    for v in b.X_outer:
+        gp.write('%g %g\n' % (v[0], v[1]))
+    gp.close()
+
 
 class Stats(object):
     def __init__(self):
@@ -196,6 +233,8 @@ class Stats(object):
         self.vertices = 0
         self.surfaces = 0
         self.have_pitched_roof = 0
+        self.have_complex_roof = 0
+        self.roof_errors = 0
         self.out = None
         self.LOD = np.zeros(3)
         self.nodes_ground = 0
@@ -231,6 +270,8 @@ class Stats(object):
           no elevation  %i
           no texture    %i
         pitched roof    %i
+          complex       %i
+          roof_errors   %i
         ground nodes    %i
           simplified    %i
         vertices        %i
@@ -240,7 +281,7 @@ class Stats(object):
         LOD detail      %i (%2.0f %%)
         """ % (self.objects, self.parse_errors, total_written,
                self.skipped_small, self.skipped_nearby, self.skipped_no_elev, self.skipped_texture,
-               self.have_pitched_roof,
+               self.have_pitched_roof, self.have_complex_roof, self.roof_errors,
                self.nodes_ground, self.nodes_simplified,
                self.vertices, self.surfaces,
                self.LOD[0], 100.*self.LOD[0]/total_written,

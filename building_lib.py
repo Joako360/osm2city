@@ -26,6 +26,7 @@ from math import sin, cos, radians
 import tools
 import parameters
 import myskeleton
+import roofs
 
 def write_and_count_numvert(out, building, numvert):
     """write numvert tag to .ac, update stats"""
@@ -610,40 +611,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         for inner in b.polygon.interiors:
             v0 = write_ring(out, b, inner, v0, True)
 
-    # -- write relation roof, for special case of exactly one inner ring
-    if len(b.polygon.interiors) == 1:
-        #print "one roof"
-        #
-        #   3-----------2  Outer is CCW : 0 1 2 3
-        #   |           |  Inner is CW  : 4 5 6 7
-        #   |           |
-        #   | 7----4    |  draw 0 1 2 3 - 0 - 6 7 4 5 - 6
-        #   | |    |    |
-        #   | 6-<<-5    |  6 is the inner node which is closest to first outer node
-        #   |/          |
-        #   0---->>-----1
-
-        # -- find inner node i that is closest to first outer node
-        xo = shg.Point(b.X_outer[0])
-        dists = np.array([shg.Point(xi).distance(xo) for xi in b.polygon.interiors[0].coords])
-        #i = dists.argmin()
-        out.write("SURF 0x0\n")
-        out.write("mat %i\n" % b.mat)
-        out.write("refs %i\n" % (b._nnodes_ground + 2))
-
-        for i in range(b._nnodes_ground, b._nnodes_ground + b.nnodes_outer):
-            out.write("%i %g %g\n" % (i, 0, 0))
-        out.write("%i %g %g\n" % (b._nnodes_ground, 0, 0))
-        ninner = len(b.X_inner)
-        Xi = np.arange(ninner) + b.nnodes_outer + b._nnodes_ground
-        Xi = np.roll(Xi, dists.argmin())
-        for i in Xi:
-            out.write("%i %g %g\n" % (i, 0, 0))
-        out.write("%i %g %g\n" % (Xi[0], 0, 0))
-        out.write("kids 0\n")
-        tools.stats.count(b)
-        return
-
+    # -- roof
     if no_roof:  # -- a debug thing
         out.write("kids 0\n")
         tools.stats.count(b)
@@ -652,16 +620,26 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     if len(b.polygon.interiors) > 1:
         raise NotImplementedError("Can't yet handle relations with more than one inner way")
 
+  
+    if not b.roof_separate:
+        if len(b.polygon.interiors) == 1:
+            # -- relation roof, for special case of exactly one inner ring
+            out.write(roofs.flat_relation(b))
+            tools.stats.count(b)
+        else:
+            # -- plain flat roof
+            out.write(roofs.flat(b))
+        return
+
     # -- roof
-    if not b.roof_separate:   # -- flat roof
-        out.write("SURF 0x0\n")
-        out.write("mat %i\n" % b.roof_mat)
-        out.write("refs %i\n" % b.nnodes_outer)
-        for i in range(b.nnodes_outer):
-            out.write("%i %g %g\n" % (i+b.nnodes_outer, 0, 0))
-        out.write("kids 0\n")
-    else:
-        # -- roof is a separate object
+    #    relation flat roof: included in base model and LOD
+    #    flat roof:          included in base model and LOD
+    #    all other: separate object LOD roof, plus a flat model LOD same as building
+    #    4 nodes pitched: gable, hipped, half-hipped?, gambrel, mansard, ...
+    #    5+ nodes: skeleton
+    #    5+ mansard
+    
+    else:  # -- roof is a separate object, in LOD roof
         roof_ac_name = "b%i-roof" % nb
         out.write("kids 0\n")
         LOD_lists[3].append(roof_ac_name)  # -- roof in separate LOD
@@ -669,8 +647,13 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
         # -- pitched roof for > 4 ground nodes
         if parameters.EXPERIMENTAL_USE_SKEL:
-            print "ground", b._nnodes_ground
+            #print "ground", b._nnodes_ground
             s = myskeleton.myskel(b, roof_ac_name, offset_xy = offset, offset_z = b.ground_elev + b.height)
+            if not s: # -- fall back to flat roof
+                s = roofs.flat(b)
+                # FIXME: move to analyse. If we fall back, don't require separate LOD
+            else:
+                tools.stats.have_complex_roof += 1
             out.write(s)
         
         # -- pitched roof for exactly 4 ground nodes        

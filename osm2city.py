@@ -20,13 +20,15 @@ import pdb
 # x use geometry library
 # x read original .stg+.xml, don't place OSM buildings when there's a static model near/within
 # - compute static_object stg's on the fly
-# - put roofs into separate LOD
-# - lights
+# x put roofs into separate LOD
+# x lights
 # - read relations tag == fix empty backyards
-# - simplify buildings
+# x simplify buildings
 # x put tall, large buildings in LOD bare, and small buildings in LOD detail
 # - more complicated roof geometries
-# - cmd line switches
+#   - split, new roofs.py?
+# x cmd line switches
+# - 
 
 # - city center??
 
@@ -609,6 +611,14 @@ if __name__ == "__main__":
         fpickle = open(parameters.PREFIX + '/buildings.pkl', 'rb')
         buildings = cPickle.load(fpickle)[:parameters.MAX_OBJECTS]
         fpickle.close()
+        
+#        newbuildings = []
+#        for b in buildings:
+#            if b.osm_id == 34112567:
+#                new_buildings = [b] + buildings[0:10]
+#                break
+#        buildings = new_buildings
+
         print "unpickled %g buildings " % (len(buildings))
         tools.stats.objects = len(buildings)
 
