@@ -28,7 +28,7 @@ import pdb
 # - more complicated roof geometries
 #   - split, new roofs.py?
 # x cmd line switches
-# - 
+# -
 
 # - city center??
 
@@ -611,7 +611,7 @@ if __name__ == "__main__":
         fpickle = open(parameters.PREFIX + '/buildings.pkl', 'rb')
         buildings = cPickle.load(fpickle)[:parameters.MAX_OBJECTS]
         fpickle.close()
-        
+
 #        newbuildings = []
 #        for b in buildings:
 #            if b.osm_id == 34112567:
@@ -665,7 +665,7 @@ if __name__ == "__main__":
 #    import myskeleton
  #   myskeleton.myskel(buildings[0])
   #  sys.exit(0)
-    
+
     #tools.write_gp(buildings)
 
     tools.stats.print_summary()
@@ -739,7 +739,7 @@ if __name__ == "__main__":
             if not stg_fname in stg_fp_dict:
                 stg_io.uninstall_ours(stg_fname)
                 stg = open(stg_fname, "a")
-                stg.write("%s\n# do not edit below this line\n#\n" % stg_io.our_magic)
+                stg.write("\n%s\n# do not edit below this line\n#\n" % stg_io.our_magic)
                 stg_fp_dict[stg_fname] = stg
             else:
                 stg = stg_fp_dict[stg_fname]

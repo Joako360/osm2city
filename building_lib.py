@@ -331,7 +331,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                or (parameters.EXPERIMENTAL_USE_SKEL and b._nnodes_ground in range(4, 10)):
                 b.roof_flat = False
                 b.roof_separate = True
-        
+
 
         # -- no pitched roof on tall buildings
         if b.levels > 5:
@@ -620,7 +620,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     if len(b.polygon.interiors) > 1:
         raise NotImplementedError("Can't yet handle relations with more than one inner way")
 
-  
+
     if not b.roof_separate:
         if len(b.polygon.interiors) == 1:
             # -- relation roof, for special case of exactly one inner ring
@@ -638,7 +638,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     #    4 nodes pitched: gable, hipped, half-hipped?, gambrel, mansard, ...
     #    5+ nodes: skeleton
     #    5+ mansard
-    
+
     else:  # -- roof is a separate object, in LOD roof
         roof_ac_name = "b%i-roof" % nb
         out.write("kids 0\n")
@@ -655,18 +655,18 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             else:
                 tools.stats.have_complex_roof += 1
             out.write(s)
-        
-        # -- pitched roof for exactly 4 ground nodes        
+
+        # -- pitched roof for exactly 4 ground nodes
         else:
             out.write("OBJECT poly\n")
             out.write('name "%s"\n' % roof_ac_name)
-    
+
             if b.roof_flat:
                 # FIXME: still have flat AND separate roof?? Doesn't seem so.
                 out.write('texture "%s"\n' % 'roof_flat.png')
             else:
                 out.write('texture "%s"\n' % (roof_texture.filename + '.png'))
-    
+
             # -- pitched roof for 4 ground nodes
             write_and_count_numvert(out, b, b.nnodes_outer + 2)
             # -- 4 corners
@@ -730,14 +730,14 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         out.write("kids 0\n")
 
         # -- LOD flat model
-        if False:
+        if True:
             roof_ac_name_flat = "b%i-flat" % nb
             out.write("OBJECT poly\n")
             out.write('name "%s"\n' % roof_ac_name_flat)
             LOD_lists[4].append(roof_ac_name_flat)
-    
+
             out.write('texture "%s"\n' % (roof_texture.filename + '.png'))
-    
+
             write_and_count_numvert(out, b, b.nnodes_outer)
             for x in X:
                 z = b.ground_elev - 1
@@ -750,7 +750,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             out.write("%i %g %g\n" % (1, 1, 0))
             out.write("%i %g %g\n" % (2, 1, 1))
             out.write("%i %g %g\n" % (3, 0, 1))
-    
+
             out.write("kids 0\n")
 
     tools.stats.count(b)
