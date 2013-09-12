@@ -83,7 +83,8 @@ LOD_PERCENTAGE_DETAIL = 0.5         # -- of the remaining buildings, this percen
 
 OBSTRUCTION_LIGHT_MIN_LEVELS = 15   # -- put obstruction lights on buildings with >= given levels
 
-EXPERIMENTAL_USE_SKEL = 0
+EXPERIMENTAL_USE_SKEL = 0           # -- generate complex roofs with pySkeleton?
+SKEL_MAX_NODES = 10                 # -- max number of nodes for which we generate complex roofs
 
 def set_parameters(paramDict):
     for k in paramDict:

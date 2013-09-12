@@ -98,8 +98,8 @@ class Mesh:
 #            
 #        f.close()
 
-    def ac3d_string(self, name, offset_xy = vec2d(0,0), offset_z = 0., header = False):
-        """return mesh as string in a AC3D format"""
+    def ac3d_string(self, name, offset_xy = vec2d(0,0), offset_z = 0., header = False, mat = 0):
+        """return mesh as string in a AC3D format. You must append kids line."""
         s = ""
         if header:
             s += "AC3Db\n"
@@ -117,11 +117,10 @@ class Mesh:
         s += "numsurf %i\n" % len(self.faces)
         for face in self.faces:
             s += "SURF 0x0\n"
-            s += "mat 0\n"
+            s += "mat %i\n" % mat
             s += "refs %i\n" % len(face)
             for index in face[::-1]:
                 s += "%i 0 0\n" % (index)
-        s += "kids 0\n"
             
         return s
         

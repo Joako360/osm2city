@@ -125,20 +125,6 @@ def get_nodes_from_acs(objs, own_prefix):
 
     all_nodes = np.array([[0,0]])
 
-#    for b in objs:
-#        if b.name.endswith(".xml") and b.stg_typ == "OBJECT_STATIC":
-#            print "READ xml", b.name
-#            try:
-#                xml = open(path_prefix + b.name, 'r')
-#            except:
-#                continue
-#            # first occurence of <path>name.ac</path>
-#
-#            lines = ac.readlines()
-#            xml.close()
-
-
-
     for b in objs:
         fname = b.name
         #print "in objs <%s>" % b.name
@@ -252,11 +238,11 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         tools.stats.nodes_ground += b._nnodes_ground
 
         # -- compute edge length
-        lenX = np.zeros((b._nnodes_ground))
+        b.lenX = np.zeros((b._nnodes_ground))
         for i in range(b.nnodes_outer-1):
-            lenX[i] = ((Xo[i+1,0]-Xo[i,0])**2 + (Xo[i+1,1]-Xo[i,1])**2)**0.5
+            b.lenX[i] = ((Xo[i+1,0]-Xo[i,0])**2 + (Xo[i+1,1]-Xo[i,1])**2)**0.5
         n = b.nnodes_outer
-        lenX[n-1] = ((Xo[0,0]-Xo[n-1,0])**2 + (Xo[0,1]-Xo[n-1,1])**2)**0.5
+        b.lenX[n-1] = ((Xo[0,0]-Xo[n-1,0])**2 + (Xo[0,1]-Xo[n-1,1])**2)**0.5
 
         if b.inner_rings_list:
             i0 = b.nnodes_outer
@@ -264,18 +250,18 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 Xi = np.array(interior.coords)[:-1]
                 n = len(Xi)
                 for i in range(n-1):
-                    lenX[i0 + i] = ((Xi[i+1,0]-Xi[i,0])**2 + (Xi[i+1,1]-Xi[i,1])**2)**0.5
-                lenX[i0 + n - 1] = ((Xi[0,0]-Xi[n-1,0])**2 + (Xi[0,1]-Xi[n-1,1])**2)**0.5
+                    b.lenX[i0 + i] = ((Xi[i+1,0]-Xi[i,0])**2 + (Xi[i+1,1]-Xi[i,1])**2)**0.5
+                b.lenX[i0 + n - 1] = ((Xi[0,0]-Xi[n-1,0])**2 + (Xi[0,1]-Xi[n-1,1])**2)**0.5
                 i0 += n
 
         # -- re-number nodes such that longest edge is first -- only on simple buildings
         if b.nnodes_outer == 4 and not b.X_inner:
-            if lenX[0] < lenX[1]:
+            if b.lenX[0] < b.lenX[1]:
                 Xo = np.roll(Xo, 1, axis=0)
-                lenX = np.roll(lenX, 1)
+                b.lenX = np.roll(b.lenX, 1)
                 b.set_polygon(Xo, b.inner_rings_list)
 
-        b.lenX = lenX   # FIXME: compute on the fly, or on set_polygon()?
+        b.lenX = b.lenX   # FIXME: compute on the fly, or on set_polygon()?
                         #        Or is there a shapely equivalent?
 
         # -- skip buildings outside elevation raster
@@ -315,32 +301,28 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
         # -- Work on roof
         #    roof is controlled by two flags:
-        #    bool b.roof_separate: whether or not to include roof as separate model
+        #    bool b.roof_complex: whether or not to include roof as separate model
         #      useful for
         #      - pitched roof
         #      - roof with add-ons: AC (TODO)
         #    replace by roof_type? flat  --> no separate model
         #                          gable --> separate model
         #                          ACs         -"-
-        b.roof_flat = True
-        b.roof_separate = False
+        b.roof_complex = False
 
         # -- pitched, separate roof if we have 4 ground nodes and area below 1000m2
         if not b.polygon.interiors and b.area < 2000:
             if b._nnodes_ground == 4 \
-               or (parameters.EXPERIMENTAL_USE_SKEL and b._nnodes_ground in range(4, 10)):
-                b.roof_flat = False
-                b.roof_separate = True
-
+               or (parameters.EXPERIMENTAL_USE_SKEL and b._nnodes_ground in range(4, parameters.SKEL_MAX_NODES)):
+                b.roof_complex = True
 
         # -- no pitched roof on tall buildings
         if b.levels > 5:
-            b.roof_flat = True
-            b.roof_separate = False
+            b.roof_complex = False
             # FIXME: roof_ACs = True
 
         requires = []
-        if b.roof_separate and not b.roof_flat:
+        if b.roof_complex:
             requires.append('age:old')
             requires.append('compat:roof-pitched')
 
@@ -350,7 +332,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             tools.stats.skipped_texture += 1
             print "Skipping building (no matching texture)"
             continue
-        if b.roof_separate:
+        if b.roof_complex:
             b.roof_texture = roofs.find_matching(b.facade_texture.requires)
 
         # -- finally: append building to new list
@@ -494,11 +476,11 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         v1 = v0 + nnodes_ring
         for i in range(v0, v1 - 1):
             if False:
-                tex_x1 = lenX[i] / facade_texture.h_size_meters # -- simply repeat texture to fit length
+                tex_x1 = b.lenX[i] / facade_texture.h_size_meters # -- simply repeat texture to fit length
             else:
                 # FIXME: respect facade texture split_h
                 #FIXME: there is a nan in facade_textures.h_splits of tex/facade_modern36x36_12
-                a = lenX[i] / facade_texture.h_size_meters
+                a = b.lenX[i] / facade_texture.h_size_meters
                 ia = int(a)
                 frac = a - ia
                 tex_x1 = facade_texture.closest_h_match(frac) + ia
@@ -517,7 +499,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         #return OK
 
         # -- closing wall
-        tex_x1 = lenX[v1-1] /  facade_texture.h_size_meters
+        tex_x1 = b.lenX[v1-1] /  facade_texture.h_size_meters
         out.write("SURF 0x0\n")
         out.write("mat %i\n" % mat)
         out.write("refs %i\n" % 4)
@@ -534,11 +516,11 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         X[i,0] -= offset.x # -- cluster coordinates. NB: this changes building coordinates!
         X[i,1] -= offset.y
 
-    lenX = b.lenX
-    height = b.height
-    roof_texture = b.roof_texture
+    #lenX = b.lenX
+    #height = b.height
+    #roof_texture = b.roof_texture
     facade_texture = b.facade_texture
-    roof_separate = b.roof_separate
+    #roof_complex = b.roof_complex
 
     global nb
     nb += 1
@@ -556,12 +538,13 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
 
     no_roof = False
+    #if not b.roof_complex: no_roof = True
 #    if len(b.polygon.interiors) < 2:
 #        no_roof = False
 #    else:
 #        no_roof = True
 
-    if (not no_roof) and (not roof_separate): nsurf += 1 # -- because roof will be part of base model
+    if (not no_roof) and (not b.roof_complex): nsurf += 1 # -- because roof will be part of base model
 
     #repeat_vert = int(height/3)
 
@@ -577,12 +560,12 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 #    shuffled_t = copy.copy(facade_candidates)
 #    random.shuffle(shuffled_t)
 #    for t in shuffled_t:
-    tex_y0, tex_y1 = check_height(height, facade_texture)
+    tex_y0, tex_y1 = check_height(b.height, facade_texture)
 
     if facade_texture:
         out.write('texture "%s"\n' % (facade_texture.filename+'.png'))
     else:
-        print "WARNING: no texture height", height, requires
+        print "WARNING: no texture height", b.height, requires
 
     # -- check h: width
 
@@ -621,7 +604,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         raise NotImplementedError("Can't yet handle relations with more than one inner way")
 
 
-    if not b.roof_separate:
+    if not b.roof_complex:
         if len(b.polygon.interiors) == 1:
             # -- relation roof, for special case of exactly one inner ring
             out.write(roofs.flat_relation(b))
@@ -629,26 +612,29 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         else:
             # -- plain flat roof
             out.write(roofs.flat(b))
+        out.write("kids 0\n")
         return
-
     # -- roof
-    #    relation flat roof: included in base model and LOD
-    #    flat roof:          included in base model and LOD
-    #    all other: separate object LOD roof, plus a flat model LOD same as building
-    #    4 nodes pitched: gable, hipped, half-hipped?, gambrel, mansard, ...
-    #    5+ nodes: skeleton
-    #    5+ mansard
+    #    We can have complex and non-complex roofs: 
+    #       - non-complex will be included in base object
+    #         - relations with 1 inner -> special flat roof
+    #         - all other -> flat roof
+    #       - complex will be separate object, go into LOD roof
+    #         - 4 nodes pitched: gable, hipped, half-hipped?, gambrel, mansard, ...
+    #         - 5+ nodes: skeleton
+    #         - 5+ mansard
+    #         - all will have additional flat roof for base model LOD
 
     else:  # -- roof is a separate object, in LOD roof
-        roof_ac_name = "b%i-roof" % nb
         out.write("kids 0\n")
-        LOD_lists[3].append(roof_ac_name)  # -- roof in separate LOD
+        #b.roof_mat = 1 # -- different color
+        b.roof_ac_name = "b%i-roof" % nb
+        LOD_lists[3].append(b.roof_ac_name)
 #        LOD_lists[b.LOD].append(roof_ac_name)
 
         # -- pitched roof for > 4 ground nodes
         if parameters.EXPERIMENTAL_USE_SKEL:
-            #print "ground", b._nnodes_ground
-            s = myskeleton.myskel(b, roof_ac_name, offset_xy = offset, offset_z = b.ground_elev + b.height)
+            s = myskeleton.myskel(b, offset_xy = offset, offset_z = b.ground_elev + b.height)
             if not s: # -- fall back to flat roof
                 s = roofs.flat(b)
                 # FIXME: move to analyse. If we fall back, don't require separate LOD
@@ -658,99 +644,14 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
         # -- pitched roof for exactly 4 ground nodes
         else:
-            out.write("OBJECT poly\n")
-            out.write('name "%s"\n' % roof_ac_name)
-
-            if b.roof_flat:
-                # FIXME: still have flat AND separate roof?? Doesn't seem so.
-                out.write('texture "%s"\n' % 'roof_flat.png')
-            else:
-                out.write('texture "%s"\n' % (roof_texture.filename + '.png'))
-
-            # -- pitched roof for 4 ground nodes
-            write_and_count_numvert(out, b, b.nnodes_outer + 2)
-            # -- 4 corners
-            for x in X:
-                z = b.ground_elev - 1
-                out.write("%1.2f %1.2f %1.2f\n" % (-x[1], b.ground_elev + b.height, -x[0]))
-            # --
-            #mid_short_x = 0.5*(X[3][1]+X[0][1])
-            #mid_short_z = 0.5*(X[3][0]+X[0][0])
-            # -- tangential vector of long edge
-            inward = 4. # will shift roof top 4m inward
-            roof_height = 3. # 3m
-            tang = (X[1]-X[0])/lenX[0] * inward
-
-            len_roof_top = lenX[0] - 2.*inward
-            len_roof_bottom = 1.*lenX[0]
-
-            out.write("%1.2f %1.2f %1.2f\n" % (-(0.5*(X[3][1]+X[0][1]) + tang[1]), b.ground_elev + height + roof_height, -(0.5*(X[3][0]+X[0][0]) + tang[0])))
-            out.write("%1.2f %1.2f %1.2f\n" % (-(0.5*(X[1][1]+X[2][1]) - tang[1]), b.ground_elev + height + roof_height, -(0.5*(X[1][0]+X[2][0]) - tang[0])))
-
-            roof_texture_size_x = roof_texture.h_size_meters # size of roof texture in meters
-            roof_texture_size_y = roof_texture.v_size_meters
-            repeatx = len_roof_bottom / roof_texture_size_x
-            len_roof_hypo = ((0.5*lenX[1])**2 + roof_height**2)**0.5
-            repeaty = len_roof_hypo / roof_texture_size_y
-
-            write_and_count_numsurf(out, b, 4)
-            out.write("SURF 0x0\n")
-            out.write("mat %i\n" % b.mat)
-            out.write("refs %i\n" % b.nnodes_outer)
-            out.write("%i %g %g\n" % (0, 0, 0))
-            out.write("%i %g %g\n" % (1, repeatx, 0))
-            out.write("%i %g %g\n" % (5, repeatx*(1-inward/len_roof_bottom), repeaty))
-            out.write("%i %g %g\n" % (4, repeatx*(inward/len_roof_bottom), repeaty))
-
-            out.write("SURF 0x0\n")
-            out.write("mat %i\n" % b.mat)
-            out.write("refs %i\n" % b.nnodes_outer)
-            out.write("%i %g %g\n" % (2, 0, 0))
-            out.write("%i %g %g\n" % (3, repeatx, 0))
-            out.write("%i %g %g\n" % (4, repeatx*(1-inward/len_roof_bottom), repeaty))
-            out.write("%i %g %g\n" % (5, repeatx*(inward/len_roof_bottom), repeaty))
-
-            repeatx = lenX[1]/roof_texture_size_x
-            len_roof_hypo = (inward**2 + roof_height**2)**0.5
-            repeaty = len_roof_hypo/roof_texture_size_y
-            out.write("SURF 0x0\n")
-            out.write("mat %i\n" % b.mat)
-            out.write("refs %i\n" % 3)
-            out.write("%i %g %g\n" % (1, 0, 0))
-            out.write("%i %g %g\n" % (2, repeatx, 0))
-            out.write("%i %g %g\n" % (5, 0.5*repeatx, repeaty))
-
-            repeatx = lenX[3]/roof_texture_size_x
-            out.write("SURF 0x0\n")
-            out.write("mat %i\n" % b.mat)
-            out.write("refs %i\n" % 3)
-            out.write("%i %g %g\n" % (3, 0, 0))
-            out.write("%i %g %g\n" % (0, repeatx, 0))
-            out.write("%i %g %g\n" % (4, 0.5*repeatx, repeaty))
+            out.write(roofs.separate_gable(b, X))
         out.write("kids 0\n")
 
         # -- LOD flat model
         if True:
             roof_ac_name_flat = "b%i-flat" % nb
-            out.write("OBJECT poly\n")
-            out.write('name "%s"\n' % roof_ac_name_flat)
             LOD_lists[4].append(roof_ac_name_flat)
-
-            out.write('texture "%s"\n' % (roof_texture.filename + '.png'))
-
-            write_and_count_numvert(out, b, b.nnodes_outer)
-            for x in X:
-                z = b.ground_elev - 1
-                out.write("%1.2f %1.2f %1.2f\n" % (-x[1], b.ground_elev + height, -x[0]))
-            write_and_count_numsurf(out, b, 1)
-            out.write("SURF 0x0\n")
-            out.write("mat %i\n" % b.mat)
-            out.write("refs %i\n" % b.nnodes_outer)
-            out.write("%i %g %g\n" % (0, 0, 0))
-            out.write("%i %g %g\n" % (1, 1, 0))
-            out.write("%i %g %g\n" % (2, 1, 1))
-            out.write("%i %g %g\n" % (3, 0, 1))
-
+            out.write(roofs.separate_flat(b, roof_ac_name_flat, X))
             out.write("kids 0\n")
 
     tools.stats.count(b)

@@ -117,8 +117,7 @@ class Building(object):
         self.anchor = vec2d(list(outer_ring.coords[0]))
         self.facade_texture = None
         self.roof_texture = None
-        self.roof_separate = False
-        self.roof_flat = True
+        self.roof_complex = False
         self.ac_name = None
         self.ceiling = 0.
         if len(outer_ring.coords) > 2:
@@ -693,7 +692,7 @@ if __name__ == "__main__":
             # -- count roofs == separate objects
             nroofs = 0
             for b in cl.objects:
-                if b.roof_separate: nroofs += 2  # we have 2 different LOD models for each roof
+                if b.roof_complex: nroofs += 2  # we have 2 different LOD models for each roof
 
             tile_elev = elev(cl.center)
             if tile_elev == -9999:

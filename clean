@@ -1,3 +1,6 @@
 #!/bin/bash
 rm *.stg
 rm ????city*.ac ????city*.xml
+rm *.pyc pySkeleton/*.pyc
+rm roof-error*
+

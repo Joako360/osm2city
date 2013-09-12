@@ -6,7 +6,7 @@ Created on Fri Sep  6 19:37:03 2013
 @author: tom
 """
 
-import polygon
+import pySkeleton.polygon as polygon
 from vec2d import vec2d
 import random
 import textwrap
@@ -73,7 +73,7 @@ def myskel(b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header = Fal
         print "skel", skeleton
         roof_mesh = poly.roof_3D(angle*3.1415/180.)
         
-        s = roof_mesh.ac3d_string(name, offset_xy, offset_z, header)
+        s = roof_mesh.ac3d_string(b.roof_ac_name, offset_xy, offset_z, header, b.roof_mat)
         
     # -- for some reason, roof_3d fails at times.
     try:
@@ -81,7 +81,7 @@ def myskel(b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header = Fal
         angle = random.uniform(20, 50)
         roof_mesh = poly.roof_3D(angle*3.1415/180.)
         
-        s = roof_mesh.ac3d_string(name, offset_xy, offset_z, header)
+        s = roof_mesh.ac3d_string(b.roof_ac_name, offset_xy, offset_z, header, b.roof_mat)
     except:
         print "Error while creating 3d roof (OSM_ID %i)" % b.osm_id
         tools.stats.roof_errors += 1
