@@ -188,12 +188,12 @@ def write_one_gp(b, filename):
     miny = min(npv[:,1])
     maxy = max(npv[:,1])
     dx = 0.1*(maxx - minx)
-    minx -= dx    
-    maxx += dx    
+    minx -= dx
+    maxx += dx
     dy = 0.1*(maxy - miny)
-    miny -= dy 
-    maxy += dy    
-    
+    miny -= dy
+    maxy += dy
+
     gp = open(filename + '.gp', 'w')
 #    term = "postscript enh eps"
 #    ext = ".eps"
@@ -245,7 +245,7 @@ class Stats(object):
         """
         self.vertices += b.vertices
         self.surfaces += b.surfaces
-        self.have_pitched_roof += not b.roof_flat
+        self.have_pitched_roof += b.roof_complex # FIXME: do we still need this??
         # self.objects += 1 # skipped because we count buildings while OSM parsing
         for i in range(len(self.area_levels))[::-1]:
             if b.area >= self.area_levels[i]:
