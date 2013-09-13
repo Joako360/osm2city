@@ -61,6 +61,7 @@ BUILDING_REDUCE_CHECK_TOUCH = False # -- before removing a building due to area,
 BUILDING_SIMPLIFY_TOLERANCE = 1.0   # -- all points in the simplified building will be within the tolerance distance of the original geometry.
 BUILDING_NEVER_SKIP_LEVELS = 6      # -- buildings that tall will never be skipped
 
+BUILDING_COMPLEX_ROOFS = 1          # -- generate complex roofs on buildings?
 # -- Parameters which influence the height of buildings if no info from OSM is available.
 #    It uses a triangular distribution (see http://en.wikipedia.org/wiki/Triangular_distribution)
 BUILDING_CITY_LEVELS_LOW = 2.0

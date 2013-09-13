@@ -8,7 +8,8 @@
 import point3D
 #import rainbow
 from vec2d import vec2d
-
+import roofs
+import numpy as np
 class Mesh:
     """
     A mesh is represented by an indexed face structure (IFS):
@@ -107,20 +108,28 @@ class Mesh:
             s += "OBJECT world\nkids 1\n"
         s += "OBJECT poly\n"
         s += "name \"%s\"\n" % name
-#        s += "texture 'a.png'\n")
+        s += "texture \"%s\"\n" % "tex/test.png"
         s += "numvert %i\n" % len(self.vertices)
 
+        X = []
         for p in self.vertices:
 #            s += "%f %f %f\n" % (p.x, p.y, p.z)
-            s += "%f %f %f\n" % (-(p.y - offset_xy.y), p.z + offset_z, -(p.x - offset_xy.x))
+            x = -(p.x - offset_xy.x)
+            y = -(p.y - offset_xy.y)
+            X.append([x,y])
+            s += "%f %f %f\n" % (y, p.z + offset_z, x)
             
         s += "numsurf %i\n" % len(self.faces)
         for face in self.faces:
             s += "SURF 0x0\n"
             s += "mat %i\n" % mat
             s += "refs %i\n" % len(face)
+            uv = roofs.face_uv(face[::-1], np.array(X), scale=0.05)
+            i = 0            
             for index in face[::-1]:
-                s += "%i 0 0\n" % (index)
+                s += "%i %i %i\n" % (index, uv[i,0], uv[i,1])
+                print "UV coord", uv[i,0], uv[i,1]
+                i += 1
             
         return s
         

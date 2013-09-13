@@ -309,18 +309,19 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         #                          gable --> separate model
         #                          ACs         -"-
         b.roof_complex = False
+        if parameters.BUILDING_COMPLEX_ROOFS:
+            # -- pitched, separate roof if we have 4 ground nodes and area below 1000m2
+            if not b.polygon.interiors and b.area < 2000:
+                if b._nnodes_ground == 4 \
+                   or (parameters.EXPERIMENTAL_USE_SKEL and b._nnodes_ground in range(4, parameters.SKEL_MAX_NODES)):
+                    b.roof_complex = True
+    
+            # -- no pitched roof on tall buildings
+            if b.levels > 5:
+                b.roof_complex = False
+                # FIXME: roof_ACs = True
 
-        # -- pitched, separate roof if we have 4 ground nodes and area below 1000m2
-        if not b.polygon.interiors and b.area < 2000:
-            if b._nnodes_ground == 4 \
-               or (parameters.EXPERIMENTAL_USE_SKEL and b._nnodes_ground in range(4, parameters.SKEL_MAX_NODES)):
-                b.roof_complex = True
-
-        # -- no pitched roof on tall buildings
-        if b.levels > 5:
-            b.roof_complex = False
-            # FIXME: roof_ACs = True
-
+        b.roof_complex = True
         requires = []
         if b.roof_complex:
             requires.append('age:old')
@@ -334,6 +335,10 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             continue
         if b.roof_complex:
             b.roof_texture = roofs.find_matching(b.facade_texture.requires)
+
+#        if b.nnodes_outer != 4:
+#            print "!=4",
+#            continue
 
         # -- finally: append building to new list
         new_buildings.append(b)
@@ -613,7 +618,6 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             # -- plain flat roof
             out.write(roofs.flat(b))
         out.write("kids 0\n")
-        return
     # -- roof
     #    We can have complex and non-complex roofs: 
     #       - non-complex will be included in base object
@@ -634,7 +638,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
         # -- pitched roof for > 4 ground nodes
         if parameters.EXPERIMENTAL_USE_SKEL:
-            s = myskeleton.myskel(b, offset_xy = offset, offset_z = b.ground_elev + b.height)
+            s = myskeleton.myskel(b, name = "tex/test.png", offset_xy = offset, offset_z = b.ground_elev + b.height)
             if not s: # -- fall back to flat roof
                 s = roofs.flat(b)
                 # FIXME: move to analyse. If we fall back, don't require separate LOD

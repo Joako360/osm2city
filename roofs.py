@@ -1,6 +1,8 @@
 import shapely.geometry as shg
 import numpy as np
 import building_lib
+import random
+from math import sin, cos, atan2
 
 def flat_relation(b):
     """relation flat roof, for one inner way only, included in base model"""
@@ -42,7 +44,12 @@ def flat(b):
     out += "SURF 0x0\n"
     out += "mat %i\n" % b.roof_mat
     out += "refs %i\n" % b.nnodes_outer
+    #X = np.array(b.X_outer)
+    #u = random.uniform(0, 1)
+    #scale = b.lenX[0]
+    #X = (X - X[0])/scale
     for i in range(b.nnodes_outer):
+#        out += "%i %g %g\n" % (i+b.nnodes_outer, X[i,0], X[i,1])
         out += "%i %g %g\n" % (i+b.nnodes_outer, 0, 0)
     return out
 
@@ -124,11 +131,16 @@ def separate_gable(b, X):
     
 def separate_flat(b, ac_name, X):
     """flat roof, any number of nodes, separate model"""
+
+    uv = face_uv(range(b.nnodes_outer), X, scale=0.05)
+
     out = ""
     out += "OBJECT poly\n"
     out += 'name "%s"\n' % ac_name
 
-    out += 'texture "%s"\n' % (b.roof_texture.filename + '.png')
+
+    #out += 'texture "%s"\n' % (b.roof_texture.filename + '.png')
+    out += 'texture "%s"\n' % 'tex/test.png'
     out += "numvert %i\n" % b.nnodes_outer
 
     for x in X:
@@ -138,6 +150,27 @@ def separate_flat(b, ac_name, X):
     out += "SURF 0x0\n"
     out += "mat %i\n" % b.mat
     out += "refs %i\n" % b.nnodes_outer
+
+    #X = np.array(b.X_outer)
+    scale = b.roof_texture.h_size_meters
+    X = (X - X[0])/scale
+    
     for i in range(b.nnodes_outer):
-        out += "%i %g %g\n" % (i, 0, 0)
+#        out += "%i %g %g\n" % (i, X[i,0], X[i,1])
+        out += "%i %g %g\n" % (i, uv[i][0], uv[i][1])
+        #        out += "%i %g %g\n" % (i+b.nnodes_outer, X[i,0], X[i,1])
     return out
+
+def face_uv(nodes, X, angle=None, scale=1.):
+    """return list of uv coords for given face"""
+    X = X[nodes]
+    X = (X - X[0])
+    if angle == None:
+        x, y = X[1]
+        angle = -atan2(y, x)
+    R = np.array([[cos(angle), -sin(angle)],
+                  [sin(angle),  cos(angle)]])
+    nodes = np.dot(X, R.transpose())
+    #nodes = np.dot(R, X) #.reshape(1,2)
+    return nodes * scale
+    

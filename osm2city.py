@@ -684,7 +684,7 @@ if __name__ == "__main__":
 
     for cl in clusters:
             nb = len(cl.objects)
-            if nb < 5: continue # skip almost empty clusters
+            #if nb < 5: continue # skip almost empty clusters
 
             # -- get cluster center
             offset = cl.center

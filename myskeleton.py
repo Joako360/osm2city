@@ -77,6 +77,7 @@ def myskel(b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header = Fal
         
     # -- for some reason, roof_3d fails at times.
     try:
+#    if True:
         poly = polygon.Polygon(vertices, edges, speeds)
         angle = random.uniform(20, 50)
         roof_mesh = poly.roof_3D(angle*3.1415/180.)
