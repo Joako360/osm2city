@@ -99,7 +99,7 @@ class Mesh:
 #            
 #        f.close()
 
-    def ac3d_string(self, name, offset_xy = vec2d(0,0), offset_z = 0., header = False, mat = 0):
+    def ac3d_string(self, b, offset_xy = vec2d(0,0), offset_z = 0., header = False):
         """return mesh as string in a AC3D format. You must append kids line."""
         s = ""
         if header:
@@ -107,8 +107,8 @@ class Mesh:
             s += """MATERIAL "" rgb 1   1   1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0\n"""
             s += "OBJECT world\nkids 1\n"
         s += "OBJECT poly\n"
-        s += "name \"%s\"\n" % name
-        s += "texture \"%s\"\n" % "tex/test.png"
+        s += "name \"%s\"\n" % b.roof_ac_name
+        s += "texture \"%s\"\n" % (b.roof_texture.filename + '.png')
         s += "numvert %i\n" % len(self.vertices)
 
         X = []
@@ -118,17 +118,28 @@ class Mesh:
             y = -(p.y - offset_xy.y)
             X.append([x,y])
             s += "%f %f %f\n" % (y, p.z + offset_z, x)
-            
+
+#        for p in self.vertices:
+##            s += "%f %f %f\n" % (p.x, p.y, p.z)
+#            x = -(p.x - offset_xy.x)
+#            y = -(p.y - offset_xy.y)
+#            print "nod ", x, y
+#            
+#        print "tot", X
+#        print "---"
+
         s += "numsurf %i\n" % len(self.faces)
         for face in self.faces:
+            face = np.roll(face[::-1], 1) # -- make outer edge the first
             s += "SURF 0x0\n"
-            s += "mat %i\n" % mat
+            s += "mat %i\n" % b.roof_mat
             s += "refs %i\n" % len(face)
-            uv = roofs.face_uv(face[::-1], np.array(X), scale=0.05)
-            i = 0            
-            for index in face[::-1]:
-                s += "%i %i %i\n" % (index, uv[i,0], uv[i,1])
-                print "UV coord", uv[i,0], uv[i,1]
+            uv = roofs.face_uv(face, np.array(X), b.roof_texture.h_size_meters, b.roof_texture.v_size_meters)
+            i = 0
+            for index in face:
+                s += "%i %1.3g %1.3g\n" % (index, uv[i,0], uv[i,1])
+                #print "UV coord", uv[i,0], uv[i,1]
+#                print "z=%g %g %g" % (self.vertices[index].z, uv[i,0], uv[i,1])
                 i += 1
             
         return s

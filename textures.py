@@ -284,10 +284,12 @@ def init():
 
 
     roofs = TextureManager('roof')
+#    roofs.append(Texture('tex/test',
+#                             10., [], True, 10., [], True, provides=['color:black', 'color:red']))
     roofs.append(Texture('tex/roof_tiled_black',
-                             1.20, [], True, 0.60, [], True, provides=['color:black']))
+                         1.20, [], True, 0.60, [], True, provides=['color:black']))
     roofs.append(Texture('tex/roof_tiled_red',
-                             1.0, [], True, 0.88, [], True, provides=['color:red']))
+                         1.0, [], True, 0.88, [], True, provides=['color:red']))
 #    roofs.append(Texture('tex/roof_black2',
 #                             1.39, [], True, 0.89, [], True, provides=['color:black']))
 #    roofs.append(Texture('tex/roof_black3',

@@ -187,6 +187,106 @@ def test_ac_load():
 #    out.close()
     #print s
 
+def is_static_object_nearby(b, X, static_tree):
+    """check for static/shared objects close to given building"""
+    # FIXME: which radius? Or use centroid point? make radius a parameter
+    radius = parameters.OVERLAP_RADIUS # alternative: radius = max(lenX)
+
+    # -- query_ball_point may return funny lists [[], [], .. ]
+    #    filter these
+    nearby = static_tree.query_ball_point(X, radius)
+    nearby = [x for x in nearby if x]
+
+    if len(nearby):
+        for i in range(b.nnodes_outer):
+            tools.stats.debug2.write("%g %g\n" % (X[i,0], X[i,1]))
+#            print "nearby:", nearby
+#            for n in nearby:
+#                print "-->", s[n]
+        try:
+            print "Static objects nearby. Skipping ", b.name, len(nearby)
+        except:
+            print "FIXME: Encoding problem", b.name.encode('ascii', 'ignore')
+        #for n in nearby:
+        #    print static_objects.objs[n].name,
+        #print
+        return True
+    return False
+
+
+def is_large_enough(b, buildings):
+    """Checks whether a given building's area is too small for inclusion.
+    Never drop tall buildings.
+    FIXME: Exclusion might be skipped if the building touches another building (i.e. an annex)
+    Returns true if the building should be included (i.e. area is big enough etc.)
+    """
+    if b.levels >= parameters.BUILDING_NEVER_SKIP_LEVELS: return True
+    if b.area < parameters.BUILDING_MIN_AREA or \
+       (b.area < parameters.BUILDING_REDUCE_THRESHOLD and random.uniform(0,1) < parameters.BUILDING_REDUCE_RATE):
+        #if parameters.BUILDING_REDUCE_CHECK_TOUCH:
+            #for k in buildings:
+                #if k.touches(b): # using Shapely, but buildings have no polygon currently
+                    #return True
+        return False
+    return True
+
+def compute_height_and_levels(b):
+    """Determines total height (and number of levels) of a building based on
+       OSM values and other logic"""
+    level_height = random_level_height()
+
+    # -- try OSM height first
+    #    catch exceptions, since height might be "5 m" instead of "5"
+    try:
+        height = float(b.height.replace('m', ''))
+        if height > 1.:
+            b.levels = (height * 1.)/level_height
+    except:
+        height = 0.
+        pass
+
+    # -- failing that, try OSM levels
+    if height < 1:
+        if float(b.levels) > 0:
+            pass
+            #print "have levels", b.levels
+        else:
+            # -- failing that, use random levels
+            b.levels = random_levels()
+            if b.area < parameters.BUILDING_MIN_AREA:
+                b.levels = min(b.levels, 2)
+
+    b.height = float(b.levels) * level_height
+
+
+def make_lightmap_dict(buildings):
+    """make a dictionary: map texture to objects"""
+    lightmap_dict = {}
+    for b in buildings:
+        key = b.facade_texture
+        if not lightmap_dict.has_key(key):
+            lightmap_dict[key] = []
+        lightmap_dict[key].append(b)
+    return lightmap_dict
+
+def decide_LOD(buildings):
+    """Decide on the building's LOD based on area, number of levels, and some randomness."""
+    for b in buildings:
+        r = random.uniform(0,1)
+        if r < parameters.LOD_PERCENTAGE_DETAIL: lod = 2  # -- detail
+        else: lod = 1                                     #    rough
+
+        if b.levels > parameters.LOD_ALWAYS_ROUGH_ABOVE_LEVELS:  lod = 1  #    tall buildings        -> rough
+        if b.levels > parameters.LOD_ALWAYS_BARE_ABOVE_LEVELS:   lod = 0  # -- really tall buildings -> bare
+        if b.levels < parameters.LOD_ALWAYS_DETAIL_BELOW_LEVELS: lod = 2  #    small buildings       -> detail
+
+        if b.area < parameters.LOD_ALWAYS_DETAIL_BELOW_AREA:     lod = 2
+        if b.area > parameters.LOD_ALWAYS_ROUGH_ABOVE_AREA:      lod = 1
+        # mat = lod
+        b.LOD = lod
+        tools.stats.count_LOD(lod)
+
+
 def analyse(buildings, static_objects, transform, elev, facades, roofs):
     """analyse all buildings
     - calculate area
@@ -312,16 +412,15 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         if parameters.BUILDING_COMPLEX_ROOFS:
             # -- pitched, separate roof if we have 4 ground nodes and area below 1000m2
             if not b.polygon.interiors and b.area < 2000:
-                if b._nnodes_ground == 4 \
-                   or (parameters.EXPERIMENTAL_USE_SKEL and b._nnodes_ground in range(4, parameters.SKEL_MAX_NODES)):
-                    b.roof_complex = True
+                if b._nnodes_ground == 4 or (parameters.EXPERIMENTAL_USE_SKEL and \
+                   b._nnodes_ground in range(4, parameters.SKEL_MAX_NODES)):
+                   b.roof_complex = True
     
             # -- no pitched roof on tall buildings
             if b.levels > 5:
                 b.roof_complex = False
                 # FIXME: roof_ACs = True
 
-        b.roof_complex = True
         requires = []
         if b.roof_complex:
             requires.append('age:old')
@@ -345,104 +444,6 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
     return new_buildings
 
-def is_static_object_nearby(b, X, static_tree):
-    """check for static/shared objects close to given building"""
-    # FIXME: which radius? Or use centroid point? make radius a parameter
-    radius = parameters.OVERLAP_RADIUS # alternative: radius = max(lenX)
-
-    # -- query_ball_point may return funny lists [[], [], .. ]
-    #    filter these
-    nearby = static_tree.query_ball_point(X, radius)
-    nearby = [x for x in nearby if x]
-
-    if len(nearby):
-        for i in range(b.nnodes_outer):
-            tools.stats.debug2.write("%g %g\n" % (X[i,0], X[i,1]))
-#            print "nearby:", nearby
-#            for n in nearby:
-#                print "-->", s[n]
-        try:
-            print "Static objects nearby. Skipping ", b.name, len(nearby)
-        except:
-            print "FIXME: Encoding problem", b.name.encode('ascii', 'ignore')
-        #for n in nearby:
-        #    print static_objects.objs[n].name,
-        #print
-        return True
-    return False
-
-
-def is_large_enough(b, buildings):
-    """Checks whether a given building's area is too small for inclusion.
-    Never drop tall buildings.
-    FIXME: Exclusion might be skipped if the building touches another building (i.e. an annex)
-    Returns true if the building should be included (i.e. area is big enough etc.)
-    """
-    if b.levels >= parameters.BUILDING_NEVER_SKIP_LEVELS: return True
-    if b.area < parameters.BUILDING_MIN_AREA or \
-       (b.area < parameters.BUILDING_REDUCE_THRESHOLD and random.uniform(0,1) < parameters.BUILDING_REDUCE_RATE):
-        #if parameters.BUILDING_REDUCE_CHECK_TOUCH:
-            #for k in buildings:
-                #if k.touches(b): # using Shapely, but buildings have no polygon currently
-                    #return True
-        return False
-    return True
-
-def compute_height_and_levels(b):
-    """Determines total height (and number of levels) of a building based on
-       OSM values and other logic"""
-    level_height = random_level_height()
-
-    # -- try OSM height first
-    #    catch exceptions, since height might be "5 m" instead of "5"
-    try:
-        height = float(b.height.replace('m', ''))
-        if height > 1.:
-            b.levels = (height * 1.)/level_height
-    except:
-        height = 0.
-        pass
-
-    # -- failing that, try OSM levels
-    if height < 1:
-        if float(b.levels) > 0:
-            pass
-            #print "have levels", b.levels
-        else:
-            # -- failing that, use random levels
-            b.levels = random_levels()
-            if b.area < parameters.BUILDING_MIN_AREA:
-                b.levels = min(b.levels, 2)
-
-    b.height = float(b.levels) * level_height
-
-
-def make_lightmap_dict(buildings):
-    """make a dictionary: map texture to objects"""
-    lightmap_dict = {}
-    for b in buildings:
-        key = b.facade_texture
-        if not lightmap_dict.has_key(key):
-            lightmap_dict[key] = []
-        lightmap_dict[key].append(b)
-    return lightmap_dict
-
-def decide_LOD(buildings):
-    """Decide on the building's LOD based on area, number of levels, and some randomness."""
-    for b in buildings:
-        r = random.uniform(0,1)
-        if r < parameters.LOD_PERCENTAGE_DETAIL: lod = 2  # -- detail
-        else: lod = 1                                     #    rough
-
-        if b.levels > parameters.LOD_ALWAYS_ROUGH_ABOVE_LEVELS:  lod = 1  #    tall buildings        -> rough
-        if b.levels > parameters.LOD_ALWAYS_BARE_ABOVE_LEVELS:   lod = 0  # -- really tall buildings -> bare
-        if b.levels < parameters.LOD_ALWAYS_DETAIL_BELOW_LEVELS: lod = 2  #    small buildings       -> detail
-
-        if b.area < parameters.LOD_ALWAYS_DETAIL_BELOW_AREA:     lod = 2
-        if b.area > parameters.LOD_ALWAYS_ROUGH_ABOVE_AREA:      lod = 1
-        # mat = lod
-        b.LOD = lod
-        tools.stats.count_LOD(lod)
 
 def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
     """now actually write building.
@@ -633,22 +634,28 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         out.write("kids 0\n")
         #b.roof_mat = 1 # -- different color
         b.roof_ac_name = "b%i-roof" % nb
+#        print "roof name", b.roof_ac_name,
         LOD_lists[3].append(b.roof_ac_name)
 #        LOD_lists[b.LOD].append(roof_ac_name)
 
         # -- pitched roof for > 4 ground nodes
         if parameters.EXPERIMENTAL_USE_SKEL:
-            s = myskeleton.myskel(b, name = "tex/test.png", offset_xy = offset, offset_z = b.ground_elev + b.height)
+            s = myskeleton.myskel(b, offset_xy = offset, 
+                                  offset_z = b.ground_elev + b.height, 
+                                  max_height = b.height * parameters.SKEL_MAX_HEIGHT_RATIO)
             if not s: # -- fall back to flat roof
                 s = roofs.flat(b)
+#                print "FAIL"
                 # FIXME: move to analyse. If we fall back, don't require separate LOD
             else:
+#                print "COMPLEX"
                 tools.stats.have_complex_roof += 1
             out.write(s)
 
         # -- pitched roof for exactly 4 ground nodes
         else:
             out.write(roofs.separate_gable(b, X))
+#            print "4 GROUND", b._nnodes_ground
         out.write("kids 0\n")
 
         # -- LOD flat model
