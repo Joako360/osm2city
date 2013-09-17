@@ -318,6 +318,8 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         # - facade raussuchen
         #   requires: compat:flat-roof
 
+        #if len(b.inner_rings_list) < 1: continue
+
         #mat = random.randint(1,4)
         b.mat = 0
         b.roof_mat = 0
@@ -327,7 +329,8 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         #    - compute edge lengths
 
         tools.stats.nodes_simplified += b.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
-
+        b.roll_inner_nodes()
+        
         # -- array of local outer coordinates
         Xo = np.array(b.X_outer)
 
@@ -606,13 +609,12 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         tools.stats.count(b)
         return
 
-    if len(b.polygon.interiors) > 1:
+    if not parameters.EXPERIMENTAL_INNER and len(b.polygon.interiors) > 1:
         raise NotImplementedError("Can't yet handle relations with more than one inner way")
 
 
     if not b.roof_complex:
-        if len(b.polygon.interiors) == 1:
-            # -- relation roof, for special case of exactly one inner ring
+        if len(b.polygon.interiors):
             out.write(roofs.flat_relation(b))
             tools.stats.count(b)
         else:

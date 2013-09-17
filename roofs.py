@@ -4,18 +4,8 @@ import building_lib
 import random
 from math import sin, cos, atan2
 
-def flat_relation(b):
+def _flat_relation(b):
     """relation flat roof, for one inner way only, included in base model"""
-    #print "one roof"
-    #
-    #   3-----------2  Outer is CCW : 0 1 2 3
-    #   |           |  Inner is CW  : 4 5 6 7
-    #   |           |
-    #   | 7----4    |  draw 0 1 2 3 - 0 - 6 7 4 5 - 6
-    #   | |    |    |
-    #   | 6-<<-5    |  6 is the inner node which is closest to first outer node
-    #   |/          |
-    #   0---->>-----1
 
     out = ""
 
@@ -38,9 +28,55 @@ def flat_relation(b):
     out += "%i %g %g\n" % (Xi[0], 0, 0)
     return out
 
+def flat_relation(b):
+    """Relation flat roof, included in base model."""
+    #   3-----------2  Outer is CCW : 0 1 2 3
+    #   |           |  Inner is CW  : 4 5 6 7
+    #   |           |
+    #   | 7----4    |  draw 0 1 2 3 - 0 - 6 7 4 5 - 6
+    #   | |    |    |
+    #   | 6-<<-5    |  6 is the inner node which is closest to first outer node
+    #   |/          |
+    #   0---->>-----1
+    out = ""
+    out += "SURF 0x0\n"
+    out += "mat %i\n" % b.roof_mat
+    out += "refs %i\n" % (b._nnodes_ground + 2 * len(b.polygon.interiors))
+
+#    print "nouter", b.nnodes_outer
+#    print "\nouter_closest", b.outer_nodes_closest
+#    print "inner rings", len(b.polygon.interiors)
+#    for i in b.polygon.interiors:
+#        print "  inner", len(i.coords) - 1
+    outer_closest = b.outer_nodes_closest
+    i = b.nnodes_outer
+    inner_ring = 0
+    ofs = b._nnodes_ground
+    nodes = []
+    for o in range(b.nnodes_outer):
+        nodes.append(o + ofs)
+        if outer_closest and o == outer_closest[0]:
+#            print "inner ring!"
+            len_ring = len(b.polygon.interiors[inner_ring].coords) - 1
+            a = np.arange(len_ring) + i + ofs
+            for x in a: nodes.append(x)
+            nodes.append(a[0]) # -- close inner ring
+            i += len_ring
+            inner_ring += 1
+            outer_closest.pop(0)
+            nodes.append(o + ofs) # -- go back to outer ring
+
+#    print nodes
+    for node in nodes:
+        out += "%i %g %g\n" % (node, 0, 0)
+#    print "len nodes", len(nodes)
+    assert(len(nodes) == b._nnodes_ground + 2 * len(b.polygon.interiors))
+    return out
+
+
 def flat(b):
     """plain flat roof, included in base model"""
-    out = ""    
+    out = ""
     out += "SURF 0x0\n"
     out += "mat %i\n" % b.roof_mat
     out += "refs %i\n" % b.nnodes_outer
@@ -90,7 +126,7 @@ def separate_gable(b, X):
     len_roof_hypo = ((0.5*b.lenX[1])**2 + roof_height**2)**0.5
     repeaty = len_roof_hypo / roof_texture_size_y
 
-    numsurf = 4    
+    numsurf = 4
     out += "numsurf %i\n" % numsurf
     b.surfaces += numsurf
 
@@ -128,7 +164,7 @@ def separate_gable(b, X):
     out += "%i %g %g\n" % (0, repeatx, 0)
     out += "%i %g %g\n" % (4, 0.5*repeatx, repeaty)
     return out
-    
+
 def separate_flat(b, ac_name, X):
     """flat roof, any number of nodes, separate model"""
 
@@ -154,7 +190,7 @@ def separate_flat(b, ac_name, X):
     #X = np.array(b.X_outer)
     scale = b.roof_texture.h_size_meters
     X = (X - X[0])/scale
-    
+
     for i in range(b.nnodes_outer):
 #        out += "%i %g %g\n" % (i, X[i,0], X[i,1])
         out += "%i %1.2f %1.2f\n" % (i, uv[i][0], uv[i][1])
@@ -170,8 +206,11 @@ def face_uv(nodes, X, h_scale=1., v_scale=1., angle=None):
         angle = -atan2(y, x)
     R = np.array([[cos(angle), -sin(angle)],
                   [sin(angle),  cos(angle)]])
-    uv = np.dot(X, R.transpose()) * 0.1
-    #uv[:,0] /= h_scale
-    #uv[:,1] /= v_scale
+    uv = np.dot(X, R.transpose())
+#    print "SCALE", h_scale, v_scale
+#    print "X=", X
+#    print "UV", uv
+    uv[:,0] /= h_scale
+    uv[:,1] /= v_scale
+#    print "UVsca", uv
     return uv
-    

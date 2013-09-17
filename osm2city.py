@@ -121,9 +121,47 @@ class Building(object):
         self.ac_name = None
         self.ceiling = 0.
         if len(outer_ring.coords) > 2:
-            self.set_polygon(outer_ring, inner_rings_list)
+            self.set_polygon(outer_ring, self.inner_rings_list)
         else:
             self.polygon = None
+        if self.inner_rings_list: self.roll_inner_nodes()
+
+
+    def roll_inner_nodes(self):
+        """Roll inner rings such that the node closest to an outer node goes first.
+
+           Also, create a list of outer corresponding outer nodes.
+        """
+        new_inner_rings_list = []
+        self.outer_nodes_closest = []
+        outer_nodes_avail = range(self.nnodes_outer)
+        for inner in self.polygon.interiors:
+            min_r = 1e99
+            for i, node_i in enumerate(list(inner.coords)[:-1]):
+                node_i = vec2d(node_i)
+                for o in outer_nodes_avail:
+                    r = node_i.distance_to(vec2d(self.X_outer[o]))
+                    if r <= min_r:
+                        closest_i = node_i
+                        min_r = r
+                        min_i = i
+                        min_o = o
+#            print "\nfirst nodes", closest_i, closest_o, r
+            new_inner = shg.polygon.LinearRing(np.roll(np.array(inner.coords)[:-1], -min_i, axis=0))
+            new_inner_rings_list.append(new_inner)
+#            print "NEW", new_inner
+#            print "OLD", inner
+            self.outer_nodes_closest.append(min_o)
+            outer_nodes_avail.remove(min_o)
+#            print self.outer_nodes_closest
+#        print "---\n\n"
+        # -- sort inner rings by index of closest outer node
+        yx = sorted(zip(self.outer_nodes_closest, new_inner_rings_list))
+        self.inner_rings_list = [x for (y,x) in yx]
+        self.outer_nodes_closest = [y for (y,x) in yx]
+        self.set_polygon(self.polygon.exterior, self.inner_rings_list)
+#        for o in self.outer_nodes_closest:
+#            assert(o < len(outer_ring.coords) - 1)
 
     def simplify(self, tolerance):
         original_nodes = self.nnodes_outer + len(self.X_inner)
@@ -223,7 +261,7 @@ class wayExtract(object):
                     coords.append(tools.transform.toLocal((c.lon, c.lat)))
                     break
         #print "before inner", refs
-        #print "cord", coords
+#        print "cord", coords
         ring = shg.polygon.LinearRing(coords)
         # -- outer -> CCW, inner -> not CCW
         if ring.is_ccw == inner:
@@ -258,25 +296,26 @@ class wayExtract(object):
                 _levels = float(tags['building:levels'])
             if 'layer' in tags:
                 _layer = int(tags['layer'])
-        except:
-            print "\nFailed to parse building", osm_id, tags, refs
+
+            # -- simple (silly?) heuristics to 'respect' layers
+            if _layer == 0: return False
+            if _layer < 99 and _height == 0 and _levels == 0:
+                _levels = _layer + 2
+
+        #        if len(refs) != 4: return False# -- testing, 4 corner buildings only
+
+            # -- all checks OK: accept building
+
+            # -- make outer and inner rings from refs
+            outer_ring = self.refs_to_ring(refs)
+            inner_rings_list = []
+            for way in inner_ways:
+                inner_rings_list.append(self.refs_to_ring(way.refs, inner=True))
+        except Exception, reason:
+            print "\nFailed to parse building (%s)" % reason, osm_id, tags, refs
             tools.stats.parse_errors += 1
             return False
 
-        # -- simple (silly?) heuristics to 'respect' layers
-        if _layer == 0: return False
-        if _layer < 99 and _height == 0 and _levels == 0:
-            _levels = _layer + 2
-
-#        if len(refs) != 4: return False# -- testing, 4 corner buildings only
-
-        # -- all checks OK: accept building
-
-        # -- make outer and inner rings from refs
-        outer_ring = self.refs_to_ring(refs)
-        inner_rings_list = []
-        for way in inner_ways:
-            inner_rings_list.append(self.refs_to_ring(way.refs, inner=True))
 
         self.buildings.append(Building(osm_id, tags, outer_ring, _name, _height, _levels, inner_rings_list = inner_rings_list))
         tools.stats.objects += 1
@@ -313,7 +352,7 @@ class wayExtract(object):
                     #all_tags = dict([way.tags for way in outer_ways]) # + tags.items())
                     #print "all outer refs", all_outer_refs
                     #dict(outer.tags.items() + tags.items())
-                    if len(inner_ways) > 1:
+                    if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
                         print "FIXME: ignoring all but first inner way (%i total) of ID %i" % (len(inner_ways), osm_id)
                         self.make_building_from_way(outer_ways[0].osm_id,
                                                     all_tags,
@@ -578,21 +617,27 @@ if __name__ == "__main__":
 
     # -- now read OSM data. Either parse OSM xml, or read a previously cached .pkl file
     #    End result is 'buildings', a list of building objects
+    pkl_fname = parameters.PREFIX + os.sep + parameters.OSM_FILE + '.pkl'
+    osm_fname = parameters.PREFIX + os.sep + parameters.OSM_FILE
     if not parameters.USE_PKL:
         # -- parse OSM, return
+        if os.path.exists(pkl_fname):
+            print "Existing cache file %s will be overwritten. Continue? (y/n)" % pkl_fname
+            if raw_input() != 'y': sys.exit(-1)
+
         way = wayExtract()
         p = OSMParser(concurrency=parameters.CONCURRENCY, coords_callback=way.coords)
         print "start parsing coords"
-        p.parse(parameters.PREFIX + os.sep + parameters.OSM_FILE)
+        p.parse(osm_fname)
         print "done parsing"
         print "ncords:", len(way.coord_list)
         print "bounds:", way.minlon, way.minlat, way.maxlon, way.maxlat
 
         print "start parsing ways and relations"
         p = OSMParser(concurrency=parameters.CONCURRENCY, ways_callback=way.ways)
-        p.parse(parameters.PREFIX + os.sep + parameters.OSM_FILE)
+        p.parse(osm_fname)
         p = OSMParser(concurrency=parameters.CONCURRENCY, relations_callback=way.relations)
-        p.parse(parameters.PREFIX + os.sep + parameters.OSM_FILE)
+        p.parse(osm_fname)
         way.process_ways()
         #tools.stats.print_summary()
 
@@ -602,12 +647,13 @@ if __name__ == "__main__":
 
         # -- cache parsed data. To prevent accidentally overwriting,
         #    write to local dir, while we later read from $PREFIX/buildings.pkl
-        fpickle = open('buildings.pkl', 'wb')
+        fpickle = open(pkl_fname, 'wb')
         cPickle.dump(buildings, fpickle, -1)
         fpickle.close()
     else:
         # -- load list of building objects from previously cached file
-        fpickle = open(parameters.PREFIX + '/buildings.pkl', 'rb')
+        print "Loading %s" % pkl_fname
+        fpickle = open(pkl_fname, 'rb')
         buildings = cPickle.load(fpickle)[:parameters.MAX_OBJECTS]
         fpickle.close()
 

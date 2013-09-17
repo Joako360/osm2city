@@ -28,13 +28,13 @@ def myskel(b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header = Fal
     edges = [(i, i+1) for i in range(no-1)]
     edges.append((no-1, 0))
     speeds = [1.] * no
-    
+
     #print "OSMID", b.osm_id
     if False and b.osm_id == 34112567:
         if False:
             vertices = np.array(vertices)
     #        print "vertices = ", vertices
-            
+
             minx = min(vertices[:,0])
             maxx = max(vertices[:,0])
             miny = min(vertices[:,1])
@@ -45,11 +45,11 @@ def myskel(b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header = Fal
             dy = (maxy - miny)
             vertices[:,0] -= (minx)
             vertices[:,1] -= (miny)
-    
+
             #sc = dx/600.
             #vertices /= sc
             vertices += 10.
-            
+
     #        print "vertices = ", vertices
     #        print "edges = ", edges
     #        print "speeds = ", speeds
@@ -61,7 +61,7 @@ def myskel(b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header = Fal
         for e in edges:
             f.write("%i %i 1.0\n" % (e[0], e[1]))
         f.close()
-        
+
         gp = "try"
         tools.write_one_gp(b, gp)
         os.system("gnuplot %s.gp" % gp)
@@ -72,25 +72,25 @@ def myskel(b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header = Fal
         skeleton = poly.straight_skeleton()
         print "skel", skeleton
         roof_mesh = poly.roof_3D(angle*3.1415/180.)
-        
+
         s = roof_mesh.ac3d_string(b, offset_xy, offset_z, header)
-        
+
     # -- for some reason, roof_3d fails at times.
-#    try:
-    if True:
+    try:
+#    if True:
         poly = polygon.Polygon(vertices, edges, speeds)
         angle = random.uniform(20, 50)
         roof_mesh = poly.roof_3D(angle*3.1415/180.)
         #roof.mesh.vertices
         roof_height = max([p[2] for p in roof_mesh.vertices])
-        if roof_height > max_height: 
+        if roof_height > max_height:
 #            print "roof too heigh", roof_height, max_height
             return False
         s = roof_mesh.ac3d_string(b, offset_xy, offset_z, header)
 #        return s
-#    except:
-    if False:
-        print "Error while creating 3d roof (OSM_ID %i)" % b.osm_id
+    except Exception, reason:
+#    if False:
+        print "Error while creating 3d roof (OSM_ID %i, %s)" % (b.osm_id, reason)
         tools.stats.roof_errors += 1
         gp = 'roof-error-%04i' % tools.stats.roof_errors
         tools.write_one_gp(b, gp)
@@ -103,7 +103,7 @@ def myskel(b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header = Fal
         f.close()
 
     return s
-    
+
 
 if __name__ == "__main__":
     myskel(header = True)

@@ -12,7 +12,8 @@ class vec2d(object):
         #print "got x", x
         #print "got y", y
         if y == None:
-            y = x[1]
+            if len(x) != 2: raise ValueError('Need exactly two values to create vec2d from list.')
+            y = x[1]  # -- Yes, we need to process y first.
             x = x[0]
         self.x = x
         self.y = y
@@ -81,6 +82,10 @@ class vec2d(object):
 
     def int(self):
         return vec2d(int(self.x), int(self.y))
+    
+    def distance_to(self, other):
+        d = self - other
+        return (d.x**2 + d.y**2)**0.5
 
 if __name__ == "__main__":
     a = vec2d(1,2)
