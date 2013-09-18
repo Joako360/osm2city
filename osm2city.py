@@ -22,11 +22,11 @@ import pdb
 # - compute static_object stg's on the fly
 # x put roofs into separate LOD
 # x lights
-# - read relations tag == fix empty backyards
+# x read relations tag == fix empty backyards
 # x simplify buildings
 # x put tall, large buildings in LOD bare, and small buildings in LOD detail
 # - more complicated roof geometries
-#   - split, new roofs.py?
+#   x split, new roofs.py?
 # x cmd line switches
 # -
 
@@ -43,8 +43,8 @@ import pdb
 # x respect ac
 
 # cmd line
-# - skip nearby check
-# - fake elev
+# x skip nearby check
+# x fake elev
 # - log level
 
 # development hints:
@@ -56,18 +56,6 @@ import pdb
 # - variable names: use underscores (my_long_variable), avoid CamelCase
 # - capitalize class names: class Interpolator(object):
 # - comments: code # -- comment
-
-# -- new design:
-# - parse OSM -> return a list of building objects
-# - read relevant stgs
-# - analyze buildings
-#   - calculate area
-#   - location clash with stg static models? drop building
-#   - analyze surrounding: similar shaped buildings nearby? will get same texture
-#   - set building type, roof type etc
-#   - decide LOD
-# - write clusters
-
 
 import numpy as np
 import sys
@@ -120,6 +108,7 @@ class Building(object):
         self.roof_complex = False
         self.ac_name = None
         self.ceiling = 0.
+        self.outer_nodes_closest = []
         if len(outer_ring.coords) > 2:
             self.set_polygon(outer_ring, self.inner_rings_list)
         else:
@@ -276,7 +265,7 @@ class wayExtract(object):
         if refs[0] == refs[-1]: refs = refs[0:-1] # -- kick last ref if it coincides with first
 
         _name = ""
-        _height = 0
+        _height = 0.
         _levels = 0
         _layer = 99
 
@@ -316,8 +305,8 @@ class wayExtract(object):
             tools.stats.parse_errors += 1
             return False
 
-
         self.buildings.append(Building(osm_id, tags, outer_ring, _name, _height, _levels, inner_rings_list = inner_rings_list))
+               
         tools.stats.objects += 1
         if tools.stats.objects % 70 == 0: print tools.stats.objects
         else: sys.stdout.write(".")
@@ -327,6 +316,7 @@ class wayExtract(object):
         for osm_id, tags, members in relations:
             if tools.stats.objects >= parameters.MAX_OBJECTS:
                 return
+                
             if 'building' in tags:
                 outer_ways = []
                 inner_ways = []
@@ -354,20 +344,18 @@ class wayExtract(object):
                     #dict(outer.tags.items() + tags.items())
                     if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
                         print "FIXME: ignoring all but first inner way (%i total) of ID %i" % (len(inner_ways), osm_id)
-                        self.make_building_from_way(outer_ways[0].osm_id,
+                        self.make_building_from_way(osm_id,
                                                     all_tags,
                                                     all_outer_refs, [inner_ways[0]])
                     else:
-                        self.make_building_from_way(outer_ways[0].osm_id,
+                        self.make_building_from_way(osm_id,
                                                     all_tags,
                                                     all_outer_refs, inner_ways)
 
 
-                    # -- way could have a 'building' tag. Prevent processing this twice
+                    # -- way could have a 'building' tag, too. Prevent processing this twice.
                     for way in outer_ways:
                         self.way_list.remove(way)
-                    #print "FIXME: skipping possible 'inner' way(s) of relation %i" % osm_id
- #                               print "corr way: ", way
 
 
     def ways(self, ways):
@@ -379,6 +367,9 @@ class wayExtract(object):
     def process_ways(self):
         for way in self.way_list:
             if 'building' in way.tags:
+                if tools.stats.objects >= parameters.MAX_OBJECTS: return
+                self.make_building_from_way(way.osm_id, way.tags, way.refs)
+            elif 'building:part' in way.tags:
                 if tools.stats.objects >= parameters.MAX_OBJECTS: return
                 self.make_building_from_way(way.osm_id, way.tags, way.refs)
 
@@ -658,11 +649,6 @@ if __name__ == "__main__":
         fpickle.close()
 
 #        newbuildings = []
-#        for b in buildings:
-#            if b.osm_id == 34112567:
-#                new_buildings = [b] + buildings[0:10]
-#                break
-#        buildings = new_buildings
 
         print "unpickled %g buildings " % (len(buildings))
         tools.stats.objects = len(buildings)
@@ -705,12 +691,6 @@ if __name__ == "__main__":
     #   - set building type, roof type etc
     buildings = building_lib.analyse(buildings, static_objects, tools.transform, elev, tex.facades, tex.roofs)
 
-    # -- skeleton testing
-    #  export PYTHONPATH=pySkeleton/
-#    import myskeleton
- #   myskeleton.myskel(buildings[0])
-  #  sys.exit(0)
-
     #tools.write_gp(buildings)
 
     tools.stats.print_summary()
@@ -730,7 +710,7 @@ if __name__ == "__main__":
 
     for cl in clusters:
             nb = len(cl.objects)
-            #if nb < 5: continue # skip almost empty clusters
+            if nb < 5: continue # skip almost empty clusters
 
             # -- get cluster center
             offset = cl.center

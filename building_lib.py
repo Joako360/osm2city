@@ -233,31 +233,23 @@ def is_large_enough(b, buildings):
 def compute_height_and_levels(b):
     """Determines total height (and number of levels) of a building based on
        OSM values and other logic"""
+
+    assert(isinstance(b.height, float))
+    # -- try OSM height and levels first
+    if b.height > 0 and b.levels > 0: return
+    
     level_height = random_level_height()
-
-    # -- try OSM height first
-    #    catch exceptions, since height might be "5 m" instead of "5"
-    try:
-        height = float(b.height.replace('m', ''))
-        if height > 1.:
-            b.levels = (height * 1.)/level_height
-    except:
-        height = 0.
+    if b.height > 0:
+        b.levels = int(b.height/level_height)
+        return
+    elif b.levels > 0:
         pass
-
-    # -- failing that, try OSM levels
-    if height < 1:
-        if float(b.levels) > 0:
-            pass
-            #print "have levels", b.levels
-        else:
-            # -- failing that, use random levels
-            b.levels = random_levels()
-            if b.area < parameters.BUILDING_MIN_AREA:
-                b.levels = min(b.levels, 2)
-
+    else:
+        # -- neither height nor levels given: use random levels
+        b.levels = random_levels()
+        if b.area < parameters.BUILDING_MIN_AREA:
+            b.levels = min(b.levels, 2)
     b.height = float(b.levels) * level_height
-
 
 def make_lightmap_dict(buildings):
     """make a dictionary: map texture to objects"""
@@ -615,11 +607,11 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
     if not b.roof_complex:
         if len(b.polygon.interiors):
-            out.write(roofs.flat_relation(b))
+            out.write(roofs.flat(b, X))
             tools.stats.count(b)
         else:
             # -- plain flat roof
-            out.write(roofs.flat(b))
+            out.write(roofs.flat(b, X))
         out.write("kids 0\n")
     # -- roof
     #    We can have complex and non-complex roofs: 
@@ -646,7 +638,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
                                   offset_z = b.ground_elev + b.height, 
                                   max_height = b.height * parameters.SKEL_MAX_HEIGHT_RATIO)
             if not s: # -- fall back to flat roof
-                s = roofs.flat(b)
+                s = roofs.flat(b, X, b.roof_ac_name)
 #                print "FAIL"
                 # FIXME: move to analyse. If we fall back, don't require separate LOD
             else:
@@ -664,7 +656,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         if True:
             roof_ac_name_flat = "b%i-flat" % nb
             LOD_lists[4].append(roof_ac_name_flat)
-            out.write(roofs.separate_flat(b, roof_ac_name_flat, X))
+            out.write(roofs.flat(b, X, roof_ac_name_flat))
             out.write("kids 0\n")
 
     tools.stats.count(b)

@@ -193,6 +193,7 @@ def init():
     global facades
     global roofs
     facades = FacadeManager('facade')
+    roofs = TextureManager('roof')
 
     if True:
         facades.append(Texture('tex/DSCF9495_pow2',
@@ -283,9 +284,6 @@ def init():
 
 
 
-    roofs = TextureManager('roof')
-#    roofs.append(Texture('tex/test',
-#                             10., [], True, 10., [], True, provides=['color:black', 'color:red']))
     roofs.append(Texture('tex/roof_tiled_black',
                          1.20, [], True, 0.60, [], True, provides=['color:black']))
     roofs.append(Texture('tex/roof_tiled_red',
@@ -306,6 +304,16 @@ def init():
         for i in facades.find_candidates(['facade:shape:residential','age:old'], 10):
             print i, i.v_splits * i.v_size_meters
     #print facades[0].provides
+
+    if False:
+        facades = FacadeManager('facade')
+        roofs = TextureManager('roof')
+        facades.append(Texture('tex/test',
+                               10, [142,278,437,590,756,890,1024], True,
+                               10, [130,216,297,387,512], True, True,
+                               provides=['shape:urban','shape:residential','age:modern','age:old','compat:roof-flat','compat:roof-pitched']))
+        roofs.append(Texture('tex/test',
+                             10., [], True, 10., [], True, provides=['color:black', 'color:red']))
 
 if __name__ == "__main__":
     init()
