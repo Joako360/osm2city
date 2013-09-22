@@ -21,7 +21,7 @@ import shapely.geometry as shg
 #from shapely.geometry.polygon import LinearRing
 import sys
 import textwrap
-import plot
+#import plot
 from math import sin, cos, radians
 import tools
 import parameters
@@ -237,7 +237,7 @@ def compute_height_and_levels(b):
     assert(isinstance(b.height, float))
     # -- try OSM height and levels first
     if b.height > 0 and b.levels > 0: return
-    
+
     level_height = random_level_height()
     if b.height > 0:
         b.levels = int(b.height/level_height)
@@ -322,7 +322,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
         tools.stats.nodes_simplified += b.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
         b.roll_inner_nodes()
-        
+
         # -- array of local outer coordinates
         Xo = np.array(b.X_outer)
 
@@ -410,7 +410,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 if b._nnodes_ground == 4 or (parameters.EXPERIMENTAL_USE_SKEL and \
                    b._nnodes_ground in range(4, parameters.SKEL_MAX_NODES)):
                    b.roof_complex = True
-    
+
             # -- no pitched roof on tall buildings
             if b.levels > 5:
                 b.roof_complex = False
@@ -614,7 +614,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             out.write(roofs.flat(b, X))
         out.write("kids 0\n")
     # -- roof
-    #    We can have complex and non-complex roofs: 
+    #    We can have complex and non-complex roofs:
     #       - non-complex will be included in base object
     #         - relations with 1 inner -> special flat roof
     #         - all other -> flat roof
@@ -634,8 +634,8 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
         # -- pitched roof for > 4 ground nodes
         if parameters.EXPERIMENTAL_USE_SKEL:
-            s = myskeleton.myskel(b, offset_xy = offset, 
-                                  offset_z = b.ground_elev + b.height, 
+            s = myskeleton.myskel(b, offset_xy = offset,
+                                  offset_z = b.ground_elev + b.height,
                                   max_height = b.height * parameters.SKEL_MAX_HEIGHT_RATIO)
             if not s: # -- fall back to flat roof
                 s = roofs.flat(b, X, b.roof_ac_name)
