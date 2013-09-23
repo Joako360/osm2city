@@ -320,8 +320,12 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         #    - simplify
         #    - compute edge lengths
 
-        tools.stats.nodes_simplified += b.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
-        b.roll_inner_nodes()
+        try:
+            tools.stats.nodes_simplified += b.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
+            b.roll_inner_nodes()
+        except Exception, reason:
+            print "simplify or roll_inner_nodes failed (OSM ID %i, %s)" % (b.osm_id, reason)
+            continue
 
         # -- array of local outer coordinates
         Xo = np.array(b.X_outer)

@@ -86,8 +86,10 @@ OBSTRUCTION_LIGHT_MIN_LEVELS = 15   # -- put obstruction lights on buildings wit
 
 EXPERIMENTAL_USE_SKEL = 0           # -- generate complex roofs with pySkeleton?
 SKEL_MAX_NODES = 10                 # -- max number of nodes for which we generate complex roofs
-SKEL_MAX_HEIGHT_RATIO = 0.7         # -- 
+SKEL_MAX_HEIGHT_RATIO = 0.7         # --
 EXPERIMENTAL_INNER = 0
+
+CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if to little objects
 
 def set_parameters(paramDict):
     for k in paramDict:

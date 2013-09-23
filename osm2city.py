@@ -162,6 +162,7 @@ class Building(object):
         #print ">> outer nodes", b.nnodes_outer
         #print ">> inner nodes", len(b.X_inner)
         nnodes_simplified = original_nodes - (self.nnodes_outer + len(self.X_inner))
+        # FIXME: simplifiy interiors
         #print "now", simple_nodes
         #print "--------------------"
         return nnodes_simplified
@@ -306,7 +307,7 @@ class wayExtract(object):
             return False
 
         self.buildings.append(Building(osm_id, tags, outer_ring, _name, _height, _levels, inner_rings_list = inner_rings_list))
-               
+
         tools.stats.objects += 1
         if tools.stats.objects % 70 == 0: print tools.stats.objects
         else: sys.stdout.write(".")
@@ -316,7 +317,7 @@ class wayExtract(object):
         for osm_id, tags, members in relations:
             if tools.stats.objects >= parameters.MAX_OBJECTS:
                 return
-                
+
             if 'building' in tags:
                 outer_ways = []
                 inner_ways = []
@@ -654,6 +655,13 @@ if __name__ == "__main__":
         tools.stats.objects = len(buildings)
 
 
+    # -- debug filter
+#    for b in buildings:
+#        if b.osm_id == 35336:
+#            new_buildings = [b]
+#            break
+#    buildings = new_buildings
+
     # -- create (empty) clusters
     lmin = vec2d(tools.transform.toLocal(cmin))
     lmax = vec2d(tools.transform.toLocal(cmax))
@@ -710,7 +718,7 @@ if __name__ == "__main__":
 
     for cl in clusters:
             nb = len(cl.objects)
-            if nb < 5: continue # skip almost empty clusters
+            if nb < parameters.CLUSTER_MIN_OBJECTS: continue # skip almost empty clusters
 
             # -- get cluster center
             offset = cl.center
