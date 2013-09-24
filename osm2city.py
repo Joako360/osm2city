@@ -206,8 +206,7 @@ class Building(object):
         #print "tr X", self.X
 
 class Coord(object):
-    def __init__(self, osm_id, lon, lat):
-        self.osm_id = osm_id
+    def __init__(self, lon, lat):
         self.lon = lon
         self.lat = lat
     def __str__(self):
@@ -223,22 +222,12 @@ class Way(object):
 class wayExtract(object):
     def __init__(self):
         self.buildings = []
-        self.coord_list = []
+        self.coord_dict = {}
         self.way_list = []
         self.minlon = 181.
         self.maxlon = -181.
         self.minlat = 91.
         self.maxlat = -91.
-
-    def _DEPRECATED_refs_to_local_coords(self, refs):
-        """accept a list of osm refs, return a list of local coordinates"""
-        coords = []
-        for ref in refs:
-            for c in self.coord_list:
-                if c.osm_id == ref:
-                    coords.append(tools.transform.toLocal((c.lon, c.lat)))
-                    break
-        return coords
 
     def refs_to_ring(self, refs, inner = False):
         """accept a list of OSM refs, return a linear ring. Also
@@ -246,10 +235,9 @@ class wayExtract(object):
         """
         coords = []
         for ref in refs:
-            for c in self.coord_list:
-                if c.osm_id == ref:
-                    coords.append(tools.transform.toLocal((c.lon, c.lat)))
-                    break
+                c = self.coord_dict[ref]
+                coords.append(tools.transform.toLocal((c.lon, c.lat)))
+
         #print "before inner", refs
 #        print "cord", coords
         ring = shg.polygon.LinearRing(coords)
@@ -378,7 +366,7 @@ class wayExtract(object):
     def coords(self, coords):
         for osm_id, lon, lat in coords:
             #print '%s %.4f %.4f' % (osm_id, lon, lat)
-            self.coord_list.append(Coord(osm_id, lon, lat))
+            self.coord_dict[osm_id] = Coord(lon, lat)
             if lon > self.maxlon: self.maxlon = lon
             if lon < self.minlon: self.minlon = lon
             if lat > self.maxlat: self.maxlat = lat
@@ -622,7 +610,7 @@ if __name__ == "__main__":
         print "start parsing coords"
         p.parse(osm_fname)
         print "done parsing"
-        print "ncords:", len(way.coord_list)
+        print "ncords:", len(way.coord_dict)
         print "bounds:", way.minlon, way.minlat, way.maxlon, way.maxlat
 
         print "start parsing ways and relations"
