@@ -38,7 +38,7 @@ def read(path, stg, prefix, fgscenery):
             lon = float(splitted[2])
             lat = float(splitted[3])
             alt = float(splitted[4])
-            r = osm2city.Coord(-1, lon, lat)
+            r = osm2city.Coord(lon, lat)
             point = shg.Point(tools.transform.toLocal((r.lon, r.lat)))
             hdg = float(splitted[5])
                 #print "stg:", typ, path + ac_path
