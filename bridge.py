@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# FIXME: check sign of angle
+
 """
 Created on Sun Sep 29 10:42:12 2013
 
@@ -8,8 +10,9 @@ Created on Sun Sep 29 10:42:12 2013
 import scipy.interpolate as interpolate
 import matplotlib.pyplot as plt
 import numpy as np
-
+from vec2d import vec2d
 import shapely.geometry as shg
+import pdb
 
 def param_interpolate():
     t = np.arange(0,1.1,.1)
@@ -43,9 +46,19 @@ def plot_line(center, style='-x'):
 t = np.arange(0,1.1,.01)
 x = np.sin(2*np.pi*t)
 y = np.cos(np.pi*t)
+
 nodes = zip(x,y)
 center = shg.LineString(nodes)
+n = len(center.coords)
+angle = np.zeros(n)
+angle[0] = (vec2d(center.coords[1]) - vec2d(center.coords[0])).atan2()
+for i in range(1, n-1):
+    angle[i] = 0.5 * ( (vec2d(center.coords[i-1]) - vec2d(center.coords[i])).atan2()
+                      +(vec2d(center.coords[i])   - vec2d(center.coords[i+1])).atan2())
+angle[n-1] = (vec2d(center.coords[n-2]) - vec2d(center.coords[n-1])).atan2()
+
 center = center.simplify(0.03)
+
 offset_ul = center.parallel_offset(0.1, 'left', resolution=16, join_style=2, mitre_limit=5.0)
 offset_ur = center.parallel_offset(0.1, 'right', resolution=16, join_style=2, mitre_limit=5.0)
 offset_ll = center.parallel_offset(0.06, 'left', resolution=16, join_style=2, mitre_limit=5.0)
@@ -103,64 +116,62 @@ if True:
 #for u in linspace(0, 1., 4):
 
 
-def pillar(x, y, ofs):
-    rx = 0.02
+def pillar(x, y, ofs, angle):
+    rx = 0.05
     ry = 0.01
     h0 = -0.3
     h1 = 0
     n = npi
     nodes_list = []
     vert = ""
+    R = np.array([[np.cos(-angle), -np.sin(-angle)],
+                  [np.sin(-angle),  np.cos(-angle)]])
     for a in np.linspace(0, 2*np.pi, n, endpoint = False):
         a += np.pi/npi
-        vert += "%1.6f %1.6f %1.6f\n" % (x + rx*np.cos(a), y + ry*np.sin(a), h0)
+        node = np.array([rx*np.cos(a), ry*np.sin(a)])
+        node = np.dot(R, node)
+        vert += "%1.6f %1.6f %1.6f\n" % (x+node[1], y+node[0], h0)
     for a in np.linspace(0, 2*np.pi, n, endpoint = False):
         a += np.pi/npi
-        vert += "%1.6f %1.6f %1.6f\n" % (x + rx*np.cos(a), y + ry*np.sin(a), h1)
+        node = np.array([rx*np.cos(a), ry*np.sin(a)])
+        node = np.dot(R, node)
+        vert += "%1.6f %1.6f %1.6f\n" % (x+node[1], y+node[0], h1)
     for i in range(npi-1):
-        face = [ofs+i, ofs+i+1, ofs+i+1+npi, ofs+i+npi]
+        face = [ofs+i, ofs+i+1, ofs+i+1+npi, ofs+i+npi][::-1]
         nodes_list.append(face)
     i = npi - 1
-    face = [ofs+i, ofs, ofs+npi, ofs+i+npi]
+    face = [ofs+i, ofs, ofs+npi, ofs+i+npi][::-1]
     nodes_list.append(face)
     return ofs + 2*npi, vert, nodes_list
     
 #out  += "# pil\n"
+# -- pillar verts
 i0 = n_ul + n_ll + n_ur + n_lr
 p_nodes = []
 for i in ipfeiler:
-    px = x[i]
-    py = y[i]
-    i0, verts, nodes = pillar(px, py, i0)
+    i0, verts, nodes = pillar(x[i], y[i], i0, angle[i])
     out += verts
     p_nodes.append(nodes)
 
-out += "numsurf %i\n" % (4 + npi*len(p_nodes))
+out += "numsurf %i\n" % (4*(len(nodes_ul)-1) + npi*len(p_nodes))
 
-if True:
-    out += "SURF 0x0\n"
-    out += "mat 0\n"
-    out += "refs %i\n" % (n_ul + n_ll)
-    for n in nodes_ul + nodes_ll[::-1]:
-        out += "%i 0 0\n" % n
+# -- body nodes
+def surf_between_lines(l1, l2):
+    out = ""
+    for i in range(len(l1)-1):
+        out += "SURF 0x0\n"
+        out += "mat 0\n"
+        out += "refs 4\n"
+        out += "%i 0 0\n" % l1[i]
+        out += "%i 0 0\n" % l1[i+1]
+        out += "%i 0 0\n" % l2[i+1]
+        out += "%i 0 0\n" % l2[i]
+    return out
 
-    out += "SURF 0x0\n"
-    out += "mat 0\n"
-    out += "refs %i\n" % (n_ul + n_ur)
-    for n in nodes_ur + nodes_lr[::-1]:
-        out += "%i 0 0\n" % n
-
-    out += "SURF 0x0\n"
-    out += "mat 0\n"
-    out += "refs %i\n" % (n_ul + n_ur)
-    for n in nodes_ur[::-1] + nodes_ul[::-1]:
-        out += "%i 0 0\n" % n
-
-    out += "SURF 0x0\n"
-    out += "mat 0\n"
-    out += "refs %i\n" % (n_ll + n_lr)
-    for n in nodes_ll + nodes_lr:
-        out += "%i 0 0\n" % n
+out += surf_between_lines(nodes_ul, nodes_ll)
+out += surf_between_lines(nodes_ur, nodes_lr)
+out += surf_between_lines(nodes_ul[::-1], nodes_ur)
+out += surf_between_lines(nodes_ll, nodes_lr[::-1])
 
 for pillar in p_nodes:
     for face in pillar:

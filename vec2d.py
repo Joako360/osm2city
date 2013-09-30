@@ -5,6 +5,7 @@ Created on Sat Mar  2 12:04:17 2013
 @author: tom
 """
 import numpy as np
+from math import atan2
 
 class vec2d(object):
     """A simple 2d vector class. Supports basic arithmetics."""
@@ -86,6 +87,9 @@ class vec2d(object):
     def distance_to(self, other):
         d = self - other
         return (d.x**2 + d.y**2)**0.5
+    
+    def atan2(self):
+        return atan2(self.y, self.x)
 
 if __name__ == "__main__":
     a = vec2d(1,2)
