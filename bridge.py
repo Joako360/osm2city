@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 # FIXME: check sign of angle
 
@@ -46,7 +46,7 @@ def plot_line(center, style='-x'):
 t = np.arange(0,1.1,.01)
 x = np.sin(2*np.pi*t)
 y = np.cos(np.pi*t)
-
+z = np.sin(2*np.pi*t)
 nodes = zip(x,y)
 center = shg.LineString(nodes)
 n = len(center.coords)
@@ -80,7 +80,7 @@ out += "OBJECT world\n"
 out += "kids 1\n"
 out += "OBJECT poly\n"
 out += 'name "b6"\n'
-#out += 'texture "roof_tiled_red.png"\n'
+out += 'texture "bridge.png"\n'
 n_ul = len(offset_ul.coords)
 n_ll = len(offset_ll.coords)
 n_ur = len(offset_ul.coords)
@@ -94,9 +94,9 @@ i, nodes_ll = succ_range(i, n_ll)
 i, nodes_ur = succ_range(i, n_ur)
 i, nodes_lr = succ_range(i, n_lr)
 
-h = 0.05
+bridge_body_h = 0.05
 npi = 4
-ipfeiler = range(len(x))[::15]
+ipfeiler = range(len(x))[::1]
 npfeiler = len(ipfeiler)
 out += "numvert %i\n" %  (n_ul + n_ll + n_ur + n_lr + 2*npi*npfeiler)
 
@@ -104,23 +104,21 @@ out += "numvert %i\n" %  (n_ul + n_ll + n_ur + n_lr + 2*npi*npfeiler)
 
 # -- body verts
 if True:
-    for v in offset_ul.coords:
-        out += "%g %g %g\n" % (v[0], v[1], h)
-    for v in offset_ll.coords:
-        out += "%g %g %g\n" % (v[0], v[1], 0)
-    for v in offset_ur.coords:
-        out += "%g %g %g\n" % (v[0], v[1], h)
-    for v in offset_lr.coords:
-        out += "%g %g %g\n" % (v[0], v[1], 0)
+    for i, v in enumerate(offset_ul.coords):
+        out += "%g %g %g\n" % (v[0], v[1], z[i])
+    for i, v in enumerate(offset_ll.coords):
+        out += "%g %g %g\n" % (v[0], v[1], z[i] - bridge_body_h)
+    for i, v in enumerate(offset_ur.coords[::-1]):
+        out += "%g %g %g\n" % (v[0], v[1], z[i])
+    for i, v in enumerate(offset_lr.coords[::-1]):
+        out += "%g %g %g\n" % (v[0], v[1], z[i] - bridge_body_h)
 # -- pillars
 #for u in linspace(0, 1., 4):
 
 
-def pillar(x, y, ofs, angle):
+def pillar(x, y, h0, h1, ofs, angle):
     rx = 0.05
     ry = 0.01
-    h0 = -0.3
-    h1 = 0
     n = npi
     nodes_list = []
     vert = ""
@@ -130,56 +128,66 @@ def pillar(x, y, ofs, angle):
         a += np.pi/npi
         node = np.array([rx*np.cos(a), ry*np.sin(a)])
         node = np.dot(R, node)
-        vert += "%1.6f %1.6f %1.6f\n" % (x+node[1], y+node[0], h0)
+        vert += "%1.6f %1.6f %1.6f\n" % (x+node[1], y+node[0], h1)
     for a in np.linspace(0, 2*np.pi, n, endpoint = False):
         a += np.pi/npi
         node = np.array([rx*np.cos(a), ry*np.sin(a)])
         node = np.dot(R, node)
-        vert += "%1.6f %1.6f %1.6f\n" % (x+node[1], y+node[0], h1)
+        vert += "%1.6f %1.6f %1.6f\n" % (x+node[1], y+node[0], h0)
+
     for i in range(npi-1):
         face = [ofs+i, ofs+i+1, ofs+i+1+npi, ofs+i+npi][::-1]
         nodes_list.append(face)
     i = npi - 1
     face = [ofs+i, ofs, ofs+npi, ofs+i+npi][::-1]
     nodes_list.append(face)
+
     return ofs + 2*npi, vert, nodes_list
     
 #out  += "# pil\n"
 # -- pillar verts
 i0 = n_ul + n_ll + n_ur + n_lr
 p_nodes = []
-for i in ipfeiler:
-    i0, verts, nodes = pillar(x[i], y[i], i0, angle[i])
+for j, i in enumerate(ipfeiler):
+    i0, verts, nodes = pillar(x[i], y[i], z[j], 0, i0, angle[i])
     out += verts
     p_nodes.append(nodes)
 
-out += "numsurf %i\n" % (4*(len(nodes_ul)-1) + npi*len(p_nodes))
+ns = 4*(len(nodes_ul)-1) 
+ns += npi*len(p_nodes)
+out += "numsurf %i\n" % (ns)
 
 # -- body nodes
-def surf_between_lines(l1, l2):
+def surf_between_lines(l1, l2, t0, t1):
     out = ""
     for i in range(len(l1)-1):
         out += "SURF 0x0\n"
         out += "mat 0\n"
         out += "refs 4\n"
-        out += "%i 0 0\n" % l1[i]
-        out += "%i 0 0\n" % l1[i+1]
-        out += "%i 0 0\n" % l2[i+1]
-        out += "%i 0 0\n" % l2[i]
+        out += "%i 0 %g\n" % (l1[i],   t0)
+        out += "%i 1 %g\n" % (l1[i+1], t0)
+        out += "%i 1 %g\n" % (l2[i+1], t1)
+        out += "%i 0 %g\n" % (l2[i],   t1)
     return out
 
-out += surf_between_lines(nodes_ul, nodes_ll)
-out += surf_between_lines(nodes_ur, nodes_lr)
-out += surf_between_lines(nodes_ul[::-1], nodes_ur)
-out += surf_between_lines(nodes_ll, nodes_lr[::-1])
+out += surf_between_lines(nodes_ul, nodes_ll, 1, 0.75)
+out += surf_between_lines(nodes_ur[::-1], nodes_lr[::-1], 1, 0.75)
+out += surf_between_lines(nodes_ul[::-1], nodes_ur[::-1], 0.75, 0.5)
+out += surf_between_lines(nodes_ll, nodes_lr, 0.5, 0.25)
 
 for pillar in p_nodes:
     for face in pillar:
         out += "SURF 0x0\n"
         out += "mat 0\n"
         out += "refs %i\n" % (len(face))
-        for n in face:
-            out += "%i 0 0\n" % n
+#        for n in face:
+#            out += "%i 0 0\n" % n
+
+        out += "%i 0 0.5\n" % face[0]
+        out += "%i 1 0.5\n" % face[1]
+        out += "%i 1 0\n" % face[2]
+        out += "%i 0 0\n" % face[3]
+    
 
 out += "kids 0\n"
 #print out
