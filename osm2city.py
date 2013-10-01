@@ -205,18 +205,6 @@ class Building(object):
 
         #print "tr X", self.X
 
-class Coord(object):
-    def __init__(self, lon, lat):
-        self.lon = lon
-        self.lat = lat
-    def __str__(self):
-        return "%g %g" % (self.lon, self.lat)
-
-class Way(object):
-    def __init__(self, osm_id, tags, refs):
-        self.osm_id = osm_id
-        self.tags = tags
-        self.refs = refs
 
 #import multiprocessing
 class wayExtract(object):
@@ -361,6 +349,9 @@ class wayExtract(object):
             elif 'building:part' in way.tags:
                 if tools.stats.objects >= parameters.MAX_OBJECTS: return
                 self.make_building_from_way(way.osm_id, way.tags, way.refs)
+            elif 'bridge' in way.tags:
+                self.make_bridge_from_way(way.osm_id, way.tags, way.refs)
+
 
 
     def coords(self, coords):
