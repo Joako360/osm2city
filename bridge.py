@@ -233,6 +233,29 @@ def ac_header():
     out += "kids 500\n"
     ac.write(out)
     ac.close()
+    
+def simplify_line(coords, z = None):
+
+    coords = np.array(coords)
+    x = coords[:,0]
+    y = coords[:,1]
+    print "l=", len(x)
+    if len(x) < 4: return
+    tck,u = interpolate.splprep([x,y],s=0)
+    unew = np.arange(0,1.01,0.05)
+    out = interpolate.splev(unew,tck)
+    xder, yder = interpolate.splev(unew,tck,der=1)
+
+    plt.figure()
+    plt.plot(x, y, '-x')
+    plt.plot(out[0], out[1], '-o')
+    
+#    plt.legend(['Linear', 'a'])
+    #plt.axis([-1.05,1.05,-1.05,1.05])
+#    plt.title('Spline of parametrically-defined curve')
+    
+    plt.show()
+   
 
 def make_bridge_from_way(osm_id, tags, coords):
 
@@ -273,6 +296,7 @@ def make_bridge_from_way(osm_id, tags, coords):
 #    coords -= coords[0]
     z = np.ones(len(coords))*10.
     bridge = Bridge(width)
+    simplify_line(coords)
     out = bridge.geom(False, coords, z)
     ac = open("bridge.ac", "a")
     ac.write(out)
