@@ -18,6 +18,7 @@ import coordinates
 import tools
 import parameters
 import sys
+import math
 
 def param_interpolate():
     t = np.arange(0,1.1,.1)
@@ -236,26 +237,97 @@ def ac_header():
     
 def simplify_line(coords, z = None):
 
-    coords = np.array(coords)
+    coords = np.array(coords) - coords[0]
     x = coords[:,0]
     y = coords[:,1]
     print "l=", len(x)
-    if len(x) < 4: return
-    tck,u = interpolate.splprep([x,y],s=0)
-    unew = np.arange(0,1.01,0.05)
-    out = interpolate.splev(unew,tck)
-    xder, yder = interpolate.splev(unew,tck,der=1)
+    do_interp = False
+    if do_interp: # interpolate?
+        if len(x) < 4: return
+        tck,u = interpolate.splprep([x,y],s=0)
+        unew = np.arange(0,1.0,0.0002)
+        #out = interpolate.splev(unew,tck) # parametric
+        nx, ny = interpolate.splev(unew,tck) # parametric
+        xder, yder = interpolate.splev(unew,tck,der=1)
+        
+        a = interpolate.spalde(unew, tck) # derivatives
+        dx = np.array([ar[1] for ar in a[0]])
+        dy = np.array([ar[1] for ar in a[1]])
+        an = np.array([math.atan2(_dy, _dx) for _dx, _dy in zip(dx, dy)])
+
+        print "nx", len(nx)
+    
+    def get_angle(x, y):
+        an = np.zeros_like(x)
+        for i in range(1, len(x)-1):
+            an[i] = math.atan2(y[i+1] - y[i-1], x[i+1] - x[i-1])
+        return an
+
+    an = get_angle(x, y)
+    
+    #print dx
+    #print dy
+    #print "an", an * 57.3
+    #print "tck", tck
+
+    
+    u = 0.1*np.cos(an)
+    v = 0.1*np.sin(an)
+
+    def simple(nx, ny, an, eps_l, eps_a):
+        sx = []
+        sy = []
+        sx.append(nx[0])
+        sy.append(ny[0])
+        last_angle = an[0]
+        l = 0
+        for i, a in enumerate(an[1:], 1):
+            l += ((nx[i] - nx[i-1])**2 + (ny[i] - ny[i-1])**2)**0.5
+            if abs(a - last_angle)*l > eps_l and abs(a - last_angle) > eps_a:
+                sx.append(nx[i])
+                sy.append(ny[i])
+                last_angle = a
+                l = 0
+        print "simplified", len(sx)
+        return sx, sy
+
 
     plt.figure()
-    plt.plot(x, y, '-x')
-    plt.plot(out[0], out[1], '-o')
+    if True:
+        plt.plot(x, y, 'c-|', ms=20, label='osm', linewidth=5)
+        #plt.plot(x, dx, 'k-')
+        #plt.plot(x, dy, 'r-')
+        if do_interp: plt.plot(nx, ny, 'k-', label='spline')
+
+        sx, sy = simple(x, y, an, 0.0, 4/57.3)
+        plt.plot(sx, sy, 'r-o', label="simple")
+        
+        for i, a in enumerate(an[1:], 1):
+            plt.text(x[i], y[i], u"%1.0f°\n%i" % ((an[i]-an[i-1])*57.3, i))
+        
+        plt.legend()
+        #sx, sy = simple(nx, ny, an, 0.2, 0*5/57.3)
+        #plt.plot(sx, sy, 'b-o')
+
+#        plt.quiver(nx, ny, u, v)
+
+            
+    
     
 #    plt.legend(['Linear', 'a'])
-    #plt.axis([-1.05,1.05,-1.05,1.05])
+    plt.axes().set_aspect('equal')
+  #  plt.axis([-2.05,2.05,-2.05,2.05])
 #    plt.title('Spline of parametrically-defined curve')
     
     plt.show()
+    
    
+
+def make_road_from_way(osm_id, tags, coords):
+    if osm_id != 35586594: return
+    simplify_line(coords)
+    print ">>>", osm_id
+
 
 def make_bridge_from_way(osm_id, tags, coords):
 
@@ -351,9 +423,47 @@ def make_bridge_from_way(osm_id, tags, coords):
 
 
 if __name__ == "__main__":
+
+    if False:
+        p = np.linspace(-1.5, 1.5, 20)
+        coords = np.zeros((20,2))
+        coords[:,0] = 2*p**3-p
+        coords[:,1] = -2*p**2+1
+        #coords[:,1] = p
     
-    #bridge_geom(True, None, None)
-    #sys.exit(0)
+        simplify_line(coords)
+        sys.exit(0)
+
+    if False:    
+        coords = np.array(coords)
+        x = coords[:,0]
+        y = coords[:,1]
+        print "l=", len(x)
+        #if len(x) < 4: return
+        tck,u = interpolate.splprep([x,y],s=0)
+        unew = np.arange(0,1.01,0.05)
+        out = interpolate.splev(unew,tck) # parametric
+        
+        xder, yder = interpolate.splev(unew,tck,der=1)
+        
+        interpolate.splev
+        plt.figure()
+        plt.plot(x, y, '-x')
+        plt.plot(out[0], out[1], '-o')
+        
+    #    plt.legend(['Linear', 'a'])
+        #plt.axis([-1.05,1.05,-1.05,1.05])
+    #    plt.title('Spline of parametrically-defined curve')
+        
+        plt.show()
+        a = interpolate.spalde(unew, tck)
+        print "sh", a.shape
+        print a
+    
+    
+    
+        #bridge_geom(True, None, None)
+        sys.exit(0)
     import argparse
     parser = argparse.ArgumentParser(description="osm2city reads OSM data and creates buildings for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
@@ -380,8 +490,11 @@ if __name__ == "__main__":
 
     ac_header()
     way = osm.OsmExtract(tools.transform.toLocal)
-    way.register_way_callback('bridge', make_bridge_from_way)
+    #way.register_way_callback('bridge', make_bridge_from_way)
+    way.register_way_callback('highway', make_road_from_way)
+
 #    way.parse("EDDC/carolarbruecke.osm")
-    way.parse("EDDC/bridges.osm")
+#    way.parse("EDDC/bridges.osm")
+    way.parse("serpentine.osm")
     
     print "done parsing"
