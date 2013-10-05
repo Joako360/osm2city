@@ -155,8 +155,37 @@ class Bridge(object):
         i, nodes_ur = succ_range(i, n_ur)
         i, nodes_lr = succ_range(i, n_lr)
         
-        ipfeiler = range(len(x))[::1]
-        npfeiler = len(ipfeiler)
+        # -- how many pillars?
+        i0 = n_ul + n_ll + n_ur + n_lr
+        p_nodes = []
+        pillar_out = ""
+        if True:
+            """equi-distant pillars"""
+            pillar_distance = 40.
+            npfeiler = int(center.length / pillar_distance)
+            pillar_distance = center.length / npfeiler
+                        
+            # -- pillar verts
+            l = 0.
+            height = z[0]
+            for i in range(npfeiler):
+                pillar_pos = center.interpolate(l)
+                i0, verts, nodes = self.pillar(pillar_pos.coords[0][0], pillar_pos.coords[0][1], height - self.body_height, 0, i0, 0.) # angle
+                pillar_out += verts
+                p_nodes.append(nodes)
+                l += pillar_distance
+        else:
+            ipfeiler = range(len(x))[::1]
+            npfeiler = len(ipfeiler)
+
+            # -- pillar verts
+            for j, i in enumerate(ipfeiler):
+                i0, verts, nodes = self.pillar(x[i], y[i], z[j] - self.body_height, 0, i0, angle[i])
+                pillar_out += verts
+                p_nodes.append(nodes)
+
+
+            
         out += "numvert %i\n" %  (n_ul + n_ll + n_ur + n_lr + 2*self.pillar_nnodes*npfeiler)
         
 #        out += "numvert %i\n" %  (n_ul + n_ll + n_ur + n_lr)
@@ -174,16 +203,9 @@ class Bridge(object):
         # -- pillars
         #for u in linspace(0, 1., 4):
         
-        
+        out += pillar_out
            
         #out  += "# pil\n"
-        # -- pillar verts
-        i0 = n_ul + n_ll + n_ur + n_lr
-        p_nodes = []
-        for j, i in enumerate(ipfeiler):
-            i0, verts, nodes = self.pillar(x[i], y[i], z[j] - self.body_height, 0, i0, angle[i])
-            out += verts
-            p_nodes.append(nodes)
         
         ns = 4*(len(nodes_ul)-1) 
         ns += self.pillar_nnodes*len(p_nodes)
@@ -260,7 +282,7 @@ def simplify_line(coords, z = None):
     def get_angle(x, y):
         an = np.zeros_like(x)
         for i in range(1, len(x)-1):
-            an[i] = math.atan2(y[i+1] - y[i-1], x[i+1] - x[i-1])
+            an[i] = math.atan2(y[i+1] - y[i], x[i+1] - x[i])
         return an
 
     an = get_angle(x, y)
@@ -292,8 +314,8 @@ def simplify_line(coords, z = None):
         return sx, sy
 
 
-    plt.figure()
-    if True:
+    if 0:
+        plt.figure()
         plt.plot(x, y, 'c-|', ms=20, label='osm', linewidth=5)
         #plt.plot(x, dx, 'k-')
         #plt.plot(x, dy, 'r-')
@@ -303,7 +325,8 @@ def simplify_line(coords, z = None):
         plt.plot(sx, sy, 'r-o', label="simple")
         
         for i, a in enumerate(an[1:], 1):
-            plt.text(x[i], y[i], u"%1.0f°\n%i" % ((an[i]-an[i-1])*57.3, i))
+#            plt.text(x[i], y[i], u"%1.0f°\n%i" % ((an[i]-an[i-1])*57.3, i))
+            plt.text(x[i], y[i], u"%1.0f°\n" % ((an[i]-an[i-1])*57.3))
         
         plt.legend()
         #sx, sy = simple(nx, ny, an, 0.2, 0*5/57.3)
@@ -314,18 +337,26 @@ def simplify_line(coords, z = None):
             
     
     
-#    plt.legend(['Linear', 'a'])
-    plt.axes().set_aspect('equal')
+    #    plt.legend(['Linear', 'a'])
+        plt.axes().set_aspect('equal')
   #  plt.axis([-2.05,2.05,-2.05,2.05])
 #    plt.title('Spline of parametrically-defined curve')
     
-    plt.show()
+        plt.show()
     
    
 
 def make_road_from_way(osm_id, tags, coords):
     if osm_id != 35586594: return
+    width = 5
+    bridge = Bridge(width)
     simplify_line(coords)
+    z = np.ones(len(coords))*10.
+    out = bridge.geom(False, coords, z)
+    ac = open("bridge.ac", "a")
+    ac.write(out)
+    ac.close()
+
     print ">>>", osm_id
 
 
@@ -424,6 +455,20 @@ def make_bridge_from_way(osm_id, tags, coords):
 
 if __name__ == "__main__":
 
+    if 0:
+        an = np.array([0.,0,45,45,45,20,0,0])
+        coords = np.zeros((len(an),2))
+        for i, a in enumerate(an[1:], 1):
+            r = 20
+            coords[i,0] = coords[i-1, 0] + r * math.cos(a/57.3)
+            coords[i,1] = coords[i-1, 1] + r * math.sin(a/57.3)
+#        l = shg.LineString(coords)
+#        l.interpolate(10)
+#        bla
+        simplify_line(coords)
+        sys.exit(0)
+
+
     if False:
         p = np.linspace(-1.5, 1.5, 20)
         coords = np.zeros((20,2))
@@ -490,11 +535,12 @@ if __name__ == "__main__":
 
     ac_header()
     way = osm.OsmExtract(tools.transform.toLocal)
-    #way.register_way_callback('bridge', make_bridge_from_way)
-    way.register_way_callback('highway', make_road_from_way)
 
+    way.register_way_callback('highway', make_road_from_way)
+    way.parse("serpentine.osm")
+
+#    way.register_way_callback('bridge', make_bridge_from_way)
 #    way.parse("EDDC/carolarbruecke.osm")
 #    way.parse("EDDC/bridges.osm")
-    way.parse("serpentine.osm")
     
     print "done parsing"
