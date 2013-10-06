@@ -58,8 +58,8 @@ class Bridge(object):
         self.body_height = 0.3*scale
         self.lower_offset = 0.3*scale
         self.pillar_r0 = 0.2*scale
-        self.pillar_r1 = 0.1*scale
-        self.pillar_nnodes = 4
+        self.pillar_r1 = 0.2*scale
+        self.pillar_nnodes = 16
         
         self.scale = scale
 
@@ -110,6 +110,8 @@ class Bridge(object):
                 y[i] = c[1]
     
         center = shg.LineString(coords)
+        #center = center.simplify(0.03)
+            
         n = len(center.coords)
         angle = np.zeros(n)
         angle[0] = (vec2d(center.coords[1]) - vec2d(center.coords[0])).atan2()
@@ -117,14 +119,19 @@ class Bridge(object):
             angle[i] = 0.5 * ( (vec2d(center.coords[i-1]) - vec2d(center.coords[i])).atan2()
                               +(vec2d(center.coords[i])   - vec2d(center.coords[i+1])).atan2())
         angle[n-1] = (vec2d(center.coords[n-2]) - vec2d(center.coords[n-1])).atan2()
-        
-        center = center.simplify(0.03)
-        
+
         ml = 10.
         offset_ul = center.parallel_offset(self.upper_offset, 'left', resolution=16, join_style=2, mitre_limit=ml)
         offset_ur = center.parallel_offset(self.upper_offset, 'right', resolution=16, join_style=2, mitre_limit=ml)
         offset_ll = center.parallel_offset(self.lower_offset, 'left', resolution=16, join_style=2, mitre_limit=ml)
         offset_lr = center.parallel_offset(self.lower_offset, 'right', resolution=16, join_style=2, mitre_limit=ml)
+
+#        segment_len = np.array([vec2d(coord).distance_to(vec2d(center.coords[i])) for i, coord in enumerate(center.coords[1:])])
+        segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(offset_ur.coords[i])) for i, coord in enumerate(offset_ur.coords[1:])])
+        # FIXME: use average offset_ur and offset_ul or fix parallel_offset computation.
+#        segment_len = np.array([vec2d(coord).distance_to(vec2d(center.coords[i])) for i, coord in enumerate(center.coords[1:])])
+
+
         if False:
             # -- plot
             plt.figure()
@@ -170,7 +177,8 @@ class Bridge(object):
             height = z[0]
             for i in range(npfeiler):
                 pillar_pos = center.interpolate(l)
-                i0, verts, nodes = self.pillar(pillar_pos.coords[0][0], pillar_pos.coords[0][1], height - self.body_height, 0, i0, 0.) # angle
+                # FIXME: angle
+                i0, verts, nodes = self.pillar(pillar_pos.coords[0][0], pillar_pos.coords[0][1], height - self.body_height, 0, i0, 0.)
                 pillar_out += verts
                 p_nodes.append(nodes)
                 l += pillar_distance
@@ -212,22 +220,26 @@ class Bridge(object):
         out += "numsurf %i\n" % (ns)
         
         # -- body nodes
-        def surf_between_lines(l1, l2, t0, t1):
+        def surf_between_lines(l1, l2, u, v0, v1):
             out = ""
+            u0 = u[0]
             for i in range(len(l1)-1):
+                u1 = u0 + u[i+1]
                 out += "SURF 0x0\n"
                 out += "mat 0\n"
                 out += "refs 4\n"
-                out += "%i 0 %g\n" % (l1[i],   t0)
-                out += "%i 1 %g\n" % (l1[i+1], t0)
-                out += "%i 1 %g\n" % (l2[i+1], t1)
-                out += "%i 0 %g\n" % (l2[i],   t1)
+                out += "%i %g %g\n" % (l1[i],   u0, v0)
+                out += "%i %g %g\n" % (l1[i+1], u1, v0)
+                out += "%i %g %g\n" % (l2[i+1], u1, v1)
+                out += "%i %g %g\n" % (l2[i],   u0, v1)
+                u0 = u1
             return out
-        
-        out += surf_between_lines(nodes_ul, nodes_ll, 1, 0.75)
-        out += surf_between_lines(nodes_ur[::-1], nodes_lr[::-1], 1, 0.75)
-        out += surf_between_lines(nodes_ul[::-1], nodes_ur[::-1], 0.75, 0.5)
-        out += surf_between_lines(nodes_ll, nodes_lr, 0.5, 0.25)
+
+        u = segment_len / 25.
+        out += surf_between_lines(nodes_ul, nodes_ll, u, 1, 0.75)
+        out += surf_between_lines(nodes_ur[::-1], nodes_lr[::-1], u, 1, 0.75)
+        out += surf_between_lines(nodes_ul[::-1], nodes_ur[::-1], u, 0.75, 0.5)
+        out += surf_between_lines(nodes_ll, nodes_lr, u, 0.5, 0.25)
         
         for pillar in p_nodes:
             for face in pillar:
@@ -393,7 +405,7 @@ def make_bridge_from_way(osm_id, tags, coords):
     except:
         lanes = 1
     width = lanes * 3. + 2.
-    print "w=", width
+    print "width %g, lanes %g" % (width, lanes)
     
 #    coords = np.array(coords)    
 #    coords -= coords[0]
@@ -491,7 +503,6 @@ if __name__ == "__main__":
         
         xder, yder = interpolate.splev(unew,tck,der=1)
         
-        interpolate.splev
         plt.figure()
         plt.plot(x, y, '-x')
         plt.plot(out[0], out[1], '-o')
@@ -536,11 +547,11 @@ if __name__ == "__main__":
     ac_header()
     way = osm.OsmExtract(tools.transform.toLocal)
 
-    way.register_way_callback('highway', make_road_from_way)
-    way.parse("serpentine.osm")
+    #way.register_way_callback('highway', make_road_from_way)
+    #way.parse("serpentine.osm")
 
-#    way.register_way_callback('bridge', make_bridge_from_way)
-#    way.parse("EDDC/carolarbruecke.osm")
+    way.register_way_callback('bridge', make_bridge_from_way)
+    way.parse("EDDC/carolarbruecke.osm")
 #    way.parse("EDDC/bridges.osm")
     
     print "done parsing"
