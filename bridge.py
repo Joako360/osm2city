@@ -48,7 +48,15 @@ def plot_line(center, style='-x'):
     #plt.legend(['Linear'])
     #plt.title('Spline of parametrically-defined curve')
 
-
+def probe_elev():
+    pass
+    import subprocess
+    
+    pid = subprocess.Popen(["/bin/mycmd", "myarg"],  stdin=subprocess.PIPE, stdout=subprocess.PIPE).pid
+    pid.communicate( "input data\n" )
+    pid.wait()
+    pid.stdout.read()
+    
 class Bridge(object):
 #    def __init__(self, osm_id, tags, refs, scale=1):
     def __init__(self, scale=1):
@@ -67,7 +75,6 @@ class Bridge(object):
     def pillar(self, x, y, h0, h1, ofs, angle):
         rx = self.pillar_r0
         ry = self.pillar_r1
-
         
         nodes_list = []
         vert = ""
@@ -92,6 +99,52 @@ class Bridge(object):
         nodes_list.append(face)
     
         return ofs + 2*self.pillar_nnodes, vert, nodes_list
+
+    def prep_height(self):
+        pass
+        # - probe terrain at points on center
+#        insert nodes at equidistant
+#        simplify
+        
+#        pillar positions
+#        height() = linear_height(b0, b1)
+
+        if center.length < 10: raise ValueError("bridge length must be > 10 m")
+
+        ofs = 1. 
+        s_ofs0 = center.interpolate(ofs)
+        s_ofs1 = center.interpolate(center.length - ofs)
+        s_street0 = center.interpolate(0.25, normalized=True)
+        s_street1 = center.interpolate(0.75, normalized=True)
+        
+        
+        
+#        bofs1 = b1 - ofs
+#        min_height_border = 2.5
+#        for node in [bofs0, bofs1]:
+#            if height(node) - elev(node) < min_height_ofs:
+#                height(node) = elev(node) + min_height_ofs
+        
+#        height(r0) = elev(r0)
+#        height(r1) = elev(r1)
+        
+#        min_height_street = 4.5
+#        for node in [street0, street1]:
+#            if height(node) - elev(node) < min_height_street:
+#                height(node) = elev(node) + min_height_street
+#        
+#        compute total pillar height -> cost
+        
+        
+#                            -----o---
+#                      -o----     |
+#                  --+- |         |
+#               ---  |  |         |
+#        ___o_--_____|__|_________|__
+#           s0       0  s_ofs0   s_street0
+#         dh/dr=0  h>=min_h_ofs h>=min_h_street
+
+
 
     def geom(self, default, coords, z):
     
@@ -466,6 +519,12 @@ def make_bridge_from_way(osm_id, tags, coords):
 
 
 if __name__ == "__main__":
+
+    if 0:
+        coords = [[0,0], [1,0], [2,0.5]]
+        a = shg.LineString(coords)
+        print a
+        sys.exit(0)
 
     if 0:
         an = np.array([0.,0,45,45,45,20,0,0])
