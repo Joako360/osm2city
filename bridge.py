@@ -51,11 +51,25 @@ def plot_line(center, style='-x'):
 def probe_elev():
     pass
     import subprocess
+    import time
     
-    pid = subprocess.Popen(["/bin/mycmd", "myarg"],  stdin=subprocess.PIPE, stdout=subprocess.PIPE).pid
-    pid.communicate( "input data\n" )
-    pid.wait()
-    pid.stdout.read()
+    print "popen"    
+    fgelev = subprocess.Popen("/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev --fg-root $FG_ROOT --fg-scenery $FG_SCENERY",  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    #fgelev = subprocess.Popen(["/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev", "--fg-root", "$FG_ROOT",  "--fg-scenery", "$FG_SCENERY"],  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    #time.sleep(5)
+
+    print "write"    
+    fgelev.stdin.write("id1\n13.01\n51.00\n")
+    fgelev.stdin.write("id2\n13.21\n51.10\n")
+    #time.sleep(2)
+#    fgelev.communicate( "id\n13.01\n51.00\n")
+    #fgelev.wait()
+    print "read"
+    print fgelev.stdout.readline()
+    print fgelev.stdout.readline()
+    print fgelev.stdout.readline()
+    print "done"
+        
     
 class Bridge(object):
 #    def __init__(self, osm_id, tags, refs, scale=1):
@@ -133,7 +147,7 @@ class Bridge(object):
 #            if height(node) - elev(node) < min_height_street:
 #                height(node) = elev(node) + min_height_street
 #        
-#        compute total pillar height -> cost
+#        compute total pier height -> cost
         
         
 #                            -----o---
@@ -519,6 +533,9 @@ def make_bridge_from_way(osm_id, tags, coords):
 
 
 if __name__ == "__main__":
+
+    probe_elev()
+    sys.exit(0)
 
     if 0:
         coords = [[0,0], [1,0], [2,0.5]]
