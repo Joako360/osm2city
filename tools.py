@@ -101,6 +101,45 @@ def raster_glob():
     """ % path)
     print msg
 
+def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
+    import subprocess
+    import Queue
+
+    print "popen"    
+    fgelev = subprocess.Popen('/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev --fg-root $FG_ROOT --fg-scenery $FG_SCENERY',  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    #fgelev = subprocess.Popen(["/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev", "--fg-root", "$FG_ROOT",  "--fg-scenery", "$FG_SCENERY"],  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    #time.sleep(5)
+    print "building buffer"
+    buf_in = Queue.Queue(maxsize=0)
+    #f = open(fname, 'w')
+    f = sys.stdout
+    f.write("# %g %g %g %g %g %g\n" % (x0, y0, size_x, size_y, step_x, step_y))
+    i = 0
+    for y in np.arange(y0, y0+size_y, step_y):
+        for x in np.arange(x0, x0+size_x, step_x):
+            i += 1
+            lon, lat = transform.toGlobal((x, y))
+            buf_in.put("%i %g %g\n" % (i, lon, lat))
+
+    print "sending buffer"
+    for i in range(1000):
+        fgelev.stdin.write(buf_in.get())
+
+    print "reading"
+    i = 0
+    for y in np.arange(y0, y0+size_y, step_y):
+        for x in np.arange(x0, x0+size_x, step_x):
+            i += 1
+            if not buf_in.empty(): fgelev.stdin.write(buf_in.get())
+            tmp, elev = fgelev.stdout.readline().split()
+            lon, lat = transform.toGlobal((x, y))
+            f.write("%i " % i)
+            f.write("%1.8f %1.8f %g %g %g\n" % (lon, lat, x, y, float(elev)))
+            #if i > 10000: return
+        f.write("\n")
+    f.close()
+    
+    print "done"
 
 
 def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):

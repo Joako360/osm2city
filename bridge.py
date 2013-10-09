@@ -59,8 +59,8 @@ def probe_elev():
     #time.sleep(5)
 
     print "write"    
-    fgelev.stdin.write("id1\n13.01\n51.00\n")
-    fgelev.stdin.write("id2\n13.21\n51.10\n")
+    fgelev.stdin.write("id1 13.01 51.00\n")
+    fgelev.stdin.write("id2 13.21 51.10\n")
     #time.sleep(2)
 #    fgelev.communicate( "id\n13.01\n51.00\n")
     #fgelev.wait()
