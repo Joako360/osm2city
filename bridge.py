@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 # FIXME: check sign of angle
 
@@ -73,18 +73,40 @@ def probe_elev():
     
 class Bridge(object):
 #    def __init__(self, osm_id, tags, refs, scale=1):
-    def __init__(self, scale=1):
+    def __init__(self, coords, scale=1.):
         pass
-    
+
         self.upper_offset = 0.5*scale
         self.body_height = 0.3*scale
         self.lower_offset = 0.3*scale
-        self.pillar_r0 = 0.2*scale
-        self.pillar_r1 = 0.2*scale
-        self.pillar_nnodes = 16
+        # -- round piers
+        #self.pillar_r0 = 0.2*scale
+        #self.pillar_r1 = 0.2*scale
+        #self.pillar_nnodes = 16
+        
+        self.pillar_r0 = 0.25*scale # -- lateral
+        self.pillar_r1 = 0.1*scale  # -- longitudinal
+        self.pillar_nnodes = 4
+
         
         self.scale = scale
 
+        default = False        
+        if default:
+            t = np.arange(0,1.1,.01)
+            x = np.sin(2*np.pi*t)
+            y = np.cos(np.pi*t)
+            coords = zip(x,y)
+        else:            
+            x = np.zeros(len(coords))
+            y = np.zeros_like(x)
+            #z = np.zeros(len(coords)+10)+10
+            for i, c in enumerate(coords):
+                x[i] = c[0]
+                y[i] = c[1]
+    
+        self.center = shg.LineString(coords)
+        #center = center.simplify(0.03)
 
     def pillar(self, x, y, h0, h1, ofs, angle):
         rx = self.pillar_r0
@@ -123,6 +145,13 @@ class Bridge(object):
 #        pillar positions
 #        height() = linear_height(b0, b1)
 
+
+        # - probe terrain at 0..1, 100 nodes
+        # - compute bridge deck height based on
+        #   - terrain
+        #   - crossed railroads, roads, streams, none
+        #   - 
+
         if center.length < 10: raise ValueError("bridge length must be > 10 m")
 
         ofs = 1. 
@@ -158,27 +187,45 @@ class Bridge(object):
 #           s0       0  s_ofs0   s_street0
 #         dh/dr=0  h>=min_h_ofs h>=min_h_street
 
+    def set_deck_height(self):
+        """accepts height function?
+           sets deck height at coords
+        """
+        pass
 
-
-    def geom(self, default, coords, z):
+    def deck_height(self, l):
+        """given linear distance [m], interpolate and return deck height"""
+        x = l / self.center.length
+        #return -0.5*(math.cos(4*math.pi*x)-1.)*10
+        return -5.*((2.*x-1)**2-1.)
+        #return 10.
     
-        if default:
-            t = np.arange(0,1.1,.01)
-            x = np.sin(2*np.pi*t)
-            y = np.cos(np.pi*t)
-            z = np.sin(2*np.pi*t)*0+1
-            coords = zip(x,y)
+    def elev(self, l):
+        """given linear distance [m], interpolate and return terrain elevation"""
+        x = l / self.center.length
+        return 30.*((2.*x-1)**2-1.)
+
+    def angle(self, l):
+        """given linear distance [m], interpolate and return angle"""
+#        x = l / self.center.length
+        dl = 0.5
+        if l < dl:
+            l0 = 0.
+            l1 = dl
+        elif l >= self.center.length - dl:
+            l0 = self.center.length - dl
+            l1 = self.center.length
         else:
-            x = np.zeros(len(coords))
-            y = np.zeros_like(x)
-            z = np.zeros(len(coords)+10)+10
-            for i, c in enumerate(coords):
-                x[i] = c[0]
-                y[i] = c[1]
-    
-        center = shg.LineString(coords)
-        #center = center.simplify(0.03)
+            l0 = l - dl
+            l1 = l + dl
+        p0 = vec2d(self.center.interpolate(l0).coords[0])
+        p1 = vec2d(self.center.interpolate(l1).coords[0])
+        return (p1 - p0).atan2()
+
+    def geom(self):
             
+        # -- FIXME: compute angle
+        center = self.center
         n = len(center.coords)
         angle = np.zeros(n)
         angle[0] = (vec2d(center.coords[1]) - vec2d(center.coords[0])).atan2()
@@ -192,12 +239,23 @@ class Bridge(object):
         offset_ur = center.parallel_offset(self.upper_offset, 'right', resolution=16, join_style=2, mitre_limit=ml)
         offset_ll = center.parallel_offset(self.lower_offset, 'left', resolution=16, join_style=2, mitre_limit=ml)
         offset_lr = center.parallel_offset(self.lower_offset, 'right', resolution=16, join_style=2, mitre_limit=ml)
+        assert(len(offset_ul.coords) == n)
+        assert(len(offset_ur.coords) == n)
+        assert(len(offset_ll.coords) == n)
+        assert(len(offset_ur.coords) == n)
+        
+        # -- offset_ul: same order as center, whereas offset_ur is reversed
+        
+        #ofs = vec2d(center.coords[0])
+        #for i in range(n):
+        #    print vec2d(center.coords[i]) - ofs, vec2d(offset_ur.coords[i]) - ofs
+        #sys.exit(0)
+        
 
 #        segment_len = np.array([vec2d(coord).distance_to(vec2d(center.coords[i])) for i, coord in enumerate(center.coords[1:])])
-        segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(offset_ur.coords[i])) for i, coord in enumerate(offset_ur.coords[1:])])
+        segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(offset_ul.coords[i])) for i, coord in enumerate(offset_ul.coords[1:])])
         # FIXME: use average offset_ur and offset_ul or fix parallel_offset computation.
 #        segment_len = np.array([vec2d(coord).distance_to(vec2d(center.coords[i])) for i, coord in enumerate(center.coords[1:])])
-
 
         if False:
             # -- plot
@@ -213,7 +271,7 @@ class Bridge(object):
         # vertices
         out += "OBJECT poly\n"
         out += 'name "b6"\n'
-        out += 'texture "bridge.png"\n'
+        out += 'texture "tex/bridge.png"\n'
         n_ul = len(offset_ul.coords)
         n_ll = len(offset_ll.coords)
         n_ur = len(offset_ul.coords)
@@ -241,11 +299,13 @@ class Bridge(object):
                         
             # -- pillar verts
             l = 0.
-            height = z[0]
             for i in range(npfeiler):
                 pillar_pos = center.interpolate(l)
                 # FIXME: angle
-                i0, verts, nodes = self.pillar(pillar_pos.coords[0][0], pillar_pos.coords[0][1], height - self.body_height, 0, i0, 0.)
+                i0, verts, nodes = self.pillar(pillar_pos.coords[0][0], 
+                                               pillar_pos.coords[0][1], 
+                                               self.deck_height(l) - self.body_height, 
+                                               self.elev(l), i0, self.angle(l))
                 pillar_out += verts
                 p_nodes.append(nodes)
                 l += pillar_distance
@@ -255,26 +315,32 @@ class Bridge(object):
 
             # -- pillar verts
             for j, i in enumerate(ipfeiler):
-                i0, verts, nodes = self.pillar(x[i], y[i], z[j] - self.body_height, 0, i0, angle[i])
+                i0, verts, nodes = self.pillar(x[i], y[i], 
+                                               self.deck_height(l) - self.body_height, 
+                                               self.elev(l), i0, angle[i])
                 pillar_out += verts
                 p_nodes.append(nodes)
-
-
-            
+         
         out += "numvert %i\n" %  (n_ul + n_ll + n_ur + n_lr + 2*self.pillar_nnodes*npfeiler)
         
 #        out += "numvert %i\n" %  (n_ul + n_ll + n_ur + n_lr)
-        
         # -- body verts
+        
+        _z = np.zeros(n)
+        l = 0.
+        for i in range(n):
+            _z[i] = self.deck_height(l)
+            l += segment_len[i]
+            
         if True:
             for i, v in enumerate(offset_ul.coords):
-                out += "%g %g %g\n" % (v[0], v[1], z[i])
+                out += "%g %g %g\n" % (v[0], v[1], _z[i])
             for i, v in enumerate(offset_ll.coords):
-                out += "%g %g %g\n" % (v[0], v[1], z[i] - self.body_height)
+                out += "%g %g %g\n" % (v[0], v[1], _z[i] - self.body_height)
             for i, v in enumerate(offset_ur.coords[::-1]):
-                out += "%g %g %g\n" % (v[0], v[1], z[i])
+                out += "%g %g %g\n" % (v[0], v[1], _z[i])
             for i, v in enumerate(offset_lr.coords[::-1]):
-                out += "%g %g %g\n" % (v[0], v[1], z[i] - self.body_height)
+                out += "%g %g %g\n" % (v[0], v[1], _z[i] - self.body_height)
         # -- pillars
         #for u in linspace(0, 1., 4):
         
@@ -303,10 +369,16 @@ class Bridge(object):
             return out
 
         u = segment_len / 25.
-        out += surf_between_lines(nodes_ul, nodes_ll, u, 1, 0.75)
-        out += surf_between_lines(nodes_ur[::-1], nodes_lr[::-1], u, 1, 0.75)
-        out += surf_between_lines(nodes_ul[::-1], nodes_ur[::-1], u, 0.75, 0.5)
-        out += surf_between_lines(nodes_ll, nodes_lr, u, 0.5, 0.25)
+#        out += surf_between_lines(nodes_ul[::-1], nodes_ll[::-1], u, 1, 0.75)
+#        out += surf_between_lines(nodes_ur, nodes_lr, u, 1, 0.75)
+#        out += surf_between_lines(nodes_ul, nodes_ur, u, 0.75, 0.5)
+#        out += surf_between_lines(nodes_ll[::-1], nodes_lr[::-1], u, 0.5, 0.25)
+
+        out += surf_between_lines(nodes_ll[::-1], nodes_ul[::-1], u, 1, 0.75)
+        out += surf_between_lines(nodes_lr, nodes_ur, u, 1, 0.75)
+        out += surf_between_lines(nodes_ur, nodes_ul, u, 0.75, 0.5)
+        out += surf_between_lines(nodes_lr[::-1], nodes_ll[::-1], u, 0.5, 0.25)
+
         
         for pillar in p_nodes:
             for face in pillar:
@@ -431,7 +503,7 @@ def make_road_from_way(osm_id, tags, coords):
     bridge = Bridge(width)
     simplify_line(coords)
     z = np.ones(len(coords))*10.
-    out = bridge.geom(False, coords, z)
+    out = bridge.geom(False, coords)
     ac = open("bridge.ac", "a")
     ac.write(out)
     ac.close()
@@ -476,14 +548,15 @@ def make_bridge_from_way(osm_id, tags, coords):
     
 #    coords = np.array(coords)    
 #    coords -= coords[0]
-    z = np.ones(len(coords))*10.
-    bridge = Bridge(width)
-    simplify_line(coords)
-    out = bridge.geom(False, coords, z)
+    x = np.linspace(-1, 1, 100)
+    elev = 10.*(x**2 - 1.)
+    bridge = Bridge(coords, width)
+#   coords = simplify_line(coords)
+    out = bridge.geom()
     ac = open("bridge.ac", "a")
     ac.write(out)
     ac.close()
-
+    sys.exit(0)
     # -- funny things might happen while parsing OSM
 #    try:
 #        if 'name' in tags:
@@ -534,8 +607,8 @@ def make_bridge_from_way(osm_id, tags, coords):
 
 if __name__ == "__main__":
 
-    probe_elev()
-    sys.exit(0)
+#    probe_elev()
+ #   sys.exit(0)
 
     if 0:
         coords = [[0,0], [1,0], [2,0.5]]
