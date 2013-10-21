@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 """
 osm2city.py aims at generating 3D city models for FG, using OSM data.
@@ -65,6 +65,7 @@ import copy
 
 from imposm.parser import OSMParser
 import shapely.geometry as shg
+import osm
 import coordinates
 import itertools
 from cluster import Clusters
@@ -339,7 +340,7 @@ class wayExtract(object):
         """callback method for ways"""
         for osm_id, tags, refs in ways:
             if tools.stats.objects >= parameters.MAX_OBJECTS: return
-            self.way_list.append(Way(osm_id, tags, refs))
+            self.way_list.append(osm.Way(osm_id, tags, refs))
 
     def process_ways(self):
         for way in self.way_list:
@@ -349,15 +350,13 @@ class wayExtract(object):
             elif 'building:part' in way.tags:
                 if tools.stats.objects >= parameters.MAX_OBJECTS: return
                 self.make_building_from_way(way.osm_id, way.tags, way.refs)
-            elif 'bridge' in way.tags:
-                self.make_bridge_from_way(way.osm_id, way.tags, way.refs)
-
-
+#            elif 'bridge' in way.tags:
+#                self.make_bridge_from_way(way.osm_id, way.tags, way.refs)
 
     def coords(self, coords):
         for osm_id, lon, lat in coords:
             #print '%s %.4f %.4f' % (osm_id, lon, lat)
-            self.coord_dict[osm_id] = Coord(lon, lat)
+            self.coord_dict[osm_id] = osm.Coord(lon, lat)
             if lon > self.maxlon: self.maxlon = lon
             if lon < self.minlon: self.minlon = lon
             if lat > self.maxlat: self.maxlat = lat

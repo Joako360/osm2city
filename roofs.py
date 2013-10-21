@@ -41,7 +41,7 @@ def flat(b, X, ac_name = ""):
     #   0---->>-----------1
 
     out = ""
-    if ac_name != "":
+    if ac_name:
         out += "OBJECT poly\n"
         out += 'name "%s"\n' % ac_name
         out += 'texture "%s"\n' % (b.roof_texture.filename + '.png')
@@ -89,7 +89,8 @@ def flat(b, X, ac_name = ""):
     else:
         uv = face_uv(nodes, X, b.roof_texture.h_size_meters, b.roof_texture.v_size_meters, angle=None)
 
-#    print nodes
+    if not ac_name: uv *= 0 # -- texture only separate roofs
+
     for i, node in enumerate(nodes):
         out += "%i %g %g\n" % (node, uv[i][0], uv[i][1])
 #    print "len nodes", len(nodes)
