@@ -20,6 +20,30 @@ import parameters
 import sys
 import math
 
+class Deck_shape_linear(object):
+    def __init__(self, h0, h1):
+        self.h0 = h0
+        self.h1 = h1
+        
+    def __call__(self, s):
+        #assert(s <= 1. and s >= 0.)
+        return (1-s) * self.h0 + s * self.h1
+
+class Deck_shape_poly(object):
+    def __init__(self, h0, hm, h1):
+        self.h0 = h0
+        self.hm = hm
+        self.h1 = h1
+        self.a0 = h0
+        self.a2 = 2*(h1 - 2*hm + h0)
+        self.a1 = h1 - h0 - self.a2
+        
+    def __call__(self, s):
+        #print "call", s
+        #assert(s <= 1. and s >= 0.)
+        return self.a0 + self.a1*s + self.a2*s*s
+
+
 def param_interpolate():
     t = np.arange(0,1.1,.1)
     x = np.sin(2*np.pi*t)
@@ -106,6 +130,7 @@ class Bridge(object):
                 y[i] = c[1]
     
         self.center = shg.LineString(coords)
+        self.prep_height()
         #center = center.simplify(0.03)
 
     def pillar(self, x, y, h0, h1, ofs, angle):
@@ -136,7 +161,7 @@ class Bridge(object):
     
         return ofs + 2*self.pillar_nnodes, vert, nodes_list
 
-    def prep_height(self):
+    def _prep_height(self):
         pass
         # - probe terrain at points on center
 #        insert nodes at equidistant
@@ -145,22 +170,18 @@ class Bridge(object):
 #        pillar positions
 #        height() = linear_height(b0, b1)
 
-
         # - probe terrain at 0..1, 100 nodes
         # - compute bridge deck height based on
         #   - terrain
         #   - crossed railroads, roads, streams, none
         #   - 
 
-        if center.length < 10: raise ValueError("bridge length must be > 10 m")
-
-        ofs = 1. 
-        s_ofs0 = center.interpolate(ofs)
-        s_ofs1 = center.interpolate(center.length - ofs)
-        s_street0 = center.interpolate(0.25, normalized=True)
-        s_street1 = center.interpolate(0.75, normalized=True)
-        
-        
+#        if center.length < 10: raise ValueError("bridge length must be > 10 m")
+#        ofs = 1. 
+#        s_ofs0 = center.interpolate(ofs)
+#        s_ofs1 = center.interpolate(center.length - ofs)
+#        s_street0 = center.interpolate(0.25, normalized=True)
+#        s_street1 = center.interpolate(0.75, normalized=True)
         
 #        bofs1 = b1 - ofs
 #        min_height_border = 2.5
@@ -187,23 +208,52 @@ class Bridge(object):
 #           s0       0  s_ofs0   s_street0
 #         dh/dr=0  h>=min_h_ofs h>=min_h_street
 
-    def set_deck_height(self):
-        """accepts height function?
-           sets deck height at coords
-        """
-        pass
 
-    def deck_height(self, l):
-        """given linear distance [m], interpolate and return deck height"""
-        x = l / self.center.length
-        #return -0.5*(math.cos(4*math.pi*x)-1.)*10
-        return -5.*((2.*x-1)**2-1.)
-        #return 10.
     
-    def elev(self, l):
+    def prep_height(self):
+        """Set deck shape depending on elevation."""
+        h0 = self.elev(0.)
+        hm = self.elev(0.5)
+        h1 = self.elev(1.)
+        print "h0, hm, h1:", h0, hm, h1
+        self.D = Deck_shape_linear(h0, h1)
+        min_height = 10.
+        if self.D(0.5) - hm < min_height:
+            print "poly!", h0, hm+min_height, h1
+            self.D = Deck_shape_poly(h0, hm+min_height, h1)
+
+        print "deck height @0, m, 1:", self.deck_height(0.), self.deck_height(0.5), self.deck_height(1.)
+
+        
+# probe elevation
+# put constraint in middle
+# prepare deck
+# D = linear(h0, h1)
+# hm = elev(middle)
+#     
+#    def set_deck_height(self):
+#        """accepts height function?
+#           sets deck height at coords
+#        """
+#        pass
+
+    def deck_height(self, l, normalized=True):
+        """given linear distance [m], interpolate and return deck height"""
+        if not normalized: l /= self.center.length
+        #return -0.5*(math.cos(4*math.pi*x)-1.)*10
+        #return -5.*((2.*x-1)**2-1.)
+        #return 10.
+        return self.D(l)
+    
+    def elev(self, l, normalized=True):
         """given linear distance [m], interpolate and return terrain elevation"""
-        x = l / self.center.length
-        return 30.*((2.*x-1)**2-1.)
+        p = self.center.interpolate(l, normalized)
+        # FIXME: actually probe terrain at p
+        #print "elev at ", p
+        if not normalized: l /= self.center.length
+        l -= 0.1
+        #return 0.4*l
+        return 2.*((2.*l-1)**2-1.)
 
     def angle(self, l):
         """given linear distance [m], interpolate and return angle"""
@@ -250,10 +300,9 @@ class Bridge(object):
         #for i in range(n):
         #    print vec2d(center.coords[i]) - ofs, vec2d(offset_ur.coords[i]) - ofs
         #sys.exit(0)
-        
 
-#        segment_len = np.array([vec2d(coord).distance_to(vec2d(center.coords[i])) for i, coord in enumerate(center.coords[1:])])
-        segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(offset_ul.coords[i])) for i, coord in enumerate(offset_ul.coords[1:])])
+        self.segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(center.coords[i])) for i, coord in enumerate(center.coords[1:])])
+        #segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(offset_ul.coords[i])) for i, coord in enumerate(offset_ul.coords[1:])])
         # FIXME: use average offset_ur and offset_ul or fix parallel_offset computation.
 #        segment_len = np.array([vec2d(coord).distance_to(vec2d(center.coords[i])) for i, coord in enumerate(center.coords[1:])])
 
@@ -304,8 +353,8 @@ class Bridge(object):
                 # FIXME: angle
                 i0, verts, nodes = self.pillar(pillar_pos.coords[0][0], 
                                                pillar_pos.coords[0][1], 
-                                               self.deck_height(l) - self.body_height, 
-                                               self.elev(l), i0, self.angle(l))
+                                               self.deck_height(l, normalized=False) - self.body_height, 
+                                               self.elev(l, normalized=False), i0, self.angle(l))
                 pillar_out += verts
                 p_nodes.append(nodes)
                 l += pillar_distance
@@ -316,8 +365,8 @@ class Bridge(object):
             # -- pillar verts
             for j, i in enumerate(ipfeiler):
                 i0, verts, nodes = self.pillar(x[i], y[i], 
-                                               self.deck_height(l) - self.body_height, 
-                                               self.elev(l), i0, angle[i])
+                                               self.deck_height(l, normalized=False) - self.body_height, 
+                                               self.elev(l, normalized=False), i0, angle[i])
                 pillar_out += verts
                 p_nodes.append(nodes)
          
@@ -329,8 +378,9 @@ class Bridge(object):
         _z = np.zeros(n)
         l = 0.
         for i in range(n):
-            _z[i] = self.deck_height(l)
-            l += segment_len[i]
+            l += self.segment_len[i]
+            _z[i] = self.deck_height(l, normalized=False)
+            #print "seg", l/self.center.length, _z[i]
             
         if True:
             for i, v in enumerate(offset_ul.coords):
@@ -368,7 +418,7 @@ class Bridge(object):
                 u0 = u1
             return out
 
-        u = segment_len / 25.
+        u = self.segment_len / 25.
 #        out += surf_between_lines(nodes_ul[::-1], nodes_ll[::-1], u, 1, 0.75)
 #        out += surf_between_lines(nodes_ur, nodes_lr, u, 1, 0.75)
 #        out += surf_between_lines(nodes_ul, nodes_ur, u, 0.75, 0.5)
@@ -549,7 +599,7 @@ def make_bridge_from_way(osm_id, tags, coords):
 #    coords = np.array(coords)    
 #    coords -= coords[0]
     x = np.linspace(-1, 1, 100)
-    elev = 10.*(x**2 - 1.)
+#    elev = 10.*(x**2 - 1.)
     bridge = Bridge(coords, width)
 #   coords = simplify_line(coords)
     out = bridge.geom()
