@@ -707,8 +707,9 @@ if __name__ == "__main__":
                 if b.roof_complex: nroofs += 2  # we have 2 different LOD models for each roof
 
             tile_elev = elev(cl.center)
+            center_global = vec2d(tools.transform.toGlobal(cl.center))
             if tile_elev == -9999:
-                print "Skipping tile elev = -9999"
+                print "Skipping tile elev = -9999 at", center_global
                 continue # skip tile with improper elev
             #print "TILE E", tile_elev
 
@@ -720,7 +721,6 @@ if __name__ == "__main__":
             LOD_lists.append([]) # roof-flat
 
             # -- prepare output path
-            center_global = vec2d(tools.transform.toGlobal(cl.center))
             if parameters.PATH_TO_OUTPUT:
                 path = parameters.PATH_TO_OUTPUT
             else:
