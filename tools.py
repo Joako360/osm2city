@@ -11,6 +11,7 @@ Created on Sat Mar 23 18:42:23 2013
 import numpy as np
 import sys
 import textwrap
+import os
 
 stats = None
 
@@ -87,32 +88,39 @@ def raster_glob():
     lmax = vec2d.vec2d(transform.toLocal(cmax.__iter__()))
     delta = (lmax - lmin)*0.5
     print "Distance from center to boundary in meters (x, y):", delta
-    print "Creating elev.in ..."
-    raster(transform, "elev.in", -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
+    if False:
+        print "Creating elev.in ..."
+        raster(transform, "elev.in", -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
 
-    path = calc_tile.directory_name(center)
-    msg = textwrap.dedent("""
-    Done. You should now
-    - copy elev.in to $FGDATA/Nasal/
-    - hide the scenery folder Objects/%s to prevent probing on top of existing objects
-    - start FG, open Nasal console, enter 'elev.get()', press execute. This will create /tmp/elev.xml
-    - once that's done, copy /tmp/elev.xml to your $PREFIX folder
-    - unhide the scenery folder
-    """ % path)
-    print msg
+        path = calc_tile.directory_name(center)
+        msg = textwrap.dedent("""
+        Done. You should now
+        - copy elev.in to $FGDATA/Nasal/
+        - hide the scenery folder Objects/%s to prevent probing on top of existing objects
+        - start FG, open Nasal console, enter 'elev.get()', press execute. This will create /tmp/elev.xml
+        - once that's done, copy /tmp/elev.xml to your $PREFIX folder
+        - unhide the scenery folder
+        """ % path)
+        print msg
+    else:
+        fname = parameters.PREFIX + os.sep + 'elev.xml'
+        print "Creating ", fname
+        raster_fgelev(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
+
 
 def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
     import subprocess
     import Queue
-
-    print "popen"    
-    fgelev = subprocess.Popen('/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev --fg-root $FG_ROOT --fg-scenery $FG_SCENERY',  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    fg_scenery="/home/tom/fgfs/home/Scenery-devel"
+    fg_scenery="$FG_SCENERY"
+    
+    fgelev = subprocess.Popen('/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev --fg-root $FG_ROOT --fg-scenery '+fg_scenery,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     #fgelev = subprocess.Popen(["/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev", "--fg-root", "$FG_ROOT",  "--fg-scenery", "$FG_SCENERY"],  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     #time.sleep(5)
     print "building buffer"
     buf_in = Queue.Queue(maxsize=0)
-    #f = open(fname, 'w')
-    f = sys.stdout
+    f = open(fname, 'w')
+    #f = sys.stdout
     f.write("# %g %g %g %g %g %g\n" % (x0, y0, size_x, size_y, step_x, step_y))
     i = 0
     for y in np.arange(y0, y0+size_y, step_y):
@@ -133,10 +141,12 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
             if not buf_in.empty(): fgelev.stdin.write(buf_in.get())
             tmp, elev = fgelev.stdout.readline().split()
             lon, lat = transform.toGlobal((x, y))
-            f.write("%i " % i)
+            #f.write("%i " % i)
             f.write("%1.8f %1.8f %g %g %g\n" % (lon, lat, x, y, float(elev)))
             #if i > 10000: return
         f.write("\n")
+        print "done %3.1f %%\r" % ((y - y0)*100/size_y),
+
     f.close()
     
     print "done"
