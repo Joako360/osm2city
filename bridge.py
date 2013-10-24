@@ -602,11 +602,14 @@ def make_bridge_from_way(osm_id, tags, coords):
 #    elev = 10.*(x**2 - 1.)
     bridge = Bridge(coords, width)
 #   coords = simplify_line(coords)
-    out = bridge.geom()
+    try:
+        out = bridge.geom()
+    except:
+        return True
     ac = open("bridge.ac", "a")
     ac.write(out)
     ac.close()
-    sys.exit(0)
+    #sys.exit(0)
     # -- funny things might happen while parsing OSM
 #    try:
 #        if 'name' in tags:
@@ -750,7 +753,7 @@ if __name__ == "__main__":
     #way.parse("serpentine.osm")
 
     way.register_way_callback('bridge', make_bridge_from_way)
-    way.parse("EDDC/carolarbruecke.osm")
-#    way.parse("EDDC/bridges.osm")
+#    way.parse("EDDC/carolarbruecke.osm")
+    way.parse("EDDC/bridges.osm")
     
     print "done parsing"

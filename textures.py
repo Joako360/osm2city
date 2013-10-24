@@ -238,7 +238,7 @@ def init():
     #                            requires=['roof:color:black'],
     #                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
         facades.append(Texture('tex/DSCF9503_noroofsec_pow2',
-                                12.85, [], True,
+                                12.85, [360, 708, 1044, 1392, 2048], True,
                                 17.66, [556,1015,1474,2048], False, True,
                                 requires=['roof:color:black'],
                                 provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))

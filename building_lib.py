@@ -637,7 +637,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 #        LOD_lists[b.LOD].append(roof_ac_name)
 
         # -- pitched roof for > 4 ground nodes
-        if parameters.EXPERIMENTAL_USE_SKEL:
+        if b._nnodes_ground > 4 and parameters.EXPERIMENTAL_USE_SKEL:
             s = myskeleton.myskel(b, offset_xy = offset,
                                   offset_z = b.ground_elev + b.height,
                                   max_height = b.height * parameters.SKEL_MAX_HEIGHT_RATIO)
