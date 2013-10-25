@@ -168,12 +168,12 @@ class Bridge(object):
             a += np.pi/self.pillar_nnodes
             node = np.array([rx*np.cos(a), ry*np.sin(a)])
             node = np.dot(R, node)
-            vert += "%1.6f %1.6f %1.6f\n" % (x+node[1], y+node[0], h1)
+            vert += "%1.6f %1.6f %1.6f\n" % (-(y+node[0]), h1, -(x+node[1]) )
         for a in np.linspace(0, 2*np.pi, self.pillar_nnodes, endpoint = False):
             a += np.pi/self.pillar_nnodes
             node = np.array([rx*np.cos(a), ry*np.sin(a)])
             node = np.dot(R, node)
-            vert += "%1.6f %1.6f %1.6f\n" % (x+node[1], y+node[0], h0)
+            vert += "%1.6f %1.6f %1.6f\n" % (-(y+node[0]), h0, -(x+node[1]))
     
         for i in range(self.pillar_nnodes-1):
             face = [ofs+i, ofs+i+1, ofs+i+1+self.pillar_nnodes, ofs+i+self.pillar_nnodes][::-1]
@@ -406,16 +406,16 @@ class Bridge(object):
             _z[i] = self.deck_height(l, normalized=False)
             #print "seg", l/self.center.length, _z[i]
 
-#            -x[1], b.ground_elev + b.height, -x[0]
+#            -y, z, -x
         if True:
             for i, v in enumerate(offset_ul.coords):
-                out += "%g %g %g\n" % (v[0], v[1], _z[i])
+                out += "%g %g %g\n" % (-v[1], _z[i], -v[0])
             for i, v in enumerate(offset_ll.coords):
-                out += "%g %g %g\n" % (v[0], v[1], _z[i] - self.body_height)
+                out += "%g %g %g\n" % (-v[1], _z[i] - self.body_height, -v[0])
             for i, v in enumerate(offset_ur.coords[::-1]):
-                out += "%g %g %g\n" % (v[0], v[1], _z[i])
+                out += "%g %g %g\n" % (-v[1], _z[i], -v[0])
             for i, v in enumerate(offset_lr.coords[::-1]):
-                out += "%g %g %g\n" % (v[0], v[1], _z[i] - self.body_height)
+                out += "%g %g %g\n" % (-v[1], _z[i] - self.body_height, -v[0])
         # -- pillars
         #for u in linspace(0, 1., 4):
         
@@ -593,7 +593,7 @@ def make_bridge_from_way(osm_id, tags, coords):
     _levels = 0
     _layer = 99
 
-    ok = (u'Flügelwegbrücke', u'Albertbrücke', u'Waldschlößchenbrücke', u'Loschwitzer Brücke', u'Carolabrücke', u'Marienbrücke')
+    ok = (u'Flügelwegbrücke', u'Albertbrücke', u'Waldschlößchenbrücke', u'Loschwitzer Brücke', u'Carolabrücke', u'Marienbrücke', u'Europabrücke')
 
 
     if 'highway' in tags and tags['highway'] in ('motorway', 'primary', 'secondary', 'residential'):
@@ -618,6 +618,7 @@ def make_bridge_from_way(osm_id, tags, coords):
         lanes = float(tags['lanes'])
     except:
         lanes = 1
+    #if lanes == 1: return
     width = lanes * 3. + 2.
     print "width %g, lanes %g" % (width, lanes)
     
@@ -779,7 +780,8 @@ if __name__ == "__main__":
 
     way.register_way_callback('bridge', make_bridge_from_way)
 #    way.parse("EDDC/carolarbruecke.osm")
-    way.parse("EDDC/bridges.osm")
+    #way.parse("EDDC/bridges.osm")
+    way.parse("LOWI/europabruecke.osm")
 
 
     print "center glob", center_global
