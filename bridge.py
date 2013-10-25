@@ -7,7 +7,7 @@ Created on Sun Sep 29 10:42:12 2013
 
 @author: tom
 """
-import scipy.interpolate as interpolate
+import scipy.interpolate 
 import matplotlib.pyplot as plt
 import numpy as np
 from vec2d import vec2d
@@ -19,6 +19,10 @@ import tools
 import parameters
 import sys
 import math
+import calc_tile
+import os
+
+import subprocess
 
 class Deck_shape_linear(object):
     def __init__(self, h0, h1):
@@ -72,28 +76,30 @@ def plot_line(center, style='-x'):
     #plt.legend(['Linear'])
     #plt.title('Spline of parametrically-defined curve')
 
-def probe_elev():
-    pass
-    import subprocess
-    import time
-    
-    print "popen"    
-    fgelev = subprocess.Popen("/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev --fg-root $FG_ROOT --fg-scenery $FG_SCENERY",  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-    #fgelev = subprocess.Popen(["/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev", "--fg-root", "$FG_ROOT",  "--fg-scenery", "$FG_SCENERY"],  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-    #time.sleep(5)
 
-    print "write"    
-    fgelev.stdin.write("id1 13.01 51.00\n")
-    fgelev.stdin.write("id2 13.21 51.10\n")
-    #time.sleep(2)
-#    fgelev.communicate( "id\n13.01\n51.00\n")
-    #fgelev.wait()
-    print "read"
-    print fgelev.stdout.readline()
-    print fgelev.stdout.readline()
-    print fgelev.stdout.readline()
-    print "done"
+class Elev_probe(object):
+    def __init__(self):
+        fg_scenery="/home/tom/fgfs/home/Scenery-devel"
+        fg_scenery="$FG_SCENERY"
         
+        print "popen"    
+        self.fgelev = subprocess.Popen('/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev --fg-root $FG_ROOT --fg-scenery '+fg_scenery,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+
+    def __call__(self, coords):
+        print "write"
+        n = len(coords)
+        for i in range(n):
+            self.fgelev.stdin.write("%i %g %g\n" % (i, coords[i][0], coords[i][1]))
+        self.fgelev.stdin.flush()
+        print "read"
+        elevs = np.zeros(n)
+        for i in range(n):
+            tmp, elev = self.fgelev.stdout.readline().split()
+            elevs[i] = float(elev)
+    
+        return elevs
+
+probe = Elev_probe() # FIXME: global variable
     
 class Bridge(object):
 #    def __init__(self, osm_id, tags, refs, scale=1):
@@ -130,9 +136,26 @@ class Bridge(object):
                 y[i] = c[1]
     
         self.center = shg.LineString(coords)
+        
+        # -- prepare elevation spline
+        #    probe elev at n_probes locations
+        n_probes = 10
+        probe_locations = np.linspace(0, 1., n_probes)
+        probe_coords = np.zeros((n_probes, 2))
+        for i, l in enumerate(probe_locations):
+            local = self.center.interpolate(l, normalized=True)
+            probe_coords[i] = tools.transform.toGlobal(local.coords[0])
+
+        print "probing at", probe_coords
+        elevs = probe(probe_coords)
+        print ">>> got", elevs
+        self.elev_spline = scipy.interpolate.interp1d(probe_locations, elevs)
+        
         self.prep_height()
         #center = center.simplify(0.03)
 
+
+        
     def pillar(self, x, y, h0, h1, ofs, angle):
         rx = self.pillar_r0
         ry = self.pillar_r1
@@ -247,13 +270,14 @@ class Bridge(object):
     
     def elev(self, l, normalized=True):
         """given linear distance [m], interpolate and return terrain elevation"""
-        p = self.center.interpolate(l, normalized)
-        # FIXME: actually probe terrain at p
-        #print "elev at ", p
         if not normalized: l /= self.center.length
-        l -= 0.1
+        return self.elev_spline(l)
+        
+#        p = self.center.interpolate(l, normalized)
+#        if not normalized: l /= self.center.length
+#        l -= 0.1
         #return 0.4*l
-        return 2.*((2.*l-1)**2-1.)
+#        return 2.*((2.*l-1)**2-1.)
 
     def angle(self, l):
         """given linear distance [m], interpolate and return angle"""
@@ -381,7 +405,8 @@ class Bridge(object):
             l += self.segment_len[i]
             _z[i] = self.deck_height(l, normalized=False)
             #print "seg", l/self.center.length, _z[i]
-            
+
+#            -x[1], b.ground_elev + b.height, -x[0]
         if True:
             for i, v in enumerate(offset_ul.coords):
                 out += "%g %g %g\n" % (v[0], v[1], _z[i])
@@ -743,8 +768,8 @@ if __name__ == "__main__":
 
     cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
     cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
-    center = (cmin + cmax)*0.5
-    tools.init(coordinates.Transformation(center, hdg = 0))
+    center_global = (cmin + cmax)*0.5
+    tools.init(coordinates.Transformation(center_global, hdg = 0))
 
     ac_header()
     way = osm.OsmExtract(tools.transform.toLocal)
@@ -755,5 +780,17 @@ if __name__ == "__main__":
     way.register_way_callback('bridge', make_bridge_from_way)
 #    way.parse("EDDC/carolarbruecke.osm")
     way.parse("EDDC/bridges.osm")
+
+
+    print "center glob", center_global
+    path = calc_tile.directory_name(center_global)
+    stg = "%07i.stg" % calc_tile.tile_index(center_global)
+    print path + os.sep + stg
+    print "OBJECT_STATIC %s %g %g %1.2f %g\n" % ('bridge.ac', center_global.lon, center_global.lat, 0, 0)
+
     
     print "done parsing"
+
+# probe elevation
+# if not linear: split coords
+# done
