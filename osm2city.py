@@ -83,6 +83,7 @@ import calc_tile
 import parameters
 
 buildings = [] # -- master list, holds all buildings
+our_magic = "osm2city"
 
 
 class Building(object):
@@ -661,7 +662,8 @@ if __name__ == "__main__":
             if stg not in stgs:
                 stgs.append(stg)
                 static_objects.extend(stg_io.read(path, stg, parameters.PREFIX,
-                                                  parameters.PATH_TO_SCENERY))
+                                                  parameters.PATH_TO_SCENERY,
+                                                  our_magic))
 
         print "read %i objects from %i tiles" % (len(static_objects), len(stgs)), stgs
     else:
@@ -748,9 +750,9 @@ if __name__ == "__main__":
             tile_index = calc_tile.tile_index(center_global)
             stg_fname = path + "%07i.stg" % tile_index
             if not stg_fname in stg_fp_dict:
-                stg_io.uninstall_ours(stg_fname)
+                stg_io.uninstall_ours(stg_fname, our_magic)
                 stg = open(stg_fname, "a")
-                stg.write("\n%s\n# do not edit below this line\n#\n" % stg_io.our_magic)
+                stg.write("\n%s\n# do not edit below this line\n#\n" % our_magic)
                 stg_fp_dict[stg_fname] = stg
             else:
                 stg = stg_fp_dict[stg_fname]

@@ -18,9 +18,9 @@ import tools
 #    def __str__(self):
 #        return "%s %s %g %g %g %g" % (self.typ, self.path, self.lon, self.lat, self.alt, self.hdg)
 
-our_magic = "# osm2city"
+#our_magic_start = "# osm2city"
 
-def read(path, stg, prefix, fgscenery):
+def read(path, stg, prefix, fgscenery, our_magic):
     """Accepts a scenery sub-path, as in 'w010n40/w005n48/', plus an .stg file name.
        In the future, take care of multiple scenery paths here.
        Returns list of buildings representing static/shared objects in .stg, with full path.
@@ -29,10 +29,20 @@ def read(path, stg, prefix, fgscenery):
     path = fgscenery + os.sep + 'Objects' + os.sep + path + os.sep
     print "stg: reading", path + stg
 
+    our_magic_start = '# ' + our_magic
+    our_magic_end = '# END ' + our_magic
+
+    ours = False
     try:
         f = open(path + stg)
         for line in f.readlines():
-            if line.startswith(our_magic): break
+            if line.startswith(our_magic_start):
+                ours = True
+                continue
+            if line.startswith(our_magic_end):
+                ours = False
+            if ours: continue
+
             if line.startswith('#') or line.lstrip() == "": continue
             splitted = line.split()
             typ, ac_path  = splitted[0:2]
@@ -51,17 +61,27 @@ def read(path, stg, prefix, fgscenery):
 
     return objs
 
-def uninstall_ours(stg_fname):
+def uninstall_ours(stg_fname, our_magic):
     """Uninstall previous osm2city data from .stg.
-       Read full .stg to memory, Write everything except ours back to .stg, sync.
+       Read full .stg to memory, write everything except ours back to .stg, sync.
     """
+    our_magic_start = '# ' + our_magic
+    our_magic_end = '# END ' + our_magic
+    
     try:
         stg = open(stg_fname, "r")
         lines = stg.readlines()
         stg.close()
         stg = open(stg_fname, "w")
+        ours = False
         for line in lines:
-            if line.startswith(our_magic): break
+            if line.startswith(our_magic_start):
+                ours = True
+                continue
+            if line.startswith(our_magic_end):
+                ours = False
+            if ours: continue
+            
             stg.write(line)
         stg.flush()
         stg.close()
