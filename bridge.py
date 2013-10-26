@@ -103,8 +103,8 @@ probe = Elev_probe() # FIXME: global variable
     
 class Bridge(object):
 #    def __init__(self, osm_id, tags, refs, scale=1):
-    def __init__(self, coords, scale=1.):
-        pass
+    def __init__(self, coords, transform, scale=1.):
+        self.transform = transform
 
         self.upper_offset = 0.5*scale
         self.body_height = 0.3*scale
@@ -137,21 +137,28 @@ class Bridge(object):
     
         self.center = shg.LineString(coords)
         print "# length %1.0f m" % self.center.length
-        
+        if self.center.length < 1000: 
+            print "# too short"
+            self.too_short = True
+            return
+            
+        self.too_short = False
+
+
         # -- prepare elevation spline
         #    probe elev at n_probes locations
-        n_probes = 100
+        n_probes = int(self.center.length/5.)
         self.probe_locations = np.linspace(0, 1., n_probes)
         probe_coords = np.zeros((n_probes, 2))
         for i, l in enumerate(self.probe_locations):
             local = self.center.interpolate(l, normalized=True)
-            probe_coords[i] = tools.transform.toGlobal(local.coords[0])
+            probe_coords[i] = self.transform.toGlobal(local.coords[0])
 
         #print "probing at", probe_coords
         self.elevs = probe(probe_coords)
 
       
-        #print ">>> got", elevs
+        #print ">>> got", self.elevs
         self.elev_spline = scipy.interpolate.interp1d(self.probe_locations, self.elevs)
         
         self.prep_height()
@@ -599,7 +606,7 @@ def print_stg_info(center_global, ac_name):
     #print "center glob", center_global
     path = calc_tile.directory_name(center_global)
     stg = "%07i.stg" % calc_tile.tile_index(center_global)
-    print path + os.sep + stg
+    print path + os.sep + stg + ':',
     print "OBJECT_STATIC %s %g %g %1.2f %g\n" % (ac_name, center_global.lon, center_global.lat, 0, 0)
 
 
@@ -609,6 +616,8 @@ def make_bridge_from_way(osm_id, tags, coords):
     _height = 0.
     _levels = 0
     _layer = 99
+    
+    #if osm_id != 24960801: return True
 
     ok = (u'Flügelwegbrücke', u'Albertbrücke', u'Waldschlößchenbrücke', u'Loschwitzer Brücke', u'Carolabrücke', u'Marienbrücke', u'Europabrücke')
 
@@ -646,10 +655,9 @@ def make_bridge_from_way(osm_id, tags, coords):
 
 #    coords = np.array(coords)    
 #    coords -= coords[0]
-    bridge = Bridge(coords_local, width)
-    if bridge.center.length < 100: 
-        print "# to short"
-        return True
+    bridge = Bridge(coords_local, transform, width)
+    if bridge.too_short: return
+        
 #   coords = simplify_line(coords)
     try:
         out = bridge.geom()
@@ -665,6 +673,11 @@ def make_bridge_from_way(osm_id, tags, coords):
     bridge.plot_height_profile('bridge_%i.png' % osm_id)
 
     print_stg_info(center_this, ac_name)
+
+    # append .stg to list
+    # store stg_line in dict    
+    
+    #def uninstall_ours(stg_fname, our_magic):
 
     #sys.exit(0)
     # -- funny things might happen while parsing OSM
@@ -718,39 +731,6 @@ def no_transform((x, y)):
 
 if __name__ == "__main__":
 
-#    probe_elev()
- #   sys.exit(0)
-
-    if 0:
-        coords = [[0,0], [1,0], [2,0.5]]
-        a = shg.LineString(coords)
-        print a
-        sys.exit(0)
-
-    if 0:
-        an = np.array([0.,0,45,45,45,20,0,0])
-        coords = np.zeros((len(an),2))
-        for i, a in enumerate(an[1:], 1):
-            r = 20
-            coords[i,0] = coords[i-1, 0] + r * math.cos(a/57.3)
-            coords[i,1] = coords[i-1, 1] + r * math.sin(a/57.3)
-#        l = shg.LineString(coords)
-#        l.interpolate(10)
-#        bla
-        simplify_line(coords)
-        sys.exit(0)
-
-
-    if False:
-        p = np.linspace(-1.5, 1.5, 20)
-        coords = np.zeros((20,2))
-        coords[:,0] = 2*p**3-p
-        coords[:,1] = -2*p**2+1
-        #coords[:,1] = p
-    
-        simplify_line(coords)
-        sys.exit(0)
-
     if False:    
         coords = np.array(coords)
         x = coords[:,0]
@@ -776,12 +756,10 @@ if __name__ == "__main__":
         print "sh", a.shape
         print a
     
-    
-    
         #bridge_geom(True, None, None)
         sys.exit(0)
     import argparse
-    parser = argparse.ArgumentParser(description="osm2city reads OSM data and creates buildings for use with FlightGear")
+    parser = argparse.ArgumentParser(description="bridge.py reads OSM data and creates bridge models for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                       help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
 #    parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
@@ -815,10 +793,12 @@ if __name__ == "__main__":
 #    way.parse("EDDC/carolarbruecke.osm")
     #way.parse("EDDC/bridges.osm")
     #way.parse("LOWI/europabruecke.osm")
-    way.parse("LOWI/way_highway=motorway,primary__bbox=11.28159,47.19438,11.58646,47.30997_.osm")
+    way.parse(parameters.PREFIX + os.sep + parameters.OSM_FILE)
+
+    #stg_dict = {}
 
     print "done parsing"
-    print_stg_info(center_global, 'bridge.ac')
+    #print_stg_info(center_global, 'bridge.ac')
 
     
 
