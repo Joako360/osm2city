@@ -86,12 +86,12 @@ class Elev_probe(object):
         self.fgelev = subprocess.Popen('/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev --fg-root $FG_ROOT --fg-scenery '+fg_scenery,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
     def __call__(self, coords):
-        print "write"
+        #print "write"
         n = len(coords)
         for i in range(n):
             self.fgelev.stdin.write("%i %g %g\n" % (i, coords[i][0], coords[i][1]))
         self.fgelev.stdin.flush()
-        print "read"
+        #print "read"
         elevs = np.zeros(n)
         for i in range(n):
             tmp, elev = self.fgelev.stdout.readline().split()
@@ -136,24 +136,36 @@ class Bridge(object):
                 y[i] = c[1]
     
         self.center = shg.LineString(coords)
+        print "# length %1.0f m" % self.center.length
         
         # -- prepare elevation spline
         #    probe elev at n_probes locations
-        n_probes = 10
-        probe_locations = np.linspace(0, 1., n_probes)
+        n_probes = 100
+        self.probe_locations = np.linspace(0, 1., n_probes)
         probe_coords = np.zeros((n_probes, 2))
-        for i, l in enumerate(probe_locations):
+        for i, l in enumerate(self.probe_locations):
             local = self.center.interpolate(l, normalized=True)
             probe_coords[i] = tools.transform.toGlobal(local.coords[0])
 
-        print "probing at", probe_coords
-        elevs = probe(probe_coords)
-        print ">>> got", elevs
-        self.elev_spline = scipy.interpolate.interp1d(probe_locations, elevs)
+        #print "probing at", probe_coords
+        self.elevs = probe(probe_coords)
+
+      
+        #print ">>> got", elevs
+        self.elev_spline = scipy.interpolate.interp1d(self.probe_locations, self.elevs)
         
         self.prep_height()
         #center = center.simplify(0.03)
 
+    def plot_height_profile(self, png_name):
+        plt.figure()
+        X = self.probe_locations * self.center.length
+        plt.plot(X, self.elevs)
+        dh = [self.deck_height(l) for l in self.probe_locations]
+        plt.plot(X, dh)
+        plt.axes().set_aspect('equal')
+        plt.savefig(png_name)
+        plt.clf()
 
         
     def pillar(self, x, y, h0, h1, ofs, angle):
@@ -238,14 +250,14 @@ class Bridge(object):
         h0 = self.elev(0.)
         hm = self.elev(0.5)
         h1 = self.elev(1.)
-        print "h0, hm, h1:", h0, hm, h1
+        print "# h0, hm, h1:", h0, hm, h1
         self.D = Deck_shape_linear(h0, h1)
         min_height = 10.
         if self.D(0.5) - hm < min_height:
-            print "poly!", h0, hm+min_height, h1
+            print "# poly", h0, hm+min_height, h1
             self.D = Deck_shape_poly(h0, hm+min_height, h1)
 
-        print "deck height @0, m, 1:", self.deck_height(0.), self.deck_height(0.5), self.deck_height(1.)
+        #print "deck height @0, m, 1:", self.deck_height(0.), self.deck_height(0.5), self.deck_height(1.)
 
         
 # probe elevation
@@ -350,7 +362,7 @@ class Bridge(object):
         n_ur = len(offset_ul.coords)
         n_lr = len(offset_ll.coords)
         
-        print "lens", n, n_ul, n_ll, n_ur, n_lr
+        print "# lens", n, n_ul, n_ll, n_ur, n_lr
         
         def succ_range(i, delta):
             return i + delta, range(i, i + delta)
@@ -474,14 +486,12 @@ class Bridge(object):
         return out        
  
 
-def ac_header():
-    ac = open("bridge.ac", "w")
+def ac_header(kids=500):
     out  = "AC3Db\n"
     out += 'MATERIAL "" rgb 1 1 1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0\n'
     out += "OBJECT world\n"
-    out += "kids 500\n"
-    ac.write(out)
-    ac.close()
+    out += "kids %i\n" % kids
+    return out
     
 def simplify_line(coords, z = None):
 
@@ -585,6 +595,13 @@ def make_road_from_way(osm_id, tags, coords):
 
     print ">>>", osm_id
 
+def print_stg_info(center_global, ac_name):
+    #print "center glob", center_global
+    path = calc_tile.directory_name(center_global)
+    stg = "%07i.stg" % calc_tile.tile_index(center_global)
+    print path + os.sep + stg
+    print "OBJECT_STATIC %s %g %g %1.2f %g\n" % (ac_name, center_global.lon, center_global.lat, 0, 0)
+
 
 def make_bridge_from_way(osm_id, tags, coords):
 
@@ -596,10 +613,10 @@ def make_bridge_from_way(osm_id, tags, coords):
     ok = (u'Flügelwegbrücke', u'Albertbrücke', u'Waldschlößchenbrücke', u'Loschwitzer Brücke', u'Carolabrücke', u'Marienbrücke', u'Europabrücke')
 
 
-    if 'highway' in tags and tags['highway'] in ('motorway', 'primary', 'secondary', 'residential'):
+    if 'highway' in tags and tags['highway'] in ('motorway', '_primary', '_secondary', '_residential'):
 
         if 'name' in tags:
-            if tags['name'] in ok:
+            if True or tags['name'] in ok:
                 pass
             else:
                 print tags['name']
@@ -620,21 +637,35 @@ def make_bridge_from_way(osm_id, tags, coords):
         lanes = 1
     #if lanes == 1: return
     width = lanes * 3. + 2.
-    print "width %g, lanes %g" % (width, lanes)
+    print "# width %g, lanes %g" % (width, lanes)
     
+    # -- to local coordinates
+    center_this = vec2d(coords[0])
+    transform = coordinates.Transformation(center_this, hdg = 0)
+    coords_local = [transform.toLocal(c) for c in coords]
+
 #    coords = np.array(coords)    
 #    coords -= coords[0]
-    x = np.linspace(-1, 1, 100)
-#    elev = 10.*(x**2 - 1.)
-    bridge = Bridge(coords, width)
+    bridge = Bridge(coords_local, width)
+    if bridge.center.length < 100: 
+        print "# to short"
+        return True
 #   coords = simplify_line(coords)
     try:
         out = bridge.geom()
     except:
+        print "# geom failed"
         return True
-    ac = open("bridge.ac", "a")
+    ac_name = "bridge_%i.ac" % osm_id
+    ac = open(ac_name, "w")
+    ac.write(ac_header(1))
     ac.write(out)
     ac.close()
+    
+    bridge.plot_height_profile('bridge_%i.png' % osm_id)
+
+    print_stg_info(center_this, ac_name)
+
     #sys.exit(0)
     # -- funny things might happen while parsing OSM
 #    try:
@@ -682,7 +713,8 @@ def make_bridge_from_way(osm_id, tags, coords):
 
 
 # -----------------------------------------------------------------------------
-
+def no_transform((x, y)):
+    return x, y
 
 if __name__ == "__main__":
 
@@ -772,8 +804,9 @@ if __name__ == "__main__":
     center_global = (cmin + cmax)*0.5
     tools.init(coordinates.Transformation(center_global, hdg = 0))
 
-    ac_header()
-    way = osm.OsmExtract(tools.transform.toLocal)
+    #ac_header()
+#    way = osm.OsmExtract(tools.transform.toLocal)
+    way = osm.OsmExtract(no_transform)
 
     #way.register_way_callback('highway', make_road_from_way)
     #way.parse("serpentine.osm")
@@ -781,17 +814,13 @@ if __name__ == "__main__":
     way.register_way_callback('bridge', make_bridge_from_way)
 #    way.parse("EDDC/carolarbruecke.osm")
     #way.parse("EDDC/bridges.osm")
-    way.parse("LOWI/europabruecke.osm")
+    #way.parse("LOWI/europabruecke.osm")
+    way.parse("LOWI/way_highway=motorway,primary__bbox=11.28159,47.19438,11.58646,47.30997_.osm")
 
-
-    print "center glob", center_global
-    path = calc_tile.directory_name(center_global)
-    stg = "%07i.stg" % calc_tile.tile_index(center_global)
-    print path + os.sep + stg
-    print "OBJECT_STATIC %s %g %g %1.2f %g\n" % ('bridge.ac', center_global.lon, center_global.lat, 0, 0)
+    print "done parsing"
+    print_stg_info(center_global, 'bridge.ac')
 
     
-    print "done parsing"
 
 # probe elevation
 # if not linear: split coords

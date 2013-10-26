@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 from imposm.parser import OSMParser
+import shapely.geometry as shg
 
 class Coord(object):
     def __init__(self, lon, lat):
@@ -62,7 +63,7 @@ class OsmExtract(object):
         coords = []
         for ref in refs:
                 c = self.coord_dict[ref]
-                coords.append(tools.transform.toLocal((c.lon, c.lat)))
+                coords.append(self.transform((c.lon, c.lat)))
 
         #print "before inner", refs
 #        print "cord", coords
