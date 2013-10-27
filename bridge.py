@@ -137,7 +137,7 @@ class Bridge(object):
     
         self.center = shg.LineString(coords)
         print "# length %1.0f m" % self.center.length
-        if self.center.length < 1000: 
+        if len(coords) < 3 or 0 and self.center.length < 1000: 
             print "# too short"
             self.too_short = True
             return
@@ -259,7 +259,7 @@ class Bridge(object):
         h1 = self.elev(1.)
         print "# h0, hm, h1:", h0, hm, h1
         self.D = Deck_shape_linear(h0, h1)
-        min_height = 10.
+        min_height = 6.
         if self.D(0.5) - hm < min_height:
             print "# poly", h0, hm+min_height, h1
             self.D = Deck_shape_poly(h0, hm+min_height, h1)

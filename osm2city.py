@@ -430,9 +430,9 @@ def write_ac_header(out, nb):
 
 # -----------------------------------------------------------------------------
 # -- write xml
-def write_xml(fname, LOD_lists, LM_dict, buildings):
+def write_xml(path, fname, LOD_lists, LM_dict, buildings):
     #  -- LOD animation
-    xml = open(fname + ".xml", "w")
+    xml = open(path + fname + ".xml", "w")
     xml.write("""<?xml version="1.0"?>\n<PropertyList>\n""")
     xml.write("<path>%s.ac</path>" % fname)
 
@@ -744,7 +744,7 @@ if __name__ == "__main__":
             LM_dict = building_lib.make_lightmap_dict(cl.objects)
 
             # -- write xml
-            write_xml(path + fname, LOD_lists, LM_dict, cl.objects)
+            write_xml(path, fname, LOD_lists, LM_dict, cl.objects)
 
             # -- write stg
             tile_index = calc_tile.tile_index(center_global)
@@ -752,7 +752,7 @@ if __name__ == "__main__":
             if not stg_fname in stg_fp_dict:
                 stg_io.uninstall_ours(stg_fname, our_magic)
                 stg = open(stg_fname, "a")
-                stg.write("\n%s\n# do not edit below this line\n#\n" % our_magic)
+                stg.write("\n# %s\n# do not edit below this line\n#\n" % our_magic)
                 stg_fp_dict[stg_fname] = stg
             else:
                 stg = stg_fp_dict[stg_fname]
