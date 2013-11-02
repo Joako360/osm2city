@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-http://www.knowthytools.com/2010/03/sax-parsing-with-python.html
+Parser for OpenStreetMap data based on standard Python SAX library for processing XML.
+Other formats than XML are not available for parsing OSM input data.
+Use a tool like Osmosis to pre-process data.
 
 @author: vanosten
 """
@@ -49,6 +51,14 @@ class Member(object):
         self.role = role
 
 class OSMContentHandler(xml.sax.ContentHandler):
+    """
+    A Specialized SAX ContentHandler for OpenStreetMap data to be processed by osm2city.
+    The valid_??_keys are those tag keys, which will be accepted and added to an element's tags.
+    The req_??_keys are those tag keys, of which at least one must be present to add an element to the saved elements.
+    
+    The valid_??_keys and req_??_keys are a primitive way to save memory and reduce the number of further processed elements.
+    A better way is to have the input file processed by e.g. Osmosis first.
+    """
     def __init__(self, valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys):
         xml.sax.ContentHandler.__init__(self)
         self.valid_node_keys = valid_node_keys
@@ -113,6 +123,7 @@ class OSMContentHandler(xml.sax.ContentHandler):
         pass
     
 def hasRequiredTagKeys(my_tags, my_required_keys):
+    """ Checks whether a given set of actual tags contains at least one of the required tags """
     for tag in my_tags:
         if tag.key in my_required_keys:
             return True
@@ -132,5 +143,5 @@ def main(sourceFileName):
     print "relations:", len(handler.relations_dict)
  
 if __name__ == "__main__":
-    main("C:\\FlightGear\\customscenery2\\LSZS\\ch_at.osm")
+    main("C:\\FlightGear\\customscenery2\\LSZS\\ch.osm")
 
