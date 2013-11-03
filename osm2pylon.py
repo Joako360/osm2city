@@ -8,31 +8,44 @@ as input and generates data to be used in FlightGear sceneries.
     http://wiki.openstreetmap.org/wiki/Tag:power%3Dtower
 * Cf. OSM Aerialway: http://wiki.openstreetmap.org/wiki/Map_Features#Aerialway
 
+TODO:
+* Elevation of pylons
+* Check for inconsistencies between pylons in same way
+* For aearialways make sure there is a station at both ends
+* Calculate headings of pylons and stations
+* Calculate cables
+* LOD
+
 @author: vanosten
 """
 
 import osmparser
 import xml.sax
 
+
 class Pylon(object):
     def __init__(self, osm_id):
         self.osm_id = osm_id
-        self.p_type = 0 # 11 = electric pole, 12 = electric tower, 21 = aerialway pylon, 22 = aerialway station
-        self.height = 0
+        self.p_type = 0  # 11 = electric pole, 12 = electric tower, 21 = aerialway pylon, 22 = aerialway station
+        self.height = 0  # parsed as float
         self.structure = None
         self.material = None
         self.colour = None
-        self.line = None # a reference to the way - either an electrical line or an aerialway
+        self.line = None  # a reference to the way - either an electrical line or an aerialway
         self.prev_pylon = None
         self.next_pylon = None
+        self.lon = 0  # longitude coordinate in decimal
+        self.lat = 0  # latitude coordinate in decimal
+
 
 class Line(object):
     def __init__(self, osm_id):
         self.osm_id = osm_id
         self.pylons = []
-        self.l_type = 0 # 11 = power line, 12 = power minor line, 21 = cable_car, 22 = chair_lift/mixed_lift, 23 = drag_lift/t-bar/platter, 24 = gondola, 25 = goods
+        self.l_type = 0  # 11 = power line, 12 = power minor line, 21 = cable_car, 22 = chair_lift/mixed_lift, 23 = drag_lift/t-bar/platter, 24 = gondola, 25 = goods
 
-def transformOSMElements(nodes_dict, ways_dict):
+
+def transform_osm_elements(nodes_dict, ways_dict):
     """
     Transforms a dict of Node and a dict of Way OSMElements from osmparser.py to a dict of Line objects for electrical power
     lines and a dict of Line objects for aerialways.
@@ -52,7 +65,7 @@ def transformOSMElements(nodes_dict, ways_dict):
                     my_line.l_type = 21
                 elif tag.value in ["chair_lift", "mixed_lift"]:
                     my_line.l_type = 22
-                elif tag.value in ["drag_lift","t-bar","platter"]:
+                elif tag.value in ["drag_lift", "t-bar", "platter"]:
                     my_line.l_type = 23
                 elif "gondola" == tag.value:
                     my_line.l_type = 24
@@ -64,6 +77,8 @@ def transformOSMElements(nodes_dict, ways_dict):
                 if ref in nodes_dict:
                     my_node = nodes_dict[ref]
                     my_pylon = Pylon(my_node.osm_id)
+                    my_pylon.lat = my_node.lat
+                    my_pylon.lon = my_node.lon
                     my_pylon.line = my_line
                     for tag in my_node.tags:
                         if "power" == tag.key:
@@ -77,7 +92,7 @@ def transformOSMElements(nodes_dict, ways_dict):
                             elif "station" == tag.value:
                                 my_pylon.p_type = 22
                         elif "height" == tag.key:
-                            my_pylon.height = tag.value
+                            my_pylon.height = osmparser.parse_length(tag.value)
                         elif "structure" == tag.key:
                             my_pylon.structure = tag.value
                         elif "material" == tag.key:
@@ -88,7 +103,7 @@ def transformOSMElements(nodes_dict, ways_dict):
                         my_pylon.prev_pylon = prev_pylon
                     prev_pylon = my_pylon
             if 1 < len(my_line.pylons):
-                if "power" == tag.key:
+                if my_line.l_type < 20:
                     my_powerlines[my_line.osm_id] = my_line
                 else:
                     my_aerialways[my_line.osm_id] = my_line
@@ -107,9 +122,7 @@ if __name__ == "__main__":
     print "ways:", len(handler.ways_dict)
     print "relations:", len(handler.relations_dict)
     
-    my_powerlines, my_aerialways = transformOSMElements(handler.nodes_dict, handler.ways_dict)
+    powerlines, aerialways = transform_osm_elements(handler.nodes_dict, handler.ways_dict)
 
-    print "powerlines: ", len(my_powerlines)
-    print "aerialways: ", len(my_aerialways)
-
-
+    print "powerlines: ", len(powerlines)
+    print "aerialways: ", len(aerialways)
