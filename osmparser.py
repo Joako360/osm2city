@@ -9,6 +9,7 @@ Use a tool like Osmosis to pre-process data.
 
 import xml.sax
 
+
 class OSMElement(object):
     def __init__(self, osm_id):
         self.osm_id = osm_id
@@ -16,12 +17,14 @@ class OSMElement(object):
         
     def addTag(self, tag):
         self.tags.append(tag)
-    
+
+
 class Node(OSMElement):
     def __init__(self, osm_id, lat, lon):
         OSMElement.__init__(self, osm_id)
         self.lat = lat
         self.lon = lon
+
 
 class Way(OSMElement):
     def __init__(self, osm_id):
@@ -31,6 +34,7 @@ class Way(OSMElement):
     def addRef(self, ref):
         self.refs.append(ref)
 
+
 class Relation(OSMElement):
     def __init__(self, osm_id):
         OSMElement.__init__(self, osm_id)
@@ -39,16 +43,19 @@ class Relation(OSMElement):
     def addMember(self, member):
         self.members.append(member)
 
+
 class Tag(object):
     def __init__(self, key, value):
         self.key = key
         self.value = value
-        
+
+
 class Member(object):
     def __init__(self, ref, mtype, role):
         self.ref = ref
         self.mtype = mtype
         self.role = role
+
 
 class OSMContentHandler(xml.sax.ContentHandler):
     """
@@ -113,24 +120,71 @@ class OSMContentHandler(xml.sax.ContentHandler):
         if name == "node":
             self.nodes_dict[self.current_node.osm_id] = self.current_node
         elif name == "way":
-            if True == hasRequiredTagKeys(self.current_way.tags, self.req_way_keys):
+            if has_required_tag_keys(self.current_way.tags, self.req_way_keys):
                 self.ways_dict[self.current_way.osm_id] = self.current_way
         elif name == "relation":
-            if True == hasRequiredTagKeys(self.current_relation.tags, self.req_relation_keys):
+            if has_required_tag_keys(self.current_relation.tags, self.req_relation_keys):
                 self.relations_dict[self.current_relation.osm_id] = self.current_relation
             
     def characters(self, content):
         pass
-    
-def hasRequiredTagKeys(my_tags, my_required_keys):
+
+
+def has_required_tag_keys(my_tags, my_required_keys):
     """ Checks whether a given set of actual tags contains at least one of the required tags """
     for tag in my_tags:
         if tag.key in my_required_keys:
             return True
     return False
- 
-def main(sourceFileName):
-    source = open(sourceFileName)
+
+
+def parse_length(str_length):
+    """
+    Transform length to meters if not yet default. Input is a string, output is a float. If the string cannot be parsed, then 0 is returned.
+    Length (and width/height) in OSM is per default meters cf. OSM Map Features / Units.
+    Possible units can be "m" (metre), "km" (kilometre -> 0.001), "mi" (mile -> 0.00062137) and
+    <feet>' <inch>" (multiply feet by 12, add inches and then multiply by 0.0254).
+    Theoretically there is a blank between the number and the unit, practically there might not be.
+    """
+    _processed = str_length.strip().lower()
+    if _processed.endswith("km"):
+        _processed = _processed.rstrip("km").strip()
+        _factor = 1000
+    elif _processed.endswith("m"):
+        _processed = _processed.rstrip("m").strip()
+        _factor = 1
+    elif _processed.endswith("mi"):
+        _processed = _processed.rstrip("mi").strip()
+        _factor = 1609.344
+    elif "'" in _processed:
+        _processed = _processed.replace('"', '')
+        _split = _processed.split("'", 1)
+        _factor = 0.0254
+        if is_parseable_float(_split[0]):
+            _f_length = float(_split[0])*12
+            _processed = str(_f_length)
+            if 2 == len(_split):
+                if is_parseable_float(_split[1]):
+                    _processed = str(_f_length + float(_split[1]))
+    else:  # assumed that no unit characters are in the string
+        _factor = 1
+    if is_parseable_float(_processed):
+        return float(_processed)*_factor
+    else:
+        print "Unable to parse for length from:", str_length
+        return 0
+
+
+def is_parseable_float(str_float):
+    try:
+        x = float(str_float)
+        return True
+    except ValueError:
+        return False
+
+
+def main(source_file_name):
+    source = open(source_file_name)
     valid_node_keys = []
     valid_way_keys = ["building", "height", "building:levels"]
     req_way_keys = ["building"]
@@ -144,4 +198,3 @@ def main(sourceFileName):
  
 if __name__ == "__main__":
     main("C:\\FlightGear\\customscenery2\\LSZS\\ch.osm")
-
