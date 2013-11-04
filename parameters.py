@@ -35,6 +35,7 @@ PATH_TO_SCENERY = "/home/user/fgfs/scenery"
 PATH_TO_OUTPUT = ""
 
 NO_ELEV = False             # -- skip elevation interpolation
+MANUAL_ELEV = True          # uses manual process with copy elev.in and elev.out through Nasal. Otherwise experimental direct FG invocation
 
 # -- check for overlap with static models. The scenery folder must contain an "Objects" folder
 OVERLAP_CHECK = True

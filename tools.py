@@ -88,9 +88,10 @@ def raster_glob():
     lmax = vec2d.vec2d(transform.toLocal(cmax.__iter__()))
     delta = (lmax - lmin)*0.5
     print "Distance from center to boundary in meters (x, y):", delta
-    if False:
+    if parameters.MANUAL_ELEV:
         print "Creating elev.in ..."
-        raster(transform, "elev.in", -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
+        fname = parameters.PATH_TO_SCENERY + os.sep + "elev.in"
+        raster(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
 
         path = calc_tile.directory_name(center)
         msg = textwrap.dedent("""
