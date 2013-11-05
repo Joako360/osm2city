@@ -3,7 +3,9 @@ var path_out = "/tmp/elev.xml";
 
 var get = func {
   var raw_str = io.readfile(path_file);
-  var raw_list = split("\n", raw_str);
+  var delimitter = "\r\n";
+  if (-1 == find(delimitter, raw_str)) delimitter = "\n";
+  var raw_list = split(delimitter, raw_str);
   var file_out = io.open(path_out, "w");
   foreach(var l; raw_list) {
      var l_list = split(" ", l);
