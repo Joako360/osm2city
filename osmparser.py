@@ -22,8 +22,8 @@ class OSMElement(object):
 class Node(OSMElement):
     def __init__(self, osm_id, lat, lon):
         OSMElement.__init__(self, osm_id)
-        self.lat = lat
-        self.lon = lon
+        self.lat = lat  # float value
+        self.lon = lon  # float value
 
 
 class Way(OSMElement):
@@ -84,8 +84,8 @@ class OSMContentHandler(xml.sax.ContentHandler):
     def startElement(self, name, attrs):
         if name == "node":
             self.within_element = name
-            lat = attrs.getValue("lat")
-            lon = attrs.getValue("lon")
+            lat = float(attrs.getValue("lat"))
+            lon = float(attrs.getValue("lon"))
             osm_id = attrs.getValue("id")
             self.current_node = Node(osm_id, lat, lon)
         elif name == "way":
