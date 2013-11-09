@@ -18,8 +18,10 @@ TODO:
 @author: vanosten
 """
 
+import argparse
 import os
 import xml.sax
+import logging
 
 import coordinates
 import osmparser
@@ -31,7 +33,7 @@ import vec2d
 class Pylon(object):
     def __init__(self, osm_id):
         self.osm_id = osm_id
-        self.p_type = 0  # 11 = electric pole, 12 = electric tower, 21 = aerialway pylon, 22 = aerialway station
+        self.type_ = 0  # 11 = electric pole, 12 = electric tower, 21 = aerialway pylon, 22 = aerialway station
         self.height = 0  # parsed as float
         self.structure = None
         self.material = None
@@ -58,7 +60,7 @@ class Line(object):
     def __init__(self, osm_id):
         self.osm_id = osm_id
         self.pylons = []
-        self.l_type = 0  # 11 = power line, 12 = power minor line, 21 = cable_car, 22 = chair_lift/mixed_lift, 23 = drag_lift/t-bar/platter, 24 = gondola, 25 = goods
+        self.type_ = 0  # 11 = power line, 12 = power minor line, 21 = cable_car, 22 = chair_lift/mixed_lift, 23 = drag_lift/t-bar/platter, 24 = gondola, 25 = goods
 
     def make_pylons_stg_entries(self):
         """
@@ -69,8 +71,26 @@ class Line(object):
             _entries.append(my_pylon.make_stg_entry())
         return "\n".join(_entries)
 
+    def is_aerialway(self):
+        return self.type_ > 20
 
-def transform_osm_elements(nodes_dict, ways_dict, interpol):
+    def validate(self):
+        """Validate various aspects of the line and its nodes and attempt to correct if needed. Return True if usable"""
+        if len(self.pylons) < 2:
+            return False
+        if self.is_aerialway():
+            return self._validate_aerialway()
+        else:
+            return self._validate_powerline()
+
+    def _validate_aerialway(self):
+        return True
+
+    def _validate_powerline(self):
+        return True
+
+
+def process_osm_elements(nodes_dict, ways_dict, interpol):
     """
     Transforms a dict of Node and a dict of Way OSMElements from osmparser.py to a dict of Line objects for electrical power
     lines and a dict of Line objects for aerialways.
@@ -79,24 +99,25 @@ def transform_osm_elements(nodes_dict, ways_dict, interpol):
     my_aerialways = {}
     for way in ways_dict.values():
         my_line = Line(way.osm_id)
-        for tag in way.tags:
-            if "power" == tag.key:
-                if "line" == tag.value:
-                    my_line.l_type = 11
-                elif "minor_line" == tag.value:
-                    my_line.l_type = 12
-            elif "aerialway" == tag.key:
-                if "cable_car" == tag.value:
-                    my_line.l_type = 21
-                elif tag.value in ["chair_lift", "mixed_lift"]:
-                    my_line.l_type = 22
-                elif tag.value in ["drag_lift", "t-bar", "platter"]:
-                    my_line.l_type = 23
-                elif "gondola" == tag.value:
-                    my_line.l_type = 24
-                elif "goods" == tag.value:
-                    my_line.l_type = 25
-        if 0 != my_line.l_type:
+        for key in way.tags:
+            value = way.tags[key]
+            if "power" == key:
+                if "line" == value:
+                    my_line.type_ = 11
+                elif "minor_line" == value:
+                    my_line.type_ = 12
+            elif "aerialway" == key:
+                if "cable_car" == value:
+                    my_line.type_ = 21
+                elif value in ["chair_lift", "mixed_lift"]:
+                    my_line.type_ = 22
+                elif value in ["drag_lift", "t-bar", "platter"]:
+                    my_line.type_ = 23
+                elif "gondola" == value:
+                    my_line.type_ = 24
+                elif "goods" == value:
+                    my_line.type_ = 25
+        if 0 != my_line.type_:
             prev_pylon = None
             for ref in way.refs:
                 if ref in nodes_dict:
@@ -106,41 +127,44 @@ def transform_osm_elements(nodes_dict, ways_dict, interpol):
                     my_pylon.lon = my_node.lon
                     my_pylon.line = my_line
                     my_pylon.elevation = interpol(vec2d.vec2d(my_pylon.lon, my_pylon.lat))
-                    for tag in my_node.tags:
-                        if "power" == tag.key:
-                            if "tower" == tag.value:
-                                my_pylon.p_type = 12
-                            elif "pole" == tag.value:
-                                my_pylon.p_type = 11
-                        elif "aerialway" == tag.key:
-                            if "pylon" == tag.value:
-                                my_pylon.p_type = 21
-                            elif "station" == tag.value:
-                                my_pylon.p_type = 22
-                        elif "height" == tag.key:
-                            my_pylon.height = osmparser.parse_length(tag.value)
-                        elif "structure" == tag.key:
-                            my_pylon.structure = tag.value
-                        elif "material" == tag.key:
-                            my_pylon.material = tag.value
+                    for key in my_node.tags:
+                        value = my_node.tags[key]
+                        if "power" == key:
+                            if "tower" == value:
+                                my_pylon.type_ = 12
+                            elif "pole" == value:
+                                my_pylon.type_ = 11
+                        elif "aerialway" == key:
+                            if "pylon" == value:
+                                my_pylon.type_ = 21
+                            elif "station" == value:
+                                my_pylon.type_ = 22
+                        elif "height" == key:
+                            my_pylon.height = osmparser.parse_length(value)
+                        elif "structure" == key:
+                            my_pylon.structure = value
+                        elif "material" == key:
+                            my_pylon.material = value
                     if my_pylon.elevation != -9999:  # if elevation is -9999, then point is outside of boundaries
                         my_line.pylons.append(my_pylon)
                     else:
-                        print "Node outside of boundaries with osm_id =", my_node.osm_id
+                        logging.debug('Node outside of boundaries with osm_id = %s and therefore ignored', my_node.osm_id)
                     if None != prev_pylon:
                         prev_pylon.next_pylon = my_pylon
                         my_pylon.prev_pylon = prev_pylon
                     prev_pylon = my_pylon
-            if 1 < len(my_line.pylons):
-                if my_line.l_type < 20:
-                    my_powerlines[my_line.osm_id] = my_line
-                else:
+            if my_line.validate():
+                if my_line.is_aerialway():
                     my_aerialways[my_line.osm_id] = my_line
+                else:
+                    my_powerlines[my_line.osm_id] = my_line
+            else:
+                logging.warning('Line could not be validated or corrected. osm_id = %s', my_line.osm_id)
     return (my_powerlines, my_aerialways)
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     # Handling arguments and parameters
-    import argparse
     parser = argparse.ArgumentParser(description="osm2city reads OSM data and creates buildings for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                       help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
@@ -156,7 +180,7 @@ if __name__ == "__main__":
     req_relation_keys = []
     handler = osmparser.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys)
     source = open(parameters.PATH_TO_SCENERY + os.sep + parameters.OSM_FILE)
-    print "Reading the OSM file might take some time ..."
+    logging.info("Reading the OSM file might take some time ...")
     xml.sax.parse(source, handler)
 
     # Reading elevation data
@@ -164,18 +188,21 @@ if __name__ == "__main__":
     cmax = vec2d.vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
     center = (cmin + cmax)*0.5
     tools.init(coordinates.Transformation(center, hdg = 0))
-    print "Reading ground elevation data might take some time ..."
+    logging.info("Reading ground elevation data might take some time ...")
     elev = tools.Interpolator(parameters.PATH_TO_SCENERY + os.sep + "elev.xml", fake=parameters.NO_ELEV)
 
     # Transform to real objects
-    powerlines, aerialways = transform_osm_elements(handler.nodes_dict, handler.ways_dict, elev)
+    logging.info("Transforming OSM data to Line and Pylon objects")
+    powerlines, aerialways = process_osm_elements(handler.nodes_dict, handler.ways_dict, elev)
     handler = None
 
 
-    print "powerlines: ", len(powerlines)
+    logging.info('Number of power lines: %s', len(powerlines))
     for line in powerlines.values():
         print line.make_pylons_stg_entries()
 
-    print "aerialways: ", len(aerialways)
+    logging.info('Number of aerialways: %s', len(aerialways))
     for line in aerialways.values():
         print line.make_pylons_stg_entries()
+
+    logging.info("Finished")

@@ -10,7 +10,7 @@ import os
 import string
 #from osm2city import Building, Coords
 import osm2city
-import osm
+import osmparser
 import shapely.geometry as shg
 import tools
 #, transform
@@ -49,7 +49,7 @@ def read(path, stg, prefix, fgscenery, our_magic):
             lon = float(splitted[2])
             lat = float(splitted[3])
             alt = float(splitted[4])
-            r = osm.Coord(lon, lat)
+            r = osmparser.Nodey(lon, lat)
             point = shg.Point(tools.transform.toLocal((r.lon, r.lat)))
             hdg = float(splitted[5])
                 #print "stg:", typ, path + ac_path

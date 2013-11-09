@@ -60,12 +60,12 @@ import pdb
 import numpy as np
 import sys
 import os
+import xml.sax
 import random
 import copy
 
-from imposm.parser import OSMParser
 import shapely.geometry as shg
-import osm
+#import osm
 import coordinates
 import itertools
 from cluster import Clusters
@@ -79,6 +79,7 @@ import textures as tex
 import stg_io
 import tools
 import calc_tile
+import osmparser
 
 import parameters
 
@@ -219,7 +220,7 @@ class wayExtract(object):
         self.minlat = 91.
         self.maxlat = -91.
 
-    def refs_to_ring(self, refs, inner = False):
+    def _refs_to_ring(self, refs, inner = False):
         """accept a list of OSM refs, return a linear ring. Also
            fixes face orientation, depending on inner/outer.
         """
@@ -236,7 +237,7 @@ class wayExtract(object):
             ring.coords = list(ring.coords)[::-1]
         return ring
 
-    def make_building_from_way(self, osm_id, tags, refs, inner_ways = []):
+    def _make_building_from_way(self, osm_id, tags, refs, inner_ways = []):
 #       p = multiprocessing.current_process()
 #       print 'running:', p.name, p.pid
         #print "got building", osm_id, tags
@@ -257,9 +258,9 @@ class wayExtract(object):
                     print "SKIPPING", _name
                     return False
             if 'height' in tags:
-                _height = float(tags['height'].replace('m',''))
+                _height = osmparser.parse_length(tags['height'])
             elif 'building:height' in tags:
-                _height = float(tags['building:height'].replace('m',''))
+                _height = osmparser.parse_length(tags['building:height'])
             if 'building:levels' in tags:
                 _levels = float(tags['building:levels'])
             if 'layer' in tags:
@@ -275,10 +276,10 @@ class wayExtract(object):
             # -- all checks OK: accept building
 
             # -- make outer and inner rings from refs
-            outer_ring = self.refs_to_ring(refs)
+            outer_ring = self._refs_to_ring(refs)
             inner_rings_list = []
             for way in inner_ways:
-                inner_rings_list.append(self.refs_to_ring(way.refs, inner=True))
+                inner_rings_list.append(self._refs_to_ring(way.refs, inner=True))
         except Exception, reason:
             print "\nFailed to parse building (%s)" % reason, osm_id, tags, refs
             tools.stats.parse_errors += 1
@@ -291,18 +292,18 @@ class wayExtract(object):
         else: sys.stdout.write(".")
         return True
 
-    def relations(self, relations):
-        for osm_id, tags, members in relations:
+    def _process_relations(self, relations):
+        for _relation in relations:
             if tools.stats.objects >= parameters.MAX_OBJECTS:
                 return
 
-            if 'building' in tags:
+            if 'building' in _relation.tags:
                 outer_ways = []
                 inner_ways = []
                 #print "rel: ", osm_id, tags #, members
-                for ref, typ, role in members:
+                for ref, type_, role in _relation.members:
 #                    if typ == 'way' and role == 'inner':
-                    if typ == 'way':
+                    if type_ == 'way':
                         if role == 'outer':
                             for way in self.way_list:
                                 if way.osm_id == ref: outer_ways.append(way)
@@ -313,7 +314,7 @@ class wayExtract(object):
                 if outer_ways:
                     #print "len outer ways", len(outer_ways)
                     all_outer_refs = [ref for way in outer_ways for ref in way.refs]
-                    all_tags = tags
+                    all_tags = _relation.tags
                     for way in outer_ways:
                         #print "TAG", way.tags
                         all_tags = dict(way.tags.items() + all_tags.items())
@@ -322,12 +323,12 @@ class wayExtract(object):
                     #print "all outer refs", all_outer_refs
                     #dict(outer.tags.items() + tags.items())
                     if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
-                        print "FIXME: ignoring all but first inner way (%i total) of ID %i" % (len(inner_ways), osm_id)
-                        self.make_building_from_way(osm_id,
+                        print "FIXME: ignoring all but first inner way (%i total) of ID %i" % (len(inner_ways), _relation.osm_id)
+                        self._make_building_from_way(_relation.osm_id,
                                                     all_tags,
                                                     all_outer_refs, [inner_ways[0]])
                     else:
-                        self.make_building_from_way(osm_id,
+                        self._make_building_from_way(_relation.osm_id,
                                                     all_tags,
                                                     all_outer_refs, inner_ways)
 
@@ -337,31 +338,34 @@ class wayExtract(object):
                         self.way_list.remove(way)
 
 
-    def ways(self, ways):
-        """callback method for ways"""
-        for osm_id, tags, refs in ways:
+    def _process_ways(self, ways):
+        for _way in ways.values():
             if tools.stats.objects >= parameters.MAX_OBJECTS: return
-            self.way_list.append(osm.Way(osm_id, tags, refs))
+            self.way_list.append(_way)
 
-    def process_ways(self):
+    def process_osm_elements(self, nodes, ways, relations):
+        """Takes osmparser Node, Way and Relation objects and transforms them to Building objects"""
+        self._process_coords(nodes)
+        self._process_ways(ways)
+        self._process_relations(relations)
         for way in self.way_list:
             if 'building' in way.tags:
                 if tools.stats.objects >= parameters.MAX_OBJECTS: return
-                self.make_building_from_way(way.osm_id, way.tags, way.refs)
+                self._make_building_from_way(way.osm_id, way.tags, way.refs)
             elif 'building:part' in way.tags:
                 if tools.stats.objects >= parameters.MAX_OBJECTS: return
-                self.make_building_from_way(way.osm_id, way.tags, way.refs)
+                self._make_building_from_way(way.osm_id, way.tags, way.refs)
 #            elif 'bridge' in way.tags:
 #                self.make_bridge_from_way(way.osm_id, way.tags, way.refs)
 
-    def coords(self, coords):
-        for osm_id, lon, lat in coords:
+    def _process_coords(self, coords):
+        for _node in coords.values():
             #print '%s %.4f %.4f' % (osm_id, lon, lat)
-            self.coord_dict[osm_id] = osm.Coord(lon, lat)
-            if lon > self.maxlon: self.maxlon = lon
-            if lon < self.minlon: self.minlon = lon
-            if lat > self.maxlat: self.maxlat = lat
-            if lat < self.minlat: self.minlat = lat
+            self.coord_dict[_node.osm_id] = _node
+            if _node.lon > self.maxlon: self.maxlon = _node.lon
+            if _node.lon < self.minlon: self.minlon = _node.lon
+            if _node.lat > self.maxlat: self.maxlat = _node.lat
+            if _node.lat < self.minlat: self.minlat = _node.lat
 
 
 # -----------------------------------------------------------------------------
@@ -580,7 +584,7 @@ if __name__ == "__main__":
     print tools.transform.toGlobal(cmin), tools.transform.toGlobal(cmax)
 
     print "reading elevation data"
-    elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.xml", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
+    elev = tools.Interpolator(parameters.PATH_TO_SCENERY + os.sep + "elev.xml", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
     print "height at origin", elev(vec2d(0,0))
     print "origin at ", tools.transform.toGlobal((0,0))
 
@@ -588,28 +592,29 @@ if __name__ == "__main__":
 
     # -- now read OSM data. Either parse OSM xml, or read a previously cached .pkl file
     #    End result is 'buildings', a list of building objects
-    pkl_fname = parameters.PREFIX + os.sep + parameters.OSM_FILE + '.pkl'
-    osm_fname = parameters.PREFIX + os.sep + parameters.OSM_FILE
+    pkl_fname = parameters.PATH_TO_SCENERY + os.sep + parameters.OSM_FILE + '.pkl'
+    osm_fname = parameters.PATH_TO_SCENERY + os.sep + parameters.OSM_FILE
     if not parameters.USE_PKL:
         # -- parse OSM, return
         if os.path.exists(pkl_fname):
             print "Existing cache file %s will be overwritten. Continue? (y/n)" % pkl_fname
-            if raw_input() != 'y': sys.exit(-1)
+            if raw_input().lower() != 'y':
+                sys.exit(-1)
 
         way = wayExtract()
-        p = OSMParser(concurrency=parameters.CONCURRENCY, coords_callback=way.coords)
-        print "start parsing coords"
-        p.parse(osm_fname)
-        print "done parsing"
-        print "ncords:", len(way.coord_dict)
-        print "bounds:", way.minlon, way.minlat, way.maxlon, way.maxlat
 
-        print "start parsing ways and relations"
-        p = OSMParser(concurrency=parameters.CONCURRENCY, ways_callback=way.ways)
-        p.parse(osm_fname)
-        p = OSMParser(concurrency=parameters.CONCURRENCY, relations_callback=way.relations)
-        p.parse(osm_fname)
-        way.process_ways()
+        valid_node_keys = []
+        valid_way_keys = ["building", "building:part", "building:height", "height", "building:levels", "layer"]
+        req_way_keys = ["building"]
+        valid_relation_keys = ["building"]
+        req_relation_keys = ["building"]
+        handler = osmparser.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys)
+        source = open(osm_fname)
+        print("Reading the OSM file might take some time ...")
+        xml.sax.parse(source, handler)
+
+        print("Transforming OSM objects to Buildings")
+        way.process_osm_elements(handler.nodes_dict, handler.ways_dict, handler.relations_dict)
         #tools.stats.print_summary()
 
         print "nbuildings", len(way.buildings)

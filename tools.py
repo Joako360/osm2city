@@ -312,6 +312,13 @@ class Stats(object):
     def print_summary(self):
         out = sys.stdout
         total_written = self.LOD.sum()
+        lodzero = 0
+        lodone = 0
+        lodtwo = 0
+        if total_written > 0:
+            lodzero = 100.*self.LOD[0]/total_written
+            lodone = 100.*self.LOD[1]/total_written
+            lodtwo = 100.*self.LOD[0]/total_written
         out.write(textwrap.dedent("""
         total buildings %i
         parse errors    %i
@@ -336,9 +343,9 @@ class Stats(object):
                self.have_pitched_roof, self.have_complex_roof, self.roof_errors,
                self.nodes_ground, self.nodes_simplified,
                self.vertices, self.surfaces,
-               self.LOD[0], 100.*self.LOD[0]/total_written,
-               self.LOD[1], 100.*self.LOD[1]/total_written,
-               self.LOD[2], 100.*self.LOD[2]/total_written)))
+               self.LOD[0], lodzero,
+               self.LOD[1], lodone,
+               self.LOD[2], lodtwo)))
         out.write("above\n")
         max_area_above = self.area_above.max()
         if max_area_above < 1: max_area_above = 1
