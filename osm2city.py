@@ -584,7 +584,7 @@ if __name__ == "__main__":
     print tools.transform.toGlobal(cmin), tools.transform.toGlobal(cmax)
 
     print "reading elevation data"
-    elev = tools.Interpolator(parameters.PATH_TO_SCENERY + os.sep + "elev.xml", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
+    elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
     print "height at origin", elev(vec2d(0,0))
     print "origin at ", tools.transform.toGlobal((0,0))
 
@@ -592,8 +592,8 @@ if __name__ == "__main__":
 
     # -- now read OSM data. Either parse OSM xml, or read a previously cached .pkl file
     #    End result is 'buildings', a list of building objects
-    pkl_fname = parameters.PATH_TO_SCENERY + os.sep + parameters.OSM_FILE + '.pkl'
-    osm_fname = parameters.PATH_TO_SCENERY + os.sep + parameters.OSM_FILE
+    pkl_fname = parameters.PREFIX + os.sep + parameters.OSM_FILE + '.pkl'
+    osm_fname = parameters.PREFIX + os.sep + parameters.OSM_FILE
     if not parameters.USE_PKL:
         # -- parse OSM, return
         if os.path.exists(pkl_fname):

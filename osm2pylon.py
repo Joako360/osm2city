@@ -179,7 +179,7 @@ if __name__ == "__main__":
     valid_relation_keys = []
     req_relation_keys = []
     handler = osmparser.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys)
-    source = open(parameters.PATH_TO_SCENERY + os.sep + parameters.OSM_FILE)
+    source = open(parameters.PREFIX + os.sep + parameters.OSM_FILE)
     logging.info("Reading the OSM file might take some time ...")
     xml.sax.parse(source, handler)
 
@@ -189,7 +189,7 @@ if __name__ == "__main__":
     center = (cmin + cmax)*0.5
     tools.init(coordinates.Transformation(center, hdg = 0))
     logging.info("Reading ground elevation data might take some time ...")
-    elev = tools.Interpolator(parameters.PATH_TO_SCENERY + os.sep + "elev.xml", fake=parameters.NO_ELEV)
+    elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV)
 
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")

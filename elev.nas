@@ -1,5 +1,5 @@
 var path_file = "/home/tom/daten/fgfs/src/fgdata/Nasal/elev.in";
-var path_out = "/tmp/elev.xml";
+var path_out = "/tmp/elev.out";
 
 var get = func {
   var raw_str = io.readfile(path_file);
