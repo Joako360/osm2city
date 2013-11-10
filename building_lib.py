@@ -233,8 +233,11 @@ def is_large_enough(b, buildings):
 def compute_height_and_levels(b):
     """Determines total height (and number of levels) of a building based on
        OSM values and other logic"""
-
-    assert(isinstance(b.height, float))
+    try:
+        assert(isinstance(b.height, float))
+    except AssertionError:
+        b.height = 0
+        print "Building height has wrong type. Value is: ", b.height
     # -- try OSM height and levels first
     if b.height > 0 and b.levels > 0: return
 
