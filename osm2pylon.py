@@ -12,6 +12,7 @@ TODO:
 * Calculate headings of pylons and stations
 * Check for inconsistencies between pylons in same way
 * For aearialways make sure there is a station at both ends
+* for aerialways handle stations if represented as ways instead of nodes
 * Calculate cables
 * LOD
 
@@ -23,12 +24,15 @@ import os
 import xml.sax
 import logging
 
+import calc_tile
 import coordinates
 import osmparser
 import parameters
+import stg_io
 import tools
 import vec2d
 
+OUR_MAGIC = "osm2pylon"  # Used in e.g. stg files to mark edits by osm2pylon
 
 class Pylon(object):
     def __init__(self, osm_id):
@@ -51,7 +55,10 @@ class Pylon(object):
         Returns a stg entry for this pylon.
         E.g. OBJECT_SHARED Models/Airport/ils.xml 5.313108 45.364122 374.49 268.92
         """
-        _entry = ["OBJECT_SHARED", "Models/Power/generic_pylon_25m.xml", str(self.lon), str(self.lat)
+        _model = "Models/Power/generic_pylon_50m.xml"
+        if self.line.is_aerialway():
+            _model = "Models/Power/generic_pylon_25m.xml"
+        _entry = ["OBJECT_SHARED", _model, str(self.lon), str(self.lat)
                 , str(self.elevation), str(self.heading)]
         return " ".join(_entry)
 
@@ -88,6 +95,12 @@ class Line(object):
 
     def _validate_powerline(self):
         return True
+
+    def get_center_coordinates(self):
+        """Returns the lon/lat coordinates of the line
+        FIXME: needs to be calculated more properly with shapely"""
+        my_pylon = self.pylons[0]
+        return (my_pylon.lon, my_pylon.lat)
 
 
 def process_osm_elements(nodes_dict, ways_dict, interpol):
@@ -126,7 +139,7 @@ def process_osm_elements(nodes_dict, ways_dict, interpol):
                     my_pylon.lat = my_node.lat
                     my_pylon.lon = my_node.lon
                     my_pylon.line = my_line
-                    my_pylon.elevation = interpol(vec2d.vec2d(my_pylon.lon, my_pylon.lat))
+                    my_pylon.elevation = interpol(vec2d.vec2d(my_pylon.lon, my_pylon.lat), True)
                     for key in my_node.tags:
                         value = my_node.tags[key]
                         if "power" == key:
@@ -162,6 +175,30 @@ def process_osm_elements(nodes_dict, ways_dict, interpol):
                 logging.warning('Line could not be validated or corrected. osm_id = %s', my_line.osm_id)
     return (my_powerlines, my_aerialways)
 
+
+def write_stg_entries(stg_fp_dict, lines_dict):
+    for line in lines_dict.values():
+        _center = line.get_center_coordinates()
+        stg_fname = calc_tile.construct_stg_file_name(_center)
+        if not stg_fname in stg_fp_dict:
+            if parameters.PATH_TO_OUTPUT:
+                path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, _center)
+            else:
+                path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, _center)
+            try:
+                os.makedirs(path)
+            except OSError:
+                logging.exception("Path to output already exists or unable to create")
+                pass
+            stg_io.uninstall_ours(path, stg_fname, OUR_MAGIC)
+            stg_file = open(path + stg_fname, "a")
+            stg_file.write(stg_io.delimiter_string(OUR_MAGIC, True) + "\n# do not edit below this line\n#\n")
+            stg_fp_dict[stg_fname] = stg_file
+        else:
+            stg_file = stg_fp_dict[stg_fname]
+        stg_file.write(line.make_pylons_stg_entries() + "\n")
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     # Handling arguments and parameters
@@ -187,7 +224,7 @@ if __name__ == "__main__":
     cmin = vec2d.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
     cmax = vec2d.vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
     center = (cmin + cmax)*0.5
-    tools.init(coordinates.Transformation(center, hdg = 0))
+    tools.init(coordinates.Transformation(center, hdg=0))
     logging.info("Reading ground elevation data might take some time ...")
     elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV)
 
@@ -195,14 +232,15 @@ if __name__ == "__main__":
     logging.info("Transforming OSM data to Line and Pylon objects")
     powerlines, aerialways = process_osm_elements(handler.nodes_dict, handler.ways_dict, elev)
     handler = None
-
-
     logging.info('Number of power lines: %s', len(powerlines))
-    for line in powerlines.values():
-        print line.make_pylons_stg_entries()
-
     logging.info('Number of aerialways: %s', len(aerialways))
-    for line in aerialways.values():
-        print line.make_pylons_stg_entries()
 
-    logging.info("Finished")
+    stg_file_pointers = {}  # -- dictionary of stg file pointers
+    write_stg_entries(stg_file_pointers, powerlines)
+    write_stg_entries(stg_file_pointers, aerialways)
+
+    for stg in stg_file_pointers.values():
+        stg.write(stg_io.delimiter_string(OUR_MAGIC, False) + "\n")
+        stg.close()
+
+    logging.info("******* Finished *******")

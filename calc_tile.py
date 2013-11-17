@@ -4,19 +4,28 @@
 shamelessly translated from calc-tile.pl
 """
 import os
-from math import floor, trunc
+from math import floor
+
 
 def bucket_span(lat):
     """Latitude Range -> Tile Width (deg)"""
     alat = abs(lat)
-    if alat >= 89: return 360
-    if alat >= 88: return 8
-    if alat >= 86: return 4
-    if alat >= 83: return 2
-    if alat >= 76: return 1
-    if alat >= 62: return .5
-    if alat >= 22: return .25
+    if alat >= 89:
+        return 360
+    if alat >= 88:
+        return 8
+    if alat >= 86:
+        return 4
+    if alat >= 83:
+        return 2
+    if alat >= 76:
+        return 1
+    if alat >= 62:
+        return .5
+    if alat >= 22:
+        return .25
     return .125
+
 
 def format_lon (lon):
     """Format longitude as e/w."""
@@ -25,12 +34,14 @@ def format_lon (lon):
     else:
         return "e%03d" % int(lon)
 
+
 def format_lat (lat):
     """Format latitude as n/s."""
     if lat < 0.:
         return "s%02d" % int(0. - lat)
     else:
         return "n%02d" % int(lat)
+
 
 def directory_name ((lon, lat)):
     """Generate the directory name for a location."""
@@ -40,6 +51,7 @@ def directory_name ((lon, lat)):
     lat_chunk = floor(lat/10.0) * 10
     return format_lon(lon_chunk) + format_lat(lat_chunk) + os.sep \
          + format_lon(lon_floor) + format_lat(lat_floor)
+
 
 def tile_index((lon, lat)):
     tile_width = bucket_span(lat)
@@ -71,6 +83,16 @@ def tile_index((lon, lat)):
     index += y << 3
     index += x
     return index
+
+
+def construct_path_to_stg(base_directory, center_global):
+    """Returns the path to the stg-files in a FG scenery directory hierarchy at a given global lat/lon location"""
+    return base_directory + os.sep + 'Objects' + os.sep + directory_name(center_global) + os.sep
+
+
+def construct_stg_file_name(center_global):
+    """Returns the file name of the stg-file at a given global lat/lon location"""
+    return "%07i.stg" % tile_index(center_global)
 
 
 if __name__ == "__main__":

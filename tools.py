@@ -57,11 +57,13 @@ class Interpolator(object):
         self.dy = self.y[1,0] - self.y[0,0]
         print "dx, dy", self.dx, self.dy
 
-    def __call__(self, p):
+    def __call__(self, p, is_global=False):
         """compute elevation at (x,y) by linear interpolation"""
-        if self.fake: return 0.
+        if self.fake:
+            return 0.
         global transform
-        p = vec2d.vec2d(transform.toGlobal(p))
+        if not is_global:
+            p = vec2d.vec2d(transform.toGlobal(p))
         if p.x <= self.min_x or p.x >= self.max_x:
             return -9999
         elif p.y <= self.min_y or p.y >= self.max_y:
@@ -92,7 +94,7 @@ def raster_glob():
     print "Distance from center to boundary in meters (x, y):", delta
     if parameters.MANUAL_ELEV:
         print "Creating elev.in ..."
-        fname = parameters.PATH_TO_SCENERY + os.sep + "elev.in"
+        fname = parameters.PREFIX + os.sep + "elev.in"
         raster(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
 
         path = calc_tile.directory_name(center)

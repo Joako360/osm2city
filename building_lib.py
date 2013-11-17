@@ -4,6 +4,9 @@ Created on Thu Feb 28 23:18:08 2013
 
 @author: tom
 """
+
+import logging
+
 import random
 import numpy as np
 import copy
@@ -234,10 +237,12 @@ def compute_height_and_levels(b):
     """Determines total height (and number of levels) of a building based on
        OSM values and other logic"""
     try:
+        if isinstance(b.height, (int, long)):
+            b.height = float(b.height)
         assert(isinstance(b.height, float))
     except AssertionError:
+        logging.warning("Building height has wrong type. Value is: %s", b.height)
         b.height = 0
-        print "Building height has wrong type. Value is: ", b.height
     # -- try OSM height and levels first
     if b.height > 0 and b.levels > 0: return
 
