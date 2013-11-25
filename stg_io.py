@@ -36,9 +36,12 @@ def read(path, stg_fname, our_magic):
                 continue
             if line.startswith(our_magic_end):
                 ours = False
-            if ours: continue
+                continue
+            if ours:
+                continue
 
-            if line.startswith('#') or line.lstrip() == "": continue
+            if line.startswith('#') or line.lstrip() == "":
+                continue
             splitted = line.split()
             typ, ac_path = splitted[0:2]
             lon = float(splitted[2])
@@ -75,6 +78,7 @@ def uninstall_ours(path, stg_fname, our_magic):
                 continue
             if line.startswith(our_magic_end):
                 ours = False
+                continue
             if ours:
                 continue
             
