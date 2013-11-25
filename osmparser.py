@@ -11,6 +11,7 @@ import xml.sax
 import logging
 import unittest
 
+
 class OSMElement(object):
     def __init__(self, osm_id):
         self.osm_id = osm_id
@@ -198,6 +199,7 @@ if __name__ == "__main__":
 
 # ================ UNITTESTS =======================
 
+
 class TestOSMParser(unittest.TestCase):
     def test_parse_length(self):
         self.assertAlmostEqual(1.2, parse_length(' 1.2 '), 2, "Correct number with trailing spaces")
@@ -209,7 +211,6 @@ class TestOSMParser(unittest.TestCase):
         self.assertAlmostEqual(3.073, parse_length('10\'1"'), 2, "Correct number with feet unit without space")
         self.assertEquals(0, parse_length('m'), "Only valid unit")
         self.assertEquals(0, parse_length('"'), "Only inches, no feet")
-
 
     def test_is_parsable_float(self):
         self.assertFalse(is_parsable_float('1,2'))
