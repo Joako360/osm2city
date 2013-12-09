@@ -67,7 +67,7 @@ class Pylon(object):
             _model = "Models/StreetFurniture/RailPower.xml"
         elif self.line.type_ > 11:
             _model = "Models/StreetFurniture/streetlamp3.xml"
-        _entry = ["OBJECT_SHARED", _model, str(self.lon), str(self.lat), str(self.elevation), str(self.heading)]
+        _entry = ["OBJECT_SHARED", _model, str(self.lon), str(self.lat), str(self.elevation), str(stg_angle(self.heading))]
         return " ".join(_entry)
 
 
@@ -120,7 +120,7 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
             _next_pylon = self.pylons[x + 1]
             _current_angle = angle_of_line(_current_pylon.x, _current_pylon.y, _next_pylon.x, _next_pylon.y)
             _current_pylon.heading = middle_angle(_prev_angle, _current_angle)
-        self.pylons[-1].heading = _current_angle
+        self.pylons[-1].heading = _current_angle - 90  # 90 more because hangers are in x-direction
 
 
 def process_osm_elements(nodes_dict, ways_dict, _elev_interpolator, _coord_transformator):
@@ -305,6 +305,15 @@ def middle_angle(angle_line1, angle_line2):
     if 360 <= _middle:
         _middle -= 360
     return _middle
+
+
+def stg_angle(angle_normal):
+    """Returns the input angle in degrees to an angle for the stg-file in degrees.
+    stg-files use angles counter-clockwise starting with 0 in North."""
+    if 0 == angle_normal:
+        return 0
+    else:
+        return 360 - angle_normal
 
 
 def do_calculations(waylines_dict):
