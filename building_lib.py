@@ -672,6 +672,14 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             out.write("kids 0\n")
 
     tools.stats.count(b)
+    
+#
+# Maps the Type of the building 
+#    
+def mapType(tags):
+    if 'building' in tags and not tags['building'] == 'yes':
+        return tags['building']
+    return 'unknown'
 
 if __name__ == "__main__":
     test_ac_load()

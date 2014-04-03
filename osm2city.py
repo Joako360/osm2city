@@ -87,7 +87,7 @@ class Building(object):
        Read-only access to node coordinates via self.X[node][0|1]
     """
     def __init__(self, osm_id, tags, outer_ring, name, height, levels,
-                 stg_typ = None, stg_hdg = None, inner_rings_list = []):
+                 stg_typ = None, stg_hdg = None, inner_rings_list = [], building_type):
         self.osm_id = osm_id
         self.tags = tags
         #self.outer_ring = outer_ring # (outer) local linear ring
@@ -111,6 +111,7 @@ class Building(object):
         else:
             self.polygon = None
         if self.inner_rings_list: self.roll_inner_nodes()
+        self.building_type = building_type
 
 
     def roll_inner_nodes(self):
@@ -242,6 +243,7 @@ class wayExtract(object):
         _height = 0.
         _levels = 0
         _layer = 99
+        _building_type = 'unknown'
 
         # -- funny things might happen while parsing OSM
         try:
@@ -259,6 +261,7 @@ class wayExtract(object):
                 _levels = float(tags['building:levels'])
             if 'layer' in tags:
                 _layer = int(tags['layer'])
+            _building_type = building_lib.mapType(tags)
 
             # -- simple (silly?) heuristics to 'respect' layers
             if _layer == 0: return False
@@ -279,7 +282,7 @@ class wayExtract(object):
             tools.stats.parse_errors += 1
             return False
 
-        self.buildings.append(Building(osm_id, tags, outer_ring, _name, _height, _levels, inner_rings_list = inner_rings_list))
+        self.buildings.append(Building(osm_id, tags, outer_ring, _name, _height, _levels, inner_rings_list = inner_rings_list, _building_type))
 
         tools.stats.objects += 1
         if tools.stats.objects % 50 == 0:
