@@ -87,7 +87,7 @@ class Building(object):
        Read-only access to node coordinates via self.X[node][0|1]
     """
     def __init__(self, osm_id, tags, outer_ring, name, height, levels,
-                 stg_typ = None, stg_hdg = None, inner_rings_list = [], building_type):
+                 stg_typ = None, stg_hdg = None, inner_rings_list = [], building_type = 'unknown'):
         self.osm_id = osm_id
         self.tags = tags
         #self.outer_ring = outer_ring # (outer) local linear ring
@@ -282,7 +282,7 @@ class wayExtract(object):
             tools.stats.parse_errors += 1
             return False
 
-        self.buildings.append(Building(osm_id, tags, outer_ring, _name, _height, _levels, inner_rings_list = inner_rings_list, _building_type))
+        self.buildings.append(Building(osm_id, tags, outer_ring, _name, _height, _levels, inner_rings_list = inner_rings_list, building_type = _building_type))
 
         tools.stats.objects += 1
         if tools.stats.objects % 50 == 0:
