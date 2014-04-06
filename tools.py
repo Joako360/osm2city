@@ -57,13 +57,17 @@ class Interpolator(object):
         self.dy = self.y[1,0] - self.y[0,0]
         print "dx, dy", self.dx, self.dy
 
-    def __call__(self, p):
+    def __call__(self, p, is_global=False):
         """compute elevation at (x,y) by linear interpolation"""
-        if self.fake: return 0.
+        if self.fake:
+            return 0.
         global transform
-        p = vec2d.vec2d(transform.toGlobal(p))
-        if p.x <= self.min_x or p.x >= self.max_x or \
-           p.y <= self.min_y or p.y >= self.max_y: return -9999
+        if not is_global:
+            p = vec2d.vec2d(transform.toGlobal(p))
+        if p.x <= self.min_x or p.x >= self.max_x:
+            return -9999
+        elif p.y <= self.min_y or p.y >= self.max_y:
+            return -9999
         i = int((p.x - self.min_x)/self.dx)
         j = int((p.y - self.min_y)/self.dy)
         fx = (p.x - self.x[j,i])/self.dx
@@ -90,7 +94,7 @@ def raster_glob():
     print "Distance from center to boundary in meters (x, y):", delta
     if parameters.MANUAL_ELEV:
         print "Creating elev.in ..."
-        fname = parameters.PATH_TO_SCENERY + os.sep + "elev.in"
+        fname = parameters.PREFIX + os.sep + "elev.in"
         raster(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
 
         path = calc_tile.directory_name(center)
@@ -310,6 +314,13 @@ class Stats(object):
     def print_summary(self):
         out = sys.stdout
         total_written = self.LOD.sum()
+        lodzero = 0
+        lodone = 0
+        lodtwo = 0
+        if total_written > 0:
+            lodzero = 100.*self.LOD[0]/total_written
+            lodone = 100.*self.LOD[1]/total_written
+            lodtwo = 100.*self.LOD[0]/total_written
         out.write(textwrap.dedent("""
         total buildings %i
         parse errors    %i
@@ -334,9 +345,9 @@ class Stats(object):
                self.have_pitched_roof, self.have_complex_roof, self.roof_errors,
                self.nodes_ground, self.nodes_simplified,
                self.vertices, self.surfaces,
-               self.LOD[0], 100.*self.LOD[0]/total_written,
-               self.LOD[1], 100.*self.LOD[1]/total_written,
-               self.LOD[2], 100.*self.LOD[2]/total_written)))
+               self.LOD[0], lodzero,
+               self.LOD[1], lodone,
+               self.LOD[2], lodtwo)))
         out.write("above\n")
         max_area_above = self.area_above.max()
         if max_area_above < 1: max_area_above = 1

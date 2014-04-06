@@ -8,22 +8,23 @@ Use a tool like Osmosis to pre-process data.
 """
 
 import xml.sax
-
+import logging
+import unittest
 
 class OSMElement(object):
     def __init__(self, osm_id):
         self.osm_id = osm_id
-        self.tags = []
+        self.tags = {}
         
-    def addTag(self, tag):
-        self.tags.append(tag)
+    def addTag(self, key, value):
+        self.tags[key] = value
 
 
 class Node(OSMElement):
     def __init__(self, osm_id, lat, lon):
         OSMElement.__init__(self, osm_id)
-        self.lat = lat
-        self.lon = lon
+        self.lat = lat  # float value
+        self.lon = lon  # float value
 
 
 class Way(OSMElement):
@@ -44,16 +45,10 @@ class Relation(OSMElement):
         self.members.append(member)
 
 
-class Tag(object):
-    def __init__(self, key, value):
-        self.key = key
-        self.value = value
-
-
 class Member(object):
-    def __init__(self, ref, mtype, role):
+    def __init__(self, ref, type_, role):
         self.ref = ref
-        self.mtype = mtype
+        self.type_ = type_
         self.role = role
 
 
@@ -68,63 +63,63 @@ class OSMContentHandler(xml.sax.ContentHandler):
     """
     def __init__(self, valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys):
         xml.sax.ContentHandler.__init__(self)
-        self.valid_node_keys = valid_node_keys
-        self.valid_way_keys = valid_way_keys
-        self.req_way_keys = req_way_keys
-        self.valid_relation_keys = valid_relation_keys
-        self.req_relation_keys = req_relation_keys
+        self._valid_node_keys = valid_node_keys
+        self._valid_way_keys = valid_way_keys
+        self._req_way_keys = req_way_keys
+        self._valid_relation_keys = valid_relation_keys
+        self._req_relation_keys = req_relation_keys
         self.nodes_dict = {}
         self.ways_dict = {}
         self.relations_dict = {}
-        self.current_node = None
-        self.current_way = None
-        self.current_relation = None
-        self.within_element = None
+        self._current_node = None
+        self._current_way = None
+        self._current_relation = None
+        self._within_element = None
 
     def startElement(self, name, attrs):
         if name == "node":
-            self.within_element = name
-            lat = attrs.getValue("lat")
-            lon = attrs.getValue("lon")
+            self._within_element = name
+            lat = float(attrs.getValue("lat"))
+            lon = float(attrs.getValue("lon"))
             osm_id = attrs.getValue("id")
-            self.current_node = Node(osm_id, lat, lon)
+            self._current_node = Node(osm_id, lat, lon)
         elif name == "way":
-            self.within_element = name
+            self._within_element = name
             osm_id = attrs.getValue("id")
-            self.current_way = Way(osm_id)
+            self._current_way = Way(osm_id)
         elif name == "relation":
             osm_id = attrs.getValue("id")
-            self.current_relation = Relation(osm_id)
+            self._current_relation = Relation(osm_id)
         elif name == "tag":
             key = attrs.getValue("k")
             value = attrs.getValue("v")
-            if "node" == self.within_element:
-                if key in self.valid_node_keys: 
-                    self.current_node.addTag(Tag(key, value))
-            elif "way" == self.within_element:
-                if key in self.valid_way_keys:
-                    self.current_way.addTag(Tag(key, value))
-            elif "relation" == self.within_element:
-                if key in self.valid_relation_keys:
-                    self.current_relation.addTag(Tag(key, value))
+            if "node" == self._within_element:
+                if key in self._valid_node_keys:
+                    self._current_node.addTag(key, value)
+            elif "way" == self._within_element:
+                if key in self._valid_way_keys:
+                    self._current_way.addTag(key, value)
+            elif "relation" == self._within_element:
+                if key in self._valid_relation_keys:
+                    self._current_relation.addTag(key, value)
         elif name == "nd":
             ref = attrs.getValue("ref")
-            self.current_way.addRef(ref)
+            self._current_way.addRef(ref)
         elif name == "member":
             ref = attrs.getValue("ref")
-            mtype = attrs.getValue("type")
+            type_ = attrs.getValue("type")
             role = attrs.getValue("role")
-            self.current_relation.addMember(Member(ref, mtype, role))
+            self._current_relation.addMember(Member(ref, type_, role))
 
     def endElement(self, name):
         if name == "node":
-            self.nodes_dict[self.current_node.osm_id] = self.current_node
+            self.nodes_dict[self._current_node.osm_id] = self._current_node
         elif name == "way":
-            if has_required_tag_keys(self.current_way.tags, self.req_way_keys):
-                self.ways_dict[self.current_way.osm_id] = self.current_way
+            if has_required_tag_keys(self._current_way.tags, self._req_way_keys):
+                self.ways_dict[self._current_way.osm_id] = self._current_way
         elif name == "relation":
-            if has_required_tag_keys(self.current_relation.tags, self.req_relation_keys):
-                self.relations_dict[self.current_relation.osm_id] = self.current_relation
+            if has_required_tag_keys(self._current_relation.tags, self._req_relation_keys):
+                self.relations_dict[self._current_relation.osm_id] = self._current_relation
             
     def characters(self, content):
         pass
@@ -132,8 +127,8 @@ class OSMContentHandler(xml.sax.ContentHandler):
 
 def has_required_tag_keys(my_tags, my_required_keys):
     """ Checks whether a given set of actual tags contains at least one of the required tags """
-    for tag in my_tags:
-        if tag.key in my_required_keys:
+    for key in my_tags.keys():
+        if key in my_required_keys:
             return True
     return False
 
@@ -160,22 +155,22 @@ def parse_length(str_length):
         _processed = _processed.replace('"', '')
         _split = _processed.split("'", 1)
         _factor = 0.0254
-        if is_parseable_float(_split[0]):
+        if is_parsable_float(_split[0]):
             _f_length = float(_split[0])*12
             _processed = str(_f_length)
             if 2 == len(_split):
-                if is_parseable_float(_split[1]):
+                if is_parsable_float(_split[1]):
                     _processed = str(_f_length + float(_split[1]))
     else:  # assumed that no unit characters are in the string
         _factor = 1
-    if is_parseable_float(_processed):
+    if is_parsable_float(_processed):
         return float(_processed)*_factor
     else:
-        print "Unable to parse for length from:", str_length
+        logging.warning('Unable to parse for length from value: %s', str_length)
         return 0
 
 
-def is_parseable_float(str_float):
+def is_parsable_float(str_float):
     try:
         x = float(str_float)
         return True
@@ -184,6 +179,8 @@ def is_parseable_float(str_float):
 
 
 def main(source_file_name):
+    """Only for test of parser. Normally Parser should be instantiated from other module and then run"""
+    logging.basicConfig(level=logging.INFO)
     source = open(source_file_name)
     valid_node_keys = []
     valid_way_keys = ["building", "height", "building:levels"]
@@ -192,9 +189,30 @@ def main(source_file_name):
     req_relation_keys = ["building"]
     handler = OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys)
     xml.sax.parse(source, handler)
-    print "nodes:", len(handler.nodes_dict)
-    print "ways:", len(handler.ways_dict)
-    print "relations:", len(handler.relations_dict)
+    logging.info('Number of nodes: %s', len(handler.nodes_dict))
+    logging.info('Number of ways: %s', len(handler.ways_dict))
+    logging.info('Number of relations: %s', len(handler.relations_dict))
  
 if __name__ == "__main__":
     main("C:\\FlightGear\\customscenery2\\LSZS\\ch.osm")
+
+# ================ UNITTESTS =======================
+
+class TestOSMParser(unittest.TestCase):
+    def test_parse_length(self):
+        self.assertAlmostEqual(1.2, parse_length(' 1.2 '), 2, "Correct number with trailing spaces")
+        self.assertAlmostEqual(1.2, parse_length(' 1.2 m'), 2, "Correct number with meter unit incl. space")
+        self.assertAlmostEqual(1.2, parse_length(' 1.2m'), 2, "Correct number with meter unit without space")
+        self.assertAlmostEqual(1200, parse_length(' 1.2 km'), 2, "Correct number with km unit incl. space")
+        self.assertAlmostEqual(2092.1472, parse_length(' 1.3mi'), 2, "Correct number with mile unit without space")
+        self.assertAlmostEqual(3.048, parse_length("10'"), 2, "Correct number with feet unit without space")
+        self.assertAlmostEqual(3.073, parse_length('10\'1"'), 2, "Correct number with feet unit without space")
+        self.assertEquals(0, parse_length('m'), "Only valid unit")
+        self.assertEquals(0, parse_length('"'), "Only inches, no feet")
+
+
+    def test_is_parsable_float(self):
+        self.assertFalse(is_parsable_float('1,2'))
+        self.assertFalse(is_parsable_float('x'))
+        self.assertTrue(is_parsable_float('1.2'))
+

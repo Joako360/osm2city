@@ -13,9 +13,6 @@ number of facade/roof textures.
 You should disable random buildings.
 """
 
-import pdb
-
-
 # TODO:
 # x use geometry library
 # x read original .stg+.xml, don't place OSM buildings when there's a static model near/within
@@ -57,33 +54,31 @@ import pdb
 # - capitalize class names: class Interpolator(object):
 # - comments: code # -- comment
 
-import numpy as np
 import sys
 import os
-import random
-import copy
+import xml.sax
+import argparse
+import logging
 
-from imposm.parser import OSMParser
+
+import numpy as np
 import shapely.geometry as shg
-import osm
+
 import coordinates
-import itertools
 from cluster import Clusters
 import building_lib
-#from building_writer import write_building, random_number
 from vec2d import vec2d
 import textwrap
 import cPickle
-
 import textures as tex
 import stg_io
 import tools
 import calc_tile
-
+import osmparser
 import parameters
 
-buildings = [] # -- master list, holds all buildings
-our_magic = "osm2city"
+buildings = []  # -- master list, holds all buildings
+OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
 
 
 class Building(object):
@@ -154,6 +149,7 @@ class Building(object):
 #        for o in self.outer_nodes_closest:
 #            assert(o < len(outer_ring.coords) - 1)
 
+
     def simplify(self, tolerance):
         original_nodes = self.nnodes_outer + len(self.X_inner)
         #print ">> outer nodes", b.nnodes_outer
@@ -208,7 +204,6 @@ class Building(object):
         #print "tr X", self.X
 
 
-#import multiprocessing
 class wayExtract(object):
     def __init__(self):
         self.buildings = []
@@ -219,7 +214,7 @@ class wayExtract(object):
         self.minlat = 91.
         self.maxlat = -91.
 
-    def refs_to_ring(self, refs, inner = False):
+    def _refs_to_ring(self, refs, inner = False):
         """accept a list of OSM refs, return a linear ring. Also
            fixes face orientation, depending on inner/outer.
         """
@@ -236,7 +231,7 @@ class wayExtract(object):
             ring.coords = list(ring.coords)[::-1]
         return ring
 
-    def make_building_from_way(self, osm_id, tags, refs, inner_ways = []):
+    def _make_building_from_way(self, osm_id, tags, refs, inner_ways = []):
 #       p = multiprocessing.current_process()
 #       print 'running:', p.name, p.pid
         #print "got building", osm_id, tags
@@ -257,9 +252,9 @@ class wayExtract(object):
                     print "SKIPPING", _name
                     return False
             if 'height' in tags:
-                _height = float(tags['height'].replace('m',''))
+                _height = osmparser.parse_length(tags['height'])
             elif 'building:height' in tags:
-                _height = float(tags['building:height'].replace('m',''))
+                _height = osmparser.parse_length(tags['building:height'])
             if 'building:levels' in tags:
                 _levels = float(tags['building:levels'])
             if 'layer' in tags:
@@ -275,10 +270,10 @@ class wayExtract(object):
             # -- all checks OK: accept building
 
             # -- make outer and inner rings from refs
-            outer_ring = self.refs_to_ring(refs)
+            outer_ring = self._refs_to_ring(refs)
             inner_rings_list = []
-            for way in inner_ways:
-                inner_rings_list.append(self.refs_to_ring(way.refs, inner=True))
+            for _way in inner_ways:
+                inner_rings_list.append(self._refs_to_ring(_way.refs, inner=True))
         except Exception, reason:
             print "\nFailed to parse building (%s)" % reason, osm_id, tags, refs
             tools.stats.parse_errors += 1
@@ -287,22 +282,22 @@ class wayExtract(object):
         self.buildings.append(Building(osm_id, tags, outer_ring, _name, _height, _levels, inner_rings_list = inner_rings_list))
 
         tools.stats.objects += 1
-        if tools.stats.objects % 70 == 0: print tools.stats.objects
-        else: sys.stdout.write(".")
+        if tools.stats.objects % 50 == 0:
+            logging.info(tools.stats.objects)
         return True
 
-    def relations(self, relations):
-        for osm_id, tags, members in relations:
+    def _process_relations(self, relations):
+        for _relation in relations:
             if tools.stats.objects >= parameters.MAX_OBJECTS:
                 return
 
-            if 'building' in tags:
+            if 'building' in _relation.tags:
                 outer_ways = []
                 inner_ways = []
                 #print "rel: ", osm_id, tags #, members
-                for ref, typ, role in members:
+                for ref, type_, role in _relation.members:
 #                    if typ == 'way' and role == 'inner':
-                    if typ == 'way':
+                    if type_ == 'way':
                         if role == 'outer':
                             for way in self.way_list:
                                 if way.osm_id == ref: outer_ways.append(way)
@@ -313,7 +308,7 @@ class wayExtract(object):
                 if outer_ways:
                     #print "len outer ways", len(outer_ways)
                     all_outer_refs = [ref for way in outer_ways for ref in way.refs]
-                    all_tags = tags
+                    all_tags = _relation.tags
                     for way in outer_ways:
                         #print "TAG", way.tags
                         all_tags = dict(way.tags.items() + all_tags.items())
@@ -322,46 +317,54 @@ class wayExtract(object):
                     #print "all outer refs", all_outer_refs
                     #dict(outer.tags.items() + tags.items())
                     if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
-                        print "FIXME: ignoring all but first inner way (%i total) of ID %i" % (len(inner_ways), osm_id)
-                        self.make_building_from_way(osm_id,
+                        print "FIXME: ignoring all but first inner way (%i total) of ID %i" % (len(inner_ways), _relation.osm_id)
+                        self._make_building_from_way(_relation.osm_id,
                                                     all_tags,
                                                     all_outer_refs, [inner_ways[0]])
                     else:
-                        self.make_building_from_way(osm_id,
+                        self._make_building_from_way(_relation.osm_id,
                                                     all_tags,
                                                     all_outer_refs, inner_ways)
 
-
                     # -- way could have a 'building' tag, too. Prevent processing this twice.
-                    for way in outer_ways:
-                        self.way_list.remove(way)
+                    for _way in outer_ways:
+                        self.way_list.remove(_way)
 
 
-    def ways(self, ways):
-        """callback method for ways"""
-        for osm_id, tags, refs in ways:
+    def _process_ways(self, ways):
+        for _way in ways.values():
             if tools.stats.objects >= parameters.MAX_OBJECTS: return
-            self.way_list.append(osm.Way(osm_id, tags, refs))
+            self.way_list.append(_way)
 
-    def process_ways(self):
-        for way in self.way_list:
-            if 'building' in way.tags:
-                if tools.stats.objects >= parameters.MAX_OBJECTS: return
-                self.make_building_from_way(way.osm_id, way.tags, way.refs)
-            elif 'building:part' in way.tags:
-                if tools.stats.objects >= parameters.MAX_OBJECTS: return
-                self.make_building_from_way(way.osm_id, way.tags, way.refs)
+    def process_osm_elements(self, nodes, ways, relations):
+        """Takes osmparser Node, Way and Relation objects and transforms them to Building objects"""
+        self._process_coords(nodes)
+        self._process_ways(ways)
+        self._process_relations(relations)
+        for _way in self.way_list:
+            if 'building' in _way.tags:
+                if tools.stats.objects >= parameters.MAX_OBJECTS:
+                    return
+                self._make_building_from_way(_way.osm_id, _way.tags, _way.refs)
+            elif 'building:part' in _way.tags:
+                if tools.stats.objects >= parameters.MAX_OBJECTS:
+                    return
+                self._make_building_from_way(_way.osm_id, _way.tags, _way.refs)
 #            elif 'bridge' in way.tags:
 #                self.make_bridge_from_way(way.osm_id, way.tags, way.refs)
 
-    def coords(self, coords):
-        for osm_id, lon, lat in coords:
-            #print '%s %.4f %.4f' % (osm_id, lon, lat)
-            self.coord_dict[osm_id] = osm.Coord(lon, lat)
-            if lon > self.maxlon: self.maxlon = lon
-            if lon < self.minlon: self.minlon = lon
-            if lat > self.maxlat: self.maxlat = lat
-            if lat < self.minlat: self.minlat = lat
+    def _process_coords(self, coords):
+        for _node in coords.values():
+            logging.debug('%s %.4f %.4f', _node.osm_id, _node.lon, _node.lat)
+            self.coord_dict[_node.osm_id] = _node
+            if _node.lon > self.maxlon:
+                self.maxlon = _node.lon
+            if _node.lon < self.minlon:
+                self.minlon = _node.lon
+            if _node.lat > self.maxlat:
+                self.maxlat = _node.lat
+            if _node.lat < self.minlat:
+                self.minlat = _node.lat
 
 
 # -----------------------------------------------------------------------------
@@ -550,8 +553,8 @@ def write_xml(path, fname, LOD_lists, LM_dict, buildings):
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     # -- Parse arguments. Command line overrides config file.
-    import argparse
     parser = argparse.ArgumentParser(description="osm2city reads OSM data and creates buildings for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                       help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
@@ -579,10 +582,10 @@ if __name__ == "__main__":
     tools.init(coordinates.Transformation(center, hdg = 0))
     print tools.transform.toGlobal(cmin), tools.transform.toGlobal(cmax)
 
-    print "reading elevation data"
-    elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.xml", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
-    print "height at origin", elev(vec2d(0,0))
-    print "origin at ", tools.transform.toGlobal((0,0))
+    logging.info("reading elevation data")
+    elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
+    logging.debug("height at origin", elev(vec2d(0,0)))
+    logging.debug("origin at ", tools.transform.toGlobal((0,0)))
 
     #tools.write_map('dresden.png', transform, elev, vec2d(minlon, minlat), vec2d(maxlon, maxlat))
 
@@ -594,26 +597,27 @@ if __name__ == "__main__":
         # -- parse OSM, return
         if os.path.exists(pkl_fname):
             print "Existing cache file %s will be overwritten. Continue? (y/n)" % pkl_fname
-            if raw_input() != 'y': sys.exit(-1)
+            if raw_input().lower() != 'y':
+                sys.exit(-1)
 
         way = wayExtract()
-        p = OSMParser(concurrency=parameters.CONCURRENCY, coords_callback=way.coords)
-        print "start parsing coords"
-        p.parse(osm_fname)
-        print "done parsing"
-        print "ncords:", len(way.coord_dict)
-        print "bounds:", way.minlon, way.minlat, way.maxlon, way.maxlat
 
-        print "start parsing ways and relations"
-        p = OSMParser(concurrency=parameters.CONCURRENCY, ways_callback=way.ways)
-        p.parse(osm_fname)
-        p = OSMParser(concurrency=parameters.CONCURRENCY, relations_callback=way.relations)
-        p.parse(osm_fname)
-        way.process_ways()
+        valid_node_keys = []
+        valid_way_keys = ["building", "building:part", "building:height", "height", "building:levels", "layer"]
+        req_way_keys = ["building"]
+        valid_relation_keys = ["building"]
+        req_relation_keys = ["building"]
+        handler = osmparser.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys)
+        source = open(osm_fname)
+        logging.info("Reading the OSM file might take some time ...")
+        xml.sax.parse(source, handler)
+
+        logging.info("Transforming OSM objects to Buildings")
+        way.process_osm_elements(handler.nodes_dict, handler.ways_dict, handler.relations_dict)
         #tools.stats.print_summary()
 
-        print "nbuildings", len(way.buildings)
-        print "done parsing"
+        logging.debug("number of buildings", len(way.buildings))
+        logging.info("done parsing")
         buildings = way.buildings
 
         # -- cache parsed data. To prevent accidentally overwriting,
@@ -623,14 +627,14 @@ if __name__ == "__main__":
         fpickle.close()
     else:
         # -- load list of building objects from previously cached file
-        print "Loading %s" % pkl_fname
+        logging.info("Loading %s", pkl_fname)
         fpickle = open(pkl_fname, 'rb')
         buildings = cPickle.load(fpickle)[:parameters.MAX_OBJECTS]
         fpickle.close()
 
 #        newbuildings = []
 
-        print "unpickled %g buildings " % (len(buildings))
+        logging.info("unpickled %g buildings ", len(buildings))
         tools.stats.objects = len(buildings)
 
 
@@ -655,17 +659,14 @@ if __name__ == "__main__":
         static_objects = []
         for cl in clusters:
             center_global = tools.transform.toGlobal(cl.center)
-            # center_global = [-4.412768, 48.4463626] # -- debug
-            path = calc_tile.directory_name(center_global)
-            stg = "%07i.stg" % calc_tile.tile_index(center_global)
+            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center_global)
+            stg_fname = calc_tile.construct_stg_file_name(center_global)
 
-            if stg not in stgs:
-                stgs.append(stg)
-                static_objects.extend(stg_io.read(path, stg, parameters.PREFIX,
-                                                  parameters.PATH_TO_SCENERY,
-                                                  our_magic))
+            if stg_fname not in stgs:
+                stgs.append(stg_fname)
+                static_objects.extend(stg_io.read(path, stg_fname, OUR_MAGIC))
 
-        print "read %i objects from %i tiles" % (len(static_objects), len(stgs)), stgs
+        logging.info("read %i objects from %i tiles", len(static_objects), len(stgs))
     else:
         static_objects = None
 
@@ -695,6 +696,7 @@ if __name__ == "__main__":
     # -- write clusters
 
     stg_fp_dict = {}    # -- dictionary of stg file pointers
+    stg = None  # stg-file object
 
     for cl in clusters:
             nb = len(cl.objects)
@@ -711,31 +713,31 @@ if __name__ == "__main__":
             tile_elev = elev(cl.center)
             center_global = vec2d(tools.transform.toGlobal(cl.center))
             if tile_elev == -9999:
-                print "Skipping tile elev = -9999 at", center_global
+                logging.warning("Skipping tile elev = -9999 at lat %.3f and lon %.3f", center_global.lat, center_global.lon)
                 continue # skip tile with improper elev
             #print "TILE E", tile_elev
 
             LOD_lists = []
-            LOD_lists.append([]) # bare
-            LOD_lists.append([]) # rough
-            LOD_lists.append([]) # detail
-            LOD_lists.append([]) # roof
-            LOD_lists.append([]) # roof-flat
+            LOD_lists.append([])  # bare
+            LOD_lists.append([])  # rough
+            LOD_lists.append([])  # detail
+            LOD_lists.append([])  # roof
+            LOD_lists.append([])  # roof-flat
 
             # -- prepare output path
             if parameters.PATH_TO_OUTPUT:
-                path = parameters.PATH_TO_OUTPUT
+                path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, center_global)
             else:
-                path = parameters.PATH_TO_SCENERY
-            path += os.sep + 'Objects' + os.sep + calc_tile.directory_name(center_global) + os.sep
+                path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center_global)
             try:
                 os.makedirs(path)
             except OSError:
+                logging.exception("Path to output already exists or unable to create")
                 pass
 
             # -- open .ac and write header
             fname = parameters.PREFIX + "city%02i%02i" % (cl.I.x, cl.I.y)
-            out = open(path + fname+".ac", "w")
+            out = open(path + fname + ".ac", "w")
             write_ac_header(out, nb + nroofs)
             for b in cl.objects:
                 building_lib.write(b, out, elev, tile_elev, tools.transform, offset, LOD_lists)
@@ -747,12 +749,11 @@ if __name__ == "__main__":
             write_xml(path, fname, LOD_lists, LM_dict, cl.objects)
 
             # -- write stg
-            tile_index = calc_tile.tile_index(center_global)
-            stg_fname = path + "%07i.stg" % tile_index
+            stg_fname = calc_tile.construct_stg_file_name(center_global)
             if not stg_fname in stg_fp_dict:
-                stg_io.uninstall_ours(stg_fname, our_magic)
-                stg = open(stg_fname, "a")
-                stg.write("\n# %s\n# do not edit below this line\n#\n" % our_magic)
+                stg_io.uninstall_ours(path, stg_fname, OUR_MAGIC)
+                stg = open(path + stg_fname, "a")
+                stg.write(stg_io.delimiter_string(OUR_MAGIC, True) + "\n# do not edit below this line\n#\n")
                 stg_fp_dict[stg_fname] = stg
             else:
                 stg = stg_fp_dict[stg_fname]
@@ -760,12 +761,13 @@ if __name__ == "__main__":
             stg.write("OBJECT_STATIC %s %g %g %1.2f %g\n" % (fname+".xml", center_global.lon, center_global.lat, tile_elev, 0))
 
     for stg in stg_fp_dict.values():
+        stg.write(stg_io.delimiter_string(OUR_MAGIC, False) + "\n")
         stg.close()
 
     tools.stats.debug1.close()
     tools.stats.debug2.close()
     tools.stats.print_summary()
-    print "done. If program does not exit at this point, press CTRL+C."
+    logging.info("done. If program does not exit at this point, press CTRL+C.")
     sys.exit(0)
 
 
