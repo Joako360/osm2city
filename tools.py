@@ -62,8 +62,10 @@ class Interpolator(object):
         if self.fake: return 0.
         global transform
         p = vec2d.vec2d(transform.toGlobal(p))
-        if p.x <= self.min_x or p.x >= self.max_x or \
-           p.y <= self.min_y or p.y >= self.max_y: return -9999
+        if p.x <= self.min_x or p.x >= self.max_x:
+            return -9999
+        elif p.y <= self.min_y or p.y >= self.max_y:
+            return -9999
         i = int((p.x - self.min_x)/self.dx)
         j = int((p.y - self.min_y)/self.dy)
         fx = (p.x - self.x[j,i])/self.dx
