@@ -244,7 +244,7 @@ def compute_height_and_levels(b):
         logging.warning("Building height has wrong type. Value is: %s", b.height)
         b.height = 0
     # -- try OSM height and levels first
-    if b.height > 0 and b.levels > 0: return
+    if b.height > 0: return
 
     level_height = random_level_height()
     if b.height > 0:
@@ -660,7 +660,11 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
         # -- pitched roof for exactly 4 ground nodes
         else:
-            out.write(roofs.separate_gable(b, X))
+            if b.roof_type=='gabled':
+                out.write(roofs.separate_gable(b, X))
+            else:
+                out.write(roofs.separate_hipped(b, X))
+                
 #            print "4 GROUND", b._nnodes_ground
         out.write("kids 0\n")
 
