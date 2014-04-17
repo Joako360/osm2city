@@ -87,7 +87,7 @@ class Building(object):
        Read-only access to node coordinates via self.X[node][0|1]
     """
     def __init__(self, osm_id, tags, outer_ring, name, height, levels,
-                 stg_typ = None, stg_hdg = None, inner_rings_list = [], building_type = 'unknown'):
+                 stg_typ = None, stg_hdg = None, inner_rings_list = [], building_type = 'unknown', roof_type = 'flat'):
         self.osm_id = osm_id
         self.tags = tags
         #self.outer_ring = outer_ring # (outer) local linear ring
@@ -112,6 +112,7 @@ class Building(object):
             self.polygon = None
         if self.inner_rings_list: self.roll_inner_nodes()
         self.building_type = building_type
+        self.roof_type = roof_type
 
 
     def roll_inner_nodes(self):
@@ -261,6 +262,10 @@ class wayExtract(object):
                 _levels = float(tags['building:levels'])
             if 'layer' in tags:
                 _layer = int(tags['layer'])
+            if 'roof:shape' in tags:
+                _roof_type = tags['roof:shape']
+            else:
+                _roof_type = 'unknown'
             _building_type = building_lib.mapType(tags)
 
             # -- simple (silly?) heuristics to 'respect' layers
@@ -282,7 +287,7 @@ class wayExtract(object):
             tools.stats.parse_errors += 1
             return False
 
-        self.buildings.append(Building(osm_id, tags, outer_ring, _name, _height, _levels, inner_rings_list = inner_rings_list, building_type = _building_type))
+        self.buildings.append(Building(osm_id, tags, outer_ring, _name, _height, _levels, inner_rings_list = inner_rings_list, building_type = _building_type, roof_type=_roof_type))
 
         tools.stats.objects += 1
         if tools.stats.objects % 50 == 0:
@@ -606,7 +611,7 @@ if __name__ == "__main__":
         way = wayExtract()
 
         valid_node_keys = []
-        valid_way_keys = ["building", "building:part", "building:height", "height", "building:levels", "layer"]
+        valid_way_keys = ["building", "building:part", "building:height", "height", "building:levels", "layer", "roof:shape"]
         req_way_keys = ["building"]
         valid_relation_keys = ["building"]
         req_relation_keys = ["building"]
