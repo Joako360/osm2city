@@ -731,9 +731,9 @@ if __name__ == "__main__":
                 path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center_global)
             try:
                 os.makedirs(path)
-            except OSError:
-                logging.exception("Path to output already exists or unable to create")
-                pass
+            except OSError, e:
+                if e.errno != 17:
+                    logging.exception("Unable to create path to output")
 
             # -- open .ac and write header
             fname = parameters.PREFIX + "city%02i%02i" % (cl.I.x, cl.I.y)
