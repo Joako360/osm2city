@@ -651,6 +651,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
                                   max_height = b.height * parameters.SKEL_MAX_HEIGHT_RATIO)
             if not s: # -- fall back to flat roof
                 s = roofs.flat(b, X, b.roof_ac_name)
+                b.roof_type = 'flat'
 #                print "FAIL"
                 # FIXME: move to analyse. If we fall back, don't require separate LOD
             else:
