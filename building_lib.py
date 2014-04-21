@@ -12,6 +12,7 @@ import numpy as np
 import copy
 import pdb
 import math
+import string
 
 from vec2d import vec2d
 from textures import find_matching_texture
