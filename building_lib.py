@@ -36,10 +36,6 @@ def write_and_count_numvert(out, building, numvert):
     out.write("numvert %i\n" % numvert)
     building.vertices += numvert
 
-def write_and_count_numsurf(out, building, numsurf):
-    """write numsurf tag to .ac, update stats"""
-    out.write("numsurf %i\n" % numsurf)
-    building.surfaces += numsurf
 
 class random_number(object):
     def __init__(self, randtype, min, max):
@@ -451,227 +447,233 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
     return new_buildings
 
+class StringCache(object):
+    def __init__(self):
+        self.cache = []
+    
+    def write(self, s):
+        self.cache.append(s)
+        
+    def __len__(self):
+        return len(self.cache)
+        
+    def to_file(self, f):
+        for s in self.cache:
+            f.write(s)
 
-def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
-    """now actually write building.
+def write_and_count_vert(out, b, elev, offset, tile_elev):
+    """write numvert tag to .ac, update stats"""
+    numvert = 2 * b._nnodes_ground
+    #out.write("numvert %i\n" % numvert)
+    b.vertices_offset = len(out)
+    b.vertices += numvert
+
+    b.ground_elev = elev(vec2d(b.X[0]) + offset) - tile_elev # -- interpolate ground elevation at building location
+    #print b.refs[0].lon
+    #ground_elev = 200. + (b.refs[0].lon-13.6483695)*5000.
+    #print "ground_elev", ground_elev
+
+    #print "LEN", b._nnodes_ground
+    #print "X  ", len(X)
+    #print "Xo  ", len(b.X_outer), b.nnodes_outer
+    #print "Xi  ", len(b.X_inner)
+    #bla
+
+    for x in b.X:
+        z = b.ground_elev - 1
+        out.write("%1.2f %1.2f %1.2f\n" % (-x[1], z, -x[0]))
+    for x in b.X:
+        out.write("%1.2f %1.2f %1.2f\n" % (-x[1], b.ground_elev + b.height, -x[0]))
+    b.ceiling = b.ground_elev + b.height
+# ----
+        
+
+  # write_ring(out, b, b.polygon.exterior, 0)
+def write_ring(out, b, ring, v0, facade_texture, tex_y0, tex_y1, inner = False):
+    nnodes_ring = len(ring.coords) - 1
+    
+    v1 = v0 + nnodes_ring
+    #print "v0 %i v1 %i lenX %i" % (v0, v1, len(b.lenX))
+    for i in range(v0, v1 - 1):
+        if False:
+            tex_x1 = b.lenX[i] / facade_texture.h_size_meters # -- simply repeat texture to fit length
+        else:
+            # FIXME: respect facade texture split_h
+            #FIXME: there is a nan in facade_textures.h_splits of tex/facade_modern36x36_12
+            a = b.lenX[i] / facade_texture.h_size_meters
+            ia = int(a)
+            frac = a - ia
+            tex_x1 = facade_texture.closest_h_match(frac) + ia
+
+        out.write("SURF 0x0\n")
+        mat = b.mat
+        #if inner:
+        #    mat = 1
+        j = i + b.vertices_offset
+        out.write("mat %i\n" % mat)
+        out.write("refs %i\n" % 4)
+        out.write("%i %g %g\n" % (j,                     0,          tex_y0))
+        out.write("%i %g %g\n" % (j + 1,                 tex_x1, tex_y0))
+        out.write("%i %g %g\n" % (j + 1 + b._nnodes_ground, tex_x1, tex_y1))
+        out.write("%i %g %g\n" % (j     + b._nnodes_ground,     0,          tex_y1))
+
+    #return OK
+
+    # -- closing wall
+    tex_x1 = b.lenX[v1-1] /  facade_texture.h_size_meters
+    j0 = v0 + b.vertices_offset
+    j1 = v1 + b.vertices_offset
+    out.write("SURF 0x0\n")
+    out.write("mat %i\n" % mat)
+    out.write("refs %i\n" % 4)
+    out.write("%i %g %g\n" % (j1 - 1, 0,          tex_y0))
+    out.write("%i %g %g\n" % (j0,                 tex_x1, tex_y0))
+    out.write("%i %g %g\n" % (j0     + b._nnodes_ground,     tex_x1, tex_y1))
+    out.write("%i %g %g\n" % (j1 - 1 + b._nnodes_ground, 0,          tex_y1))
+
+    return v1
+    # ---
+    # need numvert
+    # numsurf
+    
+   
+def write_one_LOD(f_out, lod, elev, tile_elev, transform, offset):
+#def write_one(out, buildings, elev, tile_elev, transform, offset, LOD_lists):
+    """now actually write all buildings.
        While writing, accumulate some statistics
        (totals stored in global stats object, individually also in building)
        offset accounts for cluster center
     """
 
-    def write_and_count_vert(out, b):
-        """write numvert tag to .ac, update stats"""
-        numvert = 2 * b._nnodes_ground
-        out.write("numvert %i\n" % numvert)
-        b.vertices += numvert
+    # vert_list = []
+    # for b in LOD:
+    #   verts = building_verts(b, len(vert_list))
+    #   vert_list.append(verts)
+    # 
+    # write_vert_list(vert_list)
+    # write numsurf
+    # for b in LOD:
+    #   write_surf(b)f
+    out_vert = StringCache()
+    out_surf = StringCache()
+    f_out.write("OBJECT poly\n")
+    f_out.write("name \"%s\"\n" % "body")
 
-        b.ground_elev = elev(vec2d(X[0]) + offset) - tile_elev # -- interpolate ground elevation at building location
-        #print b.refs[0].lon
-        #ground_elev = 200. + (b.refs[0].lon-13.6483695)*5000.
-        #print "ground_elev", ground_elev
+    for b in lod:
+        print "#"
+        b.roof_complex = False # no complex roofs for now
+        b.X = np.array(b.X_outer + b.X_inner)
+    #    Xo = np.array(b.X_outer)
+        for i in range(b._nnodes_ground):
+            b.X[i,0] -= offset.x # -- cluster coordinates. NB: this changes building coordinates!
+            b.X[i,1] -= offset.y
 
-        #print "LEN", b._nnodes_ground
-        #print "X  ", len(X)
-        #print "Xo  ", len(b.X_outer), b.nnodes_outer
-        #print "Xi  ", len(b.X_inner)
-        #bla
+        write_and_count_vert(out_vert, b, elev, offset, tile_elev)
 
-        for x in X:
-            z = b.ground_elev - 1
-            out.write("%1.2f %1.2f %1.2f\n" % (-x[1], z, -x[0]))
-        for x in X:
-            out.write("%1.2f %1.2f %1.2f\n" % (-x[1], b.ground_elev + b.height, -x[0]))
-        b.ceiling = b.ground_elev + b.height
-    # ----
-    def write_ring(out, b, ring, v0, inner = False):
-        nnodes_ring = len(ring.coords) - 1
-
-        v1 = v0 + nnodes_ring
-        for i in range(v0, v1 - 1):
-            if False:
-                tex_x1 = b.lenX[i] / facade_texture.h_size_meters # -- simply repeat texture to fit length
-            else:
-                # FIXME: respect facade texture split_h
-                #FIXME: there is a nan in facade_textures.h_splits of tex/facade_modern36x36_12
-                a = b.lenX[i] / facade_texture.h_size_meters
-                ia = int(a)
-                frac = a - ia
-                tex_x1 = facade_texture.closest_h_match(frac) + ia
-
-            out.write("SURF 0x0\n")
-            mat = b.mat
-            #if inner:
-            #    mat = 1
-            out.write("mat %i\n" % mat)
-            out.write("refs %i\n" % 4)
-            out.write("%i %g %g\n" % (i,                     0,          tex_y0))
-            out.write("%i %g %g\n" % (i + 1,                 tex_x1, tex_y0))
-            out.write("%i %g %g\n" % (i + 1 + b._nnodes_ground, tex_x1, tex_y1))
-            out.write("%i %g %g\n" % (i     + b._nnodes_ground,     0,          tex_y1))
-
-        #return OK
-
-        # -- closing wall
-        tex_x1 = b.lenX[v1-1] /  facade_texture.h_size_meters
-        out.write("SURF 0x0\n")
-        out.write("mat %i\n" % mat)
-        out.write("refs %i\n" % 4)
-        out.write("%i %g %g\n" % (v1 - 1, 0,          tex_y0))
-        out.write("%i %g %g\n" % (v0,                 tex_x1, tex_y0))
-        out.write("%i %g %g\n" % (v0     + b._nnodes_ground,     tex_x1, tex_y1))
-        out.write("%i %g %g\n" % (v1 - 1 + b._nnodes_ground, 0,          tex_y1))
-
-        return v1
-    # ---
-    X = np.array(b.X_outer + b.X_inner)
-#    Xo = np.array(b.X_outer)
-    for i in range(b._nnodes_ground):
-        X[i,0] -= offset.x # -- cluster coordinates. NB: this changes building coordinates!
-        X[i,1] -= offset.y
-
-    #lenX = b.lenX
-    #height = b.height
-    #roof_texture = b.roof_texture
-    facade_texture = b.facade_texture
-    #roof_complex = b.roof_complex
-
+    #out.write('texture "%s"\n' % (facade_texture.filename+'.png'))
+    
+    # -- surfaces
+    n_surf_total = 0
     global nb
-    nb += 1
-    #print nb
-    if nb % 70 == 0: print nb
-    else: sys.stdout.write(".")
+    for b in lod:
+        facade_texture = b.facade_texture
+    
+        nb += 1
+        if nb % 70 == 0: print nb
+        else: sys.stdout.write(".")
+    
+        b.ac_name = "b%i" % nb
+        nsurf = b._nnodes_ground
 
-    out.write("OBJECT poly\n")
-    b.ac_name = "b%i" % nb
-    out.write("name \"%s\"\n" % b.ac_name)
-    LOD_lists[b.LOD].append(b.ac_name)
-
-    nsurf = b._nnodes_ground
-    #nsurf = b.nnodes_outer
-
-
-    no_roof = False
-    #if not b.roof_complex: no_roof = True
-#    if len(b.polygon.interiors) < 2:
-#        no_roof = False
-#    else:
-#        no_roof = True
-
-    if (not no_roof) and (not b.roof_complex): nsurf += 1 # -- because roof will be part of base model
-
-    #repeat_vert = int(height/3)
-
-    # -- texturing facade
-    # - check all walls -- min length?
-    #global textures
-    # loop all textures
-    # award points for good matches
-    # pick best match?
-
-    # -- check v: height
-
-#    shuffled_t = copy.copy(facade_candidates)
-#    random.shuffle(shuffled_t)
-#    for t in shuffled_t:
-    tex_y0, tex_y1 = check_height(b.height, facade_texture)
-
-    if facade_texture:
-        out.write('texture "%s"\n' % (facade_texture.filename+'.png'))
-    else:
-        print "WARNING: no texture height", b.height, requires
-
-    # -- check h: width
-
-    # building shorter than facade texture
-    # layers > facade_min_layers
-    # layers < facade_max_layers
-#    building_height = height
-#    texture_height = 12*3.
-#    if building_height < texture_height:
-#    if 1:
-#        tex_y0 = 1 - building_height / texture_height
-#        tex_y1 = 1
-#    else:
-#        tex_y0 = 0
-#        tex_y1 = building_height / texture_height # FIXME
-
-    #out.write("loc 0 0 0\n")
-    write_and_count_vert(out, b)
-
-    write_and_count_numsurf(out, b, nsurf)
-
-    # -- outer and inner walls (if any)
-    write_ring(out, b, b.polygon.exterior, 0)
-    if True:
-        v0 = b.nnodes_outer
-        for inner in b.polygon.interiors:
-            v0 = write_ring(out, b, inner, v0, True)
-
-    # -- roof
-    if no_roof:  # -- a debug thing
-        out.write("kids 0\n")
-        tools.stats.count(b)
-        return
-
-    if not parameters.EXPERIMENTAL_INNER and len(b.polygon.interiors) > 1:
-        raise NotImplementedError("Can't yet handle relations with more than one inner way")
-
-
-    if not b.roof_complex:
-        if len(b.polygon.interiors):
-            out.write(roofs.flat(b, X))
-            tools.stats.count(b)
-        else:
-            # -- plain flat roof
-            out.write(roofs.flat(b, X))
-        out.write("kids 0\n")
-    # -- roof
-    #    We can have complex and non-complex roofs:
-    #       - non-complex will be included in base object
-    #         - relations with 1 inner -> special flat roof
-    #         - all other -> flat roof
-    #       - complex will be separate object, go into LOD roof
-    #         - 4 nodes pitched: gable, hipped, half-hipped?, gambrel, mansard, ...
-    #         - 5+ nodes: skeleton
-    #         - 5+ mansard
-    #         - all will have additional flat roof for base model LOD
-
-    else:  # -- roof is a separate object, in LOD roof
-        out.write("kids 0\n")
-        #b.roof_mat = 1 # -- different color
-        b.roof_ac_name = "b%i-roof" % nb
-#        print "roof name", b.roof_ac_name,
-        LOD_lists[3].append(b.roof_ac_name)
-#        LOD_lists[b.LOD].append(roof_ac_name)
-
-        # -- pitched roof for > 4 ground nodes
-        if b._nnodes_ground > 4 and parameters.EXPERIMENTAL_USE_SKEL:
-            s = myskeleton.myskel(b, offset_xy = offset,
-                                  offset_z = b.ground_elev + b.height,
-                                  max_height = b.height * parameters.SKEL_MAX_HEIGHT_RATIO)
-            if not s: # -- fall back to flat roof
-                s = roofs.flat(b, X, b.roof_ac_name)
-#                print "FAIL"
-                # FIXME: move to analyse. If we fall back, don't require separate LOD
-            else:
-#                print "COMPLEX"
-                tools.stats.have_complex_roof += 1
-            out.write(s)
-
-        # -- pitched roof for exactly 4 ground nodes
-        else:
-            out.write(roofs.separate_gable(b, X))
-#            print "4 GROUND", b._nnodes_ground
-        out.write("kids 0\n")
-
-        # -- LOD flat model
+        no_roof = False
+    
+        if (not no_roof) and (not b.roof_complex): nsurf += 1 # -- because roof will be part of base model
+    
+        tex_y0, tex_y1 = check_height(b.height, facade_texture)
+    
+        # -- outer and inner walls (if any)
+        #print "--1"
+        write_ring(out_surf, b, b.polygon.exterior, 0, facade_texture, tex_y0, tex_y1)
         if True:
-            roof_ac_name_flat = "b%i-flat" % nb
-            LOD_lists[4].append(roof_ac_name_flat)
-            out.write(roofs.flat(b, X, roof_ac_name_flat))
-            out.write("kids 0\n")
+            v0 = b.nnodes_outer
+            for inner in b.polygon.interiors:
+                #print "--2"
+                v0 = write_ring(out, b, inner, v0, True)
+    
+        # -- roof
+        if no_roof:  # -- a debug thing
+            tools.stats.count(b)
+            continue
 
-    tools.stats.count(b)
+        n_surf_total += nsurf
+    
+        if not parameters.EXPERIMENTAL_INNER and len(b.polygon.interiors) > 1:
+            raise NotImplementedError("Can't yet handle relations with more than one inner way")
+    
+    
+        #if not b.roof_complex:
+        if True:
+            if len(b.polygon.interiors):
+                out_surf.write(roofs.flat(b, b.X))
+                tools.stats.count(b)
+            else:
+                # -- plain flat roof
+                out_surf.write(roofs.flat(b, b.X))
+            continue
+                
+        # -- roof
+        #    We can have complex and non-complex roofs:
+        #       - non-complex will be included in base object
+        #         - relations with 1 inner -> special flat roof
+        #         - all other -> flat roof
+        #       - complex will be separate object, go into LOD roof
+        #         - 4 nodes pitched: gable, hipped, half-hipped?, gambrel, mansard, ...
+        #         - 5+ nodes: skeleton
+        #         - 5+ mansard
+        #         - all will have additional flat roof for base model LOD
+    
+        else:  # -- roof is a separate object, in LOD roof
+            out_surf.write("kids 0\n")
+            #b.roof_mat = 1 # -- different color
+            b.roof_ac_name = "b%i-roof" % nb
+    #        print "roof name", b.roof_ac_name,
+    
+            # -- pitched roof for > 4 ground nodes
+            if b._nnodes_ground > 4 and parameters.EXPERIMENTAL_USE_SKEL:
+                s = myskeleton.myskel(b, offset_xy = offset,
+                                      offset_z = b.ground_elev + b.height,
+                                      max_height = b.height * parameters.SKEL_MAX_HEIGHT_RATIO)
+                if not s: # -- fall back to flat roof
+                    s = roofs.flat(b, b.X, b.roof_ac_name)
+    #                print "FAIL"
+                    # FIXME: move to analyse. If we fall back, don't require separate LOD
+                else:
+    #                print "COMPLEX"
+                    tools.stats.have_complex_roof += 1
+                out_surf.write(s)
+    
+            # -- pitched roof for exactly 4 ground nodes
+            else:
+                out_surf.write(roofs.separate_gable(b, b.X))
+    #            print "4 GROUND", b._nnodes_ground
+            out_surf.write("kids 0\n")
+    
+            # -- LOD flat model
+            if True:
+                roof_ac_name_flat = "b%i-flat" % nb
+                LOD_lists[4].append(roof_ac_name_flat)
+                out_surf.write(roofs.flat(b, X, roof_ac_name_flat))
+                out_surf.write("kids 0\n")
+    
+        tools.stats.count(b)
+
+    out_surf.write("kids 0\n")
+
+    f_out.write("numvert %i\n" % len(out_vert))
+    out_vert.to_file(f_out)
+    f_out.write("numsurf %i\n" % n_surf_total)
+    out_surf.to_file(f_out)
+    
 
 if __name__ == "__main__":
     test_ac_load()

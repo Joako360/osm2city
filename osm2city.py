@@ -77,6 +77,7 @@ import tools
 import calc_tile
 import osmparser
 import parameters
+import pdb
 
 buildings = []  # -- master list, holds all buildings
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
@@ -99,6 +100,7 @@ class Building(object):
         self.height = height
         self.levels = levels
         self.vertices = 0
+        self.vertices_offset = 0
         self.surfaces = 0
         self.anchor = vec2d(list(outer_ring.coords[0]))
         self.facade_texture = None
@@ -741,9 +743,10 @@ if __name__ == "__main__":
             # -- open .ac and write header
             fname = parameters.PREFIX + "city%02i%02i" % (cl.I.x, cl.I.y)
             out = open(path + fname + ".ac", "w")
-            write_ac_header(out, nb + nroofs)
-            for b in cl.objects:
-                building_lib.write(b, out, elev, tile_elev, tools.transform, offset, LOD_lists)
+            write_ac_header(out, 1)
+            #for lod in LOD_lists:
+                # cl.objects,
+            building_lib.write_one_LOD(out, cl.objects, elev, tile_elev, tools.transform, offset)
             out.close()
 
             LM_dict = building_lib.make_lightmap_dict(cl.objects)
@@ -761,7 +764,7 @@ if __name__ == "__main__":
             else:
                 stg = stg_fp_dict[stg_fname]
 
-            stg.write("OBJECT_STATIC %s %g %g %1.2f %g\n" % (fname+".xml", center_global.lon, center_global.lat, tile_elev, 0))
+            stg.write("OBJECT_STATIC %s %g %g %1.2f %g\n" % (fname+".ac", center_global.lon, center_global.lat, tile_elev, 0))
 
     for stg in stg_fp_dict.values():
         stg.write(stg_io.delimiter_string(OUR_MAGIC, False) + "\n")

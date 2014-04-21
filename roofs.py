@@ -81,7 +81,7 @@ def flat(b, X, ac_name = ""):
     else:
         nodes = range(b.nnodes_outer)
         
-    
+    assert(len(X) >= len(nodes))
     if ac_name == "": 
         uv = face_uv(nodes, X, 5.0, 5.0, angle=None)
         nodes = np.array(nodes) + b._nnodes_ground
@@ -92,7 +92,7 @@ def flat(b, X, ac_name = ""):
     if not ac_name: uv *= 0 # -- texture only separate roofs
 
     for i, node in enumerate(nodes):
-        out += "%i %g %g\n" % (node, uv[i][0], uv[i][1])
+        out += "%i %g %g\n" % (node + b.vertices_offset, uv[i][0], uv[i][1])
 #    print "len nodes", len(nodes)
     assert(len(nodes) == b._nnodes_ground + 2 * len(b.polygon.interiors))
     return out
