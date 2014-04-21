@@ -449,17 +449,17 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
 class StringCache(object):
     def __init__(self):
-        self.cache = []
+        self._cache = []
     
     def write(self, s):
-        self.cache.append(s)
+        self._cache.append(s)
         
     def __len__(self):
-        return len(self.cache)
+        return len(self._cache)
+                    
+    def __str__(self):
+        return string.join(self._cache)
         
-    def to_file(self, f):
-        for s in self.cache:
-            f.write(s)
 
 def write_and_count_vert(out, b, elev, offset, tile_elev):
     """write numvert tag to .ac, update stats"""
@@ -560,7 +560,7 @@ def write_one_LOD(f_out, lod, elev, tile_elev, transform, offset):
     f_out.write("name \"%s\"\n" % "body")
 
     for b in lod:
-        print "#"
+        #print "#"
         b.roof_complex = False # no complex roofs for now
         b.X = np.array(b.X_outer + b.X_inner)
     #    Xo = np.array(b.X_outer)
