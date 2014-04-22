@@ -413,3 +413,68 @@ above
  20000 m^2      3
  50000 m^2      0
 done.
+---
+
+
+single_object_per_tile
+======================
+myfg dev  24, or 16-17 facing towards LOWI
+drawables 1057   2300
+
+previously 16 or 12
+
+now:
+
+total buildings 56580
+parse errors    0
+written         16315
+skipped
+small         40244
+nearby        0
+no elevation  21
+no texture    0
+pitched roof    0
+complex       0
+roof_errors   0
+ground nodes    311010
+simplified    46948
+vertices        0
+surfaces        0
+LOD bare        1 ( 0 %)
+LOD rough       6640 (41 %)
+LOD detail      9674 ( 0 %)
+
+prev:
+
+total buildings 56580
+parse errors    0
+written         16120
+skipped
+small         40439
+nearby        0
+no elevation  21
+no texture    0
+pitched roof    0
+complex       0
+roof_errors   0
+ground nodes    311010
+simplified    46948
+vertices        211438
+surfaces        108416
+LOD bare        1 ( 0 %)
+LOD rough       6634 (41 %)
+LOD detail      9485 ( 0 %)
+above
+1 m^2      1 |
+10 m^2      0 |
+20 m^2      0 |
+50 m^2      1 |
+100 m^2   3808 |###########################
+200 m^2   7795 |########################################################
+500 m^2   3030 |#####################
+1000 m^2    916 |######
+2000 m^2    376 |##
+5000 m^2     68 |
+10000 m^2     16 |
+20000 m^2      3 |
+50000 m^2      0 |

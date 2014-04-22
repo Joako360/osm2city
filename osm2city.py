@@ -100,7 +100,7 @@ class Building(object):
         self.height = height
         self.levels = levels
         self.vertices = 0
-        self.vertices_offset = 0
+        self.first_node = 0  # index of first node in final OBJECT node list
         self.surfaces = 0
         self.anchor = vec2d(list(outer_ring.coords[0]))
         self.facade_texture = None
@@ -743,7 +743,6 @@ if __name__ == "__main__":
             # -- open .ac and write header
             fname = parameters.PREFIX + "city%02i%02i" % (cl.I.x, cl.I.y)
             out = open(path + fname + ".ac", "w")
-            write_ac_header(out, 1)
             #for lod in LOD_lists:
                 # cl.objects,
             building_lib.write_one_LOD(out, cl.objects, elev, tile_elev, tools.transform, offset)

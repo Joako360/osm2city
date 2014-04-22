@@ -14,7 +14,7 @@ import numpy as np
 import tools
 import os
 
-def myskel(b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header = False, max_height = 1e99):
+def myskel(out, b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header = False, max_height = 1e99):
 #vertices = [(202.0, 52.0), (400.0, 52.0), (400.0, 153.0), (202.0, 152.0)]
 #edges =  [(0, 1), (1, 2), (2, 3), (3, 0)]
 #speeds = [1.0, 1.0, 1.0, 1.0]
@@ -86,7 +86,7 @@ def myskel(b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header = Fal
         if roof_height > max_height:
 #            print "roof too heigh", roof_height, max_height
             return False
-        s = roof_mesh.ac3d_string(b, offset_xy, offset_z, header)
+        result = roof_mesh.to_out(out, b, offset_xy, offset_z, header)
 #        return s
     except Exception, reason:
 #    if False:
@@ -97,12 +97,12 @@ def myskel(b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header = Fal
         os.system("gnuplot %s.gp" % gp)
         return False
 
-    if header:
+    if False and header:
         f = open("r.ac", "w")
         f.write(s)
         f.close()
 
-    return s
+    return result
 
 
 if __name__ == "__main__":
