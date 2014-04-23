@@ -444,19 +444,6 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
     return new_buildings
 
-class StringCache(object):
-    def __init__(self):
-        self._cache = []
-
-    def write(self, s):
-        self._cache.append(s)
-
-    def __len__(self):
-        return len(self._cache)
-
-    def __str__(self):
-        return string.join(self._cache)
-
 
 
 def write_and_count_vert(out, b, elev, offset, tile_elev):
