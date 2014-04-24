@@ -515,10 +515,11 @@ def write_ring(out, b, ring, v0, facade_texture, tex_y0, tex_y1, inner = False):
 
 
 def write_one_LOD(f_out, lod, elev, tile_elev, transform, offset):
-    """now actually write all buildings.
+    """now actually write all buildings for given tile.
        While writing, accumulate some statistics
        (totals stored in global stats object, individually also in building)
        offset accounts for cluster center
+       - all LOD in one file. Plus roofs. One Object per LOD
     """
     out = ac3d.Writer(tools.stats)
     out.new_object('main', None)
@@ -569,8 +570,8 @@ def write_one_LOD(f_out, lod, elev, tile_elev, transform, offset):
             raise NotImplementedError("Can't yet handle relations with more than one inner way")
 
 
-        #if not b.roof_complex:
-        if True:
+        if not b.roof_complex:
+        #if True:
             roofs.flat(out, b, b.X)
             tools.stats.count(b)
             continue
@@ -587,7 +588,8 @@ def write_one_LOD(f_out, lod, elev, tile_elev, transform, offset):
         #         - all will have additional flat roof for base model LOD
 
         else:  # -- roof is a separate object, in LOD roof
-            out.close_object()
+            #out.close_object()
+            #FIXME: put roofs again into seperate LOD
             # -- pitched roof for > 4 ground nodes
             if b._nnodes_ground > 4 and parameters.EXPERIMENTAL_USE_SKEL:
                 s = myskeleton.myskel(out, b, offset_xy = offset,

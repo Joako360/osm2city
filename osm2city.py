@@ -101,6 +101,7 @@ class Building(object):
         self.levels = levels
         self.vertices = 0
         self.first_node = 0  # index of first node in final OBJECT node list
+        self._nnodes_ground = 0 # number of nodes on ground
         self.surfaces = 0
         self.anchor = vec2d(list(outer_ring.coords[0]))
         self.facade_texture = None
