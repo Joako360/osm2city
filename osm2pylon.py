@@ -38,10 +38,10 @@ OUR_MAGIC = "osm2pylon"  # Used in e.g. stg files to mark edits by osm2pylon
 
 
 class CableVertex(object):
-    def __init__(self, out, height):
+    def __init__(self, out, height, along=0):
         self.out = out  # the distance from the middle vertical line of the pylon
-        self.along = 0  # the distance along the x-axis away from the middle vertical line of the pylon
         self.height = height  # the distance above ground relative to the pylon's ground level (y-axis in ac-file)
+        self.along = along  # the distance along the x-axis away from the middle vertical line of the pylon
         self.x = 0  # the calculated x-axis in the ac-file
         self.z = 0  # the calculated z-axis in the ac-file
         self.y = 0  # the calculated y-axis in the ac-file
@@ -109,10 +109,9 @@ class WaySegment(object):
     def __init__(self, start_pylon, end_pylon):
         self.start_pylon = start_pylon
         self.end_pylon = end_pylon
-        self.length = distance(start_pylon.x, start_pylon.y, end_pylon.x, end_pylon.y)
-        self.heading = angle_of_line(start_pylon.x, start_pylon.y
-                                     , end_pylon.x, end_pylon.y)
-
+        self.length = calc_distance(start_pylon.x, start_pylon.y, end_pylon.x, end_pylon.y)
+        self.heading = calc_angle_of_line(start_pylon.x, start_pylon.y
+                                          , end_pylon.x, end_pylon.y)
 
 
 class Pylon(object):
@@ -123,7 +122,7 @@ class Pylon(object):
         self.structure = None
         self.material = None
         self.colour = None
-        self.line = None  # a reference to the way - either an electrical line or an aerialway
+        self.my_wayline = None  # a reference to the way - either an electrical line or an aerialway
         self.prev_pylon = None
         self.next_pylon = None
         self.lon = 0.0  # longitude coordinate in decimal as a float
@@ -138,9 +137,9 @@ class Pylon(object):
         Returns a stg entry for this pylon.
         E.g. OBJECT_SHARED Models/Airport/ils.xml 5.313108 45.364122 374.49 268.92
         """
-        _entry = ["OBJECT_SHARED", self.line.pylon_model, str(self.lon), str(self.lat), str(self.elevation)
+        entry = ["OBJECT_SHARED", self.my_wayline.pylon_model, str(self.lon), str(self.lat), str(self.elevation)
                   , str(stg_angle(self.heading - 90))]  # 90 less because arms are in x-direction in ac-file
-        return " ".join(_entry)
+        return " ".join(entry)
 
 
 class WayLine(object):  # The name "Line" is also used in e.g. SymPy
@@ -160,21 +159,21 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
         """
         Returns the stg entries for the line in a string separated by linebreaks
         """
-        _entries = []
+        entries = []
         for my_pylon in self.pylons:
-            _entries.append(my_pylon.make_stg_entry())
-        return "\n".join(_entries)
+            entries.append(my_pylon.make_stg_entry())
+        return "\n".join(entries)
 
     def is_aerialway(self):
         return self.type_ > 20
 
     def calc_and_map(self):
         """Calculates various aspects of the line and its nodes and attempt to correct if needed. """
-        _max_length = self._calc_segments()
+        max_length = self._calc_segments()
         if self.is_aerialway():
             self._calc_and_map_aerialway()
         else:
-            self._calc_and_map_powerline(_max_length)
+            self._calc_and_map_powerline(max_length)
         self._calc_headings_pylons()
         self._calc_cables()
 
@@ -188,33 +187,33 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
         150KV: height 25-32 meter, distance 180-350 meter, sagging 2.5-9 meter
         60KV: height 15-25 meter, distance 100-250 meter, sagging 1-5 meter"""
         # calculate min, max, averages etc.
-        _max_height = 0.0
-        _average_height = 0.0
-        _found = 0
-        _nbr_poles = 0
-        _nbr_towers = 0
+        max_height = 0.0
+        average_height = 0.0
+        found = 0
+        nbr_poles = 0
+        nbr_towers = 0
         for my_pylon in self.pylons:
             if my_pylon.type_ == 11:
-                _nbr_towers += 1
+                nbr_towers += 1
             elif my_pylon.type_ == 12:
-                _nbr_poles += 1
+                nbr_poles += 1
             if my_pylon.height > 0:
-                _average_height += my_pylon.height
-                _found += 1
-            if my_pylon.height > _max_height:
-                _max_height = my_pylon.height
-        if _found > 0:
-            _average_height /= _found
+                average_height += my_pylon.height
+                found += 1
+            if my_pylon.height > max_height:
+                max_height = my_pylon.height
+        if found > 0:
+            average_height /= found
 
         # use statistics to determine type_ and pylon_model
-        if self.type_ == 11 and _nbr_towers <= _nbr_poles and _max_height <= 25.0 and max_length <= 250.0:
+        if self.type_ == 11 and nbr_towers <= nbr_poles and max_height <= 25.0 and max_length <= 250.0:
             self.type_ = 11
             self.pylon_model = "Models/StreetFurniture/streetlamp3.xml"
         else:
             self.type_ = 12
-            if _average_height < 35.0 and max_length < 300.0:
+            if average_height < 35.0 and max_length < 300.0:
                 self.pylon_model = "Models/Power/generic_pylon_25m.xml"
-            elif _average_height < 75.0 and max_length < 500.0:
+            elif average_height < 75.0 and max_length < 500.0:
                 self.pylon_model = "Models/Power/generic_pylon_50m.xml"
             else:
                 self.pylon_model = "Models/Power/generic_pylon_100m.xml"
@@ -225,36 +224,37 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
         return my_pylon.lon, my_pylon.lat  # FIXME: needs to be calculated more properly with shapely
 
     def _calc_headings_pylons(self):
-        _current_pylon = self.pylons[0]
-        _next_pylon = self.pylons[1]
-        _current_angle = angle_of_line(_current_pylon.x, _current_pylon.y, _next_pylon.x, _next_pylon.y)
-        _current_pylon.heading = _current_angle
+        current_pylon = self.pylons[0]
+        next_pylon = self.pylons[1]
+        current_angle = calc_angle_of_line(current_pylon.x, current_pylon.y, next_pylon.x, next_pylon.y)
+        current_pylon.heading = current_angle
         for x in range(1, len(self.pylons) - 1):
-            _prev_angle = _current_angle
-            _current_pylon = self.pylons[x]
-            _next_pylon = self.pylons[x + 1]
-            _current_angle = angle_of_line(_current_pylon.x, _current_pylon.y, _next_pylon.x, _next_pylon.y)
-            _current_pylon.heading = middle_angle(_prev_angle, _current_angle)
-        self.pylons[-1].heading = _current_angle
+            prev_angle = current_angle
+            current_pylon = self.pylons[x]
+            next_pylon = self.pylons[x + 1]
+            current_angle = calc_angle_of_line(current_pylon.x, current_pylon.y, next_pylon.x, next_pylon.y)
+            current_pylon.heading = calc_middle_angle(prev_angle, current_angle)
+        self.pylons[-1].heading = current_angle
 
     def _calc_segments(self):
         """Creates the segments of this WayLine and calculates the total length.
         Returns the maximum length of segments"""
-        _max_length = 0.0
-        _total_length = 0.0
+        max_length = 0.0
+        total_length = 0.0
+        self.segments = []  # if this method would be called twice by mistake
         for x in range(0, len(self.pylons) - 2):
-            _segment = WaySegment(self.pylons[x], self.pylons[x + 1])
-            self.segments.append(_segment)
-            if _segment.length > _max_length:
-                _max_length = _segment.length
-            _total_length += _segment.length
-        self.length = _total_length
-        return _max_length
+            segment = WaySegment(self.pylons[x], self.pylons[x + 1])
+            self.segments.append(segment)
+            if segment.length > max_length:
+                max_length = segment.length
+            total_length += segment.length
+        self.length = total_length
+        return max_length
 
     def _calc_cables(self):
-        for _segment in self.segments:
-            _start_heading = _segment.heading - _segment.start_pylon.heading
-            _end_heading = _segment.heading - _segment.end_pylon.heading
+        for segment in self.segments:
+            start_heading = segment.heading - segment.start_pylon.heading
+            end_heading = segment.heading - segment.end_pylon.heading
 
 
 def process_osm_elements(nodes_dict, ways_dict, _elev_interpolator, _coord_transformator):
@@ -263,9 +263,9 @@ def process_osm_elements(nodes_dict, ways_dict, _elev_interpolator, _coord_trans
     electrical power lines and a dict of WayLine objects for aerialways. Nodes are transformed to Pylons.
     The elevation of the pylons is calculated as part of this process.
     """
-    my_powerlines = {}  # osm_id as key, Line object as value
-    my_aerialways = {}  # osm_id as key, Line object as value
-    my_shared_nodes = {}  # node osm_id as key, list of Line objects as value
+    my_powerlines = {}  # osm_id as key, WayLine object as value
+    my_aerialways = {}  # osm_id as key, WayLine object as value
+    my_shared_nodes = {}  # node osm_id as key, list of WayLine objects as value
     for way in ways_dict.values():
         my_line = WayLine(way.osm_id)
         for key in way.tags:
@@ -295,7 +295,7 @@ def process_osm_elements(nodes_dict, ways_dict, _elev_interpolator, _coord_trans
                     my_pylon.lat = my_node.lat
                     my_pylon.lon = my_node.lon
                     my_pylon.x, my_pylon.y = _coord_transformator.toLocal((my_node.lon, my_node.lat))
-                    my_pylon.line = my_line
+                    my_pylon.my_wayline = my_line
                     my_pylon.elevation = _elev_interpolator(vec2d.vec2d(my_pylon.lon, my_pylon.lat), True)
                     for key in my_node.tags:
                         value = my_node.tags[key]
@@ -337,24 +337,24 @@ def process_osm_elements(nodes_dict, ways_dict, _elev_interpolator, _coord_trans
                 logging.warning('Line could not be validated or corrected. osm_id = %s', my_line.osm_id)
 
     for key in my_shared_nodes.keys():
-        _shared_node = my_shared_nodes[key]
-        if len(_shared_node) == 2:
-            return_code = merge_lines(key, _shared_node[0], _shared_node[1])
+        shared_node = my_shared_nodes[key]
+        if len(shared_node) == 2:
+            return_code = merge_lines(key, shared_node[0], shared_node[1])
             if 0 == return_code:  # remove the merged line
-                if _shared_node[0].is_aerialway() and (_shared_node[1].osm_id in my_aerialways):
-                    del my_aerialways[_shared_node[1].osm_id]
-                elif _shared_node[1].osm_id in my_powerlines:
-                    del my_powerlines[_shared_node[1].osm_id]
+                if shared_node[0].is_aerialway() and (shared_node[1].osm_id in my_aerialways):
+                    del my_aerialways[shared_node[1].osm_id]
+                elif shared_node[1].osm_id in my_powerlines:
+                    del my_powerlines[shared_node[1].osm_id]
                 logging.info("Merged two lines with node osm_id: %s", key)
             elif 1 == return_code:
                 logging.warning(
                     "A node is referenced in two ways, but the lines have not same type. Node osm_id: %s; %s; %s"
-                    , key, _shared_node[0].type_, _shared_node[1].type_)
+                    , key, shared_node[0].type_, shared_node[1].type_)
             else:
                 logging.warning(
                     "A node is referenced in two ways, but the common node is not at start/end. Node osm_id: %s; %s"
-                    , key, _shared_node[0].type_)
-        if len(_shared_node) > 2:
+                    , key, shared_node[0].type_)
+        if len(shared_node) > 2:
             logging.warning("A node is referenced in more than two ways. Most likely OSM problem. Node osm_id: %s", key)
 
     return my_powerlines, my_aerialways
@@ -398,13 +398,13 @@ def merge_lines(osm_id, line0, line1):
 
 def write_stg_entries(stg_fp_dict, lines_dict):
     for line in lines_dict.values():
-        _center = line.get_center_coordinates()
-        stg_fname = calc_tile.construct_stg_file_name(_center)
+        center = line.get_center_coordinates()
+        stg_fname = calc_tile.construct_stg_file_name(center)
         if not stg_fname in stg_fp_dict:
             if parameters.PATH_TO_OUTPUT:
-                path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, _center)
+                path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, center)
             else:
-                path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, _center)
+                path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center)
             try:
                 os.makedirs(path)
             except OSError:
@@ -419,29 +419,32 @@ def write_stg_entries(stg_fp_dict, lines_dict):
         stg_file.write(line.make_pylons_stg_entries() + "\n")
 
 
-def angle_of_line(x1, y1, x2, y2):
+def calc_angle_of_line(x1, y1, x2, y2):
     """Returns the angle in degrees of a line relative to North"""
-    _angle = math.atan2(x2 - x1, y2 - y1)
-    _degree = math.degrees(_angle)
-    if _degree < 0:
-        _degree += 360
-    return _degree
+    angle = math.atan2(x2 - x1, y2 - y1)
+    degree = math.degrees(angle)
+    if degree < 0:
+        degree += 360
+    return degree
 
 
-def middle_angle(angle_line1, angle_line2):
+def calc_middle_angle(angle_line1, angle_line2):
     """Returns the angle halfway between two lines"""
     if angle_line1 == angle_line2:
-        _middle = angle_line1
+        middle = angle_line1
     elif angle_line1 > angle_line2:
-        _middle = angle_line1 - (angle_line1 - angle_line2) / 2
+        if 0 == angle_line2:
+            middle = calc_middle_angle(angle_line1, 360)
+        else:
+            middle = angle_line1 - (angle_line1 - angle_line2) / 2
     else:
         if math.fabs(angle_line2 - angle_line1) > 180:
-            _middle = middle_angle(angle_line1 + 360, angle_line2)
+            middle = calc_middle_angle(angle_line1 + 360, angle_line2)
         else:
-            _middle = angle_line2 - (angle_line2 - angle_line1) / 2
-    if 360 <= _middle:
-        _middle -= 360
-    return _middle
+            middle = angle_line2 - (angle_line2 - angle_line1) / 2
+    if 360 <= middle:
+        middle -= 360
+    return middle
 
 
 def stg_angle(angle_normal):
@@ -453,7 +456,7 @@ def stg_angle(angle_normal):
         return 360 - angle_normal
 
 
-def distance(x1, y1, x2, y2):
+def calc_distance(x1, y1, x2, y2):
     return math.sqrt(math.pow(x1 - x2, 2) + math.pow(y1 - y2, 2))
 
 
@@ -499,10 +502,10 @@ if __name__ == "__main__":
     logging.info('Number of aerialways: %s', len(aerialways))
 
     # Work on objects
-    for _wayline in powerlines.values():
-        _wayline.calc_and_map()
-    for _wayline in aerialways.values():
-        _wayline.calc_and_map()
+    for wayline in powerlines.values():
+        wayline.calc_and_map()
+    for wayline in aerialways.values():
+        wayline.calc_and_map()
 
     # Write to Flightgear
     stg_file_pointers = {}  # -- dictionary of stg file pointers
@@ -521,32 +524,32 @@ if __name__ == "__main__":
 
 class TestOSMPylons(unittest.TestCase):
     def test_angle_of_line(self):
-        self.assertEqual(0, angle_of_line(0, 0, 0, 1), "North")
-        self.assertEqual(90, angle_of_line(0, 0, 1, 0), "East")
-        self.assertEqual(180, angle_of_line(0, 1, 0, 0), "South")
-        self.assertEqual(270, angle_of_line(1, 0, 0, 0), "West")
-        self.assertEqual(45, angle_of_line(0, 0, 1, 1), "North East")
-        self.assertEqual(315, angle_of_line(1, 0, 0, 1), "North West")
-        self.assertEqual(225, angle_of_line(1, 1, 0, 0), "South West")
+        self.assertEqual(0, calc_angle_of_line(0, 0, 0, 1), "North")
+        self.assertEqual(90, calc_angle_of_line(0, 0, 1, 0), "East")
+        self.assertEqual(180, calc_angle_of_line(0, 1, 0, 0), "South")
+        self.assertEqual(270, calc_angle_of_line(1, 0, 0, 0), "West")
+        self.assertEqual(45, calc_angle_of_line(0, 0, 1, 1), "North East")
+        self.assertEqual(315, calc_angle_of_line(1, 0, 0, 1), "North West")
+        self.assertEqual(225, calc_angle_of_line(1, 1, 0, 0), "South West")
 
     def test_middle_angle(self):
-        self.assertEqual(0, middle_angle(0, 0), "North North")
-        self.assertEqual(45, middle_angle(0, 90), "North East")
-        self.assertEqual(130, middle_angle(90, 170), "East Almost_South")
-        self.assertEqual(90, middle_angle(135, 45), "South_East North_East")
-        self.assertEqual(0, middle_angle(45, 315), "South_East North_East")
-        self.assertEqual(260, middle_angle(170, 350), "Almost_South Almost_North")
+        self.assertEqual(0, calc_middle_angle(0, 0), "North North")
+        self.assertEqual(45, calc_middle_angle(0, 90), "North East")
+        self.assertEqual(130, calc_middle_angle(90, 170), "East Almost_South")
+        self.assertEqual(90, calc_middle_angle(135, 45), "South_East North_East")
+        self.assertEqual(0, calc_middle_angle(45, 315), "South_East North_East")
+        self.assertEqual(260, calc_middle_angle(170, 350), "Almost_South Almost_North")
 
     def test_distance(self):
-        self.assertEqual(5, distance(0, -1, -4, 2))
+        self.assertEqual(5, calc_distance(0, -1, -4, 2))
 
     def test_calculate_and_map(self):
         pylon1 = Pylon(1)
-        pylon1.x = -1
-        pylon1.y = -1
+        pylon1.x = -100
+        pylon1.y = -100
         pylon2 = Pylon(2)
-        pylon2.x = 1
-        pylon2.y = 1
+        pylon2.x = 100
+        pylon2.y = 100
         wayline1 = WayLine(100)
         wayline1.pylons.append(pylon1)
         wayline1.pylons.append(pylon2)
@@ -555,13 +558,20 @@ class TestOSMPylons(unittest.TestCase):
         self.assertAlmostEqual(45, pylon2.heading, 2)
         pylon3 = Pylon(3)
         pylon3.x = 0
-        pylon3.y = 1
+        pylon3.y = 100
         pylon4 = Pylon(4)
-        pylon4.x = -1
-        pylon4.y = 2
+        pylon4.x = -100
+        pylon4.y = 200
         wayline1.pylons.append(pylon3)
         wayline1.pylons.append(pylon4)
         wayline1.calc_and_map()
         self.assertAlmostEqual(337.5, pylon2.heading, 2)
         self.assertAlmostEqual(292.5, pylon3.heading, 2)
         self.assertAlmostEqual(315, pylon4.heading, 2)
+        pylon5 = Pylon(5)
+        pylon5.x = -100
+        pylon5.y = 300
+        wayline1.pylons.append(pylon5)
+        wayline1.calc_and_map()
+        self.assertAlmostEqual(337.5, pylon4.heading, 2)
+        self.assertAlmostEqual(0, pylon5.heading, 2)
