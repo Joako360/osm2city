@@ -10,13 +10,12 @@ import logging
 import random
 import numpy as np
 import copy
-import pdb
+#from pdb import pm
 import math
 import string
 
 from vec2d import vec2d
 from textures import find_matching_texture
-import ac3d
 #nobjects = 0
 nb = 0
 out = ""
@@ -32,7 +31,7 @@ import tools
 import parameters
 import myskeleton
 import roofs
-
+import ac3d
 
 class random_number(object):
     def __init__(self, randtype, min, max):
@@ -514,17 +513,23 @@ def write_ring(out, b, ring, v0, facade_texture, tex_y0, tex_y1, inner = False):
     # numsurf
 
 
-def write_one_LOD(f_out, lod, elev, tile_elev, transform, offset):
-    """now actually write all buildings for given tile.
+def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
+    """now actually write buildings of one LOD for given tile.
        While writing, accumulate some statistics
        (totals stored in global stats object, individually also in building)
        offset accounts for cluster center
        - all LOD in one file. Plus roofs. One Object per LOD
     """
-    out = ac3d.Writer(tools.stats)
-    out.new_object('main', None)
+    ac = ac3d.Writer(tools.stats)
+    LOD_objects = []
+    LOD_objects.append(ac.new_object('LOD_bare', None))
+    LOD_objects.append(ac.new_object('LOD_rough', None))
+    LOD_objects.append(ac.new_object('LOD_detail', None))
 
-    for b in lod:
+    global nb # FIXME: still need this?
+
+    for b in buildings:
+        out = LOD_objects[b.LOD]
         #print "#"
         b.roof_complex = False # no complex roofs for now
         b.X = np.array(b.X_outer + b.X_inner)
@@ -535,9 +540,6 @@ def write_one_LOD(f_out, lod, elev, tile_elev, transform, offset):
 
         write_and_count_vert(out, b, elev, offset, tile_elev)
 
-    # -- surfaces
-    global nb
-    for b in lod:
         facade_texture = b.facade_texture
 
         nb += 1
@@ -616,7 +618,9 @@ def write_one_LOD(f_out, lod, elev, tile_elev, transform, offset):
 
         tools.stats.count(b)
 
-    f_out.write(str(out))
+    f = open(ac_file_name, "w")
+    f.write(str(ac))
+    f.close()
 
 
 if __name__ == "__main__":
