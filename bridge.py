@@ -137,7 +137,7 @@ class Bridge(object):
     
         self.center = shg.LineString(coords)
         print "# length %1.0f m" % self.center.length
-        if len(coords) < 3 or 0 and self.center.length < 1000: 
+        if len(coords) < 3 or self.center.length < 20:
             print "# too short"
             self.too_short = True
             return
@@ -625,10 +625,10 @@ def make_bridge_from_way(osm_id, tags, coords):
     if 'highway' in tags and tags['highway'] in ('motorway', '_primary', '_secondary', '_residential'):
 
         if 'name' in tags:
-            if True or tags['name'] in ok:
+            if False or tags['name'] in ok:
                 pass
             else:
-                print tags['name']
+                #print tags['name']
                 return
     else:
         if False:

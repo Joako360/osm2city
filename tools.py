@@ -24,6 +24,7 @@ class Interpolator(object):
     """load elevation data from file, interpolate"""
     def __init__(self, filename, fake=False):
         # FIXME: use values from header in filename
+        # FIXME: could save lots of mem by not storing regular grid XY
         if fake:
             self.fake = True
             self.h = 0.
@@ -32,15 +33,15 @@ class Interpolator(object):
         else:
             self.fake = False
         f = open(filename, "r")
-        x0, y0, size_x, size_y, step_x, step_y = [float(i) for i in f.readline().split()[1:]]
-        ny = len(np.arange(y0, y0+size_y, step_y))
-        nx = len(np.arange(x0, x0+size_x, step_x))
+        x0, y0, size_x, size_y, self.step_x, self.step_y = [float(i) for i in f.readline().split()[1:]]
+        ny = len(np.arange(y0, y0+size_y, self.step_y))
+        nx = len(np.arange(x0, x0+size_x, self.step_x))
 
         #elev = np.loadtxt(filename)[:,2:]
         elev = np.loadtxt(filename)
         f.close()
-        self.x = elev[:,0]
-        self.y = elev[:,1]
+        self.x = elev[:,0] # -- that's actually lon
+        self.y = elev[:,1] #                and lat
         self.h = elev[:,4]
         if nx * ny != len(self.x):
             raise ValueError("expected %i, but read %i lines." % (nx*ny, len(self.x)))
@@ -81,6 +82,20 @@ class Interpolator(object):
 
     def shift(self, h):
         self.h += h
+        
+    def write(self, filename, downsample=2):
+        """Interpolate, write to file. Useful to create a coarser grid that loads faster"""
+        x = self.x[::downsample,::downsample]
+        y = self.y[::downsample,::downsample]
+        h = self.h[::downsample,::downsample]
+        ny, nx = x.shape
+        zero = np.zeros_like(x).ravel()
+        size_x = self.step_x * downsample * nx
+        size_y = self.step_y * downsample * ny
+        header = "%g %g %g %g %g %g" \
+            % (0, 0, size_x, size_y, self.step_x * downsample, self.step_y * downsample)
+        X = np.vstack((x.ravel(), y.ravel(), zero, zero, h.ravel())).transpose()
+        np.savetxt(filename, X, header=header, fmt=["%1.8f", "%1.8f", "%g", "%g", "%1.2f"])
 
 
 def raster_glob():

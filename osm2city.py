@@ -14,6 +14,7 @@ You should disable random buildings.
 """
 
 # TODO:
+# - one object per tile only. Now drawables 1072 -> 30fps
 # x use geometry library
 # x read original .stg+.xml, don't place OSM buildings when there's a static model near/within
 # - compute static_object stg's on the fly
@@ -584,6 +585,8 @@ if __name__ == "__main__":
 
     logging.info("reading elevation data")
     elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
+    #elev.write("elev.out.small", 4)
+    #sys.exit(0)
     logging.debug("height at origin", elev(vec2d(0,0)))
     logging.debug("origin at ", tools.transform.toGlobal((0,0)))
 
@@ -731,9 +734,9 @@ if __name__ == "__main__":
                 path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center_global)
             try:
                 os.makedirs(path)
-            except OSError:
-                logging.exception("Path to output already exists or unable to create")
-                pass
+            except OSError, e:
+                if e.errno != 17:
+                    logging.exception("Unable to create path to output")
 
             # -- open .ac and write header
             fname = parameters.PREFIX + "city%02i%02i" % (cl.I.x, cl.I.y)
