@@ -62,7 +62,7 @@ def uninstall_ours(path, stg_fname, our_magic):
     """
     our_magic_start = delimiter_string(our_magic, True)
     our_magic_end = delimiter_string(our_magic, False)
-    
+
     try:
         stg = open(path + stg_fname, "r")
         lines = stg.readlines()
@@ -75,9 +75,10 @@ def uninstall_ours(path, stg_fname, our_magic):
                 continue
             if line.startswith(our_magic_end):
                 ours = False
+                continue
             if ours:
                 continue
-            
+
             stg.write(line)
         stg.flush()
         stg.close()
