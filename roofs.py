@@ -176,7 +176,7 @@ def separate_gable(out, b, X):
                (o + 0, repeatx, 0),
                (o + 4, 0.5*repeatx, repeaty) ])
 
-def _separate_flat(o + b, X, ac_name = ""):
+def _separate_flat(b, X, ac_name = ""):
 
     """flat roof, any number of nodes, separate model"""
     uv = face_uv(range(b.nnodes_outer), X, b.roof_texture.h_size_meters, b.roof_texture.v_size_meters)
