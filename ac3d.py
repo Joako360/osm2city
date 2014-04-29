@@ -55,6 +55,9 @@ class Object(object):
         self._faces.append(Face(nodes_uv_list, typ, mat))
         return len(self._faces) - 1
 
+    def is_empty(self):
+        return not self._nodes
+
     def __str__(self):
         s = 'OBJECT poly\n'
         s += 'name "%s"\n' % self.name
@@ -81,6 +84,7 @@ class Writer(object):
         o = Object(name, texture, **kwargs)
         self.objects.append(o)
         self._current_object = o
+        return o
 
     def close_object(self):
         self._current_object.close()
@@ -98,8 +102,9 @@ class Writer(object):
     def __str__(self):
         s = 'AC3Db\n'
         s += 'MATERIAL "" rgb 1 1 1 amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0\n'
-        s += 'OBJECT world\nkids %i\n' % (len(self.objects))
-        s += string.join([str(o) for o in self.objects])
+        non_empty = [o for o in self.objects if not o.is_empty()]
+        s += 'OBJECT world\nkids %i\n' % len(non_empty)
+        s += string.join([str(o) for o in non_empty])
         return s
 
 if __name__ == "__main__":
