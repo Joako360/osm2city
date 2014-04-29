@@ -419,7 +419,9 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         if parameters.BUILDING_COMPLEX_ROOFS:
             # -- pitched, separate roof if we have 4 ground nodes and area below 1000m2
             if not b.polygon.interiors and b.area < 2000:
-                if b._nnodes_ground == 4 or (parameters.EXPERIMENTAL_USE_SKEL and \
+                if b._nnodes_ground == 4
+                   b.roof_complex = True
+                elif (parameters.EXPERIMENTAL_USE_SKEL and \
                    b._nnodes_ground in range(4, parameters.SKEL_MAX_NODES)):
                    b.roof_complex = True
 
