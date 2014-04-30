@@ -1,12 +1,15 @@
 next
 ----
+- get textures back
+- get roofs back
 x relations with 2+ inner rings
 - merge adjacent buildings
 - texture gable walls
 x usability: try .pkl first, failing that, try .osm. Warn about existing .pkl before .osm parsing.
-- compute angles for ground nodes, simplify large angles
+x compute angles for ground nodes, simplify large angles
 - pitched roofs on relations
 - discard small inner ways
+
 
 textures
 --------
@@ -479,33 +482,14 @@ above
 20000 m^2      3 |
 50000 m^2      0 |
 
-Plan
-----
-Hi Keith,
+repeat textures?
+----------------
++ more simple coding
++ no additional verts
+- future use. What if global texture atlas becomes standard?
+  -> by then, osm2city will be integrated into FG
+? how many buildings make use of repeatx?
 
-It's great to see you're getting something useful out of osm2city, and thanks a lot for your contribution!
-
-You may have seen my recent forum post/git commits. My near-term goal is to get textures and LOD back with the single-object-per-tile approach, which performs way better than having thousands of objects.
-
-Then,
-- alleviate/hide the mismatch between FG's generic urban/suburban texture and the buildings. Probably I'll replace FG's texture with a more or less gray one, and add a little patch of ground (like a garden) around each building, which can be textured greenish.
-- integrate shared models, much like x-plane's art assets. E.g., gas stations etc.
-- where OSM roads are avavilabe, but no OSM buildings, place shared models within city boundaries, aligned to the roads.
-- finally, do all of this within FG
-(sufficient work for the next years, I guess)
-
-Your plan sounds good! I thought about populating larger areas, too, but then got side-tracked with further improving the spots I visit most often. But hey, if you're volunteering, great :)
-
-Master scripts make sense. You can hard-code defaults in parameters.py. But I can also imagine it wouldn't be to hard to allow multiple -f options, as in
-./osm2city -f master_param.ini -f LOWI/params.ini
-
-* Better Elevation loading.
-Besides the elev.nas approach, there is experimental support for fgelev.
-https://www.mail-archive.com/flightgear-devel@lists.sourceforge.net/msg40753.html
-Controlled by the parameter MANUAL_ELEV. Have a look at tools.py:raster_fgelev()
-That basically does the same as elev.nas, but from within python.
-
-I can imagine, for massive generation, you'd want to probe elevation only for the actual building you're placing. That might (or might not) be faster than probing the whole area and then interpolating.
 
 
 
