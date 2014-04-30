@@ -400,7 +400,8 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
         # -- Work on roof
         #    roof is controlled by two flags:
-        #    bool b.roof_complex: whether or not to include roof as separate model
+        #    bool b.roof_complex: flat or pitched?
+        #    bool b.roof_separate_LOD
         #      useful for
         #      - pitched roof
         #      - roof with add-ons: AC (TODO)
@@ -411,7 +412,9 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         if parameters.BUILDING_COMPLEX_ROOFS:
             # -- pitched, separate roof if we have 4 ground nodes and area below 1000m2
             if not b.polygon.interiors and b.area < 2000:
-                if b._nnodes_ground == 4 or (parameters.EXPERIMENTAL_USE_SKEL and \
+                if b._nnodes_ground == 4:
+                   b.roof_complex = True
+                if (parameters.EXPERIMENTAL_USE_SKEL and \
                    b._nnodes_ground in range(4, parameters.SKEL_MAX_NODES)):
                    b.roof_complex = True
 
@@ -531,7 +534,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
     for b in buildings:
         out = LOD_objects[b.LOD]
         #print "#"
-        b.roof_complex = False # no complex roofs for now
+        #b.roof_complex = False # no complex roofs for now
         b.X = np.array(b.X_outer + b.X_inner)
     #    Xo = np.array(b.X_outer)
         for i in range(b._nnodes_ground):
@@ -571,7 +574,6 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
         if not parameters.EXPERIMENTAL_INNER and len(b.polygon.interiors) > 1:
             raise NotImplementedError("Can't yet handle relations with more than one inner way")
 
-
         if not b.roof_complex:
         #if True:
             roofs.flat(out, b, b.X)
@@ -600,7 +602,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
                 if s:
                     tools.stats.have_complex_roof += 1
                 else: # -- fall back to flat roof
-                    roofs.flat(out, b, b.X, b.roof_ac_name)
+                    roofs.flat(out, b, b.X, None) #b.roof_ac_name)
     #                print "FAIL"
                     # FIXME: move to analyse. If we fall back, don't require separate LOD
 
@@ -610,7 +612,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
             #out_surf.write("kids 0\n")
 
             # -- LOD flat model
-            if True:
+            if False:
                 roof_ac_name_flat = "b%i-flat" % nb
                 LOD_lists[4].append(roof_ac_name_flat)
                 out_surf.write(roofs.flat(b, X, roof_ac_name_flat))

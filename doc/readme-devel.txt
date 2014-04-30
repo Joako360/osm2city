@@ -1,7 +1,7 @@
 next
 ----
-- get textures back
 - get roofs back
+- get textures back
 x relations with 2+ inner rings
 - merge adjacent buildings
 - texture gable walls

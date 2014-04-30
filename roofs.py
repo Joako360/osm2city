@@ -109,13 +109,12 @@ def separate_gable(out, b, X):
     #out.new_object(b.roof_ac_name, b.roof_texture.filename + '.png')
 
     # -- pitched roof for 4 ground nodes
-    numvert = b.nnodes_outer + 2
-    out += "numvert %i\n" % numvert
-    b.n_vert += numvert
+    #numvert = b.nnodes_outer + 2
+    #b.n_vert += numvert
 
     # -- 4 corners
+    o = out.next_node_index()
     for x in X:
-        z = b.ground_elev - 1
         out.node(-x[1], b.ground_elev + b.height, -x[0])
     # --
     #mid_short_x = 0.5*(X[3][1]+X[0][1])
@@ -137,8 +136,8 @@ def separate_gable(out, b, X):
     len_roof_hypo = ((0.5*b.lenX[1])**2 + roof_height**2)**0.5
     repeaty = len_roof_hypo / roof_texture_size_y
 
-    numsurf = 4
-    b.surfaces += numsurf
+#    numsurf = 4
+#    b.surfaces += numsurf
 
 #    out += "SURF 0x0\n"
 #    out += "mat %i\n" % b.mat

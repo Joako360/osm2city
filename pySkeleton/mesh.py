@@ -151,12 +151,13 @@ class Mesh:
             out.new_object(b.roof_ac_name, b.roof_texture.filename + '.png')
 
         X = []
+        o = out.next_node_index()
         for p in self.vertices:
 #            s += "%f %f %f\n" % (p.x, p.y, p.z)
             x = -(p.x - offset_xy.x)
             y = -(p.y - offset_xy.y)
             X.append([x,y])
-            out.vert(y, p.z + offset_z, x)
+            out.node(y, p.z + offset_z, x)
 
         for face in self.faces:
             face = np.roll(face[::-1], 1) # -- make outer edge the first
@@ -164,7 +165,7 @@ class Mesh:
             i = 0
             l = []
             for index in face:
-                l.append((index, uv[i,0], uv[i,1]))
+                l.append((o + index, uv[i,0], uv[i,1]))
                 #print "UV coord", uv[i,0], uv[i,1]
 #                print "z=%g %g %g" % (self.vertices[index].z, uv[i,0], uv[i,1])
                 i += 1

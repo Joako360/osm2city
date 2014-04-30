@@ -99,14 +99,13 @@ class Building(object):
         self.stg_hdg = stg_hdg
         self.height = height
         self.levels = levels
-        self.vertices = 0
         self.first_node = 0  # index of first node in final OBJECT node list
         #self._nnodes_ground = 0 # number of nodes on ground
-        self.surfaces = 0
         self.anchor = vec2d(list(outer_ring.coords[0]))
         self.facade_texture = None
         self.roof_texture = None
         self.roof_complex = False
+        self.roof_separate_LOD = False # May or may not be faster
         self.ac_name = None
         self.ceiling = 0.
         self.LOD = None
