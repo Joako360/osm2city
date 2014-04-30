@@ -1,13 +1,14 @@
 next
 ----
-- get roofs back
+x get roofs back
+- put roofs in same object, re-use nodes/separate object
 - get textures back
 x relations with 2+ inner rings
 - merge adjacent buildings
 - texture gable walls
 x usability: try .pkl first, failing that, try .osm. Warn about existing .pkl before .osm parsing.
 x compute angles for ground nodes, simplify large angles
-- pitched roofs on relations
+x pitched roofs on relations
 - discard small inner ways
 
 
@@ -488,7 +489,18 @@ repeat textures?
 + no additional verts
 - future use. What if global texture atlas becomes standard?
   -> by then, osm2city will be integrated into FG
-? how many buildings make use of repeatx?
+20 % of buildings make use of repeatx
+
+ground texture
+--------------
+1. use a patch of ground for every building.
++ easy to code first try
++ better resolution
+- eventually needs meshing
+
+2. one large texture, paint on it
+- must code paint algs -- is that useful in future?
++ less verts, but needs huge texture
 
 
 

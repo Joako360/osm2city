@@ -455,7 +455,6 @@ def write_and_count_vert(out, b, elev, offset, tile_elev):
 
     #b.n_verts += numvert
 
-    b.ground_elev = elev(vec2d(b.X[0]) + offset) - tile_elev # -- interpolate ground elevation at building location
     #print b.refs[0].lon
     #ground_elev = 200. + (b.refs[0].lon-13.6483695)*5000.
     #print "ground_elev", ground_elev
@@ -476,6 +475,62 @@ def write_and_count_vert(out, b, elev, offset, tile_elev):
     b.ceiling = b.ground_elev + b.height
 # ----
 
+def write_ground(out, b, elev):
+    # align smallest rectangle
+    d = 2
+
+    # align x/y
+    if 0:
+        x0 = b.X[:,0].min() - d
+        x1 = b.X[:,0].max() + d
+        y0 = b.X[:,1].min() - d
+        y1 = b.X[:,1].max() + d
+
+    # align along longest side
+    if 1:
+        Xo = np.array(b.X_outer)
+        origin = Xo[0].copy()
+        Xo -= origin
+
+        # rotate such that longest side is parallel with x
+        i = b.lenX[:b.nnodes_outer].argmax() # longest side
+        i1 = i + 1
+        if i1 == b.nnodes_outer: i1 = 0
+        angle_deg = math.atan2(Xo[i1,1]-Xo[i,1], Xo[i1,0]-Xo[i,0])
+        angle = radians(angle_deg)
+        R = np.array([[cos(angle), -sin(angle)],
+                      [sin(angle), cos(angle)]])
+        Xo_rot = np.dot(Xo, R)  #.reshape(1,2)
+        x0 = Xo_rot[:,0].min() - d
+        x1 = Xo_rot[:,0].max() + d
+        y0 = Xo_rot[:,1].min() - d
+        y1 = Xo_rot[:,1].max() + d
+        # rotate back
+        if 1:
+            R = np.array([[cos(angle),  sin(angle)],
+                          [-sin(angle), cos(angle)]])
+            Xnew = np.array([[x0, y0], [x1,y1]])
+            Xnew_rot = np.dot(Xnew, R) - origin #.reshape(1,2)
+            x0 = Xnew_rot[0,0]
+            x1 = Xnew_rot[1,0]
+            y0 = Xnew_rot[0,1]
+            y1 = Xnew_rot[1,1]
+
+    offset_z = 0.05
+    z0 = elev(vec2d(x0, y0)) + offset_z
+    z1 = elev(vec2d(x1, y0)) + offset_z
+    z2 = elev(vec2d(x1, y1)) + offset_z
+    z3 = elev(vec2d(x0, y1)) + offset_z
+
+    o = out.next_node_index()
+    out.node(-y0, z0, -x0)
+    out.node(-y0, z1, -x1)
+    out.node(-y1, z2, -x1)
+    out.node(-y1, z3, -x0)
+    out.face([ (o,0,0),
+               (o+1,0,0),
+               (o+2,0,0),
+               (o+3,0,0)], mat=1)
 
   # write_ring(out, b, b.polygon.exterior, 0)
 def write_ring(out, b, ring, v0, facade_texture, tex_y0, tex_y1, inner = False):
@@ -523,6 +578,9 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
        offset accounts for cluster center
        - all LOD in one file. Plus roofs. One Object per LOD
     """
+    def local_elev(p):
+        return elev(p + offset) - tile_elev
+
     ac = ac3d.Writer(tools.stats)
     LOD_objects = []
     LOD_objects.append(ac.new_object('LOD_bare', None))
@@ -541,6 +599,10 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
             b.X[i,0] -= offset.x # -- cluster coordinates. NB: this changes building coordinates!
             b.X[i,1] -= offset.y
 
+
+        b.ground_elev = local_elev(vec2d(b.X[0])) # -- interpolate ground elevation at building location
+        #b.ground_elev = elev(vec2d(b.X[0]) + offset) - tile_elev # -- interpolate ground elevation at building location
+        write_ground(out, b, local_elev)
         write_and_count_vert(out, b, elev, offset, tile_elev)
 
         facade_texture = b.facade_texture
@@ -556,6 +618,8 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 #        if (not no_roof) and (not b.roof_complex): nsurf += 1 # -- because roof will be part of base model
 
         tex_y0, tex_y1 = check_height(b.height, facade_texture)
+
+
 
         # -- outer and inner walls (if any)
         #print "--1"

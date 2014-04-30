@@ -62,6 +62,7 @@ class Interpolator(object):
         """compute elevation at (x,y) by linear interpolation"""
         if self.fake:
             return 0.
+            #return p.x + p.y
         global transform
         if not is_global:
             p = vec2d.vec2d(transform.toGlobal(p))
