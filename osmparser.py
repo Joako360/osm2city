@@ -15,7 +15,7 @@ class OSMElement(object):
     def __init__(self, osm_id):
         self.osm_id = osm_id
         self.tags = {}
-        
+
     def addTag(self, key, value):
         self.tags[key] = value
 
@@ -31,7 +31,7 @@ class Way(OSMElement):
     def __init__(self, osm_id):
         OSMElement.__init__(self, osm_id)
         self.refs = []
-        
+
     def addRef(self, ref):
         self.refs.append(ref)
 
@@ -40,7 +40,7 @@ class Relation(OSMElement):
     def __init__(self, osm_id):
         OSMElement.__init__(self, osm_id)
         self.members = []
-        
+
     def addMember(self, member):
         self.members.append(member)
 
@@ -57,7 +57,7 @@ class OSMContentHandler(xml.sax.ContentHandler):
     A Specialized SAX ContentHandler for OpenStreetMap data to be processed by osm2city.
     The valid_??_keys are those tag keys, which will be accepted and added to an element's tags.
     The req_??_keys are those tag keys, of which at least one must be present to add an element to the saved elements.
-    
+
     The valid_??_keys and req_??_keys are a primitive way to save memory and reduce the number of further processed elements.
     A better way is to have the input file processed by e.g. Osmosis first.
     """
@@ -81,14 +81,14 @@ class OSMContentHandler(xml.sax.ContentHandler):
             self._within_element = name
             lat = float(attrs.getValue("lat"))
             lon = float(attrs.getValue("lon"))
-            osm_id = attrs.getValue("id")
+            osm_id = int(attrs.getValue("id"))
             self._current_node = Node(osm_id, lat, lon)
         elif name == "way":
             self._within_element = name
-            osm_id = attrs.getValue("id")
+            osm_id = int(attrs.getValue("id"))
             self._current_way = Way(osm_id)
         elif name == "relation":
-            osm_id = attrs.getValue("id")
+            osm_id = int(attrs.getValue("id"))
             self._current_relation = Relation(osm_id)
         elif name == "tag":
             key = attrs.getValue("k")
@@ -103,10 +103,10 @@ class OSMContentHandler(xml.sax.ContentHandler):
                 if key in self._valid_relation_keys:
                     self._current_relation.addTag(key, value)
         elif name == "nd":
-            ref = attrs.getValue("ref")
+            ref = int(attrs.getValue("ref"))
             self._current_way.addRef(ref)
         elif name == "member":
-            ref = attrs.getValue("ref")
+            ref = int(attrs.getValue("ref"))
             type_ = attrs.getValue("type")
             role = attrs.getValue("role")
             self._current_relation.addMember(Member(ref, type_, role))
@@ -120,7 +120,7 @@ class OSMContentHandler(xml.sax.ContentHandler):
         elif name == "relation":
             if has_required_tag_keys(self._current_relation.tags, self._req_relation_keys):
                 self.relations_dict[self._current_relation.osm_id] = self._current_relation
-            
+
     def characters(self, content):
         pass
 
@@ -192,7 +192,7 @@ def main(source_file_name):
     logging.info('Number of nodes: %s', len(handler.nodes_dict))
     logging.info('Number of ways: %s', len(handler.ways_dict))
     logging.info('Number of relations: %s', len(handler.relations_dict))
- 
+
 if __name__ == "__main__":
     main("C:\\FlightGear\\customscenery2\\LSZS\\ch.osm")
 
