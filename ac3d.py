@@ -26,11 +26,12 @@ class Face(object):
         return s
 
 class Object(object):
-    def __init__(self, name, texture=None, default_type=0x0, default_mat=0):
+    def __init__(self, name, stats, texture=None, default_type=0x0, default_mat=0):
         self._nodes = []
         self._faces = []
         self.name = str(name)
         assert name != ""
+        self.stats = stats
         self.texture = texture
         self.default_type = default_type
         self.default_mat = default_mat
@@ -41,6 +42,7 @@ class Object(object):
     def node(self, x, y, z):
         """Add new node. Return its index."""
         self._nodes.append(Node(x, y, z))
+        self.stats.vertices += 1
         return len(self._nodes) - 1
 
     def next_node_index(self):
@@ -53,6 +55,7 @@ class Object(object):
         if not mat:
             mat = self.default_mat
         self._faces.append(Face(nodes_uv_list, typ, mat))
+        self.stats.surfaces += 1
         return len(self._faces) - 1
 
     def is_empty(self):
@@ -78,10 +81,11 @@ class Writer(object):
     """
     def __init__(self, stats):
         self.objects = []
+        self.stats = stats
         self._current_object = None
 
     def new_object(self, name, texture, **kwargs):
-        o = Object(name, texture, **kwargs)
+        o = Object(name, self.stats, texture, **kwargs)
         self.objects.append(o)
         self._current_object = o
         return o

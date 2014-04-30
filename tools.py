@@ -82,7 +82,7 @@ class Interpolator(object):
 
     def shift(self, h):
         self.h += h
-        
+
     def write(self, filename, downsample=2):
         """Interpolate, write to file. Useful to create a coarser grid that loads faster"""
         x = self.x[::downsample,::downsample]
@@ -133,7 +133,7 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
     import Queue
     fg_scenery="/home/tom/fgfs/home/Scenery-devel"
     fg_scenery="$FG_SCENERY"
-    
+
     fgelev = subprocess.Popen('/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev --fg-root $FG_ROOT --fg-scenery '+fg_scenery,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     #fgelev = subprocess.Popen(["/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev", "--fg-root", "$FG_ROOT",  "--fg-scenery", "$FG_SCENERY"],  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     #time.sleep(5)
@@ -168,7 +168,7 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
         print "done %3.1f %%\r" % ((y - y0)*100/size_y),
 
     f.close()
-    
+
     print "done"
 
 
@@ -312,8 +312,6 @@ class Stats(object):
     def count(self, b):
         """update stats (vertices, surfaces, area) with given building's data
         """
-        self.vertices += b.vertices
-        self.surfaces += b.surfaces
         self.have_pitched_roof += b.roof_complex # FIXME: do we still need this??
         # self.objects += 1 # skipped because we count buildings while OSM parsing
         for i in range(len(self.area_levels))[::-1]:
