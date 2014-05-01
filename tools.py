@@ -82,7 +82,7 @@ class Interpolator(object):
 
     def shift(self, h):
         self.h += h
-        
+
     def write(self, filename, downsample=2):
         """Interpolate, write to file. Useful to create a coarser grid that loads faster"""
         x = self.x[::downsample,::downsample]
@@ -133,7 +133,7 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
     import Queue
     fg_scenery="/home/tom/fgfs/home/Scenery-devel"
     fg_scenery="$FG_SCENERY"
-    
+
     fgelev = subprocess.Popen('/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev --fg-root $FG_ROOT --fg-scenery '+fg_scenery,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     #fgelev = subprocess.Popen(["/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev", "--fg-root", "$FG_ROOT",  "--fg-scenery", "$FG_SCENERY"],  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     #time.sleep(5)
@@ -168,7 +168,7 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
         print "done %3.1f %%\r" % ((y - y0)*100/size_y),
 
     f.close()
-    
+
     print "done"
 
 
@@ -308,6 +308,8 @@ class Stats(object):
         self.LOD = np.zeros(3)
         self.nodes_ground = 0
         self.nodes_simplified = 0
+        self.texture_x_repeated = 0
+        self.texture_x_simple = 0
 
     def count(self, b):
         """update stats (vertices, surfaces, area) with given building's data
@@ -336,33 +338,38 @@ class Stats(object):
             lodzero = 100.*self.LOD[0]/total_written
             lodone = 100.*self.LOD[1]/total_written
             lodtwo = 100.*self.LOD[0]/total_written
-        out.write(textwrap.dedent("""
-        total buildings %i
-        parse errors    %i
-        written         %i
-        skipped
-          small         %i
-          nearby        %i
-          no elevation  %i
-          no texture    %i
-        pitched roof    %i
-          complex       %i
-          roof_errors   %i
-        ground nodes    %i
-          simplified    %i
-        vertices        %i
-        surfaces        %i
-        LOD bare        %i (%2.0f %%)
-        LOD rough       %i (%2.0f %%)
-        LOD detail      %i (%2.0f %%)
-        """ % (self.objects, self.parse_errors, total_written,
-               self.skipped_small, self.skipped_nearby, self.skipped_no_elev, self.skipped_texture,
-               self.have_pitched_roof, self.have_complex_roof, self.roof_errors,
-               self.nodes_ground, self.nodes_simplified,
-               self.vertices, self.surfaces,
-               self.LOD[0], lodzero,
-               self.LOD[1], lodone,
-               self.LOD[2], lodtwo)))
+        try:
+            out.write(textwrap.dedent("""
+            total buildings %i
+            parse errors    %i
+            written         %i
+            skipped
+              small         %i
+              nearby        %i
+              no elevation  %i
+              no texture    %i
+            pitched roof    %i
+              complex       %i
+              roof_errors   %i
+            ground nodes    %i
+              simplified    %i
+            vertices        %i
+            surfaces        %i
+            repeated tex x  %i out of %i (%2.0f %%)
+            LOD bare        %i (%2.0f %%)
+            LOD rough       %i (%2.0f %%)
+            LOD detail      %i (%2.0f %%)
+            """ % (self.objects, self.parse_errors, total_written,
+                   self.skipped_small, self.skipped_nearby, self.skipped_no_elev, self.skipped_texture,
+                   self.have_pitched_roof, self.have_complex_roof, self.roof_errors,
+                   self.nodes_ground, self.nodes_simplified,
+                   self.vertices, self.surfaces,
+                   self.texture_x_repeated, (self.texture_x_repeated + self.texture_x_simple), (self.texture_x_repeated * 100. /(self.texture_x_repeated + self.texture_x_simple)),
+                   self.LOD[0], lodzero,
+                   self.LOD[1], lodone,
+                   self.LOD[2], lodtwo)))
+        except ZeroDivisionError:
+            pass
         out.write("above\n")
         max_area_above = self.area_above.max()
         if max_area_above < 1: max_area_above = 1

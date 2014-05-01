@@ -499,6 +499,10 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
                 ia = int(a)
                 frac = a - ia
                 tex_x1 = facade_texture.closest_h_match(frac) + ia
+                if tex_x1 > 1.:
+                    tools.stats.texture_x_repeated += 1
+                else:
+                    tools.stats.texture_x_simple += 1
 
             out.write("SURF 0x0\n")
             mat = b.mat
@@ -515,6 +519,10 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
         # -- closing wall
         tex_x1 = b.lenX[v1-1] /  facade_texture.h_size_meters
+        if tex_x1 > 1.:
+            tools.stats.texture_x_repeated += 1
+        else:
+            tools.stats.texture_x_simple += 1
         out.write("SURF 0x0\n")
         out.write("mat %i\n" % mat)
         out.write("refs %i\n" % 4)
