@@ -9,6 +9,7 @@ as input and generates data to be used in FlightGear sceneries.
 * Cf. OSM Aerialway: http://wiki.openstreetmap.org/wiki/Map_Features#Aerialway
 
 TODO:
+* Cables should have different diameter depending on WayLine.type_
 * For aerialways make sure there is a station at both ends
 * For aerialways handle stations if represented as ways instead of nodes.
 * For powerlines handle power stations if represented as ways instead of nodes
@@ -37,78 +38,158 @@ import vec2d
 OUR_MAGIC = "osm2pylon"  # Used in e.g. stg files to mark edits by osm2pylon
 
 
+class Cable(object):
+    def __init__(self, start_cable_vertex, end_cable_vertex, radius=0.5):
+        self.start_cable_vertex = start_cable_vertex
+        self.end_cable_vertex = end_cable_vertex
+        self.vertices = [self.start_cable_vertex, self.end_cable_vertex]
+        self.radius = radius
+        self.heading = calc_angle_of_line(start_cable_vertex.x, start_cable_vertex.y
+                                          , end_cable_vertex.x, end_cable_vertex.y)
+
+    def translate_vertices_relative(self, rel_x, rel_y, rel_elevation):
+        """
+        Translates the CableVertices relatively to a reference position
+        """
+        for cable_vertex in self.vertices:
+            cable_vertex.x -= rel_x
+            cable_vertex.y -= rel_y
+            cable_vertex.elevation -= rel_elevation
+
+    def create_numvert_lines(self, cable_vertex):
+        """
+        In the map-data x-axis is towards East and y-axis is towards North and z-axis is elevation.
+        In ac-files the y-axis is pointing upwards and the z-axis points to South -
+        therefore y and z are switched and z * -1
+        """
+        numvert_lines = str(cable_vertex.x + math.sin(math.radians(self.heading + 90))*self.radius)
+        numvert_lines += " " + str(cable_vertex.elevation - self.radius)
+        numvert_lines += " " + str(-1*(cable_vertex.y + math.cos(math.radians(self.heading + 90))*self.radius)) + "\n"
+        numvert_lines += str(cable_vertex.x - math.sin(math.radians(self.heading + 90))*self.radius)
+        numvert_lines += " " + str(cable_vertex.elevation - self.radius)
+        numvert_lines += " " + str(-1*(cable_vertex.y - math.cos(math.radians(self.heading + 90))*self.radius)) + "\n"
+        numvert_lines += str(cable_vertex.x)
+        numvert_lines += " " + str(cable_vertex.elevation + self.radius)
+        numvert_lines += " " + str(-1*cable_vertex.y)
+        return numvert_lines
+
+    def make_ac_entry(self, material):
+        """
+        Returns an ac entry for this cable.
+        """
+        lines = []
+        lines.append("OBJECT poly")
+        lines.append("numvert 6")
+        lines.append(self.create_numvert_lines(self.start_cable_vertex))
+        lines.append(self.create_numvert_lines(self.end_cable_vertex))
+        lines.append("numsurf 3")
+        lines.append("SURF 0x40")
+        lines.append("mat " + str(material))
+        lines.append("refs 4")
+        lines.append("0 0 0")
+        lines.append("3 0 0")
+        lines.append("5 0 0")
+        lines.append("2 0 0")
+        lines.append("SURF 0x40")
+        lines.append("mat " + str(material))
+        lines.append("refs 4")
+        lines.append("0 0 0")
+        lines.append("1 0 0")
+        lines.append("4 0 0")
+        lines.append("3 0 0")
+        lines.append("SURF 0x40")
+        lines.append("mat " + str(material))
+        lines.append("refs 4")
+        lines.append("4 0 0")
+        lines.append("1 0 0")
+        lines.append("2 0 0")
+        lines.append("5 0 0")
+        lines.append("kids 0")
+        return "\n".join(lines)
+
+
 class CableVertex(object):
     def __init__(self, out, height, along=0):
         self.out = out  # the distance from the middle vertical line of the pylon
         self.height = height  # the distance above ground relative to the pylon's ground level (y-axis in ac-file)
-        self.along = along  # the distance along the x-axis away from the middle vertical line of the pylon
-        self.x = 0  # the calculated x-axis in the ac-file
-        self.z = 0  # the calculated z-axis in the ac-file
-        self.y = 0  # the calculated y-axis in the ac-file
+        #  not yet used: self.along = along  # the distance along the x-axis away from the middle vertical line
+        self.x = 0.0  # local position x
+        self.y = 0.0  # local position y
+        self.elevation = 0.0  # elevation above sea level in meters
+
+    def calc_position(self, pylon_x, pylon_y, pylon_elevation, pylon_heading):
+        self.elevation = pylon_elevation + self.height
+        self.x = pylon_x + math.sin(math.radians(pylon_heading + 90))*self.out
+        self.y = pylon_y + math.cos(math.radians(pylon_heading + 90))*self.out
 
 
-def generic_pylon_25_vertices():
-    _vertices = [CableVertex(5.0, 12.6)
-                 , CableVertex(-5.0, 12.6)
-                 , CableVertex(5.0, 16.8)
-                 , CableVertex(-5.0, 16.8)
-                 , CableVertex(5.0, 21.0)
-                 , CableVertex(-5.0, 21.0)
-                 , CableVertex(0.0, 25.2)]
-    return _vertices
+def create_generic_pylon_25_vertices():
+    vertices = [CableVertex(5.0, 12.6)
+                , CableVertex(-5.0, 12.6)
+                , CableVertex(5.0, 16.8)
+                , CableVertex(-5.0, 16.8)
+                , CableVertex(5.0, 21.0)
+                , CableVertex(-5.0, 21.0)
+                , CableVertex(0.0, 25.2)]
+    return vertices
 
 
-def generic_pylon_50_vertices():
-    _vertices = [CableVertex(10.0, 25.2)
-                 , CableVertex(-10.0, 25.2)
-                 , CableVertex(10.0, 33.6)
-                 , CableVertex(-10.0, 33.6)
-                 , CableVertex(10.0, 42.0)
-                 , CableVertex(-10.0, 42.0)
-                 , CableVertex(0.0, 50.4)]
-    return _vertices
+def create_generic_pylon_50_vertices():
+    vertices = [CableVertex(10.0, 25.2)
+                , CableVertex(-10.0, 25.2)
+                , CableVertex(10.0, 33.6)
+                , CableVertex(-10.0, 33.6)
+                , CableVertex(10.0, 42.0)
+                , CableVertex(-10.0, 42.0)
+                , CableVertex(0.0, 50.4)]
+    return vertices
 
 
-def generic_pylon_100_vertices():
-    _vertices = [CableVertex(20.0, 50.4)
-                 , CableVertex(-20.0, 50.4)
-                 , CableVertex(20.0, 67.2)
-                 , CableVertex(-20.0, 67.2)
-                 , CableVertex(20.0, 84.0)
-                 , CableVertex(-20.0, 84.0)
-                 , CableVertex(0.0, 100.8)]
-    return _vertices
+def create_generic_pylon_100_vertices():
+    vertices = [CableVertex(20.0, 50.4)
+                , CableVertex(-20.0, 50.4)
+                , CableVertex(20.0, 67.2)
+                , CableVertex(-20.0, 67.2)
+                , CableVertex(20.0, 84.0)
+                , CableVertex(-20.0, 84.0)
+                , CableVertex(0.0, 100.8)]
+    return vertices
 
 
-def streetlamp3_vertices():
-    _vertices = [CableVertex(1.7, 6.07)
-                 , CableVertex(-1.7, 6.07)]
-    return _vertices
+def create_streetlamp3_vertices():
+    vertices = [CableVertex(1.7, 6.07)
+                , CableVertex(-1.7, 6.07)]
+    return vertices
 
 
-def rail_power_vertices():
-    _vertices = [CableVertex(2.0, 5.9)
-                 , CableVertex(2.0, 5.0)]
-    return _vertices
+def create_rail_power_vertices():
+    vertices = [CableVertex(2.0, 5.9)
+                , CableVertex(2.0, 5.0)]
+    return vertices
 
 
-def get_pylon_vertices(pylon_model):
+def get_cable_vertices(pylon_model):
+    if "generic_pylon_25m" in pylon_model:
+        return create_generic_pylon_25_vertices()
     if "generic_pylon_50m" in pylon_model:
-        return generic_pylon_50_vertices()
+        return create_generic_pylon_50_vertices()
+    if "generic_pylon_100m" in pylon_model:
+        return create_generic_pylon_100_vertices()
     elif "RailPower" in pylon_model:
-        return rail_power_vertices()
+        return create_rail_power_vertices()
     elif "lamp3" in pylon_model:
-        return streetlamp3_vertices()
+        return create_streetlamp3_vertices()
     else:
         return None
 
 
 class WaySegment(object):
-    """Represents the part between the pylons -> cables"""
+    """Represents the part between the pylons and is a container for the cables"""
 
     def __init__(self, start_pylon, end_pylon):
         self.start_pylon = start_pylon
         self.end_pylon = end_pylon
+        self.cables = []
         self.length = calc_distance(start_pylon.x, start_pylon.y, end_pylon.x, end_pylon.y)
         self.heading = calc_angle_of_line(start_pylon.x, start_pylon.y
                                           , end_pylon.x, end_pylon.y)
@@ -138,7 +219,7 @@ class Pylon(object):
         E.g. OBJECT_SHARED Models/Airport/ils.xml 5.313108 45.364122 374.49 268.92
         """
         entry = ["OBJECT_SHARED", self.my_wayline.pylon_model, str(self.lon), str(self.lat), str(self.elevation)
-                  , str(stg_angle(self.heading - 90))]  # 90 less because arms are in x-direction in ac-file
+                 , str(stg_angle(self.heading - 90))]  # 90 less because arms are in x-direction in ac-file
         return " ".join(entry)
 
 
@@ -150,19 +231,64 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
     def __init__(self, osm_id):
         self.osm_id = osm_id
         self.pylons = []
-        self.segments = []
+        self.way_segments = []
         self.type_ = 0
         self.pylon_model = None  # the path to the ac/xml model
         self.length = 0.0  # the total length of all segments
 
     def make_pylons_stg_entries(self):
         """
-        Returns the stg entries for the line in a string separated by linebreaks
+        Returns the stg entries for the pylons of this WayLine in a string separated by linebreaks
         """
         entries = []
         for my_pylon in self.pylons:
             entries.append(my_pylon.make_stg_entry())
         return "\n".join(entries)
+
+    def make_cables_ac_xml_stg_entries(self, filename, path):
+        """
+        Returns the stg entries for the cables of this WayLine in a string separated by linebreaks
+        E.g. OBJECT_STATIC LSZSpylons1901.xml 9.75516 46.4135 2000.48 0
+
+        Before this it creates the xml-file and ac-file containing the cables.
+
+        Each WaySegment is represented as an object group in ac with each cable of the WaySegment as a kid
+
+        """
+        xml_file_lines = []
+        xml_file_lines.append('<?xml version="1.0"?>')
+        xml_file_lines.append('<PropertyList>')
+        xml_file_lines.append('<path>' + filename + '.ac</path>')  # the ac-file is in the same directory
+        xml_file_lines.append('</PropertyList>')
+        with open(path + filename + ".xml", 'w') as f:
+            f.write("\n".join(xml_file_lines))
+
+        ac_file_lines = []
+        ac_file_lines.append("AC3Db")
+        ac_file_lines.append('MATERIAL "cable" rgb 0.5 0.5 0.5 amb 0.5 0.5 0.5 emis 0.0 0.0 0.0 spec 0.5 0.5 0.5 shi 64 trans 0')
+        ac_file_lines.append('MATERIAL "yellow" rgb 1   1   0 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0')
+        ac_file_lines.append('MATERIAL "blue" rgb 0   0   1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0')
+        ac_file_lines.append("OBJECT world")
+        ac_file_lines.append("kids " + str(len(self.way_segments)))
+        way_segment_index = 0
+        for way_segment in self.way_segments:
+            material = 1
+            if self.is_aerialway():
+                material = 2
+            way_segment_index += 1
+            ac_file_lines.append("OBJECT group")
+            ac_file_lines.append('"segment%05d"' % way_segment_index)
+            ac_file_lines.append("kids " + str(len(way_segment.cables)))
+            for cable in way_segment.cables:
+                cable.translate_vertices_relative(self.pylons[0].x, self.pylons[0].y, self.pylons[0].elevation)
+                ac_file_lines.append(cable.make_ac_entry(material))  # material is 0-indexed
+        ac_file_content = "\n".join(ac_file_lines)
+        with open(path + filename + ".ac", 'w') as f:
+            f.write("\n".join(ac_file_lines))
+
+        entry = ["OBJECT_STATIC", filename + ".xml", str(self.pylons[0].lon), str(self.pylons[0].lat)
+                 , str(self.pylons[0].elevation), "90"]
+        return " ".join(entry)
 
     def is_aerialway(self):
         return self.type_ > 20
@@ -206,11 +332,11 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
             average_height /= found
 
         # use statistics to determine type_ and pylon_model
-        if self.type_ == 11 and nbr_towers <= nbr_poles and max_height <= 25.0 and max_length <= 250.0:
-            self.type_ = 11
+        if self.type_ == 12 and nbr_towers <= nbr_poles and max_height <= 25.0 and max_length <= 250.0:
+            self.type_ = 12
             self.pylon_model = "Models/StreetFurniture/streetlamp3.xml"
         else:
-            self.type_ = 12
+            self.type_ = 11
             if average_height < 35.0 and max_length < 300.0:
                 self.pylon_model = "Models/Power/generic_pylon_25m.xml"
             elif average_height < 75.0 and max_length < 500.0:
@@ -241,10 +367,10 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
         Returns the maximum length of segments"""
         max_length = 0.0
         total_length = 0.0
-        self.segments = []  # if this method would be called twice by mistake
-        for x in range(0, len(self.pylons) - 2):
+        self.way_segments = []  # if this method would be called twice by mistake
+        for x in range(0, len(self.pylons) - 1):
             segment = WaySegment(self.pylons[x], self.pylons[x + 1])
-            self.segments.append(segment)
+            self.way_segments.append(segment)
             if segment.length > max_length:
                 max_length = segment.length
             total_length += segment.length
@@ -252,9 +378,21 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
         return max_length
 
     def _calc_cables(self):
-        for segment in self.segments:
-            start_heading = segment.heading - segment.start_pylon.heading
-            end_heading = segment.heading - segment.end_pylon.heading
+        """
+        Creates the cables per WaySegment. First find the start and end points depending on pylon model.
+        Then calculate the local positions of all start and end points.
+        Afterwards use the start and end points to create all cables for a given WaySegment
+        """
+        for segment in self.way_segments:
+            start_cable_vertices = get_cable_vertices(self.pylon_model)
+            end_cable_vertices = get_cable_vertices(self.pylon_model)
+            for i in xrange(0, len(start_cable_vertices)):
+                start_cable_vertices[i].calc_position(segment.start_pylon.x, segment.start_pylon.y
+                                                      , segment.start_pylon.elevation, segment.start_pylon.heading)
+                end_cable_vertices[i].calc_position(segment.end_pylon.x, segment.end_pylon.y
+                                                    , segment.end_pylon.elevation, segment.end_pylon.heading)
+                cable = Cable(start_cable_vertices[i], end_cable_vertices[i])
+                segment.cables.append(cable)
 
 
 def process_osm_elements(nodes_dict, ways_dict, _elev_interpolator, _coord_transformator):
@@ -396,27 +534,33 @@ def merge_lines(osm_id, line0, line1):
     return 0
 
 
-def write_stg_entries(stg_fp_dict, lines_dict):
+def write_stg_entries(stg_fp_dict, lines_dict, wayname):
+    line_index = 0
     for line in lines_dict.values():
+        line_index += 1
         center = line.get_center_coordinates()
         stg_fname = calc_tile.construct_stg_file_name(center)
+        if parameters.PATH_TO_OUTPUT:
+            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, center)
+        else:
+            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center)
         if not stg_fname in stg_fp_dict:
-            if parameters.PATH_TO_OUTPUT:
-                path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, center)
-            else:
-                path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center)
-            try:
-                os.makedirs(path)
-            except OSError:
-                logging.exception("Path to output already exists or unable to create")
-                pass
+            if not os.path.exists(path):
+                try:
+                    os.makedirs(path)
+                except OSError:
+                    logging.exception("Unable to create path to output directory")
+                    pass
             stg_io.uninstall_ours(path, stg_fname, OUR_MAGIC)
             stg_file = open(path + stg_fname, "a")
+            logging.info('Opening new stg-file for append: ' + path + stg_fname)
             stg_file.write(stg_io.delimiter_string(OUR_MAGIC, True) + "\n# do not edit below this line\n#\n")
             stg_fp_dict[stg_fname] = stg_file
         else:
             stg_file = stg_fp_dict[stg_fname]
         stg_file.write(line.make_pylons_stg_entries() + "\n")
+        filename = parameters.PREFIX + wayname + "%05d" % line_index
+        stg_file.write(line.make_cables_ac_xml_stg_entries(filename, path) + "\n")
 
 
 def calc_angle_of_line(x1, y1, x2, y2):
@@ -509,8 +653,8 @@ if __name__ == "__main__":
 
     # Write to Flightgear
     stg_file_pointers = {}  # -- dictionary of stg file pointers
-    write_stg_entries(stg_file_pointers, powerlines)
-    write_stg_entries(stg_file_pointers, aerialways)
+    write_stg_entries(stg_file_pointers, powerlines, "powerline")
+    write_stg_entries(stg_file_pointers, aerialways, "aerialway")
 
     for stg in stg_file_pointers.values():
         stg.write(stg_io.delimiter_string(OUR_MAGIC, False) + "\n")
@@ -543,7 +687,8 @@ class TestOSMPylons(unittest.TestCase):
     def test_distance(self):
         self.assertEqual(5, calc_distance(0, -1, -4, 2))
 
-    def test_calculate_and_map(self):
+    def test_wayline_calculate_and_map(self):
+        # first test headings
         pylon1 = Pylon(1)
         pylon1.x = -100
         pylon1.y = -100
@@ -551,6 +696,7 @@ class TestOSMPylons(unittest.TestCase):
         pylon2.x = 100
         pylon2.y = 100
         wayline1 = WayLine(100)
+        wayline1.type_ = 11  # high voltage powerline
         wayline1.pylons.append(pylon1)
         wayline1.pylons.append(pylon2)
         wayline1.calc_and_map()
@@ -575,3 +721,22 @@ class TestOSMPylons(unittest.TestCase):
         wayline1.calc_and_map()
         self.assertAlmostEqual(337.5, pylon4.heading, 2)
         self.assertAlmostEqual(0, pylon5.heading, 2)
+        # then test other stuff
+        self.assertEqual(4, len(wayline1.way_segments))
+        wayline1.make_cables_ac_xml_stg_entries("foo", "foo")
+
+    def test_cable_vertex_calc_position(self):
+        vertex = CableVertex(10, 5)
+        vertex.calc_position(0, 0, 20, 0)
+        self.assertAlmostEqual(25, vertex.elevation, 2)
+        self.assertAlmostEqual(10, vertex.x, 2)
+        self.assertAlmostEqual(0, vertex.y, 2)
+        vertex.calc_position(0, 0, 20, 90)
+        self.assertAlmostEqual(0, vertex.x, 2)
+        self.assertAlmostEqual(-10, vertex.y, 2)
+        vertex.calc_position(0, 0, 20, 210)
+        self.assertAlmostEqual(-8.660, vertex.x, 2)
+        self.assertAlmostEqual(5, vertex.y, 2)
+        vertex.calc_position(20, 50, 20, 180)
+        self.assertAlmostEqual(10, vertex.x, 2)
+        self.assertAlmostEqual(50, vertex.y, 2)
