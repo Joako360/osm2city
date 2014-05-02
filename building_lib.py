@@ -486,35 +486,59 @@ def write_ground(out, b, elev):
         y0 = b.X[:,1].min() - d
         y1 = b.X[:,1].max() + d
 
+    if 0:
+        Xo = np.array([[x0,y0],[x1,y1]])
+        angle = 1./57.3
+        R = np.array([[cos(angle), sin(angle)],
+                      [-sin(angle), cos(angle)]])
+        Xo_rot = np.dot(Xo, R)
+        x0 = Xo_rot[0,0]
+        x1 = Xo_rot[1,0]
+        y0 = Xo_rot[0,1]
+        y1 = Xo_rot[1,1]
+
+
     # align along longest side
     if 1:
-        Xo = np.array(b.X_outer)
-        origin = Xo[0].copy()
-        Xo -= origin
+        #Xo = np.array(b.X_outer)
+        Xo = b.X.copy()
+        #origin = Xo[0].copy()
+        #Xo -= origin
 
         # rotate such that longest side is parallel with x
         i = b.lenX[:b.nnodes_outer].argmax() # longest side
         i1 = i + 1
         if i1 == b.nnodes_outer: i1 = 0
-        angle_deg = math.atan2(Xo[i1,1]-Xo[i,1], Xo[i1,0]-Xo[i,0])
-        angle = radians(angle_deg)
-        R = np.array([[cos(angle), -sin(angle)],
-                      [sin(angle), cos(angle)]])
-        Xo_rot = np.dot(Xo, R)  #.reshape(1,2)
+        angle = -math.atan2(Xo[i1,1]-Xo[i,1], Xo[i1,0]-Xo[i,0])
+
+        l = ((Xo[i1,1]-Xo[i,1])**2 + (Xo[i1,0]-Xo[i,0])**2 )**0.5
+        print l, b.lenX[i]
+        #assert (l == b.lenX[i])
+        #angle = 10./57.3
+        R = np.array([[cos(angle), sin(angle)],
+                      [-sin(angle), cos(angle)]])
+        Xo_rot = np.dot(Xo, R)
         x0 = Xo_rot[:,0].min() - d
         x1 = Xo_rot[:,0].max() + d
         y0 = Xo_rot[:,1].min() - d
         y1 = Xo_rot[:,1].max() + d
         # rotate back
         if 1:
-            R = np.array([[cos(angle),  sin(angle)],
-                          [-sin(angle), cos(angle)]])
-            Xnew = np.array([[x0, y0], [x1,y1]])
-            Xnew_rot = np.dot(Xnew, R) - origin #.reshape(1,2)
+            R = np.array([[cos(angle), -sin(angle)],
+                          [sin(angle), cos(angle)]])
+            Xnew = np.array([[x0, y0], [x1, y1]])
+            Xnew_rot = np.dot(Xnew, R)
             x0 = Xnew_rot[0,0]
             x1 = Xnew_rot[1,0]
             y0 = Xnew_rot[0,1]
             y1 = Xnew_rot[1,1]
+
+            if x0 > x1: x0, x1 = x1, x0
+            if y0 > y1: y0, y1 = y1, y0
+
+        #print x0, y0, x1, y1
+        #print x0_, y0_, x1_, y1_
+        #bla
 
     offset_z = 0.05
     z0 = elev(vec2d(x0, y0)) + offset_z

@@ -502,8 +502,48 @@ ground texture
 - must code paint algs -- is that useful in future?
 + less verts, but needs huge texture
 
+long term
+---------
+city    lot     # lots
+50k     20m     6M
+20k             1M
+10k             250k
 
 
+- need OSM roads in FG
+1. use all OSM buildings
+   + best alignment with roads
+   + best match with RL
+   - need additional data
+   - less detailed buildings, unless details added procedurally
 
+2. place shared models along OSM roads
+   + can still use large OSM buildings (put into shared model DB?)
+   + can use detailed, hand-modeled buildings
+   + best match with ground texture
+   - need a number of hand-modeled buildings
+
+- pre-processor
+  - get OSM roads, at least primary + secondary
+  - either use also residential roads or generate them procedurally
+  - generate lots, with size being a function of population density? Land use?
+  - place suitable shared model
+
+  problems:
+  - large city -> huge vertex count. Need ground LOD?
+  - levels:
+    3. all buildings, all lots, all roads
+    2. some buildings, quarters bounded by secondary roads
+    1. only very large buildings, generic texture within landclass boundaries
+      -> switching from 1 to 2 obvious unless far out
+
+
+General approaches
+------------------
+- texture + mask + random buildings
+  + completely generic, no data required other than land use
+  - generic texture will never perfectly match RL roads
+
+ unless texture per lot
 
 
