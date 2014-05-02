@@ -43,6 +43,12 @@ def format_lat (lat):
         return "n%02d" % int(lat)
 
 
+def root_directory_name ((lon, lat)):
+    """Generate the directory name for a location."""
+    lon_chunk = floor(lon/10.0) * 10
+    lat_chunk = floor(lat/10.0) * 10
+    return format_lon(lon_chunk) + format_lat(lat_chunk) + os.sep 
+
 def directory_name ((lon, lat)):
     """Generate the directory name for a location."""
     lon_floor = floor(lon)
@@ -53,33 +59,14 @@ def directory_name ((lon, lat)):
          + format_lon(lon_floor) + format_lat(lat_floor)
 
 
-def tile_index((lon, lat)):
-    tile_width = bucket_span(lat)
+def tile_index((lon, lat), x=0, y=0):
+    if x == 0 and y == 0:
+        y = calc_y(lat)
+        x = calc_x(lon,lat)
+        
 
-    EPSILON = 0.0000001
-
-    lon_floor = floor(lon)
-    lat_floor = floor(lat)
-    span = bucket_span(lat)
-
-    if span < EPSILON:
-        lon = 0
-        x = 0
-    elif span <= 1.0:
-        x = int((lon - lon_floor) / span)
-    else:
-        if lon >= 0:
-          lon = int(int(lon/span) * span)
-        else:
-          lon = int(int((lon+1)/span) * span - span)
-          if lon < -180:
-            lon = -180
-        x = 0
-
-    y = int((lat - lat_floor) * 8)
-
-    index = (int(lon_floor) + 180) << 14
-    index += (int(lat_floor) + 90) << 6
+    index = (int(floor(lon)) + 180) << 14
+    index += (int(floor(lat)) + 90) << 6
     index += y << 3
     index += x
     return index
@@ -94,7 +81,48 @@ def construct_stg_file_name(center_global):
     """Returns the file name of the stg-file at a given global lat/lon location"""
     return "%07i.stg" % tile_index(center_global)
 
+def get_north_lat(lat,y):
+    return float(floor(lat)) + y / 8.0 + .125;
 
+def get_south_lat(lat,y):
+    return float(floor(lat)) + y / 8.0;
+
+def get_west_lon(lon,lat, x):
+    if( x == 0):
+        return float(floor(lon))
+    else: 
+        return float(floor(lon)) + x * (bucket_span(lat))
+
+
+def get_east_lon(lon,lat, x):
+    if( x == 0):
+        return float(floor(lon)) + (bucket_span(lat))
+    else: 
+        return float(floor(lon)) + x * (bucket_span(lat)) + (bucket_span(lat))
+
+def calc_x(lon,lat):
+    EPSILON = 0.0000001
+    span = bucket_span(lat)
+    if span < EPSILON:
+        lon = 0
+        return 0
+    elif span <= 1.0:
+        return int((lon - floor(lon)) / span)
+    else:
+        if lon >= 0:
+            lon = int(int(lon/span) * span)
+        else:
+            lon = int(int((lon+1)/span) * span - span)
+            if lon < -180:
+                lon = -180
+        return 0
+
+def calc_y(lat):
+    return int((lat - floor(lat)) * 8)
+    
+    
+    
+    
 if __name__ == "__main__":
     for lon, lat, idx in ((13.687944, 51.074664, 3171138),
                           (13.9041667, 51.1072222, 3171139),
