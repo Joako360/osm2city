@@ -1,12 +1,16 @@
-var path_file = "/home/tom/daten/fgfs/src/fgdata/Nasal/elev.in";
-var path_out = "/tmp/elev.out";
+var get_elevation = func {
+#TODO read from property or build setup.py
+  var in = "C:/Users/keith.paterson/AppData/Roaming/flightgear.org/elev.in";
+  var out = "C:/Users/keith.paterson/AppData/Roaming/flightgear.org/Export/";
 
-var get = func {
-  var raw_str = io.readfile(path_file);
+  var raw_str = io.readfile(in);
   var delimitter = "\r\n";
+  print( "Reading File " ~ in);
   if (-1 == find(delimitter, raw_str)) delimitter = "\n";
   var raw_list = split(delimitter, raw_str);
-  var file_out = io.open(path_out, "w");
+  var allLines = size(raw_list);
+  print("Read " ~ allLines ~ " records");
+  var file_out = io.open(out ~ "elev.out", "w");
   foreach(var l; raw_list) {
      var l_list = split(" ", l);
      if (size(l_list) == 4) {
@@ -20,5 +24,12 @@ var get = func {
      }
   }
   io.close(file_out);
-  print(size(raw_list));
+  print("Wrote " ~ allLines ~ " records");
 }
+
+var get_threaded = func {
+  thread.newthread(get_elevation);
+}
+
+# Make accessable from Telnet
+addcommand("get-elevation", get_threaded);
