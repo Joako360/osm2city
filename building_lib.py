@@ -32,6 +32,8 @@ import parameters
 import myskeleton
 import roofs
 import ac3d
+import matplotlib.pyplot as plt
+
 
 class random_number(object):
     def __init__(self, randtype, min, max):
@@ -477,10 +479,10 @@ def write_and_count_vert(out, b, elev, offset, tile_elev):
 
 def write_ground(out, b, elev):
     # align smallest rectangle
-    d = 2
+    d = 0
 
     # align x/y
-    if 0:
+    if 1:
         x0 = b.X[:,0].min() - d
         x1 = b.X[:,0].max() + d
         y0 = b.X[:,1].min() - d
@@ -499,7 +501,7 @@ def write_ground(out, b, elev):
 
 
     # align along longest side
-    if 1:
+    if 0:
         #Xo = np.array(b.X_outer)
         Xo = b.X.copy()
         #origin = Xo[0].copy()
@@ -509,7 +511,7 @@ def write_ground(out, b, elev):
         i = b.lenX[:b.nnodes_outer].argmax() # longest side
         i1 = i + 1
         if i1 == b.nnodes_outer: i1 = 0
-        angle = -math.atan2(Xo[i1,1]-Xo[i,1], Xo[i1,0]-Xo[i,0])
+        angle = math.atan2(Xo[i1,1]-Xo[i,1], Xo[i1,0]-Xo[i,0])
 
         l = ((Xo[i1,1]-Xo[i,1])**2 + (Xo[i1,0]-Xo[i,0])**2 )**0.5
         print l, b.lenX[i]
@@ -711,6 +713,11 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
     f = open(ac_file_name, "w")
     f.write(str(ac))
     f.close()
+    # plot on-screen using matplotlib
+    if 0:
+        ac.plot()
+        plt.show()
+
 
 
 if __name__ == "__main__":

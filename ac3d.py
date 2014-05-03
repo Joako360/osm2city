@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import string
+import matplotlib.pyplot as plt
 
 class Node(object):
     def __init__(self, x, y, z):
@@ -24,6 +25,7 @@ class Face(object):
         s += "refs %i\n" % len(self.nodes_uv_list)
         s += string.join(["%i %g %g\n" % (n[0], n[1], n[2]) for n in self.nodes_uv_list], '')
         return s
+
 
 class Object(object):
     def __init__(self, name, stats, texture=None, default_type=0x0, default_mat=0):
@@ -73,6 +75,24 @@ class Object(object):
         s += 'kids 0\n'
         return s
 
+    def plot(self):
+        """note: here, Z is height."""
+        for f in self._faces:
+            X = [self._nodes[n[0]].x for n in f.nodes_uv_list]
+            Y = [self._nodes[n[0]].z for n in f.nodes_uv_list]
+            Z = [self._nodes[n[0]].y for n in f.nodes_uv_list]
+            X.append(self._nodes[f.nodes_uv_list[0][0]].x)
+            Y.append(self._nodes[f.nodes_uv_list[0][0]].z)
+            #Z.append(self._nodes[f.nodes_uv_list[0][0]].y)
+            #if max(Z) > 1.: break
+            #print "MAX", max(Z)
+            plt.plot(X, Y)
+            for i in range(len(X)-1):
+                x = 0.5*(X[i] + X[i+1])
+                y = 0.5*(Y[i] + Y[i+1])
+                plt.text(x+Z[i], y+Z[i], "%i" % i)
+
+
 class Writer(object):
     """
     Hold a number of objects. Each object holds nodes and faces.
@@ -111,6 +131,11 @@ class Writer(object):
         s += 'OBJECT world\nkids %i\n' % len(non_empty)
         s += string.join([str(o) for o in non_empty])
         return s
+
+    def plot(self):
+        non_empty = [o for o in self.objects if not o.is_empty()]
+        for o in non_empty:
+            o.plot()
 
 if __name__ == "__main__":
     a = Writer(None)
