@@ -547,6 +547,8 @@ def write_xml(path, fname, LM_dict, buildings):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
+#    logging.basicConfig(level=logging.DEBUG)
+
     # -- Parse arguments. Command line overrides config file.
     parser = argparse.ArgumentParser(description="osm2city reads OSM data and creates buildings for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
@@ -579,8 +581,8 @@ if __name__ == "__main__":
     elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
     #elev.write("elev.out.small", 4)
     #sys.exit(0)
-    logging.debug("height at origin", elev(vec2d(0,0)))
-    logging.debug("origin at ", tools.transform.toGlobal((0,0)))
+    logging.debug("height at origin" + str(elev(vec2d(0,0))))
+    logging.debug("origin at " + str(tools.transform.toGlobal((0,0))))
 
     #tools.write_map('dresden.png', transform, elev, vec2d(minlon, minlat), vec2d(maxlon, maxlat))
 
@@ -632,6 +634,8 @@ if __name__ == "__main__":
         logging.info("unpickled %g buildings ", len(buildings))
         tools.stats.objects = len(buildings)
 
+    nb = len(buildings)
+    #buildings = buildings[nb/2:]
 
     # -- debug filter
 #    for b in buildings:

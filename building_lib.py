@@ -71,6 +71,7 @@ def check_height(building_height, t):
        - check if h is within the texture's limits (minheight, maxheight)
        -
     """
+    ofs = t.y0
     if t.v_can_repeat:
         tex_y1 = 1.
         tex_y0 = 1 - building_height / t.v_size_meters
@@ -83,26 +84,29 @@ def check_height(building_height, t):
         # - error acceptable?
         if building_height >= t.v_splits_meters[0] and building_height <= t.v_size_meters:
 #            print "--->"
-            if t.v_split_from_bottom:
-#                print "from bottom"
+            if 0 and t.v_split_from_bottom:
+                logging.debug("from bottom")
                 for i in range(len(t.v_splits_meters)):
                     if t.v_splits_meters[i] >= building_height:
 #                        print "bot trying %g >= %g ?" % (t.v_splits_meters[i],  building_height)
                         tex_y0 = 0
-                        tex_y1 = t.v_splits[i]
+                        tex_y1 = t.v_splits[i] * t.sy
                         #print "# height %g storey %i" % (building_height, i)
-                        return tex_y0, tex_y1
+                        return tex_y0 + ofs, tex_y1 + ofs
             else:
-#                print "from top"
 #                print "got", t.v_splits_meters
                 for i in range(len(t.v_splits_meters)-2, -1, -1):
 #                    print "%i top trying %g >= %g ?" % (i, t.v_splits_meters[-1] - t.v_splits_meters[i],  building_height)
                     if t.v_splits_meters[-1] - t.v_splits_meters[i] >= building_height:
                         # FIXME: probably a bug. Should use distance to height?
                         tex_y0 = t.v_splits[i]
-                        tex_y1 = 1.
-                        return tex_y0, tex_y1
-            #tex_filename = t.filename + '.png'
+                        tex_y1 = 1
+                        tex_y0
+                        ty0 = tex_y0 * t.sy + ofs
+                        ty1 = tex_y1 * t.sy + ofs
+                        logging.debug("from top %s y0=%4.2f y1=%4.2f  %4.2f %4.2f" % (t.filename, tex_y0, tex_y1, ty0, ty1))
+
+                        return ty0, ty1
             raise ValueError("SHOULD NOT HAPPEN! found no tex_y0, tex_y1 (building_height %g splits %s %g)" % (building_height, str(t.v_splits_meters), t.v_size_meters))
         else:
             raise ValueError("SHOULD NOT HAPPEN! building_height %g outside %g %g" % (building_height, t.v_splits_meters[0], t.v_size_meters))
@@ -576,6 +580,8 @@ def write_ring(out, b, ring, v0, facade_texture, tex_y0, tex_y1, inner = False):
             tex_x1 = facade_texture.closest_h_match(frac) + ia
 
 # surf(type, mat, [(), ()], type=type, mat=mat)
+        if 0:
+            tex_x1 = 1
         j = i + b.first_node
         out.face([ (j,                        0, tex_y0),
                    (j + 1,                    tex_x1, tex_y0),
@@ -584,6 +590,9 @@ def write_ring(out, b, ring, v0, facade_texture, tex_y0, tex_y1, inner = False):
 
     # -- closing wall
     tex_x1 = b.lenX[v1-1] /  facade_texture.h_size_meters
+    if 0:
+        tex_x1 = 1
+
     j0 = v0 + b.first_node
     j1 = v1 + b.first_node
 
@@ -609,9 +618,9 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
     ac = ac3d.Writer(tools.stats)
     LOD_objects = []
-    LOD_objects.append(ac.new_object('LOD_bare', None))
-    LOD_objects.append(ac.new_object('LOD_rough', None))
-    LOD_objects.append(ac.new_object('LOD_detail', None))
+    LOD_objects.append(ac.new_object('LOD_bare', 'atlas_facades.png'))
+    LOD_objects.append(ac.new_object('LOD_rough', 'atlas_facades.png'))
+    LOD_objects.append(ac.new_object('LOD_detail', 'atlas_facades.png'))
 
     global nb # FIXME: still need this?
 
@@ -628,7 +637,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
         b.ground_elev = local_elev(vec2d(b.X[0])) # -- interpolate ground elevation at building location
         #b.ground_elev = elev(vec2d(b.X[0]) + offset) - tile_elev # -- interpolate ground elevation at building location
-        write_ground(out, b, local_elev)
+        #write_ground(out, b, local_elev)
         write_and_count_vert(out, b, elev, offset, tile_elev)
 
         facade_texture = b.facade_texture

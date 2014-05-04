@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Created on Wed Mar 13 22:22:05 2013
@@ -10,6 +11,8 @@ from pdb import pm
 import logging
 import Image
 import math
+import cPickle
+import string
 
 def next_pow2(value):
     return 2**(int(math.log(value) / math.log(2)) + 1)
@@ -40,6 +43,7 @@ class TextureManager(object):
         return candidates[random.randint(0, len(candidates)-1)]
 
     def find_candidates(self, requires = []):
+        #return [self.__l[0]]
         candidates = []
         for cand in self.__l:
             if set(requires).issubset(cand.provides):
@@ -47,12 +51,12 @@ class TextureManager(object):
         return candidates
 
     def __str__(self):
-        return str(["<%s>" % i.filename for i in self.__l])
+        return string.join([str(t) + '\n' for t in self.__l])
 
     def __getitem__(self, i):
         return self.__l[i]
 
-    def make_texture_atlas(self, size_x = 512, pad_y = 0):
+    def make_texture_atlas(self, filename, size_x = 512, pad_y = 0):
         """
         create texture atlas from all textures. Update all our item coordinates.
         """
@@ -67,7 +71,7 @@ class TextureManager(object):
         # -- load and rotate images
         for l in self.__l:
             l.im = Image.open(l.filename + '.png')
-            logging.debug("name %s size " % l + str(l.im.size))
+            logging.debug("name %s size " % l.filename + str(l.im.size))
             assert (l.v_can_repeat + l.h_can_repeat < 2)
             if l.v_can_repeat:
                 l.rotated = True
@@ -93,23 +97,26 @@ class TextureManager(object):
 
         # -- create atlas image
         atlas_sy = next_pow2(atlas_sy)
-        self.atlas = Image.new("RGBA", (atlas_sx, atlas_sy))
+        atlas = Image.new("RGBA", (atlas_sx, atlas_sy))
 
         # -- paste, compute atlas coords
         #    lower left corner of texture is x0, y0
         for l in self.__l:
-            self.atlas.paste(l.im, (0, next_y))
+            atlas.paste(l.im, (0, next_y))
             sx, sy = l.im.size
             l.x0 = 0
-            l.y1 = 1. * next_y / atlas_sy
-            l.y0 = 1. * (next_y + sy) / atlas_sy
-            l.x1 = sx / atlas_sx
+            l.x1 = float(sx) / atlas_sx
+            l.y1 = 1 - float(next_y) / atlas_sy
+            l.y0 = 1 - float(next_y + sy) / atlas_sy
+            l.sy = float(sy) / atlas_sy
 
             next_y += sy + pad_y
 
-        self.atlas.save("atlas.png", optimize=True)
+        atlas.save(filename, optimize=True)
+
         for l in self.__l:
             logging.debug('%s (%4.2f, %4.2f) (%4.2f, %4.2f)' % (l.filename, l.x0, l.y0, l.x1, l.y1))
+            del l.im
 
 class FacadeManager(TextureManager):
     def find_matching(self, requires, building_height):
@@ -242,7 +249,8 @@ class Texture(object):
 
 
     def __str__(self):
-        return "<%s>" % self.filename
+        return "<%s> %4.2f %4.2f %4.2f %4.2f" % \
+                (self.filename, self.x0, self.x1, self.y0, self.y1)
         # self.type = type
         # commercial-
         # - warehouse
@@ -386,14 +394,32 @@ def init():
         roofs.append(Texture('tex/test',
                              10., [], True, 10., [], True, provides=['color:black', 'color:red']))
 
-    facades.make_texture_atlas()
+    # -- make texture atlas (or unpickle)
+    filename = 'atlas_facades'
+    pkl_fname = filename + '.pkl'
+    if 0:
+        facades.make_texture_atlas(filename + '.png')
+
+        logging.info("Saving %s", pkl_fname)
+        fpickle = open(pkl_fname, 'wb')
+        cPickle.dump(facades, fpickle, -1)
+        fpickle.close()
+    else:
+        logging.info("Loading %s", pkl_fname)
+        fpickle = open(pkl_fname, 'rb')
+        facades = cPickle.load(fpickle)
+        fpickle.close()
+
+    logging.info(facades)
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     init()
-    #cands = facades.find_candidates([], 14)
-    #print "cands are", cands
-    #for t in cands:
-    #    print "%5.2g  %s" % (t.height_min, t.filename)
+
+    cands = facades.find_candidates([], 14)
+    print "cands are", cands
+    for t in cands:
+        #print "%5.2g  %s" % (t.height_min, t.filename)
+        logging.debug('%s (%4.2f, %4.2f) (%4.2f, %4.2f)' % (t.filename, t.x0, t.y0, t.x1, t.y1))
 
