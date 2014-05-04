@@ -6,6 +6,13 @@ Created on Wed Mar 13 22:22:05 2013
 """
 import numpy as np
 import random
+from pdb import pm
+import logging
+import Image
+import math
+
+def next_pow2(value):
+    return 2**(int(math.log(value) / math.log(2)) + 1)
 
 class TextureManager(object):
     def __init__(self,cls):
@@ -44,6 +51,65 @@ class TextureManager(object):
 
     def __getitem__(self, i):
         return self.__l[i]
+
+    def make_texture_atlas(self, size_x = 512, pad_y = 0):
+        """
+        create texture atlas from all textures. Update all our item coordinates.
+        """
+        logging.debug("Making texture atlas")
+
+        atlas_sx = size_x
+        keep_aspect = True # FIXME: False won't work -- im.thumbnail seems to keep aspect no matter what
+
+        atlas_sy = 0
+        next_y = 0
+
+        # -- load and rotate images
+        for l in self.__l:
+            l.im = Image.open(l.filename + '.png')
+            logging.debug("name %s size " % l + str(l.im.size))
+            assert (l.v_can_repeat + l.h_can_repeat < 2)
+            if l.v_can_repeat:
+                l.rotated = True
+                l.im = l.im.transpose(Image.ROTATE_270)
+            else:
+                self.rotated = False
+
+        # FIXME: maybe auto-calc x-size here
+
+        # -- scale
+        for l in self.__l:
+            scale_x = 1. * atlas_sx / l.im.size[0]
+            if keep_aspect:
+                scale_y = scale_x
+            else:
+                scale_y = 1.
+            org_size = l.im.size
+            # FIXME: thumnail seems to keep aspect no matter what?
+            l.im.thumbnail((org_size[0] * scale_x, org_size[1] * scale_y), \
+                         Image.ANTIALIAS)
+            #logging.debug("scale:" + str(org_size) + str(l.im.size))
+            atlas_sy += l.im.size[1] + pad_y
+
+        # -- create atlas image
+        atlas_sy = next_pow2(atlas_sy)
+        self.atlas = Image.new("RGBA", (atlas_sx, atlas_sy))
+
+        # -- paste, compute atlas coords
+        #    lower left corner of texture is x0, y0
+        for l in self.__l:
+            self.atlas.paste(l.im, (0, next_y))
+            sx, sy = l.im.size
+            l.x0 = 0
+            l.y1 = 1. * next_y / atlas_sy
+            l.y0 = 1. * (next_y + sy) / atlas_sy
+            l.x1 = sx / atlas_sx
+
+            next_y += sy + pad_y
+
+        self.atlas.save("atlas.png", optimize=True)
+        for l in self.__l:
+            logging.debug('%s (%4.2f, %4.2f) (%4.2f, %4.2f)' % (l.filename, l.x0, l.y0, l.x1, l.y1))
 
 class FacadeManager(TextureManager):
     def find_matching(self, requires, building_height):
@@ -170,6 +236,11 @@ class Texture(object):
         self.h_splits_meters = self.h_splits * self.h_size_meters
         self.h_can_repeat = h_can_repeat
 
+        if self.h_can_repeat + self.v_can_repeat > 1:
+            raise ValueError('%s: Textures can repeat in one direction only. '\
+              'Please set either h_can_repeat or v_can_repeat to False.' % self.filename)
+
+
     def __str__(self):
         return "<%s>" % self.filename
         # self.type = type
@@ -196,11 +267,11 @@ def init():
     roofs = TextureManager('roof')
 
     if True:
-        facades.append(Texture('tex/DSCF9495_pow2',
-                                14, [585, 873, 1179, 1480, 2048], True,
-                                19.4, [274, 676, 1114, 1542, 2048], False, True,
-                                requires=['roof:color:black'],
-                                provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
+#        facades.append(Texture('tex/DSCF9495_pow2',
+#                                14, [585, 873, 1179, 1480, 2048], True,
+#                                19.4, [274, 676, 1114, 1542, 2048], False, True,
+#                                requires=['roof:color:black'],
+#                                provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
 
 #                                19.4, [1094, 1531, 2048], False, True,
 
@@ -228,7 +299,7 @@ def init():
 
         facades.append(Texture('tex/facade_modern36x36_12',
                                 36., [], True,
-                                36., [158, 234, 312, 388, 465, 542, 619, 697, 773, 870, 1024], True, True,
+                                36., [158, 234, 312, 388, 465, 542, 619, 697, 773, 870, 1024], False, True,
                                 provides=['shape:urban','shape:residential','age:modern',
                                          'compat:roof-flat']))
 
@@ -273,7 +344,7 @@ def init():
                                provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
 
         facades.append(Texture('tex/wohnheime_petersburger',
-                                15.6, [215, 414, 614, 814, 1024], True,
+                                15.6, [215, 414, 614, 814, 1024], False,
                                 15.6, [112, 295, 477, 660, 843, 1024], True, True,
                                 height_min = 15.,
                                 provides=['shape:urban','shape:residential','age:modern',
@@ -285,9 +356,9 @@ def init():
 
 
     roofs.append(Texture('tex/roof_tiled_black',
-                         1.20, [], True, 0.60, [], True, provides=['color:black']))
+                         1.20, [], True, 0.60, [], False, provides=['color:black']))
     roofs.append(Texture('tex/roof_tiled_red',
-                         1.0, [], True, 0.88, [], True, provides=['color:red']))
+                         1.0, [], True, 0.88, [], False, provides=['color:red']))
 #    roofs.append(Texture('tex/roof_black2',
 #                             1.39, [], True, 0.89, [], True, provides=['color:black']))
 #    roofs.append(Texture('tex/roof_black3',
@@ -315,10 +386,14 @@ def init():
         roofs.append(Texture('tex/test',
                              10., [], True, 10., [], True, provides=['color:black', 'color:red']))
 
+    facades.make_texture_atlas()
+
+
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
     init()
-    cands = facades.find_candidates([], 14)
-    print "cands ar", cands
-    for t in cands:
-        print "%5.2g  %s" % (t.height_min, t.filename)
+    #cands = facades.find_candidates([], 14)
+    #print "cands are", cands
+    #for t in cands:
+    #    print "%5.2g  %s" % (t.height_min, t.filename)
 
