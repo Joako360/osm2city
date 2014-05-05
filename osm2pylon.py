@@ -14,8 +14,39 @@ TODO:
 * For aerialways handle stations if represented as ways instead of nodes.
 * For powerlines handle power stations if represented as ways instead of nodes
 * If a pylon is shared between lines but not at end points, then move one pylon a bit away
-* Calculate cables
 * LOD / clusters
+* Overhead markers (http://www.avaids.com/icao.pdf):
+6.1.10 Recommendation.— Overhead wires, cables, etc.,
+crossing a river, valley or highway should be marked and their
+supporting towers marked and lighted if an aeronautical study
+indicates that the wires or cables could constitute a hazard to
+aircraft, except that the marking of the supporting towers may
+be omitted when they are lighted by high-intensity obstacle
+lights by day.
+6.1.11 Recommendation.— When it has been determined
+that an overhead wire, cable, etc., needs to be marked
+but it is not practicable to install markers on the wire, cable,
+etc., then high-intensity obstacle lights, Type B, should be
+provided on their supporting towers.
+6.2.8 Recommendation.— A marker displayed on an
+overhead wire, cable, etc., should be spherical and have a
+diameter of not less than 60 cm.
+6.2.9 Recommendation.— The spacing between two
+consecutive markers or between a marker and a supporting
+tower should be appropriate to the diameter of the marker, but
+in no case should the spacing exceed:
+a) 30 m where the marker diameter is 60 cm progressively
+increasing with the diameter of the marker to
+b) 35 m where the marker diameter is 80 cm and further
+progressively increasing to a maximum of
+c) 40 m where the marker diameter is of at least 130 cm.
+Where multiple wires, cables, etc. are involved, a marker
+should be located not lower than the level of the highest wire
+at the point marked.
+6.2.10 Recommendation.— A marker should be of one
+colour. When installed, white and red, or white and orange
+markers should be displayed alternately. The colour selected
+should contrast with the background against which it will be seen
 
 @author: vanosten
 """
@@ -39,13 +70,39 @@ OUR_MAGIC = "osm2pylon"  # Used in e.g. stg files to mark edits by osm2pylon
 
 
 class Cable(object):
-    def __init__(self, start_cable_vertex, end_cable_vertex, radius=0.5):
+    def __init__(self, start_cable_vertex, end_cable_vertex, radius, number_extra_vertices, catenary_a):
+        """
+        A Cable between two vertices. The radius is approximated with a triangle with sides of length 2*radius.
+        If both the number of extra_vertices and the catenary_a are > 0, then the Cable gets a sag based on
+        a catenary function.
+        """
         self.start_cable_vertex = start_cable_vertex
         self.end_cable_vertex = end_cable_vertex
         self.vertices = [self.start_cable_vertex, self.end_cable_vertex]
         self.radius = radius
         self.heading = calc_angle_of_line(start_cable_vertex.x, start_cable_vertex.y
                                           , end_cable_vertex.x, end_cable_vertex.y)
+
+        if (number_extra_vertices > 0) and (catenary_a > 0):
+            self._make_catenary_cable(number_extra_vertices, catenary_a)
+
+    def _make_catenary_cable(self, number_extra_vertices, catenary_a):
+        cable_distance = calc_distance(self.start_cable_vertex.x, self.start_cable_vertex.y
+                                       , self.end_cable_vertex.x, self.end_cable_vertex.y)
+        part_distance = cable_distance / (1 + number_extra_vertices)
+        pylon_y = catenary_a * math.cosh((cable_distance / 2) / catenary_a)
+        part_elevation = ((self.start_cable_vertex.elevation - self.end_cable_vertex.elevation) /
+                          (1 + number_extra_vertices))
+        for i in xrange(1, number_extra_vertices + 1):
+            x = self.start_cable_vertex.x + i * part_distance * math.sin(math.radians(self.heading))
+            y = self.start_cable_vertex.y + i * part_distance * math.cos(math.radians(self.heading))
+            catenary_x = i * part_distance - (cable_distance / 2)
+            elevation = catenary_a * math.cosh(catenary_x / catenary_a)  # pure catenary y-position
+            elevation = self.start_cable_vertex.elevation - (pylon_y - elevation)  # relative distance to start pylon
+            elevation -= i * part_elevation  # correct for elevation difference between the 2 pylons
+            v = CableVertex(0, 0)
+            v.set_position(x, y, elevation)
+            self.vertices.insert(i, v)
 
     def translate_vertices_relative(self, rel_x, rel_y, rel_elevation):
         """
@@ -56,7 +113,7 @@ class Cable(object):
             cable_vertex.y -= rel_y
             cable_vertex.elevation -= rel_elevation
 
-    def create_numvert_lines(self, cable_vertex):
+    def _create_numvert_lines(self, cable_vertex):
         """
         In the map-data x-axis is towards East and y-axis is towards North and z-axis is elevation.
         In ac-files the y-axis is pointing upwards and the z-axis points to South -
@@ -78,33 +135,36 @@ class Cable(object):
         Returns an ac entry for this cable.
         """
         lines = []
-        lines.append("OBJECT poly")
-        lines.append("numvert 6")
-        lines.append(self.create_numvert_lines(self.start_cable_vertex))
-        lines.append(self.create_numvert_lines(self.end_cable_vertex))
-        lines.append("numsurf 3")
-        lines.append("SURF 0x40")
-        lines.append("mat " + str(material))
-        lines.append("refs 4")
-        lines.append("0 0 0")
-        lines.append("3 0 0")
-        lines.append("5 0 0")
-        lines.append("2 0 0")
-        lines.append("SURF 0x40")
-        lines.append("mat " + str(material))
-        lines.append("refs 4")
-        lines.append("0 0 0")
-        lines.append("1 0 0")
-        lines.append("4 0 0")
-        lines.append("3 0 0")
-        lines.append("SURF 0x40")
-        lines.append("mat " + str(material))
-        lines.append("refs 4")
-        lines.append("4 0 0")
-        lines.append("1 0 0")
-        lines.append("2 0 0")
-        lines.append("5 0 0")
-        lines.append("kids 0")
+        lines.append("OBJECT group")
+        lines.append("kids " + str(len(self.vertices) - 1))
+        for i in xrange(0, len(self.vertices) - 1):
+            lines.append("OBJECT poly")
+            lines.append("numvert 6")
+            lines.append(self._create_numvert_lines(self.vertices[i]))
+            lines.append(self._create_numvert_lines(self.vertices[i + 1]))
+            lines.append("numsurf 3")
+            lines.append("SURF 0x40")
+            lines.append("mat " + str(material))
+            lines.append("refs 4")
+            lines.append("0 0 0")
+            lines.append("3 0 0")
+            lines.append("5 0 0")
+            lines.append("2 0 0")
+            lines.append("SURF 0x40")
+            lines.append("mat " + str(material))
+            lines.append("refs 4")
+            lines.append("0 0 0")
+            lines.append("1 0 0")
+            lines.append("4 0 0")
+            lines.append("3 0 0")
+            lines.append("SURF 0x40")
+            lines.append("mat " + str(material))
+            lines.append("refs 4")
+            lines.append("4 0 0")
+            lines.append("1 0 0")
+            lines.append("2 0 0")
+            lines.append("5 0 0")
+            lines.append("kids 0")
         return "\n".join(lines)
 
 
@@ -121,6 +181,11 @@ class CableVertex(object):
         self.elevation = pylon_elevation + self.height
         self.x = pylon_x + math.sin(math.radians(pylon_heading + 90))*self.out
         self.y = pylon_y + math.cos(math.radians(pylon_heading + 90))*self.out
+
+    def set_position(self, x, y, elevation):
+        self.x = x
+        self.y = y
+        self.elevation = elevation
 
 
 def create_generic_pylon_25_vertices():
@@ -265,16 +330,12 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
 
         ac_file_lines = []
         ac_file_lines.append("AC3Db")
-        ac_file_lines.append('MATERIAL "cable" rgb 0.5 0.5 0.5 amb 0.5 0.5 0.5 emis 0.0 0.0 0.0 spec 0.5 0.5 0.5 shi 64 trans 0')
-        ac_file_lines.append('MATERIAL "yellow" rgb 1   1   0 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0')
-        ac_file_lines.append('MATERIAL "blue" rgb 0   0   1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0')
+        ac_file_lines.append('MATERIAL "cable" rgb 0.5 0.5 0.5 amb 0.5 0.5 0.5 emis 0.0 0.0 0.0 spec 0.5 0.5 0.5 shi 1 trans 0')
         ac_file_lines.append("OBJECT world")
         ac_file_lines.append("kids " + str(len(self.way_segments)))
         way_segment_index = 0
         for way_segment in self.way_segments:
-            material = 1
-            if self.is_aerialway():
-                material = 2
+            material = 0
             way_segment_index += 1
             ac_file_lines.append("OBJECT group")
             ac_file_lines.append('"segment%05d"' % way_segment_index)
@@ -282,7 +343,6 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
             for cable in way_segment.cables:
                 cable.translate_vertices_relative(self.pylons[0].x, self.pylons[0].y, self.pylons[0].elevation)
                 ac_file_lines.append(cable.make_ac_entry(material))  # material is 0-indexed
-        ac_file_content = "\n".join(ac_file_lines)
         with open(path + filename + ".ac", 'w') as f:
             f.write("\n".join(ac_file_lines))
 
@@ -309,9 +369,11 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
     def _calc_and_map_powerline(self, max_length):
         """
         Danish rules of thumb:
-        400KV: height 30-42 meter, distance 200-420 meter, sagging 4.5-13 meter
-        150KV: height 25-32 meter, distance 180-350 meter, sagging 2.5-9 meter
-        60KV: height 15-25 meter, distance 100-250 meter, sagging 1-5 meter"""
+        400KV: height 30-42 meter, distance 200-420 meter, sagging 4.5-13 meter, a_value 1110-1698
+        150KV: height 25-32 meter, distance 180-350 meter, sagging 2.5-9 meter, a_value 1614-1702
+        60KV: height 15-25 meter, distance 100-250 meter, sagging 1-5 meter, a_value 1238-1561
+        The a_value for the catenary function has been calculated with osm2pylon.optimize_catenary().
+        """
         # calculate min, max, averages etc.
         max_height = 0.0
         average_height = 0.0
@@ -391,7 +453,7 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
                                                       , segment.start_pylon.elevation, segment.start_pylon.heading)
                 end_cable_vertices[i].calc_position(segment.end_pylon.x, segment.end_pylon.y
                                                     , segment.end_pylon.elevation, segment.end_pylon.heading)
-                cable = Cable(start_cable_vertices[i], end_cable_vertices[i])
+                cable = Cable(start_cable_vertices[i], end_cable_vertices[i], 0.1, 3, 1500)
                 segment.cables.append(cable)
 
 
@@ -604,6 +666,18 @@ def calc_distance(x1, y1, x2, y2):
     return math.sqrt(math.pow(x1 - x2, 2) + math.pow(y1 - y2, 2))
 
 
+def optimize_catenary(half_distance_pylons, max_value, sag, max_variation):
+    """
+    Calculates the parameter _a_ for a catenary with a given sag between the pylons and a mx_variation.
+    See http://www.mathdemos.org/mathdemos/catenary/catenary.html and https://en.wikipedia.org/wiki/Catenary
+    """
+    for a in xrange(1, max_value):
+        value = a * math.cosh(float(half_distance_pylons)/a) - a  # float() needed to make sure result is float
+        if (value >= (sag - max_variation)) and (value <= (sag + max_variation)):
+            return a, value
+    return -1, -1
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     # Handling arguments and parameters
@@ -740,3 +814,9 @@ class TestOSMPylons(unittest.TestCase):
         vertex.calc_position(20, 50, 20, 180)
         self.assertAlmostEqual(10, vertex.x, 2)
         self.assertAlmostEqual(50, vertex.y, 2)
+
+    def test_catenary(self):
+        #  Values taken form example 2 in http://www.mathdemos.org/mathdemos/catenary/catenary.html
+        a, value = optimize_catenary(170, 5000, 14, 0.01)
+        print a, value
+        self.assertAlmostEqual(1034/100, a/100, 2)
