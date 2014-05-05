@@ -253,6 +253,7 @@ def compute_height_and_levels(b):
     else:
         # -- neither height nor levels given: use random levels
         b.levels = random_levels()
+        #b.levels = 15
         if b.area < parameters.BUILDING_MIN_AREA:
             b.levels = min(b.levels, 2)
     b.height = float(b.levels) * level_height
@@ -435,12 +436,14 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             requires.append('compat:roof-pitched')
 
         # -- determine facade and roof textures
+        #logging.debug("find facade")
         b.facade_texture = facades.find_matching(requires, b.height)
+        #print "done" + str(b.facade_texture)
         if not b.facade_texture:
             tools.stats.skipped_texture += 1
             print "Skipping building (no matching texture)"
             continue
-        if b.roof_complex:
+        if 1 or b.roof_complex:
             b.roof_texture = roofs.find_matching(b.facade_texture.requires)
 
 #        if b.nnodes_outer != 4:
@@ -648,8 +651,6 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
         b.ac_name = "b%i" % nb
 
-        no_roof = False
-
 #        if (not no_roof) and (not b.roof_complex): nsurf += 1 # -- because roof will be part of base model
 
         tex_y0, tex_y1 = check_height(b.height, facade_texture)
@@ -666,7 +667,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
                 v0 = write_ring(out, b, inner, v0, True)
 
         # -- roof
-        if no_roof:  # -- a debug thing
+        if False:  # -- a debug thing
             tools.stats.count(b)
             continue
 
@@ -675,6 +676,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
         if not b.roof_complex:
         #if True:
+            print "flat roof text", b.roof_texture
             roofs.flat(out, b, b.X)
             tools.stats.count(b)
             continue
@@ -704,7 +706,6 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
                     roofs.flat(out, b, b.X, None) #b.roof_ac_name)
     #                print "FAIL"
                     # FIXME: move to analyse. If we fall back, don't require separate LOD
-
             # -- pitched roof for exactly 4 ground nodes
             else:
                 roofs.separate_gable(out, b, b.X)

@@ -546,4 +546,12 @@ General approaches
 
  unless texture per lot
 
+ground texture in shared model:
+------------------------------
+require all nodes of face at z=0
+walls can still/should extend below 0
+road access point at 0,0,0 centered?
+- prevents using all existing shared models
+-> add meta-info
+- can get extends from shared model automatically
 

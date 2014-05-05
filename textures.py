@@ -17,6 +17,67 @@ import string
 def next_pow2(value):
     return 2**(int(math.log(value) / math.log(2)) + 1)
 
+def make_texture_atlas(texture_list, filename, size_x = 256, pad_y = 0):
+    """
+    create texture atlas from all textures. Update all our item coordinates.
+    """
+    logging.debug("Making texture atlas")
+
+    atlas_sx = size_x
+    keep_aspect = True # FIXME: False won't work -- im.thumbnail seems to keep aspect no matter what
+
+    atlas_sy = 0
+    next_y = 0
+
+    # -- load and rotate images
+    for l in texture_list:
+        l.im = Image.open(l.filename + '.png')
+        logging.debug("name %s size " % l.filename + str(l.im.size))
+        assert (l.v_can_repeat + l.h_can_repeat < 2)
+        if l.v_can_repeat:
+            l.rotated = True
+            l.im = l.im.transpose(Image.ROTATE_270)
+
+    # FIXME: maybe auto-calc x-size here
+
+    # -- scale
+    for l in texture_list:
+        scale_x = 1. * atlas_sx / l.im.size[0]
+        if keep_aspect:
+            scale_y = scale_x
+        else:
+            scale_y = 1.
+        org_size = l.im.size
+        nx = int(org_size[0] * scale_x)
+        ny = int(org_size[1] * scale_y)
+        l.im = l.im.resize((nx, ny), Image.ANTIALIAS)
+        logging.debug("scale:" + str(org_size) + str(l.im.size))
+        atlas_sy += l.im.size[1] + pad_y
+
+    # -- create atlas image
+    atlas_sy = next_pow2(atlas_sy)
+    atlas = Image.new("RGBA", (atlas_sx, atlas_sy))
+
+    # -- paste, compute atlas coords
+    #    lower left corner of texture is x0, y0
+    for l in texture_list:
+        atlas.paste(l.im, (0, next_y))
+        sx, sy = l.im.size
+        l.x0 = 0
+        l.x1 = float(sx) / atlas_sx
+        l.y1 = 1 - float(next_y) / atlas_sy
+        l.y0 = 1 - float(next_y + sy) / atlas_sy
+        l.sy = float(sy) / atlas_sy
+        l.sx = 1.
+
+        next_y += sy + pad_y
+
+    atlas.save(filename, optimize=True)
+
+    for l in texture_list:
+        logging.debug('%s (%4.2f, %4.2f) (%4.2f, %4.2f)' % (l.filename, l.x0, l.y0, l.x1, l.y1))
+        del l.im
+
 class TextureManager(object):
     def __init__(self,cls):
         self.__l = []
@@ -40,6 +101,8 @@ class TextureManager(object):
         if len(candidates) == 0:
             print "WARNING: no matching texture for <%s>", requires
             return None
+        #print "cands are\n", string.join(["  " + str(c) for c in candidates], '\n')
+        #return candidates[3]
         return candidates[random.randint(0, len(candidates)-1)]
 
     def find_candidates(self, requires = []):
@@ -56,67 +119,9 @@ class TextureManager(object):
     def __getitem__(self, i):
         return self.__l[i]
 
-    def make_texture_atlas(self, filename, size_x = 512, pad_y = 0):
-        """
-        create texture atlas from all textures. Update all our item coordinates.
-        """
-        logging.debug("Making texture atlas")
+    def get_list(self):
+        return self.__l
 
-        atlas_sx = size_x
-        keep_aspect = True # FIXME: False won't work -- im.thumbnail seems to keep aspect no matter what
-
-        atlas_sy = 0
-        next_y = 0
-
-        # -- load and rotate images
-        for l in self.__l:
-            l.im = Image.open(l.filename + '.png')
-            logging.debug("name %s size " % l.filename + str(l.im.size))
-            assert (l.v_can_repeat + l.h_can_repeat < 2)
-            if l.v_can_repeat:
-                l.rotated = True
-                l.im = l.im.transpose(Image.ROTATE_270)
-            else:
-                self.rotated = False
-
-        # FIXME: maybe auto-calc x-size here
-
-        # -- scale
-        for l in self.__l:
-            scale_x = 1. * atlas_sx / l.im.size[0]
-            if keep_aspect:
-                scale_y = scale_x
-            else:
-                scale_y = 1.
-            org_size = l.im.size
-            # FIXME: thumnail seems to keep aspect no matter what?
-            l.im.thumbnail((org_size[0] * scale_x, org_size[1] * scale_y), \
-                         Image.ANTIALIAS)
-            #logging.debug("scale:" + str(org_size) + str(l.im.size))
-            atlas_sy += l.im.size[1] + pad_y
-
-        # -- create atlas image
-        atlas_sy = next_pow2(atlas_sy)
-        atlas = Image.new("RGBA", (atlas_sx, atlas_sy))
-
-        # -- paste, compute atlas coords
-        #    lower left corner of texture is x0, y0
-        for l in self.__l:
-            atlas.paste(l.im, (0, next_y))
-            sx, sy = l.im.size
-            l.x0 = 0
-            l.x1 = float(sx) / atlas_sx
-            l.y1 = 1 - float(next_y) / atlas_sy
-            l.y0 = 1 - float(next_y + sy) / atlas_sy
-            l.sy = float(sy) / atlas_sy
-
-            next_y += sy + pad_y
-
-        atlas.save(filename, optimize=True)
-
-        for l in self.__l:
-            logging.debug('%s (%4.2f, %4.2f) (%4.2f, %4.2f)' % (l.filename, l.x0, l.y0, l.x1, l.y1))
-            del l.im
 
 class FacadeManager(TextureManager):
     def find_matching(self, requires, building_height):
@@ -199,6 +204,9 @@ class Texture(object):
                  v_split_from_bottom = False, \
                  provides = {}, requires = {}):
         self.filename = filename
+        self.x0 = self.x1 = self.y0 = self.y1 = 0
+        self.sy = self.sx = 0
+        self.rotated = False
         self.provides = provides
         self.requires = requires
         self.has_roof_section = has_roof_section
@@ -247,10 +255,19 @@ class Texture(object):
             raise ValueError('%s: Textures can repeat in one direction only. '\
               'Please set either h_can_repeat or v_can_repeat to False.' % self.filename)
 
+    def x(self, x):
+        #print "xx==", (self.x0 + x*self.sx)
+        return self.x0 + x * self.sx
+
+    def y(self, y):
+        #print "yy==", (self.y0 + y*self.sy)
+        return self.y0 + y * self.sy
+
 
     def __str__(self):
-        return "<%s> %4.2f %4.2f %4.2f %4.2f" % \
-                (self.filename, self.x0, self.x1, self.y0, self.y1)
+        return "<%s> x0,1 %4.2f %4.2f  y0,1 %4.2f %4.2f  sh,v %4.2fm %4.2fm" % \
+                (self.filename, self.x0, self.x1, self.y0, self.y1, \
+                 self.h_size_meters, self.v_size_meters)
         # self.type = type
         # commercial-
         # - warehouse
@@ -364,9 +381,9 @@ def init():
 
 
     roofs.append(Texture('tex/roof_tiled_black',
-                         1.20, [], True, 0.60, [], False, provides=['color:black']))
+                         100, [], True, 100, [], False, provides=['color:black']))
     roofs.append(Texture('tex/roof_tiled_red',
-                         1.0, [], True, 0.88, [], False, provides=['color:red']))
+                         100, [], True, 100, [], False, provides=['color:red']))
 #    roofs.append(Texture('tex/roof_black2',
 #                             1.39, [], True, 0.89, [], True, provides=['color:black']))
 #    roofs.append(Texture('tex/roof_black3',
@@ -397,8 +414,10 @@ def init():
     # -- make texture atlas (or unpickle)
     filename = 'atlas_facades'
     pkl_fname = filename + '.pkl'
-    if 0:
-        facades.make_texture_atlas(filename + '.png')
+    if 1:
+#        facades.make_texture_atlas(filename + '.png')
+        texture_list = facades.get_list() + roofs.get_list()
+        make_texture_atlas(texture_list, filename + '.png', )
 
         logging.info("Saving %s", pkl_fname)
         fpickle = open(pkl_fname, 'wb')

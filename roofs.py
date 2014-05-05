@@ -71,16 +71,17 @@ def flat(out, b, X, ac_name = ""):
 
     assert(len(X) >= len(nodes))
     if ac_name == "":
-        uv = face_uv(nodes, X, 5.0, 5.0, angle=None)
+        uv = face_uv(nodes, X, b.roof_texture, angle=None)
         nodes = np.array(nodes) + b._nnodes_ground
 #        uv = np.zeros((len(nodes), 2))
     else:
-        uv = face_uv(nodes, X, b.roof_texture.h_size_meters, b.roof_texture.v_size_meters, angle=None)
+        uv = face_uv(nodes, X, b.roof_texture, angle=None)
 
 #    print "len nodes", len(nodes)
     assert(len(nodes) == b._nnodes_ground + 2 * len(b.polygon.interiors))
 
-    if not ac_name: uv *= 0 # -- texture only separate roofs
+    #if not ac_name: uv *= 0 # -- texture only separate roofs
+    #print "uv, ", uv
 
     l = []
     for i, node in enumerate(nodes):
@@ -111,6 +112,7 @@ def separate_gable(out, b, X):
     # -- pitched roof for 4 ground nodes
     #numvert = b.nnodes_outer + 2
     #b.n_vert += numvert
+    t = b.roof_texture
 
     # -- 4 corners
     o = out.next_node_index()
@@ -130,11 +132,12 @@ def separate_gable(out, b, X):
     out.node(-(0.5*(X[3][1]+X[0][1]) + tang[1]), b.ground_elev + b.height + roof_height, -(0.5*(X[3][0]+X[0][0]) + tang[0]))
     out.node(-(0.5*(X[1][1]+X[2][1]) - tang[1]), b.ground_elev + b.height + roof_height, -(0.5*(X[1][0]+X[2][0]) - tang[0]))
 
-    roof_texture_size_x = b.roof_texture.h_size_meters # size of roof texture in meters
-    roof_texture_size_y = b.roof_texture.v_size_meters
+    roof_texture_size_x = t.h_size_meters # size of roof texture in meters
+    roof_texture_size_y = t.v_size_meters
     repeatx = len_roof_bottom / roof_texture_size_x
     len_roof_hypo = ((0.5*b.lenX[1])**2 + roof_height**2)**0.5
     repeaty = len_roof_hypo / roof_texture_size_y
+    #print "repeaty--0", repeaty, t.y(repeaty)
 
 #    numsurf = 4
 #    b.surfaces += numsurf
@@ -144,41 +147,43 @@ def separate_gable(out, b, X):
 #    out += "refs %i\n" % b.nnodes_outer
     #o = b.first_node + b.nnodes_ground
 
-    out.face([ (o + 0, 0, 0),
-               (o + 1, repeatx, 0),
-               (o + 5, repeatx*(1-inward/len_roof_bottom), repeaty),
-               (o + 4, repeatx*(inward/len_roof_bottom), repeaty) ])
+    out.face([ (o + 0, t.x(0), t.y(0)),
+               (o + 1, t.x(repeatx), t.y(0)),
+               (o + 5, t.x(repeatx*(1-inward/len_roof_bottom)), t.y(repeaty)),
+               (o + 4, t.x(repeatx*(inward/len_roof_bottom)), t.y(repeaty)) ])
 
     #out += "SURF 0x0\n"
     #out += "mat %i\n" % b.mat
     #out += "refs %i\n" % b.nnodes_outer
-    out.face([ (o + 2, 0, 0),
-               (o + 3, repeatx, 0),
-               (o + 4, repeatx*(1-inward/len_roof_bottom), repeaty),
-               (o + 5, repeatx*(inward/len_roof_bottom), repeaty) ])
+    out.face([ (o + 2, t.x(0), t.y(0)),
+               (o + 3, t.x(repeatx), t.y(0)),
+               (o + 4, t.x(repeatx*(1-inward/len_roof_bottom)), t.y(repeaty)),
+               (o + 5, t.x(repeatx*(inward/len_roof_bottom)), t.y(repeaty)) ])
 
     repeatx = b.lenX[1]/roof_texture_size_x
     len_roof_hypo = (inward**2 + roof_height**2)**0.5
     repeaty = len_roof_hypo/roof_texture_size_y
+    #print "repeaty 1", repeaty
     #out += "SURF 0x0\n"
     #out += "mat %i\n" % b.mat
     #out += "refs %i\n" % 3
-    out.face([ (o + 1, 0, 0),
-               (o + 2, repeatx, 0),
-               (o + 5, 0.5*repeatx, repeaty) ])
+    out.face([ (o + 1, t.x(0), t.y(0)),
+               (o + 2, t.x(repeatx), t.y(0)),
+               (o + 5, t.x(0.5*repeatx), t.y(repeaty)) ])
 
     repeatx = b.lenX[3]/roof_texture_size_x
     #out += "SURF 0x0\n"
     #out += "mat %i\n" % b.mat
     #out += "refs %i\n" % 3
-    out.face([ (o + 3, 0, 0),
-               (o + 0, repeatx, 0),
-               (o + 4, 0.5*repeatx, repeaty) ])
+    out.face([ (o + 3, t.x(0), t.y(0)),
+               (o + 0, t.x(repeatx), t.y(0)),
+               (o + 4, t.x(0.5*repeatx), t.y(repeaty)) ])
+
 
 def _separate_flat(b, X, ac_name = ""):
 
     """flat roof, any number of nodes, separate model"""
-    uv = face_uv(range(b.nnodes_outer), X, b.roof_texture.h_size_meters, b.roof_texture.v_size_meters)
+    uv = face_uv(range(b.nnodes_outer), X, b.roof_texture)
 
     out = ""
     out += "OBJECT poly\n"
@@ -197,7 +202,7 @@ def _separate_flat(b, X, ac_name = ""):
 
     return out
 
-def face_uv(nodes, X, h_scale=1., v_scale=1., angle=None):
+def face_uv(nodes, X, texture, angle=None):
     """return list of uv coords for given face"""
     X = X[nodes]
     X = (X - X[0])
@@ -210,7 +215,10 @@ def face_uv(nodes, X, h_scale=1., v_scale=1., angle=None):
 #    print "SCALE", h_scale, v_scale
 #    print "X=", X
 #    print "UV", uv
-    uv[:,0] /= h_scale
-    uv[:,1] /= v_scale
+    uv[:,0] /= texture.h_size_meters
+    uv[:,0] += texture.x0
+    uv[:,1] = uv[:,1] / texture.v_size_meters * texture.sy
+    uv[:,1] += texture.y0
+#    bla
 #    print "UVsca", uv
     return uv
