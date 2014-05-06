@@ -9,7 +9,8 @@ as input and generates data to be used in FlightGear sceneries.
 * Cf. OSM Aerialway: http://wiki.openstreetmap.org/wiki/Map_Features#Aerialway
 
 TODO:
-* Cables should have different diameter depending on WayLine.type_
+* LOD and clustering
+* Collision detection
 * For aerialways make sure there is a station at both ends
 * For aerialways handle stations if represented as ways instead of nodes.
 * For powerlines handle power stations if represented as ways instead of nodes
@@ -87,6 +88,12 @@ class Cable(object):
             self._make_catenary_cable(number_extra_vertices, catenary_a)
 
     def _make_catenary_cable(self, number_extra_vertices, catenary_a):
+        """
+        Transforms the cable into one with more vertices and some sagging based on a catenary function.
+        If there is a considerable difference in elevation between the two pylons, then gravity would have to
+        be taken into account https://en.wikipedia.org/wiki/File:Catenary-tension.png.
+        However the elevation correction actually already helps quite a bit, because the x/y are kept constant.
+        """
         cable_distance = calc_distance(self.start_cable_vertex.x, self.start_cable_vertex.y
                                        , self.end_cable_vertex.x, self.end_cable_vertex.y)
         part_distance = cable_distance / (1 + number_extra_vertices)
@@ -228,8 +235,8 @@ def create_streetlamp3_vertices():
 
 
 def create_rail_power_vertices():
-    vertices = [CableVertex(2.0, 5.9)
-                , CableVertex(2.0, 5.0)]
+    vertices = [CableVertex(2.5, 12.0)
+                , CableVertex(-2.5, 12.0)]
     return vertices
 
 
@@ -261,9 +268,14 @@ class WaySegment(object):
 
 
 class Pylon(object):
+    TYPE_POWER_TOWER = 11  # OSM-key = "power", value = "tower"
+    TYPE_POWER_POLE = 12  # OSM-key = "power", value = "pole"
+    TYPE_AERIALWAY_PYLON = 21  # OSM-key = "aerialway", value = "pylon"
+    TYPE_AERIALWAY_STATION = 22  # OSM-key = "aerialway", value = "station"
+
     def __init__(self, osm_id):
         self.osm_id = osm_id
-        self.type_ = 0  # 11 = electric tower, 12 = electric pole, 21 = aerialway pylon, 22 = aerialway station
+        self.type_ = 0  # cf. class constants TYPE_*
         self.height = 0.0  # parsed as float
         self.structure = None
         self.material = None
@@ -289,15 +301,19 @@ class Pylon(object):
 
 
 class WayLine(object):  # The name "Line" is also used in e.g. SymPy
-    """
-    11 = power line, 12 = power minor line
-    21 = cable_car, 22 = chair_lift/mixed_lift, 23 = drag_lift/t-bar/platter, 24 = gondola, 25 = goods
-    """
+    TYPE_POWER_LINE = 11  # OSM-key = "power", value = "line"
+    TYPE_POWER_MINOR_LINE = 12  # OSM-key = "power", value = "minor_line"
+    TYPE_AERIALWAY_CABLE_CAR = 21  # OSM-key = "aerialway", value = "cable_car"
+    TYPE_AERIALWAY_CHAIR_LIFT = 22  # OSM-key = "aerialway", value = "chair_lift" or "mixed_lift"
+    TYPE_AERIALWAY_DRAG_LIFT = 23  # OSM-key = "aerialway", value = "drag_lift" or "t-bar" or "j-bar" or "platter"
+    TYPE_AERIALWAY_GONDOLA = 24  # OSM-key = "aerialway", value = "gondola"
+    TYPE_AERIALWAY_GOODS = 25  # OSM-key = "aerialway", value = "goods"
+
     def __init__(self, osm_id):
         self.osm_id = osm_id
         self.pylons = []
         self.way_segments = []
-        self.type_ = 0
+        self.type_ = 0  # cf. class constants TYPE_*
         self.pylon_model = None  # the path to the ac/xml model
         self.length = 0.0  # the total length of all segments
 
@@ -351,7 +367,7 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
         return " ".join(entry)
 
     def is_aerialway(self):
-        return self.type_ > 20
+        return (self.type_ != self.TYPE_POWER_LINE) and (self.type_ != self.TYPE_POWER_MINOR_LINE)
 
     def calc_and_map(self):
         """Calculates various aspects of the line and its nodes and attempt to correct if needed. """
@@ -381,9 +397,9 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
         nbr_poles = 0
         nbr_towers = 0
         for my_pylon in self.pylons:
-            if my_pylon.type_ == 11:
+            if my_pylon.type_ == Pylon.TYPE_POWER_TOWER:
                 nbr_towers += 1
-            elif my_pylon.type_ == 12:
+            elif my_pylon.type_ == Pylon.TYPE_POWER_POLE:
                 nbr_poles += 1
             if my_pylon.height > 0:
                 average_height += my_pylon.height
@@ -394,11 +410,11 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
             average_height /= found
 
         # use statistics to determine type_ and pylon_model
-        if self.type_ == 12 and nbr_towers <= nbr_poles and max_height <= 25.0 and max_length <= 250.0:
-            self.type_ = 12
+        if self.type_ == self.TYPE_POWER_MINOR_LINE and nbr_towers <= nbr_poles and max_height <= 25.0 and max_length <= 250.0:
+            self.type_ = self.TYPE_POWER_MINOR_LINE
             self.pylon_model = "Models/StreetFurniture/streetlamp3.xml"
         else:
-            self.type_ = 11
+            self.type_ = self.TYPE_POWER_LINE
             if average_height < 35.0 and max_length < 300.0:
                 self.pylon_model = "Models/Power/generic_pylon_25m.xml"
             elif average_height < 75.0 and max_length < 500.0:
@@ -445,6 +461,34 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
         Then calculate the local positions of all start and end points.
         Afterwards use the start and end points to create all cables for a given WaySegment
         """
+        radius = parameters.RADIUS_POWER_LINE
+        number_extra_vertices = parameters.EXTRA_VERTICES_POWER_LINE
+        catenary_a = parameters.CATENARY_A_POWER_LINE
+        if self.type_ == self.TYPE_POWER_MINOR_LINE:
+            radius = parameters.RADIUS_POWER_MINOR_LINE
+            number_extra_vertices = parameters.EXTRA_VERTICES_POWER_MINOR_LINE
+            catenary_a = parameters.CATENARY_A_POWER_MINOR_LINE
+        elif self.type_ == self.TYPE_AERIALWAY_CABLE_CAR:
+            radius = parameters.RADIUS_AERIALWAY_CABLE_CAR
+            number_extra_vertices = parameters.EXTRA_VERTICES_AERIALWAY_CABLE_CAR
+            catenary_a = parameters.CATENARY_A_AERIALWAY_CABLE_CAR
+        elif self.type_ == self.TYPE_AERIALWAY_CHAIR_LIFT:
+            radius = parameters.RADIUS_AERIALWAY_CHAIR_LIFT
+            number_extra_vertices = parameters.EXTRA_VERTICES_AERIALWAY_CHAIR_LIFT
+            catenary_a = parameters.CATENARY_A_AERIALWAY_CHAIR_LIFT
+        elif self.type_ == self.TYPE_AERIALWAY_DRAG_LIFT:
+            radius = parameters.RADIUS_AERIALWAY_DRAG_LIFT
+            number_extra_vertices = parameters.EXTRA_VERTICES_AERIALWAY_DRAG_LIFT
+            catenary_a = parameters.CATENARY_A_AERIALWAY_DRAG_LIFT
+        elif self.type_ == self.TYPE_AERIALWAY_GONDOLA:
+            radius = parameters.RADIUS_AERIALWAY_GONDOLA
+            number_extra_vertices = parameters.EXTRA_VERTICES_AERIALWAY_GONDOLA
+            catenary_a = parameters.CATENARY_A_AERIALWAY_GONDOLA
+        elif self.type_ == self.TYPE_AERIALWAY_GOODS:
+            radius = parameters.RADIUS_AERIALWAY_GOODS
+            number_extra_vertices = parameters.EXTRA_VERTICES_AERIALWAY_GOODS
+            catenary_a = parameters.CATENARY_A_AERIALWAY_GOODS
+
         for segment in self.way_segments:
             start_cable_vertices = get_cable_vertices(self.pylon_model)
             end_cable_vertices = get_cable_vertices(self.pylon_model)
@@ -453,7 +497,7 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
                                                       , segment.start_pylon.elevation, segment.start_pylon.heading)
                 end_cable_vertices[i].calc_position(segment.end_pylon.x, segment.end_pylon.y
                                                     , segment.end_pylon.elevation, segment.end_pylon.heading)
-                cable = Cable(start_cable_vertices[i], end_cable_vertices[i], 0.1, 3, 1500)
+                cable = Cable(start_cable_vertices[i], end_cable_vertices[i], radius, number_extra_vertices, catenary_a)
                 segment.cables.append(cable)
 
 
@@ -472,20 +516,20 @@ def process_osm_elements(nodes_dict, ways_dict, _elev_interpolator, _coord_trans
             value = way.tags[key]
             if "power" == key:
                 if "line" == value:
-                    my_line.type_ = 11
+                    my_line.type_ = WayLine.TYPE_POWER_LINE
                 elif "minor_line" == value:
-                    my_line.type_ = 12
+                    my_line.type_ = WayLine.TYPE_POWER_LINE
             elif "aerialway" == key:
                 if "cable_car" == value:
-                    my_line.type_ = 21
+                    my_line.type_ = WayLine.TYPE_AERIALWAY_CABLE_CAR
                 elif value in ["chair_lift", "mixed_lift"]:
-                    my_line.type_ = 22
-                elif value in ["drag_lift", "t-bar", "platter"]:
-                    my_line.type_ = 23
+                    my_line.type_ = WayLine.TYPE_AERIALWAY_CHAIR_LIFT
+                elif value in ["drag_lift", "t-bar", "j-bar", "platter"]:
+                    my_line.type_ = WayLine.TYPE_AERIALWAY_DRAG_LIFT
                 elif "gondola" == value:
-                    my_line.type_ = 24
+                    my_line.type_ = WayLine.TYPE_AERIALWAY_GONDOLA
                 elif "goods" == value:
-                    my_line.type_ = 25
+                    my_line.type_ = WayLine.TYPE_AERIALWAY_GOODS
         if 0 != my_line.type_:
             prev_pylon = None
             for ref in way.refs:
@@ -501,14 +545,14 @@ def process_osm_elements(nodes_dict, ways_dict, _elev_interpolator, _coord_trans
                         value = my_node.tags[key]
                         if "power" == key:
                             if "tower" == value:
-                                my_pylon.type_ = 11
+                                my_pylon.type_ = Pylon.TYPE_POWER_TOWER
                             elif "pole" == value:
-                                my_pylon.type_ = 12
+                                my_pylon.type_ = Pylon.TYPE_POWER_POLE
                         elif "aerialway" == key:
                             if "pylon" == value:
-                                my_pylon.type_ = 21
+                                my_pylon.type_ = Pylon.TYPE_AERIALWAY_PYLON
                             elif "station" == value:
-                                my_pylon.type_ = 22
+                                my_pylon.type_ = Pylon.TYPE_AERIALWAY_STATION
                         elif "height" == key:
                             my_pylon.height = osmparser.parse_length(value)
                         elif "structure" == key:
@@ -682,7 +726,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     # Handling arguments and parameters
     parser = argparse.ArgumentParser(
-        description="osm2city reads OSM data and creates buildings for use with FlightGear")
+        description="osm2pylon reads OSM data and creates pylons, powerlines and aerialways for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
     args = parser.parse_args()
@@ -770,7 +814,7 @@ class TestOSMPylons(unittest.TestCase):
         pylon2.x = 100
         pylon2.y = 100
         wayline1 = WayLine(100)
-        wayline1.type_ = 11  # high voltage powerline
+        wayline1.type_ = WayLine.TYPE_POWER_LINE
         wayline1.pylons.append(pylon1)
         wayline1.pylons.append(pylon2)
         wayline1.calc_and_map()

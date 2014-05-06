@@ -1,17 +1,21 @@
 # -*- coding: utf-8 -*-
-'''
+"""
 Central place to store parameters / settings / variables in osm2city.
-All lenght, height etc. parameters are in meters, square meters (m2) etc.
+All length, height etc. parameters are in meters, square meters (m2) etc.
+
+The assigned values are default values. The Config files will overwrite them
 
 Created on May 27, 2013
 
 @author: vanosten
-'''
+"""
 
 import sys
 import types
 
-# -- default parameters. Config file overrides these.
+#=============================================================================
+# PARAMETERS FOR ALL osm2city MODULES
+#=============================================================================
 
 # -- Scenery folder, typically a geographic name or the ICAO code of the airport
 PREFIX = "LSZR"
@@ -30,6 +34,9 @@ ELEV_RASTER_Y = 10
 #    an OBJECTS/ folder below PATH_TO_SCENERY
 PATH_TO_SCENERY = "/home/user/fgfs/scenery"
 
+OSM_FILE = "buildings.osm"  # -- file name of the file with OSM data. Must reside in $PREFIX
+USE_PKL = False             # -- instead of parsing the OSM file, read a previously created cache file $PREFIX/buildings.pkl
+
 # -- write .stg, .ac, .xml to this path. If empty, data is automatically written to correct location
 #    in $PATH_TO_SCENERY
 PATH_TO_OUTPUT = ""
@@ -37,16 +44,18 @@ PATH_TO_OUTPUT = ""
 NO_ELEV = False             # -- skip elevation interpolation
 MANUAL_ELEV = True          # uses manual process with copy elev.in and elev.out through Nasal. Otherwise experimental direct FG invocation
 
+#=============================================================================
+# PARAMETERS RELATED TO BUILDINGS IN osm2city
+#=============================================================================
+
 # -- check for overlap with static models. The scenery folder must contain an "Objects" folder
 OVERLAP_CHECK = True
 OVERLAP_RADIUS = 5
 
 TILE_SIZE = 1000            # -- tile size in meters for clustering of buildings
 
-OSM_FILE = "buildings.osm"  # -- file name of the file with OSM data. Must reside in $PREFIX
 MAX_OBJECTS = 50000         # -- maximum number of buildings to read from OSM data
 CONCURRENCY = 1             # -- number of parallel OSM parsing threads
-USE_PKL = False             # -- instead of parsing the OSM file, read a previously created cache file $PREFIX/buildings.pkl
 
 # -- skip reading named buildings from OSM (in case there's already a static model for these, and the overlap check fails)
 SKIP_LIST = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
@@ -92,6 +101,42 @@ EXPERIMENTAL_INNER = 0
 
 CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if to little objects
 
+
+#=============================================================================
+# PARAMETERS RELATED TO PYLONS, POWERLINES, AERIALWAYS IN osm2pylons.py
+#=============================================================================
+# The radius for the cable. The cable will be a triangle with side length 2*radius.
+# In order to be better visible the radius might be chosen larger than in real life
+RADIUS_POWER_LINE = 0.1
+RADIUS_POWER_MINOR_LINE = 0.1
+RADIUS_AERIALWAY_CABLE_CAR = 0.1
+RADIUS_AERIALWAY_CHAIR_LIFT = 0.1
+RADIUS_AERIALWAY_DRAG_LIFT = 0.05
+RADIUS_AERIALWAY_GONDOLA = 0.1
+RADIUS_AERIALWAY_GOODS = 0.05
+
+# The number of extra points between 2 pylons to simulate sagging of the cable.
+# If 0 is chosen or if CATENARY_A is 0 then no sagging is calculated, which is better for performances (less realistic)
+# 3 is normally a good compromise - for cable cars or major power lines with very long distances a value of 5
+# or higher might be suitable
+EXTRA_VERTICES_POWER_LINE = 3
+EXTRA_VERTICES_POWER_MINOR_LINE = 3
+EXTRA_VERTICES_AERIALWAY_CABLE_CAR = 5
+EXTRA_VERTICES_AERIALWAY_CHAIR_LIFT = 3
+EXTRA_VERTICES_AERIALWAY_DRAG_LIFT = 0
+EXTRA_VERTICES_AERIALWAY_GONDOLA = 3
+EXTRA_VERTICES_AERIALWAY_GOODS = 5
+
+# The value for catenary_a can be experimentally determined by using osm2pylon.test_catenary
+CATENARY_A_POWER_LINE = 1500
+CATENARY_A_POWER_MINOR_LINE = 1500
+CATENARY_A_AERIALWAY_CABLE_CAR = 1500
+CATENARY_A_AERIALWAY_CHAIR_LIFT = 1500
+CATENARY_A_AERIALWAY_DRAG_LIFT = 1500
+CATENARY_A_AERIALWAY_GONDOLA = 1500
+CATENARY_A_AERIALWAY_GOODS = 1500
+
+
 def set_parameters(paramDict):
     for k in paramDict:
         if k in globals():
@@ -115,10 +160,11 @@ def set_parameters(paramDict):
         else:
             print "Ignoring unknown parameter", k
 
+
 def show():
-    '''
+    """
     Prints all parameters as key = value
-    '''
+    """
     print '--- Using the following parameters: ---'
     myGlobals = globals()
     for k in sorted(myGlobals.iterkeys()):
@@ -135,9 +181,9 @@ def show():
 
 
 def parse_list(stringValue):
-    '''
+    """
     Tries to parse a string containing comma separated values and returns a list
-    '''
+    """
     myList = []
     if None is not stringValue:
         myList = stringValue.split(',')
@@ -145,11 +191,12 @@ def parse_list(stringValue):
             myList[index] = myList[index].strip().strip('"\'')
     return myList
 
+
 def parse_float(key, stringValue):
-    '''
+    """
     Tries to parse a string and get a float. If it is not possible, then None is returned.
     On parse exception the key and the value are printed to console
-    '''
+    """
     floatValue = None
     try:
         floatValue = float(stringValue)
@@ -157,11 +204,12 @@ def parse_float(key, stringValue):
         print 'Unable to convert', stringValue, 'to decimal number. Relates to key', key
     return floatValue
 
+
 def parse_int(key, stringValue):
-    '''
+    """
     Tries to parse a string and get an int. If it is not possible, then None is returned.
     On parse exception the key and the value are printed to console
-    '''
+    """
     intValue = None
     try:
         intValue = int(stringValue)
@@ -169,10 +217,11 @@ def parse_int(key, stringValue):
         print 'Unable to convert', stringValue, 'to number. Relates to key', key
     return intValue
 
+
 def parse_bool(key, stringValue):
-    '''
+    """
     Tries to parse a string and get a boolean. If it is not possible, then False is returned.
-    '''
+    """
     if stringValue.lower() in ("yes", "true", "on", "1"):
         return True
     if stringValue.lower() in ("no", "false", "off", "0"):
@@ -180,6 +229,7 @@ def parse_bool(key, stringValue):
     print "Boolean value %s for %s not understood. Assuming False." % (stringValue, key)
     # FIXME: bail out if not understood!
     return False
+
 
 def read_from_file(filename):
     print 'Reading parameters from file:', filename
@@ -208,4 +258,3 @@ def read_from_file(filename):
     except IOError, reason:
         print "Error processing file with parameters:", reason
         sys.exit(1)
-
