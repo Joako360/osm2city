@@ -330,41 +330,59 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
         """
         Returns the stg entries for the cables of this WayLine in a string separated by linebreaks
         E.g. OBJECT_STATIC LSZSpylons1901.xml 9.75516 46.4135 2000.48 0
-
         Before this it creates the xml-file and ac-file containing the cables.
-
         Each WaySegment is represented as an object group in ac with each cable of the WaySegment as a kid
 
+        In order to reduce rounding errors clusters of WaySegments are used instead of a whole WayLine per file.
         """
-        xml_file_lines = []
-        xml_file_lines.append('<?xml version="1.0"?>')
-        xml_file_lines.append('<PropertyList>')
-        xml_file_lines.append('<path>' + filename + '.ac</path>')  # the ac-file is in the same directory
-        xml_file_lines.append('</PropertyList>')
-        with open(path + filename + ".xml", 'w') as f:
-            f.write("\n".join(xml_file_lines))
+        stg_entries = []
+        cluster_segments = []
+        cluster_length = 0.0
+        cluster_index = 1
+        start_pylon = None
+        for i in xrange(0, len(self.way_segments)):
+            way_segment = self.way_segments[i]
+            if start_pylon is None:
+                start_pylon = way_segment.start_pylon
+            cluster_segments.append(way_segment)
+            cluster_length += way_segment.length
+            if (cluster_length >= parameters.CLUSTER_LINE_MAX_LENGTH) or (len(self.way_segments) - 1 == i):
+                cluster_filename = filename + '_' + str(cluster_index)
+                ac_file_lines = []
+                ac_file_lines.append("AC3Db")
+                ac_file_lines.append('MATERIAL "cable" rgb 0.5 0.5 0.5 amb 0.5 0.5 0.5 emis 0.0 0.0 0.0 spec 0.5 0.5 0.5 shi 1 trans 0')
+                ac_file_lines.append("OBJECT world")
+                ac_file_lines.append("kids " + str(len(cluster_segments)))
+                cluster_segment_index = 0
+                for cluster_segment in cluster_segments:
+                    cluster_segment_index += 1
+                    ac_file_lines.append("OBJECT group")
+                    ac_file_lines.append('"segment%05d"' % cluster_segment_index)
+                    ac_file_lines.append("kids " + str(len(cluster_segment.cables)))
+                    for cable in cluster_segment.cables:
+                        cable.translate_vertices_relative(start_pylon.x, start_pylon.y, start_pylon.elevation)
+                        ac_file_lines.append(cable.make_ac_entry(0))  # material is 0-indexed
+                with open(path + cluster_filename + ".ac", 'w') as f:
+                    f.write("\n".join(ac_file_lines))
 
-        ac_file_lines = []
-        ac_file_lines.append("AC3Db")
-        ac_file_lines.append('MATERIAL "cable" rgb 0.5 0.5 0.5 amb 0.5 0.5 0.5 emis 0.0 0.0 0.0 spec 0.5 0.5 0.5 shi 1 trans 0')
-        ac_file_lines.append("OBJECT world")
-        ac_file_lines.append("kids " + str(len(self.way_segments)))
-        way_segment_index = 0
-        for way_segment in self.way_segments:
-            material = 0
-            way_segment_index += 1
-            ac_file_lines.append("OBJECT group")
-            ac_file_lines.append('"segment%05d"' % way_segment_index)
-            ac_file_lines.append("kids " + str(len(way_segment.cables)))
-            for cable in way_segment.cables:
-                cable.translate_vertices_relative(self.pylons[0].x, self.pylons[0].y, self.pylons[0].elevation)
-                ac_file_lines.append(cable.make_ac_entry(material))  # material is 0-indexed
-        with open(path + filename + ".ac", 'w') as f:
-            f.write("\n".join(ac_file_lines))
+                xml_file_lines = []
+                xml_file_lines.append('<?xml version="1.0"?>')
+                xml_file_lines.append('<PropertyList>')
+                xml_file_lines.append('<path>' + cluster_filename + '.ac</path>')  # the ac-file is in the same directory
+                xml_file_lines.append('</PropertyList>')
+                with open(path + cluster_filename + ".xml", 'w') as f:
+                    f.write("\n".join(xml_file_lines))
 
-        entry = ["OBJECT_STATIC", filename + ".xml", str(self.pylons[0].lon), str(self.pylons[0].lat)
-                 , str(self.pylons[0].elevation), "90"]
-        return " ".join(entry)
+                entry = ["OBJECT_STATIC", cluster_filename + ".xml", str(start_pylon.lon)
+                         , str(start_pylon.lat), str(start_pylon.elevation), "90"]
+                stg_entries.append(" ".join(entry))
+
+                cluster_length = 0.0
+                cluster_segments = []
+                cluster_index += 1
+                start_pylon = None
+
+        return "\n".join(stg_entries)
 
     def is_aerialway(self):
         return (self.type_ != self.TYPE_POWER_LINE) and (self.type_ != self.TYPE_POWER_MINOR_LINE)

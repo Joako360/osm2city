@@ -105,6 +105,12 @@ CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if to little objects
 #=============================================================================
 # PARAMETERS RELATED TO PYLONS, POWERLINES, AERIALWAYS IN osm2pylons.py
 #=============================================================================
+
+# Each powerline and aerialway has segments delimited by pylons. The longer the value the better clustering and
+# the better the performance. However due to rounding errors the longer the length per cluster the larger the
+# error.
+CLUSTER_LINE_MAX_LENGTH = 500
+
 # The radius for the cable. The cable will be a triangle with side length 2*radius.
 # In order to be better visible the radius might be chosen larger than in real life
 RADIUS_POWER_LINE = 0.1
@@ -137,26 +143,26 @@ CATENARY_A_AERIALWAY_GONDOLA = 1500
 CATENARY_A_AERIALWAY_GOODS = 1500
 
 
-def set_parameters(paramDict):
-    for k in paramDict:
+def set_parameters(param_dict):
+    for k in param_dict:
         if k in globals():
             if isinstance(globals()[k], types.BooleanType):
-                globals()[k] = parse_bool(k, paramDict[k])
+                globals()[k] = parse_bool(k, param_dict[k])
             elif isinstance(globals()[k], types.FloatType):
-                floatValue = parse_float(k, paramDict[k])
-                if None is not floatValue:
-                    globals()[k] = floatValue
+                float_value = parse_float(k, param_dict[k])
+                if None is not float_value:
+                    globals()[k] = float_value
             elif isinstance(globals()[k], types.IntType):
-                intValue = parse_int(k, paramDict[k])
-                if None is not intValue:
-                    globals()[k] = intValue
+                int_value = parse_int(k, param_dict[k])
+                if None is not int_value:
+                    globals()[k] = int_value
             elif isinstance(globals()[k], types.StringType):
-                if None is not paramDict[k]:
-                    globals()[k] = paramDict[k]
+                if None is not param_dict[k]:
+                    globals()[k] = param_dict[k]
             elif isinstance(globals()[k], types.ListType):
-                globals()[k] = parse_list(paramDict[k])
+                globals()[k] = parse_list(param_dict[k])
             else:
-                print "Parameter", k, "has an unknown type/value:" , paramDict[k]
+                print "Parameter", k, "has an unknown type/value:", param_dict[k]
         else:
             print "Ignoring unknown parameter", k
 
@@ -166,67 +172,67 @@ def show():
     Prints all parameters as key = value
     """
     print '--- Using the following parameters: ---'
-    myGlobals = globals()
-    for k in sorted(myGlobals.iterkeys()):
+    my_globals = globals()
+    for k in sorted(my_globals.iterkeys()):
         if k.startswith('__'):
             continue
-        if isinstance(myGlobals[k], types.ClassType) or isinstance(myGlobals[k], types.FunctionType) or isinstance(myGlobals[k], types.ModuleType):
+        if isinstance(my_globals[k], types.ClassType) or isinstance(my_globals[k], types.FunctionType) or isinstance(my_globals[k], types.ModuleType):
             continue
-        if isinstance(myGlobals[k], types.ListType):
-            value = ', '.join(myGlobals[k])
+        if isinstance(my_globals[k], types.ListType):
+            value = ', '.join(my_globals[k])
             print k, '=', value
         else:
-            print k, '=', myGlobals[k]
+            print k, '=', my_globals[k]
     print '------'
 
 
-def parse_list(stringValue):
+def parse_list(string_value):
     """
     Tries to parse a string containing comma separated values and returns a list
     """
-    myList = []
-    if None is not stringValue:
-        myList = stringValue.split(',')
-        for index in range(len(myList)):
-            myList[index] = myList[index].strip().strip('"\'')
-    return myList
+    my_list = []
+    if None is not string_value:
+        my_list = string_value.split(',')
+        for index in range(len(my_list)):
+            my_list[index] = my_list[index].strip().strip('"\'')
+    return my_list
 
 
-def parse_float(key, stringValue):
+def parse_float(key, string_value):
     """
     Tries to parse a string and get a float. If it is not possible, then None is returned.
     On parse exception the key and the value are printed to console
     """
-    floatValue = None
+    float_value = None
     try:
-        floatValue = float(stringValue)
+        float_value = float(string_value)
     except ValueError:
-        print 'Unable to convert', stringValue, 'to decimal number. Relates to key', key
-    return floatValue
+        print 'Unable to convert', string_value, 'to decimal number. Relates to key', key
+    return float_value
 
 
-def parse_int(key, stringValue):
+def parse_int(key, string_value):
     """
     Tries to parse a string and get an int. If it is not possible, then None is returned.
     On parse exception the key and the value are printed to console
     """
-    intValue = None
+    int_value = None
     try:
-        intValue = int(stringValue)
+        int_value = int(string_value)
     except ValueError:
-        print 'Unable to convert', stringValue, 'to number. Relates to key', key
-    return intValue
+        print 'Unable to convert', string_value, 'to number. Relates to key', key
+    return int_value
 
 
-def parse_bool(key, stringValue):
+def parse_bool(key, string_value):
     """
     Tries to parse a string and get a boolean. If it is not possible, then False is returned.
     """
-    if stringValue.lower() in ("yes", "true", "on", "1"):
+    if string_value.lower() in ("yes", "true", "on", "1"):
         return True
-    if stringValue.lower() in ("no", "false", "off", "0"):
+    if string_value.lower() in ("no", "false", "off", "0"):
         return False
-    print "Boolean value %s for %s not understood. Assuming False." % (stringValue, key)
+    print "Boolean value %s for %s not understood. Assuming False." % (string_value, key)
     # FIXME: bail out if not understood!
     return False
 
@@ -235,7 +241,7 @@ def read_from_file(filename):
     print 'Reading parameters from file:', filename
     try:
         f = open(filename, 'r')
-        paramDict = {}
+        param_dict = {}
         full_line = ""
         for line in f:
             # -- ignore comments and empty lines
@@ -250,10 +256,10 @@ def read_from_file(filename):
             value = None
             if 2 == len(pair):
                 value = pair[1].strip()
-            paramDict[key] = value
+            param_dict[key] = value
             full_line = ""
 
-        set_parameters(paramDict)
+        set_parameters(param_dict)
         f.close()
     except IOError, reason:
         print "Error processing file with parameters:", reason
