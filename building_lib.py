@@ -102,7 +102,7 @@ def check_height(building_height, t):
                         # FIXME: probably a bug. Should use distance to height?
                         tex_y0 = t.v_splits[i]
                         tex_y1 = 1
-                        logging.debug("from top %s y0=%4.2f y1=%4.2f" % (t.filename, tex_y0, tex_y1))
+                        #logging.debug("from top %s y0=%4.2f y1=%4.2f" % (t.filename, tex_y0, tex_y1))
 
                         return tex_y0, tex_y1
             raise ValueError("SHOULD NOT HAPPEN! found no tex_y0, tex_y1 (building_height %g splits %s %g)" % (building_height, str(t.v_splits_meters), t.v_size_meters))
@@ -251,7 +251,7 @@ def compute_height_and_levels(b):
     else:
         # -- neither height nor levels given: use random levels
         b.levels = random_levels()
-        b.levels = 15
+        #b.levels = 15
         if b.area < parameters.BUILDING_MIN_AREA:
             b.levels = min(b.levels, 2)
     b.height = float(b.levels) * level_height
@@ -579,7 +579,10 @@ def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner = False):
             ia = int(a)
             frac = a - ia
             tex_x1 = texture.x(texture.closest_h_match(frac) + ia)
-
+            if texture.v_can_repeat:
+                #assert(tex_x1 <= 1.)
+                if not (tex_x1 <= 1.):
+                    logging.debug('FIXME: v_can_repeat: need to check in analyse')
         if 0:
             tex_x1 = texture.x(1.)
         tex_x0 = texture.x(0)
@@ -587,7 +590,8 @@ def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner = False):
         out.face([ (j,                        texture.x(tex_x0), texture.y(tex_y0)),
                    (j + 1,                    texture.x(tex_x1), texture.y(tex_y0)),
                    (j + 1 + b._nnodes_ground, texture.x(tex_x1), texture.y(tex_y1)),
-                   (j     + b._nnodes_ground, texture.x(tex_x0), texture.y(tex_y1)) ])
+                   (j     + b._nnodes_ground, texture.x(tex_x0), texture.y(tex_y1)) ],
+                   rotate=texture.v_can_repeat)
 
     # -- closing wall
     tex_x1 = texture.x(b.lenX[v1-1] /  texture.h_size_meters)
@@ -600,7 +604,8 @@ def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner = False):
     out.face([ (j1 - 1,             texture.x(tex_x0), texture.y(tex_y0)),
                (j0,                 texture.x(tex_x1), texture.y(tex_y0)),
                (j0 + b._nnodes_ground,     texture.x(tex_x1), texture.y(tex_y1)),
-               (j1 - 1 + b._nnodes_ground, texture.x(tex_x0), texture.y(tex_y1))  ])
+               (j1 - 1 + b._nnodes_ground, texture.x(tex_x0), texture.y(tex_y1))  ],
+               rotate=texture.v_can_repeat)
     return v1
     # ---
     # need numvert
@@ -672,7 +677,6 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
         if not b.roof_complex:
         #if True:
-            print "flat roof text", b.roof_texture
             roofs.flat(out, b, b.X)
             tools.stats.count(b)
             continue

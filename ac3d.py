@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import string
 import matplotlib.pyplot as plt
+import numpy as np
 
 class Node(object):
     def __init__(self, x, y, z):
@@ -11,10 +12,15 @@ class Node(object):
         return "%1.2f %1.2f %1.2f\n" % (self.x, self.y, self.z)
 
 class Face(object):
-    def __init__(self, nodes_uv_list, typ, mat):
+    def __init__(self, nodes_uv_list, typ, mat, rotate):
         assert len(nodes_uv_list) >= 3
         for n in nodes_uv_list:
             assert len(n) == 3
+        if rotate:
+            # -- roll (u, v) along node axis
+            a = np.array(nodes_uv_list)
+            a[:,1:] = np.roll(a[:,1:],1, axis=0)
+            nodes_uv_list = list(a)
         self.nodes_uv_list = nodes_uv_list
         self.typ = typ
         self.mat = mat
@@ -50,13 +56,13 @@ class Object(object):
     def next_node_index(self):
         return len(self._nodes)
 
-    def face(self, nodes_uv_list, typ=None, mat=None):
+    def face(self, nodes_uv_list, typ=None, mat=None, rotate=None):
         """Add new face. Return its index."""
         if not typ:
             typ = self.default_type
         if not mat:
             mat = self.default_mat
-        self._faces.append(Face(nodes_uv_list, typ, mat))
+        self._faces.append(Face(nodes_uv_list, typ, mat, rotate))
         self.stats.surfaces += 1
         return len(self._faces) - 1
 

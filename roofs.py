@@ -41,7 +41,7 @@ def flat(out, b, X, ac_name = ""):
     #   |/                |  draw 0 - 4 5 6 7 4 - 0 1 2 - 8 9 10 11 8 - 2 3
     #   0---->>-----------1
 
-    logging.warning("FIXME: check if we duplicate nodes, and if separate model still makes sense.")
+    logging.debug("FIXME: check if we duplicate nodes, and if separate model still makes sense.")
 
     if ac_name:
         out.new_object(ac_name, b.roof_texture.filename + '.png')
