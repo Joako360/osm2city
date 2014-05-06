@@ -357,7 +357,7 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
                 for cluster_segment in cluster_segments:
                     cluster_segment_index += 1
                     ac_file_lines.append("OBJECT group")
-                    ac_file_lines.append('"segment%05d"' % cluster_segment_index)
+                    ac_file_lines.append('name "segment%05d"' % cluster_segment_index)
                     ac_file_lines.append("kids " + str(len(cluster_segment.cables)))
                     for cable in cluster_segment.cables:
                         cable.translate_vertices_relative(start_pylon.x, start_pylon.y, start_pylon.elevation)
@@ -369,6 +369,13 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
                 xml_file_lines.append('<?xml version="1.0"?>')
                 xml_file_lines.append('<PropertyList>')
                 xml_file_lines.append('<path>' + cluster_filename + '.ac</path>')  # the ac-file is in the same directory
+                xml_file_lines.append('<animation>')
+                xml_file_lines.append('<type>range</type>')
+                xml_file_lines.append('<min-m>0</min-m>')
+                xml_file_lines.append('<max-property>/sim/rendering/static-lod/rough</max-property>')
+                for j in xrange(1, len(cluster_segments) + 1):
+                    xml_file_lines.append('<object-name>segment%05d</object-name>' % j)
+                xml_file_lines.append('</animation>')
                 xml_file_lines.append('</PropertyList>')
                 with open(path + cluster_filename + ".xml", 'w') as f:
                     f.write("\n".join(xml_file_lines))
