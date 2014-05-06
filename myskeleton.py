@@ -13,6 +13,7 @@ import textwrap
 import numpy as np
 import tools
 import os
+import logging
 
 def myskel(out, b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header = False, max_height = 1e99):
 #vertices = [(202.0, 52.0), (400.0, 52.0), (400.0, 153.0), (202.0, 152.0)]
@@ -84,7 +85,7 @@ def myskel(out, b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header 
         #roof.mesh.vertices
         roof_height = max([p[2] for p in roof_mesh.vertices])
         if roof_height > max_height:
-#            print "roof too heigh", roof_height, max_height
+            logging.debug("roof too high %g > %g" % (roof_height, max_height))
             return False
         result = roof_mesh.to_out(out, b, offset_xy, offset_z, header)
 #        return s

@@ -546,8 +546,8 @@ def write_xml(path, fname, LM_dict, buildings):
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-#    logging.basicConfig(level=logging.DEBUG)
+#    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
 
     # -- Parse arguments. Command line overrides config file.
     parser = argparse.ArgumentParser(description="osm2city reads OSM data and creates buildings for use with FlightGear")
@@ -634,8 +634,8 @@ if __name__ == "__main__":
         logging.info("unpickled %g buildings ", len(buildings))
         tools.stats.objects = len(buildings)
 
-    nb = len(buildings)
-    #buildings = buildings[nb/2:]
+    #nb = len(buildings)
+    #buildings = [buildings[0]]
 
     # -- debug filter
 #    for b in buildings:

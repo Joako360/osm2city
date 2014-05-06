@@ -71,8 +71,9 @@ def check_height(building_height, t):
        - check if h is within the texture's limits (minheight, maxheight)
        -
     """
-    ofs = t.y0
     if t.v_can_repeat:
+        # -- v-repeatable textures are rotated 90 deg in atlas.
+        #    Face will be rotated later on, so his here will actually be u
         tex_y1 = 1.
         tex_y0 = 1 - building_height / t.v_size_meters
         return tex_y0, tex_y1
@@ -90,9 +91,9 @@ def check_height(building_height, t):
                     if t.v_splits_meters[i] >= building_height:
 #                        print "bot trying %g >= %g ?" % (t.v_splits_meters[i],  building_height)
                         tex_y0 = 0
-                        tex_y1 = t.v_splits[i] * t.sy
+                        tex_y1 = t.v_splits[i]
                         #print "# height %g storey %i" % (building_height, i)
-                        return tex_y0 + ofs, tex_y1 + ofs
+                        return tex_y0, tex_y1
             else:
 #                print "got", t.v_splits_meters
                 for i in range(len(t.v_splits_meters)-2, -1, -1):
@@ -101,12 +102,9 @@ def check_height(building_height, t):
                         # FIXME: probably a bug. Should use distance to height?
                         tex_y0 = t.v_splits[i]
                         tex_y1 = 1
-                        tex_y0
-                        ty0 = tex_y0 * t.sy + ofs
-                        ty1 = tex_y1 * t.sy + ofs
-                        logging.debug("from top %s y0=%4.2f y1=%4.2f  %4.2f %4.2f" % (t.filename, tex_y0, tex_y1, ty0, ty1))
+                        logging.debug("from top %s y0=%4.2f y1=%4.2f" % (t.filename, tex_y0, tex_y1))
 
-                        return ty0, ty1
+                        return tex_y0, tex_y1
             raise ValueError("SHOULD NOT HAPPEN! found no tex_y0, tex_y1 (building_height %g splits %s %g)" % (building_height, str(t.v_splits_meters), t.v_size_meters))
         else:
             raise ValueError("SHOULD NOT HAPPEN! building_height %g outside %g %g" % (building_height, t.v_splits_meters[0], t.v_size_meters))
@@ -253,7 +251,7 @@ def compute_height_and_levels(b):
     else:
         # -- neither height nor levels given: use random levels
         b.levels = random_levels()
-        #b.levels = 15
+        b.levels = 15
         if b.area < parameters.BUILDING_MIN_AREA:
             b.levels = min(b.levels, 2)
     b.height = float(b.levels) * level_height
@@ -418,7 +416,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         b.roof_complex = False
         if parameters.BUILDING_COMPLEX_ROOFS:
             # -- pitched, separate roof if we have 4 ground nodes and area below 1000m2
-            if not b.polygon.interiors and b.area < 2000:
+            if not b.polygon.interiors and b.area < parameters.BUILDING_COMPLEX_ROOFS_MAX_AREA:
                 if b._nnodes_ground == 4:
                    b.roof_complex = True
                 if (parameters.EXPERIMENTAL_USE_SKEL and \
@@ -426,7 +424,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                    b.roof_complex = True
 
             # -- no pitched roof on tall buildings
-            if b.levels > 5:
+            if b.levels > parameters.BUILDING_COMPLEX_ROOFS_MAX_LEVELS:
                 b.roof_complex = False
                 # FIXME: roof_ACs = True
 
@@ -452,6 +450,8 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
         # -- finally: append building to new list
         new_buildings.append(b)
+
+#        print "COMPLEX??", b.roof_complex
 
     return new_buildings
 
@@ -565,44 +565,42 @@ def write_ground(out, b, elev):
                (o+2,0,0),
                (o+3,0,0)], mat=1)
 
-  # write_ring(out, b, b.polygon.exterior, 0)
-def write_ring(out, b, ring, v0, facade_texture, tex_y0, tex_y1, inner = False):
+def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner = False):
     nnodes_ring = len(ring.coords) - 1
-
     v1 = v0 + nnodes_ring
     #print "v0 %i v1 %i lenX %i" % (v0, v1, len(b.lenX))
     for i in range(v0, v1 - 1):
         if False:
-            tex_x1 = b.lenX[i] / facade_texture.h_size_meters # -- simply repeat texture to fit length
+            tex_x1 = texture.x(b.lenX[i] / texture.h_size_meters) # -- simply repeat texture to fit length
         else:
             # FIXME: respect facade texture split_h
-            #FIXME: there is a nan in facade_textures.h_splits of tex/facade_modern36x36_12
-            a = b.lenX[i] / facade_texture.h_size_meters
+            #FIXME: there is a nan in textures.h_splits of tex/facade_modern36x36_12
+            a = b.lenX[i] / texture.h_size_meters
             ia = int(a)
             frac = a - ia
-            tex_x1 = facade_texture.closest_h_match(frac) + ia
+            tex_x1 = texture.x(texture.closest_h_match(frac) + ia)
 
-# surf(type, mat, [(), ()], type=type, mat=mat)
         if 0:
-            tex_x1 = 1
+            tex_x1 = texture.x(1.)
+        tex_x0 = texture.x(0)
         j = i + b.first_node
-        out.face([ (j,                        0, tex_y0),
-                   (j + 1,                    tex_x1, tex_y0),
-                   (j + 1 + b._nnodes_ground, tex_x1, tex_y1),
-                   (j     + b._nnodes_ground, 0, tex_y1)  ])
+        out.face([ (j,                        texture.x(tex_x0), texture.y(tex_y0)),
+                   (j + 1,                    texture.x(tex_x1), texture.y(tex_y0)),
+                   (j + 1 + b._nnodes_ground, texture.x(tex_x1), texture.y(tex_y1)),
+                   (j     + b._nnodes_ground, texture.x(tex_x0), texture.y(tex_y1)) ])
 
     # -- closing wall
-    tex_x1 = b.lenX[v1-1] /  facade_texture.h_size_meters
+    tex_x1 = texture.x(b.lenX[v1-1] /  texture.h_size_meters)
     if 0:
-        tex_x1 = 1
+        tex_x1 = texture.x(1)
 
     j0 = v0 + b.first_node
     j1 = v1 + b.first_node
 
-    out.face([ (j1 - 1,             0, tex_y0),
-               (j0,                 tex_x1, tex_y0),
-               (j0 + b._nnodes_ground,     tex_x1, tex_y1),
-               (j1 - 1 + b._nnodes_ground, 0,          tex_y1)  ])
+    out.face([ (j1 - 1,             texture.x(tex_x0), texture.y(tex_y0)),
+               (j0,                 texture.x(tex_x1), texture.y(tex_y0)),
+               (j0 + b._nnodes_ground,     texture.x(tex_x1), texture.y(tex_y1)),
+               (j1 - 1 + b._nnodes_ground, texture.x(tex_x0), texture.y(tex_y1))  ])
     return v1
     # ---
     # need numvert
@@ -629,8 +627,6 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
     for b in buildings:
         out = LOD_objects[b.LOD]
-        #print "#"
-        #b.roof_complex = False # no complex roofs for now
         b.X = np.array(b.X_outer + b.X_inner)
     #    Xo = np.array(b.X_outer)
         for i in range(b._nnodes_ground):
@@ -703,8 +699,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
                 if s:
                     tools.stats.have_complex_roof += 1
                 else: # -- fall back to flat roof
-                    roofs.flat(out, b, b.X, None) #b.roof_ac_name)
-    #                print "FAIL"
+                    roofs.flat(out, b, b.X)
                     # FIXME: move to analyse. If we fall back, don't require separate LOD
             # -- pitched roof for exactly 4 ground nodes
             else:

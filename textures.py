@@ -256,13 +256,14 @@ class Texture(object):
               'Please set either h_can_repeat or v_can_repeat to False.' % self.filename)
 
     def x(self, x):
+        """given non-dimensional texture coord, return position in atlas"""
         #print "xx==", (self.x0 + x*self.sx)
         return self.x0 + x * self.sx
 
     def y(self, y):
+        """given non-dimensional texture coord, return position in atlas"""
         #print "yy==", (self.y0 + y*self.sy)
         return self.y0 + y * self.sy
-
 
     def __str__(self):
         return "<%s> x0,1 %4.2f %4.2f  y0,1 %4.2f %4.2f  sh,v %4.2fm %4.2fm" % \

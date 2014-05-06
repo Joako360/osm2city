@@ -2,7 +2,7 @@ next
 ----
 x get roofs back
 - put roofs in same object, re-use nodes/separate object
-- get textures back
+x get textures back
 x relations with 2+ inner rings
 - merge adjacent buildings
 - texture gable walls
@@ -555,3 +555,74 @@ road access point at 0,0,0 centered?
 -> add meta-info
 - can get extends from shared model automatically
 
+
+osm2city now merges all buildings into only one object per 2x2km, which is so much faster. Thanks again to those of you who convinced me at FSweekend 2013. I've lost some features with this new approach, but I'm getting them back gradually (lightmaps are still missing).
+
+Now I wonder how to move forward. As I said previously, I'd like to integrate this into FG, as an alternative to Stuart's random buildings.
+
+Source for building floorplans.
+1. use some reasonable shared models placed procedurally along OSM roads.
+  + can use somewhat detailed, hand-modeled buildings
+  + can come with a patch of ground texture that perfectly matches the building
+  - need a number of hand-modeled buildings
+
+Texture for these shared models would be merged into an atlas. That's rather easy to script with python.
+
+OR
+
+2. use actual OSM data.
+  - individual buildings won't be as detailled, but match real outline.
+
+OR
+
+3. mix both approaches: use OSM data for large buildings likely to be associated with the RL counterpart (until an individually modeled one becomes available), and place shared models for the boring ones, or if no OSM building coverage available.
+
+I'm really in favour of 1. because of the level of detail possible.
+
+Two general approaches: either outside of FG as a pre-processor (current state), or withing FG at terrain load time.
+
+1. pre-processor
+  - users get OSM data, generate city models outside of FG. This process can be highly automated (portreekid is working on this). Creating buildings is now reasonably quick, say some minutes for LOWI area.
+
+2. integrate into FG.
+  - need OSM line data
+
+
+Shared model loading in FG:
+- merge into one object/drawable.
+As I understand, individual textures then have to be merged into one file. I could code a python script which:
+    - for all .acs:
+    -   load .ac
+    -   if repeating textures found, reject .ac
+    - for all accepted .acs:
+    - create texture atlas
+      - adapt texture coordinates
+      - write .ac
+
+Any plans to do this within FG? Should, in the light of reducing drawables, the use of repeating textures be discouraged?
+
+
+Eine Weile lang war das auch mein Favorit, also der Ansatz “eine große Texture für eine Stadt”. Mein Besuch beim FSweekend und das Treffen mit den anderen FG-devs hat dann aber meine Pläne geändert. Ich bin nach wie vor begeistert, wieviel Performance das zusammenfassen von den Tausenden Objekten bringt. Ich kann locker 10km weit weg alle Häuser zeichnen und bekomme immer noch 20fps mit Intel HD 5000-Grafik. Demnächst ist vielleicht auch meine “große” Maschine wieder einsatzbereit mit richtiger Nvidia-Karte, bin mal gespannt, wie das dann rennt.
+
+Ich plane daher nun eher in eine ähnliche Richtung wie X-Plane:
+
+1. ein paar generische Texturen als Hintergrund
+
+2. die Straßen erstmal auch von osm2city als texturierte Bänder über die Scene legen. Kreuzungen etc kann man dann auch schön bemalen. Straßen in osm2city zu lesen brauche ich sowieso für mein Brücken-Projekt.
+
+3. entlang der Straßen Häuser als shared models platzieren. Die shared models können jeweils einen texturierten “Garten” auf einer Grundfläche mitbringen. Diese Grundfläche passt osm2city an die tatsächliche elevation der scene an. Außerdem können die Häuser etwas mehr Details (ggf. mit LOD) besitzen, als lediglich die derzeitigen Fassaden.
+
+Die shared models kommen zunächst einzeln als .ac. Wenn man davon 20, 30, 100 Stück hat, sollte eine Stadt schon einigermaßen divers aussehen. ich würde mir mal anschauen, was in $FGDATA dazu schon rumliegt. osm2city liest das .ac, passt die Grundfläche an, und schreibt am Ende ein großes .ac per tile mit möglichst wenigen OBJECTs.
+
+Shared models zu platzieren wäre auch eine Lösung für das Problem der teilweise schlechten OSM-Gebäudedichte. X-Plane platziert die Häuser nach einem offensichtlich recht simplen Algorithmus, und es sieht dennoch überzeugen genug aus.
+
+4. große, markante OSM-Gebäude könnten nach wie vor als Fassade eingebaut werden.
+
+Beide Ansätze schließen sich ja keinesfalls aus. Meine Nah-Ziele sind
+
+- im aktuellen osm2city Fassaden/Dachtexturen zu fixen, und dann ein neues LOWI-release. Das sollte in den nächsten 2 Woche drin sein.
+- dann die Straßen von OSM lesen, texturieren und schreiben, neues LOWI-release
+- shared models lesen, anpassen, schreiben
+- mal testweise Bäume als static objects entlang der Straßen pflanzen
+
+Thomas

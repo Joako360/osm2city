@@ -161,11 +161,11 @@ class Mesh:
 
         for face in self.faces:
             face = np.roll(face[::-1], 1) # -- make outer edge the first
-            uv = roofs.face_uv(face, np.array(X), b.roof_texture.h_size_meters, b.roof_texture.v_size_meters)
+            uv = roofs.face_uv(face, np.array(X), b.roof_texture)
             i = 0
             l = []
             for index in face:
-                l.append((o + index, uv[i,0], uv[i,1]))
+                l.append((o + index, b.roof_texture.x(uv[i,0]), b.roof_texture.y(uv[i,1])))
                 #print "UV coord", uv[i,0], uv[i,1]
 #                print "z=%g %g %g" % (self.vertices[index].z, uv[i,0], uv[i,1])
                 i += 1

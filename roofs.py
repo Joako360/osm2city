@@ -4,6 +4,7 @@ import building_lib
 import random
 from math import sin, cos, atan2
 import copy
+import logging
 
 def _flat_relation(b):
     """relation flat roof, for one inner way only, included in base model"""
@@ -39,6 +40,8 @@ def flat(out, b, X, ac_name = ""):
     #   | 4-<<-7          |
     #   |/                |  draw 0 - 4 5 6 7 4 - 0 1 2 - 8 9 10 11 8 - 2 3
     #   0---->>-----------1
+
+    logging.warning("FIXME: check if we duplicate nodes, and if separate model still makes sense.")
 
     if ac_name:
         out.new_object(ac_name, b.roof_texture.filename + '.png')
@@ -215,10 +218,8 @@ def face_uv(nodes, X, texture, angle=None):
 #    print "SCALE", h_scale, v_scale
 #    print "X=", X
 #    print "UV", uv
-    uv[:,0] /= texture.h_size_meters
-    uv[:,0] += texture.x0
-    uv[:,1] = uv[:,1] / texture.v_size_meters * texture.sy
-    uv[:,1] += texture.y0
-#    bla
+
+    uv[:,0] = texture.x(uv[:,0] / texture.h_size_meters)
+    uv[:,1] = texture.y(uv[:,1] / texture.v_size_meters)
 #    print "UVsca", uv
     return uv
