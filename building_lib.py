@@ -691,11 +691,11 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
         #         - 5+ nodes: skeleton
         #         - 5+ mansard
         #         - all will have additional flat roof for base model LOD
-
         else:  # -- roof is a separate object, in LOD roof
             #out.close_object()
             #FIXME: put roofs again into seperate LOD
             # -- pitched roof for > 4 ground nodes
+
             if b._nnodes_ground > 4 and parameters.EXPERIMENTAL_USE_SKEL:
                 s = myskeleton.myskel(out, b, offset_xy = offset,
                                       offset_z = b.ground_elev + b.height,

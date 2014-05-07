@@ -88,7 +88,6 @@ def myskel(out, b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header 
             logging.debug("roof too high %g > %g" % (roof_height, max_height))
             return False
         result = roof_mesh.to_out(out, b, offset_xy, offset_z, header)
-#        return s
     except Exception, reason:
 #    if False:
         print "Error while creating 3d roof (OSM_ID %i, %s)" % (b.osm_id, reason)

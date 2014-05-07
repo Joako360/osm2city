@@ -379,12 +379,13 @@ def init():
     #                                     'compat:roof-flat','compat:roof-pitched']))
 
 
+#    roofs.append(Texture('tex/roof_tiled_black',
+#                         1., [], True, 1., [], False, provides=['color:black']))
+#    roofs.append(Texture('tex/roof_tiled_red',
+#                         1., [], True, 1., [], False, provides=['color:red']))
+    roofs.append(Texture('tex/roof_red_1',
+                         31.8, [], True, 16.1, [], False, provides=['color:red', 'color:black']))
 
-
-    roofs.append(Texture('tex/roof_tiled_black',
-                         100, [], True, 100, [], False, provides=['color:black']))
-    roofs.append(Texture('tex/roof_tiled_red',
-                         100, [], True, 100, [], False, provides=['color:red']))
 #    roofs.append(Texture('tex/roof_black2',
 #                             1.39, [], True, 0.89, [], True, provides=['color:black']))
 #    roofs.append(Texture('tex/roof_black3',
