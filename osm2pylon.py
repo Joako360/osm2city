@@ -9,13 +9,12 @@ as input and generates data to be used in FlightGear sceneries.
 * Cf. OSM Aerialway: http://wiki.openstreetmap.org/wiki/Map_Features#Aerialway
 
 TODO:
-* LOD and clustering
+* Remove shared objects from stg-files to avoid doubles
 * Collision detection
 * For aerialways make sure there is a station at both ends
 * For aerialways handle stations if represented as ways instead of nodes.
 * For powerlines handle power stations if represented as ways instead of nodes
 * If a pylon is shared between lines but not at end points, then move one pylon a bit away
-* LOD / clusters
 * Overhead markers (http://www.avaids.com/icao.pdf):
 6.1.10 Recommendation.— Overhead wires, cables, etc.,
 crossing a river, valley or highway should be marked and their
@@ -295,6 +294,8 @@ class Pylon(object):
         Returns a stg entry for this pylon.
         E.g. OBJECT_SHARED Models/Airport/ils.xml 5.313108 45.364122 374.49 268.92
         """
+        if self.my_wayline.pylon_model is None:
+            self.my_wayline.pylon_model = "Models/Power/generic_pylon_25m.xml"  # FIXME: should never happen, but does
         entry = ["OBJECT_SHARED", self.my_wayline.pylon_model, str(self.lon), str(self.lat), str(self.elevation)
                  , str(stg_angle(self.heading - 90))]  # 90 less because arms are in x-direction in ac-file
         return " ".join(entry)
@@ -346,7 +347,7 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
                 start_pylon = way_segment.start_pylon
             cluster_segments.append(way_segment)
             cluster_length += way_segment.length
-            if (cluster_length >= parameters.CLUSTER_LINE_MAX_LENGTH) or (len(self.way_segments) - 1 == i):
+            if (cluster_length >= parameters.C2P_CLUSTER_LINE_MAX_LENGTH) or (len(self.way_segments) - 1 == i):
                 cluster_filename = filename + '_' + str(cluster_index)
                 ac_file_lines = []
                 ac_file_lines.append("AC3Db")
@@ -486,33 +487,33 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
         Then calculate the local positions of all start and end points.
         Afterwards use the start and end points to create all cables for a given WaySegment
         """
-        radius = parameters.RADIUS_POWER_LINE
-        number_extra_vertices = parameters.EXTRA_VERTICES_POWER_LINE
-        catenary_a = parameters.CATENARY_A_POWER_LINE
+        radius = parameters.C2P_RADIUS_POWER_LINE
+        number_extra_vertices = parameters.C2P_EXTRA_VERTICES_POWER_LINE
+        catenary_a = parameters.C2P_CATENARY_A_POWER_LINE
         if self.type_ == self.TYPE_POWER_MINOR_LINE:
-            radius = parameters.RADIUS_POWER_MINOR_LINE
-            number_extra_vertices = parameters.EXTRA_VERTICES_POWER_MINOR_LINE
-            catenary_a = parameters.CATENARY_A_POWER_MINOR_LINE
+            radius = parameters.C2P_RADIUS_POWER_MINOR_LINE
+            number_extra_vertices = parameters.C2P_EXTRA_VERTICES_POWER_MINOR_LINE
+            catenary_a = parameters.C2P_CATENARY_A_POWER_MINOR_LINE
         elif self.type_ == self.TYPE_AERIALWAY_CABLE_CAR:
-            radius = parameters.RADIUS_AERIALWAY_CABLE_CAR
-            number_extra_vertices = parameters.EXTRA_VERTICES_AERIALWAY_CABLE_CAR
-            catenary_a = parameters.CATENARY_A_AERIALWAY_CABLE_CAR
+            radius = parameters.C2P_RADIUS_AERIALWAY_CABLE_CAR
+            number_extra_vertices = parameters.C2P_EXTRA_VERTICES_AERIALWAY_CABLE_CAR
+            catenary_a = parameters.C2P_CATENARY_A_AERIALWAY_CABLE_CAR
         elif self.type_ == self.TYPE_AERIALWAY_CHAIR_LIFT:
-            radius = parameters.RADIUS_AERIALWAY_CHAIR_LIFT
-            number_extra_vertices = parameters.EXTRA_VERTICES_AERIALWAY_CHAIR_LIFT
-            catenary_a = parameters.CATENARY_A_AERIALWAY_CHAIR_LIFT
+            radius = parameters.C2P_RADIUS_AERIALWAY_CHAIR_LIFT
+            number_extra_vertices = parameters.C2P_EXTRA_VERTICES_AERIALWAY_CHAIR_LIFT
+            catenary_a = parameters.C2P_CATENARY_A_AERIALWAY_CHAIR_LIFT
         elif self.type_ == self.TYPE_AERIALWAY_DRAG_LIFT:
-            radius = parameters.RADIUS_AERIALWAY_DRAG_LIFT
-            number_extra_vertices = parameters.EXTRA_VERTICES_AERIALWAY_DRAG_LIFT
-            catenary_a = parameters.CATENARY_A_AERIALWAY_DRAG_LIFT
+            radius = parameters.C2P_RADIUS_AERIALWAY_DRAG_LIFT
+            number_extra_vertices = parameters.C2P_EXTRA_VERTICES_AERIALWAY_DRAG_LIFT
+            catenary_a = parameters.C2P_CATENARY_A_AERIALWAY_DRAG_LIFT
         elif self.type_ == self.TYPE_AERIALWAY_GONDOLA:
-            radius = parameters.RADIUS_AERIALWAY_GONDOLA
-            number_extra_vertices = parameters.EXTRA_VERTICES_AERIALWAY_GONDOLA
-            catenary_a = parameters.CATENARY_A_AERIALWAY_GONDOLA
+            radius = parameters.C2P_RADIUS_AERIALWAY_GONDOLA
+            number_extra_vertices = parameters.C2P_EXTRA_VERTICES_AERIALWAY_GONDOLA
+            catenary_a = parameters.C2P_CATENARY_A_AERIALWAY_GONDOLA
         elif self.type_ == self.TYPE_AERIALWAY_GOODS:
-            radius = parameters.RADIUS_AERIALWAY_GOODS
-            number_extra_vertices = parameters.EXTRA_VERTICES_AERIALWAY_GOODS
-            catenary_a = parameters.CATENARY_A_AERIALWAY_GOODS
+            radius = parameters.C2P_RADIUS_AERIALWAY_GOODS
+            number_extra_vertices = parameters.C2P_EXTRA_VERTICES_AERIALWAY_GOODS
+            catenary_a = parameters.C2P_CATENARY_A_AERIALWAY_GOODS
 
         for segment in self.way_segments:
             start_cable_vertices = get_cable_vertices(self.pylon_model)

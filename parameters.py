@@ -109,38 +109,38 @@ CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if to little objects
 # Each powerline and aerialway has segments delimited by pylons. The longer the value the better clustering and
 # the better the performance. However due to rounding errors the longer the length per cluster the larger the
 # error.
-CLUSTER_LINE_MAX_LENGTH = 500
+C2P_CLUSTER_LINE_MAX_LENGTH = 500
 
 # The radius for the cable. The cable will be a triangle with side length 2*radius.
 # In order to be better visible the radius might be chosen larger than in real life
-RADIUS_POWER_LINE = 0.1
-RADIUS_POWER_MINOR_LINE = 0.1
-RADIUS_AERIALWAY_CABLE_CAR = 0.1
-RADIUS_AERIALWAY_CHAIR_LIFT = 0.1
-RADIUS_AERIALWAY_DRAG_LIFT = 0.05
-RADIUS_AERIALWAY_GONDOLA = 0.1
-RADIUS_AERIALWAY_GOODS = 0.05
+C2P_RADIUS_POWER_LINE = 0.1
+C2P_RADIUS_POWER_MINOR_LINE = 0.1
+C2P_RADIUS_AERIALWAY_CABLE_CAR = 0.1
+C2P_RADIUS_AERIALWAY_CHAIR_LIFT = 0.1
+C2P_RADIUS_AERIALWAY_DRAG_LIFT = 0.05
+C2P_RADIUS_AERIALWAY_GONDOLA = 0.1
+C2P_RADIUS_AERIALWAY_GOODS = 0.05
 
 # The number of extra points between 2 pylons to simulate sagging of the cable.
 # If 0 is chosen or if CATENARY_A is 0 then no sagging is calculated, which is better for performances (less realistic)
 # 3 is normally a good compromise - for cable cars or major power lines with very long distances a value of 5
 # or higher might be suitable
-EXTRA_VERTICES_POWER_LINE = 3
-EXTRA_VERTICES_POWER_MINOR_LINE = 3
-EXTRA_VERTICES_AERIALWAY_CABLE_CAR = 5
-EXTRA_VERTICES_AERIALWAY_CHAIR_LIFT = 3
-EXTRA_VERTICES_AERIALWAY_DRAG_LIFT = 0
-EXTRA_VERTICES_AERIALWAY_GONDOLA = 3
-EXTRA_VERTICES_AERIALWAY_GOODS = 5
+C2P_EXTRA_VERTICES_POWER_LINE = 3
+C2P_EXTRA_VERTICES_POWER_MINOR_LINE = 3
+C2P_EXTRA_VERTICES_AERIALWAY_CABLE_CAR = 5
+C2P_EXTRA_VERTICES_AERIALWAY_CHAIR_LIFT = 3
+C2P_EXTRA_VERTICES_AERIALWAY_DRAG_LIFT = 0
+C2P_EXTRA_VERTICES_AERIALWAY_GONDOLA = 3
+C2P_EXTRA_VERTICES_AERIALWAY_GOODS = 5
 
 # The value for catenary_a can be experimentally determined by using osm2pylon.test_catenary
-CATENARY_A_POWER_LINE = 1500
-CATENARY_A_POWER_MINOR_LINE = 1500
-CATENARY_A_AERIALWAY_CABLE_CAR = 1500
-CATENARY_A_AERIALWAY_CHAIR_LIFT = 1500
-CATENARY_A_AERIALWAY_DRAG_LIFT = 1500
-CATENARY_A_AERIALWAY_GONDOLA = 1500
-CATENARY_A_AERIALWAY_GOODS = 1500
+C2P_CATENARY_A_POWER_LINE = 1500
+C2P_CATENARY_A_POWER_MINOR_LINE = 1500
+C2P_CATENARY_A_AERIALWAY_CABLE_CAR = 1500
+C2P_CATENARY_A_AERIALWAY_CHAIR_LIFT = 1500
+C2P_CATENARY_A_AERIALWAY_DRAG_LIFT = 1500
+C2P_CATENARY_A_AERIALWAY_GONDOLA = 1500
+C2P_CATENARY_A_AERIALWAY_GOODS = 1500
 
 
 def set_parameters(param_dict):
