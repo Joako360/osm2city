@@ -317,6 +317,9 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
         self.type_ = 0  # cf. class constants TYPE_*
         self.pylon_model = None  # the path to the ac/xml model
         self.length = 0.0  # the total length of all segments
+        self.voltage = 0  # from osm-tag "voltage"
+        self.cables = 0  # from osm-tag "cables"
+        self.wires = None  # from osm-tag "wires"
 
     def make_pylons_stg_entries(self):
         """
@@ -556,6 +559,16 @@ def process_osm_elements(nodes_dict, ways_dict, _elev_interpolator, _coord_trans
                     my_line.type_ = WayLine.TYPE_AERIALWAY_GONDOLA
                 elif "goods" == value:
                     my_line.type_ = WayLine.TYPE_AERIALWAY_GOODS
+            #  special values
+            elif "cables" == key:
+                my_line.cables = int(value)
+            elif "voltage" == key:
+                try:
+                    my_line.voltage = int(value)
+                except ValueError:
+                    pass  # principally only substations may have values like "100000;25000", but only principally ...
+            elif "wires" == key:
+                my_line.wires = value
         if 0 != my_line.type_:
             prev_pylon = None
             for ref in way.refs:
@@ -670,12 +683,12 @@ def write_stg_entries(stg_fp_dict, lines_dict, wayname):
     line_index = 0
     for line in lines_dict.values():
         line_index += 1
-        center = line.get_center_coordinates()
-        stg_fname = calc_tile.construct_stg_file_name(center)
+        line_center = line.get_center_coordinates()
+        stg_fname = calc_tile.construct_stg_file_name(line_center)
         if parameters.PATH_TO_OUTPUT:
-            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, center)
+            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, line_center)
         else:
-            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center)
+            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, line_center)
         if not stg_fname in stg_fp_dict:
             if not os.path.exists(path):
                 try:
@@ -761,7 +774,7 @@ if __name__ == "__main__":
 
     # Reading OSM-file and transform to Pylons / Lines objects
     valid_node_keys = ["power", "structure", "material", "height", "colour", "aerialway"]
-    valid_way_keys = ["power", "aerialway"]
+    valid_way_keys = ["power", "aerialway", "voltage", "cables", "wires"]
     req_way_keys = ["power", "aerialway"]
     valid_relation_keys = []
     req_relation_keys = []
