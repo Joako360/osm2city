@@ -301,7 +301,7 @@ class Stats(object):
         self.area_above = np.zeros_like(self.area_levels)
         self.vertices = 0
         self.surfaces = 0
-        self.have_pitched_roof = 0
+        self.roof_types = {}
         self.have_complex_roof = 0
         self.roof_errors = 0
         self.out = None
@@ -316,7 +316,11 @@ class Stats(object):
         """
         self.vertices += b.vertices
         self.surfaces += b.surfaces
-        self.have_pitched_roof += b.roof_complex # FIXME: do we still need this??
+        if b.roof_type in self.roof_types:
+            self.roof_types[b.roof_type] += 1
+        else:
+            self.roof_types[b.roof_type] = 1
+        # FIXME: do we still need this??
         # self.objects += 1 # skipped because we count buildings while OSM parsing
         for i in range(len(self.area_levels))[::-1]:
             if b.area >= self.area_levels[i]:
@@ -348,7 +352,13 @@ class Stats(object):
               nearby        %i
               no elevation  %i
               no texture    %i
-            pitched roof    %i
+        """ % (self.objects, self.parse_errors, total_written,
+               self.skipped_small, self.skipped_nearby, self.skipped_no_elev, self.skipped_texture)))
+        roof_line = "        roof-types"
+        for roof_type in self.roof_types:
+            roof_line += """\r\n          %s\t%i""" % (roof_type,self.roof_types[roof_type])
+        out.write(textwrap.dedent(roof_line))
+        out.write(textwrap.dedent("""
               complex       %i
               roof_errors   %i
             ground nodes    %i
@@ -359,17 +369,12 @@ class Stats(object):
             LOD bare        %i (%2.0f %%)
             LOD rough       %i (%2.0f %%)
             LOD detail      %i (%2.0f %%)
-            """ % (self.objects, self.parse_errors, total_written,
-                   self.skipped_small, self.skipped_nearby, self.skipped_no_elev, self.skipped_texture,
-                   self.have_pitched_roof, self.have_complex_roof, self.roof_errors,
-                   self.nodes_ground, self.nodes_simplified,
-                   self.vertices, self.surfaces,
-                   self.texture_x_repeated, (self.texture_x_repeated + self.texture_x_simple), (self.texture_x_repeated * 100. /(self.texture_x_repeated + self.texture_x_simple)),
-                   self.LOD[0], lodzero,
-                   self.LOD[1], lodone,
-                   self.LOD[2], lodtwo)))
-        except ZeroDivisionError:
-            pass
+        """ % (self.have_complex_roof, self.roof_errors,
+               self.nodes_ground, self.nodes_simplified,
+               self.vertices, self.surfaces,
+               self.LOD[0], lodzero,
+               self.LOD[1], lodone,
+               self.LOD[2], lodtwo)))
         out.write("above\n")
         max_area_above = self.area_above.max()
         if max_area_above < 1: max_area_above = 1

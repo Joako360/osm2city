@@ -244,7 +244,7 @@ def compute_height_and_levels(b):
         logging.warning("Building height has wrong type. Value is: %s", b.height)
         b.height = 0
     # -- try OSM height and levels first
-    if b.height > 0 and b.levels > 0: return
+    if b.height > 0: return
 
     level_height = random_level_height()
     if b.height > 0:
@@ -661,6 +661,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
                                   max_height = b.height * parameters.SKEL_MAX_HEIGHT_RATIO)
             if not s: # -- fall back to flat roof
                 s = roofs.flat(b, X, b.roof_ac_name)
+                b.roof_type = 'flat'
 #                print "FAIL"
                 # FIXME: move to analyse. If we fall back, don't require separate LOD
             else:
@@ -670,7 +671,11 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
 
         # -- pitched roof for exactly 4 ground nodes
         else:
-            out.write(roofs.separate_gable(b, X))
+            if b.roof_type=='gabled':
+                out.write(roofs.separate_gable(b, X))
+            else:
+                out.write(roofs.separate_hipped(b, X))
+                
 #            print "4 GROUND", b._nnodes_ground
         out.write("kids 0\n")
 
@@ -682,6 +687,14 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             out.write("kids 0\n")
 
     tools.stats.count(b)
+    
+#
+# Maps the Type of the building 
+#    
+def mapType(tags):
+    if 'building' in tags and not tags['building'] == 'yes':
+        return tags['building']
+    return 'unknown'
 
 if __name__ == "__main__":
     test_ac_load()
