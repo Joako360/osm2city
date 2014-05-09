@@ -556,9 +556,13 @@ road access point at 0,0,0 centered?
 - can get extends from shared model automatically
 
 
-osm2city now merges all buildings into only one object per 2x2km, which is so much faster. Thanks again to those of you who convinced me at FSweekend 2013. I've lost some features with this new approach, but I'm getting them back gradually (lightmaps are still missing).
+osm2city now merges all buildings into only one object per 2x2km, which is indeed much faster. Thanks again to those of you who convinced me at FSweekend 2013. I've lost some features with this new approach, but I'm getting them back gradually (lightmaps are still missing).
 
-Now I wonder how to move forward. As I said previously, I'd like to integrate this into FG, as an alternative to Stuart's random buildings.
+Now I wonder how to move forward. As I said previously, I'd like to integrate this into FG. I see this as an alternative to Stuart's random buildings.
+
+- buildings should be aligned with roads
+- buildings should match the ground texture
+- use real road data, if available. OSM road coverage is quite good. Where no (dense) real data is available, procedurally create some.
 
 Source for building floorplans.
 1. use some reasonable shared models placed procedurally along OSM roads.
