@@ -555,14 +555,58 @@ road access point at 0,0,0 centered?
 -> add meta-info
 - can get extends from shared model automatically
 
+The state of cities in FG & how to move forward
+-----------------------------------------------
 
-osm2city now merges all buildings into only one object per 2x2km, which is indeed much faster. Thanks again to those of you who convinced me at FSweekend 2013. I've lost some features with this new approach, but I'm getting them back gradually (lightmaps are still missing).
+osm2city now merges all buildings into a few objects per 2x2km (used to be some 1000s), reducing the number of drawables tremendously. The result renders indeed much faster: link. I can have 60k buildings in a scene and still get reasonable frame rate on my mid-range system. Thanks again to those of you who convinced me at FSweekend 2013!
 
-Now I wonder how to move forward. As I said previously, I'd like to integrate this into FG. I see this as an alternative to Stuart's random buildings.
+Now I wonder how to move forward. As I said previously, my long-term goal is a better representation of cities in FG. My feature wish-list is this:
 
-- buildings should be aligned with roads
-- buildings should match the ground texture
-- use real road data, if available. OSM road coverage is quite good. Where no (dense) real data is available, procedurally create some.
+1) use real primary/secondary road data. If residential roads are available, use even that, otherwise create those procedurally (within city landclass boundaries).
+Then, buildings should
+2) be aligned with roads
+3) match the ground texture
+4) allow for more detail than just a textured quad plus roof. That is, allow using a set of (10, 20, 100) hand-modeled buildings, possibly with LOD.
+5) not collide with static models
+6) vegetation should not interfere with anything above -- no trees on roads or houses.
+
+The current urban texture, Stuart's random buildings and using placement masks fulfil 2, 3 and 6, probably also 5. Extending this to allow 4 might also be possible. But I don't see how this could play nicely with 1. Ideas?
+
+I'm proposing this, which I think is pretty much what x-plane does:
+
+- use a very unobtrusive (greenish/grayish) generic ground texture
+- use a real, detailed road network (vector data)
+- generate lots along the roads
+- place hand-modeled buildings on these lots. These buildings would come with a patch of specific ground texture, let's call it a 'garden'.
+
+I could rather easily fulfil 1-5 by extending osm2city to do that outside of FG, eventually creating low-object-count/low-texture-count 2x2km tiles ready for use with FG. Roads would be created as textured bands sitting slighty above the terrain. Could generate bridges. Use LOD. Osm2city has prototypes for most of this already (except for a shared model loader/merging a number of shared models into one object -- which I think is not that difficult to code in python)
+
+However, this approach still collides with 6.
+
+Question: what would be the best way to achive 1-6? Either within FG, or with external tools? I'm now sufficiently convinced 1-6 is possible performance-wise, and I'm ready to dive in the C++ side of things. I have no experience with GLSL though, but I'm willing to learn.
+
+I know TG can create a dense network of textured roads, and work towards scenery LOD is underway, which might eventually give us residential roads. However, to align buildings with roads, we'd still need their (OSM) line data in FG.
+
+I'm also confident I could write code that loads N shared models, copies them a couple of thousand times, and places them into the scene as one big object. That of course eats memory. No idea if a shader could achive this more efficiently?
+
+And what about the garden? A textured rectangle, slighty floating above the ground? Would that cause severe z-fighting? Is there a better way with shaders? Or create the urban landclass completely automatic at scenery load time?
+
+ThomasA
+---
+Textured roofs now look better for small buildings. However, there is only one texture so far. Also, large , which also looks silly for large area buildings, you'd still get artifacts. 
+---
+
+
+
+2. die Straßen erstmal auch von osm2city als texturierte Bänder über die Scene legen. Kreuzungen etc kann man dann auch schön bemalen. Straßen in osm2city zu lesen brauche ich sowieso für mein Brücken-Projekt.
+
+3. entlang der Straßen Häuser als shared models platzieren. Die shared models können jeweils einen texturierten “Garten” auf einer Grundfläche mitbringen. Diese Grundfläche passt osm2city an die tatsächliche elevation der scene an. Außerdem können die Häuser etwas mehr Details (ggf. mit LOD) besitzen, als lediglich die derzeitigen Fassaden.
+
+
+The current approach of a generic urban texture + placement masks largely collides with 1.
+
+
+1) is already possible with existing TG.
 
 Source for building floorplans.
 1. use some reasonable shared models placed procedurally along OSM roads.

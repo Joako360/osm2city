@@ -98,6 +98,9 @@ class TextureManager(object):
 
     def find_matching(self, requires = []):
         candidates = self.find_candidates(requires)
+        print "\nLOOKING", requires
+        for c in candidates:
+            print "--", c.filename, c.provides
         if len(candidates) == 0:
             print "WARNING: no matching texture for <%s>", requires
             return None
@@ -202,7 +205,7 @@ class Texture(object):
                  has_roof_section = False, \
                  height_min = 0, height_max = 9999, \
                  v_split_from_bottom = False, \
-                 provides = {}, requires = {}):
+                 provides = [], requires = []):
         self.filename = filename
         self.x0 = self.x1 = self.y0 = self.y1 = 0
         self.sy = self.sx = 0
@@ -384,7 +387,11 @@ def init():
 #    roofs.append(Texture('tex/roof_tiled_red',
 #                         1., [], True, 1., [], False, provides=['color:red']))
     roofs.append(Texture('tex/roof_red_1',
-                         31.8, [], True, 16.1, [], False, provides=['color:red', 'color:black']))
+                         31.8, [], True, 16.1, [], False, provides=['color:red', 'color:black', 'compat:roof-pitched']))
+    roofs.append(Texture('tex/roof_gen_black_1',
+                         100., [], True, 100., [], False, provides=['color:red', 'compat:roof-flat']))
+    roofs.append(Texture('tex/roof_gen_black_1',
+                         100., [], True, 100., [], False, provides=['color:black', 'compat:roof-flat']))
 
 #    roofs.append(Texture('tex/roof_black2',
 #                             1.39, [], True, 0.89, [], True, provides=['color:black']))

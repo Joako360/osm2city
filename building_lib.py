@@ -428,21 +428,30 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 b.roof_complex = False
                 # FIXME: roof_ACs = True
 
-        requires = []
+        facade_requires = []
         if b.roof_complex:
-            requires.append('age:old')
-            requires.append('compat:roof-pitched')
+            facade_requires.append('age:old')
+            facade_requires.append('compat:roof-pitched')
+        else:
+            facade_requires.append('compat:roof-flat')
+
 
         # -- determine facade and roof textures
         #logging.debug("find facade")
-        b.facade_texture = facades.find_matching(requires, b.height)
+        b.facade_texture = facades.find_matching(facade_requires, b.height)
         #print "done" + str(b.facade_texture)
         if not b.facade_texture:
             tools.stats.skipped_texture += 1
             print "Skipping building (no matching texture)"
             continue
-        if 1 or b.roof_complex:
-            b.roof_texture = roofs.find_matching(b.facade_texture.requires)
+
+        roof_requires = copy.copy(b.facade_texture.requires)
+        if b.roof_complex:
+            roof_requires.append('compat:roof-pitched')
+        else:
+            roof_requires.append('compat:roof-flat')
+
+        b.roof_texture = roofs.find_matching(roof_requires)
 
 #        if b.nnodes_outer != 4:
 #            print "!=4",
