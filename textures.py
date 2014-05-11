@@ -98,11 +98,11 @@ class TextureManager(object):
 
     def find_matching(self, requires = []):
         candidates = self.find_candidates(requires)
-        print "\nLOOKING", requires
+        logging.debug("looking for texture" + str(requires))
         for c in candidates:
-            print "--", c.filename, c.provides
+            logging.debug("  candidate " + c.filename + " provides " + str(c.provides))
         if len(candidates) == 0:
-            print "WARNING: no matching texture for <%s>", requires
+            logging.warn("WARNING: no matching texture for <%s>" + str(requires))
             return None
         #print "cands are\n", string.join(["  " + str(c) for c in candidates], '\n')
         #return candidates[3]
@@ -387,7 +387,9 @@ def init():
 #    roofs.append(Texture('tex/roof_tiled_red',
 #                         1., [], True, 1., [], False, provides=['color:red']))
     roofs.append(Texture('tex/roof_red_1',
-                         31.8, [], True, 16.1, [], False, provides=['color:red', 'color:black', 'compat:roof-pitched']))
+                         31.8, [], True, 16.1, [], False, provides=['color:red', 'compat:roof-pitched']))
+    roofs.append(Texture('tex/roof_black_1',
+                         31.8, [], True, 16.1, [], False, provides=['color:black', 'compat:roof-pitched']))
     roofs.append(Texture('tex/roof_gen_black_1',
                          100., [], True, 100., [], False, provides=['color:red', 'compat:roof-flat']))
     roofs.append(Texture('tex/roof_gen_black_1',
