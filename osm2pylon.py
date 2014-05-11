@@ -9,44 +9,13 @@ as input and generates data to be used in FlightGear sceneries.
 * Cf. OSM Aerialway: http://wiki.openstreetmap.org/wiki/Map_Features#Aerialway
 
 TODO:
+* CLI parameter to write param.ini file out with all parameters incl. the default ones
 * Remove shared objects from stg-files to avoid doubles
 * Collision detection
 * For aerialways make sure there is a station at both ends
 * For aerialways handle stations if represented as ways instead of nodes.
 * For powerlines handle power stations if represented as ways instead of nodes
 * If a pylon is shared between lines but not at end points, then move one pylon a bit away
-* Overhead markers (http://www.avaids.com/icao.pdf):
-6.1.10 Recommendation.— Overhead wires, cables, etc.,
-crossing a river, valley or highway should be marked and their
-supporting towers marked and lighted if an aeronautical study
-indicates that the wires or cables could constitute a hazard to
-aircraft, except that the marking of the supporting towers may
-be omitted when they are lighted by high-intensity obstacle
-lights by day.
-6.1.11 Recommendation.— When it has been determined
-that an overhead wire, cable, etc., needs to be marked
-but it is not practicable to install markers on the wire, cable,
-etc., then high-intensity obstacle lights, Type B, should be
-provided on their supporting towers.
-6.2.8 Recommendation.— A marker displayed on an
-overhead wire, cable, etc., should be spherical and have a
-diameter of not less than 60 cm.
-6.2.9 Recommendation.— The spacing between two
-consecutive markers or between a marker and a supporting
-tower should be appropriate to the diameter of the marker, but
-in no case should the spacing exceed:
-a) 30 m where the marker diameter is 60 cm progressively
-increasing with the diameter of the marker to
-b) 35 m where the marker diameter is 80 cm and further
-progressively increasing to a maximum of
-c) 40 m where the marker diameter is of at least 130 cm.
-Where multiple wires, cables, etc. are involved, a marker
-should be located not lower than the level of the highest wire
-at the point marked.
-6.2.10 Recommendation.— A marker should be of one
-colour. When installed, white and red, or white and orange
-markers should be displayed alternately. The colour selected
-should contrast with the background against which it will be seen
 
 @author: vanosten
 """
@@ -175,18 +144,19 @@ class Cable(object):
 
 
 class CableVertex(object):
-    def __init__(self, out, height, along=0):
+    def __init__(self, out, height, along=0.0, top_cable=False):
         self.out = out  # the distance from the middle vertical line of the pylon
         self.height = height  # the distance above ground relative to the pylon's ground level (y-axis in ac-file)
-        #  not yet used: self.along = along  # the distance along the x-axis away from the middle vertical line
+        self.along = along  # the distance along the x-axis away from the middle vertical line
+        self.top_cable = top_cable  # for the cables at the top, which are not executing the main task
         self.x = 0.0  # local position x
         self.y = 0.0  # local position y
         self.elevation = 0.0  # elevation above sea level in meters
 
     def calc_position(self, pylon_x, pylon_y, pylon_elevation, pylon_heading):
         self.elevation = pylon_elevation + self.height
-        self.x = pylon_x + math.sin(math.radians(pylon_heading + 90))*self.out
-        self.y = pylon_y + math.cos(math.radians(pylon_heading + 90))*self.out
+        self.x = pylon_x + math.sin(math.radians(pylon_heading + 90))*self.out - math.cos(math.radians(pylon_heading + 90))*self.along
+        self.y = pylon_y + math.cos(math.radians(pylon_heading + 90))*self.out + math.sin(math.radians(pylon_heading + 90))*self.along
 
     def set_position(self, x, y, elevation):
         self.x = x
@@ -201,7 +171,7 @@ def create_generic_pylon_25_vertices():
                 , CableVertex(-5.0, 16.8)
                 , CableVertex(5.0, 21.0)
                 , CableVertex(-5.0, 21.0)
-                , CableVertex(0.0, 25.2)]
+                , CableVertex(0.0, 25.2, top_cable=True)]
     return vertices
 
 
@@ -212,7 +182,7 @@ def create_generic_pylon_50_vertices():
                 , CableVertex(-10.0, 33.6)
                 , CableVertex(10.0, 42.0)
                 , CableVertex(-10.0, 42.0)
-                , CableVertex(0.0, 50.4)]
+                , CableVertex(0.0, 50.4, top_cable=True)]
     return vertices
 
 
@@ -223,13 +193,17 @@ def create_generic_pylon_100_vertices():
                 , CableVertex(-20.0, 67.2)
                 , CableVertex(20.0, 84.0)
                 , CableVertex(-20.0, 84.0)
-                , CableVertex(0.0, 100.8)]
+                , CableVertex(0.0, 100.8, top_cable=True)]
     return vertices
 
 
-def create_streetlamp3_vertices():
-    vertices = [CableVertex(1.7, 6.07)
-                , CableVertex(-1.7, 6.07)]
+def create_wooden_pole_14m_vertices():
+    vertices = [CableVertex(1.7, 14.4, along=0.175)
+                , CableVertex(-1.7, 14.4, along=0.175)
+                , CableVertex(2.7, 12.6, along=0.175)
+                , CableVertex(0.7, 12.6, along=0.175)
+                , CableVertex(-2.7, 12.6, along=0.175)
+                , CableVertex(-0.7, 12.6, along=0.175)]
     return vertices
 
 
@@ -248,8 +222,8 @@ def get_cable_vertices(pylon_model):
         return create_generic_pylon_100_vertices()
     elif "RailPower" in pylon_model:
         return create_rail_power_vertices()
-    elif "lamp3" in pylon_model:
-        return create_streetlamp3_vertices()
+    elif "wooden_pole_14m" in pylon_model:
+        return create_wooden_pole_14m_vertices()
     else:
         return None
 
@@ -380,6 +354,12 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
                 for j in xrange(1, len(cluster_segments) + 1):
                     xml_file_lines.append('<object-name>segment%05d</object-name>' % j)
                 xml_file_lines.append('</animation>')
+                if parameters.C2P_CABLES_NO_SHADOW:
+                    xml_file_lines.append('<animation>')
+                    xml_file_lines.append('<type>noshadow</type>')
+                    for j in xrange(1, len(cluster_segments) + 1):
+                        xml_file_lines.append('<object-name>segment%05d</object-name>' % j)
+                    xml_file_lines.append('</animation>')
                 xml_file_lines.append('</PropertyList>')
                 with open(path + cluster_filename + ".xml", 'w') as f:
                     f.write("\n".join(xml_file_lines))
@@ -441,7 +421,7 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
         # use statistics to determine type_ and pylon_model
         if self.type_ == self.TYPE_POWER_MINOR_LINE and nbr_towers <= nbr_poles and max_height <= 25.0 and max_length <= 250.0:
             self.type_ = self.TYPE_POWER_MINOR_LINE
-            self.pylon_model = "Models/StreetFurniture/streetlamp3.xml"
+            self.pylon_model = "Models/Power/wooden_pole_14m.xml"
         else:
             self.type_ = self.TYPE_POWER_LINE
             if average_height < 35.0 and max_length < 300.0:
@@ -526,7 +506,12 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
                                                       , segment.start_pylon.elevation, segment.start_pylon.heading)
                 end_cable_vertices[i].calc_position(segment.end_pylon.x, segment.end_pylon.y
                                                     , segment.end_pylon.elevation, segment.end_pylon.heading)
-                cable = Cable(start_cable_vertices[i], end_cable_vertices[i], radius, number_extra_vertices, catenary_a)
+                if start_cable_vertices[i].top_cable:
+                    cable = Cable(start_cable_vertices[i], end_cable_vertices[i]
+                                  , parameters.C2P_RADIUS_TOP_LINE, number_extra_vertices, catenary_a)
+                else:
+                    cable = Cable(start_cable_vertices[i], end_cable_vertices[i]
+                                  , radius, number_extra_vertices, catenary_a)
                 segment.cables.append(cable)
 
 
@@ -547,7 +532,7 @@ def process_osm_elements(nodes_dict, ways_dict, _elev_interpolator, _coord_trans
                 if "line" == value:
                     my_line.type_ = WayLine.TYPE_POWER_LINE
                 elif "minor_line" == value:
-                    my_line.type_ = WayLine.TYPE_POWER_LINE
+                    my_line.type_ = WayLine.TYPE_POWER_MINOR_LINE
             elif "aerialway" == key:
                 if "cable_car" == value:
                     my_line.type_ = WayLine.TYPE_AERIALWAY_CABLE_CAR
@@ -799,10 +784,17 @@ if __name__ == "__main__":
     powerlines, aerialways = process_osm_elements(handler.nodes_dict, handler.ways_dict, elev_interpolator,
                                                   coord_transformator)
     handler = None  # free memory
-    logging.info('Number of power lines: %s', len(powerlines))
-    logging.info('Number of aerialways: %s', len(aerialways))
 
-    # Work on objects
+    # only keep those lines, which should be processed
+    if parameters.C2P_PROCESS_POWERLINES is False:
+        powerlines.clear()
+    if parameters.C2P_PROCESS_AERIALWAYS is False:
+        aerialways.clear()
+
+    logging.info('Number of power lines to process: %s', len(powerlines))
+    logging.info('Number of aerialways to process: %s', len(aerialways))
+
+    # Work on object
     for wayline in powerlines.values():
         wayline.calc_and_map()
     for wayline in aerialways.values():
@@ -897,6 +889,16 @@ class TestOSMPylons(unittest.TestCase):
         vertex.calc_position(20, 50, 20, 180)
         self.assertAlmostEqual(10, vertex.x, 2)
         self.assertAlmostEqual(50, vertex.y, 2)
+        vertex2 = CableVertex(10, 5, along=1)
+        vertex2.calc_position(0, 0, 20, 0)
+        self.assertAlmostEqual(10, vertex2.x, 2)
+        self.assertAlmostEqual(1, vertex2.y, 2)
+        vertex2.calc_position(0, 0, 20, 90)
+        self.assertAlmostEqual(1, vertex2.x, 2)
+        self.assertAlmostEqual(-10, vertex2.y, 2)
+        vertex2.calc_position(0, 0, 20, 180)
+        self.assertAlmostEqual(-10, vertex2.x, 2)
+        self.assertAlmostEqual(-1, vertex2.y, 2)
 
     def test_catenary(self):
         #  Values taken form example 2 in http://www.mathdemos.org/mathdemos/catenary/catenary.html
