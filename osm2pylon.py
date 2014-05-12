@@ -39,7 +39,7 @@ OUR_MAGIC = "osm2pylon"  # Used in e.g. stg files to mark edits by osm2pylon
 
 
 class Cable(object):
-    def __init__(self, start_cable_vertex, end_cable_vertex, radius, number_extra_vertices, catenary_a):
+    def __init__(self, start_cable_vertex, end_cable_vertex, radius, number_extra_vertices, catenary_a, distance):
         """
         A Cable between two vertices. The radius is approximated with a triangle with sides of length 2*radius.
         If both the number of extra_vertices and the catenary_a are > 0, then the Cable gets a sag based on
@@ -52,7 +52,7 @@ class Cable(object):
         self.heading = calc_angle_of_line(start_cable_vertex.x, start_cable_vertex.y
                                           , end_cable_vertex.x, end_cable_vertex.y)
 
-        if (number_extra_vertices > 0) and (catenary_a > 0):
+        if (number_extra_vertices > 0) and (catenary_a > 0) and (distance >= parameters.C2P_CATENARY_MIN_DISTANCE):
             self._make_catenary_cable(number_extra_vertices, catenary_a)
 
     def _make_catenary_cable(self, number_extra_vertices, catenary_a):
@@ -207,6 +207,12 @@ def create_wooden_pole_14m_vertices():
     return vertices
 
 
+def create_drag_lift_pylon():
+    vertices = [CableVertex(2.8, 8.1)
+                , CableVertex(-0.8, 8.1)]
+    return vertices
+
+
 def create_rail_power_vertices():
     vertices = [CableVertex(2.5, 12.0)
                 , CableVertex(-2.5, 12.0)]
@@ -220,8 +226,8 @@ def get_cable_vertices(pylon_model):
         return create_generic_pylon_50_vertices()
     if "generic_pylon_100m" in pylon_model:
         return create_generic_pylon_100_vertices()
-    elif "RailPower" in pylon_model:
-        return create_rail_power_vertices()
+    elif "drag_lift_pylon" in pylon_model:
+        return create_drag_lift_pylon()
     elif "wooden_pole_14m" in pylon_model:
         return create_wooden_pole_14m_vertices()
     else:
@@ -389,7 +395,7 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
         self._calc_cables()
 
     def _calc_and_map_aerialway(self):
-        self.pylon_model = "Models/StreetFurniture/RailPower.xml"  # FIXME: make real implementation
+        self.pylon_model = "Models/Transport/drag_lift_pylon.xml"  # FIXME: make real implementation
 
     def _calc_and_map_powerline(self, max_length):
         """
@@ -419,7 +425,8 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
             average_height /= found
 
         # use statistics to determine type_ and pylon_model
-        if self.type_ == self.TYPE_POWER_MINOR_LINE and nbr_towers <= nbr_poles and max_height <= 25.0 and max_length <= 250.0:
+        if (self.type_ == self.TYPE_POWER_MINOR_LINE and nbr_towers <= nbr_poles
+           and max_height <= 25.0 and max_length <= 250.0) or (self.type_ == self.TYPE_POWER_LINE and max_length <= 150):
             self.type_ = self.TYPE_POWER_MINOR_LINE
             self.pylon_model = "Models/Power/wooden_pole_14m.xml"
         else:
@@ -428,8 +435,10 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
                 self.pylon_model = "Models/Power/generic_pylon_25m.xml"
             elif average_height < 75.0 and max_length < 500.0:
                 self.pylon_model = "Models/Power/generic_pylon_50m.xml"
-            else:
+            elif parameters.C2P_POWER_LINE_ALLOW_100M:
                 self.pylon_model = "Models/Power/generic_pylon_100m.xml"
+            else:
+                self.pylon_model = "Models/Power/generic_pylon_50m.xml"
 
     def get_center_coordinates(self):
         """Returns the lon/lat coordinates of the line"""
@@ -508,10 +517,10 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
                                                     , segment.end_pylon.elevation, segment.end_pylon.heading)
                 if start_cable_vertices[i].top_cable:
                     cable = Cable(start_cable_vertices[i], end_cable_vertices[i]
-                                  , parameters.C2P_RADIUS_TOP_LINE, number_extra_vertices, catenary_a)
+                                  , parameters.C2P_RADIUS_TOP_LINE, number_extra_vertices, catenary_a, segment.length)
                 else:
                     cable = Cable(start_cable_vertices[i], end_cable_vertices[i]
-                                  , radius, number_extra_vertices, catenary_a)
+                                  , radius, number_extra_vertices, catenary_a, segment.length)
                 segment.cables.append(cable)
 
 

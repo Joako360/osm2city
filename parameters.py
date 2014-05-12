@@ -112,7 +112,7 @@ C2P_PROCESS_AERIALWAYS = True
 # Each powerline and aerialway has segments delimited by pylons. The longer the value the better clustering and
 # the better the performance. However due to rounding errors the longer the length per cluster the larger the
 # error.
-C2P_CLUSTER_LINE_MAX_LENGTH = 500
+C2P_CLUSTER_LINE_MAX_LENGTH = 300
 C2P_CABLES_NO_SHADOW = True
 
 # The radius for the cable. The cable will be a triangle with side length 2*radius.
@@ -147,6 +147,9 @@ C2P_CATENARY_A_AERIALWAY_DRAG_LIFT = 1500
 C2P_CATENARY_A_AERIALWAY_GONDOLA = 1500
 C2P_CATENARY_A_AERIALWAY_GOODS = 1500
 
+C2P_CATENARY_MIN_DISTANCE = 50
+
+C2P_POWER_LINE_ALLOW_100M = False
 
 def set_parameters(param_dict):
     for k in param_dict:
