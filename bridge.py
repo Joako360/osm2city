@@ -3,6 +3,8 @@
 # FIXME: check sign of angle
 
 """
+Ugly, highly experimental code.
+
 Created on Sun Sep 29 10:42:12 2013
 
 @author: tom
@@ -732,6 +734,78 @@ def make_bridge_from_way(osm_id, tags, coords):
 def no_transform((x, y)):
     return x, y
 
+
+class Way_extract(object):
+    def __init__(self):
+        self.roads = []
+        self.coord_dict = {}
+        self.way_list = []
+        self.minlon = 181.
+        self.maxlon = -181.
+        self.minlat = 91.
+        self.maxlat = -91.
+
+    def process_osm_elements(self, nodes, ways, relations):
+        """Takes osmparser Node, Way and Relation objects and transforms them to Building objects"""
+        self._process_coords(nodes)
+        self._process_ways(ways)
+        #yself._process_relations(relations)
+        return
+        for way in self.way_list:
+            if 'building' in way.tags:
+                if tools.stats.objects >= parameters.MAX_OBJECTS:
+                    return
+                self._make_building_from_way(way.osm_id, way.tags, way.refs)
+            elif 'building:part' in way.tags:
+                if tools.stats.objects >= parameters.MAX_OBJECTS:
+                    return
+                self._make_building_from_way(way.osm_id, way.tags, way.refs)
+#            elif 'bridge' in way.tags:
+#                self.make_bridge_from_way(way.osm_id, way.tags, way.refs)
+
+    def _process_ways(self, ways):
+        for way in ways.values():
+            #if tools.stats.objects >= parameters.MAX_OBJECTS: return
+            self.way_list.append(way)
+
+    def _process_coords(self, coords):
+       self.coord_dict = coords
+       # -- get bounding box
+       for node in self.coord_dict.values():
+            logging.debug('%s %.4f %.4f', node.osm_id, node.lon, node.lat)
+            if node.lon > self.maxlon:
+                self.maxlon = node.lon
+            if node.lon < self.minlon:
+                self.minlon = node.lon
+            if node.lat > self.maxlat:
+                self.maxlat = node.lat
+            if node.lat < self.minlat:
+                self.minlat = node.lat
+
+    def _refs_to_line_string(self, refs, inner = False):
+        """accept a list of OSM refs, return a line string. Also
+           fixes face orientation, depending on inner/outer.
+        """
+        coords = []
+        for ref in refs:
+                c = self.coord_dict[ref]
+                coords.append(tools.transform.toLocal((c.lon, c.lat)))
+
+        line_string = shg.LineString(coords)
+#        # -- outer -> CCW, inner -> not CCW
+#        if line_string.is_ccw == inner:
+#            line_string.coords = list(line_string.coords)[::-1]
+        return line_string
+
+    def make_road_from_way(self, way):
+        # transform to local
+        self._refs_to_line_string(way.refs)
+        # create line string
+
+#    def print_dict(self, dic, tag):
+#        for d in dic:
+#            print "%10i" % d, dic[d], tag
+
 def alt_main():
     logging.basicConfig(level=logging.INFO)
     #logging.basicConfig(level=logging.DEBUG)
@@ -762,15 +836,34 @@ def alt_main():
     tools.init(coordinates.Transformation(center_global, hdg = 0))
 
     valid_node_keys = []
-    valid_way_keys = ["building", "building:part", "building:height", "height", "building:levels", "layer"]
-    req_way_keys = ["building"]
-    valid_relation_keys = ["building"]
-    req_relation_keys = ["building"]
+#    valid_way_keys = ["building", "building:part", "building:height", "height", "building:levels", "layer"]
+    valid_way_keys = ["highway"]
+    req_way_keys = ["highway"]
+#    valid_relation_keys = ["building"]
+#    req_relation_keys = ["building"]
+    valid_relation_keys = []
+    req_relation_keys = []
     handler = osmparser.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys)
     source = open(osm_fname)
     logging.info("Reading the OSM file might take some time ...")
     xml.sax.parse(source, handler)
     logging.info("done.")
+    logging.info("Transforming OSM objects to roads")
+
+    way = Way_extract()
+    way.process_osm_elements(handler.nodes_dict, handler.ways_dict, handler.relations_dict)
+    logging.info("done.")
+
+    logging.info("ways: %i", len(way.way_list))
+    if 0:
+        import matplotlib.pylab as plt
+        for w in way.way_list:
+            a = np.array([(way.coord_dict[ref].lon, way.coord_dict[ref].lat) for ref in w.refs])
+            plt.plot(a[:,0], a[:,1])
+        plt.show()
+
+    elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
+
 
 
 def main():

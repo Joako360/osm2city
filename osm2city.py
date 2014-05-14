@@ -14,7 +14,8 @@ You should disable random buildings.
 """
 
 # TODO:
-# - one object per tile only. Now drawables 1072 -> 30fps
+# - FIXME: texture size meters works reversed??
+# x one object per tile only. Now drawables 1072 -> 30fps
 # x use geometry library
 # x read original .stg+.xml, don't place OSM buildings when there's a static model near/within
 # - compute static_object stg's on the fly
@@ -598,6 +599,10 @@ if __name__ == "__main__":
                 sys.exit(-1)
 
         way = wayExtract()
+
+# How to improve OSM parsing?
+# give parser a tuple (valid_way_keys, req_way_keys, way_callback) For each way, the parser calls way_callback(way, nodes)
+# could add multiple tuples, one per OSM feature
 
         valid_node_keys = []
         valid_way_keys = ["building", "building:part", "building:height", "height", "building:levels", "layer"]

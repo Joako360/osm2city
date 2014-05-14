@@ -593,9 +593,42 @@ And what about the garden? A textured rectangle, slighty floating above the grou
 
 ThomasA
 ---
-Textured roofs now look better for small buildings. However, there is only one texture so far. Also, large , which also looks silly for large area buildings, you'd still get artifacts. 
+Textured roofs now look better for small buildings. However, there is only one texture so far. Also, large , which also looks silly for large area buildings, you'd still get artifacts.
 ---
+Let me try to reply to some of these:
 
+    > I'm also confident I could write FG/SG/OSG code that loads N shared
+    > models, copies them a couple of thousand times, and places them into the
+    > scene as one big object. That of course eats memory. No idea if a shader
+    > could achieve this more efficiently?
+    >
+    > And what about the garden? A textured rectangle, slighty floating above
+    > the ground? Would that cause severe z-fighting? Is there a better way
+    > with shaders? Or create the urban land class consisting of those little
+    > lots completely automatic at scenery load time?
+
+    My main concern would be to implement this in an optional way. We are seeing a fair fraction of users with low-end systems having problems even running the 2.0 scenery. If they're getting additional 60k buildings shipped in a precomputed way (which would be the case if they end up as static models), cities become no-fly zones for these users. I know that Paris already is for some.
+
+    Stuart has dropped the merging models approach for random buildings in favour of an instancing approach because large urban areas like Tehran or Los Angeles simply blew the memory of even decently equipped systems.
+
+    So whatever the system is, I think it needs to be optional, and it needs to work such that it deals with the worst-cases, urban sprawls to the horizon, and then take it from there.
+
+    The current approach for random buildings and trees we use is more memory-friendly and is called instancing. There's a limited number of copies of objects which are all sitting at the origin, and their position and orientation information is passed in gl_Color to the vertex shader in every instance, and the building is then positioned inside the vertex shader. Like all shader-based techniques, this has the advantage that it can simply be turned off runtime, the density of buildings can dynamically be reduced by moving vertices out of the view frustrum early on by evaluating a threshold attribute against a random number, as evidenced by the forest effect, a limited amount of random patterns can be imposed after the fact altering e.g. size distribution of buildings slightly....
+
+My secondary concern would then be with the high vertex density of roads - currently they're quite costly, and this hinges on a LOD system.
+
+My third question would be how easy the techniqe can be extended by non-developers to different parts of the world, as cities in the US are rather different from cities in Europe .
+
+As for the garden, if the information where to draw it can be represented in a 'simple' way, letting the shader draw the patches is not an issue. Representing the information efficiently may be the issue though. Basically the fragment shader has a position (xyz) and needs to call a function f(xyz) that returns 1 if a garden should be drawn (that's a bit like the cloud shadow problem). The function can be a texture, so a table lookup is performed, or something else (cloud shadows evaluate a series of distance checks to specified points)
+
+A textured rectangle floating above the ground would be the easier solution, but it will float if the terrain is not level, so we need a solution which also works for sloped terrain. You could use a block instead, but then you get a terraced appearance of cities.
+
+The best solution for high-end systems would probably be to pre-compute the building positions outside FG, from these assemble textures which contain the garden information at tile loading time and then use instancing to position the buildings inside the shader and the garden texture to determine vegetation as is done now at tile loading  time and use instancing to position the trees. I'm not completely clear on how to do this optionally though...
+
+Hope that advances the discussion...
+
+* Thorsten
+---
 
 
 2. die Straßen erstmal auch von osm2city als texturierte Bänder über die Scene legen. Kreuzungen etc kann man dann auch schön bemalen. Straßen in osm2city zu lesen brauche ich sowieso für mein Brücken-Projekt.

@@ -232,6 +232,11 @@ def is_large_enough(b, buildings):
 def compute_height_and_levels(b):
     """Determines total height (and number of levels) of a building based on
        OSM values and other logic"""
+    if 0:
+        b.levels = 13
+        b.height = b.levels * 3.
+        return
+
     try:
         if isinstance(b.height, (int, long)):
             b.height = float(b.height)
@@ -251,7 +256,7 @@ def compute_height_and_levels(b):
     else:
         # -- neither height nor levels given: use random levels
         b.levels = random_levels()
-        #b.levels = 15
+
         if b.area < parameters.BUILDING_MIN_AREA:
             b.levels = min(b.levels, 2)
     b.height = float(b.levels) * level_height
@@ -437,9 +442,9 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
 
         # -- determine facade and roof textures
-        #logging.debug("find facade")
+        logging.debug("___find facade")
         b.facade_texture = facades.find_matching(facade_requires, b.height)
-        #print "done" + str(b.facade_texture)
+        logging.debug("__done" + str(b.facade_texture))
         if not b.facade_texture:
             tools.stats.skipped_texture += 1
             print "Skipping building (no matching texture)"
