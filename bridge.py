@@ -855,8 +855,7 @@ def alt_main():
     logging.info("done.")
 
     logging.info("ways: %i", len(way.way_list))
-    if 0:
-        import matplotlib.pylab as plt
+    if 1:
         for w in way.way_list:
             a = np.array([(way.coord_dict[ref].lon, way.coord_dict[ref].lat) for ref in w.refs])
             plt.plot(a[:,0], a[:,1])
