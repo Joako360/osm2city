@@ -57,6 +57,7 @@ You should disable random buildings.
 
 import sys
 import os
+import re
 import xml.sax
 import argparse
 import logging
@@ -745,9 +746,10 @@ if __name__ == "__main__":
             except OSError, e:
                 if e.errno != 17:
                     logging.exception("Unable to create path to output")
-
+            #incase Prefix is a path (batch processing)
+            replacement_prefix = re.sub('[\/]','_', parameters.PREFIX)
             # -- open .ac and write header
-            fname = parameters.PREFIX + "city%02i%02i" % (cl.I.x, cl.I.y)
+            fname = replacement_prefix + "city%02i%02i" % (cl.I.x, cl.I.y)
             out = open(path + fname + ".ac", "w")
             write_ac_header(out, nb + nroofs)
             for b in cl.objects:
