@@ -47,9 +47,18 @@ if __name__ == '__main__':
         if e.errno != 17:
             logging.exception("Unable to create path to output")
     
-    downloadfile = open(calc_tile.root_directory_name((lon, lat)) + os.sep + "download_" + args.tilename, "wb") 
-    osm2city = open(calc_tile.root_directory_name((lon, lat)) + os.sep + "osm2city_"  + args.tilename, "wb")
-    tools = open(calc_tile.root_directory_name((lon, lat)) + os.sep + "tools_"  + args.tilename, "wb") 
+    if "nt" in os.name:
+        download_name = "download_" + args.tilename + ".cmd"
+        osm_name = "osm2city_" + args.tilename + ".cmd"
+        tools_name = "tools_" + args.tilename + ".cmd"
+    else:
+        download_name = "download_" + args.tilename
+        osm_name = "osm2city_" + args.tilename
+        tools_name = "tools_" + args.tilename
+        
+    downloadfile = open(calc_tile.root_directory_name((lon, lat)) + os.sep + download_name, "wb") 
+    osm2city = open(calc_tile.root_directory_name((lon, lat)) + os.sep + osm_name, "wb")
+    tools = open(calc_tile.root_directory_name((lon, lat)) + os.sep + tools_name, "wb") 
     for dy in range(0, num_cols):
         for dx in range(0, num_rows):
             index = calc_tile.tile_index((lon, lat), dx, dy)
