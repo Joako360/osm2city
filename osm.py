@@ -2,32 +2,47 @@
 """abstract way extractor. To be inherited.
 
 class Road(object):
-   # holds data for one road
-   def init(...)
+    # holds data for one road
+    def init(...)
 
 class Roads(object):
-   #holds all roads. OSM parser calls back our create_from_way().
-   self.roads = []
-   self.valid_node_keys = ..
-   self.valid_way_keys = ..
-   def create_from_way(way, refs, nodes):
-       road = Road(...)
-       self.roads.append(road)
+    #holds all roads. OSM parser calls back our create_from_way().
+    self.roads = []
+    self.valid_node_keys = ..
+    self.valid_way_keys = ..
+    def create_from_way(way, refs, nodes):
+        road = Road(...)
+        self.roads.append(road)
+
+    def analyse():
+        pass
+
+    def write():
+    # how to interact with other stuff?
+        pass
+        # ac.write(lod=1)
+
+class static_objects(object):
+    def load_stg():
+
+    def is_near(position, delta):
+        # check for static object at given position
+        pass
 
 def __main__():
-   roads = Roads()
-   handler = osmparser.OSMContentHandler()
+    roads = Roads()
+    handler = osmparser.OSMContentHandler()
 
-   # -- handler hält eine Liste von callbacks. Wenn der handler beim parsen
-   #    valid_keys trifft, wird der entsprechende callback aufgerufen.
+    # -- handler hält eine Liste von callbacks. Wenn der handler beim parsen
+    #    valid_keys trifft, wird der entsprechende callback aufgerufen.
 
-   handler.register_way_callback(roads.create_from_way, roads.valid_node_keys, ...)
-   # -- add node or relation callbacks if needed
+    handler.register_way_callback(roads.create_from_way, roads.valid_node_keys, ...)
+    # -- add node or relation callbacks if needed
 
-   pylons = Pylons()
-   handler.register_way_callback(pylons.create_from_way, pylons.valid_node_keys, ...)
+    pylons = Pylons()
+    handler.register_way_callback(pylons.create_from_way, pylons.valid_node_keys, ...)
 
-   handler.parse(osm_file)
+    handler.parse(osm_file)
 
 """
 

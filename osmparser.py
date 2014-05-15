@@ -51,6 +51,10 @@ class Member(object):
         self.type_ = type_
         self.role = role
 
+#class Callback(object):
+#    def __init__(self, callback, **kwargs):
+#        self.callback = callback
+#        self.kwargs = kwargs
 
 class OSMContentHandler(xml.sax.ContentHandler):
     """
@@ -61,13 +65,15 @@ class OSMContentHandler(xml.sax.ContentHandler):
     The valid_??_keys and req_??_keys are a primitive way to save memory and reduce the number of further processed elements.
     A better way is to have the input file processed by e.g. Osmosis first.
     """
-    def __init__(self, valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys):
+
+    def __init__(self, valid_node_keys): #, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys):
         xml.sax.ContentHandler.__init__(self)
+        self._way_callbacks = []
         self._valid_node_keys = valid_node_keys
-        self._valid_way_keys = valid_way_keys
-        self._req_way_keys = req_way_keys
-        self._valid_relation_keys = valid_relation_keys
-        self._req_relation_keys = req_relation_keys
+        #self._valid_way_keys = valid_way_keys
+        #self._req_way_keys = req_way_keys
+        #self._valid_relation_keys = valid_relation_keys
+        #self._req_relation_keys = req_relation_keys
         self.nodes_dict = {}
         self.ways_dict = {}
         self.relations_dict = {}
@@ -75,6 +81,14 @@ class OSMContentHandler(xml.sax.ContentHandler):
         self._current_way = None
         self._current_relation = None
         self._within_element = None
+
+    def parse(self, source):
+        xml.sax.parse(source, self)
+#, valid_relation_keys=[], req_relation_keys=[]
+
+    def register_way_callback(self, callback, req_keys=[]):
+#        c = Callback(callback, valid_way_keys)
+        self._way_callbacks.append((callback, req_keys))
 
     def startElement(self, name, attrs):
         if name == "node":
@@ -97,10 +111,10 @@ class OSMContentHandler(xml.sax.ContentHandler):
                 if key in self._valid_node_keys:
                     self._current_node.addTag(key, value)
             elif "way" == self._within_element:
-                if key in self._valid_way_keys:
+                if 1: #key in self._valid_way_keys:
                     self._current_way.addTag(key, value)
             elif "relation" == self._within_element:
-                if key in self._valid_relation_keys:
+                if 1: # key in self._valid_relation_keys:
                     self._current_relation.addTag(key, value)
         elif name == "nd":
             ref = int(attrs.getValue("ref"))
@@ -115,11 +129,22 @@ class OSMContentHandler(xml.sax.ContentHandler):
         if name == "node":
             self.nodes_dict[self._current_node.osm_id] = self._current_node
         elif name == "way":
-            if has_required_tag_keys(self._current_way.tags, self._req_way_keys):
-                self.ways_dict[self._current_way.osm_id] = self._current_way
+            cb = self.find_callback_for(self._current_way.tags)
+            # -- no longer filter valid_way_keys here. That's up for the callback
+            if cb: cb(self._current_way, self.nodes_dict)
+            #if has_required_tag_keys(self._current_way.tags, self._req_way_keys):
+            #    self.ways_dict[self._current_way.osm_id] = self._current_way
         elif name == "relation":
-            if has_required_tag_keys(self._current_relation.tags, self._req_relation_keys):
-                self.relations_dict[self._current_relation.osm_id] = self._current_relation
+            pass
+            #if has_required_tag_keys(self._current_relation.tags, self._req_relation_keys):
+            #    self.relations_dict[self._current_relation.osm_id] = self._current_relation
+
+    def find_callback_for(self, tags):
+        for (callback, req_keys) in self._way_callbacks:
+            for key in tags.keys():
+                if key in req_keys:
+                    return callback
+        return False
 
     def characters(self, content):
         pass

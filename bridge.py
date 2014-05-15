@@ -15,7 +15,7 @@ import numpy as np
 from vec2d import vec2d
 import shapely.geometry as shg
 import pdb
-import osm
+#import osm
 import coordinates
 import tools
 import parameters
@@ -805,6 +805,17 @@ class Way_extract(object):
 #    def print_dict(self, dic, tag):
 #        for d in dic:
 #            print "%10i" % d, dic[d], tag
+
+class Road(object):
+    def __init__(self):
+        pass
+
+class Roads(object):
+    def __init__(self):
+        pass
+    def create_from_way(self, way, refs_list, nodes_dict):
+        pass
+    #def create_from_rel(self, rel, refs_list, ways_dict, nodes_dict):
 
 def alt_main():
     logging.basicConfig(level=logging.INFO)
