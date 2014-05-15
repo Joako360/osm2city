@@ -11,7 +11,8 @@ import re
 def getFGHome():
 #http://wiki.flightgear.org/$FG_HOME
     if "nt" in os.name:
-        return os.getenv("APPDATA", "APPDATA_NOT_FOUND") + os.sep + "flightgear.org" + os.sep
+        home = os.getenv("APPDATA", "APPDATA_NOT_FOUND") + os.sep + "flightgear.org" + os.sep
+        return home.replace("\\", "/")
     if "posix" in os.name:
         return "~/.fgfs/"
 
@@ -42,11 +43,10 @@ if __name__ == '__main__':
                 logging.error("FG can't read from $FG_HOME/* check IORules")
             if not fg_data_out_ok:
                 logging.error("FG can't write to $FG_HOME/Export/* check IORules")
-        in_dir = getFGHome()                 
-        out_dir = getFGHome() + "Export" + os.sep                 
+        in_dir = getFGHome() + "elev.in"                
+        out_dir = getFGHome() + "Export/"                  
         with open("elev.nas", "r") as sources:
             lines = sources.readlines()
-        os.close( sources )
         with open(nasalDir + os.sep + "elev.nas", "w") as sources:
             for line in lines:
 #  var in = "C:/Users/keith.paterson/AppData/Roaming/flightgear.org/elev.in";
@@ -56,5 +56,4 @@ if __name__ == '__main__':
                 if "var out" in line:
                     line = '  var out = "' + out_dir + '";\n'
                 sources.write(line)
-        os.close(sources)  
         logging.info('Sucessfully installed elev.out')                   
