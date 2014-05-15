@@ -12,6 +12,11 @@ import numpy as np
 import sys
 import textwrap
 import os
+import logging
+import batch_processing.fg_telnet as telnet
+import shutil
+import io
+from parameters import ELEV_MODE
 
 stats = None
 
@@ -19,6 +24,8 @@ import vec2d
 import coordinates
 import calc_tile
 import parameters
+import time
+import re
 
 class Interpolator(object):
     """load elevation data from file, interpolate"""
@@ -107,7 +114,27 @@ def raster_glob():
     lmax = vec2d.vec2d(transform.toLocal(cmax.__iter__()))
     delta = (lmax - lmin)*0.5
     print "Distance from center to boundary in meters (x, y):", delta
-    if parameters.MANUAL_ELEV:
+    if ELEV_MODE == None:
+        if parameters.MANUAL_ELEV:
+            print "Creating elev.in ..."
+            fname = parameters.PREFIX + os.sep + "elev.in"
+            raster(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
+    
+            path = calc_tile.directory_name(center)
+            msg = textwrap.dedent("""
+            Done. You should now
+            - copy elev.in to $FGDATA/Nasal/
+            - hide the scenery folder Objects/%s to prevent probing on top of existing objects
+            - start FG, open Nasal console, enter 'elev.get()', press execute. This will create /tmp/elev.xml
+            - once that's done, copy /tmp/elev.xml to your $PREFIX folder
+            - unhide the scenery folder
+            """ % path)
+            print msg
+        else:
+            fname = parameters.PREFIX + os.sep + 'elev.xml'
+            print "Creating ", fname
+            raster_fgelev(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
+    elif parameters.ELEV_MODE == 'Manual':
         print "Creating elev.in ..."
         fname = parameters.PREFIX + os.sep + "elev.in"
         raster(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
@@ -122,10 +149,68 @@ def raster_glob():
         - unhide the scenery folder
         """ % path)
         print msg
-    else:
+    elif parameters.ELEV_MODE == 'Telnet':
+        fname = parameters.PREFIX + os.sep + 'elev.in'
+        if not os.path.exists(parameters.PREFIX + os.sep + 'elev.out'):
+            print "Creating ", fname
+            raster_telnet(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
+        else:
+            print "Skipping ", parameters.PREFIX + os.sep + 'elev.out', " exists"
+    elif parameters.ELEV_MODE == 'Fgelev':
         fname = parameters.PREFIX + os.sep + 'elev.xml'
         print "Creating ", fname
         raster_fgelev(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
+    else:
+        logging.error("Unknown Elev mode : %s Use Manual, Telnet or Fgelev"%(parameters.ELEV_MODE))
+
+def wait_for_fg(fg):
+    for count in range(0,1000):
+        semaphore = fg.get_prop("/osm2city/tiles")
+        semaphore = semaphore.split('=')[1]
+# We don't care if we get 0.0000 (String) or 0 (Int)
+        m = re.search("([0-9.]+)", semaphore)
+        if not m is None and float(m.groups()[0]) > 0: 
+            try:
+                return True
+            except:
+                # perform an action#
+                pass
+        time.sleep(1)
+        print( "Waiting for Semaphore")
+    return False
+
+def raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
+    # --- need $FGDATA/Nasal/elev.nas and elev.in
+    #     hide scenery/Objects/e.... folder
+    #     in Nasal console: elev.get()
+    #     data gets written to /tmp/elev.xml
+
+    # check $FGDATA/Nasal/IOrules
+    fg = telnet.FG_Telnet( "localhost", 5501)
+    fg.set_prop( "/position/latitude-deg", parameters.BOUNDARY_NORTH );
+    fg.set_prop( "/position/longitude-deg", parameters.BOUNDARY_WEST );
+    fg.set_prop( "/position/altitude-ft", 3000 );
+    f = open( "C:/Users/keith.paterson/AppData/Roaming/flightgear.org/elev.in", "w");
+#       f = open(fname, 'w')
+#    f.write("# Tile %s\n" % (parameters.PREFIX))
+    f.write("# %g %g %g %g %g %g\n" % (x0, y0, size_x, size_y, step_x, step_y))
+    for y in np.arange(y0, y0+size_y, step_y):
+        for x in np.arange(x0, x0+size_x, step_x):
+            lon, lat = transform.toGlobal((x, y))
+            f.write("%1.8f %1.8f %g %g\n" % (lon, lat, x, y))
+        f.write("\n")
+    f.close()
+    logging.info("Running FG Command")
+    fg.set_prop("/osm2city/tiles", 0)
+    if( fg.run_command("get-elevation") ):
+        if not wait_for_fg(fg):
+            logging.error("Process in FG timed out")
+        else:
+            logging.info("Success")
+            shutil.copy2("C:/Users/keith.paterson/AppData/Roaming/flightgear.org/Export/elev.out", parameters.PREFIX + os.sep + 'elev.out')
+    fg.close()
+
+    
 
 
 def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
@@ -392,6 +477,7 @@ def init(new_transform):
     print "tools: init", stats
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     #Parse arguments and eventually override Parameters
     import argparse
     parser = argparse.ArgumentParser(description="tools prepares an elevation grid for Nasal script and then osm2city")

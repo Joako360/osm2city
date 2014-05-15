@@ -43,6 +43,7 @@ PATH_TO_OUTPUT = ""
 
 NO_ELEV = False             # -- skip elevation interpolation
 MANUAL_ELEV = True          # uses manual process with copy elev.in and elev.out through Nasal. Otherwise experimental direct FG invocation
+ELEV_MODE = None            # Either Manual, Telnet, Fgelev
 
 #=============================================================================
 # PARAMETERS RELATED TO BUILDINGS IN osm2city
