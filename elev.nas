@@ -1,7 +1,8 @@
 var get_elevation = func {
 #Set via setup.py
-  var in = "C:/Users/keith.paterson/AppData/Roaming/flightgear.org/elev.in";
-  var out = "C:/Users/keith.paterson/AppData/Roaming/flightgear.org/Export/";
+  setprop("/osm2city/tiles", 0);
+  var in = "WILL_BE_SET_BY_SETUP.PY";
+  var out = "WILL_BE_SET_BY_SETUP.PY";
 
   print( "Reading File " ~ in);
   var raw_str = io.readfile(in);
@@ -10,9 +11,11 @@ var get_elevation = func {
   print( "Reading File " ~ in);
   if (-1 == find(delimitter, raw_str)) delimitter = "\n";
   var raw_list = split(delimitter, raw_str);
+  raw_str = nil;
   print("Read " ~ size(raw_list) ~ " records");
   var allLines = size(raw_list);
   var file_out = io.open(out ~ "elev.out", "w");
+  var header = subvec(raw_list, 0, 1);
   foreach(var l; raw_list) {
      line = line + 1;
      var l_list = split(" ", l);
@@ -27,10 +30,14 @@ var get_elevation = func {
   }
 #  io.write(file_out, "-- END -- ");
   io.close(file_out);
-  print("Wrote " ~ size(raw_list) ~ " records");
+  
+  raw_list = nil;
+  setprop("/osm2city/tiles", 1);
+  print("Wrote " ~ allLines ~ " records");
 }
 
 var get_threaded = func {
+  
   thread.newthread(get_elevation);
 }
 
