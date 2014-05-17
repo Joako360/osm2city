@@ -694,8 +694,6 @@ if __name__ == "__main__":
 
     #tools.write_gp(buildings)
 
-    tools.stats.print_summary()
-
     # -- now put buildings into clusters
     for b in buildings:
         clusters.append(b.anchor, b)
