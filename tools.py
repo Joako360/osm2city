@@ -114,7 +114,7 @@ def raster_glob():
     lmax = vec2d.vec2d(transform.toLocal(cmax.__iter__()))
     delta = (lmax - lmin)*0.5
     print "Distance from center to boundary in meters (x, y):", delta
-    if ELEV_MODE == None:
+    if parameters.ELEV_MODE == None:
         if parameters.MANUAL_ELEV:
             print "Creating elev.in ..."
             fname = parameters.PREFIX + os.sep + "elev.in"
@@ -130,10 +130,12 @@ def raster_glob():
             - unhide the scenery folder
             """ % path)
             print msg
+            return
         else:
             fname = parameters.PREFIX + os.sep + 'elev.xml'
             print "Creating ", fname
             raster_fgelev(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
+            return
     elif parameters.ELEV_MODE == 'Manual':
         print "Creating elev.in ..."
         fname = parameters.PREFIX + os.sep + "elev.in"
@@ -167,8 +169,11 @@ def wait_for_fg(fg):
     for count in range(0,1000):
         semaphore = fg.get_prop("/osm2city/tiles")
         semaphore = semaphore.split('=')[1]
-# We don't care if we get 0.0000 (String) or 0 (Int)
         m = re.search("([0-9.]+)", semaphore)
+# We don't care if we get 0.0000 (String) or 0 (Int)
+        record = fg.get_prop("/osm2city/record")
+        record = record.split('=')[1]
+        m2 = re.search("([0-9.]+)", record)
         if not m is None and float(m.groups()[0]) > 0: 
             try:
                 return True
@@ -176,7 +181,8 @@ def wait_for_fg(fg):
                 # perform an action#
                 pass
         time.sleep(1)
-        print( "Waiting for Semaphore")
+        if not m2 is None:        
+            print( "Waiting for Semaphore " + m2.groups()[0])
     return False
 
 def raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
@@ -187,8 +193,10 @@ def raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
 
     # check $FGDATA/Nasal/IOrules
     fg = telnet.FG_Telnet( "localhost", 5501)
-    fg.set_prop( "/position/latitude-deg", parameters.BOUNDARY_NORTH );
-    fg.set_prop( "/position/longitude-deg", parameters.BOUNDARY_WEST );
+    center_lat = abs(parameters.BOUNDARY_NORTH - parameters.BOUNDARY_SOUTH)/2 + parameters.BOUNDARY_SOUTH
+    center_lon = abs(parameters.BOUNDARY_WEST - parameters.BOUNDARY_EAST)/2 + parameters.BOUNDARY_WEST
+    fg.set_prop( "/position/latitude-deg", center_lat );
+    fg.set_prop( "/position/longitude-deg", center_lon );
     fg.set_prop( "/position/altitude-ft", 3000 );
     f = open( "C:/Users/keith.paterson/AppData/Roaming/flightgear.org/elev.in", "w");
 #       f = open(fname, 'w')
@@ -200,6 +208,10 @@ def raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
             f.write("%1.8f %1.8f %g %g\n" % (lon, lat, x, y))
         f.write("\n")
     f.close()
+    fg.set_prop( "/position/latitude-deg", center_lat );
+    fg.set_prop( "/position/longitude-deg", center_lon );
+    fg.set_prop( "/position/altitude-ft", 3000 );
+
     logging.info("Running FG Command")
     fg.set_prop("/osm2city/tiles", 0)
     if( fg.run_command("get-elevation") ):
@@ -437,36 +449,41 @@ class Stats(object):
               nearby        %i
               no elevation  %i
               no texture    %i
-        """ % (self.objects, self.parse_errors, total_written,
-               self.skipped_small, self.skipped_nearby, self.skipped_no_elev, self.skipped_texture)))
-        roof_line = "        roof-types"
-        for roof_type in self.roof_types:
-            roof_line += """\r\n          %s\t%i""" % (roof_type,self.roof_types[roof_type])
-        out.write(textwrap.dedent(roof_line))
-        out.write(textwrap.dedent("""
-              complex       %i
-              roof_errors   %i
-            ground nodes    %i
-              simplified    %i
-            vertices        %i
-            surfaces        %i
-            repeated tex x  %i out of %i (%2.0f %%)
-            LOD bare        %i (%2.0f %%)
-            LOD rough       %i (%2.0f %%)
-            LOD detail      %i (%2.0f %%)
-        """ % (self.have_complex_roof, self.roof_errors,
-               self.nodes_ground, self.nodes_simplified,
-               self.vertices, self.surfaces,
-               self.LOD[0], lodzero,
-               self.LOD[1], lodone,
-               self.LOD[2], lodtwo)))
-        out.write("above\n")
-        max_area_above = self.area_above.max()
-        if max_area_above < 1: max_area_above = 1
-        for i in range(len(self.area_levels)):
-            out.write(" %5g m^2  %5i |%s\n" % (self.area_levels[i], self.area_above[i], \
-                      "#"*int(56. * self.area_above[i]/max_area_above)))
-        #print self
+            """ % (self.objects, self.parse_errors, total_written,
+                   self.skipped_small, self.skipped_nearby, self.skipped_no_elev, self.skipped_texture)))
+            roof_line = "        roof-types"
+            for roof_type in self.roof_types:
+                roof_line += """\r\n          %s\t%i""" % (roof_type,self.roof_types[roof_type])
+            out.write(textwrap.dedent(roof_line))
+            out.write(textwrap.dedent("""
+                  complex       %i
+                  roof_errors   %i
+                ground nodes    %i
+                  simplified    %i
+                vertices        %i
+                surfaces        %i
+                repeated tex x  %i out of %i (%2.0f %%)
+                LOD bare        %i (%2.0f %%)
+                LOD rough       %i (%2.0f %%)
+                LOD detail      %i (%2.0f %%)
+            """ % (self.have_complex_roof, self.roof_errors,
+                   self.nodes_ground, self.nodes_simplified,
+                   self.vertices, self.surfaces,
+                   self.texture_x_repeated, (self.texture_x_repeated + self.texture_x_simple), (self.texture_x_repeated * 100. /(self.texture_x_repeated + self.texture_x_simple)),
+                   self.LOD[0], lodzero,
+                   self.LOD[1], lodone,
+                   self.LOD[2], lodtwo)))
+            out.write("above\n")
+            max_area_above = self.area_above.max()
+            if max_area_above < 1: max_area_above = 1
+            for i in range(len(self.area_levels)):
+                out.write(" %5g m^2  %5i |%s\n" % (self.area_levels[i], self.area_above[i], \
+                          "#" * int(56. * self.area_above[i]/max_area_above)))
+            #print self
+        except Exception, reason:
+            logging.error(reason)
+            return
+
 
 def init(new_transform):
     global transform
