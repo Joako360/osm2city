@@ -673,8 +673,10 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
         else:
             if b.roof_type=='gabled':
                 out.write(roofs.separate_gable(b, X))
+            elif b.roof_type=='hipped':
+                out.write(roofs.separate_gable(b, X))
             else:
-                out.write(roofs.separate_hipped(b, X))
+                out.write(roofs._separate_flat(b, X))
                 
 #            print "4 GROUND", b._nnodes_ground
         out.write("kids 0\n")
@@ -685,8 +687,7 @@ def write(b, out, elev, tile_elev, transform, offset, LOD_lists):
             LOD_lists[4].append(roof_ac_name_flat)
             out.write(roofs.flat(b, X, roof_ac_name_flat))
             out.write("kids 0\n")
-
-    tools.stats.count(b)
+        tools.stats.count(b)
     
 #
 # Maps the Type of the building 
