@@ -23,7 +23,7 @@ import sys
 import math
 import calc_tile
 import os
-
+import ac3d
 
 import logging
 import osmparser
@@ -33,13 +33,18 @@ def no_transform((x, y)):
     return x, y
 
 class Road(object):
-    def __init__(self, osm_id, tags, refs, nodes_dict):
+    def __init__(self, transform, osm_id, tags, refs, nodes_dict):
         self.osm_id = osm_id
         self.tags = tags
+        self.refs = refs
         self.nodes = []
-        for r in refs:
-            node = nodes_dict[r]
-            self.nodes.append(node)
+
+#    def transform(self, nodes_dict, transform):
+        osm_nodes = [nodes_dict[r] for r in refs]
+        self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
+        #self.nodes = np.array([(n.lon, n.lat) for n in osm_nodes])
+        self.line_string = shg.LineString(self.nodes)
+
 
 class Roads(object):
     valid_node_keys = []
@@ -47,13 +52,41 @@ class Roads(object):
     #req_and_valid_keys = {"valid_way_keys" : ["highway"], "req_way_keys" : ["highway"]}
     req_keys = ['highway', 'railway']
 
-    def __init__(self):
+    def __init__(self, transform):
         self.roads = []
+        self.transform = transform
+        self.minlon = 181.
+        self.maxlon = -181.
+        self.minlat = 91.
+        self.maxlat = -91.
+        self.min_max_scanned = False
+
+    def _process_nodes(self, nodes):
+        for node in nodes.values():
+            #logging.debug('%s %.4f %.4f', node.osm_id, node.lon, node.lat)
+            #self.coord_dict[node.osm_id] = node
+            if node.lon > self.maxlon:
+                self.maxlon = node.lon
+            if node.lon < self.minlon:
+                self.minlon = node.lon
+            if node.lat > self.maxlat:
+                self.maxlat = node.lat
+            if node.lat < self.minlat:
+                self.minlat = node.lat
+        logging.debug("")
 
     def create_from_way(self, way, nodes_dict):
-        print "got", way.osm_id,
-        for t in way.tags.keys():
-            print (t), "=", (way.tags[t])+" ",
+
+        if not self.min_max_scanned:
+            self._process_nodes(nodes_dict)
+            self.min_max_scanned = True
+            cmin = vec2d(self.minlon, self.minlat)
+            cmax = vec2d(self.maxlon, self.maxlat)
+            logging.info("min/max " + str(cmin) + " " + str(cmax))
+#            center_global = (cmin + cmax)*0.5
+            #center_global = vec2d(1.135e1+0.03, 0.02+4.724e1)
+            #self.transform = coordinates.Transformation(center_global, hdg = 0)
+            #tools.init(self.transform) # FIXME. Not a nice design.
 
         col = None
         if way.tags.has_key('highway'):
@@ -75,16 +108,89 @@ class Roads(object):
                 col = 6
 
         if col == None:
-            print "(rejected)"
+#            print "got", way.osm_id,
+#            for t in way.tags.keys():
+#                print (t), "=", (way.tags[t])+" ",
+#            print "(rejected)"
             return
 
-        print "(accepted)"
-        road = Road(way.osm_id, way.tags, way.refs, nodes_dict)
+        #print "(accepted)"
+        road = Road(self.transform, way.osm_id, way.tags, way.refs, nodes_dict)
         road.typ = col
         self.roads.append(road)
 
     def __len__(self):
         return len(self.roads)
+
+    def write(self, elev):
+        ac = ac3d.Writer(tools.stats)
+        obj = ac.new_object('roads', 'bridge.png')
+        for rd in self.roads[:]:
+            left  = rd.line_string.parallel_offset(3, 'left', resolution=16, join_style=1, mitre_limit=10.0)
+            right = rd.line_string.parallel_offset(3, 'right', resolution=16, join_style=1, mitre_limit=10.0)
+            o = obj.next_node_index()
+            #face = np.zeros((len(left.coords) + len(right.coords)))
+            try:
+                do_tex = True
+                len_left = len(left.coords)
+                len_right = len(right.coords)
+
+                if len_left != len_right:
+                    print "different lengths not yet implemented ", rd.osm_id
+                    do_tex = False
+                    #continue
+                if len_left != len(rd.line_string.coords):
+                    print "WTF? ", rd.osm_id
+                    do_tex = False
+                    #continue
+                #if len_left != 3: continue
+
+
+                for p in left.coords:
+                    e = elev(vec2d(p[0], p[1])) + 1
+                    obj.node(-p[1], e, -p[0])
+                for p in right.coords:
+                    e = elev(vec2d(p[0], p[1])) + 1
+                    obj.node(-p[1], e, -p[0])
+                #refs = np.arange(len_left + len_right) + o
+                nodes_l = np.arange(len(left.coords))
+                nodes_r = np.arange(len(right.coords))
+                rd.segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(rd.line_string.coords[i])) for i, coord in enumerate(rd.line_string.coords[1:])])
+                rd_len = len(rd.line_string.coords)
+                rd.dist = np.zeros((rd_len))
+                for i in range(1, rd_len):
+                    rd.dist[i] = rd.dist[i-1] + rd.segment_len[i]
+
+                face = []
+                scale = 20.
+                x = 0.
+                for i, n in enumerate(nodes_l):
+                    #face.append((r+o, 0, 0))
+                    if do_tex: x = rd.dist[i]/scale
+                    face.append((n+o, x, 0.5))
+                o += len(left.coords)
+
+                for i, n in enumerate(nodes_r):
+                    if do_tex: x = rd.dist[-i-1]/scale
+                    #x = 0
+                    #face.append((r+o, 0, 0))
+                    face.append((n+o, x, 0.75))
+                #face = [(r, 0, 0) for r in refs[0:len_left]]
+                obj.face(face[::-1], mat=1)
+            except NotImplementedError:
+                print "error in osm_id", rd.osm_id
+
+#            print rd.dist
+#            print rd.segment_len
+#            break
+
+        f = open('roads.ac', 'w')
+
+        f.write(str(ac))
+        f.close()
+
+            #obj.node()
+
 
 def main():
     logging.basicConfig(level=logging.INFO)
@@ -110,56 +216,56 @@ def main():
 
     osm_fname = parameters.PREFIX + os.sep + parameters.OSM_FILE
 
-    cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
-    cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
-    center_global = (cmin + cmax)*0.5
+#    cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
+#    cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
+#    center_global = (cmin + cmax)*0.5
+#    transform = coordinates.Transformation(center_global, hdg = 0)
+    center_global = vec2d(11.38, 47.26)
     transform = coordinates.Transformation(center_global, hdg = 0)
     tools.init(transform)
-
-    roads = Roads()
+    roads = Roads(transform)
 
     handler = osmparser.OSMContentHandler(valid_node_keys=[])
     source = open(osm_fname)
     logging.info("Reading the OSM file might take some time ...")
 
 #    handler.register_way_callback(roads.create_from_way, **roads.req_and_valid_keys)
+#    roads.register_callbacks_in(handler)
     handler.register_way_callback(roads.create_from_way, req_keys=roads.req_keys)
     handler.parse(source)
 
-    logging.info("done.")
-    logging.info("Transforming OSM objects to roads")
-
+    #transform = tools.transform
+    #center_global =  vec2d(transform.toGlobal(vec2d(0,0)))
     logging.info("done.")
     logging.info("ways: %i", len(roads))
+    print "OBJECT_STATIC %s %g %g %1.2f %g\n" % ("road.ac", center_global.lon, center_global.lat, 0, 0)
+    if parameters.PATH_TO_OUTPUT:
+        path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, center_global)
+    else:
+        path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center_global)
+    stg_fname = calc_tile.construct_stg_file_name(center_global)
+    print path+stg_fname
 
     # -- quick test output
     col = ['b', 'r', 'y', 'g', '0.75', '0.5', 'k']
-    lw  = [2, 1.5, 1.2, 1, 1, 1, 1]
+    lw    = [2, 1.5, 1.2, 1, 1, 1, 1]
+    lw_w  = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 1]
+
     if 1:
         for r in roads.roads:
-            a = np.array([transform.toLocal((n.lon, n.lat)) for n in r.nodes])
+            a = r.nodes
+            #np.array([transform.toLocal((n.lon, n.lat)) for n in r.nodes])
             plt.plot(a[:,0], a[:,1], color=col[r.typ], linewidth=lw[r.typ])
-            plt.plot(a[:,0], a[:,1], color='w', linewidth=0.2, ls=":")
+            plt.plot(a[:,0], a[:,1], color='w', linewidth=lw_w[r.typ], ls=":")
 
         plt.axes().set_aspect('equal')
         #plt.show()
         plt.savefig('roads.eps')
 
-    #elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
+    elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
+    roads.write(elev)
 
-class AA(object):
-    arglist = {"a":123, "b":22}
-    def __init__(self):
 
-        print "per"
-
-def func(e, a=0, b=99):
-    print e, a, b
 
 if __name__ == "__main__":
     main()
-    if 0:
-        a = AA()
-        func(1)
-        func(1,a=50, b=50)
-        func(2, **a.arglist)

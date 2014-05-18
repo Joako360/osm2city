@@ -132,7 +132,7 @@ class Writer(object):
     def __str__(self):
         s = 'AC3Db\n'
         s += 'MATERIAL "" rgb 1 1 1 amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0\n'
-        s += 'MATERIAL "" rgb 0 1 0 amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0\n'
+        s += 'MATERIAL "" rgb 1 1 1 amb 0.5 0.5 0.5 emis 1 1 1 spec 0.5 0.5 0.5 shi 64 trans 0\n'
         non_empty = [o for o in self.objects if not o.is_empty()]
         s += 'OBJECT world\nkids %i\n' % len(non_empty)
         s += string.join([str(o) for o in non_empty])
