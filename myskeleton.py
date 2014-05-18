@@ -84,13 +84,13 @@ def myskel(b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header = Fal
         #roof.mesh.vertices
         roof_height = max([p[2] for p in roof_mesh.vertices])
         if roof_height > max_height:
-#            print "roof too heigh", roof_height, max_height
+#            print "roof too high", roof_height, max_height
             return False
         s = roof_mesh.ac3d_string(b, offset_xy, offset_z, header)
 #        return s
     except Exception, reason:
 #    if False:
-        print "Error while creating 3d roof (OSM_ID %i, %s)" % (b.osm_id, reason)
+        print "Error while creating 3d roof (OSM_ID %s, %s)" % (b.osm_id, reason)
         tools.stats.roof_errors += 1
         gp = 'roof-error-%04i' % tools.stats.roof_errors
         tools.write_one_gp(b, gp)

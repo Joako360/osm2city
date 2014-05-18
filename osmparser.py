@@ -184,9 +184,9 @@ def main(source_file_name):
     logging.basicConfig(level=logging.INFO)
     source = open(source_file_name)
     valid_node_keys = []
-    valid_way_keys = ["building", "height", "building:levels"]
+    valid_way_keys = ["building", "height", "building:levels", "roof:shape"]
     req_way_keys = ["building"]
-    valid_relation_keys = ["building"]
+    valid_relation_keys = ["building", "height", "building:levels", "roof:shape"]
     req_relation_keys = ["building"]
     handler = OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys)
     xml.sax.parse(source, handler)
