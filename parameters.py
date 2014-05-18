@@ -10,6 +10,7 @@ Created on May 27, 2013
 @author: vanosten
 """
 
+import argparse
 import sys
 import types
 
@@ -152,6 +153,7 @@ C2P_CATENARY_MIN_DISTANCE = 50
 
 C2P_POWER_LINE_ALLOW_100M = False
 
+
 def set_parameters(param_dict):
     for k in param_dict:
         if k in globals():
@@ -185,9 +187,15 @@ def show():
     for k in sorted(my_globals.iterkeys()):
         if k.startswith('__'):
             continue
-        if isinstance(my_globals[k], types.ClassType) or isinstance(my_globals[k], types.FunctionType) or isinstance(my_globals[k], types.ModuleType):
+        elif k == "args":
             continue
-        if isinstance(my_globals[k], types.ListType):
+        elif k == "parser":
+            continue
+        elif isinstance(my_globals[k], types.ClassType) or \
+                isinstance(my_globals[k], types.FunctionType) or \
+                isinstance(my_globals[k], types.ModuleType):
+            continue
+        elif isinstance(my_globals[k], types.ListType):
             value = ', '.join(my_globals[k])
             print k, '=', value
         else:
@@ -255,10 +263,12 @@ def read_from_file(filename):
         for line in f:
             # -- ignore comments and empty lines
             line = line.split('#')[0].strip()
-            if line == "": continue
+            if line == "":
+                continue
 
             full_line += line  # -- allow for multi-line lists
-            if line.endswith(","): continue
+            if line.endswith(","):
+                continue
 
             pair = full_line.split("=", 1)
             key = pair[0].strip().upper()
@@ -273,3 +283,15 @@ def read_from_file(filename):
     except IOError, reason:
         print "Error processing file with parameters:", reason
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    # Handling arguments and parameters
+    parser = argparse.ArgumentParser(
+        description="The parameters module provides parameters to osm2city - used as main it shows the parameters used.")
+    parser.add_argument("-f", "--file", dest="filename",
+                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
+    args = parser.parse_args()
+    if args.filename is not None:
+        read_from_file(args.filename)
+        show()
