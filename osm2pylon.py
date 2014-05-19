@@ -269,7 +269,6 @@ class Pylon(object):
         self.structure = None
         self.material = None
         self.colour = None
-        self.my_wayline = None  # a reference to the way - either an electrical line or an aerialway
         self.prev_pylon = None
         self.next_pylon = None
         self.lon = 0.0  # longitude coordinate in decimal as a float
@@ -301,8 +300,6 @@ class Pylon(object):
         if self.in_osm_building:
             return " "  # no need to write a shared object
 
-        if self.pylon_model is None:
-            self.pylon_model = "Models/Power/generic_pylon_25m.xml"  # FIXME: should never happen, but does
         entry = ["OBJECT_SHARED", self.pylon_model, str(self.lon), str(self.lat), str(self.elevation)
                  , str(stg_angle(self.heading - 90))]  # 90 less because arms are in x-direction in ac-file
         return " ".join(entry)
@@ -319,7 +316,7 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
 
     def __init__(self, osm_id):
         self.osm_id = osm_id
-        self.pylons = []
+        self.nodes = []  # Pylons
         self.way_segments = []
         self.type_ = 0  # cf. class constants TYPE_*
         self.length = 0.0  # the total length of all segments
@@ -332,7 +329,7 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
         Returns the stg entries for the pylons of this WayLine in a string separated by linebreaks
         """
         entries = []
-        for my_pylon in self.pylons:
+        for my_pylon in self.nodes:
             entries.append(my_pylon.make_stg_entry())
         return "\n".join(entries)
 
@@ -418,7 +415,7 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
             pylon_model = self._calc_and_map_aerialway()
         else:
             pylon_model = self._calc_and_map_powerline(max_length)
-        for my_pylon in self.pylons:
+        for my_pylon in self.nodes:
             my_pylon.pylon_model = pylon_model
 
         self._calc_headings_pylons()
@@ -442,7 +439,7 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
         found = 0
         nbr_poles = 0
         nbr_towers = 0
-        for my_pylon in self.pylons:
+        for my_pylon in self.nodes:
             if my_pylon.type_ == Pylon.TYPE_POWER_TOWER:
                 nbr_towers += 1
             elif my_pylon.type_ == Pylon.TYPE_POWER_POLE:
@@ -475,21 +472,21 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
 
     def get_center_coordinates(self):
         """Returns the lon/lat coordinates of the line"""
-        my_pylon = self.pylons[0]
+        my_pylon = self.nodes[0]
         return my_pylon.lon, my_pylon.lat  # FIXME: needs to be calculated more properly with shapely
 
     def _calc_headings_pylons(self):
-        current_pylon = self.pylons[0]
-        next_pylon = self.pylons[1]
+        current_pylon = self.nodes[0]
+        next_pylon = self.nodes[1]
         current_angle = calc_angle_of_line(current_pylon.x, current_pylon.y, next_pylon.x, next_pylon.y)
         current_pylon.heading = current_angle
-        for x in range(1, len(self.pylons) - 1):
+        for x in range(1, len(self.nodes) - 1):
             prev_angle = current_angle
-            current_pylon = self.pylons[x]
-            next_pylon = self.pylons[x + 1]
+            current_pylon = self.nodes[x]
+            next_pylon = self.nodes[x + 1]
             current_angle = calc_angle_of_line(current_pylon.x, current_pylon.y, next_pylon.x, next_pylon.y)
             current_pylon.heading = calc_middle_angle(prev_angle, current_angle)
-        self.pylons[-1].heading = current_angle
+        self.nodes[-1].heading = current_angle
 
     def _calc_segments(self):
         """Creates the segments of this WayLine and calculates the total length.
@@ -497,8 +494,8 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
         max_length = 0.0
         total_length = 0.0
         self.way_segments = []  # if this method would be called twice by mistake
-        for x in range(0, len(self.pylons) - 1):
-            segment = WaySegment(self.pylons[x], self.pylons[x + 1])
+        for x in range(0, len(self.nodes) - 1):
+            segment = WaySegment(self.nodes[x], self.nodes[x + 1])
             self.way_segments.append(segment)
             if segment.length > max_length:
                 max_length = segment.length
@@ -557,8 +554,29 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
                 segment.cables.append(cable)
 
 
-def process_building_refs(nodes_dict, ways_dict, my_elev_interpolator, my_coord_transformator):
-    my_buildings = {}  # osm_id as key, LinearRing
+class RailNode(object):
+    def __init__(self, osm_id):
+        self.osm_id = osm_id
+        self.switch = False
+        self.lon = 0.0  # longitude coordinate in decimal as a float
+        self.lat = 0.0  # latitude coordinate in decimal as a float
+        self.x = 0.0  # local position x
+        self.y = 0.0  # local position y
+        self.elevation = 0.0  # elevation above sea level in meters
+
+
+class RailLine(object):
+    TYPE_RAILWAY_GAUGE_NARROW = 11
+    TYPE_RAILWAY_GAUGE_NORMAL = 12
+
+    def __init__(self, osm_id):
+        self.osm_id = osm_id
+        self.type_ = 0
+        self.nodes = []  # RailNodes
+
+
+def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator):
+    my_buildings = {}  # osm_id as key, Polygon
     for way in ways_dict.values():
         coordinates = []
         for ref in way.refs:
@@ -570,7 +588,84 @@ def process_building_refs(nodes_dict, ways_dict, my_elev_interpolator, my_coord_
     return my_buildings
 
 
-def process_osm_elements(nodes_dict, ways_dict, my_elev_interpolator, my_coord_transformator, building_refs):
+def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_coord_transformator):
+    my_railways = {}  # osm_id as key, RailLine
+    my_shared_nodes = {}  # node osm_id as key, list of WayLine objects as value
+
+    # First reduce to electrified narrow_gauge or rail, no tunnels and no abandoned
+    for way in ways_dict.values():
+        my_line = RailLine(way.osm_id)
+        is_railway = False
+        is_electrified = False
+        is_challenged = False
+        for key in way.tags:
+            value = way.tags[key]
+            if "railway" == key:
+                if value == "rail":
+                    is_railway = True
+                    my_line.type_ = RailLine.TYPE_RAILWAY_GAUGE_NORMAL
+                elif value == "narrow_gauge":
+                    is_railway = True
+                    my_line.type_ = RailLine.TYPE_RAILWAY_GAUGE_NARROW
+                elif value == "abandoned":
+                    is_challenged = True
+            elif "electrified" == key:
+                if value in ("contact_line", "yes"):
+                    is_electrified = True
+            elif ("tunnel" == key) and ("yes" == value):
+                is_challenged = True
+        if is_railway and is_electrified and (not is_challenged):
+            # Process the Nodes
+            for ref in way.refs:
+                if ref in nodes_dict:
+                    my_node = nodes_dict[ref]
+                    my_rail_node = RailNode(my_node.osm_id)
+                    my_rail_node.lat = my_node.lat
+                    my_rail_node.lon = my_node.lon
+                    my_rail_node.x, my_rail_node.y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
+                    my_rail_node.elevation = my_elev_interpolator(vec2d.vec2d(my_rail_node.lon, my_rail_node.lat), True)
+                    for key in my_node.tags:
+                        value = my_node.tags[key]
+                        if "railway" == key and "switch" == value:
+                            my_rail_node.switch = True
+                    if my_rail_node.elevation != -9999:  # if elevation is -9999, then point is outside of boundaries
+                        my_line.nodes.append(my_rail_node)
+                    else:
+                        logging.debug('Node outside of boundaries and therefore ignored: osm_id = %s ', my_node.osm_id)
+            if len(my_line.nodes) > 1:
+                my_railways[my_line.osm_id] = my_line
+                for my_rail_node in my_line.nodes:
+                    if my_rail_node.osm_id in my_shared_nodes.keys():
+                        my_shared_nodes[my_rail_node.osm_id].append(my_line)
+                    else:
+                        my_shared_nodes[my_rail_node.osm_id] = [my_line]
+            else:
+                logging.warning('Line could not be validated or corrected. osm_id = %s', my_line.osm_id)
+
+    # Attempt to merge lines
+    for key in my_shared_nodes.keys():
+        shared_node = my_shared_nodes[key]
+        if len(shared_node) == 2:
+            my_osm_id = shared_node[1].osm_id
+            return_code = merge_lines(key, shared_node[0], shared_node[1], my_shared_nodes)
+            if 0 == return_code:
+                del my_railways[my_osm_id]
+                del my_shared_nodes[key]
+                logging.debug("Merged two lines with node osm_id: %s", key)
+            elif 1 == return_code:
+                logging.debug(
+                    "A node is referenced in two ways, but the lines have not same type. Node osm_id: %s; %s; %s"
+                    , key, shared_node[0].type_, shared_node[1].type_)
+            else:
+                logging.debug(
+                    "A node is referenced in two ways, but the common node is not at start/end. Node osm_id: %s; %s"
+                    , key, shared_node[0].type_)
+        elif len(shared_node) > 2:
+            pass  # FIXME: to be replaced by intelligent algorithm to take the two which merge lineraly
+    return my_railways
+
+
+def process_osm_power_aerialway(nodes_dict, ways_dict, my_elev_interpolator, my_coord_transformator, building_refs):
     """
     Transforms a dict of Node and a dict of Way OSMElements from osmparser.py to a dict of WayLine objects for
     electrical power lines and a dict of WayLine objects for aerialways. Nodes are transformed to Pylons.
@@ -618,7 +713,6 @@ def process_osm_elements(nodes_dict, ways_dict, my_elev_interpolator, my_coord_t
                     my_pylon.lat = my_node.lat
                     my_pylon.lon = my_node.lon
                     my_pylon.x, my_pylon.y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
-                    my_pylon.my_wayline = my_line
                     my_pylon.elevation = my_elev_interpolator(vec2d.vec2d(my_pylon.lon, my_pylon.lat), True)
                     for key in my_node.tags:
                         value = my_node.tags[key]
@@ -646,19 +740,18 @@ def process_osm_elements(nodes_dict, ways_dict, my_elev_interpolator, my_coord_t
                         elif "material" == key:
                             my_pylon.material = value
                     if my_pylon.elevation != -9999:  # if elevation is -9999, then point is outside of boundaries
-                        my_line.pylons.append(my_pylon)
+                        my_line.nodes.append(my_pylon)
                         if my_node.osm_id in my_shared_nodes.keys():
                             my_shared_nodes[my_node.osm_id].append(my_line)
                         else:
                             my_shared_nodes[my_node.osm_id] = [my_line]
                     else:
-                        logging.debug('Node outside of boundaries with osm_id = %s and therefore ignored',
-                                      my_node.osm_id)
+                        logging.debug('Node outside of boundaries and therefore ignored: osm_id = %s', my_node.osm_id)
                     if None != prev_pylon:
                         prev_pylon.next_pylon = my_pylon
                         my_pylon.prev_pylon = prev_pylon
                     prev_pylon = my_pylon
-            if len(my_line.pylons) > 1:
+            if len(my_line.nodes) > 1:
                 if my_line.is_aerialway():
                     my_aerialways[my_line.osm_id] = my_line
                 else:
@@ -669,60 +762,80 @@ def process_osm_elements(nodes_dict, ways_dict, my_elev_interpolator, my_coord_t
     for key in my_shared_nodes.keys():
         shared_node = my_shared_nodes[key]
         if len(shared_node) == 2:
-            return_code = merge_lines(key, shared_node[0], shared_node[1])
+            my_osm_id = shared_node[1].osm_id
+            return_code = merge_lines(key, shared_node[0], shared_node[1], my_shared_nodes)
             if 0 == return_code:  # remove the merged line
-                if shared_node[0].is_aerialway() and (shared_node[1].osm_id in my_aerialways):
-                    del my_aerialways[shared_node[1].osm_id]
-                elif shared_node[1].osm_id in my_powerlines:
-                    del my_powerlines[shared_node[1].osm_id]
-                logging.info("Merged two lines with node osm_id: %s", key)
+                if shared_node[0].is_aerialway():
+                    del my_aerialways[my_osm_id]
+                else:
+                    del my_powerlines[my_osm_id]
+                del my_shared_nodes[key]
+                logging.debug("Merged two lines with node osm_id: %s", key)
             elif 1 == return_code:
-                logging.warning(
+                logging.debug(
                     "A node is referenced in two ways, but the lines have not same type. Node osm_id: %s; %s; %s"
                     , key, shared_node[0].type_, shared_node[1].type_)
             else:
-                logging.warning(
+                logging.debug(
                     "A node is referenced in two ways, but the common node is not at start/end. Node osm_id: %s; %s"
                     , key, shared_node[0].type_)
-        if len(shared_node) > 2:
+        elif len(shared_node) > 2:
             logging.warning("A node is referenced in more than two ways. Most likely OSM problem. Node osm_id: %s", key)
 
     return my_powerlines, my_aerialways
 
 
-def merge_lines(osm_id, line0, line1):
+def merge_lines(osm_id, line0, line1, shared_nodes):
     """Takes two Line objects and attempts to merge them at a given node.
     Returns 1 if the Line objects are not of same type.
     Returns 2 if the node is not first or last node in both Line objects
     in a given Line object.
-    Returns 0 if the added/merged pylons are in line0"""
+    Returns 0 if all went well.
+    The added/merged pylons are in line0 in correct sequence.
+    Makes sure that line1 is replaced by line0 in shared_nodes"""
     if line0.type_ != line1.type_:
         return 1
-    if line0.pylons[0].osm_id == osm_id:
+    if line0.nodes[0].osm_id == osm_id:
         line0_first = True
-    elif line0.pylons[-1].osm_id == osm_id:
+    elif line0.nodes[-1].osm_id == osm_id:
         line0_first = False
     else:
         return 2
-    if line1.pylons[0].osm_id == osm_id:
+    if line1.nodes[0].osm_id == osm_id:
         line1_first = True
-    elif line1.pylons[-1].osm_id == osm_id:
+    elif line1.nodes[-1].osm_id == osm_id:
         line1_first = False
     else:
         return 2
 
+    # combine line1 into line0 in correct sequence (e.g. line0(A,B) + line1(C,B) -> line0(A,B,C)
     if (False == line0_first) and (True == line1_first):
-        for x in range(1, len(line1.pylons), 1):
-            line0.pylons.append(line1.pylons[x])
+        for x in range(1, len(line1.nodes), 1):
+            line0.nodes.append(line1.nodes[x])
     elif (False == line0_first) and (False == line1_first):
-        for x in range(len(line1.pylons) - 2, 0, -1):
-            line0.pylons.append(line1.pylons[x])
+        for x in range(len(line1.nodes) - 2, 0, -1):
+            line0.nodes.append(line1.nodes[x])
     elif (True == line0_first) and (True == line1_first):
-        for x in range(1, len(line1.pylons), 1):
-            line0.pylons.insert(0, line1.pylons[x])
+        for x in range(1, len(line1.nodes), 1):
+            line0.nodes.insert(0, line1.nodes[x])
     else:
-        for x in range(len(line1.pylons) - 2, 0, -1):
-            line0.pylons.insert(0, line1.pylons[x])
+        for x in range(len(line1.nodes) - 2, 0, -1):
+            line0.nodes.insert(0, line1.nodes[x])
+
+    # in shared_nodes replace line1 with line2
+    for shared_node in shared_nodes.values():
+        has_line0 = False
+        pos_line1 = -1
+        for i in xrange(0, len(shared_node)):
+            if shared_node[i].osm_id == line0.osm_id:
+                has_line0 = True
+            if shared_node[i].osm_id == line1.osm_id:
+                pos_line1 = i
+        if pos_line1 >= 0:
+            del shared_node[pos_line1]
+            if not has_line0:
+                shared_node.append(line0)
+
     return 0
 
 
@@ -842,10 +955,23 @@ if __name__ == "__main__":
                                           req_relation_keys)
     source = open(parameters.PREFIX + os.sep + parameters.OSM_FILE)
     xml.sax.parse(source, handler)
-    building_refs = process_building_refs(handler.nodes_dict, handler.ways_dict, elev_interpolator,
-                                      coord_transformator)
+    building_refs = process_osm_building_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
     logging.info('Number of reference buildings: %s', len(building_refs))
-    # Starting with power lines and aerialways
+
+    # Railway overhead lines
+    valid_node_keys = ["railway"]
+    valid_way_keys = ["railway", "electrified", "tunnel"]
+    req_way_keys = ["railway"]
+    handler = osmparser.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
+                                          req_relation_keys)
+    source = open(parameters.PREFIX + os.sep + parameters.OSM_FILE)
+    xml.sax.parse(source, handler)
+    logging.info('Number of rail lines read from OSM: %s', len(handler.ways_dict))
+    rail_lines = process_osm_rail_overhead(handler.nodes_dict, handler.ways_dict, elev_interpolator,
+                                           coord_transformator)
+    logging.info('Reduced number of rail lines: %s', len(rail_lines))
+
+    # Power lines and aerialways
     valid_node_keys = ["power", "structure", "material", "height", "colour", "aerialway"]
     valid_way_keys = ["power", "aerialway", "voltage", "cables", "wires"]
     req_way_keys = ["power", "aerialway", "building"]
@@ -853,7 +979,7 @@ if __name__ == "__main__":
                                           req_relation_keys)
     source = open(parameters.PREFIX + os.sep + parameters.OSM_FILE)
     xml.sax.parse(source, handler)
-    powerlines, aerialways = process_osm_elements(handler.nodes_dict, handler.ways_dict, elev_interpolator,
+    powerlines, aerialways = process_osm_power_aerialway(handler.nodes_dict, handler.ways_dict, elev_interpolator,
                                                   coord_transformator, building_refs)
     building_refs = None   # free memory
     handler = None  # free memory
@@ -919,8 +1045,8 @@ class TestOSMPylons(unittest.TestCase):
         pylon2.y = 100
         wayline1 = WayLine(100)
         wayline1.type_ = WayLine.TYPE_POWER_LINE
-        wayline1.pylons.append(pylon1)
-        wayline1.pylons.append(pylon2)
+        wayline1.nodes.append(pylon1)
+        wayline1.nodes.append(pylon2)
         wayline1.calc_and_map()
         self.assertAlmostEqual(45, pylon1.heading, 2)
         self.assertAlmostEqual(45, pylon2.heading, 2)
@@ -930,8 +1056,8 @@ class TestOSMPylons(unittest.TestCase):
         pylon4 = Pylon(4)
         pylon4.x = -100
         pylon4.y = 200
-        wayline1.pylons.append(pylon3)
-        wayline1.pylons.append(pylon4)
+        wayline1.nodes.append(pylon3)
+        wayline1.nodes.append(pylon4)
         wayline1.calc_and_map()
         self.assertAlmostEqual(337.5, pylon2.heading, 2)
         self.assertAlmostEqual(292.5, pylon3.heading, 2)
@@ -939,7 +1065,7 @@ class TestOSMPylons(unittest.TestCase):
         pylon5 = Pylon(5)
         pylon5.x = -100
         pylon5.y = 300
-        wayline1.pylons.append(pylon5)
+        wayline1.nodes.append(pylon5)
         wayline1.calc_and_map()
         self.assertAlmostEqual(337.5, pylon4.heading, 2)
         self.assertAlmostEqual(0, pylon5.heading, 2)
