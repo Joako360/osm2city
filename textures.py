@@ -332,6 +332,13 @@ def init():
             requires=[],
             provides=['shape:urban','age:modern', 'compat:roof-flat']))
 
+        facades.append(Texture('tex/facade_modern_black_46x60m.jpg',
+            45.9, [167, 345, 521, 700, 873, 944], True,
+            60.5, [144, 229, 311, 393, 480, 562, 645, 732, 818, 901, 983, 1067, 1154, 1245], False, True,
+            v_split_from_bottom = True,
+            requires=[],
+            provides=['shape:urban','age:modern', 'compat:roof-flat']))
+
         facades.append(Texture('tex/facade_modern36x36_12.png',
                                 36., [], True,
                                 36., [158, 234, 312, 388, 465, 542, 619, 697, 773, 870, 1024], False, True,

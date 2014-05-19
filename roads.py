@@ -105,7 +105,8 @@ class Roads(object):
                 col = 5
         elif way.tags.has_key('railway'):
             if way.tags['railway'] == 'rail':
-                col = 6
+                #col = 6
+                col = None # skip railways for now
 
         if col == None:
 #            print "got", way.osm_id,
