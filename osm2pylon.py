@@ -634,32 +634,29 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_co
                         logging.debug('Node outside of boundaries and therefore ignored: osm_id = %s ', my_node.osm_id)
             if len(my_line.nodes) > 1:
                 my_railways[my_line.osm_id] = my_line
-                for my_rail_node in my_line.nodes:
-                    if my_rail_node.osm_id in my_shared_nodes.keys():
-                        my_shared_nodes[my_rail_node.osm_id].append(my_line)
-                    else:
-                        my_shared_nodes[my_rail_node.osm_id] = [my_line]
+                if my_line.nodes[0].osm_id in my_shared_nodes.keys():
+                    my_shared_nodes[my_line.nodes[0].osm_id].append(my_line)
+                else:
+                    my_shared_nodes[my_line.nodes[0].osm_id] = [my_line]
+                if my_line.nodes[-1].osm_id in my_shared_nodes.keys():
+                    my_shared_nodes[my_line.nodes[-1].osm_id].append(my_line)
+                else:
+                    my_shared_nodes[my_line.nodes[-1].osm_id] = [my_line]
             else:
                 logging.warning('Line could not be validated or corrected. osm_id = %s', my_line.osm_id)
 
     # Attempt to merge lines
     for key in my_shared_nodes.keys():
         shared_node = my_shared_nodes[key]
-        if len(shared_node) == 2:
+        if (len(shared_node) == 2) and (shared_node[0].type_ == shared_node[1].type_):
             my_osm_id = shared_node[1].osm_id
-            return_code = merge_lines(key, shared_node[0], shared_node[1], my_shared_nodes)
-            if 0 == return_code:
+            try:
+                merge_lines(key, shared_node[0], shared_node[1], my_shared_nodes)
                 del my_railways[my_osm_id]
                 del my_shared_nodes[key]
                 logging.debug("Merged two lines with node osm_id: %s", key)
-            elif 1 == return_code:
-                logging.debug(
-                    "A node is referenced in two ways, but the lines have not same type. Node osm_id: %s; %s; %s"
-                    , key, shared_node[0].type_, shared_node[1].type_)
-            else:
-                logging.debug(
-                    "A node is referenced in two ways, but the common node is not at start/end. Node osm_id: %s; %s"
-                    , key, shared_node[0].type_)
+            except Exception as e:
+                logging.error(e)
         elif len(shared_node) > 2:
             pass  # FIXME: to be replaced by intelligent algorithm to take the two which merge lineraly
     return my_railways
@@ -741,10 +738,6 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, my_elev_interpolator, my_
                             my_pylon.material = value
                     if my_pylon.elevation != -9999:  # if elevation is -9999, then point is outside of boundaries
                         my_line.nodes.append(my_pylon)
-                        if my_node.osm_id in my_shared_nodes.keys():
-                            my_shared_nodes[my_node.osm_id].append(my_line)
-                        else:
-                            my_shared_nodes[my_node.osm_id] = [my_line]
                     else:
                         logging.debug('Node outside of boundaries and therefore ignored: osm_id = %s', my_node.osm_id)
                     if None != prev_pylon:
@@ -752,6 +745,11 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, my_elev_interpolator, my_
                         my_pylon.prev_pylon = prev_pylon
                     prev_pylon = my_pylon
             if len(my_line.nodes) > 1:
+                for the_node in [my_line.nodes[0], my_line.nodes[-1]]:
+                    if the_node.osm_id in my_shared_nodes.keys():
+                        my_shared_nodes[the_node.osm_id].append(my_line)
+                    else:
+                        my_shared_nodes[the_node.osm_id] = [my_line]
                 if my_line.is_aerialway():
                     my_aerialways[my_line.osm_id] = my_line
                 else:
@@ -761,24 +759,18 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, my_elev_interpolator, my_
 
     for key in my_shared_nodes.keys():
         shared_node = my_shared_nodes[key]
-        if len(shared_node) == 2:
+        if (len(shared_node) == 2) and (shared_node[0].type_ == shared_node[1].type_):
             my_osm_id = shared_node[1].osm_id
-            return_code = merge_lines(key, shared_node[0], shared_node[1], my_shared_nodes)
-            if 0 == return_code:  # remove the merged line
+            try:
+                merge_lines(key, shared_node[0], shared_node[1], my_shared_nodes)
                 if shared_node[0].is_aerialway():
                     del my_aerialways[my_osm_id]
                 else:
                     del my_powerlines[my_osm_id]
                 del my_shared_nodes[key]
                 logging.debug("Merged two lines with node osm_id: %s", key)
-            elif 1 == return_code:
-                logging.debug(
-                    "A node is referenced in two ways, but the lines have not same type. Node osm_id: %s; %s; %s"
-                    , key, shared_node[0].type_, shared_node[1].type_)
-            else:
-                logging.debug(
-                    "A node is referenced in two ways, but the common node is not at start/end. Node osm_id: %s; %s"
-                    , key, shared_node[0].type_)
+            except Exception as e:
+                logging.error(e)
         elif len(shared_node) > 2:
             logging.warning("A node is referenced in more than two ways. Most likely OSM problem. Node osm_id: %s", key)
 
@@ -787,40 +779,35 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, my_elev_interpolator, my_
 
 def merge_lines(osm_id, line0, line1, shared_nodes):
     """Takes two Line objects and attempts to merge them at a given node.
-    Returns 1 if the Line objects are not of same type.
-    Returns 2 if the node is not first or last node in both Line objects
-    in a given Line object.
-    Returns 0 if all went well.
     The added/merged pylons are in line0 in correct sequence.
-    Makes sure that line1 is replaced by line0 in shared_nodes"""
-    if line0.type_ != line1.type_:
-        return 1
+    Makes sure that line1 is replaced by line0 in shared_nodes.
+    Raises Exception if the referenced node is not at beginning or end of the two lines."""
     if line0.nodes[0].osm_id == osm_id:
         line0_first = True
     elif line0.nodes[-1].osm_id == osm_id:
         line0_first = False
     else:
-        return 2
+        raise Exception("The referenced node is not at the beginning or end of line0")
     if line1.nodes[0].osm_id == osm_id:
         line1_first = True
     elif line1.nodes[-1].osm_id == osm_id:
         line1_first = False
     else:
-        return 2
+        raise Exception("The referenced node is not at the beginning or end of line1")
 
     # combine line1 into line0 in correct sequence (e.g. line0(A,B) + line1(C,B) -> line0(A,B,C)
     if (False == line0_first) and (True == line1_first):
-        for x in range(1, len(line1.nodes), 1):
+        for x in range(1, len(line1.nodes)):
             line0.nodes.append(line1.nodes[x])
     elif (False == line0_first) and (False == line1_first):
-        for x in range(len(line1.nodes) - 2, 0, -1):
-            line0.nodes.append(line1.nodes[x])
+        for x in range(0, len(line1.nodes) - 1):
+            line0.nodes.append(line1.nodes[len(line1.nodes) - x - 2])
     elif (True == line0_first) and (True == line1_first):
-        for x in range(1, len(line1.nodes), 1):
+        for x in range(1, len(line1.nodes)):
             line0.nodes.insert(0, line1.nodes[x])
     else:
-        for x in range(len(line1.nodes) - 2, 0, -1):
-            line0.nodes.insert(0, line1.nodes[x])
+        for x in range(0, len(line1.nodes) - 1):
+            line0.nodes.insert(0, line1.nodes[len(line1.nodes) - x - 2])
 
     # in shared_nodes replace line1 with line2
     for shared_node in shared_nodes.values():
@@ -835,8 +822,6 @@ def merge_lines(osm_id, line0, line1, shared_nodes):
             del shared_node[pos_line1]
             if not has_line0:
                 shared_node.append(line0)
-
-    return 0
 
 
 def write_stg_entries(stg_fp_dict, lines_dict, wayname):
@@ -922,7 +907,7 @@ def optimize_catenary(half_distance_pylons, max_value, sag, max_variation):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
     # Handling arguments and parameters
     parser = argparse.ArgumentParser(
         description="osm2pylon reads OSM data and creates pylons, powerlines and aerialways for use with FlightGear")
@@ -1094,3 +1079,38 @@ class TestOSMPylons(unittest.TestCase):
         a, value = optimize_catenary(170, 5000, 14, 0.01)
         print a, value
         self.assertAlmostEqual(1034/100, a/100, 2)
+
+    def test_merge_lines(self):
+        line_u = RailLine("u")
+        line_v = RailLine("v")
+        line_w = RailLine("w")
+        line_x = RailLine("x")
+        line_y = RailLine("y")
+        node1 = RailNode("1")
+        node2 = RailNode("2")
+        node3 = RailNode("3")
+        node4 = RailNode("4")
+        node5 = RailNode("5")
+        node6 = RailNode("6")
+        node7 = RailNode("7")
+        shared_nodes = {}
+
+        line_u.nodes.append(node1)
+        line_u.nodes.append(node2)
+        line_v.nodes.append(node2)
+        line_v.nodes.append(node3)
+        merge_lines("2", line_u, line_v, shared_nodes)
+        self.assertEqual(3, len(line_u.nodes))
+        line_w.nodes.append(node1)
+        line_w.nodes.append(node4)
+        merge_lines("1", line_u, line_w, shared_nodes)
+        self.assertEqual(4, len(line_u.nodes))
+        line_x.nodes.append(node5)
+        line_x.nodes.append(node3)
+        merge_lines("3", line_u, line_x, shared_nodes)
+        self.assertEqual(5, len(line_u.nodes))
+        line_y.nodes.append(node7)
+        line_y.nodes.append(node6)
+        line_y.nodes.append(node4)
+        merge_lines("4", line_u, line_y, shared_nodes)
+        self.assertEqual(7, len(line_u.nodes))
