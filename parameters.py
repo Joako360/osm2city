@@ -153,6 +153,8 @@ C2P_CATENARY_MIN_DISTANCE = 50
 
 C2P_POWER_LINE_ALLOW_100M = False
 
+C2P_RAIL_OVERHEAD_MIN_LENGTH = 30
+
 
 def set_parameters(param_dict):
     for k in param_dict:
