@@ -35,6 +35,7 @@ import stg_io
 import tools
 import vec2d
 
+from shapely.geometry import LineString
 from shapely.geometry import Point
 from shapely.geometry import Polygon
 
@@ -573,6 +574,7 @@ class RailLine(object):
         self.osm_id = osm_id
         self.type_ = 0
         self.nodes = []  # RailNodes
+        self.linear = None  # The LineaString of the line
 
 
 def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator):
@@ -648,17 +650,33 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_co
     # Attempt to merge lines
     for key in my_shared_nodes.keys():
         shared_node = my_shared_nodes[key]
-        if (len(shared_node) == 2) and (shared_node[0].type_ == shared_node[1].type_):
-            my_osm_id = shared_node[1].osm_id
+        if len(shared_node) >= 2:
+            pos1 = 0
+            pos2 = 1
+            # we believe that all have same type - would be a OSM editing error to combine narrow and normal gauge
+            if len(shared_node) > 2:
+                pos1, pos2 = find_connecting_line(key, shared_node)
+            my_osm_id = shared_node[pos2].osm_id
             try:
-                merge_lines(key, shared_node[0], shared_node[1], my_shared_nodes)
+                merge_lines(key, shared_node[pos1], shared_node[pos2], my_shared_nodes)
                 del my_railways[my_osm_id]
                 del my_shared_nodes[key]
                 logging.debug("Merged two lines with node osm_id: %s", key)
             except Exception as e:
                 logging.error(e)
-        elif len(shared_node) > 2:
-            pass  # FIXME: to be replaced by intelligent algorithm to take the two which merge lineraly
+
+    #get LineStrings and remove those lines, which are less than the minimal requirement
+    for the_railway in my_railways.values():
+        coordinates = []
+        for node in the_railway.nodes:
+            coordinates.append((node.x, node.y))
+        my_linear = LineString(coordinates)
+        if my_linear.length < parameters.C2P_RAIL_OVERHEAD_MIN_LENGTH:
+            logging.debug("Delete too short line with osm_id: %s", the_railway.osm_id)
+            del my_railways[the_railway.osm_id]
+        else:
+            the_railway.linear = my_linear
+
     return my_railways
 
 
@@ -777,11 +795,44 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, my_elev_interpolator, my_
     return my_powerlines, my_aerialways
 
 
+def find_connecting_line(key, lines):
+    """
+    In the array of lines checks which 2 lines have an angle closest to 180 degrees at end node key.
+    Looked at second last node and last node (key).
+    """
+    angles = []
+    # Get the angle of each line
+    for line in lines:
+        if line.nodes[0].osm_id == key:
+            angle = calc_angle_of_line(line.nodes[0].x, line.nodes[0].y, line.nodes[1].x, line.nodes[1].y)
+        elif line.nodes[-1].osm_id == key:
+            angle = calc_angle_of_line(line.nodes[-1].x, line.nodes[-1].y, line.nodes[-2].x, line.nodes[-2].y)
+        else:
+            raise Exception("The referenced node is not at the beginning or end of line0")
+        angles.append(angle)
+    # Get the angles between all line pairs and find the one closest to 180 degrees
+    pos1 = 0
+    pos2 = 1
+    max_angle = 0
+    for i in xrange(0, len(angles) - 1):
+        for j in xrange(i + 1, len(angles)):
+            angle_between = abs(angles[i] - angles[j])
+            if 180 < angle_between:
+                angle_between -= 180
+            if angle_between > max_angle:
+                max_angle = angle_between
+                pos1 = i
+                pos2 = j
+    return pos1, pos2
+
+
 def merge_lines(osm_id, line0, line1, shared_nodes):
-    """Takes two Line objects and attempts to merge them at a given node.
+    """
+    Takes two Line objects and attempts to merge them at a given node.
     The added/merged pylons are in line0 in correct sequence.
     Makes sure that line1 is replaced by line0 in shared_nodes.
-    Raises Exception if the referenced node is not at beginning or end of the two lines."""
+    Raises Exception if the referenced node is not at beginning or end of the two lines.
+    """
     if line0.nodes[0].osm_id == osm_id:
         line0_first = True
     elif line0.nodes[-1].osm_id == osm_id:
@@ -1114,3 +1165,32 @@ class TestOSMPylons(unittest.TestCase):
         line_y.nodes.append(node4)
         merge_lines("4", line_u, line_y, shared_nodes)
         self.assertEqual(7, len(line_u.nodes))
+
+    def find_connecting_line(self):
+        node1 = RailNode("1")
+        node1.x = 5
+        node1.y = 10
+        node2 = RailNode("2")
+        node2.x = 10
+        node2.y = 10
+        node3 = RailNode("3")
+        node3.x = 20
+        node3.y = 5
+        node4 = RailNode("4")
+        node4.x = 20
+        node4.y = 20
+
+        line_u = RailLine("u")
+        line_u.nodes.append(node1)
+        line_u.nodes.append(node2)
+        line_v = RailLine("v")
+        line_v.nodes.append(node2)
+        line_v.nodes.append(node3)
+        line_w = RailLine("w")
+        line_w.nodes.append(node4)
+        line_w.nodes.append(node2)
+
+        lines = [line_u, line_v, line_w]
+        pos1, pos2 = find_connecting_line("2", lines)
+        self.assertEqual(0, pos1)
+        self.assertEqual(1, pos2)
