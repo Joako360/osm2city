@@ -68,7 +68,6 @@ import numpy as np
 import shapely.geometry as shg
 
 import coordinates
-from cluster import Clusters
 import building_lib
 from vec2d import vec2d
 import textwrap
@@ -80,6 +79,7 @@ import calc_tile
 import osmparser
 import parameters
 from pdb import pm
+from cluster import Clusters
 
 buildings = []  # -- master list, holds all buildings
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
@@ -602,7 +602,7 @@ if __name__ == "__main__":
     osm_fname = parameters.PREFIX + os.sep + parameters.OSM_FILE
     if not parameters.USE_PKL:
         # -- parse OSM, return
-        if os.path.exists(pkl_fname):
+        if not parameters.IGNORE_PKL_OVERWRITE and os.path.exists(pkl_fname):
             print "Existing cache file %s will be overwritten. Continue? (y/n)" % pkl_fname
             if raw_input().lower() != 'y':
                 sys.exit(-1)
@@ -683,8 +683,8 @@ if __name__ == "__main__":
     else:
         static_objects = None
 
-    tools.stats.debug1 = open("debug1.dat", "w")
-    tools.stats.debug2 = open("debug2.dat", "w")
+    tools.stats.debug1 = open(parameters.PREFIX + os.sep +"debug1.dat", "w")
+    tools.stats.debug2 = open(parameters.PREFIX + os.sep +"debug2.dat", "w")
 
     # - analyze buildings
     #   - calculate area
