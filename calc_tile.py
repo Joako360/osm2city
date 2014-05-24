@@ -81,6 +81,10 @@ def construct_stg_file_name(center_global):
     """Returns the file name of the stg-file at a given global lat/lon location"""
     return "%07i.stg" % tile_index(center_global)
 
+def construct_btg_file_name(center_global):
+    """Returns the file name of the stg-file at a given global lat/lon location"""
+    return "%07i.btg.gz" % tile_index(center_global)
+
 def get_north_lat(lat,y):
     return float(floor(lat)) + y / 8.0 + .125;
 
