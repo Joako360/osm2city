@@ -50,14 +50,17 @@ if __name__ == '__main__':
     if "nt" in os.name:
         download_name = "download_" + args.tilename + ".cmd"
         osm_name = "osm2city_" + args.tilename + ".cmd"
+        osm_pylons = "osm2pylon_" + args.tilename + ".cmd"
         tools_name = "tools_" + args.tilename + ".cmd"
     else:
         download_name = "download_" + args.tilename
         osm_name = "osm2city_" + args.tilename
+        osm_pylons = "osm2pylon_" + args.tilename
         tools_name = "tools_" + args.tilename
         
     downloadfile = open(calc_tile.root_directory_name((lon, lat)) + os.sep + download_name, "wb") 
     osm2city = open(calc_tile.root_directory_name((lon, lat)) + os.sep + osm_name, "wb")
+    osm2pylon = open(calc_tile.root_directory_name((lon, lat)) + os.sep + osm_pylons, "wb")
     tools = open(calc_tile.root_directory_name((lon, lat)) + os.sep + tools_name, "wb") 
     for dy in range(0, num_cols):
         for dx in range(0, num_rows):
@@ -86,6 +89,7 @@ if __name__ == '__main__':
             #wget -O FT_WILLIAM/buildings.osm http://overpass-api.de/api/map?bbox=-5.2,56.8,-5.,56.9
             downloadfile.write(download_command%(replacement_path,calc_tile.get_west_lon(lon, lat, dx),calc_tile.get_south_lat(lat, dy),calc_tile.get_east_lon(lon, lat, dx),calc_tile.get_north_lat(lat, dy)))
             osm2city.write('python osm2city.py -f %s/params.ini' % (replacement_path) + os.linesep)
+            osm2pylon.write('python osm2pylon.py -f %s/params.ini' % (replacement_path) + os.linesep)
             tools.write('python tools.py -f %s/params.ini' % (replacement_path) + os.linesep)
 
     sys.exit(0)
