@@ -160,9 +160,12 @@ def raster_glob():
         else:
             print "Skipping ", parameters.PREFIX + os.sep + 'elev.out', " exists"
     elif parameters.ELEV_MODE == 'Fgelev':
-        fname = parameters.PREFIX + os.sep + 'elev.out'
-        print "Creating ", fname
-        raster_fgelev(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
+        if not os.path.exists(parameters.PREFIX + os.sep + 'elev.out'):
+            fname = parameters.PREFIX + os.sep + 'elev.out'
+            print "Creating ", fname
+            raster_fgelev(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
+        else:
+            print "Skipping ", parameters.PREFIX + os.sep + 'elev.out', " exists"
     else:
         logging.error("Unknown Elev mode : %s Use Manual, Telnet or Fgelev"%(parameters.ELEV_MODE))
 
@@ -229,9 +232,18 @@ def raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
 def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
     import subprocess
     import Queue
-    fg_scenery="$FG_SCENERY"
+    fg_root = "$FG_ROOT"
+    
+    center_global = vec2d.vec2d(transform.toGlobal((x0,y0)))
+    btg_file = parameters.PATH_TO_SCENERY + os.sep + "Terrain"
+    btg_file = btg_file + os.sep + calc_tile.directory_name(center_global) + os.sep + calc_tile.construct_btg_file_name(center_global)
+    if not os.path.exists(btg_file):
+        logging.error("Terrain File " + btg_file + " does not exist. Set scenery path correctly or fly there with TerraSync enabled")
+        sys.exit(2)
+    
     fg_elev = parameters.FG_ELEV
-    fgelev = subprocess.Popen( fg_elev + ' --fg-root $FG_ROOT --fg-scenery '+fg_scenery,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    
+    fgelev = subprocess.Popen( fg_elev + ' --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     #fgelev = subprocess.Popen(["/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev", "--fg-root", "$FG_ROOT",  "--fg-scenery", "$FG_SCENERY"],  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     #time.sleep(5)
     print "building buffer"
@@ -240,8 +252,10 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
     #f = sys.stdout
     f.write("# %g %g %g %g %g %g\n" % (x0, y0, size_x, size_y, step_x, step_y))
     i = 0
-    for y in np.arange(y0, y0+size_y, step_y):
-        for x in np.arange(x0, x0+size_x, step_x):
+    y_array = np.arange(y0, y0+size_y, step_y)
+    x_array = np.arange(x0, x0+size_x, step_x)
+    for y in y_array:
+        for x in x_array:
             i += 1
             lon, lat = transform.toGlobal((x, y))
             buf_in.put("%i %g %g\n" % (i, lon, lat))
@@ -254,8 +268,8 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
     
     print "reading"
     i = 0
-    for y in np.arange(y0, y0+size_y, step_y):
-        for x in np.arange(x0, x0+size_x, step_x):
+    for y in y_array:
+        for x in x_array:
             i += 1
             if not buf_in.empty(): 
                 fgelev.stdin.write(buf_in.get())
