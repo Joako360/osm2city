@@ -69,6 +69,7 @@ class OSMContentHandler(xml.sax.ContentHandler):
     def __init__(self, valid_node_keys): #, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys):
         xml.sax.ContentHandler.__init__(self)
         self._way_callbacks = []
+        self._relation_callbacks = []
         self._valid_node_keys = valid_node_keys
         #self._valid_way_keys = valid_way_keys
         #self._req_way_keys = req_way_keys
@@ -87,8 +88,13 @@ class OSMContentHandler(xml.sax.ContentHandler):
 #, valid_relation_keys=[], req_relation_keys=[]
 
     def register_way_callback(self, callback, req_keys=[]):
-#        c = Callback(callback, valid_way_keys)
         self._way_callbacks.append((callback, req_keys))
+
+    def register_relation_callback(self, callback, req_keys=[]):
+        self._relation_callbacks.append((callback, req_keys))
+
+    def register_uncategorized_way_callback(self, callback):
+        self._uncategorized_way_callback = callback
 
     def startElement(self, name, attrs):
         if name == "node":
@@ -102,6 +108,7 @@ class OSMContentHandler(xml.sax.ContentHandler):
             osm_id = int(attrs.getValue("id"))
             self._current_way = Way(osm_id)
         elif name == "relation":
+            self._within_element = name
             osm_id = int(attrs.getValue("id"))
             self._current_relation = Relation(osm_id)
         elif name == "tag":
@@ -129,18 +136,24 @@ class OSMContentHandler(xml.sax.ContentHandler):
         if name == "node":
             self.nodes_dict[self._current_node.osm_id] = self._current_node
         elif name == "way":
-            cb = self.find_callback_for(self._current_way.tags)
-            # -- no longer filter valid_way_keys here. That's up for the callback
-            if cb: cb(self._current_way, self.nodes_dict)
+            cb = self.find_callback_for(self._current_way.tags, self._way_callbacks)
+            # -- no longer filter valid_way_keys here. That's up to the callback
+            if cb:
+                cb(self._current_way, self.nodes_dict)
+            else:
+                self._uncategorized_way_callback(self._current_way, self.nodes_dict)
             #if has_required_tag_keys(self._current_way.tags, self._req_way_keys):
             #    self.ways_dict[self._current_way.osm_id] = self._current_way
         elif name == "relation":
-            pass
+            cb = self.find_callback_for(self._current_relation.tags, self._relation_callbacks)
+            #print "tags", self._current_relation.tags
+            if cb:
+                cb(self._current_relation)
             #if has_required_tag_keys(self._current_relation.tags, self._req_relation_keys):
             #    self.relations_dict[self._current_relation.osm_id] = self._current_relation
 
-    def find_callback_for(self, tags):
-        for (callback, req_keys) in self._way_callbacks:
+    def find_callback_for(self, tags, callbacks):
+        for (callback, req_keys) in callbacks:
             for key in tags.keys():
                 if key in req_keys:
                     return callback

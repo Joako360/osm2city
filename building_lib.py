@@ -679,7 +679,8 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
             v0 = b.nnodes_outer
             for inner in b.polygon.interiors:
                 #print "--2"
-                v0 = write_ring(out, b, inner, v0, True)
+                v0 = write_ring(out, b, inner, v0, facade_texture, tex_y0, tex_y1, True)
+#def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner = False):
 
         # -- roof
         if False:  # -- a debug thing

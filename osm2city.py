@@ -209,23 +209,36 @@ class Building(object):
         #print "tr X", self.X
 
 
-class wayExtract(object):
+class Buildings(object):
+    """holds buildings list. Interfaces with OSM hanlder"""
+    valid_node_keys = []
+#    valid_way_keys = ["building", "building:part", "building:height", "height", "building:levels", "layer"]
+    req_way_keys = ["building", "building:part"]
+    valid_relation_keys = ["building"]
+    req_relation_keys = ["building"]
+
     def __init__(self):
         self.buildings = []
-        self.coord_dict = {}
+        self.nodes_dict = {}
         self.way_list = []
         self.minlon = 181.
         self.maxlon = -181.
         self.minlat = 91.
         self.maxlat = -91.
 
+    def register_callbacks_with(self, handler):
+        handler.register_way_callback(self.process_way, self.req_way_keys)
+        handler.register_uncategorized_way_callback(self.store_uncategorzied_way)
+        handler.register_relation_callback(self.process_relation, self.req_relation_keys)
+
+#            valid_relation_keys, req_relation_keys)
     def _refs_to_ring(self, refs, inner = False):
         """accept a list of OSM refs, return a linear ring. Also
            fixes face orientation, depending on inner/outer.
         """
         coords = []
         for ref in refs:
-                c = self.coord_dict[ref]
+                c = self.nodes_dict[ref]
                 coords.append(tools.transform.toLocal((c.lon, c.lat)))
 
         #print "before inner", refs
@@ -236,39 +249,46 @@ class wayExtract(object):
             ring.coords = list(ring.coords)[::-1]
         return ring
 
+    def store_uncategorzied_way(self, way, nodes_dict):
+        self.way_list.append(way)
+
+    def process_way(self, way, nodes_dict, inner_ways = []):
+        if not self.nodes_dict:
+            self.nodes_dict = nodes_dict
+        if tools.stats.objects >= parameters.MAX_OBJECTS: return
+        self.way_list.append(way)
+        self._make_building_from_way(way.osm_id, way.tags, way.refs)
+
     def _make_building_from_way(self, osm_id, tags, refs, inner_ways = []):
-#       p = multiprocessing.current_process()
-#       print 'running:', p.name, p.pid
-        #print "got building", osm_id, tags
-        #print "done\n\n"
         if refs[0] == refs[-1]: refs = refs[0:-1] # -- kick last ref if it coincides with first
 
-        _name = ""
-        _height = 0.
-        _levels = 0
-        _layer = 99
+        name = ""
+        height = 0.
+        levels = 0
+        layer = 99
 
         # -- funny things might happen while parsing OSM
-        try:
+#        try:
+        if 1:
             if 'name' in tags:
-                _name = tags['name']
+                name = tags['name']
                 #print "%s" % _name
-                if _name in parameters.SKIP_LIST:
-                    print "SKIPPING", _name
+                if name in parameters.SKIP_LIST:
+                    print "SKIPPING", name
                     return False
             if 'height' in tags:
-                _height = osmparser.parse_length(tags['height'])
+                height = osmparser.parse_length(tags['height'])
             elif 'building:height' in tags:
-                _height = osmparser.parse_length(tags['building:height'])
+                height = osmparser.parse_length(tags['building:height'])
             if 'building:levels' in tags:
-                _levels = float(tags['building:levels'])
+                levels = float(tags['building:levels'])
             if 'layer' in tags:
-                _layer = int(tags['layer'])
+                layer = int(tags['layer'])
 
             # -- simple (silly?) heuristics to 'respect' layers
-            if _layer == 0: return False
-            if _layer < 99 and _height == 0 and _levels == 0:
-                _levels = _layer + 2
+            if layer == 0: return False
+            if layer < 99 and height == 0 and levels == 0:
+                levels = layer + 2
 
         #        if len(refs) != 4: return False# -- testing, 4 corner buildings only
 
@@ -279,67 +299,74 @@ class wayExtract(object):
             inner_rings_list = []
             for _way in inner_ways:
                 inner_rings_list.append(self._refs_to_ring(_way.refs, inner=True))
-        except Exception, reason:
+#        except Exception, reason:
+        else:
             print "\nFailed to parse building (%s)" % reason, osm_id, tags, refs
             tools.stats.parse_errors += 1
             return False
 
-        self.buildings.append(Building(osm_id, tags, outer_ring, _name, _height, _levels, inner_rings_list = inner_rings_list))
+        self.buildings.append(Building(osm_id, tags, outer_ring, name, height, levels, inner_rings_list = inner_rings_list))
 
         tools.stats.objects += 1
         if tools.stats.objects % 50 == 0:
             logging.info(tools.stats.objects)
         return True
 
-    def _process_relations(self, relations):
-        for _relation in relations:
-            if tools.stats.objects >= parameters.MAX_OBJECTS:
-                return
+    def process_relation(self, relation):
+        print "__________- got relation", relation
+        bla = 0
+        if int(relation.osm_id) == 5789:
+            print "::::::::::::: name", relation.tags['name']
+            bla = 1
+        if tools.stats.objects >= parameters.MAX_OBJECTS:
+            return
 
-            if 'building' in _relation.tags:
-                outer_ways = []
-                inner_ways = []
-                #print "rel: ", osm_id, tags #, members
-                for ref, type_, role in _relation.members:
+        if 'building' in relation.tags:
+            outer_ways = []
+            inner_ways = []
+            print "rel: ", relation.osm_id, relation.tags #, members
+            for m in relation.members:
+#                print "  member", m, m.type_, m.role
 #                    if typ == 'way' and role == 'inner':
-                    if type_ == 'way':
-                        if role == 'outer':
-                            for way in self.way_list:
-                                if way.osm_id == ref: outer_ways.append(way)
-                        elif role == 'inner':
-                            for way in self.way_list:
-                                if way.osm_id == ref: inner_ways.append(way)
+                if m.type_ == 'way':
+                    if m.role == 'outer':
+                        for way in self.way_list:
+                            if way.osm_id == m.ref: outer_ways.append(way)
+                    elif m.role == 'inner':
+                        for way in self.way_list:
+                            if way.osm_id == m.ref: inner_ways.append(way)
 
-                if outer_ways:
-                    #print "len outer ways", len(outer_ways)
-                    all_outer_refs = [ref for way in outer_ways for ref in way.refs]
-                    all_tags = _relation.tags
-                    for way in outer_ways:
-                        #print "TAG", way.tags
-                        all_tags = dict(way.tags.items() + all_tags.items())
-                    #print "all tags", all_tags
-                    #all_tags = dict([way.tags for way in outer_ways]) # + tags.items())
-                    #print "all outer refs", all_outer_refs
-                    #dict(outer.tags.items() + tags.items())
-                    if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
-                        print "FIXME: ignoring all but first inner way (%i total) of ID %i" % (len(inner_ways), _relation.osm_id)
-                        self._make_building_from_way(_relation.osm_id,
-                                                    all_tags,
-                                                    all_outer_refs, [inner_ways[0]])
-                    else:
-                        self._make_building_from_way(_relation.osm_id,
-                                                    all_tags,
-                                                    all_outer_refs, inner_ways)
+            if outer_ways == []:
+                print "!!!no outer ways!"
+                bl
 
-                    # -- way could have a 'building' tag, too. Prevent processing this twice.
-                    for _way in outer_ways:
-                        self.way_list.remove(_way)
+            if outer_ways:
+                #print "len outer ways", len(outer_ways)
+                all_outer_refs = [ref for way in outer_ways for ref in way.refs]
+                all_tags = relation.tags
+                for way in outer_ways:
+                    #print "TAG", way.tags
+                    all_tags = dict(way.tags.items() + all_tags.items())
+                #print "all tags", all_tags
+                #all_tags = dict([way.tags for way in outer_ways]) # + tags.items())
+                #print "all outer refs", all_outer_refs
+                #dict(outer.tags.items() + tags.items())
+                if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
+                    print "FIXME: ignoring all but first inner way (%i total) of ID %i" % (len(inner_ways), _relation.osm_id)
+                    res = self._make_building_from_way(relation.osm_id,
+                                                all_tags,
+                                                all_outer_refs, [inner_ways[0]])
+                else:
+                    res = self._make_building_from_way(relation.osm_id,
+                                                all_tags,
+                                                all_outer_refs, inner_ways)
+                print ":::::mk_build returns", res,
+                if bla:
+                    print relation.tags['name']
+                # -- way could have a 'building' tag, too. Prevent processing this twice.
+                for _way in outer_ways:
+                    self.way_list.remove(_way)
 
-
-    def _process_ways(self, ways):
-        for _way in ways.values():
-            if tools.stats.objects >= parameters.MAX_OBJECTS: return
-            self.way_list.append(_way)
 
     def process_osm_elements(self, nodes, ways, relations):
         """Takes osmparser Node, Way and Relation objects and transforms them to Building objects"""
@@ -361,7 +388,7 @@ class wayExtract(object):
     def _process_coords(self, coords):
         for _node in coords.values():
             logging.debug('%s %.4f %.4f', _node.osm_id, _node.lon, _node.lat)
-            self.coord_dict[_node.osm_id] = _node
+            self.nodes_dict[_node.osm_id] = _node
             if _node.lon > self.maxlon:
                 self.maxlon = _node.lon
             if _node.lon < self.minlon:
@@ -598,29 +625,25 @@ if __name__ == "__main__":
             if raw_input().lower() != 'y':
                 sys.exit(-1)
 
-        way = wayExtract()
+        buildings = Buildings()
 
 # How to improve OSM parsing?
 # give parser a tuple (valid_way_keys, req_way_keys, way_callback) For each way, the parser calls way_callback(way, nodes)
 # could add multiple tuples, one per OSM feature
 
-        valid_node_keys = []
-        valid_way_keys = ["building", "building:part", "building:height", "height", "building:levels", "layer"]
-        req_way_keys = ["building"]
-        valid_relation_keys = ["building"]
-        req_relation_keys = ["building"]
-        handler = osmparser.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys)
+        handler = osmparser.OSMContentHandler(valid_node_keys = [])
+        buildings.register_callbacks_with(handler)
         source = open(osm_fname)
         logging.info("Reading the OSM file might take some time ...")
-        xml.sax.parse(source, handler)
+        handler.parse(source)
 
         logging.info("Transforming OSM objects to Buildings")
-        way.process_osm_elements(handler.nodes_dict, handler.ways_dict, handler.relations_dict)
+        #way.process_osm_elements(handler.nodes_dict, handler.ways_dict, handler.relations_dict)
         #tools.stats.print_summary()
 
-        logging.debug("number of buildings", len(way.buildings))
+        buildings = buildings.buildings
+        logging.debug("number of buildings", len(buildings))
         logging.info("done parsing")
-        buildings = way.buildings
 
         # -- cache parsed data. To prevent accidentally overwriting,
         #    write to local dir, while we later read from $PREFIX/buildings.pkl

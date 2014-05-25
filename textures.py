@@ -346,7 +346,7 @@ def init():
             requires=[],
             provides=['shape:industrial','age:modern', 'compat:roof-flat']))
 
-        facades.append(Texture('facade_modern_commercial_35x20m.jpg',
+        facades.append(Texture('tex/facade_modern_commercial_35x20m.jpg',
             34.6, [105, 210, 312, 417, 519, 622, 726, 829, 933, 1039, 1144, 1245, 1350], True,
             20.4, [177, 331, 489, 651, 796], False, True,
             v_split_from_bottom = True,
