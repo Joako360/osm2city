@@ -62,6 +62,7 @@ class Interpolator(object):
         """compute elevation at (x,y) by linear interpolation"""
         if self.fake:
             return 0.
+            #return p.x + p.y
         global transform
         if not is_global:
             p = vec2d.vec2d(transform.toGlobal(p))
@@ -314,8 +315,6 @@ class Stats(object):
     def count(self, b):
         """update stats (vertices, surfaces, area) with given building's data
         """
-        self.vertices += b.vertices
-        self.surfaces += b.surfaces
         if b.roof_type in self.roof_types:
             self.roof_types[b.roof_type] += 1
         else:
@@ -342,16 +341,15 @@ class Stats(object):
             lodzero = 100.*self.LOD[0]/total_written
             lodone = 100.*self.LOD[1]/total_written
             lodtwo = 100.*self.LOD[0]/total_written
-        try:
-            out.write(textwrap.dedent("""
-            total buildings %i
-            parse errors    %i
-            written         %i
-            skipped
-              small         %i
-              nearby        %i
-              no elevation  %i
-              no texture    %i
+        out.write(textwrap.dedent("""
+        total buildings %i
+        parse errors    %i
+        written         %i
+        skipped
+          small         %i
+          nearby        %i
+          no elevation  %i
+          no texture    %i
         """ % (self.objects, self.parse_errors, total_written,
                self.skipped_small, self.skipped_nearby, self.skipped_no_elev, self.skipped_texture)))
         roof_line = "        roof-types"
@@ -359,22 +357,22 @@ class Stats(object):
             roof_line += """\r\n          %s\t%i""" % (roof_type,self.roof_types[roof_type])
         out.write(textwrap.dedent(roof_line))
         out.write(textwrap.dedent("""
-              complex       %i
-              roof_errors   %i
-            ground nodes    %i
-              simplified    %i
-            vertices        %i
-            surfaces        %i
-            repeated tex x  %i out of %i (%2.0f %%)
-            LOD bare        %i (%2.0f %%)
-            LOD rough       %i (%2.0f %%)
-            LOD detail      %i (%2.0f %%)
+          complex       %i
+          roof_errors   %i
+        ground nodes    %i
+          simplified    %i
+        vertices        %i
+        surfaces        %i
+        LOD bare        %i (%2.0f %%)
+        LOD rough       %i (%2.0f %%)
+        LOD detail      %i (%2.0f %%)
         """ % (self.have_complex_roof, self.roof_errors,
                self.nodes_ground, self.nodes_simplified,
                self.vertices, self.surfaces,
                self.LOD[0], lodzero,
                self.LOD[1], lodone,
                self.LOD[2], lodtwo)))
+#        repeated tex x  %i out of %i (%2.0f %%)
         out.write("above\n")
         max_area_above = self.area_above.max()
         if max_area_above < 1: max_area_above = 1

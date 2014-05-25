@@ -1,6 +1,39 @@
 #!/usr/bin/env python2
-from imposm.parser import OSMParser
+"""abstract way extractor. To be inherited.
+
+    handler = osmparser.OSMContentHandler(valid_node_keys, valid_way_keys,
+         req_way_keys, valid_relation_keys, req_relation_keys)
+
+    source = open(osm_fname)
+    xml.sax.parse(source, handler)
+#    way.process_osm_elements(handler.nodes_dict, handler.ways_dict, handler.relations_dict)
+    osm = Osm(handler, transform)
+    osm.register_way_callback(roads.way_callback, valid_node_keys, valid_way_keys, ...)
+    osm.parse(osm_file)
+
+    osm = Osm()
+    osm.register_way_callback(roads.way_callback, valid_node_keys, valid_way_keys, ..., transform = transform)
+    # possibly also node, relation callbacks
+    osm.parse(osm_file)
+
+
+class Roads(object):
+    def way_callback(way, refs, trasformed_nodes):
+        pass
+
+
+    callback:
+      make_road_from_way(way)
+      or
+
+    osm.register_relation_callback(make_road_from_relation())
+
+    make_road_from_relation(rel, ways, refs, coords)
+
+"""
+
 import shapely.geometry as shg
+import osmparser
 
 class Coord(object):
     def __init__(self, lon, lat):
@@ -16,7 +49,7 @@ class Way(object):
         self.refs = refs
 
 class OsmExtract(object):
-    def __init__(self, transform = None):
+    def __init__(self, ways_callback = None, nodes_callback = None, relations_callback = None, transform = None):
         self.coord_dict = {}
         self.way_list = []
         self.minlon = 181.
@@ -25,7 +58,7 @@ class OsmExtract(object):
         self.maxlat = -91.
         self.way_callbacks = {}
         self.transform = transform
-    
+
     def parse(self, osm_fname):
         p = OSMParser(coords_callback=self.coords)
         print "start parsing coords"
@@ -33,7 +66,7 @@ class OsmExtract(object):
         print "done parsing"
         print "ncords:", len(self.coord_dict)
         print "bounds:", self.minlon, self.minlat, self.maxlon, self.maxlat
-    
+
         print "start parsing ways and relations"
         p = OSMParser(ways_callback=self.ways)
         p.parse(osm_fname)
@@ -41,8 +74,8 @@ class OsmExtract(object):
         #    p.parse(osm_fname)
         self.process_ways()
         #tools.stats.print_summary()
-    
-    
+
+
     def register_way_callback(self, tag, func):
         self.way_callbacks[tag] = func
 
