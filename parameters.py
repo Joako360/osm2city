@@ -10,6 +10,7 @@ Created on May 27, 2013
 @author: vanosten
 """
 
+import argparse
 import sys
 import types
 
@@ -109,10 +110,14 @@ CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if to little objects
 # PARAMETERS RELATED TO PYLONS, POWERLINES, AERIALWAYS IN osm2pylons.py
 #=============================================================================
 
+C2P_PROCESS_POWERLINES = True
+C2P_PROCESS_AERIALWAYS = True
+
 # Each powerline and aerialway has segments delimited by pylons. The longer the value the better clustering and
 # the better the performance. However due to rounding errors the longer the length per cluster the larger the
 # error.
-C2P_CLUSTER_LINE_MAX_LENGTH = 500
+C2P_CLUSTER_LINE_MAX_LENGTH = 300
+C2P_CABLES_NO_SHADOW = True
 
 # The radius for the cable. The cable will be a triangle with side length 2*radius.
 # In order to be better visible the radius might be chosen larger than in real life
@@ -123,6 +128,7 @@ C2P_RADIUS_AERIALWAY_CHAIR_LIFT = 0.1
 C2P_RADIUS_AERIALWAY_DRAG_LIFT = 0.05
 C2P_RADIUS_AERIALWAY_GONDOLA = 0.1
 C2P_RADIUS_AERIALWAY_GOODS = 0.05
+C2P_RADIUS_TOP_LINE = 0.05
 
 # The number of extra points between 2 pylons to simulate sagging of the cable.
 # If 0 is chosen or if CATENARY_A is 0 then no sagging is calculated, which is better for performances (less realistic)
@@ -138,12 +144,16 @@ C2P_EXTRA_VERTICES_AERIALWAY_GOODS = 5
 
 # The value for catenary_a can be experimentally determined by using osm2pylon.test_catenary
 C2P_CATENARY_A_POWER_LINE = 1500
-C2P_CATENARY_A_POWER_MINOR_LINE = 1500
+C2P_CATENARY_A_POWER_MINOR_LINE = 1200
 C2P_CATENARY_A_AERIALWAY_CABLE_CAR = 1500
 C2P_CATENARY_A_AERIALWAY_CHAIR_LIFT = 1500
 C2P_CATENARY_A_AERIALWAY_DRAG_LIFT = 1500
 C2P_CATENARY_A_AERIALWAY_GONDOLA = 1500
 C2P_CATENARY_A_AERIALWAY_GOODS = 1500
+
+C2P_CATENARY_MIN_DISTANCE = 50
+
+C2P_POWER_LINE_ALLOW_100M = False
 
 
 def set_parameters(param_dict):
@@ -179,9 +189,15 @@ def show():
     for k in sorted(my_globals.iterkeys()):
         if k.startswith('__'):
             continue
-        if isinstance(my_globals[k], types.ClassType) or isinstance(my_globals[k], types.FunctionType) or isinstance(my_globals[k], types.ModuleType):
+        elif k == "args":
             continue
-        if isinstance(my_globals[k], types.ListType):
+        elif k == "parser":
+            continue
+        elif isinstance(my_globals[k], types.ClassType) or \
+                isinstance(my_globals[k], types.FunctionType) or \
+                isinstance(my_globals[k], types.ModuleType):
+            continue
+        elif isinstance(my_globals[k], types.ListType):
             value = ', '.join(my_globals[k])
             print k, '=', value
         else:
@@ -249,10 +265,12 @@ def read_from_file(filename):
         for line in f:
             # -- ignore comments and empty lines
             line = line.split('#')[0].strip()
-            if line == "": continue
+            if line == "":
+                continue
 
             full_line += line  # -- allow for multi-line lists
-            if line.endswith(","): continue
+            if line.endswith(","):
+                continue
 
             pair = full_line.split("=", 1)
             key = pair[0].strip().upper()
@@ -267,3 +285,15 @@ def read_from_file(filename):
     except IOError, reason:
         print "Error processing file with parameters:", reason
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    # Handling arguments and parameters
+    parser = argparse.ArgumentParser(
+        description="The parameters module provides parameters to osm2city - used as main it shows the parameters used.")
+    parser.add_argument("-f", "--file", dest="filename",
+                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
+    args = parser.parse_args()
+    if args.filename is not None:
+        read_from_file(args.filename)
+        show()

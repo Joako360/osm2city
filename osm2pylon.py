@@ -9,44 +9,13 @@ as input and generates data to be used in FlightGear sceneries.
 * Cf. OSM Aerialway: http://wiki.openstreetmap.org/wiki/Map_Features#Aerialway
 
 TODO:
+* CLI parameter to write param.ini file out with all parameters incl. the default ones
 * Remove shared objects from stg-files to avoid doubles
 * Collision detection
 * For aerialways make sure there is a station at both ends
 * For aerialways handle stations if represented as ways instead of nodes.
 * For powerlines handle power stations if represented as ways instead of nodes
 * If a pylon is shared between lines but not at end points, then move one pylon a bit away
-* Overhead markers (http://www.avaids.com/icao.pdf):
-6.1.10 Recommendation.— Overhead wires, cables, etc.,
-crossing a river, valley or highway should be marked and their
-supporting towers marked and lighted if an aeronautical study
-indicates that the wires or cables could constitute a hazard to
-aircraft, except that the marking of the supporting towers may
-be omitted when they are lighted by high-intensity obstacle
-lights by day.
-6.1.11 Recommendation.— When it has been determined
-that an overhead wire, cable, etc., needs to be marked
-but it is not practicable to install markers on the wire, cable,
-etc., then high-intensity obstacle lights, Type B, should be
-provided on their supporting towers.
-6.2.8 Recommendation.— A marker displayed on an
-overhead wire, cable, etc., should be spherical and have a
-diameter of not less than 60 cm.
-6.2.9 Recommendation.— The spacing between two
-consecutive markers or between a marker and a supporting
-tower should be appropriate to the diameter of the marker, but
-in no case should the spacing exceed:
-a) 30 m where the marker diameter is 60 cm progressively
-increasing with the diameter of the marker to
-b) 35 m where the marker diameter is 80 cm and further
-progressively increasing to a maximum of
-c) 40 m where the marker diameter is of at least 130 cm.
-Where multiple wires, cables, etc. are involved, a marker
-should be located not lower than the level of the highest wire
-at the point marked.
-6.2.10 Recommendation.— A marker should be of one
-colour. When installed, white and red, or white and orange
-markers should be displayed alternately. The colour selected
-should contrast with the background against which it will be seen
 
 @author: vanosten
 """
@@ -66,11 +35,14 @@ import stg_io
 import tools
 import vec2d
 
+from shapely.geometry import Point
+from shapely.geometry import Polygon
+
 OUR_MAGIC = "osm2pylon"  # Used in e.g. stg files to mark edits by osm2pylon
 
 
 class Cable(object):
-    def __init__(self, start_cable_vertex, end_cable_vertex, radius, number_extra_vertices, catenary_a):
+    def __init__(self, start_cable_vertex, end_cable_vertex, radius, number_extra_vertices, catenary_a, distance):
         """
         A Cable between two vertices. The radius is approximated with a triangle with sides of length 2*radius.
         If both the number of extra_vertices and the catenary_a are > 0, then the Cable gets a sag based on
@@ -83,7 +55,7 @@ class Cable(object):
         self.heading = calc_angle_of_line(start_cable_vertex.x, start_cable_vertex.y
                                           , end_cable_vertex.x, end_cable_vertex.y)
 
-        if (number_extra_vertices > 0) and (catenary_a > 0):
+        if (number_extra_vertices > 0) and (catenary_a > 0) and (distance >= parameters.C2P_CATENARY_MIN_DISTANCE):
             self._make_catenary_cable(number_extra_vertices, catenary_a)
 
     def _make_catenary_cable(self, number_extra_vertices, catenary_a):
@@ -175,10 +147,10 @@ class Cable(object):
 
 
 class CableVertex(object):
-    def __init__(self, out, height, along=0):
+    def __init__(self, out, height, top_cable=False):
         self.out = out  # the distance from the middle vertical line of the pylon
         self.height = height  # the distance above ground relative to the pylon's ground level (y-axis in ac-file)
-        #  not yet used: self.along = along  # the distance along the x-axis away from the middle vertical line
+        self.top_cable = top_cable  # for the cables at the top, which are not executing the main task
         self.x = 0.0  # local position x
         self.y = 0.0  # local position y
         self.elevation = 0.0  # elevation above sea level in meters
@@ -201,7 +173,7 @@ def create_generic_pylon_25_vertices():
                 , CableVertex(-5.0, 16.8)
                 , CableVertex(5.0, 21.0)
                 , CableVertex(-5.0, 21.0)
-                , CableVertex(0.0, 25.2)]
+                , CableVertex(0.0, 25.2, top_cable=True)]
     return vertices
 
 
@@ -212,7 +184,7 @@ def create_generic_pylon_50_vertices():
                 , CableVertex(-10.0, 33.6)
                 , CableVertex(10.0, 42.0)
                 , CableVertex(-10.0, 42.0)
-                , CableVertex(0.0, 50.4)]
+                , CableVertex(0.0, 50.4, top_cable=True)]
     return vertices
 
 
@@ -223,13 +195,29 @@ def create_generic_pylon_100_vertices():
                 , CableVertex(-20.0, 67.2)
                 , CableVertex(20.0, 84.0)
                 , CableVertex(-20.0, 84.0)
-                , CableVertex(0.0, 100.8)]
+                , CableVertex(0.0, 100.8, top_cable=True)]
     return vertices
 
 
-def create_streetlamp3_vertices():
-    vertices = [CableVertex(1.7, 6.07)
-                , CableVertex(-1.7, 6.07)]
+def create_wooden_pole_14m_vertices():
+    vertices = [CableVertex(1.7, 14.4)
+                , CableVertex(-1.7, 14.4)
+                , CableVertex(2.7, 12.6)
+                , CableVertex(0.7, 12.6)
+                , CableVertex(-2.7, 12.6)
+                , CableVertex(-0.7, 12.6)]
+    return vertices
+
+
+def create_drag_lift_pylon():
+    vertices = [CableVertex(2.8, 8.1)
+                , CableVertex(-0.8, 8.1)]
+    return vertices
+
+
+def create_drag_lift_in_osm_building():
+    vertices = [CableVertex(2.8, 3.0)
+                , CableVertex(-0.8, 3.0)]
     return vertices
 
 
@@ -246,10 +234,12 @@ def get_cable_vertices(pylon_model):
         return create_generic_pylon_50_vertices()
     if "generic_pylon_100m" in pylon_model:
         return create_generic_pylon_100_vertices()
-    elif "RailPower" in pylon_model:
-        return create_rail_power_vertices()
-    elif "lamp3" in pylon_model:
-        return create_streetlamp3_vertices()
+    elif "drag_lift_pylon" in pylon_model:
+        return create_drag_lift_pylon()
+    elif "create_drag_lift_in_osm_building" in pylon_model:
+        return create_drag_lift_in_osm_building()
+    elif "wooden_pole_14m" in pylon_model:
+        return create_wooden_pole_14m_vertices()
     else:
         return None
 
@@ -288,15 +278,32 @@ class Pylon(object):
         self.y = 0.0  # local position y
         self.elevation = 0.0  # elevation above sea level in meters
         self.heading = 0.0  # heading of pylon in degrees
+        self.pylon_model = None  # the path to the ac/xml model
+        self.in_osm_building = False  # a pylon can be in a OSM Way/building, in which case it should not be drawn
+
+    def calc_pylon_model(self, pylon_model):
+        if self.type_ == Pylon.TYPE_AERIALWAY_STATION:
+            if self.in_osm_building:
+                self.pylon_model = pylon_model + "_in_osm_building"
+            else:
+                if not self.prev_pylon:
+                    self.pylon_model = pylon_model + "_start_station"
+                else:
+                    self.pylon_model = pylon_model + "_end_station"
+        else:
+            self.pylon_model = pylon_model
 
     def make_stg_entry(self):
         """
         Returns a stg entry for this pylon.
         E.g. OBJECT_SHARED Models/Airport/ils.xml 5.313108 45.364122 374.49 268.92
         """
-        if self.my_wayline.pylon_model is None:
-            self.my_wayline.pylon_model = "Models/Power/generic_pylon_25m.xml"  # FIXME: should never happen, but does
-        entry = ["OBJECT_SHARED", self.my_wayline.pylon_model, str(self.lon), str(self.lat), str(self.elevation)
+        if self.in_osm_building:
+            return " "  # no need to write a shared object
+
+        if self.pylon_model is None:
+            self.pylon_model = "Models/Power/generic_pylon_25m.xml"  # FIXME: should never happen, but does
+        entry = ["OBJECT_SHARED", self.pylon_model, str(self.lon), str(self.lat), str(self.elevation)
                  , str(stg_angle(self.heading - 90))]  # 90 less because arms are in x-direction in ac-file
         return " ".join(entry)
 
@@ -315,8 +322,10 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
         self.pylons = []
         self.way_segments = []
         self.type_ = 0  # cf. class constants TYPE_*
-        self.pylon_model = None  # the path to the ac/xml model
         self.length = 0.0  # the total length of all segments
+        self.voltage = 0  # from osm-tag "voltage"
+        self.cables = 0  # from osm-tag "cables"
+        self.wires = None  # from osm-tag "wires"
 
     def make_pylons_stg_entries(self):
         """
@@ -377,6 +386,12 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
                 for j in xrange(1, len(cluster_segments) + 1):
                     xml_file_lines.append('<object-name>segment%05d</object-name>' % j)
                 xml_file_lines.append('</animation>')
+                if parameters.C2P_CABLES_NO_SHADOW:
+                    xml_file_lines.append('<animation>')
+                    xml_file_lines.append('<type>noshadow</type>')
+                    for j in xrange(1, len(cluster_segments) + 1):
+                        xml_file_lines.append('<object-name>segment%05d</object-name>' % j)
+                    xml_file_lines.append('</animation>')
                 xml_file_lines.append('</PropertyList>')
                 with open(path + cluster_filename + ".xml", 'w') as f:
                     f.write("\n".join(xml_file_lines))
@@ -398,15 +413,20 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
     def calc_and_map(self):
         """Calculates various aspects of the line and its nodes and attempt to correct if needed. """
         max_length = self._calc_segments()
+        pylon_model = None
         if self.is_aerialway():
-            self._calc_and_map_aerialway()
+            pylon_model = self._calc_and_map_aerialway()
         else:
-            self._calc_and_map_powerline(max_length)
+            pylon_model = self._calc_and_map_powerline(max_length)
+        for my_pylon in self.pylons:
+            my_pylon.pylon_model = pylon_model
+
         self._calc_headings_pylons()
         self._calc_cables()
 
     def _calc_and_map_aerialway(self):
-        self.pylon_model = "Models/StreetFurniture/RailPower.xml"  # FIXME: make real implementation
+        pylon_model = "Models/Transport/drag_lift_pylon.xml"  # FIXME: make real implementation
+        return pylon_model
 
     def _calc_and_map_powerline(self, max_length):
         """
@@ -436,17 +456,22 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
             average_height /= found
 
         # use statistics to determine type_ and pylon_model
-        if self.type_ == self.TYPE_POWER_MINOR_LINE and nbr_towers <= nbr_poles and max_height <= 25.0 and max_length <= 250.0:
+        if (self.type_ == self.TYPE_POWER_MINOR_LINE and nbr_towers <= nbr_poles
+           and max_height <= 25.0 and max_length <= 250.0) or (self.type_ == self.TYPE_POWER_LINE and max_length <= 150):
             self.type_ = self.TYPE_POWER_MINOR_LINE
-            self.pylon_model = "Models/StreetFurniture/streetlamp3.xml"
+            pylon_model = "Models/Power/wooden_pole_14m.xml"
         else:
             self.type_ = self.TYPE_POWER_LINE
             if average_height < 35.0 and max_length < 300.0:
-                self.pylon_model = "Models/Power/generic_pylon_25m.xml"
+                pylon_model = "Models/Power/generic_pylon_25m.xml"
             elif average_height < 75.0 and max_length < 500.0:
-                self.pylon_model = "Models/Power/generic_pylon_50m.xml"
+                pylon_model = "Models/Power/generic_pylon_50m.xml"
+            elif parameters.C2P_POWER_LINE_ALLOW_100M:
+                pylon_model = "Models/Power/generic_pylon_100m.xml"
             else:
-                self.pylon_model = "Models/Power/generic_pylon_100m.xml"
+                pylon_model = "Models/Power/generic_pylon_50m.xml"
+
+        return pylon_model
 
     def get_center_coordinates(self):
         """Returns the lon/lat coordinates of the line"""
@@ -516,18 +541,36 @@ class WayLine(object):  # The name "Line" is also used in e.g. SymPy
             catenary_a = parameters.C2P_CATENARY_A_AERIALWAY_GOODS
 
         for segment in self.way_segments:
-            start_cable_vertices = get_cable_vertices(self.pylon_model)
-            end_cable_vertices = get_cable_vertices(self.pylon_model)
+            start_cable_vertices = get_cable_vertices(segment.start_pylon.pylon_model)
+            end_cable_vertices = get_cable_vertices(segment.end_pylon.pylon_model)
             for i in xrange(0, len(start_cable_vertices)):
                 start_cable_vertices[i].calc_position(segment.start_pylon.x, segment.start_pylon.y
                                                       , segment.start_pylon.elevation, segment.start_pylon.heading)
                 end_cable_vertices[i].calc_position(segment.end_pylon.x, segment.end_pylon.y
                                                     , segment.end_pylon.elevation, segment.end_pylon.heading)
-                cable = Cable(start_cable_vertices[i], end_cable_vertices[i], radius, number_extra_vertices, catenary_a)
+                if start_cable_vertices[i].top_cable:
+                    cable = Cable(start_cable_vertices[i], end_cable_vertices[i]
+                                  , parameters.C2P_RADIUS_TOP_LINE, number_extra_vertices, catenary_a, segment.length)
+                else:
+                    cable = Cable(start_cable_vertices[i], end_cable_vertices[i]
+                                  , radius, number_extra_vertices, catenary_a, segment.length)
                 segment.cables.append(cable)
 
 
-def process_osm_elements(nodes_dict, ways_dict, _elev_interpolator, _coord_transformator):
+def process_building_refs(nodes_dict, ways_dict, my_elev_interpolator, my_coord_transformator):
+    my_buildings = {}  # osm_id as key, LinearRing
+    for way in ways_dict.values():
+        coordinates = []
+        for ref in way.refs:
+            if ref in nodes_dict:
+                my_node = nodes_dict[ref]
+                coordinates.append(my_coord_transformator.toLocal((my_node.lon, my_node.lat)))
+        if 2 < len(coordinates):
+            my_buildings[way.osm_id] = Polygon(coordinates)
+    return my_buildings
+
+
+def process_osm_elements(nodes_dict, ways_dict, my_elev_interpolator, my_coord_transformator, building_refs):
     """
     Transforms a dict of Node and a dict of Way OSMElements from osmparser.py to a dict of WayLine objects for
     electrical power lines and a dict of WayLine objects for aerialways. Nodes are transformed to Pylons.
@@ -544,7 +587,7 @@ def process_osm_elements(nodes_dict, ways_dict, _elev_interpolator, _coord_trans
                 if "line" == value:
                     my_line.type_ = WayLine.TYPE_POWER_LINE
                 elif "minor_line" == value:
-                    my_line.type_ = WayLine.TYPE_POWER_LINE
+                    my_line.type_ = WayLine.TYPE_POWER_MINOR_LINE
             elif "aerialway" == key:
                 if "cable_car" == value:
                     my_line.type_ = WayLine.TYPE_AERIALWAY_CABLE_CAR
@@ -556,6 +599,16 @@ def process_osm_elements(nodes_dict, ways_dict, _elev_interpolator, _coord_trans
                     my_line.type_ = WayLine.TYPE_AERIALWAY_GONDOLA
                 elif "goods" == value:
                     my_line.type_ = WayLine.TYPE_AERIALWAY_GOODS
+            #  special values
+            elif "cables" == key:
+                my_line.cables = int(value)
+            elif "voltage" == key:
+                try:
+                    my_line.voltage = int(value)
+                except ValueError:
+                    pass  # principally only substations may have values like "100000;25000", but only principally ...
+            elif "wires" == key:
+                my_line.wires = value
         if 0 != my_line.type_:
             prev_pylon = None
             for ref in way.refs:
@@ -564,9 +617,9 @@ def process_osm_elements(nodes_dict, ways_dict, _elev_interpolator, _coord_trans
                     my_pylon = Pylon(my_node.osm_id)
                     my_pylon.lat = my_node.lat
                     my_pylon.lon = my_node.lon
-                    my_pylon.x, my_pylon.y = _coord_transformator.toLocal((my_node.lon, my_node.lat))
+                    my_pylon.x, my_pylon.y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
                     my_pylon.my_wayline = my_line
-                    my_pylon.elevation = _elev_interpolator(vec2d.vec2d(my_pylon.lon, my_pylon.lat), True)
+                    my_pylon.elevation = my_elev_interpolator(vec2d.vec2d(my_pylon.lon, my_pylon.lat), True)
                     for key in my_node.tags:
                         value = my_node.tags[key]
                         if "power" == key:
@@ -579,6 +632,13 @@ def process_osm_elements(nodes_dict, ways_dict, _elev_interpolator, _coord_trans
                                 my_pylon.type_ = Pylon.TYPE_AERIALWAY_PYLON
                             elif "station" == value:
                                 my_pylon.type_ = Pylon.TYPE_AERIALWAY_STATION
+                                my_point = Point(my_pylon.x, my_pylon.y)
+                                for osm_id in building_refs.keys():
+                                    building_ref = building_refs[osm_id]
+                                    if building_ref.contains(my_point):
+                                        my_pylon.in_osm_building = True
+                                        logging.debug('Station with osm_id = %s found within building reference', my_pylon.osm_id)
+                                        break
                         elif "height" == key:
                             my_pylon.height = osmparser.parse_length(value)
                         elif "structure" == key:
@@ -670,12 +730,12 @@ def write_stg_entries(stg_fp_dict, lines_dict, wayname):
     line_index = 0
     for line in lines_dict.values():
         line_index += 1
-        center = line.get_center_coordinates()
-        stg_fname = calc_tile.construct_stg_file_name(center)
+        line_center = line.get_center_coordinates()
+        stg_fname = calc_tile.construct_stg_file_name(line_center)
         if parameters.PATH_TO_OUTPUT:
-            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, center)
+            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, line_center)
         else:
-            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center)
+            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, line_center)
         if not stg_fname in stg_fp_dict:
             if not os.path.exists(path):
                 try:
@@ -759,18 +819,6 @@ if __name__ == "__main__":
     if args.filename is not None:
         parameters.read_from_file(args.filename)
 
-    # Reading OSM-file and transform to Pylons / Lines objects
-    valid_node_keys = ["power", "structure", "material", "height", "colour", "aerialway"]
-    valid_way_keys = ["power", "aerialway"]
-    req_way_keys = ["power", "aerialway"]
-    valid_relation_keys = []
-    req_relation_keys = []
-    handler = osmparser.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
-                                          req_relation_keys)
-    source = open(parameters.PREFIX + os.sep + parameters.OSM_FILE)
-    logging.info("Reading the OSM file might take some time ...")
-    xml.sax.parse(source, handler)
-
     # Initializing tools for global/local coordinate transformations
     cmin = vec2d.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
     cmax = vec2d.vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
@@ -783,13 +831,43 @@ if __name__ == "__main__":
 
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
-    powerlines, aerialways = process_osm_elements(handler.nodes_dict, handler.ways_dict, elev_interpolator,
-                                                  coord_transformator)
-    handler = None  # free memory
-    logging.info('Number of power lines: %s', len(powerlines))
-    logging.info('Number of aerialways: %s', len(aerialways))
 
-    # Work on objects
+    # References for buildings
+    valid_node_keys = []
+    valid_way_keys = ["building"]
+    req_way_keys = ["building"]
+    valid_relation_keys = []
+    req_relation_keys = []
+    handler = osmparser.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
+                                          req_relation_keys)
+    source = open(parameters.PREFIX + os.sep + parameters.OSM_FILE)
+    xml.sax.parse(source, handler)
+    building_refs = process_building_refs(handler.nodes_dict, handler.ways_dict, elev_interpolator,
+                                      coord_transformator)
+    logging.info('Number of reference buildings: %s', len(building_refs))
+    # Starting with power lines and aerialways
+    valid_node_keys = ["power", "structure", "material", "height", "colour", "aerialway"]
+    valid_way_keys = ["power", "aerialway", "voltage", "cables", "wires"]
+    req_way_keys = ["power", "aerialway", "building"]
+    handler = osmparser.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
+                                          req_relation_keys)
+    source = open(parameters.PREFIX + os.sep + parameters.OSM_FILE)
+    xml.sax.parse(source, handler)
+    powerlines, aerialways = process_osm_elements(handler.nodes_dict, handler.ways_dict, elev_interpolator,
+                                                  coord_transformator, building_refs)
+    building_refs = None   # free memory
+    handler = None  # free memory
+
+    # only keep those lines, which should be processed
+    if parameters.C2P_PROCESS_POWERLINES is False:
+        powerlines.clear()
+    if parameters.C2P_PROCESS_AERIALWAYS is False:
+        aerialways.clear()
+
+    logging.info('Number of power lines to process: %s', len(powerlines))
+    logging.info('Number of aerialways to process: %s', len(aerialways))
+
+    # Work on object
     for wayline in powerlines.values():
         wayline.calc_and_map()
     for wayline in aerialways.values():
