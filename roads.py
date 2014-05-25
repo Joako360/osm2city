@@ -43,7 +43,19 @@ class Road(object):
         osm_nodes = [nodes_dict[r] for r in refs]
         self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
         #self.nodes = np.array([(n.lon, n.lat) for n in osm_nodes])
-        self.line_string = shg.LineString(self.nodes)
+        self.center = shg.LineString(self.nodes)
+        self.compute_angle()
+
+    def compute_angle(self):
+        """For every node, compute angle."""
+        n = len(self.center.coords)
+        self.angle = np.zeros(n)
+        self.angle[0] = (vec2d(self.center.coords[1]) - vec2d(self.center.coords[0])).atan2()
+        for i in range(1, n-1):
+            self.angle[i] = 0.5 * ( (vec2d(self.center.coords[i-1]) - vec2d(self.center.coords[i])).atan2()
+                              +(vec2d(self.center.coords[i])   - vec2d(self.center.coords[i+1])).atan2())
+        self.angle[n-1] = (vec2d(self.center.coords[n-2]) - vec2d(self.center.coords[n-1])).atan2()
+
 
 
 class Roads(object):
@@ -89,6 +101,11 @@ class Roads(object):
             #tools.init(self.transform) # FIXME. Not a nice design.
 
         col = None
+        try:
+            access = not (way.tags['access'] == 'no')
+        except:
+            access = 'yes'
+
         if way.tags.has_key('highway'):
             road_type = way.tags['highway']
             if road_type == 'motorway' or road_type == 'motorway_link':
@@ -100,11 +117,11 @@ class Roads(object):
             elif road_type == 'tertiary':
                 col = 3
             elif road_type == 'residential':
-                col = 4
-            elif road_type == 'service':
-                col = 5
+                col = None
+            elif road_type == 'service' and access:
+                col = None
         elif way.tags.has_key('railway'):
-            if way.tags['railway'] == 'rail':
+            if way.tags['railway'] in ['rail', 'tram']:
                 #col = 6
                 col = None # skip railways for now
 
@@ -127,8 +144,8 @@ class Roads(object):
         ac = ac3d.Writer(tools.stats)
         obj = ac.new_object('roads', 'bridge.png')
         for rd in self.roads[:]:
-            left  = rd.line_string.parallel_offset(3, 'left', resolution=16, join_style=1, mitre_limit=10.0)
-            right = rd.line_string.parallel_offset(3, 'right', resolution=16, join_style=1, mitre_limit=10.0)
+            left  = rd.center.parallel_offset(3, 'left', resolution=16, join_style=1, mitre_limit=10.0)
+            right = rd.center.parallel_offset(3, 'right', resolution=16, join_style=1, mitre_limit=10.0)
             o = obj.next_node_index()
             #face = np.zeros((len(left.coords) + len(right.coords)))
             try:
@@ -140,7 +157,7 @@ class Roads(object):
                     print "different lengths not yet implemented ", rd.osm_id
                     do_tex = False
                     #continue
-                if len_left != len(rd.line_string.coords):
+                if len_left != len(rd.center.coords):
                     print "WTF? ", rd.osm_id
                     do_tex = False
                     #continue
@@ -156,8 +173,8 @@ class Roads(object):
                 #refs = np.arange(len_left + len_right) + o
                 nodes_l = np.arange(len(left.coords))
                 nodes_r = np.arange(len(right.coords))
-                rd.segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(rd.line_string.coords[i])) for i, coord in enumerate(rd.line_string.coords[1:])])
-                rd_len = len(rd.line_string.coords)
+                rd.segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(rd.center.coords[i])) for i, coord in enumerate(rd.center.coords[1:])])
+                rd_len = len(rd.center.coords)
                 rd.dist = np.zeros((rd_len))
                 for i in range(1, rd_len):
                     rd.dist[i] = rd.dist[i-1] + rd.segment_len[i]
@@ -192,6 +209,20 @@ class Roads(object):
 
             #obj.node()
 
+def join_ways():
+    """join ways that
+       - don't make an intersection and
+       - are of compatible type
+    """
+    pass
+
+def find_intersections():
+    cand_intersections = []
+    for way in ways:
+        for ref in way.refs:
+            cand_node = nodes[ref]
+            if len(cand_node.ways) == 1:
+                cand_intersections.append(ref)
 
 def main():
     logging.basicConfig(level=logging.INFO)
@@ -265,6 +296,13 @@ def main():
 
     elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
     roads.write(elev)
+
+    max_a = 0.
+    for r in roads.roads:
+        a = max(r.angle)
+        if a > max_a: max_a = a
+
+    print "max angle", max_a*57.3
 
 
 
