@@ -981,40 +981,27 @@ if __name__ == "__main__":
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
 
-    # References for buildings
-    valid_node_keys = []
-    valid_way_keys = ["building"]
-    req_way_keys = ["building"]
+    valid_node_keys = [  # building refs
+                       "power", "structure", "material", "height", "colour", "aerialway"  # power/aerialways
+                       , "railway"]
+    valid_way_keys = ["building"
+                      ,"power", "aerialway", "voltage", "cables", "wires"
+                      ,"railway", "electrified", "tunnel"]
     valid_relation_keys = []
     req_relation_keys = []
+    req_way_keys = ["building", "power", "aerialway", "railway"]
     handler = osmparser.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
                                           req_relation_keys)
     source = open(parameters.PREFIX + os.sep + parameters.OSM_FILE)
     xml.sax.parse(source, handler)
+    # References for buildings
     building_refs = process_osm_building_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
     logging.info('Number of reference buildings: %s', len(building_refs))
-
-    # Railway overhead lines
-    valid_node_keys = ["railway"]
-    valid_way_keys = ["railway", "electrified", "tunnel"]
-    req_way_keys = ["railway"]
-    handler = osmparser.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
-                                          req_relation_keys)
-    source = open(parameters.PREFIX + os.sep + parameters.OSM_FILE)
-    xml.sax.parse(source, handler)
-    logging.info('Number of rail lines read from OSM: %s', len(handler.ways_dict))
+    # Overhead lines for rail
     rail_lines = process_osm_rail_overhead(handler.nodes_dict, handler.ways_dict, elev_interpolator,
                                            coord_transformator)
     logging.info('Reduced number of rail lines: %s', len(rail_lines))
-
     # Power lines and aerialways
-    valid_node_keys = ["power", "structure", "material", "height", "colour", "aerialway"]
-    valid_way_keys = ["power", "aerialway", "voltage", "cables", "wires"]
-    req_way_keys = ["power", "aerialway", "building"]
-    handler = osmparser.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
-                                          req_relation_keys)
-    source = open(parameters.PREFIX + os.sep + parameters.OSM_FILE)
-    xml.sax.parse(source, handler)
     powerlines, aerialways = process_osm_power_aerialway(handler.nodes_dict, handler.ways_dict, elev_interpolator,
                                                   coord_transformator, building_refs)
     building_refs = None   # free memory
