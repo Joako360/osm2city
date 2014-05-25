@@ -724,7 +724,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
             else:
                 if b.roof_type == 'gabled':
                     roofs.separate_gable(out, b, b.X)
-                else:
+                else: # b.roof_type == 'hipped':
                     roofs.separate_hipped(out, b, b.X)
 
 
@@ -734,7 +734,6 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
                 LOD_lists[4].append(roof_ac_name_flat)
                 out_surf.write(roofs.flat(b, X, roof_ac_name_flat))
                 out_surf.write("kids 0\n")
-
         tools.stats.count(b)
 
     f = open(ac_file_name, "w")

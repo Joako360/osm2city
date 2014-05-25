@@ -58,6 +58,7 @@ You should disable random buildings.
 
 import sys
 import os
+import re
 import xml.sax
 import argparse
 import logging
@@ -694,8 +695,6 @@ if __name__ == "__main__":
 
     #tools.write_gp(buildings)
 
-    tools.stats.print_summary()
-
     # -- now put buildings into clusters
     for b in buildings:
         clusters.append(b.anchor, b)
@@ -746,9 +745,10 @@ if __name__ == "__main__":
             except OSError, e:
                 if e.errno != 17:
                     logging.exception("Unable to create path to output")
-
+            #incase Prefix is a path (batch processing)
+            replacement_prefix = re.sub('[\/]','_', parameters.PREFIX)
             # -- open .ac and write header
-            fname = parameters.PREFIX + "city%02i%02i" % (cl.I.x, cl.I.y)
+            fname = replacement_prefix + "city%02i%02i" % (cl.I.x, cl.I.y)
             building_lib.write(path + fname + ".ac", cl.objects, elev, tile_elev, tools.transform, offset)
 
             LM_dict = building_lib.make_lightmap_dict(cl.objects)
