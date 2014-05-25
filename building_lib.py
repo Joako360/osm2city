@@ -721,11 +721,11 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
                     roofs.flat(out, b, b.X)
                     # FIXME: move to analyse. If we fall back, don't require separate LOD
             # -- pitched roof for exactly 4 ground nodes
-            elif 0:
+            else:
                 if b.roof_type == 'gabled':
                     roofs.separate_gable(out, b, b.X)
                 else:
-                    out.write(roofs.separate_hipped(b, b.X))
+                    roofs.separate_hipped(out, b, b.X)
 
 
             # -- LOD flat model
