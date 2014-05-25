@@ -74,6 +74,8 @@ BUILDING_SIMPLIFY_TOLERANCE = 1.0   # -- all points in the simplified building w
 BUILDING_NEVER_SKIP_LEVELS = 6      # -- buildings that tall will never be skipped
 
 BUILDING_COMPLEX_ROOFS = 1          # -- generate complex roofs on buildings?
+BUILDING_COMPLEX_ROOFS_MAX_LEVELS = 5 # -- don't put complex roofs on buildings taller than this
+BUILDING_COMPLEX_ROOFS_MAX_AREA   = 2000 # -- don't put complex roofs on buildings larger than this
 # -- Parameters which influence the height of buildings if no info from OSM is available.
 #    It uses a triangular distribution (see http://en.wikipedia.org/wiki/Triangular_distribution)
 BUILDING_CITY_LEVELS_LOW = 2.0

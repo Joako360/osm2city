@@ -14,7 +14,8 @@ You should disable random buildings.
 """
 
 # TODO:
-# - one object per tile only. Now drawables 1072 -> 30fps
+# - FIXME: texture size meters works reversed??
+# x one object per tile only. Now drawables 1072 -> 30fps
 # x use geometry library
 # x read original .stg+.xml, don't place OSM buildings when there's a static model near/within
 # - compute static_object stg's on the fly
@@ -78,6 +79,7 @@ import tools
 import calc_tile
 import osmparser
 import parameters
+from pdb import pm
 
 buildings = []  # -- master list, holds all buildings
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
@@ -99,14 +101,16 @@ class Building(object):
         self.stg_hdg = stg_hdg
         self.height = height
         self.levels = levels
-        self.vertices = 0
-        self.surfaces = 0
+        self.first_node = 0  # index of first node in final OBJECT node list
+        #self._nnodes_ground = 0 # number of nodes on ground
         self.anchor = vec2d(list(outer_ring.coords[0]))
         self.facade_texture = None
         self.roof_texture = None
         self.roof_complex = False
+        self.roof_separate_LOD = False # May or may not be faster
         self.ac_name = None
         self.ceiling = 0.
+        self.LOD = None
         self.outer_nodes_closest = []
         if len(outer_ring.coords) > 2:
             self.set_polygon(outer_ring, self.inner_rings_list)
@@ -443,7 +447,7 @@ def write_ac_header(out, nb):
 
 # -----------------------------------------------------------------------------
 # -- write xml
-def write_xml(path, fname, LOD_lists, LM_dict, buildings):
+def write_xml(path, fname, LM_dict, buildings):
     #  -- LOD animation
     xml = open(path + fname + ".xml", "w")
     xml.write("""<?xml version="1.0"?>\n<PropertyList>\n""")
@@ -454,29 +458,31 @@ def write_xml(path, fname, LOD_lists, LM_dict, buildings):
     LMs_avail = ['tex/DSCF9495_pow2', 'tex/DSCF9503_noroofsec_pow2', 'tex/LZ_old_bright_bc2', 'tex/DSCF9678_pow2', 'tex/DSCF9710', 'tex/wohnheime_petersburger']
 
     # FIXME: use Effect/Building? What's the difference?
-    for texture in LM_dict.keys():
-        if texture.filename in LMs_avail:
-#                <lightmap-factor type="float" n="0"><use>/scenery/LOWI/garage[0]/door[0]/position-norm</use></lightmap-factor>
-            xml.write(textwrap.dedent("""
-            <effect>
-              <inherits-from>cityLM</inherits-from>
-              <parameters>
-                <lightmap-enabled type="int">1</lightmap-enabled>
-                <texture n="3">
-                  <image>%s_LM.png</image>
-                  <wrap-s>repeat</wrap-s>
-                  <wrap-t>repeat</wrap-t>
-                </texture>
-              </parameters>
-                  """ % texture.filename))
+    # FIXME: LM and textures currently broken
+    if 0:
+        for texture in LM_dict.keys():
+            if texture.filename in LMs_avail:
+    #                <lightmap-factor type="float" n="0"><use>/scenery/LOWI/garage[0]/door[0]/position-norm</use></lightmap-factor>
+                xml.write(textwrap.dedent("""
+                <effect>
+                  <inherits-from>cityLM</inherits-from>
+                  <parameters>
+                    <lightmap-enabled type="int">1</lightmap-enabled>
+                    <texture n="3">
+                      <image>%s_LM.png</image>
+                      <wrap-s>repeat</wrap-s>
+                      <wrap-t>repeat</wrap-t>
+                    </texture>
+                  </parameters>
+                      """ % texture.filename))
 
-            for b in LM_dict[texture]:
+                for b in LM_dict[texture]:
+            #        if name.find("roof") < 0:
+                        xml.write("  <object-name>%s</object-name>\n" % b.ac_name)
+        #    for name in LOD_lists[1]:
         #        if name.find("roof") < 0:
-                    xml.write("  <object-name>%s</object-name>\n" % b.ac_name)
-    #    for name in LOD_lists[1]:
-    #        if name.find("roof") < 0:
-    #            xml.write("  <object-name>%s</object-name>\n" % name)
-            xml.write("</effect>\n")
+        #            xml.write("  <object-name>%s</object-name>\n" % name)
+                xml.write("</effect>\n")
 
     # -- put obstruction lights on hi-rise buildings
     for b in buildings:
@@ -507,55 +513,42 @@ def write_xml(path, fname, LOD_lists, LM_dict, buildings):
       <type>range</type>
       <min-m>0</min-m>
       <max-property>/sim/rendering/static-lod/bare</max-property>
-    """))
-    for name in LOD_lists[0]:
-        xml.write("  <object-name>%s</object-name>\n" % name)
-    xml.write(textwrap.dedent(
-    """    </animation>
+      <object-name>LOD_bare</object-name>
+    </animation>
 
     <animation>
       <type>range</type>
       <min-m>0</min-m>
       <max-property>/sim/rendering/static-lod/rough</max-property>
-    """))
-    for name in LOD_lists[1]:
-        xml.write("  <object-name>%s</object-name>\n" % name)
-    xml.write(textwrap.dedent(
-    """    </animation>
+      <object-name>LOD_rough</object-name>
+    </animation>
 
     <animation>
       <type>range</type>
       <min-m>0</min-m>
       <max-property>/sim/rendering/static-lod/detailed</max-property>
-    """))
-    for name in LOD_lists[2]:
-        xml.write("  <object-name>%s</object-name>\n" % name)
-    xml.write(textwrap.dedent(
-    """    </animation>
+      <object-name>LOD_detail</object-name>
+    </animation>
 
-    <animation>
-      <type>range</type>
-      <min-m>0</min-m>
-      <max-property>/sim/rendering/static-lod/roof</max-property>
-    """))
-    for name in LOD_lists[3]:
-        xml.write("  <object-name>%s</object-name>\n" % name)
-    xml.write(textwrap.dedent(
-    """    </animation>
-
-    <animation>
-      <type>range</type>
-      <min-property>/sim/rendering/static-lod/roof</min-property>
-      <max-property>/sim/rendering/static-lod/rough</max-property>
-    """))
-    for name in LOD_lists[4]:
-        xml.write("  <object-name>%s</object-name>\n" % name)
-    xml.write(textwrap.dedent(
-    """    </animation>
 
     </PropertyList>
     """))
     xml.close()
+
+#    <animation>
+#      <type>range</type>
+#      <min-m>0</min-m>
+#      <max-property>/sim/rendering/static-lod/roof</max-property>
+#      <object-name>LOD_roof</object-name>
+#    </animation>
+
+#    <animation>
+#      <type>range</type>
+#      <min-property>/sim/rendering/static-lod/roof</min-property>
+#      <max-property>/sim/rendering/static-lod/rough</max-property>
+#      <object-name>LOD_roof_flat</object-name>
+#    </animation>
+
 
 
 # -----------------------------------------------------------------------------
@@ -564,6 +557,8 @@ def write_xml(path, fname, LOD_lists, LM_dict, buildings):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
+    #logging.basicConfig(level=logging.DEBUG)
+
     # -- Parse arguments. Command line overrides config file.
     parser = argparse.ArgumentParser(description="osm2city reads OSM data and creates buildings for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
@@ -596,8 +591,8 @@ if __name__ == "__main__":
     elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
     #elev.write("elev.out.small", 4)
     #sys.exit(0)
-    logging.debug("height at origin", elev(vec2d(0,0)))
-    logging.debug("origin at ", tools.transform.toGlobal((0,0)))
+    logging.debug("height at origin" + str(elev(vec2d(0,0))))
+    logging.debug("origin at " + str(tools.transform.toGlobal((0,0))))
 
     #tools.write_map('dresden.png', transform, elev, vec2d(minlon, minlat), vec2d(maxlon, maxlat))
 
@@ -613,6 +608,10 @@ if __name__ == "__main__":
                 sys.exit(-1)
 
         way = wayExtract()
+
+# How to improve OSM parsing?
+# give parser a tuple (valid_way_keys, req_way_keys, way_callback) For each way, the parser calls way_callback(way, nodes)
+# could add multiple tuples, one per OSM feature
 
         valid_node_keys = []
         valid_way_keys = ["building", "building:part", "building:height", "height", "building:levels", "layer", "roof:shape"]
@@ -649,6 +648,8 @@ if __name__ == "__main__":
         logging.info("unpickled %g buildings ", len(buildings))
         tools.stats.objects = len(buildings)
 
+    #nb = len(buildings)
+    #buildings = [buildings[0]]
 
     # -- debug filter
 #    for b in buildings:
@@ -727,12 +728,12 @@ if __name__ == "__main__":
                 continue # skip tile with improper elev
             #print "TILE E", tile_elev
 
-            LOD_lists = []
-            LOD_lists.append([])  # bare
-            LOD_lists.append([])  # rough
-            LOD_lists.append([])  # detail
-            LOD_lists.append([])  # roof
-            LOD_lists.append([])  # roof-flat
+            #LOD_lists = []
+            #LOD_lists.append([])  # bare
+            #LOD_lists.append([])  # rough
+            #LOD_lists.append([])  # detail
+            #LOD_lists.append([])  # roof
+            #LOD_lists.append([])  # roof-flat
 
             # -- prepare output path
             if parameters.PATH_TO_OUTPUT:
@@ -748,16 +749,12 @@ if __name__ == "__main__":
             replacement_prefix = re.sub('[\/]','_', parameters.PREFIX)
             # -- open .ac and write header
             fname = replacement_prefix + "city%02i%02i" % (cl.I.x, cl.I.y)
-            out = open(path + fname + ".ac", "w")
-            write_ac_header(out, nb + nroofs)
-            for b in cl.objects:
-                building_lib.write(b, out, elev, tile_elev, tools.transform, offset, LOD_lists)
-            out.close()
+            building_lib.write(path + fname + ".ac", cl.objects, elev, tile_elev, tools.transform, offset)
 
             LM_dict = building_lib.make_lightmap_dict(cl.objects)
 
             # -- write xml
-            write_xml(path, fname, LOD_lists, LM_dict, cl.objects)
+            write_xml(path, fname, LM_dict, cl.objects)
 
             # -- write stg
             stg_fname = calc_tile.construct_stg_file_name(center_global)

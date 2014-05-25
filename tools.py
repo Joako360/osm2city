@@ -69,6 +69,7 @@ class Interpolator(object):
         """compute elevation at (x,y) by linear interpolation"""
         if self.fake:
             return 0.
+            #return p.x + p.y
         global transform
         if not is_global:
             p = vec2d.vec2d(transform.toGlobal(p))
@@ -119,7 +120,7 @@ def raster_glob():
             print "Creating elev.in ..."
             fname = parameters.PREFIX + os.sep + "elev.in"
             raster(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
-    
+
             path = calc_tile.directory_name(center)
             msg = textwrap.dedent("""
             Done. You should now
@@ -174,14 +175,14 @@ def wait_for_fg(fg):
         record = fg.get_prop("/osm2city/record")
         record = record.split('=')[1]
         m2 = re.search("([0-9.]+)", record)
-        if not m is None and float(m.groups()[0]) > 0: 
+        if not m is None and float(m.groups()[0]) > 0:
             try:
                 return True
             except:
                 # perform an action#
                 pass
         time.sleep(1)
-        if not m2 is None:        
+        if not m2 is None:
             print( "Waiting for Semaphore " + m2.groups()[0])
     return False
 
@@ -222,7 +223,7 @@ def raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
             shutil.copy2("C:/Users/keith.paterson/AppData/Roaming/flightgear.org/Export/elev.out", parameters.PREFIX + os.sep + 'elev.out')
     fg.close()
 
-    
+
 
 
 def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
@@ -411,8 +412,6 @@ class Stats(object):
     def count(self, b):
         """update stats (vertices, surfaces, area) with given building's data
         """
-        self.vertices += b.vertices
-        self.surfaces += b.surfaces
         if b.roof_type in self.roof_types:
             self.roof_types[b.roof_type] += 1
         else:
@@ -439,8 +438,7 @@ class Stats(object):
             lodzero = 100.*self.LOD[0]/total_written
             lodone = 100.*self.LOD[1]/total_written
             lodtwo = 100.*self.LOD[0]/total_written
-        try:
-            out.write(textwrap.dedent("""
+        out.write(textwrap.dedent("""
             total buildings %i
             parse errors    %i
             written         %i
@@ -451,38 +449,43 @@ class Stats(object):
               no texture    %i
             """ % (self.objects, self.parse_errors, total_written,
                    self.skipped_small, self.skipped_nearby, self.skipped_no_elev, self.skipped_texture)))
-            roof_line = "        roof-types"
-            for roof_type in self.roof_types:
-                roof_line += """\r\n          %s\t%i""" % (roof_type,self.roof_types[roof_type])
-            out.write(textwrap.dedent(roof_line))
-            out.write(textwrap.dedent("""
-                  complex       %i
-                  roof_errors   %i
-                ground nodes    %i
-                  simplified    %i
-                vertices        %i
-                surfaces        %i
-                repeated tex x  %i out of %i (%2.0f %%)
+        roof_line = "        roof-types"
+        for roof_type in self.roof_types:
+            roof_line += """\r\n          %s\t%i""" % (roof_type,self.roof_types[roof_type])
+        out.write(textwrap.dedent(roof_line))
+
+        try:
+            texture_x_repeated_percent = (self.texture_x_repeated * 100. /(self.texture_x_repeated + self.texture_x_simple))
+        except:
+            texture_x_repeated_percent = 0.
+
+        out.write(textwrap.dedent("""
+              complex       %i
+              roof_errors   %i
+            ground nodes    %i
+              simplified    %i
+            vertices        %i
+            surfaces        %i
+            repeated tex x  %i out of %i (%2.0f %%)
                 LOD bare        %i (%2.0f %%)
                 LOD rough       %i (%2.0f %%)
                 LOD detail      %i (%2.0f %%)
             """ % (self.have_complex_roof, self.roof_errors,
                    self.nodes_ground, self.nodes_simplified,
                    self.vertices, self.surfaces,
-                   self.texture_x_repeated, (self.texture_x_repeated + self.texture_x_simple), (self.texture_x_repeated * 100. /(self.texture_x_repeated + self.texture_x_simple)),
+                   self.texture_x_repeated, (self.texture_x_repeated + self.texture_x_simple), texture_x_repeated_percent,
                    self.LOD[0], lodzero,
                    self.LOD[1], lodone,
                    self.LOD[2], lodtwo)))
-            out.write("above\n")
-            max_area_above = self.area_above.max()
-            if max_area_above < 1: max_area_above = 1
-            for i in range(len(self.area_levels)):
-                out.write(" %5g m^2  %5i |%s\n" % (self.area_levels[i], self.area_above[i], \
-                          "#" * int(56. * self.area_above[i]/max_area_above)))
-            #print self
-        except Exception, reason:
-            logging.error(reason)
-            return
+        out.write("above\n")
+        max_area_above = self.area_above.max()
+        if max_area_above < 1: max_area_above = 1
+        for i in range(len(self.area_levels)):
+            out.write(" %5g m^2  %5i |%s\n" % (self.area_levels[i], self.area_above[i], \
+                      "#" * int(56. * self.area_above[i]/max_area_above)))
+#        except Exception, reason:
+#            logging.error(reason)
+#            return
 
 
 def init(new_transform):

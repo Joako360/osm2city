@@ -1,12 +1,16 @@
 next
 ----
+x get roofs back
+- put roofs in same object, re-use nodes/separate object
+x get textures back
 x relations with 2+ inner rings
 - merge adjacent buildings
 - texture gable walls
 x usability: try .pkl first, failing that, try .osm. Warn about existing .pkl before .osm parsing.
-- compute angles for ground nodes, simplify large angles
-- pitched roofs on relations
+x compute angles for ground nodes, simplify large angles
+x pitched roofs on relations
 - discard small inner ways
+
 
 textures
 --------
@@ -413,3 +417,293 @@ above
  20000 m^2      3
  50000 m^2      0
 done.
+---
+
+
+single_object_per_tile
+======================
+myfg dev  24, or 16-17 facing towards LOWI
+drawables 1057   2300
+
+previously 16 or 12
+
+now:
+
+total buildings 56580
+parse errors    0
+written         16315
+skipped
+small         40244
+nearby        0
+no elevation  21
+no texture    0
+pitched roof    0
+complex       0
+roof_errors   0
+ground nodes    311010
+simplified    46948
+vertices        0
+surfaces        0
+LOD bare        1 ( 0 %)
+LOD rough       6640 (41 %)
+LOD detail      9674 ( 0 %)
+
+prev:
+
+total buildings 56580
+parse errors    0
+written         16120
+skipped
+small         40439
+nearby        0
+no elevation  21
+no texture    0
+pitched roof    0
+complex       0
+roof_errors   0
+ground nodes    311010
+simplified    46948
+vertices        211438
+surfaces        108416
+LOD bare        1 ( 0 %)
+LOD rough       6634 (41 %)
+LOD detail      9485 ( 0 %)
+above
+1 m^2      1 |
+10 m^2      0 |
+20 m^2      0 |
+50 m^2      1 |
+100 m^2   3808 |###########################
+200 m^2   7795 |########################################################
+500 m^2   3030 |#####################
+1000 m^2    916 |######
+2000 m^2    376 |##
+5000 m^2     68 |
+10000 m^2     16 |
+20000 m^2      3 |
+50000 m^2      0 |
+
+repeat textures?
+----------------
++ more simple coding
++ no additional verts
+- future use. What if global texture atlas becomes standard?
+  -> by then, osm2city will be integrated into FG
+20 % of buildings make use of repeatx
+
+ground texture
+--------------
+1. use a patch of ground for every building.
++ easy to code first try
++ better resolution
+- eventually needs meshing
+
+2. one large texture, paint on it
+- must code paint algs -- is that useful in future?
++ less verts, but needs huge texture
+
+long term
+---------
+city    lot     # lots
+50k     20m     6M
+20k             1M
+10k             250k
+
+
+- need OSM roads in FG
+1. use all OSM buildings
+   + best alignment with roads
+   + best match with RL
+   - need additional data
+   - less detailed buildings, unless details added procedurally
+
+2. place shared models along OSM roads
+   + can still use large OSM buildings (put into shared model DB?)
+   + can use detailed, hand-modeled buildings
+   + best match with ground texture
+   - need a number of hand-modeled buildings
+
+- pre-processor
+  - get OSM roads, at least primary + secondary
+  - either use also residential roads or generate them procedurally
+  - generate lots, with size being a function of population density? Land use?
+  - place suitable shared model
+
+  problems:
+  - large city -> huge vertex count. Need ground LOD?
+  - levels:
+    3. all buildings, all lots, all roads
+    2. some buildings, quarters bounded by secondary roads
+    1. only very large buildings, generic texture within landclass boundaries
+      -> switching from 1 to 2 obvious unless far out
+
+
+General approaches
+------------------
+- texture + mask + random buildings
+  + completely generic, no data required other than land use
+  - generic texture will never perfectly match RL roads
+
+ unless texture per lot
+
+ground texture in shared model:
+------------------------------
+require all nodes of face at z=0
+walls can still/should extend below 0
+road access point at 0,0,0 centered?
+- prevents using all existing shared models
+-> add meta-info
+- can get extends from shared model automatically
+
+The state of cities in FG & how to move forward
+-----------------------------------------------
+
+osm2city now merges all buildings into a few objects per 2x2km (used to be some 1000s), reducing the number of drawables tremendously. The result renders indeed much faster: link. I can have 60k buildings in a scene and still get reasonable frame rate on my mid-range system. Thanks again to those of you who convinced me at FSweekend 2013!
+
+Now I wonder how to move forward. As I said previously, my long-term goal is a better representation of cities in FG. My feature wish-list is this:
+
+1) use real primary/secondary road data. If residential roads are available, use even that, otherwise create those procedurally (within city landclass boundaries).
+Then, buildings should
+2) be aligned with roads
+3) match the ground texture
+4) allow for more detail than just a textured quad plus roof. That is, allow using a set of (10, 20, 100) hand-modeled buildings, possibly with LOD.
+5) not collide with static models
+6) vegetation should not interfere with anything above -- no trees on roads or houses.
+
+The current urban texture, Stuart's random buildings and using placement masks fulfil 2, 3 and 6, probably also 5. Extending this to allow 4 might also be possible. But I don't see how this could play nicely with 1. Ideas?
+
+I'm proposing this, which I think is pretty much what x-plane does:
+
+- use a very unobtrusive (greenish/grayish) generic ground texture
+- use a real, detailed road network (vector data)
+- generate lots along the roads
+- place hand-modeled buildings on these lots. These buildings would come with a patch of specific ground texture, let's call it a 'garden'.
+
+I could rather easily fulfil 1-5 by extending osm2city to do that outside of FG, eventually creating low-object-count/low-texture-count 2x2km tiles ready for use with FG. Roads would be created as textured bands sitting slighty above the terrain. Could generate bridges. Use LOD. Osm2city has prototypes for most of this already (except for a shared model loader/merging a number of shared models into one object -- which I think is not that difficult to code in python)
+
+However, this approach still collides with 6.
+
+Question: what would be the best way to achive 1-6? Either within FG, or with external tools? I'm now sufficiently convinced 1-6 is possible performance-wise, and I'm ready to dive in the C++ side of things. I have no experience with GLSL though, but I'm willing to learn.
+
+I know TG can create a dense network of textured roads, and work towards scenery LOD is underway, which might eventually give us residential roads. However, to align buildings with roads, we'd still need their (OSM) line data in FG.
+
+I'm also confident I could write code that loads N shared models, copies them a couple of thousand times, and places them into the scene as one big object. That of course eats memory. No idea if a shader could achive this more efficiently?
+
+And what about the garden? A textured rectangle, slighty floating above the ground? Would that cause severe z-fighting? Is there a better way with shaders? Or create the urban landclass completely automatic at scenery load time?
+
+ThomasA
+---
+Textured roofs now look better for small buildings. However, there is only one texture so far. Also, large , which also looks silly for large area buildings, you'd still get artifacts.
+---
+Let me try to reply to some of these:
+
+    > I'm also confident I could write FG/SG/OSG code that loads N shared
+    > models, copies them a couple of thousand times, and places them into the
+    > scene as one big object. That of course eats memory. No idea if a shader
+    > could achieve this more efficiently?
+    >
+    > And what about the garden? A textured rectangle, slighty floating above
+    > the ground? Would that cause severe z-fighting? Is there a better way
+    > with shaders? Or create the urban land class consisting of those little
+    > lots completely automatic at scenery load time?
+
+    My main concern would be to implement this in an optional way. We are seeing a fair fraction of users with low-end systems having problems even running the 2.0 scenery. If they're getting additional 60k buildings shipped in a precomputed way (which would be the case if they end up as static models), cities become no-fly zones for these users. I know that Paris already is for some.
+
+    Stuart has dropped the merging models approach for random buildings in favour of an instancing approach because large urban areas like Tehran or Los Angeles simply blew the memory of even decently equipped systems.
+
+    So whatever the system is, I think it needs to be optional, and it needs to work such that it deals with the worst-cases, urban sprawls to the horizon, and then take it from there.
+
+    The current approach for random buildings and trees we use is more memory-friendly and is called instancing. There's a limited number of copies of objects which are all sitting at the origin, and their position and orientation information is passed in gl_Color to the vertex shader in every instance, and the building is then positioned inside the vertex shader. Like all shader-based techniques, this has the advantage that it can simply be turned off runtime, the density of buildings can dynamically be reduced by moving vertices out of the view frustrum early on by evaluating a threshold attribute against a random number, as evidenced by the forest effect, a limited amount of random patterns can be imposed after the fact altering e.g. size distribution of buildings slightly....
+
+My secondary concern would then be with the high vertex density of roads - currently they're quite costly, and this hinges on a LOD system.
+
+My third question would be how easy the techniqe can be extended by non-developers to different parts of the world, as cities in the US are rather different from cities in Europe .
+
+As for the garden, if the information where to draw it can be represented in a 'simple' way, letting the shader draw the patches is not an issue. Representing the information efficiently may be the issue though. Basically the fragment shader has a position (xyz) and needs to call a function f(xyz) that returns 1 if a garden should be drawn (that's a bit like the cloud shadow problem). The function can be a texture, so a table lookup is performed, or something else (cloud shadows evaluate a series of distance checks to specified points)
+
+A textured rectangle floating above the ground would be the easier solution, but it will float if the terrain is not level, so we need a solution which also works for sloped terrain. You could use a block instead, but then you get a terraced appearance of cities.
+
+The best solution for high-end systems would probably be to pre-compute the building positions outside FG, from these assemble textures which contain the garden information at tile loading time and then use instancing to position the buildings inside the shader and the garden texture to determine vegetation as is done now at tile loading  time and use instancing to position the trees. I'm not completely clear on how to do this optionally though...
+
+Hope that advances the discussion...
+
+* Thorsten
+---
+
+
+2. die Straßen erstmal auch von osm2city als texturierte Bänder über die Scene legen. Kreuzungen etc kann man dann auch schön bemalen. Straßen in osm2city zu lesen brauche ich sowieso für mein Brücken-Projekt.
+
+3. entlang der Straßen Häuser als shared models platzieren. Die shared models können jeweils einen texturierten “Garten” auf einer Grundfläche mitbringen. Diese Grundfläche passt osm2city an die tatsächliche elevation der scene an. Außerdem können die Häuser etwas mehr Details (ggf. mit LOD) besitzen, als lediglich die derzeitigen Fassaden.
+
+
+The current approach of a generic urban texture + placement masks largely collides with 1.
+
+
+1) is already possible with existing TG.
+
+Source for building floorplans.
+1. use some reasonable shared models placed procedurally along OSM roads.
+  + can use somewhat detailed, hand-modeled buildings
+  + can come with a patch of ground texture that perfectly matches the building
+  - need a number of hand-modeled buildings
+
+Texture for these shared models would be merged into an atlas. That's rather easy to script with python.
+
+OR
+
+2. use actual OSM data.
+  - individual buildings won't be as detailled, but match real outline.
+
+OR
+
+3. mix both approaches: use OSM data for large buildings likely to be associated with the RL counterpart (until an individually modeled one becomes available), and place shared models for the boring ones, or if no OSM building coverage available.
+
+I'm really in favour of 1. because of the level of detail possible.
+
+Two general approaches: either outside of FG as a pre-processor (current state), or withing FG at terrain load time.
+
+1. pre-processor
+  - users get OSM data, generate city models outside of FG. This process can be highly automated (portreekid is working on this). Creating buildings is now reasonably quick, say some minutes for LOWI area.
+
+2. integrate into FG.
+  - need OSM line data
+
+
+Shared model loading in FG:
+- merge into one object/drawable.
+As I understand, individual textures then have to be merged into one file. I could code a python script which:
+    - for all .acs:
+    -   load .ac
+    -   if repeating textures found, reject .ac
+    - for all accepted .acs:
+    - create texture atlas
+      - adapt texture coordinates
+      - write .ac
+
+Any plans to do this within FG? Should, in the light of reducing drawables, the use of repeating textures be discouraged?
+
+
+Eine Weile lang war das auch mein Favorit, also der Ansatz “eine große Texture für eine Stadt”. Mein Besuch beim FSweekend und das Treffen mit den anderen FG-devs hat dann aber meine Pläne geändert. Ich bin nach wie vor begeistert, wieviel Performance das zusammenfassen von den Tausenden Objekten bringt. Ich kann locker 10km weit weg alle Häuser zeichnen und bekomme immer noch 20fps mit Intel HD 5000-Grafik. Demnächst ist vielleicht auch meine “große” Maschine wieder einsatzbereit mit richtiger Nvidia-Karte, bin mal gespannt, wie das dann rennt.
+
+Ich plane daher nun eher in eine ähnliche Richtung wie X-Plane:
+
+1. ein paar generische Texturen als Hintergrund
+
+2. die Straßen erstmal auch von osm2city als texturierte Bänder über die Scene legen. Kreuzungen etc kann man dann auch schön bemalen. Straßen in osm2city zu lesen brauche ich sowieso für mein Brücken-Projekt.
+
+3. entlang der Straßen Häuser als shared models platzieren. Die shared models können jeweils einen texturierten “Garten” auf einer Grundfläche mitbringen. Diese Grundfläche passt osm2city an die tatsächliche elevation der scene an. Außerdem können die Häuser etwas mehr Details (ggf. mit LOD) besitzen, als lediglich die derzeitigen Fassaden.
+
+Die shared models kommen zunächst einzeln als .ac. Wenn man davon 20, 30, 100 Stück hat, sollte eine Stadt schon einigermaßen divers aussehen. ich würde mir mal anschauen, was in $FGDATA dazu schon rumliegt. osm2city liest das .ac, passt die Grundfläche an, und schreibt am Ende ein großes .ac per tile mit möglichst wenigen OBJECTs.
+
+Shared models zu platzieren wäre auch eine Lösung für das Problem der teilweise schlechten OSM-Gebäudedichte. X-Plane platziert die Häuser nach einem offensichtlich recht simplen Algorithmus, und es sieht dennoch überzeugen genug aus.
+
+4. große, markante OSM-Gebäude könnten nach wie vor als Fassade eingebaut werden.
+
+Beide Ansätze schließen sich ja keinesfalls aus. Meine Nah-Ziele sind
+
+- im aktuellen osm2city Fassaden/Dachtexturen zu fixen, und dann ein neues LOWI-release. Das sollte in den nächsten 2 Woche drin sein.
+- dann die Straßen von OSM lesen, texturieren und schreiben, neues LOWI-release
+- shared models lesen, anpassen, schreiben
+- mal testweise Bäume als static objects entlang der Straßen pflanzen
+
+Thomas
