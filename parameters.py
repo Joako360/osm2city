@@ -43,7 +43,6 @@ USE_PKL = False             # -- instead of parsing the OSM file, read a previou
 PATH_TO_OUTPUT = ""
 
 NO_ELEV = False             # -- skip elevation interpolation
-MANUAL_ELEV = True          # uses manual process with copy elev.in and elev.out through Nasal. Otherwise experimental direct FG invocation
 ELEV_MODE = ''              # Either Manual, Telnet, Fgelev
 
 #=============================================================================
