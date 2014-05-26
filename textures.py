@@ -309,7 +309,7 @@ def init():
                                 19.4, [274, 676, 1114, 1542, 2048], False, True,
                                 height_max = 13.,
                                 v_split_from_bottom = True,
-                                requires=['roof:color:red'],
+                                requires=['roof:color:black'],
                                 provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
     if True:
 
