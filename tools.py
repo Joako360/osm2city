@@ -115,28 +115,10 @@ def raster_glob():
     lmax = vec2d.vec2d(transform.toLocal(cmax.__iter__()))
     delta = (lmax - lmin)*0.5
     print "Distance from center to boundary in meters (x, y):", delta
+    err_msg = "Unknown Elevation Query mode : %s Use Manual, Telnet or Fgelev for parameter ELEV_MODE "%(parameters.ELEV_MODE)
     if parameters.ELEV_MODE == '':
-        if parameters.MANUAL_ELEV:
-            print "Creating elev.in ..."
-            fname = parameters.PREFIX + os.sep + "elev.in"
-            raster(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
-
-            path = calc_tile.directory_name(center)
-            msg = textwrap.dedent("""
-            Done. You should now
-            - copy elev.in to $FGDATA/Nasal/
-            - hide the scenery folder Objects/%s to prevent probing on top of existing objects
-            - start FG, open Nasal console, enter 'elev.get()', press execute. This will create /tmp/elev.xml
-            - once that's done, copy /tmp/elev.xml to your $PREFIX folder
-            - unhide the scenery folder
-            """ % path)
-            print msg
-            return
-        else:
-            fname = parameters.PREFIX + os.sep + 'elev.out'
-            print "Creating ", fname
-            raster_fgelev(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
-            return
+        logging.error(err_msg)
+        sys.exit(err_msg)
     elif parameters.ELEV_MODE == 'Manual':
         print "Creating elev.in ..."
         fname = parameters.PREFIX + os.sep + "elev.in"
@@ -167,9 +149,11 @@ def raster_glob():
         else:
             print "Skipping ", parameters.PREFIX + os.sep + 'elev.out', " exists"
     else:
-        logging.error("Unknown Elev mode : %s Use Manual, Telnet or Fgelev"%(parameters.ELEV_MODE))
+        logging.error(err_msg)
+        sys.exit(err_msg)
 
 def wait_for_fg(fg):
+# Waits for Flightgear to signal, that the elevation processing has finished    
     for count in range(0,1000):
         semaphore = fg.get_prop("/osm2city/tiles")
         semaphore = semaphore.split('=')[1]
@@ -185,8 +169,8 @@ def wait_for_fg(fg):
                 # perform an action#
                 pass
         time.sleep(1)
-        if not m2 is None:
-            print( "Waiting for Semaphore " + m2.groups()[0])
+        if not m2 is None:        
+            logging.debug( "Waiting for Semaphore " + m2.groups()[0])
     return False
 
 def raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
