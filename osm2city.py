@@ -249,15 +249,16 @@ class Buildings(object):
             ring.coords = list(ring.coords)[::-1]
         return ring
 
-    def store_uncategorzied_way(self, way, nodes_dict):
-        self.way_list.append(way)
+    def make_way_buildings(self):
+        def tag_matches(tags, req_tags):
+            for tag in tags:
+                if tag in req_tags:
+                    return True
+            return False
 
-    def process_way(self, way, nodes_dict, inner_ways = []):
-        if not self.nodes_dict:
-            self.nodes_dict = nodes_dict
-        if tools.stats.objects >= parameters.MAX_OBJECTS: return
-        self.way_list.append(way)
-        self._make_building_from_way(way.osm_id, way.tags, way.refs)
+        for way in self.way_list:
+            if tag_matches(way.tags, self.req_way_keys):
+                self._make_building_from_way(way.osm_id, way.tags, way.refs)
 
     def _make_building_from_way(self, osm_id, tags, refs, inner_ways = []):
         if refs[0] == refs[-1]: refs = refs[0:-1] # -- kick last ref if it coincides with first
@@ -268,8 +269,8 @@ class Buildings(object):
         layer = 99
 
         # -- funny things might happen while parsing OSM
-#        try:
-        if 1:
+        try:
+#        if 1:
             if 'name' in tags:
                 name = tags['name']
                 #print "%s" % _name
@@ -299,8 +300,8 @@ class Buildings(object):
             inner_rings_list = []
             for _way in inner_ways:
                 inner_rings_list.append(self._refs_to_ring(_way.refs, inner=True))
-#        except Exception, reason:
-        else:
+        except Exception, reason:
+#        else:
             print "\nFailed to parse building (%s)" % reason, osm_id, tags, refs
             tools.stats.parse_errors += 1
             return False
@@ -312,7 +313,23 @@ class Buildings(object):
             logging.info(tools.stats.objects)
         return True
 
+    def store_uncategorzied_way(self, way, nodes_dict):
+        """We need uncategorized ways (those without tags) too. They could
+           be part of a relation building."""
+        self.way_list.append(way)
+
+    def process_way(self, way, nodes_dict):
+        """Store ways. These simple buildings will be created only after
+           relations have been parsed, to prevent double buildings. Our way
+           could be part of a relation building and still have a 'building' tag attached.
+        """
+        if not self.nodes_dict:
+            self.nodes_dict = nodes_dict
+        if tools.stats.objects >= parameters.MAX_OBJECTS: return
+        self.way_list.append(way)
+
     def process_relation(self, relation):
+        """Build relation buildings right after parsing."""
         print "__________- got relation", relation
         bla = 0
         if int(relation.osm_id) == 5789:
@@ -336,9 +353,7 @@ class Buildings(object):
                         for way in self.way_list:
                             if way.osm_id == m.ref: inner_ways.append(way)
 
-            if outer_ways == []:
-                print "!!!no outer ways!"
-                bl
+            assert (outer_ways != [])
 
             if outer_ways:
                 #print "len outer ways", len(outer_ways)
@@ -367,23 +382,6 @@ class Buildings(object):
                 for _way in outer_ways:
                     self.way_list.remove(_way)
 
-
-    def process_osm_elements(self, nodes, ways, relations):
-        """Takes osmparser Node, Way and Relation objects and transforms them to Building objects"""
-        self._process_coords(nodes)
-        self._process_ways(ways)
-        self._process_relations(relations)
-        for _way in self.way_list:
-            if 'building' in _way.tags:
-                if tools.stats.objects >= parameters.MAX_OBJECTS:
-                    return
-                self._make_building_from_way(_way.osm_id, _way.tags, _way.refs)
-            elif 'building:part' in _way.tags:
-                if tools.stats.objects >= parameters.MAX_OBJECTS:
-                    return
-                self._make_building_from_way(_way.osm_id, _way.tags, _way.refs)
-#            elif 'bridge' in way.tags:
-#                self.make_bridge_from_way(way.osm_id, way.tags, way.refs)
 
     def _process_coords(self, coords):
         for _node in coords.values():
@@ -627,19 +625,14 @@ if __name__ == "__main__":
 
         buildings = Buildings()
 
-# How to improve OSM parsing?
-# give parser a tuple (valid_way_keys, req_way_keys, way_callback) For each way, the parser calls way_callback(way, nodes)
-# could add multiple tuples, one per OSM feature
-
         handler = osmparser.OSMContentHandler(valid_node_keys = [])
         buildings.register_callbacks_with(handler)
         source = open(osm_fname)
         logging.info("Reading the OSM file might take some time ...")
         handler.parse(source)
 
-        logging.info("Transforming OSM objects to Buildings")
-        #way.process_osm_elements(handler.nodes_dict, handler.ways_dict, handler.relations_dict)
         #tools.stats.print_summary()
+        buildings.make_way_buildings()
 
         buildings = buildings.buildings
         logging.debug("number of buildings", len(buildings))
