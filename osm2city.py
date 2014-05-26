@@ -330,18 +330,18 @@ class Buildings(object):
 
     def process_relation(self, relation):
         """Build relation buildings right after parsing."""
-        print "__________- got relation", relation
-        bla = 0
-        if int(relation.osm_id) == 5789:
-            print "::::::::::::: name", relation.tags['name']
-            bla = 1
+#        print "__________- got relation", relation
+#        bla = 0
+#        if int(relation.osm_id) == 5789:
+#            print "::::::::::::: name", relation.tags['name']
+#            bla = 1
         if tools.stats.objects >= parameters.MAX_OBJECTS:
             return
 
         if 'building' in relation.tags:
             outer_ways = []
             inner_ways = []
-            print "rel: ", relation.osm_id, relation.tags #, members
+#            print "rel: ", relation.osm_id, relation.tags #, members
             for m in relation.members:
 #                print "  member", m, m.type_, m.role
 #                    if typ == 'way' and role == 'inner':
@@ -352,8 +352,6 @@ class Buildings(object):
                     elif m.role == 'inner':
                         for way in self.way_list:
                             if way.osm_id == m.ref: inner_ways.append(way)
-
-            assert (outer_ways != [])
 
             if outer_ways:
                 #print "len outer ways", len(outer_ways)
@@ -375,12 +373,14 @@ class Buildings(object):
                     res = self._make_building_from_way(relation.osm_id,
                                                 all_tags,
                                                 all_outer_refs, inner_ways)
-                print ":::::mk_build returns", res,
-                if bla:
-                    print relation.tags['name']
+#                print ":::::mk_build returns", res,
+#                if bla:
+#                    print relation.tags['name']
                 # -- way could have a 'building' tag, too. Prevent processing this twice.
                 for _way in outer_ways:
                     self.way_list.remove(_way)
+            else:
+                logging.info("Skipping relation %i: no outer way." % relation.osm_id)
 
 
     def _process_coords(self, coords):
@@ -616,6 +616,11 @@ if __name__ == "__main__":
     #    End result is 'buildings', a list of building objects
     pkl_fname = parameters.PREFIX + os.sep + parameters.OSM_FILE + '.pkl'
     osm_fname = parameters.PREFIX + os.sep + parameters.OSM_FILE
+
+    if parameters.USE_PKL and not os.path.exists(pkl_fname):
+        logging.warn("pkl file %s not found, will parse OSM file %s instead." % (pkl_fname, osm_fname))
+        parameters.USE_PKL = False
+
     if not parameters.USE_PKL:
         # -- parse OSM, return
         if os.path.exists(pkl_fname):
@@ -623,9 +628,8 @@ if __name__ == "__main__":
             if raw_input().lower() != 'y':
                 sys.exit(-1)
 
-        buildings = Buildings()
-
         handler = osmparser.OSMContentHandler(valid_node_keys = [])
+        buildings = Buildings()
         buildings.register_callbacks_with(handler)
         source = open(osm_fname)
         logging.info("Reading the OSM file might take some time ...")
