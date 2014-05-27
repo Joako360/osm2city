@@ -16,10 +16,14 @@ class Face(object):
         assert len(nodes_uv_list) >= 3
         for n in nodes_uv_list:
             assert len(n) == 3
-        if rotate:
+        if rotate and 0:
             # -- roll (u, v) along node axis
             a = np.array(nodes_uv_list)
+            print a
             a[:,1:] = np.roll(a[:,1:],1, axis=0)
+            print
+            print a
+            print "--"
             nodes_uv_list = list(a)
         self.nodes_uv_list = nodes_uv_list
         self.typ = typ

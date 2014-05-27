@@ -82,6 +82,7 @@ def check_height(building_height, t):
         # x min_height < height < max_height
         # x find closest match
         # - evaluate error
+
         # - error acceptable?
         if building_height >= t.v_splits_meters[0] and building_height <= t.v_size_meters:
 #            print "--->"

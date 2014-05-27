@@ -96,6 +96,10 @@ class TextureManager(object):
         t.provides = new_provides
         self.__l.append(t)
 
+    def keep_only(self, i):
+        """debug: loose all but this texture"""
+        self.__l = [self.__l[i]]
+
     def find_matching(self, requires = []):
         candidates = self.find_candidates(requires)
         logging.debug("looking for texture" + str(requires))
@@ -216,6 +220,8 @@ class Texture(object):
         self.height_min = height_min
         self.height_max = height_max
         self.v_split_from_bottom = v_split_from_bottom
+        h_splits.sort()
+        v_splits.sort()
         # roof type, color
 #        self.v_min = v_min
 #        self.v_max = v_max
@@ -240,12 +246,10 @@ class Texture(object):
             self.height_min = self.v_splits_meters[0]
             self.height_max = self.v_size_meters
 
-#        self.h_min = h_min
-#        self.h_max = h_max
         self.h_size_meters = h_size_meters
         self.h_splits = np.array(h_splits, dtype=np.float)
-        print "h1", self.h_splits
-        print "h2", h_splits
+        #print "h1", self.h_splits
+        #print "h2", h_splits
 
         if h_splits == None or h_splits == []:
             self.h_splits = np.array([1.])
@@ -371,14 +375,6 @@ def init():
                                 requires=['roof:color:black'],
                                 provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
 
-    # -- this just looks ugly
-    #    facades.append(Texture('tex/facade_modern1',
-    #                           2.5, None, True,
-    #                           2.8, None, True,
-    #                           height_min = 15.,
-    #                           provides=['shape:urban','shape:residential','age:modern',
-    #                                     'compat:roof-flat']))
-
     #    facades.append(Texture('tex/DSCF9710_pow2',
     #                           29.9, (284,556,874,1180,1512,1780,2048), True,
     #                           19.8, (173,329,490,645,791,1024), False, True,
@@ -433,6 +429,8 @@ def init():
 #    roofs.append(Texture('tex/roof_black3_small_256x128',
 #                             0.25, [], True, 0.12, [], True, provides=['color:black']))
 
+    facades.keep_only(-1)
+
     if False:
         print roofs[0].provides
         print "black roofs: ", [str(i) for i in roofs.find_candidates(['roof:color:black'])]
@@ -472,13 +470,12 @@ def init():
 
     logging.info(facades)
 
-
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     init()
 
     cands = facades.find_candidates([], 14)
-    print "cands are", cands
+    #print "cands are", cands
     for t in cands:
         #print "%5.2g  %s" % (t.height_min, t.filename)
         logging.debug('%s (%4.2f, %4.2f) (%4.2f, %4.2f)' % (t.filename, t.x0, t.y0, t.x1, t.y1))
