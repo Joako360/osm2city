@@ -157,14 +157,6 @@ class FacadeManager(TextureManager):
 #        print "remaining cands", [str(t.filename) for t in new_candidates]
         return new_candidates
 
-
-#
-#
-#tex_facade = facades.find_matching(building_height, ["shape:residential", "age:modern"])
-#tex_roof = roofs.find_matching(tex_facade.requires+["shape:flat"])
-
-
-
 def find_matching_texture(cls, textures):
     candidates = []
     for t in textures:
@@ -173,9 +165,6 @@ def find_matching_texture(cls, textures):
     return candidates[random.randint(0, len(candidates)-1)]
 
 class Texture(object):
-#    def __init__(self, filename, h_min, h_max, h_size, h_splits, \
-#                                 v_min, v_max, v_size, v_splits, \
-#                                 has_roof_section):
     """
     possible texture types:
         - facade
@@ -264,13 +253,17 @@ class Texture(object):
 
     def x(self, x):
         """given non-dimensional texture coord, return position in atlas"""
-        #print "xx==", (self.x0 + x*self.sx)
-        return self.x0 + x * self.sx
+        if self.rotated:
+            return self.y0 + x * self.sy
+        else:
+            return self.x0 + x * self.sx
 
     def y(self, y):
         """given non-dimensional texture coord, return position in atlas"""
-        #print "yy==", (self.y0 + y*self.sy)
-        return self.y0 + y * self.sy
+        if self.rotated:
+            return self.x0 + y * self.sx
+        else:
+            return self.y0 + y * self.sy
 
     def __str__(self):
         return "<%s> x0,1 %4.2f %4.2f  y0,1 %4.2f %4.2f  sh,v %4.2fm %4.2fm" % \
@@ -299,111 +292,93 @@ def init():
     facades = FacadeManager('facade')
     roofs = TextureManager('roof')
 
-    if True:
-#        facades.append(Texture('tex/DSCF9495_pow2',
-#                                14, [585, 873, 1179, 1480, 2048], True,
-#                                19.4, [274, 676, 1114, 1542, 2048], False, True,
-#                                requires=['roof:color:black'],
-#                                provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
+    facades.append(Texture('tex/DSCF9495_pow2.png',
+        14, [585, 873, 1179, 1480, 2048], True,
+        19.4, [274, 676, 1114, 1542, 2048], False, True,
+        height_max = 13.,
+        v_split_from_bottom = True,
+        requires=['roof:color:black'],
+        provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
 
-#                                19.4, [1094, 1531, 2048], False, True,
+    facades.append(Texture('tex/LZ_old_bright_bc2.png',
+        17.9, [345,807,1023,1236,1452,1686,2048], True,
+        14.8, [558,1005,1446,2048], False, True,
+        provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
 
-        facades.append(Texture('tex/DSCF9495_pow2.png',
-                                14, [585, 873, 1179, 1480, 2048], True,
-                                19.4, [274, 676, 1114, 1542, 2048], False, True,
-                                height_max = 13.,
-                                v_split_from_bottom = True,
-                                requires=['roof:color:black'],
-                                provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
-    if True:
+    facades.append(Texture('tex/facade_modern_21x42m.jpg',
+        43., [40, 79, 115, 156, 196, 235, 273, 312, 351, 389, 428, 468, 507, 545, 584, 624, 662], True,
+        88., [667, 597, 530, 460, 391, 322, 254, 185, 117, 48, 736, 804, 873, 943, 1012, 1080, 1151, 1218, 1288, 1350], False, True,
+        v_split_from_bottom = True,
+        requires=[],
+        provides=['shape:urban','age:modern', 'compat:roof-flat']))
 
-        # -- just two windows. Looks rather boring. But maybe we need a very narrow texture?
-    #    facades.append(Texture('tex/DSCF9496_pow2',
-    #                            4.44, None, True,
-    #                            17.93, (1099, 1521, 2048), False, True,
-    #                            requires=['roof:color:black'],
-    #                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
+    facades.append(Texture('tex/facade_modern_black_46x60m.jpg',
+        45.9, [167, 345, 521, 700, 873, 944], True,
+        60.5, [144, 229, 311, 393, 480, 562, 645, 732, 818, 901, 983, 1067, 1154, 1245], False, True,
+        v_split_from_bottom = True,
+        requires=[],
+        provides=['shape:urban','age:modern', 'compat:roof-flat']))
 
-        facades.append(Texture('tex/LZ_old_bright_bc2.png',
-                                17.9, [345,807,1023,1236,1452,1686,2048], True,
-                                14.8, [558,1005,1446,2048], False, True,
-                                provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
+    facades.append(Texture('tex/facade_industrial_white_26x14m.jpg',
+        25.7, [165, 368, 575, 781, 987, 1191, 1332], True,
+        13.5, [383, 444, 501, 562, 621, 702], False, True,
+        v_split_from_bottom = True,
+        requires=[],
+        provides=['shape:industrial','age:modern', 'compat:roof-flat']))
 
-        facades.append(Texture('tex/facade_modern_21x42m.jpg',
-            43., [40, 79, 115, 156, 196, 235, 273, 312, 351, 389, 428, 468, 507, 545, 584, 624, 662], True,
-            88., [667, 597, 530, 460, 391, 322, 254, 185, 117, 48, 736, 804, 873, 943, 1012, 1080, 1151, 1218, 1288, 1350], False, True,
-            v_split_from_bottom = True,
-            requires=[],
-            provides=['shape:urban','age:modern', 'compat:roof-flat']))
+    facades.append(Texture('tex/facade_modern_commercial_35x20m.jpg',
+        34.6, [105, 210, 312, 417, 519, 622, 726, 829, 933, 1039, 1144, 1245, 1350], True,
+        20.4, [177, 331, 489, 651, 796], False, True,
+        v_split_from_bottom = True,
+        requires=[],
+        provides=['shape:commercial','age:modern', 'compat:roof-flat']))
 
-        facades.append(Texture('tex/facade_modern_black_46x60m.jpg',
-            45.9, [167, 345, 521, 700, 873, 944], True,
-            60.5, [144, 229, 311, 393, 480, 562, 645, 732, 818, 901, 983, 1067, 1154, 1245], False, True,
-            v_split_from_bottom = True,
-            requires=[],
-            provides=['shape:urban','age:modern', 'compat:roof-flat']))
+    facades.append(Texture('tex/facade_modern36x36_12.png',
+        36., [], True,
+        36., [158, 234, 312, 388, 465, 542, 619, 697, 773, 870, 1024], False, True,
+        provides=['shape:urban','shape:residential','age:modern',
+                 'compat:roof-flat']))
 
-        facades.append(Texture('tex/facade_industrial_white_26x14m.jpg',
-            25.7, [165, 368, 575, 781, 987, 1191, 1332], True,
-            13.5, [383, 444, 501, 562, 621, 702], False, True,
-            v_split_from_bottom = True,
-            requires=[],
-            provides=['shape:industrial','age:modern', 'compat:roof-flat']))
+#    facades.append(Texture('tex/DSCF9503_pow2',
+#                            12.85, None, True,
+#                            17.66, (1168, 1560, 2048), False, True,
+#                            requires=['roof:color:black'],
+#                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
+    facades.append(Texture('tex/DSCF9503_noroofsec_pow2.png',
+        12.85, [360, 708, 1044, 1392, 2048], True,
+        17.66, [556,1015,1474,2048], False, True,
+        requires=['roof:color:black'],
+        provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
 
-        facades.append(Texture('tex/facade_modern_commercial_35x20m.jpg',
-            34.6, [105, 210, 312, 417, 519, 622, 726, 829, 933, 1039, 1144, 1245, 1350], True,
-            20.4, [177, 331, 489, 651, 796], False, True,
-            v_split_from_bottom = True,
-            requires=[],
-            provides=['shape:commercial','age:modern', 'compat:roof-flat']))
+#    facades.append(Texture('tex/DSCF9710_pow2',
+#                           29.9, (284,556,874,1180,1512,1780,2048), True,
+#                           19.8, (173,329,490,645,791,1024), False, True,
+#                           provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
 
-
-        facades.append(Texture('tex/facade_modern36x36_12.png',
-                                36., [], True,
-                                36., [158, 234, 312, 388, 465, 542, 619, 697, 773, 870, 1024], False, True,
-                                provides=['shape:urban','shape:residential','age:modern',
-                                         'compat:roof-flat']))
-
-    #    facades.append(Texture('tex/DSCF9503_pow2',
-    #                            12.85, None, True,
-    #                            17.66, (1168, 1560, 2048), False, True,
-    #                            requires=['roof:color:black'],
-    #                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
-        facades.append(Texture('tex/DSCF9503_noroofsec_pow2.png',
-                                12.85, [360, 708, 1044, 1392, 2048], True,
-                                17.66, [556,1015,1474,2048], False, True,
-                                requires=['roof:color:black'],
-                                provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
-
-    #    facades.append(Texture('tex/DSCF9710_pow2',
-    #                           29.9, (284,556,874,1180,1512,1780,2048), True,
-    #                           19.8, (173,329,490,645,791,1024), False, True,
-    #                           provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
-
-        facades.append(Texture('tex/DSCF9710.png',
-                               29.9, [142,278,437,590,756,890,1024], True,
-                               19.8, [130,216,297,387,512], False, True,
-                               provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
+    facades.append(Texture('tex/DSCF9710.png',
+       29.9, [142,278,437,590,756,890,1024], True,
+       19.8, [130,216,297,387,512], False, True,
+       provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
 
 
-        facades.append(Texture('tex/DSCF9678_pow2.png',
-                               10.4, [97,152,210,299,355,411,512], True,
-                               15.5, [132,211,310,512], False, True,
-                               provides=['shape:residential','shape:commercial','age:modern','compat:roof-flat']))
+    facades.append(Texture('tex/DSCF9678_pow2.png',
+       10.4, [97,152,210,299,355,411,512], True,
+       15.5, [132,211,310,512], False, True,
+       provides=['shape:residential','shape:commercial','age:modern','compat:roof-flat']))
 
-        facades.append(Texture('tex/DSCF9726_noroofsec_pow2.png',
-                               15.1, [321,703,1024], True,
-                               9.6, [227,512], False, True,
-                               provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
+    facades.append(Texture('tex/DSCF9726_noroofsec_pow2.png',
+       15.1, [321,703,1024], True,
+       9.6, [227,512], False, True,
+       provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
 
-        facades.append(Texture('tex/wohnheime_petersburger.png',
-                                15.6, [215, 414, 614, 814, 1024], False,
-                                15.6, [112, 295, 477, 660, 843, 1024], True, True,
-                                height_min = 15.,
-                                provides=['shape:urban','shape:residential','age:modern',
-                                         'compat:roof-flat']))
-    #                            provides=['shape:urban','shape:residential','age:modern','age:old',
-    #                                     'compat:roof-flat','compat:roof-pitched']))
+    facades.append(Texture('tex/wohnheime_petersburger.png',
+       15.6, [215, 414, 614, 814, 1024], False,
+       15.6, [112, 295, 477, 660, 843, 1024], True, True,
+       height_min = 15.,
+       provides=['shape:urban','shape:residential','age:modern',
+                 'compat:roof-flat']))
+#                            provides=['shape:urban','shape:residential','age:modern','age:old',
+#                                     'compat:roof-flat','compat:roof-pitched']))
 
 
 #    roofs.append(Texture('tex/roof_tiled_black',
@@ -411,15 +386,15 @@ def init():
 #    roofs.append(Texture('tex/roof_tiled_red',
 #                         1., [], True, 1., [], False, provides=['color:red']))
     roofs.append(Texture('tex/roof_red_1.png',
-                         31.8, [], True, 16.1, [], False, provides=['color:red', 'compat:roof-pitched']))
+        31.8, [], True, 16.1, [], False, provides=['color:red', 'compat:roof-pitched']))
     roofs.append(Texture('tex/roof_black_1.png',
-                         31.8, [], True, 16.1, [], False, provides=['color:black', 'compat:roof-pitched']))
+        31.8, [], True, 16.1, [], False, provides=['color:black', 'compat:roof-pitched']))
     roofs.append(Texture('tex/roof_black4.jpg',
-                         6., [], True, 3.5, [], False, provides=['color:black', 'compat:roof-pitched']))
+        6., [], True, 3.5, [], False, provides=['color:black', 'compat:roof-pitched']))
     roofs.append(Texture('tex/roof_gen_black_1.png',
-                         100., [], True, 100., [], False, provides=['color:red', 'compat:roof-flat']))
+        100., [], True, 100., [], False, provides=['color:red', 'compat:roof-flat']))
     roofs.append(Texture('tex/roof_gen_black_1.png',
-                         100., [], True, 100., [], False, provides=['color:black', 'compat:roof-flat']))
+        100., [], True, 100., [], False, provides=['color:black', 'compat:roof-flat']))
 
 #    roofs.append(Texture('tex/roof_black2',
 #                             1.39, [], True, 0.89, [], True, provides=['color:black']))
@@ -429,7 +404,7 @@ def init():
 #    roofs.append(Texture('tex/roof_black3_small_256x128',
 #                             0.25, [], True, 0.12, [], True, provides=['color:black']))
 
-    facades.keep_only(-1)
+    #facades.keep_only(-1)
 
     if False:
         print roofs[0].provides

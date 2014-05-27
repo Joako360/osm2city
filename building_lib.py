@@ -581,6 +581,9 @@ def write_ground(out, b, elev):
                (o+3,0,0)], mat=1)
 
 def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner = False):
+    tex_y0 = texture.y(tex_y0) # -- to atlas coordinates
+    tex_y1 = texture.y(tex_y1)
+
     nnodes_ring = len(ring.coords) - 1
     v1 = v0 + nnodes_ring
     #print "v0 %i v1 %i lenX %i" % (v0, v1, len(b.lenX))
@@ -598,28 +601,25 @@ def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner = False):
                 #assert(tex_x1 <= 1.)
                 if not (tex_x1 <= 1.):
                     logging.debug('FIXME: v_can_repeat: need to check in analyse')
-        if 0:
-            tex_x1 = texture.x(1.)
         tex_x0 = texture.x(0)
+        print "texx", tex_x0, tex_x1
         j = i + b.first_node
-        out.face([ (j,                        texture.x(tex_x0), texture.y(tex_y0)),
-                   (j + 1,                    texture.x(tex_x1), texture.y(tex_y0)),
-                   (j + 1 + b._nnodes_ground, texture.x(tex_x1), texture.y(tex_y1)),
-                   (j     + b._nnodes_ground, texture.x(tex_x0), texture.y(tex_y1)) ],
+        out.face([ (j,                        tex_x0, tex_y0),
+                   (j + 1,                    tex_x1, tex_y0),
+                   (j + 1 + b._nnodes_ground, tex_x1, tex_y1),
+                   (j     + b._nnodes_ground, tex_x0, tex_y1) ],
                    rotate=texture.v_can_repeat)
 
     # -- closing wall
     tex_x1 = texture.x(b.lenX[v1-1] /  texture.h_size_meters)
-    if 0:
-        tex_x1 = texture.x(1)
 
     j0 = v0 + b.first_node
     j1 = v1 + b.first_node
 
-    out.face([ (j1 - 1,             texture.x(tex_x0), texture.y(tex_y0)),
-               (j0,                 texture.x(tex_x1), texture.y(tex_y0)),
-               (j0 + b._nnodes_ground,     texture.x(tex_x1), texture.y(tex_y1)),
-               (j1 - 1 + b._nnodes_ground, texture.x(tex_x0), texture.y(tex_y1))  ],
+    out.face([ (j1 - 1,             tex_x0, tex_y0),
+               (j0,                 tex_x1, tex_y0),
+               (j0 + b._nnodes_ground,     tex_x1, tex_y1),
+               (j1 - 1 + b._nnodes_ground, tex_x0, tex_y1)  ],
                rotate=texture.v_can_repeat)
     return v1
     # ---

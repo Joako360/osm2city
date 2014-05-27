@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import string
 import matplotlib.pyplot as plt
-import numpy as np
 
 class Node(object):
     def __init__(self, x, y, z):
@@ -12,19 +11,13 @@ class Node(object):
         return "%1.2f %1.2f %1.2f\n" % (self.x, self.y, self.z)
 
 class Face(object):
+    """if our texture is rotated in texture_atlas, set rotate=True"""
     def __init__(self, nodes_uv_list, typ, mat, rotate):
         assert len(nodes_uv_list) >= 3
         for n in nodes_uv_list:
             assert len(n) == 3
-        if rotate and 0:
-            # -- roll (u, v) along node axis
-            a = np.array(nodes_uv_list)
-            print a
-            a[:,1:] = np.roll(a[:,1:],1, axis=0)
-            print
-            print a
-            print "--"
-            nodes_uv_list = list(a)
+        if rotate:
+            nodes_uv_list = [(n[0], n[2], n[1]) for n in nodes_uv_list]
         self.nodes_uv_list = nodes_uv_list
         self.typ = typ
         self.mat = mat
@@ -60,7 +53,7 @@ class Object(object):
     def next_node_index(self):
         return len(self._nodes)
 
-    def face(self, nodes_uv_list, typ=None, mat=None, rotate=None):
+    def face(self, nodes_uv_list, typ=None, mat=None, rotate=False):
         """Add new face. Return its index."""
         if not typ:
             typ = self.default_type
