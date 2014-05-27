@@ -112,6 +112,7 @@ CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if to little objects
 
 C2P_PROCESS_POWERLINES = True
 C2P_PROCESS_AERIALWAYS = True
+C2P_PROCESS_RAIL_OVERHEAD = True
 
 # Each powerline and aerialway has segments delimited by pylons. The longer the value the better clustering and
 # the better the performance. However due to rounding errors the longer the length per cluster the larger the

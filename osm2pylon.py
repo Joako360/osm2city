@@ -566,15 +566,93 @@ class RailNode(object):
         self.elevation = 0.0  # elevation above sea level in meters
 
 
+class RailMast(object):
+    TYPE_VIRTUAL_MAST = 10  # only used at endpoints of RailLine for calcs - not used for visual masts
+    TYPE_SINGLE_MAST = 11
+    TYPE_DOUBLE_MAST = 12
+
+    def __init__(self, type_, point_on_line, mast_point):
+        self.type_ = type_
+        self.point_on_line = point_on_line
+        self.mast_point = mast_point  # None if type_ is TYPE_VIRTUAL_MAST
+        self.lon = 0.0
+        self.lat = 0.0
+        self.elevation = 0.0
+
+    def is_virtual(self):
+        return self.type_ == RailMast.TYPE_VIRTUAL_MAST
+
+    def calc_global_coordinates(self, my_elev_interpolator, my_coord_transformator):
+        self.lon, self.lat = my_coord_transformator.toGlobal((self.mast_point.x, self.mast_point.y))
+        self.elevation = my_elev_interpolator(vec2d.vec2d(self.lon, self.lat), True)
+
+    def make_stg_entry(self):
+        entry = ["OBJECT_SHARED Models/StreetFurniture/RailPower.xml", str(self.lon), str(self.lat), str(self.elevation)
+                 , str(-90)]  # 90 less because arms are in x-direction in ac-file
+        return " ".join(entry)
+
+
 class RailLine(object):
     TYPE_RAILWAY_GAUGE_NARROW = 11
     TYPE_RAILWAY_GAUGE_NORMAL = 12
+
+    DEFAULT_MAST_DISTANCE = 60
+    OFFSET = 5  # the minimal step size between masts respectively offset from end points
+    MAX_DEVIATION = 1  # The distance the overhead line can be off from the center
 
     def __init__(self, osm_id):
         self.osm_id = osm_id
         self.type_ = 0
         self.nodes = []  # RailNodes
         self.linear = None  # The LineaString of the line
+        self.masts = []
+
+    def get_center_coordinates(self):
+        """Returns the lon/lat coordinates of the line"""
+        my_mast = self.masts[1]  # pos 0 is virtual mast
+        return my_mast.lon, my_mast.lat  # FIXME: needs to be calculated more properly with shapely
+
+    def calc_and_map(self, my_elev_interpolator, my_coord_transformator):
+        self.masts = []  # array of RailMasts
+        self.masts.append(RailMast(RailMast.TYPE_VIRTUAL_MAST, Point(self.nodes[0].x, self.nodes[0].y), None))
+        current_distance = 0  # the distance from the origin of the current mast
+        my_length = self.linear.length  # omit recalculating length all the time
+        my_right_parallel = self.linear.parallel_offset(2.9, 'right', join_style=1)
+        my_right_parallel_length = my_right_parallel.length
+
+        # get the first mast point
+        if my_length < RailLine.DEFAULT_MAST_DISTANCE:
+            current_distance += (my_length / 2)
+            point_on_line = self.linear.interpolate(current_distance)
+            mast_point = my_right_parallel.interpolate(current_distance * (my_right_parallel_length / my_length))
+            self.masts.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point))
+        else:
+            current_distance += RailLine.OFFSET
+            point_on_line = self.linear.interpolate(RailLine.OFFSET)
+            mast_point = my_right_parallel.interpolate(current_distance * (my_right_parallel_length / my_length))
+            self.masts.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point))
+            # get the other mast points
+            while True:
+                if (my_length - current_distance) < (2*RailLine.OFFSET):
+                    break
+                new_distance = min(RailLine.DEFAULT_MAST_DISTANCE, my_length - current_distance - RailLine.OFFSET)
+                current_distance += new_distance
+                point_on_line = self.linear.interpolate(current_distance)
+                mast_point = my_right_parallel.interpolate(current_distance * (my_right_parallel_length / my_length))
+                self.masts.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point))
+        for my_mast in self.masts:
+            if not my_mast.is_virtual():
+                my_mast.calc_global_coordinates(my_elev_interpolator, my_coord_transformator)
+
+    def make_masts_stg_entries(self):
+        """
+        Returns the stg entries for the masts of this RailLine in a string separated by linebreaks
+        """
+        entries = []
+        for my_mast in self.masts:
+            if not my_mast.is_virtual():
+                entries.append(my_mast.make_stg_entry())
+        return "\n".join(entries)
 
 
 def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator):
@@ -904,6 +982,33 @@ def write_stg_entries(stg_fp_dict, lines_dict, wayname):
         stg_file.write(line.make_cables_ac_xml_stg_entries(filename, path) + "\n")
 
 
+def write_rail_stg_entries(stg_fp_dict, lines_dict):
+    line_index = 0
+    for line in lines_dict.values():
+        line_index += 1
+        line_center = line.get_center_coordinates()
+        stg_fname = calc_tile.construct_stg_file_name(line_center)
+        if parameters.PATH_TO_OUTPUT:
+            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, line_center)
+        else:
+            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, line_center)
+        if not stg_fname in stg_fp_dict:
+            if not os.path.exists(path):
+                try:
+                    os.makedirs(path)
+                except OSError:
+                    logging.exception("Unable to create path to output directory")
+                    pass
+            stg_io.uninstall_ours(path, stg_fname, OUR_MAGIC)
+            stg_file = open(path + stg_fname, "a")
+            logging.info('Opening new stg-file for append: ' + path + stg_fname)
+            stg_file.write(stg_io.delimiter_string(OUR_MAGIC, True) + "\n# do not edit below this line\n#\n")
+            stg_fp_dict[stg_fname] = stg_file
+        else:
+            stg_file = stg_fp_dict[stg_fname]
+        stg_file.write(line.make_masts_stg_entries() + "\n")
+
+
 def calc_angle_of_line(x1, y1, x2, y2):
     """Returns the angle in degrees of a line relative to North"""
     angle = math.atan2(x2 - x1, y2 - y1)
@@ -997,13 +1102,11 @@ if __name__ == "__main__":
     # References for buildings
     building_refs = process_osm_building_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
     logging.info('Number of reference buildings: %s', len(building_refs))
-    # Overhead lines for rail
-    rail_lines = process_osm_rail_overhead(handler.nodes_dict, handler.ways_dict, elev_interpolator,
-                                           coord_transformator)
-    logging.info('Reduced number of rail lines: %s', len(rail_lines))
     # Power lines and aerialways
-    powerlines, aerialways = process_osm_power_aerialway(handler.nodes_dict, handler.ways_dict, elev_interpolator,
-                                                  coord_transformator, building_refs)
+    powerlines, aerialways = process_osm_power_aerialway(handler.nodes_dict, handler.ways_dict, elev_interpolator
+                                                         , coord_transformator, building_refs)
+    rail_lines = process_osm_rail_overhead(handler.nodes_dict, handler.ways_dict, elev_interpolator
+                                           , coord_transformator)
     building_refs = None   # free memory
     handler = None  # free memory
 
@@ -1012,9 +1115,12 @@ if __name__ == "__main__":
         powerlines.clear()
     if parameters.C2P_PROCESS_AERIALWAYS is False:
         aerialways.clear()
+    if parameters.C2P_PROCESS_RAIL_OVERHEAD is False:
+        rail_lines.clear()
 
     logging.info('Number of power lines to process: %s', len(powerlines))
     logging.info('Number of aerialways to process: %s', len(aerialways))
+    logging.info('Reduced number of rail lines: %s', len(rail_lines))
 
     # Work on object
     for wayline in powerlines.values():
@@ -1022,10 +1128,15 @@ if __name__ == "__main__":
     for wayline in aerialways.values():
         wayline.calc_and_map()
 
+    # Overhead lines for rail
+    for rail_line in rail_lines.values():
+        rail_line.calc_and_map(elev_interpolator, coord_transformator)
+
     # Write to Flightgear
     stg_file_pointers = {}  # -- dictionary of stg file pointers
     write_stg_entries(stg_file_pointers, powerlines, "powerline")
     write_stg_entries(stg_file_pointers, aerialways, "aerialway")
+    write_rail_stg_entries(stg_file_pointers, rail_lines)
 
     for stg in stg_file_pointers.values():
         stg.write(stg_io.delimiter_string(OUR_MAGIC, False) + "\n")
