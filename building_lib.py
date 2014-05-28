@@ -353,6 +353,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             b.lenX[i] = ((Xo[i+1,0]-Xo[i,0])**2 + (Xo[i+1,1]-Xo[i,1])**2)**0.5
         n = b.nnodes_outer
         b.lenX[n-1] = ((Xo[0,0]-Xo[n-1,0])**2 + (Xo[0,1]-Xo[n-1,1])**2)**0.5
+        b.longest_edge_len = max(b.lenX)
 
         if b.inner_rings_list:
             i0 = b.nnodes_outer
@@ -444,12 +445,14 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
         # -- determine facade and roof textures
         logging.debug("___find facade")
-        b.facade_texture = facades.find_matching(facade_requires, b.height)
+        b.facade_texture = facades.find_matching(facade_requires, b.height, b.longest_edge_len)
         logging.debug("__done" + str(b.facade_texture))
         if not b.facade_texture:
             tools.stats.skipped_texture += 1
-            print "Skipping building (no matching texture)"
+            logging.info("Skipping building (no matching texture)")
             continue
+        assert(b.longest_edge_len <= b.facade_texture.width_max)
+        #print "long", b.longest_edge_len, b.facade_texture.width_max, str(b.facade_texture)
 
         roof_requires = copy.copy(b.facade_texture.requires)
         if b.roof_complex:
@@ -459,14 +462,8 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
         b.roof_texture = roofs.find_matching(roof_requires)
 
-#        if b.nnodes_outer != 4:
-#            print "!=4",
-#            continue
-
         # -- finally: append building to new list
         new_buildings.append(b)
-
-#        print "COMPLEX??", b.roof_complex
 
     return new_buildings
 
@@ -602,7 +599,7 @@ def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner = False):
                 if not (tex_x1 <= 1.):
                     logging.debug('FIXME: v_can_repeat: need to check in analyse')
         tex_x0 = texture.x(0)
-        print "texx", tex_x0, tex_x1
+        #print "texx", tex_x0, tex_x1
         j = i + b.first_node
         out.face([ (j,                        tex_x0, tex_y0),
                    (j + 1,                    tex_x1, tex_y0),
@@ -659,8 +656,6 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
         #write_ground(out, b, local_elev)
         write_and_count_vert(out, b, elev, offset, tile_elev)
 
-        facade_texture = b.facade_texture
-
         nb += 1
         if nb % 70 == 0: print nb
         else: sys.stdout.write(".")
@@ -669,18 +664,18 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
 #        if (not no_roof) and (not b.roof_complex): nsurf += 1 # -- because roof will be part of base model
 
-        tex_y0, tex_y1 = check_height(b.height, facade_texture)
+        tex_y0, tex_y1 = check_height(b.height, b.facade_texture)
 
 
 
         # -- outer and inner walls (if any)
         #print "--1"
-        write_ring(out, b, b.polygon.exterior, 0, facade_texture, tex_y0, tex_y1)
+        write_ring(out, b, b.polygon.exterior, 0, b.facade_texture, tex_y0, tex_y1)
         if True:
             v0 = b.nnodes_outer
             for inner in b.polygon.interiors:
                 #print "--2"
-                v0 = write_ring(out, b, inner, v0, facade_texture, tex_y0, tex_y1, True)
+                v0 = write_ring(out, b, inner, v0, b.facade_texture, tex_y0, tex_y1, True)
 #def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner = False):
 
         # -- roof

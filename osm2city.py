@@ -32,7 +32,6 @@ You should disable random buildings.
 # - city center??
 
 # FIXME:
-# - pythonic way of i = 0; for b in refs: bla[i] = b
 # - off-by-one error in building counter
 
 # LOWI:
@@ -99,6 +98,7 @@ class Building(object):
         self.stg_typ = stg_typ  # stg: OBJECT_SHARED or _STATIC
         self.stg_hdg = stg_hdg
         self.height = height
+        self.longest_edge_len = 0.
         self.levels = levels
         self.first_node = 0  # index of first node in final OBJECT node list
         #self._nnodes_ground = 0 # number of nodes on ground

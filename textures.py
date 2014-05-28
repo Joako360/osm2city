@@ -106,7 +106,7 @@ class TextureManager(object):
         for c in candidates:
             logging.debug("  candidate " + c.filename + " provides " + str(c.provides))
         if len(candidates) == 0:
-            logging.warn("WARNING: no matching texture for <%s>" + str(requires))
+            logging.warn("WARNING: no matching texture for <%s>" % str(requires))
             return None
         #print "cands are\n", string.join(["  " + str(c) for c in candidates], '\n')
         #return candidates[3]
@@ -131,14 +131,14 @@ class TextureManager(object):
 
 
 class FacadeManager(TextureManager):
-    def find_matching(self, requires, building_height):
-        candidates = self.find_candidates(requires, building_height)
+    def find_matching(self, requires, height, width):
+        candidates = self.find_candidates(requires, height, width)
         if len(candidates) == 0:
-            print "WARNING: no matching texture for <%s>", requires
+            logging.warn("no matching texture for %1.f m x %1.1f m <%s>" % (height, width, str(requires)))
             return None
         return candidates[random.randint(0, len(candidates)-1)]
 
-    def find_candidates(self, requires, building_height):
+    def find_candidates(self, requires, height, width):
         candidates = TextureManager.find_candidates(self, requires)
 #        print "\ncands", [str(t.filename) for t in candidates]
         # -- check height
@@ -148,9 +148,11 @@ class FacadeManager(TextureManager):
 #            print "  <<<", t.filename
 #            print "     building_height", building_height
 #            print "     min/max", t.height_min, t.height_max
-            if building_height < t.height_min or building_height > t.height_max:
-#                print "  KICKED"
+            if height < t.height_min or height > t.height_max:
                 continue
+            if width < t.width_min or width > t.width_max:
+                continue
+
             new_candidates.append(t)
 
 #                candidates.remove(t)
@@ -208,6 +210,8 @@ class Texture(object):
         self.has_roof_section = has_roof_section
         self.height_min = height_min
         self.height_max = height_max
+        self.width_min = 0
+        self.width_max = 9999
         self.v_split_from_bottom = v_split_from_bottom
         h_splits.sort()
         v_splits.sort()
@@ -246,6 +250,10 @@ class Texture(object):
             self.h_splits /= self.h_splits[-1]
         self.h_splits_meters = self.h_splits * self.h_size_meters
         self.h_can_repeat = h_can_repeat
+
+        if not self.h_can_repeat:
+            self.width_min = self.h_splits_meters[0]
+            self.width_max = self.h_size_meters
 
         if self.h_can_repeat + self.v_can_repeat > 1:
             raise ValueError('%s: Textures can repeat in one direction only. '\
