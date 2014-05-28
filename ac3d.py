@@ -89,7 +89,7 @@ class Object(object):
             #Z.append(self._nodes[f.nodes_uv_list[0][0]].y)
             #if max(Z) > 1.: break
             #print "MAX", max(Z)
-            plt.plot(X, Y)
+            plt.plot(X, Y, '-o')
             for i in range(len(X)-1):
                 x = 0.5*(X[i] + X[i+1])
                 y = 0.5*(Y[i] + Y[i+1])
@@ -125,6 +125,25 @@ class Writer(object):
 
     def face(self, *args):
         return self._current_object.face(*args)
+
+    def center(self):
+        """translate all nodes such that the average is zero"""
+        sum_x = sum_y = sum_z = n = 0
+        for obj in self.objects:
+            for node in obj._nodes:
+                sum_x += node.x
+                sum_y += node.y
+                sum_z += node.z
+                n += 1
+
+        cx = float(sum_x) / n
+        cy = float(sum_y) / n
+        cz = float(sum_z) / n
+        for obj in self.objects:
+            for node in obj._nodes:
+                node.x -= cx
+                node.y -= cy
+                node.z -= cz
 
     def __str__(self):
         s = 'AC3Db\n'
