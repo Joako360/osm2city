@@ -89,6 +89,9 @@ class Roads(object):
 
     def create_from_way(self, way, nodes_dict):
 
+        if len(self.roads) >= 10 and 0:
+            return
+
         if not self.min_max_scanned:
             self._process_nodes(nodes_dict)
             self.min_max_scanned = True
@@ -117,7 +120,7 @@ class Roads(object):
             elif road_type == 'tertiary':
                 col = 3
             elif road_type == 'residential':
-                col = None
+                col = 4
             elif road_type == 'service' and access:
                 col = None
         elif way.tags.has_key('railway'):
@@ -144,8 +147,8 @@ class Roads(object):
         ac = ac3d.Writer(tools.stats)
         obj = ac.new_object('roads', 'bridge.png')
         for rd in self.roads[:]:
-            left  = rd.center.parallel_offset(3, 'left', resolution=16, join_style=1, mitre_limit=10.0)
-            right = rd.center.parallel_offset(3, 'right', resolution=16, join_style=1, mitre_limit=10.0)
+            left  = rd.center.parallel_offset(4, 'left', resolution=1, join_style=2, mitre_limit=10.0)
+            right = rd.center.parallel_offset(4, 'right', resolution=1, join_style=2, mitre_limit=10.0)
             o = obj.next_node_index()
             #face = np.zeros((len(left.coords) + len(right.coords)))
             try:
@@ -194,7 +197,7 @@ class Roads(object):
                     #face.append((r+o, 0, 0))
                     face.append((n+o, x, 0.75))
                 #face = [(r, 0, 0) for r in refs[0:len_left]]
-                obj.face(face[::-1], mat=1)
+                obj.face(face[::-1])
             except NotImplementedError:
                 print "error in osm_id", rd.osm_id
 
@@ -203,6 +206,12 @@ class Roads(object):
 #            break
 
         f = open('roads.ac', 'w')
+
+        if 0:
+            ac.center()
+            plt.clf()
+            ac.plot()
+            plt.show()
 
         f.write(str(ac))
         f.close()
@@ -261,7 +270,7 @@ def main():
     source = open(osm_fname)
     logging.info("Reading the OSM file might take some time ...")
 
-#    handler.register_way_callback(roads.create_from_way, **roads.req_and_valid_keys)
+#    handler.register_way_callback(roads.from_way, **roads.req_and_valid_keys)
 #    roads.register_callbacks_in(handler)
     handler.register_way_callback(roads.create_from_way, req_keys=roads.req_keys)
     handler.parse(source)
