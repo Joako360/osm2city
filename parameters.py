@@ -114,12 +114,14 @@ CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if to little objects
 
 C2P_PROCESS_POWERLINES = True
 C2P_PROCESS_AERIALWAYS = True
-C2P_PROCESS_RAIL_OVERHEAD = True
+C2P_PROCESS_OVERHEAD_LINES = True
 
 # Each powerline and aerialway has segments delimited by pylons. The longer the value the better clustering and
 # the better the performance. However due to rounding errors the longer the length per cluster the larger the
 # error.
-C2P_CLUSTER_LINE_MAX_LENGTH = 300
+C2P_CLUSTER_POWER_LINE_MAX_LENGTH = 300
+C2P_CLUSTER_AERIALWAY_MAX_LENGTH = 300
+C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH = 130
 C2P_CABLES_NO_SHADOW = True
 
 # The radius for the cable. The cable will be a triangle with side length 2*radius.
@@ -129,7 +131,7 @@ C2P_RADIUS_POWER_MINOR_LINE = 0.05
 C2P_RADIUS_AERIALWAY_CABLE_CAR = 0.05
 C2P_RADIUS_AERIALWAY_CHAIR_LIFT = 0.05
 C2P_RADIUS_AERIALWAY_DRAG_LIFT = 0.03
-C2P_RADIUS_AERIALWAY_GONDOLA = 0.1
+C2P_RADIUS_AERIALWAY_GONDOLA = 0.05
 C2P_RADIUS_AERIALWAY_GOODS = 0.03
 C2P_RADIUS_TOP_LINE = 0.02
 C2P_RADIUS_OVERHEAD_LINE = 0.02
@@ -160,8 +162,6 @@ C2P_CATENARY_A_OVERHEAD_LINE = 1000
 C2P_CATENARY_MIN_DISTANCE = 30
 
 C2P_POWER_LINE_ALLOW_100M = False
-
-C2P_RAIL_OVERHEAD_MIN_LENGTH = 30
 
 
 def set_parameters(param_dict):

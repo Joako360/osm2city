@@ -375,7 +375,7 @@ class Line(object):
                               , catenary_a, segment.length)
                 segment.cables.append(cable)
 
-    def make_cables_ac_xml_stg_entries(self, filename, path):
+    def make_cables_ac_xml_stg_entries(self, filename, path, cluster_max_length):
         """
         Returns the stg entries for the cables of this WayLine in a string separated by linebreaks
         E.g. OBJECT_STATIC LSZSpylons1901.xml 9.75516 46.4135 2000.48 0
@@ -395,7 +395,7 @@ class Line(object):
                 start_pylon = way_segment.start_pylon
             cluster_segments.append(way_segment)
             cluster_length += way_segment.length
-            if (cluster_length >= parameters.C2P_CLUSTER_LINE_MAX_LENGTH) or (len(self.way_segments) - 1 == i):
+            if (cluster_length >= cluster_max_length) or (len(self.way_segments) - 1 == i):
                 cluster_filename = filename + '_' + str(cluster_index)
                 ac_file_lines = []
                 ac_file_lines.append("AC3Db")
@@ -758,10 +758,6 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_co
         for node in the_railway.nodes:
             coordinates.append((node.x, node.y))
         my_linear = LineString(coordinates)
-        #if my_linear.length < parameters.C2P_RAIL_OVERHEAD_MIN_LENGTH:
-            #logging.debug("Delete too short line with osm_id: %s", the_railway.osm_id)
-            #del my_railways[the_railway.osm_id]
-        #else:
         the_railway.linear = my_linear
 
     return my_railways
@@ -962,7 +958,7 @@ def merge_lines(osm_id, line0, line1, shared_nodes):
                 shared_node.append(line0)
 
 
-def write_stg_entries(stg_fp_dict, lines_dict, wayname):
+def write_stg_entries(stg_fp_dict, lines_dict, wayname, cluster_max_length):
     line_index = 0
     for line in lines_dict.values():
         line_index += 1
@@ -989,7 +985,7 @@ def write_stg_entries(stg_fp_dict, lines_dict, wayname):
         stg_file.write(line.make_shared_pylons_stg_entries() + "\n")
         if None is not wayname:
             filename = parameters.PREFIX + wayname + "%05d" % line_index
-            stg_file.write(line.make_cables_ac_xml_stg_entries(filename, path) + "\n")
+            stg_file.write(line.make_cables_ac_xml_stg_entries(filename, path, cluster_max_length) + "\n")
 
 
 def calc_heading_nodes(nodes_array):
@@ -1113,7 +1109,7 @@ if __name__ == "__main__":
         powerlines.clear()
     if parameters.C2P_PROCESS_AERIALWAYS is False:
         aerialways.clear()
-    if parameters.C2P_PROCESS_RAIL_OVERHEAD is False:
+    if parameters.C2P_PROCESS_OVERHEAD_LINES is False:
         rail_lines.clear()
 
     logging.info('Number of power lines to process: %s', len(powerlines))
@@ -1132,9 +1128,9 @@ if __name__ == "__main__":
 
     # Write to Flightgear
     stg_file_pointers = {}  # -- dictionary of stg file pointers
-    write_stg_entries(stg_file_pointers, powerlines, "powerline")
-    write_stg_entries(stg_file_pointers, aerialways, "aerialway")
-    write_stg_entries(stg_file_pointers, rail_lines, "overhead")
+    write_stg_entries(stg_file_pointers, powerlines, "powerline", parameters.C2P_CLUSTER_POWER_LINE_MAX_LENGTH)
+    write_stg_entries(stg_file_pointers, aerialways, "aerialway", parameters.C2P_CLUSTER_AERIALWAY_MAX_LENGTH)
+    write_stg_entries(stg_file_pointers, rail_lines, "overhead", parameters.C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH)
 
     for stg in stg_file_pointers.values():
         stg.write(stg_io.delimiter_string(OUR_MAGIC, False) + "\n")
@@ -1203,7 +1199,7 @@ class TestOSMPylons(unittest.TestCase):
         self.assertAlmostEqual(0, pylon5.heading, 2)
         # then test other stuff
         self.assertEqual(4, len(wayline1.way_segments))
-        wayline1.make_cables_ac_xml_stg_entries("foo", "foo")
+        wayline1.make_cables_ac_xml_stg_entries("foo", "foo", parameters.C2P_CLUSTER_POWER_LINE_MAX_LENGTH)
 
     def test_cable_vertex_calc_position(self):
         vertex = CableVertex(10, 5)
