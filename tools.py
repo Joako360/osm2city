@@ -120,28 +120,10 @@ def raster_glob():
     lmax = vec2d.vec2d(transform.toLocal(cmax.__iter__()))
     delta = (lmax - lmin)*0.5
     print "Distance from center to boundary in meters (x, y):", delta
-    if parameters.ELEV_MODE == None:
-        if parameters.MANUAL_ELEV:
-            print "Creating elev.in ..."
-            fname = parameters.PREFIX + os.sep + "elev.in"
-            raster(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
-
-            path = calc_tile.directory_name(center)
-            msg = textwrap.dedent("""
-            Done. You should now
-            - copy elev.in to $FGDATA/Nasal/
-            - hide the scenery folder Objects/%s to prevent probing on top of existing objects
-            - start FG, open Nasal console, enter 'elev.get()', press execute. This will create /tmp/elev.xml
-            - once that's done, copy /tmp/elev.xml to your $PREFIX folder
-            - unhide the scenery folder
-            """ % path)
-            print msg
-            return
-        else:
-            fname = parameters.PREFIX + os.sep + 'elev.xml'
-            print "Creating ", fname
-            raster_fgelev(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
-            return
+    err_msg = "Unknown Elevation Query mode : %s Use Manual, Telnet or Fgelev for parameter ELEV_MODE "%(parameters.ELEV_MODE)
+    if parameters.ELEV_MODE == '':
+        logging.error(err_msg)
+        sys.exit(err_msg)
     elif parameters.ELEV_MODE == 'Manual':
         print "Creating elev.in ..."
         fname = parameters.PREFIX + os.sep + "elev.in"
@@ -165,13 +147,18 @@ def raster_glob():
         else:
             print "Skipping ", parameters.PREFIX + os.sep + 'elev.out', " exists"
     elif parameters.ELEV_MODE == 'Fgelev':
-        fname = parameters.PREFIX + os.sep + 'elev.xml'
-        print "Creating ", fname
-        raster_fgelev(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
+        if not os.path.exists(parameters.PREFIX + os.sep + 'elev.out'):
+            fname = parameters.PREFIX + os.sep + 'elev.out'
+            print "Creating ", fname
+            raster_fgelev(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
+        else:
+            print "Skipping ", parameters.PREFIX + os.sep + 'elev.out', " exists"
     else:
-        logging.error("Unknown Elev mode : %s Use Manual, Telnet or Fgelev"%(parameters.ELEV_MODE))
+        logging.error(err_msg)
+        sys.exit(err_msg)
 
 def wait_for_fg(fg):
+# Waits for Flightgear to signal, that the elevation processing has finished    
     for count in range(0,1000):
         semaphore = fg.get_prop("/osm2city/tiles")
         semaphore = semaphore.split('=')[1]
@@ -187,8 +174,8 @@ def wait_for_fg(fg):
                 # perform an action#
                 pass
         time.sleep(1)
-        if not m2 is None:
-            print( "Waiting for Semaphore " + m2.groups()[0])
+        if not m2 is None:        
+            logging.debug( "Waiting for Semaphore " + m2.groups()[0])
     return False
 
 def raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
@@ -234,10 +221,18 @@ def raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
 def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
     import subprocess
     import Queue
-    fg_scenery="/home/tom/fgfs/home/Scenery-devel"
-    fg_scenery="$FG_SCENERY"
-
-    fgelev = subprocess.Popen('/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev --fg-root $FG_ROOT --fg-scenery '+fg_scenery,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    fg_root = "$FG_ROOT"
+    
+    center_global = vec2d.vec2d(transform.toGlobal((x0,y0)))
+    btg_file = parameters.PATH_TO_SCENERY + os.sep + "Terrain"
+    btg_file = btg_file + os.sep + calc_tile.directory_name(center_global) + os.sep + calc_tile.construct_btg_file_name(center_global)
+    if not os.path.exists(btg_file):
+        logging.error("Terrain File " + btg_file + " does not exist. Set scenery path correctly or fly there with TerraSync enabled")
+        sys.exit(2)
+    
+    fg_elev = parameters.FG_ELEV
+    
+    fgelev = subprocess.Popen( fg_elev + ' --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     #fgelev = subprocess.Popen(["/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev", "--fg-root", "$FG_ROOT",  "--fg-scenery", "$FG_SCENERY"],  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     #time.sleep(5)
     print "building buffer"
@@ -246,22 +241,27 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
     #f = sys.stdout
     f.write("# %g %g %g %g %g %g\n" % (x0, y0, size_x, size_y, step_x, step_y))
     i = 0
-    for y in np.arange(y0, y0+size_y, step_y):
-        for x in np.arange(x0, x0+size_x, step_x):
+    y_array = np.arange(y0, y0+size_y, step_y)
+    x_array = np.arange(x0, x0+size_x, step_x)
+    for y in y_array:
+        for x in x_array:
             i += 1
             lon, lat = transform.toGlobal((x, y))
             buf_in.put("%i %g %g\n" % (i, lon, lat))
 
-    print "sending buffer"
-    for i in range(1000):
-        fgelev.stdin.write(buf_in.get())
-
+#Doesn't work on Windows. Process will block if output buffer isn't read 
+#     print "sending buffer"
+#     for i in range(1000):
+#         fgelev.stdin.write(buf_in.get())
+    start = time.time()
+    
     print "reading"
     i = 0
-    for y in np.arange(y0, y0+size_y, step_y):
-        for x in np.arange(x0, x0+size_x, step_x):
+    for y in y_array:
+        for x in x_array:
             i += 1
-            if not buf_in.empty(): fgelev.stdin.write(buf_in.get())
+            if not buf_in.empty(): 
+                fgelev.stdin.write(buf_in.get())
             tmp, elev = fgelev.stdout.readline().split()
             lon, lat = transform.toGlobal((x, y))
             #f.write("%i " % i)
@@ -271,8 +271,8 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
         print "done %3.1f %%\r" % ((y - y0)*100/size_y),
 
     f.close()
-
-    print "done"
+    end = time.time()
+    print "done %d records/s" % ((i/(end-start)))
 
 
 def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):

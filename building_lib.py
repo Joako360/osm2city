@@ -638,9 +638,9 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
     ac = ac3d.Writer(tools.stats)
     LOD_objects = []
-    LOD_objects.append(ac.new_object('LOD_bare', 'atlas_facades.png'))
-    LOD_objects.append(ac.new_object('LOD_rough', 'atlas_facades.png'))
-    LOD_objects.append(ac.new_object('LOD_detail', 'atlas_facades.png'))
+    LOD_objects.append(ac.new_object('LOD_bare', 'tex/atlas_facades.png'))
+    LOD_objects.append(ac.new_object('LOD_rough', 'tex/atlas_facades.png'))
+    LOD_objects.append(ac.new_object('LOD_detail', 'tex/atlas_facades.png'))
 
     global nb # FIXME: still need this?
 

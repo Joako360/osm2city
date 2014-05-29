@@ -9,7 +9,7 @@ import numpy as np
 import random
 from pdb import pm
 import logging
-import Image
+from PIL import Image
 import math
 import cPickle
 import string
@@ -431,7 +431,7 @@ def init():
                              10., [], True, 10., [], True, provides=['color:black', 'color:red']))
 
     # -- make texture atlas (or unpickle)
-    filename = 'atlas_facades'
+    filename = 'tex/atlas_facades'
     pkl_fname = filename + '.pkl'
     if 1:
 #        facades.make_texture_atlas(filename + '.png')
