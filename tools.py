@@ -16,7 +16,7 @@ import logging
 import batch_processing.fg_telnet as telnet
 import shutil
 import io
-from parameters import ELEV_MODE
+import parameters
 
 stats = None
 
@@ -26,6 +26,10 @@ import calc_tile
 import parameters
 import time
 import re
+
+import subprocess
+import Queue
+
 
 class Interpolator(object):
     """load elevation data from file, interpolate"""
@@ -105,6 +109,67 @@ class Interpolator(object):
         X = np.vstack((x.ravel(), y.ravel(), zero, zero, h.ravel())).transpose()
         np.savetxt(filename, X, header=header, fmt=["%1.8f", "%1.8f", "%g", "%g", "%1.2f"])
 
+class Probe_fgelev(object):
+    """A drop-in replacement for Interpolator. Probes elevation via fgelev.
+       Performance (can only test on OSX at the moment) about 17k/sec.
+       Might have buffering/caching in the future.
+    """
+        """open pipe to fgelev"""
+        self.fake = fake
+        self.h_offset = 0
+        if not fake:
+            path_to_fgelev = parameters.FG_ELEV
+            fg_root = "$FG_ROOT"
+            self.fgelev_pipe = subprocess.Popen(path_to_fgelev + ' --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    def shift(self, h):
+        self.h_offset += h
+
+    def __call__(self, position, is_global=False, check_btg=False):
+        """probe elevation at (x,y)"""
+
+            position = vec2d.vec2d(transform.toGlobal(position))
+
+        if check_btg:
+            btg_file = parameters.PATH_TO_SCENERY + os.sep + "Terrain" \
+                       + os.sep + calc_tile.directory_name(position) + os.sep \
+                       + calc_tile.construct_btg_file_name(position)
+            if not os.path.exists(btg_file):
+                logging.error("Terrain File " + btg_file + " does not exist. Set scenery path correctly or fly there with TerraSync enabled")
+                sys.exit(2)
+
+        #fgelev = subprocess.Popen(["/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev", "--fg-root", "$FG_ROOT",  "--fg-scenery", "$FG_SCENERY"],  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+
+    #Doesn't work on Windows. Process will block if output buffer isn't read
+    #     print "sending buffer"
+    #     for i in range(1000):
+    #         fgelev.stdin.write(buf_in.get())
+#        start = time.time()
+
+        self.fgelev_pipe.stdin.write("%i %g %g\n" % (0, position.lon, position.lat))
+        tmp, elev = self.fgelev_pipe.stdout.readline().split()
+        #print "got ", tmp, elev
+        return float(elev) + self.h_offset
+#        end = time.time()
+#        print "done %d records/s" % ((i/(end-start)))
+
+def test_fgelev():
+    elev = Probe_fgelev()
+    p = vec2d.vec2d(11.2, 47.25)
+    print p, elev(p, True)
+    nx = ny = 100
+    X = np.linspace(parameters.BOUNDARY_WEST, parameters.BOUNDARY_WEST+0.03, nx)
+    Y = np.linspace(parameters.BOUNDARY_SOUTH, parameters.BOUNDARY_SOUTH+0.03, ny)
+
+    start = time.time()
+    s = []
+    for y in Y:
+        for x in X:
+            p = vec2d.vec2d(x, y)
+            s.append("%s %g" % (str(p), elev(p, True)))
+    end = time.time()
+    for item in s:
+        print item
+    print "done %d records/s" % (nx*ny/(end-start))
 
 def raster_glob():
     cmin = vec2d.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
@@ -504,9 +569,12 @@ if __name__ == "__main__":
     parser.add_argument("-f", "--file", dest="filename",
                       help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
     args = parser.parse_args()
-
     if args.filename is not None:
         parameters.read_from_file(args.filename)
     parameters.show()
+
+    #test_fgelev()
+    #sys.exit(0)
+
     raster_glob()
 
