@@ -114,6 +114,7 @@ class Probe_fgelev(object):
        Performance (can only test on OSX at the moment) about 17k/sec.
        Might have buffering/caching in the future.
     """
+    def __init__(self, fake=False):
         """open pipe to fgelev"""
         self.fake = fake
         self.h_offset = 0
@@ -121,12 +122,17 @@ class Probe_fgelev(object):
             path_to_fgelev = parameters.FG_ELEV
             fg_root = "$FG_ROOT"
             self.fgelev_pipe = subprocess.Popen(path_to_fgelev + ' --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+
     def shift(self, h):
         self.h_offset += h
 
     def __call__(self, position, is_global=False, check_btg=False):
         """probe elevation at (x,y)"""
+        if self.fake:
+            return 0.
 
+        global transform
+        if not is_global:
             position = vec2d.vec2d(transform.toGlobal(position))
 
         if check_btg:
@@ -170,6 +176,7 @@ def test_fgelev():
     for item in s:
         print item
     print "done %d records/s" % (nx*ny/(end-start))
+
 
 def raster_glob():
     cmin = vec2d.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
@@ -218,7 +225,7 @@ def raster_glob():
         sys.exit(err_msg)
 
 def wait_for_fg(fg):
-# Waits for Flightgear to signal, that the elevation processing has finished    
+# Waits for Flightgear to signal, that the elevation processing has finished
     for count in range(0,1000):
         semaphore = fg.get_prop("/osm2city/tiles")
         semaphore = semaphore.split('=')[1]
@@ -234,7 +241,7 @@ def wait_for_fg(fg):
                 # perform an action#
                 pass
         time.sleep(1)
-        if not m2 is None:        
+        if not m2 is None:
             logging.debug( "Waiting for Semaphore " + m2.groups()[0])
     return False
 
@@ -282,16 +289,16 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
     import subprocess
     import Queue
     fg_root = "$FG_ROOT"
-    
+
     center_global = vec2d.vec2d(transform.toGlobal((x0,y0)))
     btg_file = parameters.PATH_TO_SCENERY + os.sep + "Terrain"
     btg_file = btg_file + os.sep + calc_tile.directory_name(center_global) + os.sep + calc_tile.construct_btg_file_name(center_global)
     if not os.path.exists(btg_file):
         logging.error("Terrain File " + btg_file + " does not exist. Set scenery path correctly or fly there with TerraSync enabled")
         sys.exit(2)
-    
+
     fg_elev = parameters.FG_ELEV
-    
+
     fgelev = subprocess.Popen( fg_elev + ' --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     #fgelev = subprocess.Popen(["/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev", "--fg-root", "$FG_ROOT",  "--fg-scenery", "$FG_SCENERY"],  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     #time.sleep(5)
@@ -309,18 +316,18 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
             lon, lat = transform.toGlobal((x, y))
             buf_in.put("%i %g %g\n" % (i, lon, lat))
 
-#Doesn't work on Windows. Process will block if output buffer isn't read 
+#Doesn't work on Windows. Process will block if output buffer isn't read
 #     print "sending buffer"
 #     for i in range(1000):
 #         fgelev.stdin.write(buf_in.get())
     start = time.time()
-    
+
     print "reading"
     i = 0
     for y in y_array:
         for x in x_array:
             i += 1
-            if not buf_in.empty(): 
+            if not buf_in.empty():
                 fgelev.stdin.write(buf_in.get())
             tmp, elev = fgelev.stdout.readline().split()
             lon, lat = transform.toGlobal((x, y))
