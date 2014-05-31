@@ -597,7 +597,7 @@ class RailLine(Line):
     TYPE_RAILWAY_GAUGE_NARROW = 11
     TYPE_RAILWAY_GAUGE_NORMAL = 12
 
-    DEFAULT_MAST_DISTANCE = 60
+    DEFAULT_MAST_DISTANCE = 60  # if this is changed then mast algorithm for radius below must be adapted
     STEP_SIZE = 5  # the minimal step size between masts
     OFFSET = 10  # the offset from end points
     MAX_DEVIATION = 1  # The distance the overhead line can be off from the center
@@ -620,6 +620,7 @@ class RailLine(Line):
         point_on_line = self.linear.interpolate(0)
         mast_point = my_right_parallel.interpolate(0)
         self.shared_pylons.append(RailMast(RailMast.TYPE_VIRTUAL_MAST, point_on_line, mast_point))
+        prev_point = point_on_line
 
         # get the first mast point
         if my_length < RailLine.DEFAULT_MAST_DISTANCE:
@@ -633,14 +634,38 @@ class RailLine(Line):
             mast_point = my_right_parallel.interpolate(current_distance * (my_right_parallel_length / my_length))
             self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point))
             # get the other mast points
+            prev_angle = calc_angle_of_line(prev_point.x, prev_point.y, point_on_line.x, point_on_line.y)
+            prev_point = point_on_line
+            # find new masts along the line with a simple approximation for less distance between masts
+            # if the radius gets tighter
             while True:
                 if (my_length - current_distance) < (RailLine.STEP_SIZE + RailLine.OFFSET):
                     break
-                new_distance = min(RailLine.DEFAULT_MAST_DISTANCE, my_length - current_distance - RailLine.STEP_SIZE)
-                current_distance += new_distance
+                min_distance = my_length - current_distance - RailLine.OFFSET
+                if min_distance < RailLine.DEFAULT_MAST_DISTANCE:
+                    current_distance += min_distance
+                else:
+                    test_distance = current_distance + RailLine.DEFAULT_MAST_DISTANCE
+                    point_on_line = self.linear.interpolate(test_distance)
+                    new_angle = calc_angle_of_line(prev_point.x, prev_point.y, point_on_line.x, point_on_line.y)
+                    difference = abs(new_angle - prev_angle)
+                    if difference >= 50:
+                        current_distance += 10
+                    elif difference >= 40:
+                        current_distance += 20
+                    elif difference >= 30:
+                        current_distance += 30
+                    elif difference >= 20:
+                        current_distance += 40
+                    elif difference >= 10:
+                        current_distance += 50
+                    else:
+                        current_distance += RailLine.DEFAULT_MAST_DISTANCE
                 point_on_line = self.linear.interpolate(current_distance)
                 mast_point = my_right_parallel.interpolate(current_distance * (my_right_parallel_length / my_length))
                 self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point))
+                prev_angle = calc_angle_of_line(prev_point.x, prev_point.y, point_on_line.x, point_on_line.y)
+                prev_point = point_on_line
 
         # virtual end point
         point_on_line = self.linear.interpolate(my_length)
@@ -896,13 +921,11 @@ def find_connecting_line(key, lines):
     # Get the angles between all line pairs and find the one closest to 180 degrees
     pos1 = 0
     pos2 = 1
-    max_angle = 0
+    max_angle = 500
     for i in xrange(0, len(angles) - 1):
         for j in xrange(i + 1, len(angles)):
-            angle_between = abs(angles[i] - angles[j])
-            if 180 < angle_between:
-                angle_between -= 180
-            if angle_between > max_angle:
+            angle_between = abs(abs(angles[i] - angles[j]) - 180)
+            if angle_between < max_angle:
                 max_angle = angle_between
                 pos1 = i
                 pos2 = j
