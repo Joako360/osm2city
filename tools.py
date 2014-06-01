@@ -16,6 +16,7 @@ import logging
 import batch_processing.fg_telnet as telnet
 import shutil
 import io
+import cPickle
 import parameters
 
 stats = None
@@ -115,28 +116,48 @@ class Probe_fgelev(object):
        is not much spatial separation between queries. Fgelev seems to take
        quite a while though if queries are somewhat separated.
 
-       You can enable/disable a cache. In the future, we will save the cache to
-       a file.
+       By default, queries are cached. Call save_cache() to
+       save the cache to disk before freeing the object.
     """
     def __init__(self, fake=False, cache=True):
-        """open pipe to fgelev"""
+        """Open pipe to fgelev.
+           Unless disabled by cache=False, initialize the cache and try to read
+           it from disk.
+           If fake=True, never do any probing. Instead return 0 on all queries.
+        """
         self.fake = fake
         self.h_offset = 0
         if not fake:
             path_to_fgelev = parameters.FG_ELEV
             fg_root = "$FG_ROOT"
             self.fgelev_pipe = subprocess.Popen(path_to_fgelev + ' --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+
         if cache:
-            self._cache = {}
+            self.pkl_fname = parameters.PREFIX + os.sep + 'elev.pkl'
+            try:
+                logging.info("Loading %s", self.pkl_fname)
+                fpickle = open(self.pkl_fname, 'rb')
+                self._cache = cPickle.load(fpickle)
+                fpickle.close()
+                print "OK"
+            except IOError, reason:
+                logging.info("failed (%s)", reason)
+                self._cache = {}
         else:
             self._cache = None
+
+    def save_cache(self):
+        fpickle = open(self.pkl_fname, 'wb')
+        cPickle.dump(self._cache, fpickle, -1)
+        fpickle.close()
 
     def shift(self, h):
         self.h_offset += h
 
     def __call__(self, position, is_global=False, check_btg=False):
-        """probe elevation at (x,y)"""
-
+        """return elevation at (x,y). We try our cache first. Failing that,
+           call fgelev.
+        """
         def really_probe(position):
             if check_btg:
                 btg_file = parameters.PATH_TO_SCENERY + os.sep + "Terrain" \
@@ -173,6 +194,7 @@ class Probe_fgelev(object):
             return elev
 
 def test_fgelev(cache, N):
+    """unit testing for Probe_fgelev class"""
     elev = Probe_fgelev(cache=cache)
     delta = 0.3
     check_btg = True
@@ -218,7 +240,7 @@ def test_fgelev(cache, N):
     #for item in s:
     #    print item
     print cache, N, "%d records/s" % (i/(end-start))
-
+    elev.save_cache()
 
 def raster_glob():
     cmin = vec2d.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
@@ -623,9 +645,9 @@ if __name__ == "__main__":
     parameters.show()
 
     if 0:
-        for N in [10, 100, 1000, 10000]:
+        for N in [1000, 100]:
             test_fgelev(True, N)
-            test_fgelev(False, N)
+            #test_fgelev(False, N)
         sys.exit(0)
 
     raster_glob()
