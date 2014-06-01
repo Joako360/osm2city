@@ -70,6 +70,7 @@ class OSMContentHandler(xml.sax.ContentHandler):
         xml.sax.ContentHandler.__init__(self)
         self._way_callbacks = []
         self._relation_callbacks = []
+        self._uncategorized_way_callback = None
         self._valid_node_keys = valid_node_keys
         #self._valid_way_keys = valid_way_keys
         #self._req_way_keys = req_way_keys
@@ -141,7 +142,10 @@ class OSMContentHandler(xml.sax.ContentHandler):
             if cb:
                 cb(self._current_way, self.nodes_dict)
             else:
-                self._uncategorized_way_callback(self._current_way, self.nodes_dict)
+                try:
+                    self._uncategorized_way_callback(self._current_way, self.nodes_dict)
+                except TypeError:
+                    pass
             #if has_required_tag_keys(self._current_way.tags, self._req_way_keys):
             #    self.ways_dict[self._current_way.osm_id] = self._current_way
         elif name == "relation":
