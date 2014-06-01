@@ -90,6 +90,9 @@ class Roads(object):
                 self.minlat = node.lat
         logging.debug("")
 
+    def store_uncategorized(self, way, nodes_dict):
+        pass
+
     def create_from_way(self, way, nodes_dict):
 
         if len(self.roads) >= 10 and 0:
@@ -150,8 +153,12 @@ class Roads(object):
         ac = ac3d.Writer(tools.stats)
         obj = ac.new_object('roads', 'bridge.png')
         for rd in self.roads[:]:
-            left  = rd.center.parallel_offset(4, 'left', resolution=1, join_style=2, mitre_limit=10.0)
-            right = rd.center.parallel_offset(4, 'right', resolution=1, join_style=2, mitre_limit=10.0)
+            if rd.railway:
+                width = 2.87/2.
+            else:
+                width = 4.
+            left  = rd.center.parallel_offset(width, 'left', resolution=1, join_style=2, mitre_limit=10.0)
+            right = rd.center.parallel_offset(width, 'right', resolution=1, join_style=2, mitre_limit=10.0)
             o = obj.next_node_index()
             #face = np.zeros((len(left.coords) + len(right.coords)))
             try:
@@ -282,6 +289,7 @@ def main():
 #    handler.register_way_callback(roads.from_way, **roads.req_and_valid_keys)
 #    roads.register_callbacks_in(handler)
     handler.register_way_callback(roads.create_from_way, req_keys=roads.req_keys)
+    handler.register_uncategorized_way_callback(roads.store_uncategorized)
     handler.parse(source)
 
     #transform = tools.transform
