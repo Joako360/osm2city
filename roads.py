@@ -38,6 +38,9 @@ class Road(object):
         self.tags = tags
         self.refs = refs
         self.nodes = []
+        self.railway = False
+        if tags.has_key('railway'):
+            self.railway = tags['railway'] in ['rail', 'tram']
 
 #    def transform(self, nodes_dict, transform):
         osm_nodes = [nodes_dict[r] for r in refs]
@@ -124,9 +127,9 @@ class Roads(object):
             elif road_type == 'service' and access:
                 col = None
         elif way.tags.has_key('railway'):
-            if way.tags['railway'] in ['rail', 'tram']:
+            if way.tags['railway'] in ['rail']:
                 #col = 6
-                col = None # skip railways for now
+                col = 5 # skip railways for now
 
         if col == None:
 #            print "got", way.osm_id,
@@ -185,17 +188,23 @@ class Roads(object):
                 face = []
                 scale = 20.
                 x = 0.
+                if rd.railway:
+                    y0 = 0
+                    y1 = 0.25
+                else:
+                    y0 = 0.5
+                    y1 = 0.75
                 for i, n in enumerate(nodes_l):
                     #face.append((r+o, 0, 0))
                     if do_tex: x = rd.dist[i]/scale
-                    face.append((n+o, x, 0.5))
+                    face.append((n+o, x, y0))
                 o += len(left.coords)
 
                 for i, n in enumerate(nodes_r):
                     if do_tex: x = rd.dist[-i-1]/scale
                     #x = 0
                     #face.append((r+o, 0, 0))
-                    face.append((n+o, x, 0.75))
+                    face.append((n+o, x, y1))
                 #face = [(r, 0, 0) for r in refs[0:len_left]]
                 obj.face(face[::-1])
             except NotImplementedError:
