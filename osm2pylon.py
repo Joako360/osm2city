@@ -222,13 +222,17 @@ def create_drag_lift_in_osm_building():
     return vertices
 
 
-def create_rail_power_vertices():
-    vertices = [CableVertex(1.95, 5.85)
-                , CableVertex(1.95, 4.95, no_catenary=True)]
+def create_rail_power_vertices(is_right):
+    if is_right:
+        vertices = [CableVertex(-1.95, 5.85)
+                    , CableVertex(-1.95, 4.95, no_catenary=True)]
+    else:
+        vertices = [CableVertex(1.95, 5.85)
+                    , CableVertex(1.95, 4.95, no_catenary=True)]
     return vertices
 
 
-def get_cable_vertices(pylon_model):
+def get_cable_vertices(pylon_model, is_right):
     if "generic_pylon_25m" in pylon_model:
         return create_generic_pylon_25_vertices()
     if "generic_pylon_50m" in pylon_model:
@@ -242,7 +246,7 @@ def get_cable_vertices(pylon_model):
     elif "wooden_pole_14m" in pylon_model:
         return create_wooden_pole_14m_vertices()
     elif "RailPower" in pylon_model:
-        return create_rail_power_vertices()
+        return create_rail_power_vertices(is_right)
     else:
         return None
 
@@ -270,6 +274,7 @@ class SharedPylon(object):
         self.heading = 0.0  # heading of pylon in degrees
         self.pylon_model = None  # the path to the ac/xml model
         self.needs_stg_entry = True
+        self.do_mirror = False  # if e.g. a railmast looks right instead of right, then correct with 180 degrees
 
     def make_stg_entry(self):
         """
@@ -279,8 +284,11 @@ class SharedPylon(object):
         if not self.needs_stg_entry:
             return " "  # no need to write a shared object
 
+        heading_correction = 0
+        if self.do_mirror:
+            heading_correction = 180
         entry = ["OBJECT_SHARED", self.pylon_model, str(self.lon), str(self.lat), str(self.elevation)
-                 , str(stg_angle(self.heading - 90))]  # 90 less because arms are in x-direction in ac-file
+                 , str(stg_angle(self.heading - 90 + heading_correction))]  # 90 less because arms are in x-direction in ac-file
         return " ".join(entry)
 
 
@@ -358,8 +366,8 @@ class Line(object):
         Afterwards use the start and end points to create all cables for a given WaySegment
         """
         for segment in self.way_segments:
-            start_cable_vertices = get_cable_vertices(segment.start_pylon.pylon_model)
-            end_cable_vertices = get_cable_vertices(segment.end_pylon.pylon_model)
+            start_cable_vertices = get_cable_vertices(segment.start_pylon.pylon_model, segment.start_pylon.do_mirror)
+            end_cable_vertices = get_cable_vertices(segment.end_pylon.pylon_model, segment.end_pylon.do_mirror)
             for i in xrange(0, len(start_cable_vertices)):
                 my_radius = radius
                 my_number_extra_vertices = number_extra_vertices
@@ -575,7 +583,7 @@ class RailMast(SharedPylon):
     TYPE_SINGLE_MAST = 11
     TYPE_DOUBLE_MAST = 12
 
-    def __init__(self, type_, point_on_line, mast_point):
+    def __init__(self, type_, point_on_line, mast_point, do_mirror=False):
         super(RailMast, self).__init__()
         self.type_ = type_
         self.point_on_line = point_on_line
@@ -584,9 +592,22 @@ class RailMast(SharedPylon):
         self.pylon_model = "Models/StreetFurniture/RailPower.xml"
         if self.type_ == RailMast.TYPE_VIRTUAL_MAST:
             self.needs_stg_entry = False
+        self.do_mirror = do_mirror
 
     def is_virtual(self):
         return self.type_ == RailMast.TYPE_VIRTUAL_MAST
+
+    def calc_global_coordinates(self, my_elev_interpolator, my_coord_transformator):
+        self.lon, self.lat = my_coord_transformator.toGlobal((self.x, self.y))
+        self.elevation = my_elev_interpolator(vec2d.vec2d(self.lon, self.lat), True)
+
+
+class Cone(SharedPylon):  # FIXME remove
+    def __init__(self, x, y):
+        super(Cone, self).__init__()
+        self.x = x
+        self.y = y
+        self.pylon_model = "Models/StreetFurniture/cone.xml"
 
     def calc_global_coordinates(self, my_elev_interpolator, my_coord_transformator):
         self.lon, self.lat = my_coord_transformator.toGlobal((self.x, self.y))
@@ -598,9 +619,9 @@ class RailLine(Line):
     TYPE_RAILWAY_GAUGE_NORMAL = 12
 
     DEFAULT_MAST_DISTANCE = 60  # if this is changed then mast algorithm for radius below must be adapted
-    STEP_SIZE = 5  # the minimal step size between masts
-    OFFSET = 10  # the offset from end points
+    OFFSET = 20  # the offset from end points
     MAX_DEVIATION = 1  # The distance the overhead line can be off from the center
+    MAST_BUFFER = 3.0
 
     def __init__(self, osm_id):
         super(RailLine, self).__init__(osm_id)
@@ -608,38 +629,72 @@ class RailLine(Line):
         self.nodes = []  # RailNodes
         self.linear = None  # The LineaString of the line
 
-    def calc_and_map(self, my_elev_interpolator, my_coord_transformator):
+    def calc_and_map2(self, my_elev_interpolator, my_coord_transformator, rail_lines_list):  # FIXME remove
+        self.shared_pylons = []  # array of RailMasts
+        current_distance = 0  # the distance from the origin of the current mast
+        my_length = self.linear.length  # omit recalculating length all the time
+
+        # virtual start point
+        point_on_line = self.linear.interpolate(0)
+        self.shared_pylons.append(Cone(point_on_line.x, point_on_line.y))
+
+        # get the first mast point
+        while True:
+            current_distance += 5
+            if current_distance > my_length:
+                break
+            point_on_line = self.linear.interpolate(current_distance)
+            self.shared_pylons.append(Cone(point_on_line.x, point_on_line.y))
+
+        # virtual end point
+        point_on_line = self.linear.interpolate(my_length)
+        self.shared_pylons.append(Cone(point_on_line.x, point_on_line.y))
+
+        calc_heading_nodes(self.shared_pylons)
+        max_length = self._calc_segments()
+        # calculate global coordinates
+        for my_mast in self.shared_pylons:
+            my_mast.calc_global_coordinates(my_elev_interpolator, my_coord_transformator)
+
+    def calc_and_map(self, my_elev_interpolator, my_coord_transformator, rail_lines_list):
         self.shared_pylons = []  # array of RailMasts
         current_distance = 0  # the distance from the origin of the current mast
         my_length = self.linear.length  # omit recalculating length all the time
         # offset must be same as create_rail_power_vertices()
         my_right_parallel = self.linear.parallel_offset(1.95, 'right', join_style=1)
         my_right_parallel_length = my_right_parallel.length
+        my_left_parallel = self.linear.parallel_offset(1.95, 'left', join_style=1)
+        my_left_parallel_length = my_left_parallel.length
 
         # virtual start point
         point_on_line = self.linear.interpolate(0)
-        mast_point = my_right_parallel.interpolate(0)
-        self.shared_pylons.append(RailMast(RailMast.TYPE_VIRTUAL_MAST, point_on_line, mast_point))
+        mast_point = my_right_parallel.interpolate(my_right_parallel_length)
+        self.shared_pylons.append(RailMast(RailMast.TYPE_VIRTUAL_MAST, point_on_line, mast_point, True))
         prev_point = point_on_line
 
         # get the first mast point
         if my_length < RailLine.DEFAULT_MAST_DISTANCE:
             current_distance += (my_length / 2)
             point_on_line = self.linear.interpolate(current_distance)
-            mast_point = my_right_parallel.interpolate(current_distance * (my_right_parallel_length / my_length))
-            self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point))
+            mast_point = my_right_parallel.interpolate(my_left_parallel_length - current_distance * (my_left_parallel_length / my_length))
+            is_right = self.check_mast_left_right(mast_point, rail_lines_list)
+            if not is_right:
+                mast_point = my_left_parallel.interpolate(current_distance * (my_right_parallel_length / my_length))
+            self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point, is_right))
         else:
             current_distance += RailLine.OFFSET
-            point_on_line = self.linear.interpolate(RailLine.OFFSET)
-            mast_point = my_right_parallel.interpolate(current_distance * (my_right_parallel_length / my_length))
-            self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point))
-            # get the other mast points
+            point_on_line = self.linear.interpolate(current_distance)
+            mast_point = my_right_parallel.interpolate(my_left_parallel_length - current_distance * (my_left_parallel_length / my_length))
+            is_right = self.check_mast_left_right(mast_point, rail_lines_list)
+            if not is_right:
+                mast_point = my_left_parallel.interpolate(current_distance * (my_right_parallel_length / my_length))
+            self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point, is_right))
             prev_angle = calc_angle_of_line(prev_point.x, prev_point.y, point_on_line.x, point_on_line.y)
             prev_point = point_on_line
             # find new masts along the line with a simple approximation for less distance between masts
             # if the radius gets tighter
             while True:
-                if (my_length - current_distance) < (RailLine.STEP_SIZE + RailLine.OFFSET):
+                if (my_length - current_distance) < RailLine.OFFSET:
                     break
                 min_distance = my_length - current_distance - RailLine.OFFSET
                 if min_distance < RailLine.DEFAULT_MAST_DISTANCE:
@@ -662,15 +717,18 @@ class RailLine(Line):
                     else:
                         current_distance += RailLine.DEFAULT_MAST_DISTANCE
                 point_on_line = self.linear.interpolate(current_distance)
-                mast_point = my_right_parallel.interpolate(current_distance * (my_right_parallel_length / my_length))
-                self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point))
+                mast_point = my_right_parallel.interpolate(my_left_parallel_length - current_distance * (my_left_parallel_length / my_length))
+                is_right = self.check_mast_left_right(mast_point, rail_lines_list)
+                if not is_right:
+                    mast_point = my_left_parallel.interpolate(current_distance * (my_right_parallel_length / my_length))
+                self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point, is_right))
                 prev_angle = calc_angle_of_line(prev_point.x, prev_point.y, point_on_line.x, point_on_line.y)
                 prev_point = point_on_line
 
         # virtual end point
         point_on_line = self.linear.interpolate(my_length)
-        mast_point = my_right_parallel.interpolate(my_right_parallel_length)
-        self.shared_pylons.append(RailMast(RailMast.TYPE_VIRTUAL_MAST, point_on_line, mast_point))
+        mast_point = my_right_parallel.interpolate(0)
+        self.shared_pylons.append(RailMast(RailMast.TYPE_VIRTUAL_MAST, point_on_line, mast_point, True))
 
         # calculate heading
         calc_heading_nodes(self.shared_pylons)
@@ -685,6 +743,15 @@ class RailLine(Line):
         # cables
         self._calc_cables(parameters.C2P_RADIUS_OVERHEAD_LINE, parameters.C2P_EXTRA_VERTICES_OVERHEAD_LINE
                           , parameters.C2P_CATENARY_A_OVERHEAD_LINE)
+
+    def check_mast_left_right(self, mast_point, rail_lines_list):
+        mast_buffer = mast_point.buffer(RailLine.MAST_BUFFER)
+        is_right = True
+        for my_line in rail_lines_list:
+            if (my_line.osm_id != self.osm_id) and mast_buffer.intersects(my_line.linear):
+                is_right = False
+                break
+        return is_right
 
 
 def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator):
@@ -763,19 +830,16 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_co
     for key in my_shared_nodes.keys():
         shared_node = my_shared_nodes[key]
         if len(shared_node) >= 2:
-            pos1 = 0
-            pos2 = 1
-            # we believe that all have same type - would be a OSM editing error to combine narrow and normal gauge
-            if len(shared_node) > 2:
-                pos1, pos2 = find_connecting_line(key, shared_node)
-            my_osm_id = shared_node[pos2].osm_id
-            try:
-                merge_lines(key, shared_node[pos1], shared_node[pos2], my_shared_nodes)
-                del my_railways[my_osm_id]
-                del my_shared_nodes[key]
-                logging.debug("Merged two lines with node osm_id: %s", key)
-            except Exception as e:
-                logging.error(e)
+            pos1, pos2 = find_connecting_line(key, shared_node, 60)
+            if pos1 >= 0:
+                my_osm_id = shared_node[pos2].osm_id
+                try:
+                    merge_lines(key, shared_node[pos1], shared_node[pos2], my_shared_nodes)
+                    del my_railways[my_osm_id]
+                    del my_shared_nodes[key]
+                    logging.debug("Merged two lines with node osm_id: %s", key)
+                except Exception as e:
+                    logging.error(e)
 
     #get LineStrings and remove those lines, which are less than the minimal requirement
     for the_railway in my_railways.values():
@@ -903,10 +967,11 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, my_elev_interpolator, my_
     return my_powerlines, my_aerialways
 
 
-def find_connecting_line(key, lines):
+def find_connecting_line(key, lines, max_allowed_angle=360):
     """
     In the array of lines checks which 2 lines have an angle closest to 180 degrees at end node key.
-    Looked at second last node and last node (key).
+    Looked at second last node and end node (key).
+    If the found angle is larger than the max_allowed_angle at the end, then -1 is returned for pos1
     """
     angles = []
     # Get the angle of each line
@@ -929,6 +994,8 @@ def find_connecting_line(key, lines):
                 max_angle = angle_between
                 pos1 = i
                 pos2 = j
+    if max_angle > max_allowed_angle:
+        pos1 = -1
     return pos1, pos2
 
 
@@ -1124,6 +1191,8 @@ if __name__ == "__main__":
                                                          , coord_transformator, building_refs)
     rail_lines = process_osm_rail_overhead(handler.nodes_dict, handler.ways_dict, elev_interpolator
                                            , coord_transformator)
+    tracks = process_osm_rail_overhead(handler.nodes_dict, handler.ways_dict, elev_interpolator
+                                           , coord_transformator)  # FIXME remove
     building_refs = None   # free memory
     handler = None  # free memory
 
@@ -1147,13 +1216,17 @@ if __name__ == "__main__":
 
     # Overhead lines for rail
     for rail_line in rail_lines.values():
-        rail_line.calc_and_map(elev_interpolator, coord_transformator)
+        rail_line.calc_and_map(elev_interpolator, coord_transformator, rail_lines.values())
+    # Overhead lines for rail
+    for track in tracks.values():  # FIXME remove
+        track.calc_and_map2(elev_interpolator, coord_transformator, rail_lines.values())
 
     # Write to Flightgear
     stg_file_pointers = {}  # -- dictionary of stg file pointers
     write_stg_entries(stg_file_pointers, powerlines, "powerline", parameters.C2P_CLUSTER_POWER_LINE_MAX_LENGTH)
     write_stg_entries(stg_file_pointers, aerialways, "aerialway", parameters.C2P_CLUSTER_AERIALWAY_MAX_LENGTH)
     write_stg_entries(stg_file_pointers, rail_lines, "overhead", parameters.C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH)
+    write_stg_entries(stg_file_pointers, tracks, None, parameters.C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH)  # FIXME remove
 
     for stg in stg_file_pointers.values():
         stg.write(stg_io.delimiter_string(OUR_MAGIC, False) + "\n")
