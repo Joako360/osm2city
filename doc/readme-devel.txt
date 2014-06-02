@@ -1,5 +1,13 @@
 next
 ----
+- line.py
+  if line is ready,
+    - roads
+    - railways
+    - bridges are rather simple
+  - place lots along lines
+  - infrastructure for quarters? Residential, commercial, industrial, harbor, train station
+
 - postgis? get osm2pgsql
 x get roofs back
 - put roofs in same object, re-use nodes/separate object

@@ -15,6 +15,7 @@ import numpy as np
 from vec2d import vec2d
 import shapely.geometry as shg
 from pdb import pm
+#import pdb
 #import osm
 import coordinates
 import tools
@@ -24,6 +25,7 @@ import math
 import calc_tile
 import os
 import ac3d
+from line import LineObject
 
 import logging
 import osmparser
@@ -32,34 +34,12 @@ import osmparser
 def no_transform((x, y)):
     return x, y
 
-class Road(object):
+class Road(LineObject):
     def __init__(self, transform, osm_id, tags, refs, nodes_dict):
-        self.osm_id = osm_id
-        self.tags = tags
-        self.refs = refs
-        self.nodes = []
+        super(Road, self).__init__(transform, osm_id, tags, refs, nodes_dict)
         self.railway = False
         if tags.has_key('railway'):
             self.railway = tags['railway'] in ['rail', 'tram']
-
-#    def transform(self, nodes_dict, transform):
-        osm_nodes = [nodes_dict[r] for r in refs]
-        self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
-        #self.nodes = np.array([(n.lon, n.lat) for n in osm_nodes])
-        self.center = shg.LineString(self.nodes)
-        self.compute_angle()
-
-    def compute_angle(self):
-        """For every node, compute angle."""
-        n = len(self.center.coords)
-        self.angle = np.zeros(n)
-        self.angle[0] = (vec2d(self.center.coords[1]) - vec2d(self.center.coords[0])).atan2()
-        for i in range(1, n-1):
-            self.angle[i] = 0.5 * ( (vec2d(self.center.coords[i-1]) - vec2d(self.center.coords[i])).atan2()
-                              +(vec2d(self.center.coords[i])   - vec2d(self.center.coords[i+1])).atan2())
-        self.angle[n-1] = (vec2d(self.center.coords[n-2]) - vec2d(self.center.coords[n-1])).atan2()
-
-
 
 class Roads(object):
     valid_node_keys = []
@@ -152,7 +132,29 @@ class Roads(object):
     def write(self, elev):
         ac = ac3d.Writer(tools.stats)
         obj = ac.new_object('roads', 'bridge.png')
-        for rd in self.roads[:]:
+        for i, rd in enumerate(self.roads[:10]):
+            ac = ac3d.Writer(tools.stats)
+            obj = ac.new_object('roads_%s' % rd.osm_id, 'bridge.png')
+            rd.write_to(obj, elev)
+            ac.center()
+            f = open('roads:%i_%03i.ac' % (rd.osm_id, i), 'w')
+            f.write(str(ac))
+            f.close()
+        return
+        f = open('roads.ac', 'w')
+
+        if 0:
+            ac.center()
+            plt.clf()
+            ac.plot()
+            plt.show()
+
+        f.write(str(ac))
+        f.close()
+
+
+
+        if 0:
             if rd.railway:
                 width = 2.87/2.
             else:
@@ -221,16 +223,6 @@ class Roads(object):
 #            print rd.segment_len
 #            break
 
-        f = open('roads.ac', 'w')
-
-        if 0:
-            ac.center()
-            plt.clf()
-            ac.plot()
-            plt.show()
-
-        f.write(str(ac))
-        f.close()
 
             #obj.node()
 
@@ -311,7 +303,7 @@ def main():
 
     if 1:
         for r in roads.roads:
-            a = r.nodes
+            a = np.array(r.center.coords)
             #np.array([transform.toLocal((n.lon, n.lat)) for n in r.nodes])
             plt.plot(a[:,0], a[:,1], color=col[r.typ], linewidth=lw[r.typ])
             plt.plot(a[:,0], a[:,1], color='w', linewidth=lw_w[r.typ], ls=":")
