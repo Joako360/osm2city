@@ -131,28 +131,31 @@ class Roads(object):
 
     def write(self, elev):
         ac = ac3d.Writer(tools.stats)
+
+        if 0:
+            for i, rd in enumerate(self.roads[:]):
+                ac = ac3d.Writer(tools.stats)
+                obj = ac.new_object('roads_%s' % rd.osm_id, 'bridge.png')
+                if not rd.write_to(obj, elev): continue
+                #print "write", rd.osm_id
+                ac.center()
+                f = open('roads_%i_%03i.ac' % (rd.osm_id, i), 'w')
+                f.write(str(ac))
+                f.close()
+            return
+
         obj = ac.new_object('roads', 'bridge.png')
-        for i, rd in enumerate(self.roads[:10]):
-            ac = ac3d.Writer(tools.stats)
-            obj = ac.new_object('roads_%s' % rd.osm_id, 'bridge.png')
+        for rd in self.roads:
             rd.write_to(obj, elev)
-            ac.center()
-            f = open('roads:%i_%03i.ac' % (rd.osm_id, i), 'w')
-            f.write(str(ac))
-            f.close()
-        return
         f = open('roads.ac', 'w')
+        f.write(str(ac))
+        f.close()
 
         if 0:
             ac.center()
             plt.clf()
             ac.plot()
             plt.show()
-
-        f.write(str(ac))
-        f.close()
-
-
 
         if 0:
             if rd.railway:
