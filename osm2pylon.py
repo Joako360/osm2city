@@ -694,7 +694,7 @@ class RailLine(Line):
             # find new masts along the line with a simple approximation for less distance between masts
             # if the radius gets tighter
             while True:
-                if (my_length - current_distance) < RailLine.OFFSET:
+                if (my_length - current_distance) <= RailLine.OFFSET:
                     break
                 min_distance = my_length - current_distance - RailLine.OFFSET
                 if min_distance < RailLine.DEFAULT_MAST_DISTANCE:
