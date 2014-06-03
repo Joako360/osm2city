@@ -75,8 +75,8 @@ class vec2d(object):
         return self.x, self.y
 
     def array(self):
-        """return numpy array"""
-        return np.array(self.x, self.y)
+        """return as numpy array"""
+        return np.array((self.x, self.y))
 
     def __iter__(self):
         yield(self.x)
