@@ -31,8 +31,37 @@ class LineObject(object):
         #self.nodes = np.array([(n.lon, n.lat) for n in osm_nodes])
         self.center = shg.LineString(nodes)
         self.compute_angle_etc()
-        self.left  = self.center.parallel_offset(self.width/2., 'left', resolution=1, join_style=2, mitre_limit=10.0)
-        self.right = self.center.parallel_offset(self.width/2., 'right', resolution=1, join_style=2, mitre_limit=10.0)
+        self.compute_offset(self.width/2.)
+
+    def compute_offset(self, offset):
+        if 0:
+            self.left  = self.center.parallel_offset(offset, 'left', resolution=0, join_style=2, mitre_limit=100.0)
+            self.right = self.center.parallel_offset(offset, 'right', resolution=0, join_style=2, mitre_limit=100.0)
+        else:
+            pass
+            n = len(self.center.coords)
+            left = np.zeros((n,2))
+            right = np.zeros((n,2))
+            our_node = vec2d(self.center.coords[0])
+            left[0] = (our_node + self.normals[0] * offset).array()
+            right[0] = (our_node - self.normals[0] * offset).array()
+            for i in range(1,n-1):
+                mean_normal = (self.normals[i-1] + self.normals[i]).normalize()
+                assert abs(mean_normal.mag() - 1.) < 0.000001
+                angle = np.pi + self.angle[i-1] - self.angle[i]
+                o = offset / sin(angle)
+
+                our_node = vec2d(self.center.coords[i])
+                left[i] = (our_node + mean_normal * o).array()
+                right[i] = (our_node - mean_normal * o).array()
+
+            our_node = vec2d(self.center.coords[-1])
+            left[-1] = (our_node + self.normals[-1] * offset).array()
+            right[-1] = (our_node - self.normals[-1] * offset).array()
+            self.left = shg.LineString(left)
+            self.right = shg.LineString(right)
+
+#            alpha = self.angle[i+1]
         #if osm_id == 4712682:
         #self.plot()
 #            bla
@@ -52,31 +81,39 @@ class LineObject(object):
         for i, n in enumerate(c):
             plt.text(n[0]+10, n[1], "%i_%1.0f " % (i, self.angle[i]*57.3))
         #plt.show()
-        plt.savefig('road_%i.eps' % self.osm_id)
+        plt.savefig('roads_%i.eps' % self.osm_id)
 
 
     def compute_angle_etc(self):
         """Compute angle, segment_length"""
         n = len(self.center.coords)
         self.angle = np.zeros(n)
-        self.angle[0] = (vec2d(self.center.coords[1]) - vec2d(self.center.coords[0])).atan2()
-        for i in range(1, n-1):
+#        self.angle[0] = (vec2d(self.center.coords[1]) - vec2d(self.center.coords[0])).atan2()
+#        for i in range(1, n-1):
 #            self.angle[i] = 0.5 * ( (vec2d(self.center.coords[i-1]) - vec2d(self.center.coords[i])).atan2()
 #                              +(vec2d(self.center.coords[i])   - vec2d(self.center.coords[i+1])).atan2())
 
-            self.angle[i] = (vec2d(self.center.coords[i]) - vec2d(self.center.coords[i-1])).atan2()
+#            self.angle[i] = (vec2d(self.center.coords[i]) - vec2d(self.center.coords[i-1])).atan2()
 
-        self.angle[n-1] = (vec2d(self.center.coords[-1]) - vec2d(self.center.coords[-2])).atan2()
-
-        # length of i'th segment
-        self.segment_len = np.array( \
-            [vec2d(coord).distance_to(vec2d(self.center.coords[i])) \
-             for i, coord in enumerate(self.center.coords[1:])])
-
-        # distance to node number i
+        # -- normal vectors
+        self.vectors = []
+        self.normals = []
+        self.segment_len = np.zeros(n-1)
         self.dist = np.zeros((n))
+        cumulated_distance = 0.
         for i in range(n-1):
-            self.dist[i+1] = self.dist[i] + self.segment_len[i]
+            vector = vec2d(self.center.coords[i+1]) - vec2d(self.center.coords[i])
+            self.angle[i] = vector.atan2()
+            self.segment_len[i] = vector.magnitude()
+            cumulated_distance += self.segment_len[i]
+            self.dist[i+1] = cumulated_distance
+            self.normals.append(vector.rot90ccw()/self.segment_len[i])
+            self.vectors.append(vector)
+
+            assert abs(self.normals[i].magnitude() - 1.) < 0.00001
+
+        self.angle[-1] = self.angle[-2]
+
 
     def write_to(self, obj, elev):
         """need adjacency info"""
@@ -95,7 +132,7 @@ class LineObject(object):
         # who gets to write the joint nodes?
         # -> the method that takes care of intersections
         # if generic on write: write joint nodes, too
-        self.plot()
+        #self.plot()
         o = obj.next_node_index()
         #face = np.zeros((len(left.coords) + len(right.coords)))
         try:
@@ -107,9 +144,12 @@ class LineObject(object):
                 print "different lengths not yet implemented ", self.osm_id
                 do_tex = False
                 #continue
-            if len_left != len(self.center.coords):
-                print "WTF? ", self.osm_id
+            elif len_left != len(self.center.coords):
+                print "WTF? ", self.osm_id, len(self.center.coords)
                 do_tex = False
+            else:
+                return False
+            self.plot()
                 #continue
             #if len_left != 3: continue
 
@@ -146,6 +186,8 @@ class LineObject(object):
             obj.face(face[::-1])
         except NotImplementedError:
             print "error in osm_id", self.osm_id
+
+        return True
 
 def main():
     ac = ac3d.Writer(tools.stats)

@@ -73,7 +73,11 @@ class vec2d(object):
     def list(self):
         print "deprecated call to vec2d.list(). Iterate instead."
         return self.x, self.y
-    
+
+    def array(self):
+        """return numpy array"""
+        return np.array(self.x, self.y)
+
     def __iter__(self):
         yield(self.x)
         yield(self.y)
@@ -83,11 +87,22 @@ class vec2d(object):
 
     def int(self):
         return vec2d(int(self.x), int(self.y))
-    
+
     def distance_to(self, other):
         d = self - other
         return (d.x**2 + d.y**2)**0.5
-    
+
+    def magnitude(self):
+        return (self.x**2 + self.y**2)**0.5
+
+    def normalize(self):
+        mag = self.magnitude()
+        self.x /= mag
+        self.y /= mag
+
+    def rot90ccw(self):
+        return vec2d(-self.y, self.x)
+
     def atan2(self):
         return atan2(self.y, self.x)
 
@@ -109,7 +124,7 @@ if __name__ == "__main__":
     print a.lon, a.lat
     a.lon = 4
     print a.x, a.lon
-    
+
     print "a  ", a
     for i in a:
         print " y", i
