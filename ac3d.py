@@ -31,7 +31,7 @@ class Face(object):
 
 
 class Object(object):
-    def __init__(self, name, stats, texture=None, default_type=0x0, default_mat=0):
+    def __init__(self, name, stats=None, texture=None, default_type=0x0, default_mat=0):
         self._nodes = []
         self._faces = []
         self.name = str(name)
@@ -47,7 +47,8 @@ class Object(object):
     def node(self, x, y, z):
         """Add new node. Return its index."""
         self._nodes.append(Node(x, y, z))
-        self.stats.vertices += 1
+        if self.stats:
+            self.stats.vertices += 1
         return len(self._nodes) - 1
 
     def next_node_index(self):
@@ -60,7 +61,8 @@ class Object(object):
         if not mat:
             mat = self.default_mat
         self._faces.append(Face(nodes_uv_list, typ, mat, rotate))
-        self.stats.surfaces += 1
+        if self.stats:
+            self.stats.surfaces += 1
         return len(self._faces) - 1
 
     def is_empty(self):
