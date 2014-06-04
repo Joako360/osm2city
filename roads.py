@@ -132,11 +132,13 @@ class Roads(object):
     def write(self, elev):
         ac = ac3d.Writer(tools.stats)
 
-        if 0:
+        if 1:
             for i, rd in enumerate(self.roads[:]):
+                if rd.osm_id != 205546090: continue
                 ac = ac3d.Writer(tools.stats)
                 obj = ac.new_object('roads_%s' % rd.osm_id, 'bridge.png')
-                if not rd.write_to(obj, elev): continue
+
+                if not rd.write_to(obj, elev, ac): continue
                 #print "write", rd.osm_id
                 ac.center()
                 f = open('roads_%i_%03i.ac' % (rd.osm_id, i), 'w')
@@ -146,7 +148,7 @@ class Roads(object):
 
         obj = ac.new_object('roads', 'bridge.png')
         for rd in self.roads:
-            rd.write_to(obj, elev)
+            rd.write_to(obj, elev, ac)
         f = open('roads.ac', 'w')
         f.write(str(ac))
         f.close()

@@ -27,6 +27,7 @@ class LineObject(object):
         self.start_joint = False
         self.end_joint = False
         self.width = 3
+        self.AGL = 0.5 # drape above terrain
         self.osm_id = osm_id
         osm_nodes = [nodes_dict[r] for r in refs]
         nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
@@ -83,7 +84,7 @@ class LineObject(object):
 
 
     def plot(self):
-        return
+        #return
         c = np.array(self.center.coords)
         l = np.array(self.left.coords)
         r = np.array(self.right.coords)
@@ -91,7 +92,7 @@ class LineObject(object):
 #        r1 = np.array(self.right1.coords)
         plt.clf()
         #np.array([transform.toLocal((n.lon, n.lat)) for n in r.nodes])
-        plt.plot(c[:,0], c[:,1], '-o', color='b')
+        plt.plot(c[:,0], c[:,1], '-o', color='k')
         plt.plot(l[:,0], l[:,1], '-o', color='g')
         plt.plot(r[:,0], r[:,1], '-o', color='r')
 
@@ -100,7 +101,7 @@ class LineObject(object):
 
         #plt.axes().set_aspect('equal')
         for i, n in enumerate(c):
-            plt.text(n[0]+10, n[1], "%i_%1.0f " % (i, self.angle[i]*57.3))
+            plt.text(n[0]+10, n[1], "%i_%1.0f " % (i, self.angle[i]*57.3), color='k')
         for i, n in enumerate(l):
             plt.text(n[0]-3, n[1], "%i" % (i), color='g')
         for i, n in enumerate(r):
@@ -148,7 +149,7 @@ class LineObject(object):
         self.angle[-1] = self.angle[-2]
 
 
-    def write_to(self, obj, elev):
+    def write_to(self, obj, elev, ac=None):
         """need adjacency info"""
         # options:
         # - each way has two ends.
@@ -186,11 +187,20 @@ class LineObject(object):
                 #continue
             #if len_left != 3: continue
             #print np.array(self.right.coords)
-            for p in self.left.coords:
-                e = elev(vec2d(p[0], p[1])) + 1
+
+            # -- write OSM_ID label
+            if 1:
+                anchor = self.left.coords[len_left/2]
+                e = elev(vec2d(anchor[0], anchor[1])) + self.AGL
+                ac.add_label('   ' + str(self.osm_id), -anchor[1], e+4.8, -anchor[0], scale=2)
+
+            for i, p in enumerate(self.left.coords):
+                e = elev(vec2d(p[0], p[1])) + self.AGL
                 obj.node(-p[1], e, -p[0])
+                ac.add_label(str(i), -p[1], e+5, -p[0], scale=1)
+
             for p in self.right.coords:
-                e = elev(vec2d(p[0], p[1])) + 1
+                e = elev(vec2d(p[0], p[1])) + self.AGL
                 obj.node(-p[1], e, -p[0])
             #refs = np.arange(len_left + len_right) + o
             nodes_l = np.arange(len(self.left.coords))
