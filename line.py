@@ -84,7 +84,7 @@ class LineObject(object):
 
 
     def plot(self):
-        #return
+        return
         c = np.array(self.center.coords)
         l = np.array(self.left.coords)
         r = np.array(self.right.coords)
@@ -194,39 +194,65 @@ class LineObject(object):
                 e = elev(vec2d(anchor[0], anchor[1])) + self.AGL
                 ac.add_label('   ' + str(self.osm_id), -anchor[1], e+4.8, -anchor[0], scale=2)
 
-            for i, p in enumerate(self.left.coords):
-                e = elev(vec2d(p[0], p[1])) + self.AGL
-                obj.node(-p[1], e, -p[0])
-                ac.add_label(str(i), -p[1], e+5, -p[0], scale=1)
+            if 1:
+                ni = 0
+                ofs_l = obj.next_node_index()
+                for p in self.left.coords:
+                    e = elev(vec2d(p[0], p[1])) + self.AGL
+                    obj.node(-p[1], e, -p[0])
+                    ac.add_label('l'+str(ni), -p[1], e+5, -p[0], scale=5)
+                    ni += 1
 
-            for p in self.right.coords:
-                e = elev(vec2d(p[0], p[1])) + self.AGL
-                obj.node(-p[1], e, -p[0])
-            #refs = np.arange(len_left + len_right) + o
-            nodes_l = np.arange(len(self.left.coords))
-            nodes_r = np.arange(len(self.right.coords))
-            rd_len = len(self.center.coords)
+                ofs_r = obj.next_node_index()
+                for p in self.right.coords[::-1]:
+                    e = elev(vec2d(p[0], p[1])) + self.AGL
+                    obj.node(-p[1], e, -p[0])
+                    ac.add_label('r'+str(ni), -p[1], e+5, -p[0], scale=5)
+                    ni += 1
+                #refs = np.arange(len_left + len_right) + o
+                nodes_l = np.arange(len(self.left.coords))
+                nodes_r = np.arange(len(self.right.coords))
+                rd_len = len(self.center.coords)
 
-            face = []
-            scale = 20.
-            x = 0.
-#            y0 = 0;
-#            y1 = 0.25
-            y0 = 0.5
-            y1 = 0.75
-            for i, n in enumerate(nodes_l):
-                #face.append((r+o, 0, 0))
-                if do_tex: x = self.dist[i]/scale
-                face.append((n+o, x, y0))
-            o += len(self.left.coords)
+            if 0:
+                face = []
+                scale = 20.
+                x = 0.
+    #            y0 = 0;
+    #            y1 = 0.25
+                y0 = 0.5
+                y1 = 0.75
+                for i, n in enumerate(nodes_l):
+                    #face.append((r+o, 0, 0))
+                    if do_tex: x = self.dist[i]/scale
+                    face.append((n+o, x, y0))
+                o += len(self.left.coords)
 
-            for i, n in enumerate(nodes_r):
-                if do_tex: x = self.dist[-i-1]/scale
-                #x = 0
-                #face.append((r+o, 0, 0))
-                face.append((n+o, x, y1))
-            #face = [(r, 0, 0) for r in refs[0:len_left]]
-            obj.face(face[::-1])
+                for i, n in enumerate(nodes_r):
+                    if do_tex: x = self.dist[-i-1]/scale
+                    #x = 0
+                    #face.append((r+o, 0, 0))
+                    face.append((n+o, x, y1))
+                #face = [(r, 0, 0) for r in refs[0:len_left]]
+                obj.face(face[::-1])
+            else:
+                scale = 20.
+                y0 = 0.5
+                y1 = 0.75
+                l = ofs_l
+                r = ofs_r
+                for i in range(len(self.left.coords)-1):
+                    xl = self.dist[i]/scale
+                    xr = self.dist[i+1]/scale
+                    face = [ (l,xl,y0),
+                             (l+1,xr,y0),
+                             (r+1,xr,y1),
+                             (r,xl,y1) ]
+                    l += 1
+                    r += 1
+                    obj.face(face[::-1])
+
+
         except NotImplementedError:
             print "error in osm_id", self.osm_id
 

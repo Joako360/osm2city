@@ -132,7 +132,7 @@ class Roads(object):
     def write(self, elev):
         ac = ac3d.Writer(tools.stats)
 
-        if 1:
+        if 0:
             for i, rd in enumerate(self.roads[:]):
                 if rd.osm_id != 205546090: continue
                 ac = ac3d.Writer(tools.stats)
@@ -140,7 +140,7 @@ class Roads(object):
 
                 if not rd.write_to(obj, elev, ac): continue
                 #print "write", rd.osm_id
-                ac.center()
+                #ac.center()
                 f = open('roads_%i_%03i.ac' % (rd.osm_id, i), 'w')
                 f.write(str(ac))
                 f.close()
