@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import string
 import matplotlib.pyplot as plt
+import logging
 
 class Node(object):
     def __init__(self, x, y, z):
@@ -97,23 +98,61 @@ class Object(object):
                 y = 0.5*(Y[i] + Y[i+1])
                 plt.text(x+Z[i], y+Z[i], "%i" % i)
 
+class Label(Object):
+    def __init__(self):
+        super(Label, self).__init__('label', texture='ascii.png')
+        self.char_w = 1.
+        self.char_h = 1.
+
+    def add(self, text, x, y, z, orientation=0, scale=1.):
+        h = self.char_h * scale
+        w = self.char_w * scale
+        for c in str(text):
+            code = ord(c) - 32
+            if code < 0 or code > 126-32:
+                logging.warning('Ignoring character %s' % c)
+                continue
+            cw = 1/95.
+            u0 = code * cw - cw*0.05
+            u1 = u0 + cw
+            v0 = 0
+            v1 = 1
+            if 1 or orientation == 0:
+                o = self.next_node_index()
+                self.node(x, y, z)
+                self.node(x, y, z+w)
+                self.node(x+h, y, z+w)
+                self.node(x+h, y, z)
+                self.face([(o,  u0,v0),
+                           (o+1,u1,v0),
+                           (o+2,u1,v1),
+                           (o+3,u0,v1)])
+                z += w
 
 class Writer(object):
     """
     Hold a number of objects. Each object holds nodes and faces.
     Count nodes/surfaces etc internally, thereby eliminating a common source of bugs.
-    Provides a unified interface.
+    Can also add labels (useful for debugging)
     """
     def __init__(self, stats):
         self.objects = []
         self.stats = stats
         self._current_object = None
+        self.label_object = None
 
     def new_object(self, name, texture, **kwargs):
         o = Object(name, self.stats, texture, **kwargs)
         self.objects.append(o)
         self._current_object = o
         return o
+
+    def add_label(self, text, x, y, z, orientation=0, scale=1.):
+        if not self.label_object:
+            self.label_object = Label()
+            self.objects.append(self.label_object)
+        self.label_object.add(text, x, y, z, orientation, scale)
+        return self.label_object
 
     def close_object(self):
         self._current_object.close()
