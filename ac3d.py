@@ -135,8 +135,9 @@ class Writer(object):
     Count nodes/surfaces etc internally, thereby eliminating a common source of bugs.
     Can also add labels (useful for debugging)
     """
-    def __init__(self, stats):
+    def __init__(self, stats, show_labels = False):
         self.objects = []
+        self.show_labels = show_labels
         self.stats = stats
         self._current_object = None
         self.label_object = None
@@ -150,7 +151,7 @@ class Writer(object):
     def add_label(self, text, x, y, z, orientation=0, scale=1.):
         if not self.label_object:
             self.label_object = Label()
-            self.objects.append(self.label_object)
+            if self.show_labels: self.objects.append(self.label_object)
         self.label_object.add(text, x, y, z, orientation, scale)
         return self.label_object
 
