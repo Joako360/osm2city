@@ -8,6 +8,8 @@ Ugly, highly experimental code.
 Created on Sun Sep 29 10:42:12 2013
 
 @author: tom
+TODO:
+- handle intersections
 """
 import scipy.interpolate
 import matplotlib.pyplot as plt
@@ -75,9 +77,6 @@ class Roads(object):
 
     def create_from_way(self, way, nodes_dict):
 
-        if len(self.roads) >= 10 and 0:
-            return
-
         if not self.min_max_scanned:
             self._process_nodes(nodes_dict)
             self.min_max_scanned = True
@@ -89,32 +88,41 @@ class Roads(object):
             #self.transform = coordinates.Transformation(center_global, hdg = 0)
             #tools.init(self.transform) # FIXME. Not a nice design.
 
-        col = None
+        prio = None
         try:
             access = not (way.tags['access'] == 'no')
         except:
             access = 'yes'
 
+        width=9
+        tex_y0=0.5
+        tex_y1=0.75
+        AGL_ofs = 0.
+        #if way.tags.has_key('layer'):
+        #    AGL_ofs = 20.*float(way.tags['layer'])
         if way.tags.has_key('highway'):
             road_type = way.tags['highway']
             if road_type == 'motorway' or road_type == 'motorway_link':
-                col = 0
+                prio = 5
             elif road_type == 'primary':
-                col = 1
+                prio = 4
             elif road_type == 'secondary':
-                col = 2
+                prio = 3
             elif road_type == 'tertiary':
-                col = 3
+                prio = 2
             elif road_type == 'residential':
-                col = 4
+                prio = 1
             elif road_type == 'service' and access:
-                col = None
+                prio = None
         elif way.tags.has_key('railway'):
             if way.tags['railway'] in ['rail']:
-                #col = 6
-                col = 5 # skip railways for now
+                prio = 6
+                width = 2.8
+                tex_y0 = 0
+                tex_y1 = 0.25
 
-        if col == None:
+
+        if prio == None:
 #            print "got", way.osm_id,
 #            for t in way.tags.keys():
 #                print (t), "=", (way.tags[t])+" ",
@@ -122,8 +130,8 @@ class Roads(object):
             return
 
         #print "(accepted)"
-        road = Road(self.transform, way.osm_id, way.tags, way.refs, nodes_dict)
-        road.typ = col
+        road = LineObject(self.transform, way.osm_id, way.tags, way.refs, nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.2+0.02*prio+AGL_ofs)
+        road.typ = prio
         self.roads.append(road)
 
     def __len__(self):
@@ -306,7 +314,7 @@ def main():
     lw    = [2, 1.5, 1.2, 1, 1, 1, 1]
     lw_w  = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 1]
 
-    if 1:
+    if 0:
         for r in roads.roads:
             a = np.array(r.center.coords)
             #np.array([transform.toLocal((n.lon, n.lat)) for n in r.nodes])
