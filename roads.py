@@ -77,7 +77,7 @@ class Roads(object):
         pass
 
     def create_from_way(self, way, nodes_dict):
-
+        """take one osm way, create a linear object"""
         if not self.min_max_scanned:
             self._process_nodes(nodes_dict)
             self.min_max_scanned = True

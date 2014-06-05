@@ -45,6 +45,7 @@ class LineObject(object):
     def compute_offset(self, offset):
 
         if 0:
+            # -- shapely's parallel_offset sometimes introduces extra nodes??
             self.left  = self.center.parallel_offset(offset, 'left', resolution=0, join_style=2, mitre_limit=100.0)
             self.right = self.center.parallel_offset(offset, 'right', resolution=0, join_style=2, mitre_limit=100.0)
         else:
@@ -71,6 +72,7 @@ class LineObject(object):
             self.left = shg.LineString(left)
             right = copy.copy(right[::-1])
             self.right = shg.LineString(right)
+
             if 0 and self.osm_id == 112390391:
                 r = copy.copy(right[::-1])
                 self.right1 = shg.LineString(r)
