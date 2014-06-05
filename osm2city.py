@@ -778,7 +778,7 @@ if __name__ == "__main__":
             else:
                 stg = stg_fp_dict[stg_fname]
 
-            stg.write("OBJECT_STATIC %s %g %g %1.2f %g\n" % (fname+".xml", center_global.lon, center_global.lat, tile_elev, 0))
+            stg.write("OBJECT_STATIC %s %1.5f %1.5f %1.2f %g\n" % (fname+".xml", center_global.lon, center_global.lat, tile_elev, 0))
 
     for stg in stg_fp_dict.values():
         stg.write(stg_io.delimiter_string(OUR_MAGIC, False) + "\n")
