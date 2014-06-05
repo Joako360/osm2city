@@ -27,7 +27,7 @@ import math
 import calc_tile
 import os
 import ac3d
-from line import LineObject
+from linear import LineObject
 
 import logging
 import osmparser
