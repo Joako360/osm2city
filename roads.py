@@ -278,11 +278,11 @@ def main():
 
     osm_fname = parameters.PREFIX + os.sep + parameters.OSM_FILE
 
-#    cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
-#    cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
-#    center_global = (cmin + cmax)*0.5
-#    transform = coordinates.Transformation(center_global, hdg = 0)
-    center_global = vec2d(11.38, 47.26)
+    cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
+    cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
+    center_global = (cmin + cmax)*0.5
+    transform = coordinates.Transformation(center_global, hdg = 0)
+#    center_global = vec2d(11.38, 47.26)
     transform = coordinates.Transformation(center_global, hdg = 0)
     tools.init(transform)
     roads = Roads(transform)
@@ -297,11 +297,9 @@ def main():
     handler.register_uncategorized_way_callback(roads.store_uncategorized)
     handler.parse(source)
 
-    #transform = tools.transform
-    #center_global =  vec2d(transform.toGlobal(vec2d(0,0)))
     logging.info("done.")
     logging.info("ways: %i", len(roads))
-    print "OBJECT_STATIC %s %g %g %1.2f %g\n" % ("road.ac", center_global.lon, center_global.lat, 0, 0)
+    print "OBJECT_STATIC %s %1.5f %1.5f %1.2f %g\n" % ("road.ac", center_global.lon, center_global.lat, 0, 0)
     if parameters.PATH_TO_OUTPUT:
         path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, center_global)
     else:
@@ -309,12 +307,12 @@ def main():
     stg_fname = calc_tile.construct_stg_file_name(center_global)
     print path+stg_fname
 
-    # -- quick test output
-    col = ['b', 'r', 'y', 'g', '0.75', '0.5', 'k']
-    lw    = [2, 1.5, 1.2, 1, 1, 1, 1]
-    lw_w  = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 1]
 
     if 0:
+        # -- quick test output
+        col = ['b', 'r', 'y', 'g', '0.75', '0.5', 'k']
+        lw    = [2, 1.5, 1.2, 1, 1, 1, 1]
+        lw_w  = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 1]
         for r in roads.roads:
             a = np.array(r.center.coords)
             #np.array([transform.toLocal((n.lon, n.lat)) for n in r.nodes])
@@ -327,15 +325,6 @@ def main():
 
     elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
     roads.write(elev)
-
-    max_a = 0.
-    for r in roads.roads:
-        a = max(r.angle)
-        if a > max_a: max_a = a
-
-    print "max angle", max_a*57.3
-
-
 
 if __name__ == "__main__":
     main()

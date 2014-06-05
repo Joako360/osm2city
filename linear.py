@@ -43,8 +43,6 @@ class LineObject(object):
         self.tex_y1 = tex_y1
 
     def compute_offset(self, offset):
-        def sgn(x):
-            return x >= 0
 
         if 0:
             self.left  = self.center.parallel_offset(offset, 'left', resolution=0, join_style=2, mitre_limit=100.0)
@@ -62,10 +60,7 @@ class LineObject(object):
                 l = (mean_normal[0]**2 + mean_normal[1]**2)**0.5
                 mean_normal /= l
                 angle = (np.pi + self.angle[i-1] - self.angle[i])/2.
-                #if sgn(self.angle[i-1]) != sgn(self.angle[i]):
-                #    print "a", angle*57.3
                 o = abs(offset / math.sin(angle))
-                #print "o", o
                 our_node = np.array(self.center.coords[i])
                 left[i] = our_node + mean_normal * o
                 right[i] = our_node - mean_normal * o
