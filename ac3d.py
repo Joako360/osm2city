@@ -133,7 +133,7 @@ class Writer(object):
     """
     Hold a number of objects. Each object holds nodes and faces.
     Count nodes/surfaces etc internally, thereby eliminating a common source of bugs.
-    Can also add labels (useful for debugging)
+    Can also add 3d labels (useful for debugging, disabled by default)
     """
     def __init__(self, stats, show_labels = False):
         self.objects = []
