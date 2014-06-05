@@ -245,7 +245,7 @@ class LineObject(object):
 
 def main():
     ac = ac3d.Writer(tools.stats)
-    obj = ac.new_object('roads', 'bridge.png')
+    obj = ac.new_object('roads', 'tex/bridge.png')
     line.write_to(obj)
     f = open('line.ac', 'w')
 

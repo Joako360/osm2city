@@ -146,7 +146,7 @@ class Roads(object):
             for i, rd in enumerate(self.roads[:]):
                 if rd.osm_id != 205546090: continue
                 ac = ac3d.Writer(tools.stats)
-                obj = ac.new_object('roads_%s' % rd.osm_id, 'bridge.png')
+                obj = ac.new_object('roads_%s' % rd.osm_id, 'tex/bridge.png')
 
                 if not rd.write_to(obj, elev, ac): continue
                 #print "write", rd.osm_id
@@ -157,7 +157,7 @@ class Roads(object):
             return
 
         # -- write roads to ac object, then write obj to file
-        obj = ac.new_object('roads', 'bridge.png')
+        obj = ac.new_object('roads', 'tex/bridge.png')
         for rd in self.roads:
             rd.write_to(obj, elev, ac)
         f = open('roads.ac', 'w')
