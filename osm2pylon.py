@@ -222,8 +222,8 @@ def create_drag_lift_in_osm_building():
     return vertices
 
 
-def create_rail_power_vertices(is_right):
-    if is_right:
+def create_rail_power_vertices(direction_type):
+    if direction_type == SharedPylon.DIRECTION_TYPE_MIRROR:
         vertices = [CableVertex(-1.95, 5.85)
                     , CableVertex(-1.95, 4.95, no_catenary=True)]
     else:
@@ -232,7 +232,13 @@ def create_rail_power_vertices(is_right):
     return vertices
 
 
-def get_cable_vertices(pylon_model, is_right):
+def create_rail_stop_tension():
+    vertices = [CableVertex(0, 5.35)
+                , CableVertex(0, 4.95, no_catenary=True)]
+    return vertices
+
+
+def get_cable_vertices(pylon_model, direction_type):
     if "generic_pylon_25m" in pylon_model:
         return create_generic_pylon_25_vertices()
     if "generic_pylon_50m" in pylon_model:
@@ -246,7 +252,9 @@ def get_cable_vertices(pylon_model, is_right):
     elif "wooden_pole_14m" in pylon_model:
         return create_wooden_pole_14m_vertices()
     elif "RailPower" in pylon_model:
-        return create_rail_power_vertices(is_right)
+        return create_rail_power_vertices(direction_type)
+    elif "tension" in pylon_model:
+        return create_rail_stop_tension()
     else:
         return None
 
@@ -264,6 +272,11 @@ class WaySegment(object):
 
 
 class SharedPylon(object):
+    DIRECTION_TYPE_NORMAL = 0  # in ac-file mast is on left side, stuff on right side along x-axis
+    DIRECTION_TYPE_MIRROR = 1
+    DIRECTION_TYPE_START = 2
+    DIRECTION_TYPE_END = 3
+
     def __init__(self):
         self.type_ = 0  # cf. class constants TYPE_*
         self.lon = 0.0  # longitude coordinate in decimal as a float
@@ -274,7 +287,8 @@ class SharedPylon(object):
         self.heading = 0.0  # heading of pylon in degrees
         self.pylon_model = None  # the path to the ac/xml model
         self.needs_stg_entry = True
-        self.do_mirror = False  # if e.g. a railmast looks right instead of right, then correct with 180 degrees
+        self.direction_type = SharedPylon.DIRECTION_TYPE_NORMAL  # correction for which direction mast looks at
+        # maximum one of the following
 
     def make_stg_entry(self):
         """
@@ -284,11 +298,16 @@ class SharedPylon(object):
         if not self.needs_stg_entry:
             return " "  # no need to write a shared object
 
-        heading_correction = 0
-        if self.do_mirror:
-            heading_correction = 180
+        direction_correction = 0
+        if self.direction_type == SharedPylon.DIRECTION_TYPE_MIRROR:
+            direction_correction = 180
+        elif self.direction_type == SharedPylon.DIRECTION_TYPE_END:
+            direction_correction = 0
+        elif self.direction_type == SharedPylon.DIRECTION_TYPE_START:
+            direction_correction = 180
+
         entry = ["OBJECT_SHARED", self.pylon_model, str(self.lon), str(self.lat), str(self.elevation)
-                 , str(stg_angle(self.heading - 90 + heading_correction))]  # 90 less because arms are in x-direction in ac-file
+                 , str(stg_angle(self.heading - 90 + direction_correction))]  # 90 less because arms are in x-direction in ac-file
         return " ".join(entry)
 
 
@@ -366,8 +385,10 @@ class Line(object):
         Afterwards use the start and end points to create all cables for a given WaySegment
         """
         for segment in self.way_segments:
-            start_cable_vertices = get_cable_vertices(segment.start_pylon.pylon_model, segment.start_pylon.do_mirror)
-            end_cable_vertices = get_cable_vertices(segment.end_pylon.pylon_model, segment.end_pylon.do_mirror)
+            start_cable_vertices = get_cable_vertices(segment.start_pylon.pylon_model
+                                                      , segment.start_pylon.direction_type)
+            end_cable_vertices = get_cable_vertices(segment.end_pylon.pylon_model
+                                                    , segment.end_pylon.direction_type)
             for i in xrange(0, len(start_cable_vertices)):
                 my_radius = radius
                 my_number_extra_vertices = number_extra_vertices
@@ -582,8 +603,9 @@ class RailMast(SharedPylon):
     TYPE_VIRTUAL_MAST = 10  # only used at endpoints of RailLine for calcs - not used for visual masts
     TYPE_SINGLE_MAST = 11
     TYPE_DOUBLE_MAST = 12
+    TYPE_STOP_MAST = 20
 
-    def __init__(self, type_, point_on_line, mast_point, do_mirror=False):
+    def __init__(self, type_, point_on_line, mast_point, direction_type):
         super(RailMast, self).__init__()
         self.type_ = type_
         self.point_on_line = point_on_line
@@ -592,7 +614,9 @@ class RailMast(SharedPylon):
         self.pylon_model = "Models/StreetFurniture/RailPower.xml"
         if self.type_ == RailMast.TYPE_VIRTUAL_MAST:
             self.needs_stg_entry = False
-        self.do_mirror = do_mirror
+        elif self.type_ == RailMast.TYPE_STOP_MAST:
+            self.pylon_model = "Models/StreetFurniture/rail_stop_tension.xml"
+        self.direction_type = direction_type
 
     def is_virtual(self):
         return self.type_ == RailMast.TYPE_VIRTUAL_MAST
@@ -669,7 +693,12 @@ class RailLine(Line):
         # virtual start point
         point_on_line = self.linear.interpolate(0)
         mast_point = my_right_parallel.interpolate(my_right_parallel_length)
-        self.shared_pylons.append(RailMast(RailMast.TYPE_VIRTUAL_MAST, point_on_line, mast_point, True))
+        if self.nodes[0].buffer_stop:
+            self.shared_pylons.append(RailMast(RailMast.TYPE_STOP_MAST, point_on_line, point_on_line
+                                               , SharedPylon.DIRECTION_TYPE_START))
+        else:
+            self.shared_pylons.append(RailMast(RailMast.TYPE_VIRTUAL_MAST, point_on_line, mast_point
+                                               , SharedPylon.DIRECTION_TYPE_MIRROR))
         prev_point = point_on_line
 
         # get the first mast point
@@ -686,9 +715,12 @@ class RailLine(Line):
             point_on_line = self.linear.interpolate(current_distance)
             mast_point = my_right_parallel.interpolate(my_left_parallel_length - current_distance * (my_left_parallel_length / my_length))
             is_right = self.check_mast_left_right(mast_point, rail_lines_list)
-            if not is_right:
+            if is_right:
+                direction_type = SharedPylon.DIRECTION_TYPE_MIRROR
+            else:
+                direction_type = SharedPylon.DIRECTION_TYPE_NORMAL
                 mast_point = my_left_parallel.interpolate(current_distance * (my_right_parallel_length / my_length))
-            self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point, is_right))
+            self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point, direction_type))
             prev_angle = calc_angle_of_line(prev_point.x, prev_point.y, point_on_line.x, point_on_line.y)
             prev_point = point_on_line
             # find new masts along the line with a simple approximation for less distance between masts
@@ -704,31 +736,39 @@ class RailLine(Line):
                     point_on_line = self.linear.interpolate(test_distance)
                     new_angle = calc_angle_of_line(prev_point.x, prev_point.y, point_on_line.x, point_on_line.y)
                     difference = abs(new_angle - prev_angle)
-                    if difference >= 50:
+                    if difference >= 25:
                         current_distance += 10
-                    elif difference >= 40:
-                        current_distance += 20
-                    elif difference >= 30:
-                        current_distance += 30
                     elif difference >= 20:
-                        current_distance += 40
+                        current_distance += 20
+                    elif difference >= 15:
+                        current_distance += 30
                     elif difference >= 10:
+                        current_distance += 40
+                    elif difference >= 5:
                         current_distance += 50
                     else:
                         current_distance += RailLine.DEFAULT_MAST_DISTANCE
                 point_on_line = self.linear.interpolate(current_distance)
                 mast_point = my_right_parallel.interpolate(my_left_parallel_length - current_distance * (my_left_parallel_length / my_length))
                 is_right = self.check_mast_left_right(mast_point, rail_lines_list)
-                if not is_right:
+                if is_right:
+                    direction_type = SharedPylon.DIRECTION_TYPE_MIRROR
+                else:
+                    direction_type = SharedPylon.DIRECTION_TYPE_NORMAL
                     mast_point = my_left_parallel.interpolate(current_distance * (my_right_parallel_length / my_length))
-                self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point, is_right))
+                self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point, direction_type))
                 prev_angle = calc_angle_of_line(prev_point.x, prev_point.y, point_on_line.x, point_on_line.y)
                 prev_point = point_on_line
 
         # virtual end point
         point_on_line = self.linear.interpolate(my_length)
         mast_point = my_right_parallel.interpolate(0)
-        self.shared_pylons.append(RailMast(RailMast.TYPE_VIRTUAL_MAST, point_on_line, mast_point, True))
+        if self.nodes[-1].buffer_stop:
+            self.shared_pylons.append(RailMast(RailMast.TYPE_STOP_MAST, point_on_line, point_on_line
+                                               , SharedPylon.DIRECTION_TYPE_END))
+        else:
+            self.shared_pylons.append(RailMast(RailMast.TYPE_VIRTUAL_MAST, point_on_line, mast_point
+                                               , SharedPylon.DIRECTION_TYPE_MIRROR))
 
         # calculate heading
         calc_heading_nodes(self.shared_pylons)
