@@ -37,6 +37,7 @@ def no_transform((x, y)):
     return x, y
 
 class Road(LineObject):
+    """ATM unused"""
     def __init__(self, transform, osm_id, tags, refs, nodes_dict):
         super(Road, self).__init__(transform, osm_id, tags, refs, nodes_dict)
         self.railway = False
@@ -117,7 +118,7 @@ class Roads(object):
         elif way.tags.has_key('railway'):
             if way.tags['railway'] in ['rail']:
                 prio = 6
-                width = 2.8
+                width = 2.87
                 tex_y0 = 0
                 tex_y1 = 0.25
 
@@ -140,6 +141,7 @@ class Roads(object):
     def write(self, elev):
         ac = ac3d.Writer(tools.stats)
 
+        # -- debug: write individual .ac for every road
         if 0:
             for i, rd in enumerate(self.roads[:]):
                 if rd.osm_id != 205546090: continue
@@ -154,6 +156,7 @@ class Roads(object):
                 f.close()
             return
 
+        # -- write roads to ac object, then write obj to file
         obj = ac.new_object('roads', 'bridge.png')
         for rd in self.roads:
             rd.write_to(obj, elev, ac)
@@ -161,83 +164,6 @@ class Roads(object):
         f.write(str(ac))
         f.close()
 
-        if 0:
-            ac.center()
-            plt.clf()
-            ac.plot()
-            plt.show()
-
-        if 0:
-            if rd.railway:
-                width = 2.87/2.
-            else:
-                width = 4.
-            left  = rd.center.parallel_offset(width, 'left', resolution=1, join_style=2, mitre_limit=10.0)
-            right = rd.center.parallel_offset(width, 'right', resolution=1, join_style=2, mitre_limit=10.0)
-            o = obj.next_node_index()
-            #face = np.zeros((len(left.coords) + len(right.coords)))
-            try:
-                do_tex = True
-                len_left = len(left.coords)
-                len_right = len(right.coords)
-
-                if len_left != len_right:
-                    print "different lengths not yet implemented ", rd.osm_id
-                    do_tex = False
-                    #continue
-                if len_left != len(rd.center.coords):
-                    print "WTF? ", rd.osm_id
-                    do_tex = False
-                    #continue
-                #if len_left != 3: continue
-
-
-                for p in left.coords:
-                    e = elev(vec2d(p[0], p[1])) + 1
-                    obj.node(-p[1], e, -p[0])
-                for p in right.coords:
-                    e = elev(vec2d(p[0], p[1])) + 1
-                    obj.node(-p[1], e, -p[0])
-                #refs = np.arange(len_left + len_right) + o
-                nodes_l = np.arange(len(left.coords))
-                nodes_r = np.arange(len(right.coords))
-                rd.segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(rd.center.coords[i])) for i, coord in enumerate(rd.center.coords[1:])])
-                rd_len = len(rd.center.coords)
-                rd.dist = np.zeros((rd_len))
-                for i in range(1, rd_len):
-                    rd.dist[i] = rd.dist[i-1] + rd.segment_len[i]
-
-                face = []
-                scale = 20.
-                x = 0.
-                if rd.railway:
-                    y0 = 0
-                    y1 = 0.25
-                else:
-                    y0 = 0.5
-                    y1 = 0.75
-                for i, n in enumerate(nodes_l):
-                    #face.append((r+o, 0, 0))
-                    if do_tex: x = rd.dist[i]/scale
-                    face.append((n+o, x, y0))
-                o += len(left.coords)
-
-                for i, n in enumerate(nodes_r):
-                    if do_tex: x = rd.dist[-i-1]/scale
-                    #x = 0
-                    #face.append((r+o, 0, 0))
-                    face.append((n+o, x, y1))
-                #face = [(r, 0, 0) for r in refs[0:len_left]]
-                obj.face(face[::-1])
-            except NotImplementedError:
-                print "error in osm_id", rd.osm_id
-
-#            print rd.dist
-#            print rd.segment_len
-#            break
-
-
-            #obj.node()
 
 def join_ways():
     """join ways that
