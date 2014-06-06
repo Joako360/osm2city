@@ -72,7 +72,7 @@ def flat(out, b, X, ac_name = ""):
     else:
         nodes = range(b.nnodes_outer)
 
-    assert(len(X) >= len(nodes))
+    #assert(len(X) >= len(nodes))
     if ac_name == "":
         uv = face_uv(nodes, X, b.roof_texture, angle=None)
         nodes = np.array(nodes) + b._nnodes_ground

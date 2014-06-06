@@ -315,7 +315,7 @@ class Buildings(object):
             tools.stats.parse_errors += 1
             return False
 
-        self.buildings.append(Building(osm_id, tags, outer_ring, _name, _height, _levels, inner_rings_list = inner_rings_list, building_type = _building_type, roof_type=_roof_type))
+        self.buildings.append(Building(osm_id, tags, outer_ring, name, height, levels, inner_rings_list = inner_rings_list, building_type = _building_type, roof_type=_roof_type))
 
         tools.stats.objects += 1
         if tools.stats.objects % 50 == 0:
