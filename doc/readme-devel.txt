@@ -1,5 +1,14 @@
 next
 ----
+- line.py
+  if line is ready,
+    - roads
+    - railways
+    - bridges are rather simple
+  - place lots along lines
+  - infrastructure for quarters? Residential, commercial, industrial, harbor, train station
+
+- postgis? get osm2pgsql
 x get roofs back
 - put roofs in same object, re-use nodes/separate object
 x get textures back
@@ -10,6 +19,21 @@ x usability: try .pkl first, failing that, try .osm. Warn about existing .pkl be
 x compute angles for ground nodes, simplify large angles
 x pitched roofs on relations
 - discard small inner ways
+
+- roads
+- bridges
+- regions: commercial, urban, suburban, industrial, park, airports
+- simple house: shared model. Complex house: facade
+- ground patch (garden)
+- street lights
+- traffic signs
+
+Use postGIS?
++ learn SQL, database stuff
+- takes time. Refactoring!
++ outsource queries, much more complex queries possible.
+  - what queries do we really need?
+- should this once go into FG -- don't want dependency there!
 
 
 textures

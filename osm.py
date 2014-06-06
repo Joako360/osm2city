@@ -1,34 +1,48 @@
 #!/usr/bin/env python2
 """abstract way extractor. To be inherited.
 
-    handler = osmparser.OSMContentHandler(valid_node_keys, valid_way_keys,
-         req_way_keys, valid_relation_keys, req_relation_keys)
-
-    source = open(osm_fname)
-    xml.sax.parse(source, handler)
-#    way.process_osm_elements(handler.nodes_dict, handler.ways_dict, handler.relations_dict)
-    osm = Osm(handler, transform)
-    osm.register_way_callback(roads.way_callback, valid_node_keys, valid_way_keys, ...)
-    osm.parse(osm_file)
-
-    osm = Osm()
-    osm.register_way_callback(roads.way_callback, valid_node_keys, valid_way_keys, ..., transform = transform)
-    # possibly also node, relation callbacks
-    osm.parse(osm_file)
-
+class Road(object):
+    # holds data for one road
+    def init(...)
 
 class Roads(object):
-    def way_callback(way, refs, trasformed_nodes):
+    #holds all roads. OSM parser calls back our create_from_way().
+    self.roads = []
+    self.valid_node_keys = ..
+    self.valid_way_keys = ..
+    def create_from_way(way, refs, nodes):
+        road = Road(...)
+        self.roads.append(road)
+
+    def analyse():
         pass
 
+    def write():
+    # how to interact with other stuff?
+        pass
+        # ac.write(lod=1)
 
-    callback:
-      make_road_from_way(way)
-      or
+class static_objects(object):
+    def load_stg():
 
-    osm.register_relation_callback(make_road_from_relation())
+    def is_near(position, delta):
+        # check for static object at given position
+        pass
 
-    make_road_from_relation(rel, ways, refs, coords)
+def __main__():
+    roads = Roads()
+    handler = osmparser.OSMContentHandler()
+
+    # -- handler hält eine Liste von callbacks. Wenn der handler beim parsen
+    #    valid_keys trifft, wird der entsprechende callback aufgerufen.
+
+    handler.register_way_callback(roads.create_from_way, roads.valid_node_keys, ...)
+    # -- add node or relation callbacks if needed
+
+    pylons = Pylons()
+    handler.register_way_callback(pylons.create_from_way, pylons.valid_node_keys, ...)
+
+    handler.parse(osm_file)
 
 """
 

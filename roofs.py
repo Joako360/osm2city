@@ -83,6 +83,7 @@ def flat(out, b, X, ac_name = ""):
 #    print "len nodes", len(nodes)
     assert(len(nodes) == b._nnodes_ground + 2 * len(b.polygon.interiors))
 
+
     #if not ac_name: uv *= 0 # -- texture only separate roofs
     #print "uv, ", uv
 
