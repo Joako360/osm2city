@@ -301,7 +301,7 @@ class wayExtract(object):
         return True
 
     def _process_relations(self, relations):
-        for _relation in relations:
+        for _relation in relations.values():
             if tools.stats.objects >= parameters.MAX_OBJECTS:
                 return
 
@@ -309,15 +309,15 @@ class wayExtract(object):
                 outer_ways = []
                 inner_ways = []
                 #print "rel: ", osm_id, tags #, members
-                for ref, type_, role in _relation.members:
+                for m in _relation.members:
 #                    if typ == 'way' and role == 'inner':
-                    if type_ == 'way':
-                        if role == 'outer':
+                    if m.type_ == 'way':
+                        if m.role == 'outer':
                             for way in self.way_list:
-                                if way.osm_id == ref: outer_ways.append(way)
-                        elif role == 'inner':
+                                if way.osm_id == m.ref: outer_ways.append(way)
+                        elif m.role == 'inner':
                             for way in self.way_list:
-                                if way.osm_id == ref: inner_ways.append(way)
+                                if way.osm_id == m.ref: inner_ways.append(way)
 
                 if outer_ways:
                     #print "len outer ways", len(outer_ways)
@@ -618,10 +618,21 @@ if __name__ == "__main__":
         req_way_keys = ["building"]
         valid_relation_keys = ["building"]
         req_relation_keys = ["building"]
-        handler = osmparser.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys)
+        import osmparser_wrapper
+        import osmparser_alt
+        handler = osmparser_alt.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys)
+        handler2 = osmparser_wrapper.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys)
         source = open(osm_fname)
         logging.info("Reading the OSM file might take some time ...")
         xml.sax.parse(source, handler)
+        source.close()
+        source = open(osm_fname)
+        xml.sax.parse(source, handler2)
+        handler = handler2
+        if 0:
+            print len(handler.relations_dict)
+            print len(handler2.relations_dict)
+            bla
 
         logging.info("Transforming OSM objects to Buildings")
         way.process_osm_elements(handler.nodes_dict, handler.ways_dict, handler.relations_dict)
