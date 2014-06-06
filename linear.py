@@ -33,6 +33,8 @@ class LineObject(object):
         self.width = width
         self.AGL = AGL # drape distance above terrain
         self.osm_id = osm_id
+        self.refs = refs
+        self.tags = tags
         osm_nodes = [nodes_dict[r] for r in refs]
         nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
         self.center = shg.LineString(nodes)
@@ -181,7 +183,7 @@ class LineObject(object):
                 #continue
 
             # -- write OSM_ID label
-            if 1:
+            if 0:
                 anchor = self.left.coords[len_left/2]
                 e = elev(vec2d(anchor[0], anchor[1])) + self.AGL
                 ac.add_label('   ' + str(self.osm_id), -anchor[1], e+4.8, -anchor[0], scale=2)
@@ -193,14 +195,14 @@ class LineObject(object):
                 for p in self.left.coords:
                     e = elev(vec2d(p[0], p[1])) + self.AGL
                     obj.node(-p[1], e, -p[0])
-                    ac.add_label('l'+str(ni), -p[1], e+5, -p[0], scale=5)
+#                    ac.add_label('l'+str(ni), -p[1], e+5, -p[0], scale=5)
                     ni += 1
 
                 ofs_r = obj.next_node_index()
                 for p in self.right.coords[::-1]:
                     e = elev(vec2d(p[0], p[1])) + self.AGL
                     obj.node(-p[1], e, -p[0])
-                    ac.add_label('r'+str(ni), -p[1], e+5, -p[0], scale=5)
+#                    ac.add_label('r'+str(ni), -p[1], e+5, -p[0], scale=5)
                     ni += 1
                 #refs = np.arange(len_left + len_right) + o
                 nodes_l = np.arange(len(self.left.coords))

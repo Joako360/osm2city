@@ -10,7 +10,41 @@ Created on Sun Sep 29 10:42:12 2013
 @author: tom
 TODO:
 - handle intersections
+- handle layers/bridges
+
+Intersections:
+- currently, we get false positives: one road ends, another one begins.
+- loop intersections:
+    for the_node in nodes:
+    if the_node is not endpoint: put way into splitting list
+    #if only 2 nodes, and both end nodes, and road types compatible:
+    #put way into joining list
+
+Render intersection:
+  if 2 ways:
+    simply join here. Or ignore for now.
+  else:
+      for the_way in ways:
+        left_neighbor = compute from angles and width
+        store end nodes coords separately
+        add to object, get node index
+        - store end nodes index in way
+        - way does not write end node coords, central method does it
+      write intersection face
+
+Splitting:
+  find all intersections for the_way
+  normally a way would have exactly two intersections (at the ends)
+  sort intersections in way's node order:
+    add intersection node index to dict
+    sort list
+  split into nintersections-1 ways
+Now each way's end node is either intersection or dead-end.
+
+Joining:
+
 """
+
 import scipy.interpolate
 import matplotlib.pyplot as plt
 import numpy as np
@@ -60,6 +94,7 @@ class Roads(object):
         self.min_max_scanned = False
 
     def _process_nodes(self, nodes):
+        self.nodes_dict = nodes
         for node in nodes.values():
             #logging.debug('%s %.4f %.4f', node.osm_id, node.lon, node.lat)
             #self.coord_dict[node.osm_id] = node
@@ -139,7 +174,7 @@ class Roads(object):
         return len(self.roads)
 
     def write(self, elev):
-        ac = ac3d.Writer(tools.stats)
+        ac = ac3d.Writer(tools.stats, show_labels=True)
 
         # -- debug: write individual .ac for every road
         if 0:
@@ -160,10 +195,46 @@ class Roads(object):
         obj = ac.new_object('roads', 'tex/bridge.png')
         for rd in self.roads:
             rd.write_to(obj, elev, ac)
+
+        for ref in self.intersections:
+            node = self.nodes_dict[ref]
+            x, y = self.transform.toLocal((node.lon, node.lat))
+            e = elev(vec2d(x, y)) + 5
+            ac.add_label('I', -y, e, -x, scale=10)
+
         f = open('roads.ac', 'w')
         f.write(str(ac))
         f.close()
 
+    def find_intersections(self):
+        # -- brute force: loop all nodes, store the attached ways
+        #    FIXME: use quadtree/kdtree
+        logging.info('Finding intersections...')
+        self.intersections = []
+        attached_ways = {} # a dict: for each node hold a list of attached ways
+        for road in self.roads:
+            for ref in road.refs:
+                try:
+                    attached_ways[ref].append(road)
+                    if len(attached_ways[ref]) == 2:
+                        # -- check if ways are actually distinct before declaring
+                        #    an intersection?
+                        # not an intersection if
+                        # - only 2 ways && one ends && other starts
+                        # easier?: only 2 ways, at least one node is middle node
+                        self.intersections.append(ref)
+                except KeyError:
+                    attached_ways[ref] = [road]  # initialize node
+        logging.info('Done.')
+
+        for key, value in attached_ways.items():
+            if len(value) > 1:
+                print key
+                for way in value:
+                    try:
+                        print "  ", way.tags['name']
+                    except:
+                        print "  ", way
 
 def join_ways():
     """join ways that
@@ -172,13 +243,6 @@ def join_ways():
     """
     pass
 
-def find_intersections():
-    cand_intersections = []
-    for way in ways:
-        for ref in way.refs:
-            cand_node = nodes[ref]
-            if len(cand_node.ways) == 1:
-                cand_intersections.append(ref)
 
 def main():
     logging.basicConfig(level=logging.INFO)
@@ -248,6 +312,8 @@ def main():
         plt.axes().set_aspect('equal')
         #plt.show()
         plt.savefig('roads.eps')
+
+    roads.find_intersections()
 
     elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
     roads.write(elev)
