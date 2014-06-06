@@ -12,6 +12,7 @@ import os
 from _io import open
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser(description="build-tiles generates a directory structure capable of generating complete tiles of scenery")
     parser.add_argument("-t", "--tile", dest="tilename",
                       help="The name of the tile")
@@ -52,21 +53,24 @@ if __name__ == '__main__':
         osm_name = "osm2city_" + args.tilename + ".cmd"
         osm_pylons = "osm2pylon_" + args.tilename + ".cmd"
         tools_name = "tools_" + args.tilename + ".cmd"
+        platforms_name = "osm2platform_" + args.tilename + ".cmd"
     else:
         download_name = "download_" + args.tilename
         osm_name = "osm2city_" + args.tilename
         osm_pylons = "osm2pylon_" + args.tilename
         tools_name = "tools_" + args.tilename
+        platforms_name = "osm2platform_" + args.tilename
         
     downloadfile = open(calc_tile.root_directory_name((lon, lat)) + os.sep + download_name, "wb") 
     osm2city = open(calc_tile.root_directory_name((lon, lat)) + os.sep + osm_name, "wb")
     osm2pylon = open(calc_tile.root_directory_name((lon, lat)) + os.sep + osm_pylons, "wb")
     tools = open(calc_tile.root_directory_name((lon, lat)) + os.sep + tools_name, "wb") 
+    platformsfile = open(calc_tile.root_directory_name((lon, lat)) + os.sep + platforms_name, "wb") 
     for dy in range(0, num_cols):
         for dx in range(0, num_rows):
             index = calc_tile.tile_index((lon, lat), dx, dy)
             path =("%s%s%s" % (calc_tile.directory_name((lon, lat)), os.sep,  index ) )
-            print path
+            logging.info ( path)
             try:
                 os.makedirs(path)
             except OSError, e:
@@ -91,5 +95,11 @@ if __name__ == '__main__':
             osm2city.write('python osm2city.py -f %s/params.ini' % (replacement_path) + os.linesep)
             osm2pylon.write('python osm2pylon.py -f %s/params.ini' % (replacement_path) + os.linesep)
             tools.write('python tools.py -f %s/params.ini' % (replacement_path) + os.linesep)
+            platformsfile.write('python platforms.py -f %s/params.ini' % (replacement_path) + os.linesep)
+    downloadfile.close() 
+    osm2city.close()
+    osm2pylon.close()
+    tools.close() 
+    platformsfile.close() 
 
     sys.exit(0)
