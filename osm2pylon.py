@@ -36,6 +36,7 @@ import tools
 import vec2d
 
 from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
 from shapely.geometry import Point
 from shapely.geometry import Polygon
 
@@ -291,6 +292,10 @@ class SharedPylon(object):
         self.direction_type = SharedPylon.DIRECTION_TYPE_NORMAL  # correction for which direction mast looks at
         # maximum one of the following
 
+    def calc_global_coordinates(self, my_elev_interpolator, my_coord_transformator):
+        self.lon, self.lat = my_coord_transformator.toGlobal((self.x, self.y))
+        self.elevation = my_elev_interpolator(vec2d.vec2d(self.lon, self.lat), True)
+
     def make_stg_entry(self):
         """
         Returns a stg entry for this pylon.
@@ -343,12 +348,10 @@ class Pylon(SharedPylon):
             self.pylon_model = pylon_model
 
 
-class Line(object):
+class LineWithoutCables(object):
     def __init__(self, osm_id):
         self.osm_id = osm_id
         self.shared_pylons = []  # SharedPylons
-        self.way_segments = []
-        self.length = 0.0  # the total length of all segments
 
     def make_shared_pylons_stg_entries(self):
         """
@@ -361,8 +364,96 @@ class Line(object):
 
     def get_center_coordinates(self):
         """Returns the lon/lat coordinates of the line"""
-        my_shared_pylon = self.shared_pylons[1]  # pos 0 can be virtual pylon
-        return my_shared_pylon.lon, my_shared_pylon.lat  # FIXME: needs to be calculated more properly with shapely
+        if len(self.shared_pylons) == 0:  # fiXME
+            return 0, 0
+        else:  # FIXME: needs to be calculated more properly with shapely
+            if len(self.shared_pylons) == 1:
+                my_shared_pylon = self.shared_pylons[0]
+            else:
+                my_shared_pylon = self.shared_pylons[1]
+            return my_shared_pylon.lon, my_shared_pylon.lat
+
+
+class Landuse(LineWithoutCables):
+    TYPE_COMMERCIAL = 10
+    TYPE_INDUSTRIAL = 20
+    TYPE_RESIDENTIAL = 30
+    TYPE_RETAIL = 40
+
+    def __init__(self, osm_id):
+        super(Landuse, self).__init__(osm_id)
+        self.type_ = 0
+        self.polygon = None
+
+
+class Highway(LineWithoutCables):
+    TYPE_MOTORWAY = 11
+    TYPE_TRUNK = 12
+    TYPE_PRIMARY = 13
+    TYPE_SECONDARY = 14
+    TYPE_TERTIARY = 15
+    TYPE_UNCLASSIFIED = 16
+    TYPE_ROAD = 17
+    TYPE_RESIDENTIAL = 18
+    TYPE_LIVING_STREET = 19
+    TYPE_SERVICE = 20
+
+    OFFSET = 5
+    DEFAULT_DISTANCE = 50
+
+    def __init__(self, osm_id):
+        super(Highway, self).__init__(osm_id)
+        self.type_ = 0
+        self.linear = None  # The LineaString of the line
+        self.is_roundabout = False
+
+    def calc_and_map(self, my_elev_interpolator, my_coord_transformator):
+        if self.is_roundabout:
+            shared_pylon = SharedPylon()
+            shared_pylon.pylon_model = "Models/StreetFurniture/Streetlamp3.xml"
+            p = Polygon(self.linear)
+            shared_pylon.x = p.centroid.x
+            shared_pylon.y = p.centroid.y
+            self.shared_pylons.append(shared_pylon)
+        else:
+            model = "Models/StreetFurniture/Streetlamp2.xml"
+            parallel_offset = 2.5
+            if self.type_ in [Highway.TYPE_SERVICE, Highway.TYPE_RESIDENTIAL, Highway.TYPE_LIVING_STREET]:
+                model = "Models/StreetFurniture/Streetlamp1.xml"
+            elif self.type_ in [Highway.TYPE_ROAD, Highway.TYPE_UNCLASSIFIED, Highway.TYPE_TERTIARY]:
+                parallel_offset = 3.0
+            elif self.type_ in [Highway.TYPE_SECONDARY, Highway.TYPE_PRIMARY, Highway.TYPE_TRUNK]:
+                parallel_offset = 3.5
+            else:  # MOTORWAY
+                parallel_offset = 7
+            # FIXME: calculate parallel_offset based on lanes
+
+            self.shared_pylons = []  # list of SharedPylon
+
+            my_length = self.linear.length  # omit recalculating length all the time
+            my_right_parallel = self.linear.parallel_offset(parallel_offset, 'right', join_style=1)
+            my_right_parallel_length = my_right_parallel.length
+            current_distance = Highway.OFFSET  # the distance from the origin of the current streetlamp
+
+            while True:
+                if current_distance > my_length:
+                    break
+                point_on_line = my_right_parallel.interpolate(my_right_parallel_length - current_distance * (my_right_parallel_length / my_length))
+                shared_pylon = SharedPylon()
+                shared_pylon.x = point_on_line.x
+                shared_pylon.y = point_on_line.y
+                shared_pylon.pylon_model = model
+                shared_pylon.direction_type = SharedPylon.DIRECTION_TYPE_MIRROR
+                shared_pylon.calc_global_coordinates(my_elev_interpolator, my_coord_transformator)
+                self.shared_pylons.append(shared_pylon)
+                current_distance += Highway.DEFAULT_DISTANCE
+
+
+class Line(LineWithoutCables):
+    def __init__(self, osm_id):
+        super(Line, self).__init__(osm_id)
+        self.way_segments = []
+        self.length = 0.0  # the total length of all segments
 
     def _calc_segments(self):
         """Creates the segments of this WayLine and calculates the total length.
@@ -622,22 +713,6 @@ class RailMast(SharedPylon):
     def is_virtual(self):
         return self.type_ == RailMast.TYPE_VIRTUAL_MAST
 
-    def calc_global_coordinates(self, my_elev_interpolator, my_coord_transformator):
-        self.lon, self.lat = my_coord_transformator.toGlobal((self.x, self.y))
-        self.elevation = my_elev_interpolator(vec2d.vec2d(self.lon, self.lat), True)
-
-
-class Cone(SharedPylon):  # FIXME remove
-    def __init__(self, x, y):
-        super(Cone, self).__init__()
-        self.x = x
-        self.y = y
-        self.pylon_model = "Models/StreetFurniture/cone.xml"
-
-    def calc_global_coordinates(self, my_elev_interpolator, my_coord_transformator):
-        self.lon, self.lat = my_coord_transformator.toGlobal((self.x, self.y))
-        self.elevation = my_elev_interpolator(vec2d.vec2d(self.lon, self.lat), True)
-
 
 class RailLine(Line):
     TYPE_RAILWAY_GAUGE_NARROW = 11
@@ -653,33 +728,6 @@ class RailLine(Line):
         self.type_ = 0
         self.nodes = []  # RailNodes
         self.linear = None  # The LineaString of the line
-
-    def calc_and_map2(self, my_elev_interpolator, my_coord_transformator, rail_lines_list):  # FIXME remove
-        self.shared_pylons = []  # array of RailMasts
-        current_distance = 0  # the distance from the origin of the current mast
-        my_length = self.linear.length  # omit recalculating length all the time
-
-        # virtual start point
-        point_on_line = self.linear.interpolate(0)
-        self.shared_pylons.append(Cone(point_on_line.x, point_on_line.y))
-
-        # get the first mast point
-        while True:
-            current_distance += 5
-            if current_distance > my_length:
-                break
-            point_on_line = self.linear.interpolate(current_distance)
-            self.shared_pylons.append(Cone(point_on_line.x, point_on_line.y))
-
-        # virtual end point
-        point_on_line = self.linear.interpolate(my_length)
-        self.shared_pylons.append(Cone(point_on_line.x, point_on_line.y))
-
-        calc_heading_nodes(self.shared_pylons)
-        max_length = self._calc_segments()
-        # calculate global coordinates
-        for my_mast in self.shared_pylons:
-            my_mast.calc_global_coordinates(my_elev_interpolator, my_coord_transformator)
 
     def calc_and_map(self, my_elev_interpolator, my_coord_transformator, rail_lines_list):
         self.shared_pylons = []  # array of RailMasts
@@ -706,21 +754,21 @@ class RailLine(Line):
         if my_length < RailLine.DEFAULT_MAST_DISTANCE:
             current_distance += (my_length / 2)
             point_on_line = self.linear.interpolate(current_distance)
-            mast_point = my_right_parallel.interpolate(my_left_parallel_length - current_distance * (my_left_parallel_length / my_length))
+            mast_point = my_right_parallel.interpolate(my_right_parallel_length - current_distance * (my_right_parallel_length / my_length))
             is_right = self.check_mast_left_right(mast_point, rail_lines_list)
             if not is_right:
-                mast_point = my_left_parallel.interpolate(current_distance * (my_right_parallel_length / my_length))
+                mast_point = my_left_parallel.interpolate(current_distance * (my_left_parallel_length / my_length))
             self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point, is_right))
         else:
             current_distance += RailLine.OFFSET
             point_on_line = self.linear.interpolate(current_distance)
-            mast_point = my_right_parallel.interpolate(my_left_parallel_length - current_distance * (my_left_parallel_length / my_length))
+            mast_point = my_right_parallel.interpolate(my_right_parallel_length - current_distance * (my_right_parallel_length / my_length))
             is_right = self.check_mast_left_right(mast_point, rail_lines_list)
             if is_right:
                 direction_type = SharedPylon.DIRECTION_TYPE_MIRROR
             else:
                 direction_type = SharedPylon.DIRECTION_TYPE_NORMAL
-                mast_point = my_left_parallel.interpolate(current_distance * (my_right_parallel_length / my_length))
+                mast_point = my_left_parallel.interpolate(current_distance * (my_left_parallel_length / my_length))
             self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point, direction_type))
             prev_angle = calc_angle_of_line(prev_point.x, prev_point.y, point_on_line.x, point_on_line.y)
             prev_point = point_on_line
@@ -750,13 +798,13 @@ class RailLine(Line):
                     else:
                         current_distance += RailLine.DEFAULT_MAST_DISTANCE
                 point_on_line = self.linear.interpolate(current_distance)
-                mast_point = my_right_parallel.interpolate(my_left_parallel_length - current_distance * (my_left_parallel_length / my_length))
+                mast_point = my_right_parallel.interpolate(my_right_parallel_length - current_distance * (my_right_parallel_length / my_length))
                 is_right = self.check_mast_left_right(mast_point, rail_lines_list)
                 if is_right:
                     direction_type = SharedPylon.DIRECTION_TYPE_MIRROR
                 else:
                     direction_type = SharedPylon.DIRECTION_TYPE_NORMAL
-                    mast_point = my_left_parallel.interpolate(current_distance * (my_right_parallel_length / my_length))
+                    mast_point = my_left_parallel.interpolate(current_distance * (my_left_parallel_length / my_length))
                 self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point, direction_type))
                 prev_angle = calc_angle_of_line(prev_point.x, prev_point.y, point_on_line.x, point_on_line.y)
                 prev_point = point_on_line
@@ -884,13 +932,146 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_co
 
     #get LineStrings and remove those lines, which are less than the minimal requirement
     for the_railway in my_railways.values():
-        coordinates = []
+        my_coordinates = []
         for node in the_railway.nodes:
-            coordinates.append((node.x, node.y))
-        my_linear = LineString(coordinates)
+            my_coordinates.append((node.x, node.y))
+        my_linear = LineString(my_coordinates)
         the_railway.linear = my_linear
 
     return my_railways
+
+
+def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator, landuse_refs):
+    """
+    No attempt to merge lines because most probably the lines are split at corssing.
+    No attempt to guess whether there there is a division in the conter, where a street lamp with two lamps could be
+    placed - e.g. using a combination of highway type, oneway, number of lanes etc
+    """
+    my_highways = {}  # osm_id as key, RailLine
+    my_shared_nodes = {}  # node osm_id as key, list of WayLine objects as value
+
+    # First reduce to electrified narrow_gauge or rail, no tunnels and no abandoned
+    for way in ways_dict.values():
+        my_highway = Highway(way.osm_id)
+        valid_highway = False
+        is_challenged = False
+        for key in way.tags:
+            value = way.tags[key]
+            if "highway" == key:
+                valid_highway = True
+                if value in ["motorway", "motorway_link"]:
+                    my_highway.type_ = Highway.TYPE_MOTORWAY
+                elif value in ["trunk", "trunk_link"]:
+                    my_highway.type_ = Highway.TYPE_TRUNK
+                elif value in ["primary", "primary_link"]:
+                    my_highway.type_ = Highway.TYPE_PRIMARY
+                elif value in ["secondary", "secondary_link"]:
+                    my_highway.type_ = Highway.TYPE_SECONDARY
+                elif value in ["tertiary", "tertiary_link"]:
+                    my_highway.type_ = Highway.TYPE_TERTIARY
+                elif value == "unclassified":
+                    my_highway.type_ = Highway.TYPE_UNCLASSIFIED
+                elif value == "road":
+                    my_highway.type_ = Highway.TYPE_ROAD
+                elif value == "residential":
+                    my_highway.type_ = Highway.TYPE_RESIDENTIAL
+                elif value == "living_street":
+                    my_highway.type_ = Highway.TYPE_LIVING_STREET
+                elif value == "service":
+                    my_highway.type_ = Highway.TYPE_SERVICE
+                else:
+                    valid_highway = False
+            elif ("tunnel" == key) and ("yes" == value):
+                is_challenged = True
+            elif ("junction" == key) and ("roundabout" == value):
+                my_highway.is_roundabout = True
+        if valid_highway and not is_challenged:
+            # Process the Nodes
+            my_coordinates = []
+            for ref in way.refs:
+                if ref in nodes_dict:
+                    my_node = nodes_dict[ref]
+                    x, y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
+                    my_coordinates.append((x, y))
+            if len(my_coordinates) >= 2:
+                my_highway.linear = LineString(my_coordinates)
+                my_highways[my_highway.osm_id] = my_highway
+
+    # Test whether the highway is within appropriate land use or intersects with appropriate land use
+    for key in my_highways.keys():
+        my_highway = my_highways[key]
+        is_within = False
+        intersections = []
+        for landuse_ref in landuse_refs.values():
+            if my_highway.linear.within(landuse_ref.polygon):
+                is_within = True
+                break
+            elif my_highway.linear.intersects(landuse_ref.polygon):
+                intersections.append(my_highway.linear.intersection(landuse_ref.polygon))
+        if not is_within:
+            if len(intersections) == 0:
+                del my_highways[key]
+            elif my_highway.is_roundabout:
+                pass
+            else:
+                index = 10000000000
+                for intersection in intersections:
+                    if isinstance(intersection, MultiLineString):
+                        for my_line in intersection:
+                            intersections.append(my_line)
+                        continue
+                    index += 1
+                    new_highway = Highway(index + key)
+                    new_highway.type_ = my_highway.type_
+                    new_highway.linear = intersection
+                    my_highways[new_highway.osm_id] = new_highway
+                del my_highways[key]
+
+    # Remove the too short lines
+    for key in my_highways.keys():
+        my_highway = my_highways[key]
+        if my_highway.is_roundabout and (50 > my_highway.linear.length or 300 < my_highway.linear.length):
+            del my_highways[key]
+        elif my_highway.linear.length < (2 * Highway.OFFSET):
+            del my_highways[key]
+
+    return my_highways
+
+
+def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator):
+    my_landuses = {}  # osm_id as key, Landuse
+
+    # First reduce to electrified narrow_gauge or rail, no tunnels and no abandoned
+    for way in ways_dict.values():
+        my_landuse = Landuse(way.osm_id)
+        valid_landuse = True
+        for key in way.tags:
+            value = way.tags[key]
+            if "landuse" == key:
+                if value == "commercial":
+                    my_landuse.type_ = Landuse.TYPE_COMMERCIAL
+                elif value == "industrial":
+                    my_landuse.type_ = Landuse.TYPE_INDUSTRIAL
+                elif value == "residential":
+                    my_landuse.type_ = Landuse.TYPE_RESIDENTIAL
+                elif value == "retail":
+                    my_landuse.type_ = Landuse.TYPE_RETAIL
+                else:
+                    valid_landuse = False
+            else:
+                valid_landuse = False
+        if valid_landuse:
+            # Process the Nodes
+            my_coordinates = []
+            for ref in way.refs:
+                if ref in nodes_dict:
+                    my_node = nodes_dict[ref]
+                    x, y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
+                    my_coordinates.append((x, y))
+            if len(my_coordinates) >= 3:
+                my_landuse.polygon = Polygon(my_coordinates)
+                my_landuses[my_landuse.osm_id] = my_landuse
+    return my_landuses
 
 
 def process_osm_power_aerialway(nodes_dict, ways_dict, my_elev_interpolator, my_coord_transformator, building_refs):
@@ -1210,16 +1391,19 @@ if __name__ == "__main__":
 
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
-
-    valid_node_keys = [  # building refs
-                       "power", "structure", "material", "height", "colour", "aerialway"  # power/aerialways
-                       , "railway"]
+    # the lists below are in sequence: buildings references, power/aerialway, railway overhead, landuse and highway
+    valid_node_keys = ["power", "structure", "material", "height", "colour", "aerialway"
+                       , "railway"
+    ]
     valid_way_keys = ["building"
-                      ,"power", "aerialway", "voltage", "cables", "wires"
-                      ,"railway", "electrified", "tunnel"]
+                      , "power", "aerialway", "voltage", "cables", "wires"
+                      , "railway", "electrified", "tunnel"
+                      , "landuse"
+                      , "highway", "junction"
+    ]
     valid_relation_keys = []
     req_relation_keys = []
-    req_way_keys = ["building", "power", "aerialway", "railway"]
+    req_way_keys = ["building", "power", "aerialway", "railway", "landuse", "highway"]
     handler = osmparser_wrapper.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
                                                   req_relation_keys)
     source = open(parameters.PREFIX + os.sep + parameters.OSM_FILE)
@@ -1227,27 +1411,33 @@ if __name__ == "__main__":
     # References for buildings
     building_refs = process_osm_building_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
     logging.info('Number of reference buildings: %s', len(building_refs))
+    # References for landuse
+    landuse_refs = process_osm_landuse_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
     # Power lines and aerialways
     powerlines, aerialways = process_osm_power_aerialway(handler.nodes_dict, handler.ways_dict, elev_interpolator
                                                          , coord_transformator, building_refs)
     rail_lines = process_osm_rail_overhead(handler.nodes_dict, handler.ways_dict, elev_interpolator
                                            , coord_transformator)
-    tracks = process_osm_rail_overhead(handler.nodes_dict, handler.ways_dict, elev_interpolator
-                                           , coord_transformator)  # FIXME remove
-    building_refs = None   # free memory
-    handler = None  # free memory
+    highways = process_osm_highway(handler.nodes_dict, handler.ways_dict, coord_transformator, landuse_refs)
+    # free some memory
+    landuse_refs = None
+    building_refs = None
+    handler = None
 
     # only keep those lines, which should be processed
-    if parameters.C2P_PROCESS_POWERLINES is False:
+    if not parameters.C2P_PROCESS_POWERLINES:
         powerlines.clear()
-    if parameters.C2P_PROCESS_AERIALWAYS is False:
+    if not parameters.C2P_PROCESS_AERIALWAYS:
         aerialways.clear()
-    if parameters.C2P_PROCESS_OVERHEAD_LINES is False:
+    if not parameters.C2P_PROCESS_OVERHEAD_LINES:
         rail_lines.clear()
+    if not parameters.C2P_PROCESS_STREETLAMPS:
+        highways.clear()
 
     logging.info('Number of power lines to process: %s', len(powerlines))
     logging.info('Number of aerialways to process: %s', len(aerialways))
     logging.info('Reduced number of rail lines: %s', len(rail_lines))
+    logging.info('Reduced number of highways: %s', len(highways))
 
     # Work on object
     for wayline in powerlines.values():
@@ -1258,16 +1448,16 @@ if __name__ == "__main__":
     # Overhead lines for rail
     for rail_line in rail_lines.values():
         rail_line.calc_and_map(elev_interpolator, coord_transformator, rail_lines.values())
-    # Overhead lines for rail
-    for track in tracks.values():  # FIXME remove
-        track.calc_and_map2(elev_interpolator, coord_transformator, rail_lines.values())
+    # streetlamps
+    for highway in highways.values():
+        highway.calc_and_map(elev_interpolator, coord_transformator)
 
     # Write to Flightgear
     stg_file_pointers = {}  # -- dictionary of stg file pointers
     write_stg_entries(stg_file_pointers, powerlines, "powerline", parameters.C2P_CLUSTER_POWER_LINE_MAX_LENGTH)
     write_stg_entries(stg_file_pointers, aerialways, "aerialway", parameters.C2P_CLUSTER_AERIALWAY_MAX_LENGTH)
     write_stg_entries(stg_file_pointers, rail_lines, "overhead", parameters.C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH)
-    write_stg_entries(stg_file_pointers, tracks, None, parameters.C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH)  # FIXME remove
+    write_stg_entries(stg_file_pointers, highways, None, None)
 
     for stg in stg_file_pointers.values():
         stg.write(stg_io.delimiter_string(OUR_MAGIC, False) + "\n")
