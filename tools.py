@@ -15,7 +15,6 @@ import os
 import logging
 import batch_processing.fg_telnet as telnet
 import shutil
-import io
 import cPickle
 import parameters
 
@@ -24,12 +23,11 @@ stats = None
 import vec2d
 import coordinates
 import calc_tile
-import parameters
 import time
 import re
 
 import subprocess
-import Queue
+#import Queue
 
 
 class Interpolator(object):
@@ -40,7 +38,6 @@ class Interpolator(object):
         if fake:
             self.fake = True
             self.h = 0.
-            print "FAKE!"
             return
         else:
             self.fake = False
@@ -168,6 +165,10 @@ class Probe_fgelev(object):
                     logging.error("Terrain File " + btg_file + " does not exist. Set scenery path correctly or fly there with TerraSync enabled")
                     sys.exit(2)
 
+            # FIXME: raster_fgelev has buffering (though disabled due to Windows probs)
+            #        But since we might also probe just one position, we need to stay
+            #        in sync anyway?
+
             self.fgelev_pipe.stdin.write("%i %g %g\n" % (0, position.lon, position.lat))
             elev = float(self.fgelev_pipe.stdout.readline().split()[1]) + self.h_offset
             return elev
@@ -185,16 +186,14 @@ class Probe_fgelev(object):
         key = (position.lon, position.lat)
         try:
             elev = self._cache[key]
-            #print "hit", key, elev
             return elev
         except KeyError:
             elev = really_probe(position)
             self._cache[key] = elev
-            #print "miss", key, elev
             return elev
 
 def test_fgelev(cache, N):
-    """unit testing for Probe_fgelev class"""
+    """simple testing for Probe_fgelev class"""
     elev = Probe_fgelev(cache=cache)
     delta = 0.3
     check_btg = True
