@@ -15,17 +15,20 @@ import os
 import logging
 import batch_processing.fg_telnet as telnet
 import shutil
-import io
-from parameters import ELEV_MODE
+import cPickle
+import parameters
 
 stats = None
 
 import vec2d
 import coordinates
 import calc_tile
-import parameters
 import time
 import re
+
+import subprocess
+#import Queue
+
 
 class Interpolator(object):
     """load elevation data from file, interpolate"""
@@ -35,7 +38,6 @@ class Interpolator(object):
         if fake:
             self.fake = True
             self.h = 0.
-            print "FAKE!"
             return
         else:
             self.fake = False
@@ -110,6 +112,139 @@ class Interpolator(object):
         X = np.vstack((x.ravel(), y.ravel(), zero, zero, h.ravel())).transpose()
         np.savetxt(filename, X, header=header, fmt=["%1.8f", "%1.8f", "%g", "%g", "%1.2f"])
 
+class Probe_fgelev(object):
+    """A drop-in replacement for Interpolator. Probes elevation via fgelev.
+       Performance (can only test on OSX at the moment) about 17k/sec if there
+       is not much spatial separation between queries. Fgelev seems to take
+       quite a while though if queries are somewhat separated.
+
+       By default, queries are cached. Call save_cache() to
+       save the cache to disk before freeing the object.
+    """
+    def __init__(self, fake=False, cache=True):
+        """Open pipe to fgelev.
+           Unless disabled by cache=False, initialize the cache and try to read
+           it from disk.
+           If fake=True, never do any probing. Instead return 0 on all queries.
+        """
+        self.fake = fake
+        self.h_offset = 0
+        if not fake:
+            path_to_fgelev = parameters.FG_ELEV
+            fg_root = "$FG_ROOT"
+            self.fgelev_pipe = subprocess.Popen(path_to_fgelev + ' --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+
+        if cache:
+            self.pkl_fname = parameters.PREFIX + os.sep + 'elev.pkl'
+            try:
+                logging.info("Loading %s", self.pkl_fname)
+                fpickle = open(self.pkl_fname, 'rb')
+                self._cache = cPickle.load(fpickle)
+                fpickle.close()
+                print "OK"
+            except IOError, reason:
+                logging.info("failed (%s)", reason)
+                self._cache = {}
+        else:
+            self._cache = None
+
+    def save_cache(self):
+        fpickle = open(self.pkl_fname, 'wb')
+        cPickle.dump(self._cache, fpickle, -1)
+        fpickle.close()
+
+    def shift(self, h):
+        self.h_offset += h
+
+    def __call__(self, position, is_global=False, check_btg=False):
+        """return elevation at (x,y). We try our cache first. Failing that,
+           call fgelev.
+        """
+        def really_probe(position):
+            if check_btg:
+                btg_file = parameters.PATH_TO_SCENERY + os.sep + "Terrain" \
+                           + os.sep + calc_tile.directory_name(position) + os.sep \
+                           + calc_tile.construct_btg_file_name(position)
+                print calc_tile.construct_btg_file_name(position)
+                if not os.path.exists(btg_file):
+                    logging.error("Terrain File " + btg_file + " does not exist. Set scenery path correctly or fly there with TerraSync enabled")
+                    sys.exit(2)
+
+            # FIXME: raster_fgelev has buffering (though disabled due to Windows probs)
+            #        But since we might also probe just one position, we need to stay
+            #        in sync anyway?
+
+            self.fgelev_pipe.stdin.write("%i %g %g\n" % (0, position.lon, position.lat))
+            elev = float(self.fgelev_pipe.stdout.readline().split()[1]) + self.h_offset
+            return elev
+
+        if self.fake:
+            return 0.
+
+        global transform
+        if not is_global:
+            position = vec2d.vec2d(transform.toGlobal(position))
+
+        if self._cache == None:
+            return really_probe(position)
+
+        key = (position.lon, position.lat)
+        try:
+            elev = self._cache[key]
+            return elev
+        except KeyError:
+            elev = really_probe(position)
+            self._cache[key] = elev
+            return elev
+
+def test_fgelev(cache, N):
+    """simple testing for Probe_fgelev class"""
+    elev = Probe_fgelev(cache=cache)
+    delta = 0.3
+    check_btg = True
+    p = vec2d.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
+    elev(p, True, check_btg) # -- ensure fgelev is up and running
+    #p = vec2d.vec2d(parameters.BOUNDARY_WEST+delta, parameters.BOUNDARY_SOUTH+delta)
+    #elev(p, True, check_btg) # -- ensure fgelev is up and running
+    nx = ny = N
+    ny = 1
+    #X = np.linspace(parameters.BOUNDARY_WEST, parameters.BOUNDARY_WEST+delta, nx)
+    #Y = np.linspace(parameters.BOUNDARY_SOUTH, parameters.BOUNDARY_SOUTH+delta, ny)
+    X = np.linspace(parameters.BOUNDARY_WEST, parameters.BOUNDARY_EAST, nx)
+    Y = np.linspace(parameters.BOUNDARY_SOUTH, parameters.BOUNDARY_NORTH, ny)
+
+
+    # cache? N  speed
+    # True   10 30092 records/s
+    # False  10 17914 records/s
+    # True   20 27758 records/s
+    # False  20 18010 records/s
+    # True   50 29937 records/s
+    # False  50 18481 records/s
+    # True  100 30121 records/s
+    # False 100 18230 records/s
+    # True  200 29868 records/s
+    # False 200 18271 records/s
+
+    start = time.time()
+    s = []
+    i = 0
+    for y in Y:
+        for x in X:
+            p = vec2d.vec2d(x, y)
+            print i/2,
+            e = elev(p, True, check_btg)
+            i += 1
+            e = elev(p, True)
+            i += 1
+#            e = elev(p, True)
+#            i += 1
+            #s.append("%s %g" % (str(p), e))
+    end = time.time()
+    #for item in s:
+    #    print item
+    print cache, N, "%d records/s" % (i/(end-start))
+    elev.save_cache()
 
 def raster_glob():
     cmin = vec2d.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
@@ -158,7 +293,7 @@ def raster_glob():
         sys.exit(err_msg)
 
 def wait_for_fg(fg):
-# Waits for Flightgear to signal, that the elevation processing has finished    
+# Waits for Flightgear to signal, that the elevation processing has finished
     for count in range(0,1000):
         semaphore = fg.get_prop("/osm2city/tiles")
         semaphore = semaphore.split('=')[1]
@@ -174,7 +309,7 @@ def wait_for_fg(fg):
                 # perform an action#
                 pass
         time.sleep(1)
-        if not m2 is None:        
+        if not m2 is None:
             logging.debug( "Waiting for Semaphore " + m2.groups()[0])
     return False
 
@@ -222,16 +357,16 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
     import subprocess
     import Queue
     fg_root = "$FG_ROOT"
-    
+
     center_global = vec2d.vec2d(transform.toGlobal((x0,y0)))
     btg_file = parameters.PATH_TO_SCENERY + os.sep + "Terrain"
     btg_file = btg_file + os.sep + calc_tile.directory_name(center_global) + os.sep + calc_tile.construct_btg_file_name(center_global)
     if not os.path.exists(btg_file):
         logging.error("Terrain File " + btg_file + " does not exist. Set scenery path correctly or fly there with TerraSync enabled")
         sys.exit(2)
-    
+
     fg_elev = parameters.FG_ELEV
-    
+
     fgelev = subprocess.Popen( fg_elev + ' --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     #fgelev = subprocess.Popen(["/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev", "--fg-root", "$FG_ROOT",  "--fg-scenery", "$FG_SCENERY"],  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     #time.sleep(5)
@@ -249,18 +384,18 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
             lon, lat = transform.toGlobal((x, y))
             buf_in.put("%i %g %g\n" % (i, lon, lat))
 
-#Doesn't work on Windows. Process will block if output buffer isn't read 
+#Doesn't work on Windows. Process will block if output buffer isn't read
 #     print "sending buffer"
 #     for i in range(1000):
 #         fgelev.stdin.write(buf_in.get())
     start = time.time()
-    
+
     print "reading"
     i = 0
     for y in y_array:
         for x in x_array:
             i += 1
-            if not buf_in.empty(): 
+            if not buf_in.empty():
                 fgelev.stdin.write(buf_in.get())
             tmp, elev = fgelev.stdout.readline().split()
             lon, lat = transform.toGlobal((x, y))
@@ -509,9 +644,15 @@ if __name__ == "__main__":
     parser.add_argument("-f", "--file", dest="filename",
                       help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
     args = parser.parse_args()
-
     if args.filename is not None:
         parameters.read_from_file(args.filename)
     parameters.show()
+
+    if 0:
+        for N in [1000, 100]:
+            test_fgelev(True, N)
+            #test_fgelev(False, N)
+        sys.exit(0)
+
     raster_glob()
 

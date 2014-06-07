@@ -11,7 +11,6 @@ import xml.sax
 import logging
 import unittest
 
-
 class OSMElement(object):
     def __init__(self, osm_id):
         self.osm_id = osm_id
@@ -52,23 +51,30 @@ class Member(object):
         self.type_ = type_
         self.role = role
 
-
 class OSMContentHandler(xml.sax.ContentHandler):
     """
-    A Specialized SAX ContentHandler for OpenStreetMap data to be processed by osm2city.
-    The valid_??_keys are those tag keys, which will be accepted and added to an element's tags.
-    The req_??_keys are those tag keys, of which at least one must be present to add an element to the saved elements.
+    A Specialized SAX ContentHandler for OpenStreetMap data to be processed by
+    osm2city.
 
-    The valid_??_keys and req_??_keys are a primitive way to save memory and reduce the number of further processed elements.
-    A better way is to have the input file processed by e.g. Osmosis first.
+    All nodes will be accepted. However, to save memory, we strip out those
+    tags not present in valid_node_keys.
+
+    By contrast, not all ways and relations will be accepted. We accept a
+    way/relation only if at least one of its tags is in req_??_keys.
+    An accepted way/relation is handed over to the callback. It is then up to
+    the callback to discard certain tags.
+
+    The valid_??_keys and req_??_keys are a primitive way to save memory and
+    reduce the number of further processed elements. A better way is to have
+    the input file processed by e.g. Osmosis first.
     """
-    def __init__(self, valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys):
+
+    def __init__(self, valid_node_keys):
         xml.sax.ContentHandler.__init__(self)
+        self._way_callbacks = []
+        self._relation_callbacks = []
+        self._uncategorized_way_callback = None
         self._valid_node_keys = valid_node_keys
-        self._valid_way_keys = valid_way_keys
-        self._req_way_keys = req_way_keys
-        self._valid_relation_keys = valid_relation_keys
-        self._req_relation_keys = req_relation_keys
         self.nodes_dict = {}
         self.ways_dict = {}
         self.relations_dict = {}
@@ -76,6 +82,18 @@ class OSMContentHandler(xml.sax.ContentHandler):
         self._current_way = None
         self._current_relation = None
         self._within_element = None
+
+    def parse(self, source):
+        xml.sax.parse(source, self)
+
+    def register_way_callback(self, callback, req_keys=[]):
+        self._way_callbacks.append((callback, req_keys))
+
+    def register_relation_callback(self, callback, req_keys=[]):
+        self._relation_callbacks.append((callback, req_keys))
+
+    def register_uncategorized_way_callback(self, callback):
+        self._uncategorized_way_callback = callback
 
     def startElement(self, name, attrs):
         if name == "node":
@@ -89,6 +107,7 @@ class OSMContentHandler(xml.sax.ContentHandler):
             osm_id = int(attrs.getValue("id"))
             self._current_way = Way(osm_id)
         elif name == "relation":
+            self._within_element = name
             osm_id = int(attrs.getValue("id"))
             self._current_relation = Relation(osm_id)
         elif name == "tag":
@@ -98,11 +117,9 @@ class OSMContentHandler(xml.sax.ContentHandler):
                 if key in self._valid_node_keys:
                     self._current_node.addTag(key, value)
             elif "way" == self._within_element:
-                if key in self._valid_way_keys:
-                    self._current_way.addTag(key, value)
+                self._current_way.addTag(key, value)
             elif "relation" == self._within_element:
-                if key in self._valid_relation_keys:
-                    self._current_relation.addTag(key, value)
+                self._current_relation.addTag(key, value)
         elif name == "nd":
             ref = int(attrs.getValue("ref"))
             self._current_way.addRef(ref)
@@ -116,11 +133,26 @@ class OSMContentHandler(xml.sax.ContentHandler):
         if name == "node":
             self.nodes_dict[self._current_node.osm_id] = self._current_node
         elif name == "way":
-            if has_required_tag_keys(self._current_way.tags, self._req_way_keys):
-                self.ways_dict[self._current_way.osm_id] = self._current_way
+            cb = self.find_callback_for(self._current_way.tags, self._way_callbacks)
+            # no longer filter valid_way_keys here. That's up to the callback.
+            if cb:
+                cb(self._current_way, self.nodes_dict)
+            else:
+                try:
+                    self._uncategorized_way_callback(self._current_way, self.nodes_dict)
+                except TypeError:
+                    pass
         elif name == "relation":
-            if has_required_tag_keys(self._current_relation.tags, self._req_relation_keys):
-                self.relations_dict[self._current_relation.osm_id] = self._current_relation
+            cb = self.find_callback_for(self._current_relation.tags, self._relation_callbacks)
+            if cb:
+                cb(self._current_relation)
+
+    def find_callback_for(self, tags, callbacks):
+        for (callback, req_keys) in callbacks:
+            for key in tags.keys():
+                if key in req_keys:
+                    return callback
+        return False
 
     def characters(self, content):
         pass
@@ -184,9 +216,9 @@ def main(source_file_name):
     logging.basicConfig(level=logging.INFO)
     source = open(source_file_name)
     valid_node_keys = []
-    valid_way_keys = ["building", "height", "building:levels", "roof:shape"]
+    valid_way_keys = ["building", "height", "building:levels"]
     req_way_keys = ["building"]
-    valid_relation_keys = ["building", "height", "building:levels", "roof:shape"]
+    valid_relation_keys = ["building"]
     req_relation_keys = ["building"]
     handler = OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys)
     xml.sax.parse(source, handler)
@@ -199,7 +231,6 @@ if __name__ == "__main__":
 
 # ================ UNITTESTS =======================
 
-
 class TestOSMParser(unittest.TestCase):
     def test_parse_length(self):
         self.assertAlmostEqual(1.2, parse_length(' 1.2 '), 2, "Correct number with trailing spaces")
@@ -211,6 +242,7 @@ class TestOSMParser(unittest.TestCase):
         self.assertAlmostEqual(3.073, parse_length('10\'1"'), 2, "Correct number with feet unit without space")
         self.assertEquals(0, parse_length('m'), "Only valid unit")
         self.assertEquals(0, parse_length('"'), "Only inches, no feet")
+
 
     def test_is_parsable_float(self):
         self.assertFalse(is_parsable_float('1,2'))
