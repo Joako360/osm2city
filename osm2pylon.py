@@ -29,6 +29,7 @@ import xml.sax
 import calc_tile
 import coordinates
 import osmparser
+import osmparser_wrapper
 import parameters
 import stg_io
 import tools
@@ -1219,8 +1220,8 @@ if __name__ == "__main__":
     valid_relation_keys = []
     req_relation_keys = []
     req_way_keys = ["building", "power", "aerialway", "railway"]
-    handler = osmparser.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
-                                          req_relation_keys)
+    handler = osmparser_wrapper.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
+                                                  req_relation_keys)
     source = open(parameters.PREFIX + os.sep + parameters.OSM_FILE)
     xml.sax.parse(source, handler)
     # References for buildings
