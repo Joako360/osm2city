@@ -11,6 +11,13 @@ import re
 import os
 from _io import open
 
+def getFile(name, tilename, lon, lat):
+    if "nt" in os.name:
+        name = name + tilename + ".cmd"
+    else:
+        name = name + tilename
+    return open(calc_tile.root_directory_name((lon, lat)) + os.sep + name, "wb")
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser(description="build-tiles generates a directory structure capable of generating complete tiles of scenery")
@@ -47,25 +54,13 @@ if __name__ == '__main__':
     except OSError, e:
         if e.errno != 17:
             logging.exception("Unable to create path to output")
-    
-    if "nt" in os.name:
-        download_name = "download_" + args.tilename + ".cmd"
-        osm_name = "osm2city_" + args.tilename + ".cmd"
-        osm_pylons = "osm2pylon_" + args.tilename + ".cmd"
-        tools_name = "tools_" + args.tilename + ".cmd"
-        platforms_name = "osm2platform_" + args.tilename + ".cmd"
-    else:
-        download_name = "download_" + args.tilename
-        osm_name = "osm2city_" + args.tilename
-        osm_pylons = "osm2pylon_" + args.tilename
-        tools_name = "tools_" + args.tilename
-        platforms_name = "osm2platform_" + args.tilename
-        
-    downloadfile = open(calc_tile.root_directory_name((lon, lat)) + os.sep + download_name, "wb") 
-    osm2city = open(calc_tile.root_directory_name((lon, lat)) + os.sep + osm_name, "wb")
-    osm2pylon = open(calc_tile.root_directory_name((lon, lat)) + os.sep + osm_pylons, "wb")
-    tools = open(calc_tile.root_directory_name((lon, lat)) + os.sep + tools_name, "wb") 
-    platformsfile = open(calc_tile.root_directory_name((lon, lat)) + os.sep + platforms_name, "wb") 
+            
+    downloadfile = getFile("download", args.tilename ,lon, lat) 
+    osm2city = getFile("osm2city_", args.tilename ,lon, lat)
+    osm2pylon = getFile("osm2pylon_", args.tilename ,lon, lat)
+    tools = getFile("tools_", args.tilename ,lon, lat) 
+    platformsfile = getFile("osm2platform_", args.tilename ,lon, lat) 
+    roads = getFile("roads_", args.tilename ,lon, lat) 
     for dy in range(0, num_cols):
         for dx in range(0, num_rows):
             index = calc_tile.tile_index((lon, lat), dx, dy)
@@ -96,10 +91,12 @@ if __name__ == '__main__':
             osm2pylon.write('python osm2pylon.py -f %s/params.ini' % (replacement_path) + os.linesep)
             tools.write('python tools.py -f %s/params.ini' % (replacement_path) + os.linesep)
             platformsfile.write('python platforms.py -f %s/params.ini' % (replacement_path) + os.linesep)
+            roads.write('python roads.py -f %s/params.ini' % (replacement_path) + os.linesep)
     downloadfile.close() 
     osm2city.close()
     osm2pylon.close()
     tools.close() 
     platformsfile.close() 
+    roads.close() 
 
     sys.exit(0)
