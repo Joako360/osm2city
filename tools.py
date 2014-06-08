@@ -116,13 +116,15 @@ class Probe_fgelev(object):
        By default, queries are cached. Call save_cache() to
        save the cache to disk before freeing the object.
     """
-    def __init__(self, fake=False, cache=True):
+    def __init__(self, fake=False, cache=True, auto_save_every=1000):
         """Open pipe to fgelev.
            Unless disabled by cache=False, initialize the cache and try to read
-           it from disk.
+           it from disk. Automatically save the cache to disk every auto_save_every misses.
            If fake=True, never do any probing. Instead return 0 on all queries.
+
         """
         self.fake = fake
+        self.auto_save_every = auto_save_every
         self.h_offset = 0
         if not fake:
             path_to_fgelev = parameters.FG_ELEV
@@ -136,14 +138,15 @@ class Probe_fgelev(object):
                 fpickle = open(self.pkl_fname, 'rb')
                 self._cache = cPickle.load(fpickle)
                 fpickle.close()
-                print "OK"
+                logging.info("OK")
             except IOError, reason:
-                logging.info("failed (%s)", reason)
+                logging.warn("Loading elev cache failed (%s)", reason)
                 self._cache = {}
         else:
             self._cache = None
 
     def save_cache(self):
+        "save cache to disk"
         fpickle = open(self.pkl_fname, 'wb')
         cPickle.dump(self._cache, fpickle, -1)
         fpickle.close()
@@ -186,10 +189,16 @@ class Probe_fgelev(object):
         key = (position.lon, position.lat)
         try:
             elev = self._cache[key]
+            #logging.debug("hit %s %g" % (str(key), elev))
             return elev
         except KeyError:
+            logging.debug("miss (%i) %s" % (len(self._cache), str(key)))
             elev = really_probe(position)
+            logging.debug("   %g" % elev)
             self._cache[key] = elev
+
+            if self.auto_save_every and len(self._cache) % self.auto_save_every == 0:
+                self.save_cache()
             return elev
 
 def test_fgelev(cache, N):
