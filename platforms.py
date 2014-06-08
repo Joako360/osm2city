@@ -23,10 +23,12 @@ import math
 import calc_tile
 import os
 import ac3d
+import stg_io
 
 import logging
 import osmparser
 
+OUR_MAGIC = "osm2platforms"  # Used in e.g. stg files to mark edits by osm2platforms
 # -----------------------------------------------------------------------------
 def no_transform((x, y)):
     return x, y
@@ -118,11 +120,7 @@ class Platforms(object):
                 None
             else:
                 self.writeLine(platform,elev,ac,obj)
-
-        f = open('platforms.ac', 'w')
-
-        f.write(str(ac))
-        f.close()
+        return ac
 
             #obj.node()
 
@@ -144,7 +142,7 @@ class Platforms(object):
 #Top Face        
         for i, n in enumerate(top_nodes):
             face.append((n+o, x, 0.5))
-        obj.face(face, mat=2)
+        obj.face(face, mat=0)
 # Build bottom ring    
         for p in platform.nodes:
             e = elev(vec2d(p[0], p[1])) -1
@@ -156,7 +154,7 @@ class Platforms(object):
             sideface.append((n+o+rd_len, x, 0.5))
             sideface.append((n+o, x, 0.5))
             sideface.append((n+o-1, x, 0.5))
-            obj.face(sideface, mat=2)
+            obj.face(sideface, mat=0)
             
         
 
@@ -189,7 +187,7 @@ class Platforms(object):
         o += len(left.coords)
         for i, n in enumerate(nodes_r):
             face.append((n+o, x, 0.75))
-        obj.face(face[::-1], mat=2)
+        obj.face(face[::-1], mat=0)
 # Build bottom left line
         idx_bottom_left = obj.next_node_index()    
         for p in left.coords:
@@ -217,20 +215,20 @@ class Platforms(object):
             sideface.append((n+idx_bottom_right-1, x, 0.5))
             sideface.append((n+idx_right-1, x, 0.5))
             sideface.append((n+idx_right, x, 0.5))
-            obj.face(sideface, mat=1)
+            obj.face(sideface, mat=0)
 # Build Front&Back
         sideface=[]
         sideface.append((idx_left, x, 0.5))
         sideface.append((idx_bottom_left, x, 0.5))
         sideface.append((idx_end, x, 0.5))
         sideface.append((idx_bottom_left-1, x, 0.5))
-        obj.face(sideface, mat=2)
+        obj.face(sideface, mat=0)
         sideface=[]
         sideface.append((idx_bottom_right, x, 0.5))
         sideface.append((idx_bottom_right-1, x, 0.5))
         sideface.append((idx_right-1, x, 0.5))
         sideface.append((idx_right, x, 0.5))
-        obj.face(sideface, mat=3)
+        obj.face(sideface, mat=0)
     
 def main():
     logging.basicConfig(level=logging.INFO)
@@ -276,9 +274,6 @@ def main():
 
     #transform = tools.transform
     #center_global =  vec2d(transform.toGlobal(vec2d(0,0)))
-    logging.info("done.")
-    logging.info("ways: %i", len(platforms))
-    print "OBJECT_STATIC %s %g %g %1.2f %g\n" % ("platforms.ac", center_global.lon, center_global.lat, 0, 0)
     if parameters.PATH_TO_OUTPUT:
         path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, center_global)
     else:
@@ -302,8 +297,30 @@ def main():
         #plt.show()
         plt.savefig('platforms.eps')
 
-    elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
-    platforms.write(elev)
+#    elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
+    elev = tools.Probe_fgelev()
+    ac = platforms.write(elev)
+    ac_fname = 'platforms%07i.ac'%calc_tile.tile_index(center_global)
+    logging.info("done.")
+    logging.info("ways: %i", len(platforms))
+    print "OBJECT_STATIC %s %g %g %1.2f %g\n" % (ac_fname, center_global.lon, center_global.lat, 0, 0)
+    fname = path + os.sep + ac_fname
+    f = open(fname, 'w')
+    f.write(str(ac))
+    f.close()
+    
+    # -- write stg
+    stg_fname = calc_tile.construct_stg_file_name(center_global)
+    stg_io.uninstall_ours(path, stg_fname, OUR_MAGIC)
+    stg = open(path + stg_fname, "a")
+    stg.write(stg_io.delimiter_string(OUR_MAGIC, True) + "\n# do not edit below this line\n#\n")
+
+    stg.write("OBJECT_STATIC %s %1.5f %1.5f %1.2f %g\n" % (ac_fname, center_global.lon, center_global.lat, 0, 0))
+
+    stg.write(stg_io.delimiter_string(OUR_MAGIC, False) + "\n")
+    stg.close()
+    elev.save_cache()
+
     logging.info("Done")
 
 
