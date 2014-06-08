@@ -56,7 +56,7 @@ class vec2d(object):
         return vec2d(self.x / other.x, self.y / other.y)
 
     def __str__(self):
-        return "%g %g" % (self.x, self.y)
+        return "%1.7f %1.7f" % (self.x, self.y)
 
     def __neg__(self):
         return vec2d(-self.x, -self.y)
