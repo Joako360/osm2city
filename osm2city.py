@@ -318,8 +318,9 @@ class Buildings(object):
         self.buildings.append(Building(osm_id, tags, outer_ring, name, height, levels, inner_rings_list = inner_rings_list, building_type = _building_type, roof_type=_roof_type))
 
         tools.stats.objects += 1
-        if tools.stats.objects % 50 == 0:
-            logging.info(tools.stats.objects)
+        # show progress here?
+        #if tools.stats.objects % 50 == 0:
+        #    logging.info(tools.stats.objects)
         return True
 
     def store_uncategorzied_way(self, way, nodes_dict):
@@ -392,18 +393,22 @@ class Buildings(object):
                 logging.info("Skipping relation %i: no outer way." % relation.osm_id)
 
 
-    def _process_coords(self, coords):
-        for _node in coords.values():
-            logging.debug('%s %.4f %.4f', _node.osm_id, _node.lon, _node.lat)
-            self.nodes_dict[_node.osm_id] = _node
-            if _node.lon > self.maxlon:
-                self.maxlon = _node.lon
-            if _node.lon < self.minlon:
-                self.minlon = _node.lon
-            if _node.lat > self.maxlat:
-                self.maxlat = _node.lat
-            if _node.lat < self.minlat:
-                self.minlat = _node.lat
+    def _get_min_max_coords(self):
+        for node in self.nodes_dict.values():
+            #logging.debug('%s %.4f %.4f', _node.osm_id, _node.lon, _node.lat)
+            if node.lon > self.maxlon:
+                self.maxlon = node.lon
+            if node.lon < self.minlon:
+                self.minlon = node.lon
+            if node.lat > self.maxlat:
+                self.maxlat = node.lat
+            if node.lat < self.minlat:
+                self.minlat = node.lat
+
+#        cmin = vec2d(self.minlon, self.minlat)
+#        cmax = vec2d(self.maxlon, self.maxlat)
+#        logging.info("min/max coord" + str(cmin) + " " + str(cmax))
+
 
 
 # -----------------------------------------------------------------------------
@@ -609,6 +614,7 @@ if __name__ == "__main__":
     cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
     cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
     center = (cmin + cmax)*0.5
+#    center = (11.38, 47.26)
     tools.init(coordinates.Transformation(center, hdg = 0))
     print tools.transform.toGlobal(cmin), tools.transform.toGlobal(cmax)
 
@@ -646,10 +652,14 @@ if __name__ == "__main__":
 
         #tools.stats.print_summary()
         buildings.make_way_buildings()
-
+        buildings._get_min_max_coords()
+        cmin = vec2d(buildings.minlon, buildings.minlat)
+        cmax = vec2d(buildings.maxlon, buildings.maxlat)
+        logging.info("min/max " + str(cmin) + " " + str(cmax))
         buildings = buildings.buildings
-        logging.debug("number of buildings", len(buildings))
-        logging.info("done parsing")
+        logging.info("parsed %i buildings." % len(buildings))
+
+
 
         # -- cache parsed data. To prevent accidentally overwriting,
         #    write to local dir, while we later read from $PREFIX/buildings.pkl
@@ -720,7 +730,7 @@ if __name__ == "__main__":
         clusters.append(b.anchor, b)
 
     building_lib.decide_LOD(buildings)
-    clusters.transfer_buildings()
+    #clusters.transfer_buildings()
 
     clusters.write_stats()
 
