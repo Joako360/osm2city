@@ -477,7 +477,7 @@ def write_ac_header(out, nb):
 
 # -----------------------------------------------------------------------------
 # -- write xml
-def write_xml(path, fname, LM_dict, buildings):
+def write_xml(path, fname, buildings):
     #  -- LOD animation
     xml = open(path + fname + ".xml", "w")
     xml.write("""<?xml version="1.0"?>\n<PropertyList>\n""")
@@ -485,34 +485,27 @@ def write_xml(path, fname, LM_dict, buildings):
 
     # -- lightmap
     #    not all textures have lightmaps yet
-    LMs_avail = ['tex/DSCF9495_pow2', 'tex/DSCF9503_noroofsec_pow2', 'tex/LZ_old_bright_bc2', 'tex/DSCF9678_pow2', 'tex/DSCF9710', 'tex/wohnheime_petersburger']
+    #LMs_avail = ['tex/DSCF9495_pow2', 'tex/DSCF9503_noroofsec_pow2', 'tex/LZ_old_bright_bc2', 'tex/DSCF9678_pow2', 'tex/DSCF9710', 'tex/wohnheime_petersburger']
 
     # FIXME: use Effect/Building? What's the difference?
     # FIXME: LM and textures currently broken
-    if 0:
-        for texture in LM_dict.keys():
-            if texture.filename in LMs_avail:
     #                <lightmap-factor type="float" n="0"><use>/scenery/LOWI/garage[0]/door[0]/position-norm</use></lightmap-factor>
-                xml.write(textwrap.dedent("""
-                <effect>
-                  <inherits-from>cityLM</inherits-from>
-                  <parameters>
-                    <lightmap-enabled type="int">1</lightmap-enabled>
-                    <texture n="3">
-                      <image>%s_LM.png</image>
-                      <wrap-s>repeat</wrap-s>
-                      <wrap-t>repeat</wrap-t>
-                    </texture>
-                  </parameters>
-                      """ % texture.filename))
-
-                for b in LM_dict[texture]:
-            #        if name.find("roof") < 0:
-                        xml.write("  <object-name>%s</object-name>\n" % b.ac_name)
-        #    for name in LOD_lists[1]:
-        #        if name.find("roof") < 0:
-        #            xml.write("  <object-name>%s</object-name>\n" % name)
-                xml.write("</effect>\n")
+    if parameters.LIGHTMAP_ENABLE:
+        xml.write(textwrap.dedent("""
+        <effect>
+          <inherits-from>cityLM</inherits-from>
+          <parameters>
+            <lightmap-enabled type="int">1</lightmap-enabled>
+            <texture n="3">
+              <image>%s_LM.png</image>
+              <wrap-s>repeat</wrap-s>
+              <wrap-t>repeat</wrap-t>
+            </texture>
+          </parameters>
+              """ % 'tex/atlas_facades'))
+        xml.write("  <object-name>LOD_detail</object-name>\n")
+        xml.write("  <object-name>LOD_rough</object-name>\n")
+        xml.write("</effect>\n")
 
     # -- put obstruction lights on hi-rise buildings
     for b in buildings:
@@ -614,7 +607,7 @@ if __name__ == "__main__":
     cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
     cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
     center = (cmin + cmax)*0.5
-#    center = (11.38, 47.26)
+    #center = (11.38, 47.26)
     tools.init(coordinates.Transformation(center, hdg = 0))
     print tools.transform.toGlobal(cmin), tools.transform.toGlobal(cmax)
 
@@ -781,10 +774,8 @@ if __name__ == "__main__":
             fname = replacement_prefix + "city%02i%02i" % (cl.I.x, cl.I.y)
             building_lib.write(path + fname + ".ac", cl.objects, elev, tile_elev, tools.transform, offset)
 
-            LM_dict = building_lib.make_lightmap_dict(cl.objects)
-
             # -- write xml
-            write_xml(path, fname, LM_dict, cl.objects)
+            write_xml(path, fname, cl.objects)
 
             # -- write stg
             stg_fname = calc_tile.construct_stg_file_name(center_global)

@@ -212,7 +212,7 @@ class LineObject(object):
                 # -- write face as one polygon. Seems to produce artifacts
                 #    in sloped terrain. Maybe do flatness check in the future.
                 face = []
-                scale = 20.
+                scale = 10.
                 x = 0.
                 for i, n in enumerate(nodes_l):
                     if do_tex: x = self.dist[i]/scale
@@ -226,7 +226,7 @@ class LineObject(object):
             else:
                 # -- write face as series of quads. Works OK, but produces more
                 #    SURFs in .ac.
-                scale = 20.
+                scale = 30.
                 l = ofs_l
                 r = ofs_r
                 for i in range(len(self.left.coords)-1):

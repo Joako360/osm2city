@@ -13,11 +13,12 @@ from PIL import Image
 import math
 import cPickle
 import string
+import os
 
 def next_pow2(value):
     return 2**(int(math.log(value) / math.log(2)) + 1)
 
-def make_texture_atlas(texture_list, filename, size_x = 256, pad_y = 0):
+def make_texture_atlas(texture_list, atlas_filename, size_x = 256, pad_y = 0, lightmap=False):
     """
     create texture atlas from all textures. Update all our item coordinates.
     """
@@ -31,8 +32,13 @@ def make_texture_atlas(texture_list, filename, size_x = 256, pad_y = 0):
 
     # -- load and rotate images
     for l in texture_list:
-        l.im = Image.open(l.filename)
-        logging.debug("name %s size " % l.filename + str(l.im.size))
+        if lightmap:
+            filename, fileext = os.path.splitext(l.filename)
+            filename += '_LM' + fileext
+        else:
+            filename = l.filename
+        l.im = Image.open(filename)
+        logging.debug("name %s size " % filename + str(l.im.size))
         assert (l.v_can_repeat + l.h_can_repeat < 2)
         if l.v_can_repeat:
             l.rotated = True
@@ -72,7 +78,7 @@ def make_texture_atlas(texture_list, filename, size_x = 256, pad_y = 0):
 
         next_y += sy + pad_y
 
-    atlas.save(filename, optimize=True)
+    atlas.save(atlas_filename, optimize=True)
 
     for l in texture_list:
         logging.debug('%s (%4.2f, %4.2f) (%4.2f, %4.2f)' % (l.filename, l.x0, l.y0, l.x1, l.y1))
@@ -436,10 +442,11 @@ def init():
     # -- make texture atlas (or unpickle)
     filename = 'tex/atlas_facades'
     pkl_fname = filename + '.pkl'
-    if 1:
+    if 0:
 #        facades.make_texture_atlas(filename + '.png')
         texture_list = facades.get_list() + roofs.get_list()
         make_texture_atlas(texture_list, filename + '.png')
+        make_texture_atlas(texture_list, filename + '_LM.png', lightmap=True)
 
         logging.info("Saving %s", pkl_fname)
         fpickle = open(pkl_fname, 'wb')
