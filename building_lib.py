@@ -605,7 +605,7 @@ def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner = False):
                    (j + 1,                    tex_x1, tex_y0),
                    (j + 1 + b._nnodes_ground, tex_x1, tex_y1),
                    (j     + b._nnodes_ground, tex_x0, tex_y1) ],
-                   rotate=texture.v_can_repeat)
+                   swap_uv=texture.v_can_repeat)
 
     # -- closing wall
     tex_x1 = texture.x(b.lenX[v1-1] /  texture.h_size_meters)
@@ -617,7 +617,7 @@ def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner = False):
                (j0,                 tex_x1, tex_y0),
                (j0 + b._nnodes_ground,     tex_x1, tex_y1),
                (j1 - 1 + b._nnodes_ground, tex_x0, tex_y1)  ],
-               rotate=texture.v_can_repeat)
+               swap_uv=texture.v_can_repeat)
     return v1
     # ---
     # need numvert
