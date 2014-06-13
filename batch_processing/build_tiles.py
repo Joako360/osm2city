@@ -25,6 +25,8 @@ if __name__ == '__main__':
                       help="The name of the tile")
     parser.add_argument("-f", "--properties", dest="properties",
                       help="The name of the property file to be copied")
+    parser.add_argument("-o", "--out", dest="out",
+                      help="The name of the property file to be copied")
     args = parser.parse_args()
     
     if( args.tilename is None):
@@ -75,7 +77,7 @@ if __name__ == '__main__':
                 replacement_path = re.sub('\\\\','/', path)
             with open(args.properties, "r") as sources:
                 lines = sources.readlines()
-            with open(path + os.sep + args.properties, "w") as sources:
+            with open(path + os.sep + args.out, "w") as sources:
                 replacement = '\\1 ' + replacement_path
                 for line in lines:
                     line = re.sub('^\s*(PREFIX\s*=)([ A-Za-z0-9]*)', replacement, line)

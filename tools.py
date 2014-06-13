@@ -83,6 +83,11 @@ class Interpolator(object):
         j = int((p.y - self.min_y)/self.dy)
         fx = (p.x - self.x[j,i])/self.dx
         fy = (p.y - self.y[j,i])/self.dy
+        # rounding errors at boundary.
+        if j + 1 >= self.h.shape[0]:
+            j -= 1
+        if i + 1 >= self.h.shape[1]:
+            i -= 1
         #print fx, fy, i, j
         h =  (1-fx) * (1-fy) * self.h[j,i] \
            +    fx  * (1-fy) * self.h[j,i+1] \

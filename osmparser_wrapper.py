@@ -8,6 +8,7 @@ import logging
 import unittest
 import osmparser as op
 
+
 class OSMContentHandler(xml.sax.ContentHandler):
     """
     A Specialized SAX ContentHandler for OpenStreetMap data to be processed by osm2city.
@@ -18,8 +19,8 @@ class OSMContentHandler(xml.sax.ContentHandler):
     The valid_??_keys are those tag keys, which will be accepted and added to an element's tags.
     The req_??_keys are those tag keys, of which at least one must be present to add an element to the saved elements.
 
-    The valid_??_keys and req_??_keys are a primitive way to save memory and reduce the number of further processed elements.
-    A better way is to have the input file processed by e.g. Osmosis first.
+    The valid_??_keys and req_??_keys are a primitive way to save memory and reduce the number of further processed
+    elements. A better way is to have the input file processed by e.g. Osmosis first.
     """
     def __init__(self, valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys):
         self.valid_way_keys = valid_way_keys
@@ -78,6 +79,7 @@ if __name__ == "__main__":
     main("C:\\FlightGear\\customscenery2\\LSZS\\ch.osm")
 
 # ================ UNITTESTS =======================
+
 
 class TestOSMParser(unittest.TestCase):
     def test_parse_length(self):
