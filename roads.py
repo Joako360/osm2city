@@ -326,7 +326,7 @@ def main():
     cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
     cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
     center_global = (cmin + cmax)*0.5
-    center_global = vec2d(11.38, 47.26)
+    #center_global = vec2d(11.38, 47.26)
     transform = coordinates.Transformation(center_global, hdg = 0)
 #    center_global = vec2d(11.38, 47.26)
     tools.init(transform)
