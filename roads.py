@@ -65,6 +65,9 @@ from linear import LineObject
 
 import logging
 import osmparser
+import stg_io
+
+OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark edits by osm2platforms
 
 # -----------------------------------------------------------------------------
 def no_transform((x, y)):
@@ -205,10 +208,7 @@ class Roads(object):
             x, y = self.transform.toLocal((node.lon, node.lat))
             e = elev(vec2d(x, y)) + 5
             ac.add_label('I', -y, e, -x, scale=10)
-
-        f = open('roads.ac', 'w')
-        f.write(str(ac))
-        f.close()
+        return ac
 
     def find_intersections(self):
         """
@@ -375,8 +375,29 @@ def main():
 
     #elev = tools.Probe_fgelev(fake=False, auto_save_every=1000)
     elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
-    roads.write(elev)
+    ac = roads.write(elev)
     scale_test(transform, elev)
+    
+    ac_fname = 'roads%07i.ac'%calc_tile.tile_index(center_global)
+    logging.info("done.")
+    logging.info("ways: %i", len(roads))
+    print "OBJECT_STATIC %s %g %g %1.2f %g\n" % (ac_fname, center_global.lon, center_global.lat, 0, 0)
+    fname = path + os.sep + ac_fname
+    f = open(fname, 'w')
+    f.write(str(ac))
+    f.close()
+
+        # -- write stg
+    stg_fname = calc_tile.construct_stg_file_name(center_global)
+    stg_io.uninstall_ours(path, stg_fname, OUR_MAGIC)
+    stg = open(path + stg_fname, "a")
+    stg.write(stg_io.delimiter_string(OUR_MAGIC, True) + "\n# do not edit below this line\n#\n")
+
+    stg.write("OBJECT_STATIC %s %1.5f %1.5f %1.2f %g\n" % (ac_fname, center_global.lon, center_global.lat, 0, 0))
+
+    stg.write(stg_io.delimiter_string(OUR_MAGIC, False) + "\n")
+    stg.close()
+
     #elev.save_cache()
 if __name__ == "__main__":
     main()
