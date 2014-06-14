@@ -1018,7 +1018,8 @@ def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator, landuse_r
                 for intersection in intersections:
                     if isinstance(intersection, MultiLineString):
                         for my_line in intersection:
-                            intersections.append(my_line)
+                            if isinstance(my_line, LineString):
+                                intersections.append(my_line)
                         continue
                     index += 1
                     new_highway = Highway(index + key)
@@ -1030,7 +1031,9 @@ def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator, landuse_r
     # Remove the too short lines
     for key in my_highways.keys():
         my_highway = my_highways[key]
-        if my_highway.is_roundabout and (50 > my_highway.linear.length or 300 < my_highway.linear.length):
+        if not isinstance(my_highway.linear, LineString):
+            del my_highways[key]
+        elif my_highway.is_roundabout and (50 > my_highway.linear.length or 300 < my_highway.linear.length):
             del my_highways[key]
         elif my_highway.linear.length < (2 * Highway.OFFSET):
             del my_highways[key]
@@ -1070,7 +1073,8 @@ def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator):
                     my_coordinates.append((x, y))
             if len(my_coordinates) >= 3:
                 my_landuse.polygon = Polygon(my_coordinates)
-                my_landuses[my_landuse.osm_id] = my_landuse
+                if my_landuse.polygon.is_valid:
+                    my_landuses[my_landuse.osm_id] = my_landuse
     return my_landuses
 
 
