@@ -589,6 +589,7 @@ if __name__ == "__main__":
                       help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
     parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
     parser.add_argument("-c", dest="c", action="store_true", help="do not check for overlapping with static objects")
+    parser.add_argument("-u", dest="uninstall", action="store_true", help="uninstall ours from .stg")
     args = parser.parse_args()
 
     if args.filename is not None:
@@ -598,6 +599,10 @@ if __name__ == "__main__":
         parameters.NO_ELEV = True
     if args.c:
         parameters.OVERLAP_CHECK = False
+
+    if args.uninstall:
+        logging.info("Uninstalling.")
+        parameters.MAX_OBJECTS = 1
 
     parameters.show()
 
@@ -732,6 +737,18 @@ if __name__ == "__main__":
 
     stg_fp_dict = {}    # -- dictionary of stg file pointers
     stg = None  # stg-file object
+
+    if args.uninstall:
+        for cl in clusters:
+            nb = len(cl.objects)
+            center_global = vec2d(tools.transform.toGlobal(cl.center))
+            stg_fname = calc_tile.construct_stg_file_name(center_global)
+            if parameters.PATH_TO_OUTPUT:
+                path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, center_global)
+            else:
+                path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center_global)
+            stg_io.uninstall_ours(path, stg_fname, OUR_MAGIC)
+        sys.exit(0)
 
     for cl in clusters:
             nb = len(cl.objects)
