@@ -65,6 +65,9 @@ from linear import LineObject
 
 import logging
 import osmparser
+import stg_io
+
+OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark edits by osm2platforms
 
 # -----------------------------------------------------------------------------
 def no_transform((x, y)):
@@ -157,6 +160,10 @@ class Roads(object):
                 tex_y0 = 0
                 tex_y1 = 0.25
 
+        if prio in [1, 2]:
+            tex_y0 = 0.25
+            tex_y1 = 0.5
+            width=6
 
         if prio == None:
 #            print "got", way.osm_id,
@@ -166,7 +173,7 @@ class Roads(object):
             return
 
         #print "(accepted)"
-        road = LineObject(self.transform, way.osm_id, way.tags, way.refs, nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.2+0.02*prio+AGL_ofs)
+        road = LineObject(self.transform, way.osm_id, way.tags, way.refs, nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
         road.typ = prio
         self.roads.append(road)
 
@@ -174,14 +181,14 @@ class Roads(object):
         return len(self.roads)
 
     def write(self, elev):
-        ac = ac3d.Writer(tools.stats, show_labels=True)
+        ac = ac3d.Writer(tools.stats, show_labels=False)
 
         # -- debug: write individual .ac for every road
         if 0:
             for i, rd in enumerate(self.roads[:]):
                 if rd.osm_id != 205546090: continue
                 ac = ac3d.Writer(tools.stats)
-                obj = ac.new_object('roads_%s' % rd.osm_id, 'tex/bridge.png')
+                obj = ac.new_object('roads_%s' % rd.osm_id, 'tex/roads.png')
 
                 if not rd.write_to(obj, elev, ac): continue
                 #print "write", rd.osm_id
@@ -192,7 +199,7 @@ class Roads(object):
             return
 
         # -- write roads to ac object, then write obj to file
-        obj = ac.new_object('roads', 'tex/bridge.png')
+        obj = ac.new_object('roads', 'tex/roads.png', default_swap_uv=True)
         for rd in self.roads:
             rd.write_to(obj, elev, ac)
 
@@ -201,14 +208,15 @@ class Roads(object):
             x, y = self.transform.toLocal((node.lon, node.lat))
             e = elev(vec2d(x, y)) + 5
             ac.add_label('I', -y, e, -x, scale=10)
-
-        f = open('roads.ac', 'w')
-        f.write(str(ac))
-        f.close()
+        return ac
 
     def find_intersections(self):
-        # -- brute force: loop all nodes, store the attached ways
-        #    FIXME: use quadtree/kdtree
+        """
+        find intersections by brute force:
+        - for each node, store attached ways in a dict
+        - if a node has 2 ways, store that node as a candidate
+        FIXME: use quadtree/kdtree
+        """
         logging.info('Finding intersections...')
         self.intersections = []
         attached_ways = {} # a dict: for each node hold a list of attached ways
@@ -227,26 +235,73 @@ class Roads(object):
                     attached_ways[ref] = [road]  # initialize node
         logging.info('Done.')
 
-        for key, value in attached_ways.items():
-            if len(value) > 1:
-                print key
-                for way in value:
-                    try:
-                        print "  ", way.tags['name']
-                    except:
-                        print "  ", way
+        if 0:
+            for key, value in attached_ways.items():
+                if len(value) > 1:
+                    print key
+                    for way in value:
+                        try:
+                            print "  ", way.tags['name']
+                        except:
+                            print "  ", way
 
-def join_ways():
-    """join ways that
-       - don't make an intersection and
-       - are of compatible type
-    """
+    def cleanup_intersections(self):
+        """Remove intersections that
+           - have less than 3 ways attached
+        """
+        pass
+
+
+    def join_ways(self):
+        """join ways that
+           - don't make an intersection and
+           - are of compatible type
+        """
+        pass
+
+def quick_stg_line(ac_fname, position, elevation, heading, show=True):
+    stg_path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, position)
+    stg_fname = calc_tile.construct_stg_file_name(position)
+    stg_line = "OBJECT_STATIC %s %1.7f %1.7f %1.2f %g\n" % (ac_fname, position.lon, position.lat, elevation, heading)
+    if show == 1 or show == 3:
+        print stg_path + stg_fname
+    if show == 2 or show == 3:
+         print stg_line
+#        print "%s\n%s" % (stg_path + stg_fname, stg_line)
+    return stg_path, stg_fname, stg_line
+
+def scale_test(transform, elev):
     pass
+    """
+    put 4 objects into scenery
+    2 poles 1000m apart. Two ac, origin same, but one is offset in ac. Put both
+    at same location in stg
+    2 acs, at different stg location
+    Result: at 100m 35 cm difference
+            at 1000m 3.5m
+            0.35%
+    """
+    p0 = vec2d(transform.toGlobal((0,0)))
+    p100 = vec2d(transform.toGlobal((100,0)))
+    p1k = vec2d(transform.toGlobal((1000,0)))
+    p10k = vec2d(transform.toGlobal((10000,0)))
+#    BLA
+    e0 = elev(p0, is_global=True)
+    e100 = elev(p100, is_global=True)
+    e1k = elev(p1k, is_global=True)
+    e10k = elev(p10k, is_global=True)
+    quick_stg_line('cursor/cursor_blue.ac', p0, e0, 0, show=3)
+    quick_stg_line('cursor/cursor_red.ac', p100, e100, 0, show=2)
+    quick_stg_line('cursor/cursor_red.ac', p1k, e1k, 0, show=2)
+    quick_stg_line('cursor/cursor_red.ac', p10k, e10k, 0, show=2)
 
+    p0 = vec2d(transform.toGlobal((0,0)))
+    p1 = vec2d(transform.toGlobal((1.,0)))
+    print p0, p1
 
 def main():
-    logging.basicConfig(level=logging.INFO)
-    #logging.basicConfig(level=logging.DEBUG)
+    #logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
 
     import argparse
     parser = argparse.ArgumentParser(description="bridge.py reads OSM data and creates bridge models for use with FlightGear")
@@ -271,9 +326,9 @@ def main():
     cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
     cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
     center_global = (cmin + cmax)*0.5
+    #center_global = vec2d(11.38, 47.26)
     transform = coordinates.Transformation(center_global, hdg = 0)
 #    center_global = vec2d(11.38, 47.26)
-    transform = coordinates.Transformation(center_global, hdg = 0)
     tools.init(transform)
     roads = Roads(transform)
 
@@ -289,7 +344,7 @@ def main():
 
     logging.info("done.")
     logging.info("ways: %i", len(roads))
-    print "OBJECT_STATIC %s %1.5f %1.5f %1.2f %g\n" % ("road.ac", center_global.lon, center_global.lat, 0, 0)
+    print "OBJECT_STATIC %s %1.5f %1.5f %1.2f %g\n" % ("roads.ac", center_global.lon, center_global.lat, 0, 0)
     if parameters.PATH_TO_OUTPUT:
         path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, center_global)
     else:
@@ -298,11 +353,12 @@ def main():
     print path+stg_fname
 
 
-    if 0:
+    if 1:
         # -- quick test output
         col = ['b', 'r', 'y', 'g', '0.75', '0.5', 'k']
-        lw    = [2, 1.5, 1.2, 1, 1, 1, 1]
-        lw_w  = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 1]
+        col = ['0.5', '0.75', 'y', 'g', 'r', 'b', 'k']
+        lw    = [1, 1, 1, 1.2, 1.5, 2, 1]
+        lw_w  = [1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
         for r in roads.roads:
             a = np.array(r.center.coords)
             #np.array([transform.toLocal((n.lon, n.lat)) for n in r.nodes])
@@ -314,9 +370,34 @@ def main():
         plt.savefig('roads.eps')
 
     roads.find_intersections()
+    roads.cleanup_intersections()
 
+
+    #elev = tools.Probe_fgelev(fake=False, auto_save_every=1000)
     elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
-    roads.write(elev)
+    ac = roads.write(elev)
+    scale_test(transform, elev)
+    
+    ac_fname = 'roads%07i.ac'%calc_tile.tile_index(center_global)
+    logging.info("done.")
+    logging.info("ways: %i", len(roads))
+    print "OBJECT_STATIC %s %g %g %1.2f %g\n" % (ac_fname, center_global.lon, center_global.lat, 0, 0)
+    fname = path + os.sep + ac_fname
+    f = open(fname, 'w')
+    f.write(str(ac))
+    f.close()
 
+        # -- write stg
+    stg_fname = calc_tile.construct_stg_file_name(center_global)
+    stg_io.uninstall_ours(path, stg_fname, OUR_MAGIC)
+    stg = open(path + stg_fname, "a")
+    stg.write(stg_io.delimiter_string(OUR_MAGIC, True) + "\n# do not edit below this line\n#\n")
+
+    stg.write("OBJECT_STATIC %s %1.5f %1.5f %1.2f %g\n" % (ac_fname, center_global.lon, center_global.lat, 0, 0))
+
+    stg.write(stg_io.delimiter_string(OUR_MAGIC, False) + "\n")
+    stg.close()
+
+    #elev.save_cache()
 if __name__ == "__main__":
     main()

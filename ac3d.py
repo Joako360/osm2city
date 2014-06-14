@@ -12,12 +12,12 @@ class Node(object):
         return "%1.2f %1.2f %1.2f\n" % (self.x, self.y, self.z)
 
 class Face(object):
-    """if our texture is rotated in texture_atlas, set rotate=True"""
-    def __init__(self, nodes_uv_list, typ, mat, rotate):
+    """if our texture is rotated in texture_atlas, set swap_uv=True"""
+    def __init__(self, nodes_uv_list, typ, mat, swap_uv):
         assert len(nodes_uv_list) >= 3
         for n in nodes_uv_list:
             assert len(n) == 3
-        if rotate:
+        if swap_uv:
             nodes_uv_list = [(n[0], n[2], n[1]) for n in nodes_uv_list]
         self.nodes_uv_list = nodes_uv_list
         self.typ = typ
@@ -32,7 +32,9 @@ class Face(object):
 
 
 class Object(object):
-    def __init__(self, name, stats=None, texture=None, default_type=0x0, default_mat=0):
+    """
+    """
+    def __init__(self, name, stats=None, texture=None, default_type=0x0, default_mat=0, default_swap_uv=False):
         self._nodes = []
         self._faces = []
         self.name = str(name)
@@ -41,6 +43,7 @@ class Object(object):
         self.texture = texture
         self.default_type = default_type
         self.default_mat = default_mat
+        self.default_swap_uv = default_swap_uv
 
     def close(self):
         pass
@@ -55,13 +58,15 @@ class Object(object):
     def next_node_index(self):
         return len(self._nodes)
 
-    def face(self, nodes_uv_list, typ=None, mat=None, rotate=False):
+    def face(self, nodes_uv_list, typ=None, mat=None, swap_uv=None):
         """Add new face. Return its index."""
         if not typ:
             typ = self.default_type
         if not mat:
             mat = self.default_mat
-        self._faces.append(Face(nodes_uv_list, typ, mat, rotate))
+        if not swap_uv:
+            swap_uv = self.default_swap_uv
+        self._faces.append(Face(nodes_uv_list, typ, mat, swap_uv))
         if self.stats:
             self.stats.surfaces += 1
         return len(self._faces) - 1
