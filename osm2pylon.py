@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Script part of osm2city which takes OpenStreetMap data for overground power lines and aerialways
-as input and generates data to be used in FlightGear sceneries.
-
-* Cf. OSM Power: 
-    http://wiki.openstreetmap.org/wiki/Map_Features#Power
-    http://wiki.openstreetmap.org/wiki/Tag:power%3Dtower
-* Cf. OSM Aerialway: http://wiki.openstreetmap.org/wiki/Map_Features#Aerialway
+Script part of osm2city which takes OpenStreetMap data as input and generates data to be used in FlightGear
+   * overground power lines
+   * aerialways
+   * railway overlines
+   * streetlamps
 
 TODO:
 * Remove shared objects from stg-files to avoid doubles
@@ -34,6 +32,7 @@ import parameters
 import stg_io
 import tools
 import vec2d
+import re
 
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
@@ -1300,7 +1299,9 @@ def write_stg_entries(stg_fp_dict, lines_dict, wayname, cluster_max_length):
             stg_file = stg_fp_dict[stg_fname]
         stg_file.write(line.make_shared_pylons_stg_entries() + "\n")
         if None is not wayname:
-            filename = parameters.PREFIX + wayname + "%05d" % line_index
+             #incase Prefix is a path (batch processing)
+            replacement_prefix = re.sub('[\/]','_', parameters.PREFIX)
+            filename = replacement_prefix + wayname + "%05d" % line_index
             stg_file.write(line.make_cables_ac_xml_stg_entries(filename, path, cluster_max_length) + "\n")
 
 
