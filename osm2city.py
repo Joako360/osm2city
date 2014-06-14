@@ -494,15 +494,16 @@ def write_xml(path, fname, buildings):
         xml.write(textwrap.dedent("""
         <effect>
           <inherits-from>cityLM</inherits-from>
-          <parameters>
-            <lightmap-enabled type="int">1</lightmap-enabled>
-            <texture n="3">
-              <image>%s_LM.png</image>
-              <wrap-s>repeat</wrap-s>
-              <wrap-t>repeat</wrap-t>
-            </texture>
-          </parameters>
-              """ % 'tex/atlas_facades'))
+          """))
+#                    <parameters>
+#            <lightmap-enabled type="int">1</lightmap-enabled>
+#            <texture n="3">
+#              <image>%s_LM.png</image>
+#              <wrap-s>repeat</wrap-s>
+#              <wrap-t>repeat</wrap-t>
+#            </texture>
+#          </parameters>
+#              """ % 'tex/atlas_facades
         xml.write("  <object-name>LOD_detail</object-name>\n")
         xml.write("  <object-name>LOD_rough</object-name>\n")
         xml.write("</effect>\n")
