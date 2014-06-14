@@ -375,7 +375,7 @@ class Buildings(object):
                 #print "all outer refs", all_outer_refs
                 #dict(outer.tags.items() + tags.items())
                 if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
-                    print "FIXME: ignoring all but first inner way (%i total) of ID %i" % (len(inner_ways), _relation.osm_id)
+                    print "FIXME: ignoring all but first inner way (%i total) of ID %i" % (len(inner_ways), relation.osm_id)
                     res = self._make_building_from_way(relation.osm_id,
                                                 all_tags,
                                                 all_outer_refs, [inner_ways[0]])
