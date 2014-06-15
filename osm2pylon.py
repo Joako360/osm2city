@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Script part of osm2city which takes OpenStreetMap data as input and generates data to be used in FlightGear
