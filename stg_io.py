@@ -17,6 +17,9 @@ import tools
 #    def __str__(self):
 #        return "%s %s %g %g %g %g" % (self.typ, self.path, self.lon, self.lat, self.alt, self.hdg)
 
+DEPRECATED_MESSAGE = "stg_io.py is deprecated. Please consider porting to stg_io2.py"
+logging.warn(DEPRECATED_MESSAGE)
+
 
 def read(path, stg_fname, our_magic):
     """Accepts a scenery sub-path, as in 'w010n40/w005n48/', plus an .stg file name.
