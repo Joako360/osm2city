@@ -72,7 +72,7 @@ from vec2d import vec2d
 import textwrap
 import cPickle
 import textures as tex
-import stg_io
+import stg_io2
 import tools
 import calc_tile
 import osmparser
@@ -601,7 +601,9 @@ if __name__ == "__main__":
 
     if args.uninstall:
         logging.info("Uninstalling.")
-        parameters.MAX_OBJECTS = 1
+        files_to_remove = []
+        parameters.NO_ELEV = True
+        parameters.OVERLAP_CHECK = False
 
     parameters.show()
 
@@ -702,7 +704,7 @@ if __name__ == "__main__":
 
             if stg_fname not in stgs:
                 stgs.append(stg_fname)
-                static_objects.extend(stg_io.read(path, stg_fname, OUR_MAGIC))
+                static_objects.extend(stg_io2.read(path, stg_fname, OUR_MAGIC))
 
         logging.info("read %i objects from %i tiles", len(static_objects), len(stgs))
     else:
@@ -716,97 +718,79 @@ if __name__ == "__main__":
     #   - set building type, roof type etc
     buildings = building_lib.analyse(buildings, static_objects, tools.transform, elev, tex.facades, tex.roofs)
 
+    # -- initialize STG_Manager
+    if parameters.PATH_TO_OUTPUT:
+        path_to_output = parameters.PATH_TO_OUTPUT
+    else:
+        path_to_output = parameters.PATH_TO_SCENERY
+    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, overwrite=True)
+
     #tools.write_gp(buildings)
 
-    # -- now put buildings into clusters
+    # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
     for b in buildings:
         clusters.append(b.anchor, b)
-
     building_lib.decide_LOD(buildings)
-    #clusters.transfer_buildings()
-
-    clusters.write_stats()
+    clusters.transfer_buildings()
 
     # -- write clusters
-
+    clusters.write_stats()
     stg_fp_dict = {}    # -- dictionary of stg file pointers
     stg = None  # stg-file object
 
+    for cl in clusters:
+        nb = len(cl.objects)
+        if nb < parameters.CLUSTER_MIN_OBJECTS: continue # skip almost empty clusters
+
+        # -- get cluster center
+        offset = cl.center
+
+        # -- count roofs == separate objects
+        nroofs = 0
+        for b in cl.objects:
+            if b.roof_complex: nroofs += 2  # we have 2 different LOD models for each roof
+
+        tile_elev = elev(cl.center)
+        center_global = vec2d(tools.transform.toGlobal(cl.center))
+        if tile_elev == -9999:
+            logging.warning("Skipping tile elev = -9999 at lat %.3f and lon %.3f", center_global.lat, center_global.lon)
+            continue # skip tile with improper elev
+
+        #LOD_lists = []
+        #LOD_lists.append([])  # bare
+        #LOD_lists.append([])  # rough
+        #LOD_lists.append([])  # detail
+        #LOD_lists.append([])  # roof
+        #LOD_lists.append([])  # roof-flat
+
+        # -- incase PREFIX is a path (batch processing)
+        replacement_prefix = re.sub('[\/]','_', parameters.PREFIX)
+        file_name = replacement_prefix + "city%02i%02i" % (cl.I.x, cl.I.y)
+
+        path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, tile_elev, 0)
+
+        if args.uninstall:
+            files_to_remove.append(path_to_stg + file_name + ".ac")
+            files_to_remove.append(path_to_stg + file_name + ".xml")
+        else:
+            # -- write .ac and .xml
+            building_lib.write(path_to_stg + file_name + ".ac", cl.objects, elev, tile_elev, tools.transform, offset)
+            write_xml(path_to_stg, file_name, cl.objects)
+
     if args.uninstall:
-        for cl in clusters:
-            nb = len(cl.objects)
-            center_global = vec2d(tools.transform.toGlobal(cl.center))
-            stg_fname = calc_tile.construct_stg_file_name(center_global)
-            if parameters.PATH_TO_OUTPUT:
-                path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, center_global)
-            else:
-                path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center_global)
-            stg_io.uninstall_ours(path, stg_fname, OUR_MAGIC)
+        for f in files_to_remove:
+            try:
+                os.remove(f)
+            except:
+                pass
+        stg_manager.drop_ours()
+        stg_manager.write()
+        logging.info("uninstall done.")
         sys.exit(0)
 
-    for cl in clusters:
-            nb = len(cl.objects)
-            if nb < parameters.CLUSTER_MIN_OBJECTS: continue # skip almost empty clusters
-
-            # -- get cluster center
-            offset = cl.center
-
-            # -- count roofs == separate objects
-            nroofs = 0
-            for b in cl.objects:
-                if b.roof_complex: nroofs += 2  # we have 2 different LOD models for each roof
-
-            tile_elev = elev(cl.center)
-            center_global = vec2d(tools.transform.toGlobal(cl.center))
-            if tile_elev == -9999:
-                logging.warning("Skipping tile elev = -9999 at lat %.3f and lon %.3f", center_global.lat, center_global.lon)
-                continue # skip tile with improper elev
-            #print "TILE E", tile_elev
-
-            #LOD_lists = []
-            #LOD_lists.append([])  # bare
-            #LOD_lists.append([])  # rough
-            #LOD_lists.append([])  # detail
-            #LOD_lists.append([])  # roof
-            #LOD_lists.append([])  # roof-flat
-
-            # -- prepare output path
-            if parameters.PATH_TO_OUTPUT:
-                path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, center_global)
-            else:
-                path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center_global)
-            try:
-                os.makedirs(path)
-            except OSError, e:
-                if e.errno != 17:
-                    logging.exception("Unable to create path to output")
-            #incase Prefix is a path (batch processing)
-            replacement_prefix = re.sub('[\/]','_', parameters.PREFIX)
-            # -- open .ac and write header
-            fname = replacement_prefix + "city%02i%02i" % (cl.I.x, cl.I.y)
-            building_lib.write(path + fname + ".ac", cl.objects, elev, tile_elev, tools.transform, offset)
-
-            # -- write xml
-            write_xml(path, fname, cl.objects)
-
-            # -- write stg
-            stg_fname = calc_tile.construct_stg_file_name(center_global)
-            if not stg_fname in stg_fp_dict:
-                stg_io.uninstall_ours(path, stg_fname, OUR_MAGIC)
-                stg = open(path + stg_fname, "a")
-                stg.write(stg_io.delimiter_string(OUR_MAGIC, True) + "\n# do not edit below this line\n#\n")
-                stg_fp_dict[stg_fname] = stg
-            else:
-                stg = stg_fp_dict[stg_fname]
-
-            stg.write("OBJECT_STATIC %s %1.5f %1.5f %1.2f %g\n" % (fname+".xml", center_global.lon, center_global.lat, tile_elev, 0))
-
-    for stg in stg_fp_dict.values():
-        stg.write(stg_io.delimiter_string(OUR_MAGIC, False) + "\n")
-        stg.close()
-
+    stg_manager.write()
     tools.stats.print_summary()
-    logging.info("done. If program does not exit at this point, press CTRL+C.")
+    logging.info("done.")
     sys.exit(0)
 
 
