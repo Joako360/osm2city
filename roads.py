@@ -1,6 +1,5 @@
 #!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
-# FIXME: check sign of angle
 
 """
 Ugly, highly experimental code.
@@ -9,6 +8,8 @@ Created on Sun Sep 29 10:42:12 2013
 
 @author: tom
 TODO:
+- clusterize
+- LOD
 - handle intersections
 - handle layers/bridges
 
@@ -265,6 +266,7 @@ class Roads(object):
         pass
 
 def quick_stg_line(ac_fname, position, elevation, heading, show=True):
+    """debug."""
     stg_path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, position)
     stg_fname = calc_tile.construct_stg_file_name(position)
     stg_line = "OBJECT_STATIC %s %1.7f %1.7f %1.2f %g\n" % (ac_fname, position.lon, position.lat, elevation, heading)
@@ -374,9 +376,9 @@ def main():
     logging.info("ways: %i", len(roads))
 
     if parameters.PATH_TO_OUTPUT:
-        path_to_scenery = parameters.PATH_TO_OUTPUT
+        path_to_output = parameters.PATH_TO_OUTPUT
     else:
-        path_to_scenery = parameters.PATH_TO_SCENERY
+        path_to_output = parameters.PATH_TO_SCENERY
 
     if 1:
         # -- quick test output
@@ -404,7 +406,7 @@ def main():
     logging.info("done.")
     logging.info("ways: %i", len(roads))
 
-    stg_manager = stg_io2.STG_Manager(path_to_scenery, OUR_MAGIC, uninstall=True)
+    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, uninstall=True)
 
     # -- write stg
     ac = roads.create_ac(elev)
