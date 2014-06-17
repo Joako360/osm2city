@@ -201,6 +201,11 @@ class Writer(object):
         s += string.join([str(o) for o in non_empty])
         return s
 
+    def write_to_file(self, file_name):
+        f = open(file_name + '.ac', 'w')
+        f.write(str(self))
+        f.close()
+
     def plot(self):
         non_empty = [o for o in self.objects if not o.is_empty()]
         for o in non_empty:
