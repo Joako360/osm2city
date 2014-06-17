@@ -3,9 +3,10 @@
 """
 Manage I/O for .stg files. There are two classes, STG_Manager and STG_File.
 
-STG_Manager is the main interface for writing OBJECT_STATIC etc to .stg files.
-It knows about the scenery path, tile indices etc. You only need to provide the
-actual ac_file_name, position, elevation, hdg. See __main__ for usage.
+STG_Manager is the main interface for writing OBJECT_STATIC (_SHARED will
+follow) to .stg files. It knows about the scenery path, tile indices etc. You
+only need to provide the actual ac_file_name, position, elevation, hdg.
+See __main__ for usage.
 
 STG_file represents an .stg file. Usually you don't deal with them directly,
 
@@ -15,7 +16,7 @@ STG_file represents an .stg file. Usually you don't deal with them directly,
 import logging
 
 import shapely.geometry as shg
-
+import os
 #import osm2city
 import tools
 from vec2d import vec2d
@@ -58,7 +59,7 @@ class STG_File(object):
         self.other_list = lines[:ours_start] + lines[ours_end+1:]
         self.our_list = lines[ours_start+1:ours_end]
 
-    def uninstall(self):
+    def drop_ours(self):
         """Clear our list. Call write() afterwards to finish uninstall"""
         self.our_list = []
 
@@ -71,43 +72,56 @@ class STG_File(object):
 
     def write(self):
         """write others and ours to file"""
+        try:
+            os.makedirs(self.path_to_stg)
+        except OSError, e:
+            if e.errno != 17:
+                logging.exception("Unable to create path to output %s", self.path_to_stg)
+
         stg = open(self.file_name, 'w')
         for line in self.other_list:
             stg.write(line)
-        stg.write(self.our_magic_start)
-        stg.write("# do not edit below this line\n#\n")
-        for line in self.our_list:
-            stg.write(line)
-        stg.write(self.our_magic_end)
+
+        if self.our_list:
+            stg.write(self.our_magic_start)
+            stg.write("# do not edit below this line\n#\n")
+            for line in self.our_list:
+                stg.write(line)
+            stg.write(self.our_magic_end)
+
         stg.close()
 
 class STG_Manager(object):
     """manages STG objects. Knows about scenery path.
     """
-    def __init__(self, path_to_scenery, magic, uninstall=False):
+    def __init__(self, path_to_scenery, magic, overwrite=False):
         self.stg_dict = {} # maps tile index to stg object
         self.path_to_scenery = path_to_scenery
-        self.uninstall = uninstall
+        self.overwrite = overwrite
         self.magic = magic
 
-    def __call__(self, lon_lat, uninstall=None):
-        """return STG object. If uninstall is given, it overrides default"""
+    def __call__(self, lon_lat, overwrite=None):
+        """return STG object. If overwrite is given, it overrides default"""
         tile_index = calc_tile.tile_index(lon_lat)
         try:
             return self.stg_dict[tile_index]
         except KeyError:
             the_stg = STG_File(lon_lat, tile_index, self.path_to_scenery, self.magic)
             self.stg_dict[tile_index] = the_stg
-            if uninstall == None:
-                uninstall = self.uninstall
-            if uninstall:
-                the_stg.uninstall()
+            if overwrite == None:
+                overwrite = self.overwrite
+            if overwrite:
+                the_stg.drop_ours()
         return the_stg
 
     def add_object_static(self, ac_file_name, lon_lat, elev, hdg):
         """Adds OBJECT_STATIC line. Returns path to stg."""
         the_stg = self(lon_lat)
         return the_stg.add_object_static(ac_file_name, lon_lat, elev, hdg)
+
+    def drop_ours(self):
+        for the_stg in self.stg_dict.values():
+            the_stg.drop_ours()
 
     def write(self):
         for the_stg in self.stg_dict.values():
@@ -160,14 +174,19 @@ def delimiter_string(our_magic, is_start):
         delimiter += 'END '
     return delimiter + our_magic + '\n'
 
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     OUR_MAGIC = "osm2test"
-    stg_manager = STG_Manager("/home/albrecht/fgfs/my/osm2city/EDDC", OUR_MAGIC, uninstall=True)
     center_global = vec2d(13.7, 51)
+
+    # 1. Init STG_Manager
+    stg_manager = STG_Manager("/home/albrecht/fgfs/my/osm2city/EDDC", OUR_MAGIC, overwrite=True)
+
+    # 2. add object(s) to it, will return path_to_stg
     path_to_stg = stg_manager.add_object_static("test.ac", center_global, 0, 0)
-    # write your .ac file to path_to_stg + ac_file_name
-    # add more objects:
-    # stg_manager.add_object_static("test1.ac", center_global, 10, 12)
-    # ...
+
+    # 3. write your .ac to path_to_stg + ac_file_name (then add more objects)
+
+    # 4. finally write all .stg
     stg_manager.write()
