@@ -342,8 +342,8 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         Xo = np.array(b.X_outer)
 
         # -- write nodes to separate debug file
-        for i in range(b.nnodes_outer):
-            tools.stats.debug1.write("%g %g\n" % (Xo[i,0], Xo[i,1]))
+#        for i in range(b.nnodes_outer):
+#            tools.stats.debug1.write("%g %g\n" % (Xo[i,0], Xo[i,1]))
 
         tools.stats.nodes_ground += b._nnodes_ground
 
