@@ -488,7 +488,6 @@ def write_xml(path, fname, buildings):
     #LMs_avail = ['tex/DSCF9495_pow2', 'tex/DSCF9503_noroofsec_pow2', 'tex/LZ_old_bright_bc2', 'tex/DSCF9678_pow2', 'tex/DSCF9710', 'tex/wohnheime_petersburger']
 
     # FIXME: use Effect/Building? What's the difference?
-    # FIXME: LM and textures currently broken
     #                <lightmap-factor type="float" n="0"><use>/scenery/LOWI/garage[0]/door[0]/position-norm</use></lightmap-factor>
     if parameters.LIGHTMAP_ENABLE:
         xml.write(textwrap.dedent("""
@@ -677,9 +676,6 @@ if __name__ == "__main__":
         logging.info("unpickled %g buildings ", len(buildings))
         tools.stats.objects = len(buildings)
 
-    #nb = len(buildings)
-    #buildings = [buildings[0]]
-
     # -- debug filter
 #    for b in buildings:
 #        if b.osm_id == 35336:
@@ -694,7 +690,7 @@ if __name__ == "__main__":
 
     if parameters.OVERLAP_CHECK:
         # -- read static/shared objects in our area from .stg(s)
-        #    Tiles are assumed to be much larger than clusters.
+        #    FG tiles are assumed to be much larger than our clusters.
         #    Loop all clusters, find relevant tile by checking tile_index at center of each cluster.
         #    Then read objects from .stg.
         stgs = []
@@ -712,8 +708,6 @@ if __name__ == "__main__":
     else:
         static_objects = None
 
-    tools.stats.debug1 = open(parameters.PREFIX + os.sep +"debug1.dat", "w")
-    tools.stats.debug2 = open(parameters.PREFIX + os.sep +"debug2.dat", "w")
 
     # - analyze buildings
     #   - calculate area
@@ -811,8 +805,6 @@ if __name__ == "__main__":
         stg.write(stg_io.delimiter_string(OUR_MAGIC, False) + "\n")
         stg.close()
 
-    tools.stats.debug1.close()
-    tools.stats.debug2.close()
     tools.stats.print_summary()
     logging.info("done. If program does not exit at this point, press CTRL+C.")
     sys.exit(0)
