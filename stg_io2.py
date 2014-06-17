@@ -183,10 +183,17 @@ if __name__ == "__main__":
     # 1. Init STG_Manager
     stg_manager = STG_Manager("/home/albrecht/fgfs/my/osm2city/EDDC", OUR_MAGIC, overwrite=True)
 
-    # 2. add object(s) to it, will return path_to_stg
+    # 2. add object(s) to it, will return path_to_stg. If the .stg in question
+    #    is encountered for the first time, read it into an STG_File object and
+    #    separate "our" lines from "other" lines.
     path_to_stg = stg_manager.add_object_static("test.ac", center_global, 0, 0)
 
     # 3. write your .ac to path_to_stg + ac_file_name (then add more objects)
 
-    # 4. finally write all .stg
+    # 4. finally write all cached lines to .stg files.
     stg_manager.write()
+
+    # 5. If you want to uninstall, do 1. - 3. Then remove our lines from cache:l
+    #   stg_manager.drop_ours()
+    # And write other lines to disk:
+    #   stg_manager.write()
