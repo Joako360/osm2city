@@ -29,8 +29,8 @@ class STG_File(object):
     def __init__(self, lon_lat, tile_index, path_to_scenery, magic):
         """Read all lines from stg to memory.
            Store our/other lines in two separate lists."""
-        path = calc_tile.construct_path_to_stg(path_to_scenery, lon_lat)
-        self.file_name = path + "%07i.stg" % tile_index
+        self.path_to_stg = calc_tile.construct_path_to_stg(path_to_scenery, lon_lat)
+        self.file_name = self.path_to_stg + "%07i.stg" % tile_index
         self.other_list = []
         self.our_list = []
         self.magic = magic
@@ -63,10 +63,11 @@ class STG_File(object):
         self.our_list = []
 
     def add_object_static(self, ac_file_name, lon_lat, elev, hdg):
-        """add OBJECT_STATIC line to our_list"""
+        """add OBJECT_STATIC line to our_list. Returns path to stg."""
         line = "OBJECT_STATIC %s %1.5f %1.5f %1.2f %g\n" % (ac_file_name, lon_lat.lon, lon_lat.lat, elev, hdg)
         self.our_list.append(line)
         logging.debug(self.file_name + ':' + line)
+        return self.path_to_stg
 
     def write(self):
         """write others and ours to file"""
@@ -74,6 +75,7 @@ class STG_File(object):
         for line in self.other_list:
             stg.write(line)
         stg.write(self.our_magic_start)
+        stg.write("# do not edit below this line\n#\n")
         for line in self.our_list:
             stg.write(line)
         stg.write(self.our_magic_end)
@@ -89,7 +91,7 @@ class STG_Manager(object):
         self.magic = magic
 
     def __call__(self, lon_lat, uninstall=None):
-        """return STG object. If uninstall is given, it override default"""
+        """return STG object. If uninstall is given, it overrides default"""
         tile_index = calc_tile.tile_index(lon_lat)
         try:
             return self.stg_dict[tile_index]
@@ -103,8 +105,9 @@ class STG_Manager(object):
         return the_stg
 
     def add_object_static(self, ac_file_name, lon_lat, elev, hdg):
+        """Adds OBJECT_STATIC line. Returns path to stg."""
         the_stg = self(lon_lat)
-        the_stg.add_object_static(ac_file_name, lon_lat, elev, hdg)
+        return the_stg.add_object_static(ac_file_name, lon_lat, elev, hdg)
 
     def write(self):
         for the_stg in self.stg_dict.values():
@@ -162,6 +165,9 @@ if __name__ == "__main__":
     OUR_MAGIC = "osm2test"
     stg_manager = STG_Manager("/home/albrecht/fgfs/my/osm2city/EDDC", OUR_MAGIC, uninstall=True)
     center_global = vec2d(13.7, 51)
-    stg_manager.add_object_static("test.ac", center_global, 0, 0)
-    stg_manager.add_object_static("test1.ac", center_global, 10, 12)
+    path_to_stg = stg_manager.add_object_static("test.ac", center_global, 0, 0)
+    # write your .ac file to path_to_stg + ac_file_name
+    # add more objects:
+    # stg_manager.add_object_static("test1.ac", center_global, 10, 12)
+    # ...
     stg_manager.write()
