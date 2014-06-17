@@ -50,6 +50,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from vec2d import vec2d
 import shapely.geometry as shg
+import textwrap
 from pdb import pm
 #import pdb
 #import osm
@@ -65,7 +66,7 @@ from linear import LineObject
 
 import logging
 import osmparser
-import stg_io
+import stg_io2
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark edits by osm2platforms
 
@@ -180,7 +181,7 @@ class Roads(object):
     def __len__(self):
         return len(self.roads)
 
-    def write(self, elev):
+    def create_ac(self, elev):
         ac = ac3d.Writer(tools.stats, show_labels=False)
 
         # -- debug: write individual .ac for every road
@@ -198,7 +199,10 @@ class Roads(object):
                 f.close()
             return
 
-        # -- write roads to ac object, then write obj to file
+        # -- create ac object, then write obj to file
+        # TODO: try emis for night lighting? Didnt look too bad, and gave better range
+        # MATERIAL "" rgb 1 1 1 amb 1 1 1 emis 0.4 0.2 0.05 spec 0.5 0.5 0.5 shi 64 trans 0
+
         obj = ac.new_object('roads', 'tex/roads.png', default_swap_uv=True)
         for rd in self.roads:
             rd.write_to(obj, elev, ac)
@@ -208,6 +212,7 @@ class Roads(object):
             x, y = self.transform.toLocal((node.lon, node.lat))
             e = elev(vec2d(x, y)) + 5
             ac.add_label('I', -y, e, -x, scale=10)
+
         return ac
 
     def find_intersections(self):
@@ -295,9 +300,33 @@ def scale_test(transform, elev):
     quick_stg_line('cursor/cursor_red.ac', p1k, e1k, 0, show=2)
     quick_stg_line('cursor/cursor_red.ac', p10k, e10k, 0, show=2)
 
-    p0 = vec2d(transform.toGlobal((0,0)))
-    p1 = vec2d(transform.toGlobal((1.,0)))
+    p0 = vec2d(transform.toGlobal((0, 0)))
+    p1 = vec2d(transform.toGlobal((1., 0)))
     print p0, p1
+
+
+def write_xml(path_to_stg, file_name, object_name):
+    xml = open(path_to_stg + file_name + '.xml', "w")
+    if 0:  # parameters.TRAFFIC_SHADER_ENABLE:
+        shader_str = "<inherits-from>Effects/road-high</inherits-from>"
+    else:
+        shader_str = "<inherits-from>roads</inherits-from>"
+    xml.write(textwrap.dedent("""        <?xml version="1.0"?>
+        <PropertyList>
+        <path>%s.ac</path>
+        <effect>
+        <!--
+            EITHER enable the traffic shader
+                <inherits-from>Effects/road-high</inherits-from>
+            OR the lightmap shader
+                <inherits-from>roads</inherits-from>
+        -->
+                %s
+                <object-name>%s</object-name>
+        </effect>
+        </PropertyList>
+    """  % (file_name, shader_str, object_name)))
+
 
 def main():
     #logging.basicConfig(level=logging.INFO)
@@ -319,16 +348,15 @@ def main():
 #    if args.c:
 #        parameters.OVERLAP_CHECK = False
 
-    parameters.show()
+    #parameters.show()
 
     osm_fname = parameters.PREFIX + os.sep + parameters.OSM_FILE
 
     cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
     cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
     center_global = (cmin + cmax)*0.5
-    #center_global = vec2d(11.38, 47.26)
+    center_global = vec2d(11.38, 47.26)
     transform = coordinates.Transformation(center_global, hdg = 0)
-#    center_global = vec2d(11.38, 47.26)
     tools.init(transform)
     roads = Roads(transform)
 
@@ -344,14 +372,11 @@ def main():
 
     logging.info("done.")
     logging.info("ways: %i", len(roads))
-    print "OBJECT_STATIC %s %1.5f %1.5f %1.2f %g\n" % ("roads.ac", center_global.lon, center_global.lat, 0, 0)
-    if parameters.PATH_TO_OUTPUT:
-        path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, center_global)
-    else:
-        path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center_global)
-    stg_fname = calc_tile.construct_stg_file_name(center_global)
-    print path+stg_fname
 
+    if parameters.PATH_TO_OUTPUT:
+        path_to_scenery = parameters.PATH_TO_OUTPUT
+    else:
+        path_to_scenery = parameters.PATH_TO_SCENERY
 
     if 1:
         # -- quick test output
@@ -372,32 +397,29 @@ def main():
     roads.find_intersections()
     roads.cleanup_intersections()
 
-
     #elev = tools.Probe_fgelev(fake=False, auto_save_every=1000)
     elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
-    ac = roads.write(elev)
-    scale_test(transform, elev)
-    
-    ac_fname = 'roads%07i.ac'%calc_tile.tile_index(center_global)
+#    scale_test(transform, elev)
+
     logging.info("done.")
     logging.info("ways: %i", len(roads))
-    print "OBJECT_STATIC %s %g %g %1.2f %g\n" % (ac_fname, center_global.lon, center_global.lat, 0, 0)
-    fname = path + os.sep + ac_fname
-    f = open(fname, 'w')
-    f.write(str(ac))
-    f.close()
 
-        # -- write stg
-    stg_fname = calc_tile.construct_stg_file_name(center_global)
-    stg_io.uninstall_ours(path, stg_fname, OUR_MAGIC)
-    stg = open(path + stg_fname, "a")
-    stg.write(stg_io.delimiter_string(OUR_MAGIC, True) + "\n# do not edit below this line\n#\n")
+    stg_manager = stg_io2.STG_Manager(path_to_scenery, OUR_MAGIC, uninstall=True)
 
-    stg.write("OBJECT_STATIC %s %1.5f %1.5f %1.2f %g\n" % (ac_fname, center_global.lon, center_global.lat, 0, 0))
+    # -- write stg
+    ac = roads.create_ac(elev)
+    file_name = 'roads%07i' % calc_tile.tile_index(center_global)
+    path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, 0, 0)
+    stg_manager.write()
 
-    stg.write(stg_io.delimiter_string(OUR_MAGIC, False) + "\n")
-    stg.close()
-
+    # TODO: write roads xml
+#    f = open(path_to_stg + ac_file_name + '.ac', 'w')
+#    f.write(str(ac))
+#    f.close()
+    ac.write_to_file(path_to_stg + file_name)
+    write_xml(path_to_stg, file_name, 'roads')
     #elev.save_cache()
+
+
 if __name__ == "__main__":
     main()
