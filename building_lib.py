@@ -53,13 +53,27 @@ class random_number(object):
 def random_level_height(place="city"):
     """ Calculates the height for each level of a building based on place and random factor"""
     #FIXME: other places (e.g. village)
+
     return random.triangular(parameters.BUILDING_CITY_LEVEL_HEIGHT_LOW
                           , parameters.BUILDING_CITY_LEVEL_HEIGHT_HEIGH
                           , parameters.BUILDING_CITY_LEVEL_HEIGHT_MODE)
 
-def random_levels(place="city"):
+def random_levels(place="city", dist=None):
     """ Calculates the number of building levels based on place and random factor"""
     #FIXME: other places
+    if dist:
+        dist *= 2.
+        if 1000. > dist:
+            E = 15.
+        elif 2000. > dist:
+            E = (dist - 1000)/1000.* 12 + 3
+        else:
+            E = 3.
+
+        levels = int(round(random.gauss(E, 0.3*E)))
+#        print "dist %5.1f  %i levels" % (dist, levels)
+        return levels
+
     return int(round(random.triangular(parameters.BUILDING_CITY_LEVELS_LOW
                           , parameters.BUILDING_CITY_LEVELS_HEIGH
                           , parameters.BUILDING_CITY_LEVELS_MODE)))
@@ -257,6 +271,7 @@ def compute_height_and_levels(b):
     else:
         # -- neither height nor levels given: use random levels
         b.levels = random_levels()
+        #b.levels = random_levels(dist=b.anchor.magnitude())  # gives CBD-like distribution
 
         if b.area < parameters.BUILDING_MIN_AREA:
             b.levels = min(b.levels, 2)
