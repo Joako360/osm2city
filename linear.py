@@ -71,7 +71,7 @@ class LinearObject(object):
             our_node = np.array(self.center.coords[-1])
             left[-1] = our_node + self.normals[-1] * offset
             right[-1] = our_node - self.normals[-1] * offset
-            right = copy.copy(right[::-1])
+#            right = copy.copy(right[::-1])
 
             left = shg.LineString(left)
             right = shg.LineString(right)
@@ -156,7 +156,7 @@ class LinearObject(object):
             for the_node in left.coords:
                 e = elev(vec2d(the_node[0], the_node[1])) + self.AGL
                 obj.node(-the_node[1], e, -the_node[0])
-#                    ac.add_label('l'+str(ni), -p[1], e+5, -p[0], scale=5)
+                ac.add_label('l'+str(ni), -the_node[1], e+5, -the_node[0], scale=5)
                 ni += 1
         #except
         else:
@@ -169,7 +169,7 @@ class LinearObject(object):
             for the_node in right.coords:
                 e = elev(vec2d(the_node[0], the_node[1])) + self.AGL
                 obj.node(-the_node[1], e, -the_node[0])
-#                    ac.add_label('l'+str(ni), -p[1], e+5, -p[0], scale=5)
+                ac.add_label('l'+str(ni), -the_node[1], e+5, -the_node[0], scale=5)
                 ni += 1
         #except
         else:
@@ -203,8 +203,8 @@ class LinearObject(object):
             obj.face(face[::-1])
 
     def write_to(self, obj, elev, ac=None, left=None, right=None, z=None):
-        #self._write_to(obj, elev, self.left, self.right, ac=ac)
-        #return True
+#        self._write_to(obj, elev, self.left, self.right, ac=ac)
+#        return True
 
         """need adjacency info
            left: node index of left
