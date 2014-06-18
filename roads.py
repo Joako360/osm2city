@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Ugly, highly experimental code.
+Experimental code.
 
 Created on Sun Sep 29 10:42:12 2013
 
@@ -44,6 +44,9 @@ Now each way's end node is either intersection or dead-end.
 
 Joining:
 
+required graph functions:
+- find neighbours
+-
 """
 
 import scipy.interpolate
@@ -92,6 +95,7 @@ class Roads(objectlist.ObjectList):
 
     def __init__(self, transform):
         super(Roads, self).__init__(transform)
+        self.is_bridge = False
 
     def store_uncategorized(self, way, nodes_dict):
         pass
@@ -115,13 +119,15 @@ class Roads(objectlist.ObjectList):
         except:
             access = 'yes'
 
-        width=9
-        tex_y0=0.5
-        tex_y1=0.75
+        width = 9
+        tex_y0 = 0.5
+        tex_y1 = 0.75
         AGL_ofs = 0.
         #if way.tags.has_key('layer'):
         #    AGL_ofs = 20.*float(way.tags['layer'])
-        if way.tags.has_key('highway'):
+        self.is_bridge ==  "bridge" in way.tags
+
+        if 'highway' in way.tags:
             road_type = way.tags['highway']
             if road_type == 'motorway' or road_type == 'motorway_link':
                 prio = 5
@@ -135,7 +141,7 @@ class Roads(objectlist.ObjectList):
                 prio = 1
             elif road_type == 'service' and access:
                 prio = None
-        elif way.tags.has_key('railway'):
+        elif 'railway' in way.tags:
             if way.tags['railway'] in ['rail']:
                 prio = 6
                 width = 2.87
@@ -158,9 +164,6 @@ class Roads(objectlist.ObjectList):
         road = LineObject(self.transform, way.osm_id, way.tags, way.refs, nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
         road.typ = prio
         self.objects.append(road)
-
-    def __len__(self):
-        return len(self.objects)
 
     def create_ac(self, elev):
         ac = ac3d.Writer(tools.stats, show_labels=False)
@@ -205,12 +208,12 @@ class Roads(objectlist.ObjectList):
         """
         logging.info('Finding intersections...')
         self.intersections = []
-        attached_ways = {} # a dict: for each node hold a list of attached ways
+        self.attached_ways = {} # a dict: for each node hold a list of attached ways
         for road in self.objects:
             for ref in road.refs:
                 try:
-                    attached_ways[ref].append(road)
-                    if len(attached_ways[ref]) == 2:
+                    self.attached_ways[ref].append(road)
+                    if len(self.attached_ways[ref]) == 2:
                         # -- check if ways are actually distinct before declaring
                         #    an intersection?
                         # not an intersection if
@@ -218,11 +221,11 @@ class Roads(objectlist.ObjectList):
                         # easier?: only 2 ways, at least one node is middle node
                         self.intersections.append(ref)
                 except KeyError:
-                    attached_ways[ref] = [road]  # initialize node
+                    self.attached_ways[ref] = [road]  # initialize node
         logging.info('Done.')
 
         if 0:
-            for key, value in attached_ways.items():
+            for key, value in self.attached_ways.items():
                 if len(value) > 1:
                     print key
                     for way in value:
