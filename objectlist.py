@@ -6,11 +6,11 @@ Created on 15.06.2014
 import logging
 from __builtin__ import max
 
+
 class ObjectList(object):
     '''
-    Class for storing a List  OSM Objects 
+    Class for storing a List  OSM Objects
     '''
-
 
     def __init__(self, transform):
         '''
@@ -28,12 +28,11 @@ class ObjectList(object):
         self.min_max_scanned = True
         for node in nodes.values():
             #logging.debug('%s %.4f %.4f', node.osm_id, node.lon, node.lat)
-                self.maxlon = max(self.maxlon,node.lon)
-                self.minlon = min(self.minlon,node.lon)
-                self.maxlat = max(self.maxlat,node.lat)
-                self.minlat = min(self.minlat,node.lat)
+                self.maxlon = max(self.maxlon, node.lon)
+                self.minlon = min(self.minlon, node.lon)
+                self.maxlat = max(self.maxlat, node.lat)
+                self.minlat = min(self.minlat, node.lat)
         logging.debug("")
 
     def __len__(self):
         return len(self.objects)
-
