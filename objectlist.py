@@ -25,6 +25,7 @@ class ObjectList(object):
         self.min_max_scanned = False
 
     def _process_nodes(self, nodes):
+        self.nodes_dict = nodes
         self.min_max_scanned = True
         for node in nodes.values():
             #logging.debug('%s %.4f %.4f', node.osm_id, node.lon, node.lat)
@@ -36,3 +37,7 @@ class ObjectList(object):
 
     def __len__(self):
         return len(self.objects)
+
+    def __iter__(self):
+        for the_object in self.objects:
+            yield the_object
