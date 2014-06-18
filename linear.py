@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import math
 import copy
 
-class LineObject(object):
+class LinearObject(object):
     """
     generic linear feature, base class for road, railroad, bridge etc.
     - source is a center line (OSM way)

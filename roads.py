@@ -66,7 +66,7 @@ import math
 import calc_tile
 import os
 import ac3d
-from linear import LineObject
+from linear import LinearObject
 
 import logging
 import osmparser
@@ -79,7 +79,7 @@ OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark edits by osm2platforms
 def no_transform((x, y)):
     return x, y
 
-class Road(LineObject):
+class Road(LinearObject):
     """ATM unused"""
     def __init__(self, transform, osm_id, tags, refs, nodes_dict):
         super(Road, self).__init__(transform, osm_id, tags, refs, nodes_dict)
@@ -161,7 +161,7 @@ class Roads(objectlist.ObjectList):
             return
 
         #print "(accepted)"
-        road = LineObject(self.transform, way.osm_id, way.tags, way.refs, nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
+        road = LinearObject(self.transform, way.osm_id, way.tags, way.refs, nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
         road.typ = prio
         self.objects.append(road)
 
