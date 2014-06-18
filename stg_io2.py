@@ -175,6 +175,19 @@ def delimiter_string(our_magic, is_start):
     return delimiter + our_magic + '\n'
 
 
+def quick_stg_line(path_to_scenery, ac_fname, position, elevation, heading, show=True):
+    """debug."""
+    stg_path = calc_tile.construct_path_to_stg(path_to_scenery, position)
+    stg_fname = calc_tile.construct_stg_file_name(position)
+    stg_line = "OBJECT_STATIC %s %1.7f %1.7f %1.2f %g\n" % (ac_fname, position.lon, position.lat, elevation, heading)
+    if show == 1 or show == 3:
+        print stg_path + stg_fname
+    if show == 2 or show == 3:
+        print stg_line
+#        print "%s\n%s" % (stg_path + stg_fname, stg_line)
+    return stg_path, stg_fname, stg_line
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     OUR_MAGIC = "osm2test"

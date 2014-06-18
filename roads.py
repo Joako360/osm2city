@@ -265,17 +265,6 @@ class Roads(object):
         """
         pass
 
-def quick_stg_line(ac_fname, position, elevation, heading, show=True):
-    """debug."""
-    stg_path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, position)
-    stg_fname = calc_tile.construct_stg_file_name(position)
-    stg_line = "OBJECT_STATIC %s %1.7f %1.7f %1.2f %g\n" % (ac_fname, position.lon, position.lat, elevation, heading)
-    if show == 1 or show == 3:
-        print stg_path + stg_fname
-    if show == 2 or show == 3:
-         print stg_line
-#        print "%s\n%s" % (stg_path + stg_fname, stg_line)
-    return stg_path, stg_fname, stg_line
 
 def scale_test(transform, elev):
     pass
