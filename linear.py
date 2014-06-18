@@ -27,11 +27,11 @@ class LinearObject(object):
       - 2.5d, 3d, embankment
     """
     def __init__(self, transform, osm_id, tags, refs, nodes_dict, width=9, tex_y0=0.5, tex_y1=0.75, AGL=0.5):
-        self.joints = np.arange(4) # node indices of joints. 8 if 2.5d.
+        self.joints = np.arange(4)  # node indices of joints. 8 if 2.5d.
         self.start_joint = False
         self.end_joint = False
         self.width = width
-        self.AGL = AGL # drape distance above terrain
+        self.AGL = AGL  # drape distance above terrain
         self.osm_id = osm_id
         self.refs = refs
         self.tags = tags
@@ -39,26 +39,26 @@ class LinearObject(object):
         nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
         self.center = shg.LineString(nodes)
         self.compute_angle_etc()
-        self.compute_offset(self.width/2.)
+        self.left, self.right = self.compute_offset(self.width / 2.)
 
-        self.tex_y0 = tex_y0 # determines which part of texture we use
+        self.tex_y0 = tex_y0  # determines which part of texture we use
         self.tex_y1 = tex_y1
 
     def compute_offset(self, offset):
 
         if 0:
             # -- shapely's parallel_offset sometimes introduces extra nodes??
-            self.left  = self.center.parallel_offset(offset, 'left', resolution=0, join_style=2, mitre_limit=100.0)
-            self.right = self.center.parallel_offset(offset, 'right', resolution=0, join_style=2, mitre_limit=100.0)
+            left  = self.center.parallel_offset(offset, 'left', resolution=0, join_style=2, mitre_limit=100.0)
+            right = self.center.parallel_offset(offset, 'right', resolution=0, join_style=2, mitre_limit=100.0)
         else:
             offset += 1.
             n = len(self.center.coords)
-            left = np.zeros((n,2))
-            right = np.zeros((n,2))
+            left = np.zeros((n, 2))
+            right = np.zeros((n, 2))
             our_node = np.array(self.center.coords[0])
             left[0] = our_node + self.normals[0] * offset
             right[0] = our_node - self.normals[0] * offset
-            for i in range(1,n-1):
+            for i in range(1, n-1):
                 mean_normal = (self.normals[i-1] + self.normals[i])
                 l = (mean_normal[0]**2 + mean_normal[1]**2)**0.5
                 mean_normal /= l
@@ -71,20 +71,12 @@ class LinearObject(object):
             our_node = np.array(self.center.coords[-1])
             left[-1] = our_node + self.normals[-1] * offset
             right[-1] = our_node - self.normals[-1] * offset
-            self.left = shg.LineString(left)
             right = copy.copy(right[::-1])
-            self.right = shg.LineString(right)
 
-            if 0 and self.osm_id == 112390391:
-                r = copy.copy(right[::-1])
-                self.right1 = shg.LineString(r)
-                for n in self.right1.coords:
-                    print n,
-                print "--"
-                self.right2 = shg.LineString(right)
-                for n in self.right2.coords:
-                    print n,
+            left = shg.LineString(left)
+            right = shg.LineString(right)
 
+            return left, right
 
     def plot(self):
         return
