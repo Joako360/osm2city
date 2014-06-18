@@ -136,9 +136,80 @@ class LinearObject(object):
         self.normals[-1] = self.normals[-2]
         self.angle[-1] = self.angle[-2]
 
+    def _write_to(self, obj, elev, left, right, n_nodes=None, left_z=None, right_z=None, ac=None):
+        """given left and right LineStrings, write quads
+           Use height z if given, probe elev otherwise
+        """
+#        try:
+        try:
+            n_nodes = len(left.coords)
+        except AttributeError:
+            try:
+                n_nodes = len(right.coords)
+            except AttributeError:
+                if n_nodes == None:
+                    raise ValueError("Neither left nor right are iterable: need n_nodes.")
 
-    def write_to(self, obj, elev, ac=None):
-        """need adjacency info"""
+        ni = 0
+        if 1:
+            node0_l = obj.next_node_index()
+            for the_node in left.coords:
+                e = elev(vec2d(the_node[0], the_node[1])) + self.AGL
+                obj.node(-the_node[1], e, -the_node[0])
+#                    ac.add_label('l'+str(ni), -p[1], e+5, -p[0], scale=5)
+                ni += 1
+        #except
+        else:
+            node0_l = left
+        nodes_l = range(node0_l, node0_l + n_nodes)
+
+        # -- right
+        if 1:
+            node0_r = obj.next_node_index()
+            for the_node in right.coords:
+                e = elev(vec2d(the_node[0], the_node[1])) + self.AGL
+                obj.node(-the_node[1], e, -the_node[0])
+#                    ac.add_label('l'+str(ni), -p[1], e+5, -p[0], scale=5)
+                ni += 1
+        #except
+        else:
+            node0_r = right
+        nodes_r = range(node0_r, node0_r + n_nodes)
+
+
+          # make left node index list
+
+
+
+        # make left node index list
+        # write right nodes
+        # make right node index list
+
+        # write textured quads SURF
+                # -- write face as series of quads. Works OK, but produces more
+                #    SURFs in .ac.
+        scale = 30.
+        l = node0_l
+        r = node0_r
+        for i in range(n_nodes-1):
+            xl = self.dist[i]/scale
+            xr = self.dist[i+1]/scale
+            face = [ (l,   xl, self.tex_y0),
+                     (l+1, xr, self.tex_y0),
+                     (r+1, xr, self.tex_y1),
+                     (r,   xl, self.tex_y1) ]
+            l += 1
+            r += 1
+            obj.face(face[::-1])
+
+    def write_to(self, obj, elev, ac=None, left=None, right=None, z=None):
+        #self._write_to(obj, elev, self.left, self.right, ac=ac)
+        #return True
+
+        """need adjacency info
+           left: node index of left
+           right:
+        """
         # options:
         # - each way has two ends.
         #   store left neighbour? communicate with that one?
