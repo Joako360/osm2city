@@ -68,6 +68,7 @@ from linear import LineObject
 import logging
 import osmparser
 import stg_io2
+import objectlist
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark edits by osm2platforms
 
@@ -83,35 +84,14 @@ class Road(LineObject):
         if tags.has_key('railway'):
             self.railway = tags['railway'] in ['rail', 'tram']
 
-class Roads(object):
+class Roads(objectlist.ObjectList):
     valid_node_keys = []
 
     #req_and_valid_keys = {"valid_way_keys" : ["highway"], "req_way_keys" : ["highway"]}
     req_keys = ['highway', 'railway']
 
     def __init__(self, transform):
-        self.roads = []
-        self.transform = transform
-        self.minlon = 181.
-        self.maxlon = -181.
-        self.minlat = 91.
-        self.maxlat = -91.
-        self.min_max_scanned = False
-
-    def _process_nodes(self, nodes):
-        self.nodes_dict = nodes
-        for node in nodes.values():
-            #logging.debug('%s %.4f %.4f', node.osm_id, node.lon, node.lat)
-            #self.coord_dict[node.osm_id] = node
-            if node.lon > self.maxlon:
-                self.maxlon = node.lon
-            if node.lon < self.minlon:
-                self.minlon = node.lon
-            if node.lat > self.maxlat:
-                self.maxlat = node.lat
-            if node.lat < self.minlat:
-                self.minlat = node.lat
-        logging.debug("")
+        super(Roads, self).__init__(transform)
 
     def store_uncategorized(self, way, nodes_dict):
         pass
@@ -177,17 +157,17 @@ class Roads(object):
         #print "(accepted)"
         road = LineObject(self.transform, way.osm_id, way.tags, way.refs, nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
         road.typ = prio
-        self.roads.append(road)
+        self.objects.append(road)
 
     def __len__(self):
-        return len(self.roads)
+        return len(self.objects)
 
     def create_ac(self, elev):
         ac = ac3d.Writer(tools.stats, show_labels=False)
 
         # -- debug: write individual .ac for every road
         if 0:
-            for i, rd in enumerate(self.roads[:]):
+            for i, rd in enumerate(self.objects[:]):
                 if rd.osm_id != 205546090: continue
                 ac = ac3d.Writer(tools.stats)
                 obj = ac.new_object('roads_%s' % rd.osm_id, 'tex/roads.png')
@@ -205,7 +185,7 @@ class Roads(object):
         # MATERIAL "" rgb 1 1 1 amb 1 1 1 emis 0.4 0.2 0.05 spec 0.5 0.5 0.5 shi 64 trans 0
 
         obj = ac.new_object('roads', 'tex/roads.png', default_swap_uv=True)
-        for rd in self.roads:
+        for rd in self.objects:
             rd.write_to(obj, elev, ac)
 
         for ref in self.intersections:
@@ -226,7 +206,7 @@ class Roads(object):
         logging.info('Finding intersections...')
         self.intersections = []
         attached_ways = {} # a dict: for each node hold a list of attached ways
-        for road in self.roads:
+        for road in self.objects:
             for ref in road.refs:
                 try:
                     attached_ways[ref].append(road)
@@ -375,7 +355,7 @@ def main():
         col = ['0.5', '0.75', 'y', 'g', 'r', 'b', 'k']
         lw    = [1, 1, 1, 1.2, 1.5, 2, 1]
         lw_w  = [1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
-        for r in roads.roads:
+        for r in roads:
             a = np.array(r.center.coords)
             #np.array([transform.toLocal((n.lon, n.lat)) for n in r.nodes])
             plt.plot(a[:,0], a[:,1], color=col[r.typ], linewidth=lw[r.typ])
@@ -395,7 +375,7 @@ def main():
     logging.info("done.")
     logging.info("ways: %i", len(roads))
 
-    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, uninstall=True)
+    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, overwrite=True)
 
     # -- write stg
     ac = roads.create_ac(elev)
