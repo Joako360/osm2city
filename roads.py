@@ -127,10 +127,12 @@ class Roads(objectlist.ObjectList):
         AGL_ofs = 0.
         #if way.tags.has_key('layer'):
         #    AGL_ofs = 20.*float(way.tags['layer'])
-
-        if 0:
-            self.is_bridge == "bridge" in way.tags
-            self.is_bridge = True
+        #print way.tags
+        #bla
+#        if "bridge" in way.tags: print "bb"
+        self.is_bridge = "bridge" in way.tags
+#        if self.is_bridge: bla
+            #self.is_bridge = True
 
         if 'highway' in way.tags:
             road_type = way.tags['highway']
@@ -170,11 +172,12 @@ class Roads(objectlist.ObjectList):
             road = LinearBridge(self.transform, self.elev, way.osm_id, way.tags, way.refs, nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
         else:
             road = LinearObject(self.transform, way.osm_id, way.tags, way.refs, nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
+
         road.typ = prio
         self.objects.append(road)
 
     def create_ac(self):
-        ac = ac3d.Writer(tools.stats, show_labels=True)
+        ac = ac3d.Writer(tools.stats, show_labels=False)
 
         # -- debug: write individual .ac for every road
         if 0:
@@ -379,7 +382,7 @@ def main():
         #plt.show()
         plt.savefig('roads.eps')
 
-    roads.objects = [roads.objects[0]]
+#    roads.objects = [roads.objects[0]]
 
     #roads.find_intersections()
     #roads.cleanup_intersections()

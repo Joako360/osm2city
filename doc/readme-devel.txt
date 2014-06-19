@@ -1,12 +1,21 @@
 next
 ----
-- line.py
+x linear.py
   if line is ready,
     - roads
     - railways
     - bridges are rather simple
   - place lots along lines
   - infrastructure for quarters? Residential, commercial, industrial, harbor, train station
+
+night lighting
+--------------
+London: vimeo.com/66807202
+more diverse. White, red yellow dot lights
+streets only light orange
+some blue remains in facades -- but thats maybe not completely at night?
+facades high up white light
+
 
 - postgis? get osm2pgsql
 x get roofs back

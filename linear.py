@@ -120,7 +120,7 @@ class LinearObject(object):
         self.vectors = np.zeros((n-1, 2))
         self.normals = np.zeros((n, 2))
         self.angle = np.zeros(n)
-        self.segment_len = np.zeros(n-1)
+        self.segment_len = np.zeros(n)  # segment_len[-1] = 0, so loops over range(n) wont fail
         self.dist = np.zeros(n)
         cumulated_distance = 0.
         for i in range(n-1):
@@ -217,6 +217,9 @@ class LinearObject(object):
            left: node index of left
            right:
         """
+        self._write_to(obj, elev, self.left, self.right,
+                                  self.tex_y0, self.tex_y1, ac=ac)
+        return True
         # options:
         # - each way has two ends.
         #   store left neighbour? communicate with that one?
