@@ -13,6 +13,8 @@ Created on May 27, 2013
 import argparse
 import sys
 import types
+from os.path import os
+from vec2d import vec2d
 
 #=============================================================================
 # PARAMETERS FOR ALL osm2city MODULES
@@ -187,6 +189,19 @@ def set_parameters(param_dict):
                 print "Parameter", k, "has an unknown type/value:", param_dict[k]
         else:
             print "Ignoring unknown parameter", k
+
+
+def getOSMFName():
+    """
+    Returns the Path to the OSM File
+    """
+    return PREFIX + os.sep + OSM_FILE
+
+
+def getCenterGlobal():
+    cmin = vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
+    cmax = vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
+    return (cmin + cmax) * 0.5
 
 
 def show():
