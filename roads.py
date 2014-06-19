@@ -67,6 +67,7 @@ import calc_tile
 import os
 import ac3d
 from linear import LinearObject
+from linear_bridge import LinearBridge
 
 import logging
 import osmparser
@@ -93,8 +94,9 @@ class Roads(objectlist.ObjectList):
     #req_and_valid_keys = {"valid_way_keys" : ["highway"], "req_way_keys" : ["highway"]}
     req_keys = ['highway', 'railway']
 
-    def __init__(self, transform):
+    def __init__(self, transform, elev):
         super(Roads, self).__init__(transform)
+        self.elev = elev
         self.is_bridge = False
 
     def store_uncategorized(self, way, nodes_dict):
@@ -125,7 +127,10 @@ class Roads(objectlist.ObjectList):
         AGL_ofs = 0.
         #if way.tags.has_key('layer'):
         #    AGL_ofs = 20.*float(way.tags['layer'])
-        self.is_bridge ==  "bridge" in way.tags
+
+        if 0:
+            self.is_bridge == "bridge" in way.tags
+            self.is_bridge = True
 
         if 'highway' in way.tags:
             road_type = way.tags['highway']
@@ -161,21 +166,24 @@ class Roads(objectlist.ObjectList):
             return
 
         #print "(accepted)"
-        road = LinearObject(self.transform, way.osm_id, way.tags, way.refs, nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
+        if self.is_bridge:
+            road = LinearBridge(self.transform, self.elev, way.osm_id, way.tags, way.refs, nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
+        else:
+            road = LinearObject(self.transform, way.osm_id, way.tags, way.refs, nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
         road.typ = prio
         self.objects.append(road)
 
-    def create_ac(self, elev):
-        ac = ac3d.Writer(tools.stats, show_labels=False)
+    def create_ac(self):
+        ac = ac3d.Writer(tools.stats, show_labels=True)
 
         # -- debug: write individual .ac for every road
         if 0:
             for i, rd in enumerate(self.objects[:]):
                 if rd.osm_id != 205546090: continue
-                ac = ac3d.Writer(tools.stats)
+                ac = ac3d.Writer(tools.stats, show_labels=True)
                 obj = ac.new_object('roads_%s' % rd.osm_id, 'tex/roads.png')
 
-                if not rd.write_to(obj, elev, ac): continue
+                if not rd.write_to(obj, self.elev, ac): continue
                 #print "write", rd.osm_id
                 #ac.center()
                 f = open('roads_%i_%03i.ac' % (rd.osm_id, i), 'w')
@@ -189,13 +197,14 @@ class Roads(objectlist.ObjectList):
 
         obj = ac.new_object('roads', 'tex/roads.png', default_swap_uv=True)
         for rd in self.objects:
-            rd.write_to(obj, elev, ac)
+            rd.write_to(obj, self.elev, ac)
 
-        for ref in self.intersections:
-            node = self.nodes_dict[ref]
-            x, y = self.transform.toLocal((node.lon, node.lat))
-            e = elev(vec2d(x, y)) + 5
-            ac.add_label('I', -y, e, -x, scale=10)
+        if 0:
+            for ref in self.intersections:
+                node = self.nodes_dict[ref]
+                x, y = self.transform.toLocal((node.lon, node.lat))
+                e = self.elev(vec2d(x, y)) + 5
+                ac.add_label('I', -y, e, -x, scale=10)
 
         return ac
 
@@ -332,7 +341,9 @@ def main():
     center_global = vec2d(11.38, 47.26)
     transform = coordinates.Transformation(center_global, hdg = 0)
     tools.init(transform)
-    roads = Roads(transform)
+    #elev = tools.Probe_fgelev(fake=False, auto_save_every=1000)
+    elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
+    roads = Roads(transform, elev)
 
     handler = osmparser.OSMContentHandler(valid_node_keys=[])
     source = open(osm_fname)
@@ -368,11 +379,12 @@ def main():
         #plt.show()
         plt.savefig('roads.eps')
 
-    roads.find_intersections()
-    roads.cleanup_intersections()
+    roads.objects = [roads.objects[0]]
 
-    #elev = tools.Probe_fgelev(fake=False, auto_save_every=1000)
-    elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
+    #roads.find_intersections()
+    #roads.cleanup_intersections()
+#    roads.objects = [roads.objects[0]]
+
 #    scale_test(transform, elev)
 
     logging.info("done.")
@@ -381,7 +393,7 @@ def main():
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, overwrite=True)
 
     # -- write stg
-    ac = roads.create_ac(elev)
+    ac = roads.create_ac()
     file_name = 'roads%07i' % calc_tile.tile_index(center_global)
     path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, 0, 0)
     stg_manager.write()
