@@ -131,11 +131,11 @@ class Roads(objectlist.ObjectList):
             road_type = way.tags['highway']
             if road_type == 'motorway' or road_type == 'motorway_link':
                 prio = 5
-            elif road_type == 'primary':
+            elif road_type == 'primary' or road_type == 'trunk':
                 prio = 4
             elif road_type == 'secondary':
                 prio = 3
-            elif road_type == 'tertiary':
+            elif road_type == 'tertiary' or road_type == 'unclassified':
                 prio = 2
             elif road_type == 'residential':
                 prio = 1
@@ -371,7 +371,7 @@ def main():
     roads.find_intersections()
     roads.cleanup_intersections()
 
-    #elev = tools.Probe_fgelev(fake=False, auto_save_every=1000)
+#     elev = tools.Probe_fgelev(fake=False, auto_save_every=1000)
     elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
 #    scale_test(transform, elev)
 
@@ -392,7 +392,7 @@ def main():
 #    f.close()
     ac.write_to_file(path_to_stg + file_name)
     write_xml(path_to_stg, file_name, 'roads')
-    #elev.save_cache()
+#     elev.save_cache()
 
 
 if __name__ == "__main__":
