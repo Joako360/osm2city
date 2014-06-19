@@ -27,6 +27,7 @@ class LinearObject(object):
       - 2.5d, 3d, embankment
     """
     def __init__(self, transform, osm_id, tags, refs, nodes_dict, width=9, tex_y0=0.5, tex_y1=0.75, AGL=0.5):
+        #self.transform = transform
         self.joints = np.arange(4)  # node indices of joints. 8 if 2.5d.
         self.start_joint = False
         self.end_joint = False
@@ -136,49 +137,57 @@ class LinearObject(object):
         self.normals[-1] = self.normals[-2]
         self.angle[-1] = self.angle[-2]
 
-    def _write_to(self, obj, elev, left, right, n_nodes=None, left_z=None, right_z=None, ac=None):
+    def _write_to(self, obj, elev, left, right, tex_y0, tex_y1, n_nodes=None, left_z=None,
+                  right_z=None, ac=None):
         """given left and right LineStrings, write quads
            Use height z if given, probe elev otherwise
         """
-#        try:
         try:
             n_nodes = len(left.coords)
         except AttributeError:
             try:
                 n_nodes = len(right.coords)
             except AttributeError:
-                if n_nodes == None:
+                if n_nodes is None:
                     raise ValueError("Neither left nor right are iterable: need n_nodes.")
 
+        # -- get elev
+        if left_z is not None:
+            assert(len(left_z) == n_nodes)
+
+        if right_z is not None:
+            assert(len(right_z) == n_nodes)
+
+        # -- write left nodes
         ni = 0
-        if 1:
+        try:
             node0_l = obj.next_node_index()
-            for the_node in left.coords:
-                e = elev(vec2d(the_node[0], the_node[1])) + self.AGL
+            for i, the_node in enumerate(left.coords):
+                if left_z is not None:
+                    e = left_z[i]
+                else:
+                    e = elev(vec2d(the_node[0], the_node[1])) + self.AGL
                 obj.node(-the_node[1], e, -the_node[0])
                 ac.add_label('l'+str(ni), -the_node[1], e+5, -the_node[0], scale=5)
                 ni += 1
-        #except
-        else:
+        except AttributeError:
             node0_l = left
-        nodes_l = range(node0_l, node0_l + n_nodes)
+#        nodes_l = range(node0_l, node0_l + n_nodes)
 
-        # -- right
-        if 1:
+        # -- write right nodes
+        try:
             node0_r = obj.next_node_index()
-            for the_node in right.coords:
-                e = elev(vec2d(the_node[0], the_node[1])) + self.AGL
+            for i, the_node in enumerate(right.coords):
+                if right_z is not None:
+                    e = right_z[i]
+                else:
+                    e = elev(vec2d(the_node[0], the_node[1])) + self.AGL
                 obj.node(-the_node[1], e, -the_node[0])
                 ac.add_label('l'+str(ni), -the_node[1], e+5, -the_node[0], scale=5)
                 ni += 1
-        #except
-        else:
+        except AttributeError:
             node0_r = right
-        nodes_r = range(node0_r, node0_r + n_nodes)
-
-
-          # make left node index list
-
+#        nodes_r = range(node0_r, node0_r + n_nodes)
 
 
         # make left node index list
@@ -194,18 +203,16 @@ class LinearObject(object):
         for i in range(n_nodes-1):
             xl = self.dist[i]/scale
             xr = self.dist[i+1]/scale
-            face = [ (l,   xl, self.tex_y0),
-                     (l+1, xr, self.tex_y0),
-                     (r+1, xr, self.tex_y1),
-                     (r,   xl, self.tex_y1) ]
+            face = [ (l,   xl, tex_y0),
+                     (l+1, xr, tex_y0),
+                     (r+1, xr, tex_y1),
+                     (r,   xl, tex_y1) ]
             l += 1
             r += 1
             obj.face(face[::-1])
+        return node0_l, node0_r
 
     def write_to(self, obj, elev, ac=None, left=None, right=None, z=None):
-#        self._write_to(obj, elev, self.left, self.right, ac=ac)
-#        return True
-
         """need adjacency info
            left: node index of left
            right:
