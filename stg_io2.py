@@ -68,16 +68,19 @@ class STG_File(object):
         line = "OBJECT_STATIC %s %1.5f %1.5f %1.2f %g\n" % (ac_file_name, lon_lat.lon, lon_lat.lat, elev, hdg)
         self.our_list.append(line)
         logging.debug(self.file_name + ':' + line)
+        self.make_path_to_stg()
         return self.path_to_stg
 
-    def write(self):
-        """write others and ours to file"""
+    def make_path_to_stg(self):
         try:
             os.makedirs(self.path_to_stg)
         except OSError, e:
             if e.errno != 17:
                 logging.exception("Unable to create path to output %s", self.path_to_stg)
 
+    def write(self):
+        """write others and ours to file"""
+        self.make_path_to_stg()
         stg = open(self.file_name, 'w')
         for line in self.other_list:
             stg.write(line)
