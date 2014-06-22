@@ -61,6 +61,23 @@ class LinearBridge(linear.LinearObject):
 
     def prep_height(self):
         """Set deck shape depending on elevation."""
+        # deck slope more or less continuous!
+        # d2z/dx2 limit
+        # - put some constraints: min clearance
+        # - adjust z to meet constraints
+        # - minimize cost function?
+        #   -
+        # assume linear
+        # test if clearance at mid-span is sufficient
+        # if not
+        #   if embankment:
+        #     raise end-node
+        #   else:
+        #     try deck-shape poly
+        #     deck slope OK?
+        #     if not: raise end-node
+        #
+        #
         h0 = self.elev(0.)
         hm = self.elev(0.5)
         h1 = self.elev(1.)
