@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 import math
 import copy
 
+import warnings
+warnings.filterwarnings('error')
+
 class LinearObject(object):
     """
     generic linear feature, base class for road, railroad, bridge etc.
@@ -36,11 +39,15 @@ class LinearObject(object):
         self.osm_id = osm_id
         self.refs = refs
         self.tags = tags
+        self.nodes_dict = nodes_dict
         osm_nodes = [nodes_dict[r] for r in refs]
         nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
         self.center = shg.LineString(nodes)
-        self.compute_angle_etc()
-        self.left, self.right = self.compute_offset(self.width / 2.)
+        try:
+            self.compute_angle_etc()
+            self.left, self.right = self.compute_offset(self.width / 2.)
+        except Warning, reason:
+            print "Warning in OSM_ID %i: %s" % (self.osm_id, reason)
 
         self.tex_y0 = tex_y0  # determines which part of texture we use
         self.tex_y1 = tex_y1
