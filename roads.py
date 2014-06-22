@@ -97,7 +97,7 @@ class Roads(objectlist.ObjectList):
     def __init__(self, transform, elev):
         super(Roads, self).__init__(transform)
         self.elev = elev
-        self.is_bridge = False
+        self.bridges = []
 
     def store_uncategorized(self, way, nodes_dict):
         pass
@@ -129,10 +129,6 @@ class Roads(objectlist.ObjectList):
         #    AGL_ofs = 20.*float(way.tags['layer'])
         #print way.tags
         #bla
-#        if "bridge" in way.tags: print "bb"
-        self.is_bridge = "bridge" in way.tags
-#        if self.is_bridge: bla
-            #self.is_bridge = True
 
         if 'highway' in way.tags:
             road_type = way.tags['highway']
@@ -168,8 +164,10 @@ class Roads(objectlist.ObjectList):
             return
 
         #print "(accepted)"
-        if self.is_bridge:
+        is_bridge = "bridge" in way.tags
+        if is_bridge:
             road = LinearBridge(self.transform, self.elev, way.osm_id, way.tags, way.refs, nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
+            self.bridges.append(road)
         else:
             road = LinearObject(self.transform, way.osm_id, way.tags, way.refs, nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
 
@@ -384,7 +382,7 @@ def main():
 
 #    roads.objects = [roads.objects[0]]
 
-    #roads.find_intersections()
+    roads.find_intersections()
     #roads.cleanup_intersections()
 #    roads.objects = [roads.objects[0]]
 
