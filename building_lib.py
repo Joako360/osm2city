@@ -457,10 +457,9 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         else:
             facade_requires.append('compat:roof-flat')
 
-
         # -- determine facade and roof textures
         logging.debug("___find facade")
-        b.facade_texture = facades.find_matching(facade_requires, b.height, b.longest_edge_len)
+        b.facade_texture = facades.find_matching(facade_requires, b.tags, b.height, b.longest_edge_len)
         logging.debug("__done" + str(b.facade_texture))
         if not b.facade_texture:
             tools.stats.skipped_texture += 1
@@ -481,7 +480,6 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         new_buildings.append(b)
 
     return new_buildings
-
 
 
 def write_and_count_vert(out, b, elev, offset, tile_elev):

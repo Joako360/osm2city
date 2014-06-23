@@ -137,14 +137,32 @@ class TextureManager(object):
 
 
 class FacadeManager(TextureManager):
-    def find_matching(self, requires, height, width):
+    def find_matching(self, requires, tags, height, width):
         candidates = self.find_candidates(requires, height, width)
         if len(candidates) == 0:
             logging.warn("no matching texture for %1.f m x %1.1f m <%s>" % (height, width, str(requires)))
             return None
-        return candidates[random.randint(0, len(candidates)-1)]
+        ranked_list = self.rank_candidates(candidates, tags)
+        return ranked_list[random.randint(0, len(ranked_list) - 1)]
 
-    def find_candidates(self, requires, height, width):
+    def rank_candidates(self, candidates, tags):
+        ranked_list = []
+        for t in candidates:
+            match = 0
+            for tag in tags:
+                if(tag == 'building:material'):
+                    val = tags[tag]
+                    new_key = ("facade:%s:%s") % (tag, val)
+                    if new_key in t.provides:
+                        match += 1
+            ranked_list.append([match, t])
+#         b = ranked_list[:,0]
+        ranked_list.sort(key=lambda tup: tup[0], reverse=True)
+        max_val = ranked_list[0][0]
+        if(max_val > 0):
+            logging.info("Max Rank %d" % max_val)
+        return [t[1] for t in ranked_list if t[0] >= max_val]
+ef find_candidates(self, requires, height, width):
         candidates = TextureManager.find_candidates(self, requires)
 #        print "\ncands", [str(t.filename) for t in candidates]
         # -- check height
@@ -393,6 +411,15 @@ def init():
                  'compat:roof-flat']))
 #                            provides=['shape:urban','shape:residential','age:modern','age:old',
 #                                     'compat:roof-flat','compat:roof-pitched']))
+    facades.append(Texture('tex.src/castle.jpg',
+       h_size_meters=48, h_splits=[512, 1024, 1536, 2048], h_can_repeat=True,
+       v_size_meters=48, v_splits=[512, 1024, 1536, 2048], v_can_repeat=False,
+       has_roof_section=False,
+       height_min=1.,
+       provides=['building:material:stone',
+                 'compat:roof-gabled',
+                 'compat:roof-flat',
+                 'compat:roof-hipped']))
 
 
 #    roofs.append(Texture('tex.src/roof_tiled_black',
