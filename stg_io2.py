@@ -17,7 +17,7 @@ import logging
 
 import shapely.geometry as shg
 import os
-#import osm2city
+import osm2city
 import tools
 from vec2d import vec2d
 import calc_tile

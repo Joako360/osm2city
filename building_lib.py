@@ -212,8 +212,8 @@ def is_static_object_nearby(b, X, static_tree):
     nearby = [x for x in nearby if x]
 
     if len(nearby):
-        for i in range(b.nnodes_outer):
-            tools.stats.debug2.write("%g %g\n" % (X[i,0], X[i,1]))
+#        for i in range(b.nnodes_outer):
+#            tools.stats.debug2.write("%g %g\n" % (X[i,0], X[i,1]))
 #            print "nearby:", nearby
 #            for n in nearby:
 #                print "-->", s[n]
