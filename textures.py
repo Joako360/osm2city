@@ -162,7 +162,8 @@ class FacadeManager(TextureManager):
         if(max_val > 0):
             logging.info("Max Rank %d" % max_val)
         return [t[1] for t in ranked_list if t[0] >= max_val]
-ef find_candidates(self, requires, height, width):
+
+    def find_candidates(self, requires, height, width):
         candidates = TextureManager.find_candidates(self, requires)
 #        print "\ncands", [str(t.filename) for t in candidates]
         # -- check height
