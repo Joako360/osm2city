@@ -186,7 +186,7 @@ class Roads(objectlist.ObjectList):
         if 0:
             for i, rd in enumerate(self.objects[:]):
                 if rd.osm_id != 205546090: continue
-                ac = ac3d.Writer(tools.stats, show_labels=True)
+                ac = ac3d.Writer(tools.stats, show_labels=False)
                 obj = ac.new_object('roads_%s' % rd.osm_id, 'tex/roads.png')
 
                 if not rd.write_to(obj, self.elev, ac): continue
