@@ -276,8 +276,7 @@ def main():
         # plt.show()
         plt.savefig('platforms.eps')
 
-#    elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
-    elev = tools.Probe_fgelev()
+    elev = tools.getInterpolator()
     ac = platforms.write(elev)
     ac_fname = 'platforms%07i.ac' % calc_tile.tile_index(center_global)
     logging.info("done.")

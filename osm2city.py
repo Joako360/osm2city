@@ -619,7 +619,7 @@ if __name__ == "__main__":
     print tools.transform.toGlobal(cmin), tools.transform.toGlobal(cmax)
 
     logging.info("reading elevation data")
-    elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
+    elev = tools.getInterpolator()
     #elev.write("elev.out.small", 4)
     #sys.exit(0)
     logging.debug("height at origin" + str(elev(vec2d(0,0))))
@@ -788,6 +788,7 @@ if __name__ == "__main__":
         logging.info("uninstall done.")
         sys.exit(0)
 
+    elev.save_cache()
     stg_manager.write()
     tools.stats.print_summary()
     logging.info("done.")

@@ -112,6 +112,11 @@ class Interpolator(object):
         X = np.vstack((x.ravel(), y.ravel(), zero, zero, h.ravel())).transpose()
         np.savetxt(filename, X, header=header, fmt=["%1.8f", "%1.8f", "%g", "%g", "%1.2f"])
 
+    def save_cache(self):
+        """To keep the interface consistent"""
+        pass
+
+
 class Probe_fgelev(object):
     """A drop-in replacement for Interpolator. Probes elevation via fgelev.
        Performance (can only test on OSX at the moment) about 17k/sec if there
@@ -644,6 +649,14 @@ def init(new_transform):
     global stats
     stats = Stats()
     print "tools: init", stats
+
+
+def getInterpolator():
+    if(True):
+        return Probe_fgelev()
+    else:
+        return Interpolator()
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

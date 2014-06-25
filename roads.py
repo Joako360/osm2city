@@ -334,16 +334,12 @@ def main():
 
     #parameters.show()
 
-    osm_fname = parameters.PREFIX + os.sep + parameters.OSM_FILE
-
-    cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
-    cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
-    center_global = (cmin + cmax)*0.5
-    center_global = vec2d(11.38, 47.26)
-    transform = coordinates.Transformation(center_global, hdg = 0)
+    center_global = parameters.getCenterGlobal()
+    osm_fname = parameters.getOSMFName()
+    transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(transform)
-    #elev = tools.Probe_fgelev(fake=False, auto_save_every=1000)
-    elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
+    elev = tools.getInterpolator()
+
     roads = Roads(transform, elev)
 
     handler = osmparser.OSMContentHandler(valid_node_keys=[])

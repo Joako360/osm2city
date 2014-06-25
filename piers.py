@@ -275,8 +275,7 @@ def main():
         # plt.show()
         plt.savefig('Piers.eps')
 
-#    elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
-    elev = tools.Probe_fgelev()
+    elev = tools.getInterpolator()
 
     ac = piers.write(elev)
     ac_fname = 'Piers%07i.ac' % calc_tile.tile_index(center_global)

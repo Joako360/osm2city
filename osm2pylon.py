@@ -1393,8 +1393,8 @@ if __name__ == "__main__":
     tools.init(coord_transformator)
     # Reading elevation data
     logging.info("Reading ground elevation data might take some time ...")
-    elev_interpolator = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV)
-
+    elev_interpolator = tools.getInterpolator()
+    
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
     # the lists below are in sequence: buildings references, power/aerialway, railway overhead, landuse and highway
@@ -1470,6 +1470,7 @@ if __name__ == "__main__":
         stg.close()
 
     logging.info("******* Finished *******")
+    elev_interpolator.save_cache()
 
 
 # ================ UNITTESTS =======================
