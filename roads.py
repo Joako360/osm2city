@@ -55,9 +55,6 @@ import numpy as np
 from vec2d import vec2d
 import shapely.geometry as shg
 import textwrap
-from pdb import pm
-#import pdb
-#import osm
 import coordinates
 import tools
 import parameters
@@ -73,6 +70,13 @@ import logging
 import osmparser
 import stg_io2
 import objectlist
+
+# debug stuff
+from pdb import pm
+from memory_profiler import profile
+import mem
+import gc
+import time
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark edits by osm2platforms
 
@@ -106,6 +110,7 @@ class Roads(objectlist.ObjectList):
         """take one osm way, create a linear object"""
         if not self.min_max_scanned:
             self._process_nodes(nodes_dict)
+            logging.info("len of nodes_dict %i" % len(nodes_dict))
             self.min_max_scanned = True
             cmin = vec2d(self.minlon, self.minlat)
             cmax = vec2d(self.maxlon, self.maxlat)
@@ -291,7 +296,7 @@ def scale_test(transform, elev):
 
 def write_xml(path_to_stg, file_name, object_name):
     xml = open(path_to_stg + file_name + '.xml', "w")
-    if 0:  # parameters.TRAFFIC_SHADER_ENABLE:
+    if parameters.TRAFFIC_SHADER_ENABLE:
         shader_str = "<inherits-from>Effects/road-high</inherits-from>"
     else:
         shader_str = "<inherits-from>roads</inherits-from>"
@@ -311,24 +316,24 @@ def write_xml(path_to_stg, file_name, object_name):
         </PropertyList>
     """  % (file_name, shader_str, object_name)))
 
-
 def main():
+    
     #logging.basicConfig(level=logging.INFO)
     logging.basicConfig(level=logging.DEBUG)
-
+    
     import argparse
     parser = argparse.ArgumentParser(description="bridge.py reads OSM data and creates bridge models for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                       help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
-#    parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
+    parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
 #    parser.add_argument("-c", dest="c", action="store_true", help="do not check for overlapping with static objects")
     args = parser.parse_args()
 
     if args.filename is not None:
         parameters.read_from_file(args.filename)
 
-#    if args.e:
-#        parameters.NO_ELEV = True
+    if args.e:
+        parameters.NO_ELEV = True
 #    if args.c:
 #        parameters.OVERLAP_CHECK = False
 
@@ -339,13 +344,13 @@ def main():
     cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
     cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
     center_global = (cmin + cmax)*0.5
-    center_global = vec2d(11.38, 47.26)
+    if 0:
+        center_global = vec2d(11.38, 47.26)
     transform = coordinates.Transformation(center_global, hdg = 0)
     tools.init(transform)
     #elev = tools.Probe_fgelev(fake=False, auto_save_every=1000)
-    elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV) # -- fake skips actually reading the file, speeding up things
+    elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV, clamp=True)
     roads = Roads(transform, elev)
-
     handler = osmparser.OSMContentHandler(valid_node_keys=[])
     source = open(osm_fname)
     logging.info("Reading the OSM file might take some time ...")
@@ -355,7 +360,7 @@ def main():
     handler.register_way_callback(roads.create_from_way, req_keys=roads.req_keys)
     handler.register_uncategorized_way_callback(roads.store_uncategorized)
     handler.parse(source)
-
+    
     logging.info("done.")
     logging.info("ways: %i", len(roads))
 
@@ -364,7 +369,7 @@ def main():
     else:
         path_to_output = parameters.PATH_TO_SCENERY
 
-    if 1:
+    if 0:
         # -- quick test output
         col = ['b', 'r', 'y', 'g', '0.75', '0.5', 'k']
         col = ['0.5', '0.75', 'y', 'g', 'r', 'b', 'k']
@@ -379,10 +384,11 @@ def main():
         plt.axes().set_aspect('equal')
         #plt.show()
         plt.savefig('roads.eps')
+        plt.clf()
 
-#    roads.objects = [roads.objects[0]]
+    #roads.objects = roads.objects[0:10000]
 
-    roads.find_intersections()
+    #roads.find_intersections()
     #roads.cleanup_intersections()
 #    roads.objects = [roads.objects[0]]
 
@@ -395,6 +401,7 @@ def main():
 
     # -- write stg
     ac = roads.create_ac()
+
     file_name = 'roads%07i' % calc_tile.tile_index(center_global)
     path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, 0, 0)
     stg_manager.write()
@@ -405,6 +412,7 @@ def main():
 #    f.close()
     ac.write_to_file(path_to_stg + file_name)
     write_xml(path_to_stg, file_name, 'roads')
+    logging.info('Done.')
 #     elev.save_cache()
 
 
