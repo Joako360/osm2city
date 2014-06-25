@@ -84,14 +84,6 @@ OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark edits by osm2platforms
 def no_transform((x, y)):
     return x, y
 
-class Road(LinearObject):
-    """ATM unused"""
-    def __init__(self, transform, osm_id, tags, refs, nodes_dict):
-        super(Road, self).__init__(transform, osm_id, tags, refs, nodes_dict)
-        self.railway = False
-        if tags.has_key('railway'):
-            self.railway = tags['railway'] in ['rail', 'tram']
-
 class Roads(objectlist.ObjectList):
     valid_node_keys = []
 
