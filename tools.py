@@ -25,14 +25,17 @@ import coordinates
 import calc_tile
 import time
 import re
-
+import csv
 import subprocess
 #import Queue
 
 
 class Interpolator(object):
     """load elevation data from file, interpolate"""
-    def __init__(self, filename, fake=False):
+    def __init__(self, filename, fake=False, clamp=False):
+        """If clamp = False, out-of-bounds elev probing returns -9999.
+           Otherwise, return elev at closest boundary.
+        """
         # FIXME: use values from header in filename
         # FIXME: could save lots of mem by not storing regular grid XY
         if fake:
@@ -41,14 +44,28 @@ class Interpolator(object):
             return
         else:
             self.fake = False
+        self.clamp = clamp
         f = open(filename, "r")
         x0, y0, size_x, size_y, self.step_x, self.step_y = [float(i) for i in f.readline().split()[1:]]
-        ny = len(np.arange(y0, y0+size_y, self.step_y))
-        nx = len(np.arange(x0, x0+size_x, self.step_x))
-
-        #elev = np.loadtxt(filename)[:,2:]
-        elev = np.loadtxt(filename)
         f.close()
+
+        nx = int((size_x)/self.step_x)
+        ny = int((size_y)/self.step_y)
+        
+        #elev = np.loadtxt(filename)
+        
+        elev = np.zeros((nx*ny, 5))
+        with open(filename, 'r') as f:
+            reader = csv.reader(f, delimiter=' ')
+            tmp = reader.next()
+            i = 0
+            for row in reader:
+                try:
+                    elev[i,:] = np.array(row)
+                    i += 1
+                except:
+                    pass
+        
         self.x = elev[:,0] # -- that's actually lon
         self.y = elev[:,1] #                and lat
         self.h = elev[:,4]
@@ -67,6 +84,17 @@ class Interpolator(object):
         self.dy = self.y[1,0] - self.y[0,0]
         print "dx, dy", self.dx, self.dy
 
+    def _move_to_boundary(self, p):
+        if p.x <= self.min_x:
+            p.x = self.min_x
+        elif p.x >= self.max_x:
+            p.x = self.max_x
+        if p.y <= self.min_y:
+            p.y = self.min_y
+        elif p.y >= self.max_y:
+            p.y = self.max_y
+        return p
+
     def __call__(self, p, is_global=False):
         """compute elevation at (x,y) by linear interpolation"""
         if self.fake:
@@ -75,10 +103,14 @@ class Interpolator(object):
         global transform
         if not is_global:
             p = vec2d.vec2d(transform.toGlobal(p))
-        if p.x <= self.min_x or p.x >= self.max_x:
-            return -9999
-        elif p.y <= self.min_y or p.y >= self.max_y:
-            return -9999
+
+        if self.clamp:
+            p = self._move_to_boundary(p)
+        else:
+            if p.x <= self.min_x or p.x >= self.max_x:
+                return -9999
+            elif p.y <= self.min_y or p.y >= self.max_y:
+                return -9999
         i = int((p.x - self.min_x)/self.dx)
         j = int((p.y - self.min_y)/self.dy)
         fx = (p.x - self.x[j,i])/self.dx
