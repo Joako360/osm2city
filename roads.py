@@ -53,7 +53,6 @@ import scipy.interpolate
 import matplotlib.pyplot as plt
 import numpy as np
 from vec2d import vec2d
-import shapely.geometry as shg
 import textwrap
 import coordinates
 import tools
@@ -73,10 +72,6 @@ import objectlist
 
 # debug stuff
 from pdb import pm
-from memory_profiler import profile
-import mem
-import gc
-import time
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark edits by osm2platforms
 
