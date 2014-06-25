@@ -262,36 +262,16 @@ class Roads(objectlist.ObjectList):
            - are of compatible type
         """
         pass
+    
+    def clip_at_cluster_border():
+        """
+           - loop all objects
+             - intersects cluster border?
+               - remove it, insert splitted 
+             - put into cluster
+        """        
+        pass
 
-
-def scale_test(transform, elev):
-    pass
-    """
-    put 4 objects into scenery
-    2 poles 1000m apart. Two ac, origin same, but one is offset in ac. Put both
-    at same location in stg
-    2 acs, at different stg location
-    Result: at 100m 35 cm difference
-            at 1000m 3.5m
-            0.35%
-    """
-    p0 = vec2d(transform.toGlobal((0,0)))
-    p100 = vec2d(transform.toGlobal((100,0)))
-    p1k = vec2d(transform.toGlobal((1000,0)))
-    p10k = vec2d(transform.toGlobal((10000,0)))
-#    BLA
-    e0 = elev(p0, is_global=True)
-    e100 = elev(p100, is_global=True)
-    e1k = elev(p1k, is_global=True)
-    e10k = elev(p10k, is_global=True)
-    quick_stg_line('cursor/cursor_blue.ac', p0, e0, 0, show=3)
-    quick_stg_line('cursor/cursor_red.ac', p100, e100, 0, show=2)
-    quick_stg_line('cursor/cursor_red.ac', p1k, e1k, 0, show=2)
-    quick_stg_line('cursor/cursor_red.ac', p10k, e10k, 0, show=2)
-
-    p0 = vec2d(transform.toGlobal((0, 0)))
-    p1 = vec2d(transform.toGlobal((1., 0)))
-    print p0, p1
 
 
 def write_xml(path_to_stg, file_name, object_name):
@@ -326,7 +306,6 @@ def main():
     parser.add_argument("-f", "--file", dest="filename",
                       help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
     parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
-#    parser.add_argument("-c", dest="c", action="store_true", help="do not check for overlapping with static objects")
     args = parser.parse_args()
 
     if args.filename is not None:
@@ -334,8 +313,6 @@ def main():
 
     if args.e:
         parameters.NO_ELEV = True
-#    if args.c:
-#        parameters.OVERLAP_CHECK = False
 
     #parameters.show()
 
@@ -406,10 +383,6 @@ def main():
     path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, 0, 0)
     stg_manager.write()
 
-    # TODO: write roads xml
-#    f = open(path_to_stg + ac_file_name + '.ac', 'w')
-#    f.write(str(ac))
-#    f.close()
     ac.write_to_file(path_to_stg + file_name)
     write_xml(path_to_stg, file_name, 'roads')
     logging.info('Done.')
