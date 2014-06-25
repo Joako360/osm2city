@@ -166,6 +166,12 @@ C2P_CATENARY_MIN_DISTANCE = 30
 
 C2P_POWER_LINE_ALLOW_100M = False
 
+#=============================================================================
+# PARAMETERS RELATED TO ROADS IN roads.py
+#=============================================================================
+
+TRAFFIC_SHADER_ENABLE = False
+
 
 def set_parameters(param_dict):
     for k in param_dict:
