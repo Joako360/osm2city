@@ -1386,15 +1386,15 @@ if __name__ == "__main__":
         parameters.read_from_file(args.filename)
 
     # Initializing tools for global/local coordinate transformations
-    cmin = vec2d.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
-    cmax = vec2d.vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
-    center = (cmin + cmax) * 0.5
-    coord_transformator = coordinates.Transformation(center, hdg=0)
+    center_global = parameters.getCenterGlobal()
+    osm_fname = parameters.getOSMFName()
+    coord_transformator = coordinates.Transformation(center_global, hdg=0)
     tools.init(coord_transformator)
+
     # Reading elevation data
     logging.info("Reading ground elevation data might take some time ...")
     elev_interpolator = tools.getInterpolator()
-    
+
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
     # the lists below are in sequence: buildings references, power/aerialway, railway overhead, landuse and highway
@@ -1412,7 +1412,7 @@ if __name__ == "__main__":
     req_way_keys = ["building", "power", "aerialway", "railway", "landuse", "highway"]
     handler = osmparser_wrapper.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
                                                   req_relation_keys)
-    source = open(parameters.PREFIX + os.sep + parameters.OSM_FILE)
+    source = open(osm_fname)
     xml.sax.parse(source, handler)
     # References for buildings
     building_refs = process_osm_building_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)

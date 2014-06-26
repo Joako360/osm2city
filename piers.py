@@ -1,8 +1,5 @@
 #!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
-# FIXME: check sign of angle
-from objectlist import ObjectList
-import stg_io2
 
 """
 Ugly, highly experimental code.
@@ -21,7 +18,7 @@ import parameters
 import calc_tile
 import os
 import ac3d
-import stg_io
+import stg_io2
 from objectlist import ObjectList
 
 

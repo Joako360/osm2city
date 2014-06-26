@@ -21,7 +21,6 @@ import parameters
 import calc_tile
 import os
 import ac3d
-import stg_io
 from objectlist import ObjectList
 
 import logging
@@ -42,7 +41,7 @@ class Platform(object):
         self.refs = refs
         self.typ = 0
         self.nodes = []
-        self.is_area = tags.has_key('area')
+        self.is_area = 'area' in tags
 
 #    def transform(self, nodes_dict, transform):
         osm_nodes = [nodes_dict[r] for r in refs]
@@ -104,9 +103,9 @@ class Platforms(ObjectList):
     def writeArea(self, platform, elev, ac, obj):
     # Writes a platform mapped as an area
         o = obj.next_node_index()
-        if self.testCCW(platform.nodes) > 0 :
+        if self.testCCW(platform.nodes) > 0:
             logging.info("Clockwise")
-            platform.nodes = platforms.nodes[::-1]
+            platform.nodes = platform.nodes[::-1]
         else:
             logging.info('Anti-Clockwise')
         for p in platform.nodes:
@@ -138,14 +137,12 @@ class Platforms(ObjectList):
             sideface.append((n + o - 1, x, 0.5))
             obj.face(sideface, mat=0)
 
-
-
     def writeLine(self, platform, elev, ac, obj):
     # Writes a platform as a area which only is mapped as a line
         o = obj.next_node_index()
         left = platform.line_string.parallel_offset(2, 'left', resolution=8, join_style=1, mitre_limit=10.0)
         right = platform.line_string.parallel_offset(2, 'right', resolution=8, join_style=1, mitre_limit=10.0)
-        e = 10000;
+        e = 10000
         idx_left = obj.next_node_index()
         for p in left.coords:
             e = elev(vec2d(p[0], p[1])) + 1
@@ -212,6 +209,7 @@ class Platforms(ObjectList):
         sideface.append((idx_right, x, 0.5))
         obj.face(sideface, mat=0)
 
+
 def main():
     logging.basicConfig(level=logging.INFO)
     # logging.basicConfig(level=logging.DEBUG)
@@ -258,7 +256,6 @@ def main():
         path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, center_global)
     else:
         path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center_global)
-    stg_fname = calc_tile.construct_stg_file_name(center_global)
 
     # -- quick test output
     col = ['b', 'r', 'y', 'g', '0.75', '0.5', 'k']
