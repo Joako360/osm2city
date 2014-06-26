@@ -7,6 +7,8 @@ import linear
 import numpy as np
 import scipy.interpolate
 from pdb import pm
+from vec2d import vec2d
+from turtle import Vec2D
 
 class Deck_shape_linear(object):
     def __init__(self, h0, h1):
@@ -44,7 +46,9 @@ class LinearBridge(linear.LinearObject):
         for i, l in enumerate(probe_locations):
             local = self.center.interpolate(l, normalized=True)
             probe_coords[i] = transform.toGlobal(local.coords[0])
-            elevs[i] = elev(probe_coords[i])
+            position = vec2d(probe_coords[i][0], probe_coords[i][1])
+# FIXME coords are global and not fg
+            elevs[i] = elev(position, is_global=True)
 #        print "probing at", probe_coords
 #        self.elevs = probe(probe_coords)
 #        print n_probes
@@ -56,7 +60,8 @@ class LinearBridge(linear.LinearObject):
 
     def elev(self, l, normalized=True):
         """given linear distance [m], interpolate and return terrain elevation"""
-        if not normalized: l /= self.center.length
+        if not normalized:
+            l /= self.center.length
         return self.elev_spline(l)
 
     def prep_height(self):
@@ -86,7 +91,7 @@ class LinearBridge(linear.LinearObject):
         min_height = 6.
         if self.D(0.5) - hm < min_height:
 #            print "# poly", h0, hm+min_height, h1
-            self.D = Deck_shape_poly(h0, hm+min_height, h1)
+            self.D = Deck_shape_poly(h0, hm + min_height, h1)
 
     def deck_height(self, l, normalized=True):
         """given linear distance [m], interpolate and return deck height"""
