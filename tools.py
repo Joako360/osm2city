@@ -684,7 +684,7 @@ def init(new_transform):
 
 
 def getInterpolator():
-    if(True):
+    if(parameters.ELEV_MODE == 'FgelevCaching'):
         return Probe_fgelev()
     else:
         return Interpolator()
