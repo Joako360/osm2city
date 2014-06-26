@@ -1,6 +1,15 @@
 """test/debug routines
 """
 
+def show_nodes(osm_id, nodes, refs, nodes_dict, left, right):
+    print "OSM_ID %i" % osm_id
+    print "  nodes\n", nodes
+    print "  refs", refs
+    for r in refs:
+        n = nodes_dict[r]
+        print "  ", n.lon, n.lat
+    print "left", left.coords
+
 def scale_test(transform, elev):
     pass
     """

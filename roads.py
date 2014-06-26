@@ -72,6 +72,7 @@ import stg_io2
 import objectlist
 
 # debug stuff
+import test
 from pdb import pm
 from memory_profiler import profile
 import mem
@@ -112,6 +113,10 @@ class Roads(objectlist.ObjectList):
             #self.transform = coordinates.Transformation(center_global, hdg = 0)
             #tools.init(self.transform) # FIXME. Not a nice design.
 
+        #if way.osm_id == 235008364 or way.osm_id == 4374302:
+        #    pass
+        #else: return
+        
         prio = None
         try:
             access = not (way.tags['access'] == 'no')
@@ -153,6 +158,8 @@ class Roads(objectlist.ObjectList):
             tex_y1 = 0.5
             width=6
 
+        #if prio != 1: prio = None
+
         if prio == None:
 #            print "got", way.osm_id,
 #            for t in way.tags.keys():
@@ -168,8 +175,23 @@ class Roads(objectlist.ObjectList):
         else:
             road = LinearObject(self.transform, way.osm_id, way.tags, way.refs, nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
 
+        if road.has_large_angle():
+            print "skipping OSM_ID %i: large angle. OSM error?" % road.osm_id
+            return
+
         road.typ = prio
         self.objects.append(road)
+
+#        if self.has_duplicate_nodes(way.refs):
+#            print "dup nodes in", way.osm_id
+            #road.plot(left=False, right=False, angle=False)
+
+
+    def has_duplicate_nodes(self, refs):
+        for i, r in enumerate(refs):
+            if r in refs[i+1:]:
+                return True
+            
 
     def create_ac(self):
         ac = ac3d.Writer(tools.stats, show_labels=False)

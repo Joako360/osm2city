@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 import math
 import copy
 
+# debug
+import test
 #import warnings
 #warnings.filterwarnings('error')
 
@@ -52,6 +54,22 @@ class LinearObject(object):
         self.tex_y0 = tex_y0  # determines which part of texture we use
         self.tex_y1 = tex_y1
 
+#        if self.osm_id == 235008364:
+#            test.show_nodes(osm_id, nodes, refs, nodes_dict, self.left, self.right)
+#            self.plot(left=False, right=False, angle=True)
+
+    def has_large_angle(self):
+        """check for angle > 179 in way, most likely OSM errors"""
+        for i, a in enumerate(self.angle[:-1]):
+            diff = abs(math.degrees(a - self.angle[i+1]))
+            if diff > 180.: diff = 360 - diff
+            if diff > 179.: 
+                #self.plot()
+                #raise ValueError('angle > 179 in OSM_ID %i' % self.osm_id)
+                return True
+        return False
+
+
     def compute_offset(self, offset):
 
         if 0:
@@ -86,8 +104,8 @@ class LinearObject(object):
 
             return left, right
 
-    def plot(self):
-        return
+    def plot(self, center=True, left=False, right=False, angle=True):
+        """debug"""
         c = np.array(self.center.coords)
         l = np.array(self.left.coords)
         r = np.array(self.right.coords)
@@ -95,20 +113,27 @@ class LinearObject(object):
 #        r1 = np.array(self.right1.coords)
         plt.clf()
         #np.array([transform.toLocal((n.lon, n.lat)) for n in r.nodes])
-        plt.plot(c[:,0], c[:,1], '-o', color='k')
-        plt.plot(l[:,0], l[:,1], '-o', color='g')
-        plt.plot(r[:,0], r[:,1], '-o', color='r')
+        if center: plt.plot(c[:,0], c[:,1], '-o', color='k')
+        if left:   plt.plot(l[:,0], l[:,1], '-o', color='g')
+        if right:  plt.plot(r[:,0], r[:,1], '-o', color='r')
 
 #        plt.plot(l1[:,0], l1[:,1], '--.', color='g')
 #        plt.plot(r1[:,0], r1[:,1], '--.', color='r')
 
-        #plt.axes().set_aspect('equal')
-        for i, n in enumerate(c):
-            plt.text(n[0]+10, n[1], "%i_%1.0f " % (i, self.angle[i]*57.3), color='k')
-        for i, n in enumerate(l):
-            plt.text(n[0]-3, n[1], "%i" % (i), color='g')
-        for i, n in enumerate(r):
-            plt.text(n[0]+3, n[1], "%i" % (i), color='r')
+        plt.axes().set_aspect('equal')
+        import random
+        if center:
+            for i, n in enumerate(c):
+                s = "%i" % i
+                if angle:
+                    s = s + "_%1.0f " % (self.angle[i]*57.3)
+                plt.text(n[0], n[1]+random.uniform(-1, 1), s, color='k')
+        if left: 
+            for i, n in enumerate(l):
+                plt.text(n[0]-3, n[1], "%i" % (i), color='g')
+        if right:
+            for i, n in enumerate(r):
+                plt.text(n[0]+3, n[1], "%i" % (i), color='r')
 
  #       for i, n in enumerate(l1):
  #           plt.text(n[0]-6, n[1], "(%i)" % (i), color='g')
@@ -116,7 +141,7 @@ class LinearObject(object):
  #           plt.text(n[0]+6, n[1], "(%i)" % (i), color='r')
 
 
-        #plt.show()
+        plt.show()
         plt.savefig('roads_%i.eps' % self.osm_id)
 
 
@@ -139,7 +164,7 @@ class LinearObject(object):
             self.dist[i+1] = cumulated_distance
             self.normals[i] = np.array((-dy, dx))/self.segment_len[i]
             self.vectors[i] = vector
-
+        
             #assert abs(self.normals[i].magnitude() - 1.) < 0.00001
         self.normals[-1] = self.normals[-2]
         self.angle[-1] = self.angle[-2]
@@ -148,6 +173,9 @@ class LinearObject(object):
                   right_z=None, ac=None):
         """given left and right LineStrings, write quads
            Use height z if given, probe elev otherwise
+           
+           if left or right is integer, assume nodes are already written and use 
+           integer as node index.
         """
         try:
             n_nodes = len(left.coords)
@@ -175,7 +203,9 @@ class LinearObject(object):
                 else:
                     e = elev(vec2d(the_node[0], the_node[1])) + self.AGL
                 obj.node(-the_node[1], e, -the_node[0])
-                ac.add_label(''+str(self.osm_id), -the_node[1], e+5, -the_node[0], scale=5)
+#                if abs(the_node[1]) > 50000. or abs(the_node[0]) > 50000.:
+#                    print "large node %6.0f %6.0f %i" % (the_node[0], the_node[1], self.osm_id)
+                #ac.add_label(''+str(self.osm_id), -the_node[1], e+5, -the_node[0], scale=5)
                 ni += 1
         except AttributeError:
             node0_l = left
@@ -190,7 +220,7 @@ class LinearObject(object):
                 else:
                     e = elev(vec2d(the_node[0], the_node[1])) + self.AGL
                 obj.node(-the_node[1], e, -the_node[0])
-                ac.add_label(''+str(self.osm_id), -the_node[1], e+5, -the_node[0], scale=5)
+#                ac.add_label(''+str(self.osm_id), -the_node[1], e+5, -the_node[0], scale=5)
                 ni += 1
         except AttributeError:
             node0_r = right
