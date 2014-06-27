@@ -14,6 +14,9 @@ import numpy as np
 import tools
 import os
 import logging
+import parameters
+
+
 
 def myskel(out, b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header = False, max_height = 1e99):
 #vertices = [(202.0, 52.0), (400.0, 52.0), (400.0, 153.0), (202.0, 152.0)]
@@ -72,7 +75,7 @@ def myskel(out, b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header 
         print angle
         skeleton = poly.straight_skeleton()
         print "skel", skeleton
-        roof_mesh = poly.roof_3D(angle*3.1415/180.)
+        roof_mesh = poly.roof_3D(angle * 3.1415 / 180.)
 
         s = roof_mesh.ac3d_string(b, offset_xy, offset_z, header)
 
@@ -81,7 +84,7 @@ def myskel(out, b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header 
 #    if True:
         poly = polygon.Polygon(vertices, edges, speeds)
         angle = random.uniform(20, 50)
-        roof_mesh = poly.roof_3D(angle*3.1415/180.)
+        roof_mesh = poly.roof_3D(angle * 3.1415 / 180.)
         #roof.mesh.vertices
         roof_height = max([p[2] for p in roof_mesh.vertices])
         if roof_height > max_height:
@@ -90,9 +93,9 @@ def myskel(out, b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header 
         result = roof_mesh.to_out(out, b, offset_xy, offset_z, header)
     except Exception, reason:
 #    if False:
-        print "Error while creating 3d roof (OSM_ID %s, %s)" % (b.osm_id, reason)
+        logging.error("Error while creating 3d roof (OSM_ID %s, %s)" % (b.osm_id, reason))
         tools.stats.roof_errors += 1
-        gp = 'roof-error-%04i' % tools.stats.roof_errors
+        gp = parameters.PREFIX + os.sep + 'roof-error-%04i' % tools.stats.roof_errors
         tools.write_one_gp(b, gp)
         os.system("gnuplot %s.gp" % gp)
         return False
