@@ -231,9 +231,9 @@ def main():
 #        parameters.OVERLAP_CHECK = False
 
     parameters.show()
-
-    center_global = parameters.getCenterGlobal()
-    osm_fname = parameters.getOSMFName()
+    
+    center_global = parameters.get_OSM_file_name()
+    osm_fname = parameters.get_OSM_file_name()
     transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(transform)
     platforms = Platforms(transform)

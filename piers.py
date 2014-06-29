@@ -230,9 +230,9 @@ def main():
 #        parameters.OVERLAP_CHECK = False
 
     parameters.show()
-
-    osm_fname = parameters.getOSMFName()
-    center_global = parameters.getCenterGlobal()
+    
+    osm_fname = parameters.get_OSM_file_name()
+    center_global = parameters.get_OSM_file_name()
     transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(transform)
     piers = Piers(transform)
