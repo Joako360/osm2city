@@ -338,7 +338,7 @@ def main():
     osm_fname = parameters.getOSMFName()
     transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(transform)
-    elev = tools.getInterpolator()
+    elev = tools.get_interpolator(fake=parameters.NO_ELEV)
     roads = Roads(transform, elev)
     handler = osmparser.OSMContentHandler(valid_node_keys=[])
     source = open(osm_fname)
