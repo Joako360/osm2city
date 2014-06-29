@@ -48,10 +48,10 @@ class Interpolator(object):
         f = open(filename, "r")
         x0, y0, size_x, size_y, self.step_x, self.step_y = [float(i) for i in f.readline().split()[1:]]
         f.close()
-
-        nx = int((size_x)/self.step_x)
-        ny = int((size_y)/self.step_y)
         
+        nx = len(np.arange(x0, x0+size_x, self.step_x))
+        ny = len(np.arange(y0, y0+size_y, self.step_y))
+
         #elev = np.loadtxt(filename)
         
         elev = np.zeros((nx*ny, 5))
@@ -60,11 +60,10 @@ class Interpolator(object):
             tmp = reader.next()
             i = 0
             for row in reader:
-                try:
-                    elev[i,:] = np.array(row)
+                tmp = np.array(row)
+                if len(tmp) == 5:
+                    elev[i,:]
                     i += 1
-                except:
-                    pass
         
         self.x = elev[:,0] # -- that's actually lon
         self.y = elev[:,1] #                and lat
@@ -683,11 +682,12 @@ def init(new_transform):
     print "tools: init", stats
 
 
-def getInterpolator():
-    if(parameters.ELEV_MODE == 'FgelevCaching'):
-        return Probe_fgelev()
+def get_interpolator(**kwargs):
+    if parameters.ELEV_MODE == 'FgelevCaching':
+        return Probe_fgelev(**kwargs)
     else:
-        return Interpolator()
+        filename = filename = parameters.PREFIX + os.sep + 'elev.out'
+        return Interpolator(filename, **kwargs)
 
 
 if __name__ == "__main__":
