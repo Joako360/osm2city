@@ -197,14 +197,14 @@ def set_parameters(param_dict):
             print "Ignoring unknown parameter", k
 
 
-def getOSMFName():
+def get_OSM_file_name():
     """
-    Returns the Path to the OSM File
+    Returns the path to the OSM File
     """
     return PREFIX + os.sep + OSM_FILE
 
 
-def getCenterGlobal():
+def get_center_global():
     cmin = vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
     cmax = vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
     return (cmin + cmax) * 0.5
