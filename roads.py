@@ -116,6 +116,8 @@ class Roads(objectlist.ObjectList):
         #if way.osm_id == 235008364 or way.osm_id == 4374302:
         #    pass
         #else: return
+        if len(self.objects) >= parameters.MAX_OBJECTS:
+            return
         
         prio = None
         try:
@@ -277,14 +279,15 @@ class Roads(objectlist.ObjectList):
         """
         pass
 
-    def clip_at_cluster_border():
+    def clip_at_cluster_border(self):
         """
                - loop all objects
                  - intersects cluster border?
                    - remove it, insert splitted 
                  - put into cluster
         """
-        pass
+        for the_object in self.objects:
+            print the_object
 
 
 def write_xml(path_to_stg, file_name, object_name):
@@ -308,6 +311,24 @@ def write_xml(path_to_stg, file_name, object_name):
         </effect>
         </PropertyList>
     """  % (file_name, shader_str, object_name)))
+
+
+def debug_create_eps(roads):
+    """debug: plot roads map to .eps"""
+    col = ['b', 'r', 'y', 'g', '0.75', '0.5', 'k']
+    col = ['0.5', '0.75', 'y', 'g', 'r', 'b', 'k']
+    lw    = [1, 1, 1, 1.2, 1.5, 2, 1]
+    lw_w  = [1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+    for r in roads:
+        a = np.array(r.center.coords)
+        #np.array([transform.toLocal((n.lon, n.lat)) for n in r.nodes])
+        plt.plot(a[:,0], a[:,1], color=col[r.typ], linewidth=lw[r.typ])
+        plt.plot(a[:,0], a[:,1], color='w', linewidth=lw_w[r.typ], ls=":")
+
+    plt.axes().set_aspect('equal')
+    #plt.show()
+    plt.savefig('roads.eps')
+    plt.clf()
 
 def main():
     
@@ -347,31 +368,16 @@ def main():
     
     logging.info("done.")
     logging.info("ways: %i", len(roads))
-
+    
     if parameters.PATH_TO_OUTPUT:
         path_to_output = parameters.PATH_TO_OUTPUT
     else:
         path_to_output = parameters.PATH_TO_SCENERY
 
-    if 0:
-        # -- quick test output
-        col = ['b', 'r', 'y', 'g', '0.75', '0.5', 'k']
-        col = ['0.5', '0.75', 'y', 'g', 'r', 'b', 'k']
-        lw    = [1, 1, 1, 1.2, 1.5, 2, 1]
-        lw_w  = [1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
-        for r in roads:
-            a = np.array(r.center.coords)
-            #np.array([transform.toLocal((n.lon, n.lat)) for n in r.nodes])
-            plt.plot(a[:,0], a[:,1], color=col[r.typ], linewidth=lw[r.typ])
-            plt.plot(a[:,0], a[:,1], color='w', linewidth=lw_w[r.typ], ls=":")
 
-        plt.axes().set_aspect('equal')
-        #plt.show()
-        plt.savefig('roads.eps')
-        plt.clf()
-
-    #roads.objects = roads.objects[0:10000]
-
+    roads.objects = roads.objects[0:1000]
+    roads.clip_at_cluster_border()
+    debug_create_eps(roads)
     #roads.find_intersections()
     #roads.cleanup_intersections()
 #    roads.objects = [roads.objects[0]]
@@ -389,11 +395,9 @@ def main():
     file_name = 'roads%07i' % calc_tile.tile_index(center_global)
     path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, 0, 0)
     stg_manager.write()
-    
-    tools.install_files(['roads.eff'], path_to_stg)
-
     ac.write_to_file(path_to_stg + file_name)
     write_xml(path_to_stg, file_name, 'roads')
+    tools.install_files(['roads.eff'], path_to_stg)
     elev.save_cache()
     logging.info('Done.')
 
