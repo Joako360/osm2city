@@ -53,7 +53,6 @@ import scipy.interpolate
 import matplotlib.pyplot as plt
 import numpy as np
 from vec2d import vec2d
-import shapely.geometry as shg
 import textwrap
 import coordinates
 import tools
@@ -79,7 +78,7 @@ import mem
 import gc
 import time
 
-OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark edits by osm2platforms
+OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 
 # -----------------------------------------------------------------------------
 def no_transform((x, y)):
@@ -276,14 +275,14 @@ class Roads(objectlist.ObjectList):
            - are of compatible type
         """
         pass
-    
+
     def clip_at_cluster_border():
-        """
+    """
            - loop all objects
              - intersects cluster border?
                - remove it, insert splitted 
              - put into cluster
-        """        
+    """
         pass
 
 
@@ -330,17 +329,11 @@ def main():
 
     #parameters.show()
 
-    osm_fname = parameters.PREFIX + os.sep + parameters.OSM_FILE
-
-    cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
-    cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
-    center_global = (cmin + cmax)*0.5
-    if 0:
-        center_global = vec2d(11.38, 47.26)
-    transform = coordinates.Transformation(center_global, hdg = 0)
+    center_global = parameters.get_center_global()
+    osm_fname = parameters.get_OSM_file_name()
+    transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(transform)
-    #elev = tools.Probe_fgelev(fake=False, auto_save_every=1000)
-    elev = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV, clamp=True)
+    elev = tools.get_interpolator(fake=parameters.NO_ELEV)
     roads = Roads(transform, elev)
     handler = osmparser.OSMContentHandler(valid_node_keys=[])
     source = open(osm_fname)
@@ -399,8 +392,8 @@ def main():
 
     ac.write_to_file(path_to_stg + file_name)
     write_xml(path_to_stg, file_name, 'roads')
+    elev.save_cache()
     logging.info('Done.')
-#     elev.save_cache()
 
 
 if __name__ == "__main__":
