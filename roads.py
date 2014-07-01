@@ -69,6 +69,7 @@ import logging
 import osmparser
 import stg_io2
 import objectlist
+import tools
 
 # debug stuff
 import test
@@ -277,14 +278,13 @@ class Roads(objectlist.ObjectList):
         pass
 
     def clip_at_cluster_border():
-    """
-           - loop all objects
-             - intersects cluster border?
-               - remove it, insert splitted 
-             - put into cluster
-    """
+        """
+               - loop all objects
+                 - intersects cluster border?
+                   - remove it, insert splitted 
+                 - put into cluster
+        """
         pass
-
 
 
 def write_xml(path_to_stg, file_name, object_name):
@@ -389,6 +389,8 @@ def main():
     file_name = 'roads%07i' % calc_tile.tile_index(center_global)
     path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, 0, 0)
     stg_manager.write()
+    
+    tools.install_files(['roads.eff'], path_to_stg)
 
     ac.write_to_file(path_to_stg + file_name)
     write_xml(path_to_stg, file_name, 'roads')

@@ -681,6 +681,11 @@ def init(new_transform):
     stats = Stats()
     print "tools: init", stats
 
+def install_files(file_list, dst):
+    """link files in file_list to dst"""
+    for the_file in file_list:
+        print "cp %s %s" % (the_file, dst)
+        #os.link(the_file, dst)
 
 def get_interpolator(**kwargs):
     if parameters.ELEV_MODE == 'FgelevCaching':
