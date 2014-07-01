@@ -270,19 +270,19 @@ def scale_test(transform, elev):
             at 1000m 3.5m
             0.35%
     """
-    p0 = vec2d(transform.toGlobal((0,0)))
-    p100 = vec2d(transform.toGlobal((100,0)))
-    p1k = vec2d(transform.toGlobal((1000,0)))
-    p10k = vec2d(transform.toGlobal((10000,0)))
+    p0 = vec2d(transform.toGlobal((0, 0)))
+    p100 = vec2d(transform.toGlobal((100, 0)))
+    p1k = vec2d(transform.toGlobal((1000, 0)))
+    p10k = vec2d(transform.toGlobal((10000, 0)))
 #    BLA
     e0 = elev(p0, is_global=True)
     e100 = elev(p100, is_global=True)
     e1k = elev(p1k, is_global=True)
     e10k = elev(p10k, is_global=True)
-    quick_stg_line('cursor/cursor_blue.ac', p0, e0, 0, show=3)
-    quick_stg_line('cursor/cursor_red.ac', p100, e100, 0, show=2)
-    quick_stg_line('cursor/cursor_red.ac', p1k, e1k, 0, show=2)
-    quick_stg_line('cursor/cursor_red.ac', p10k, e10k, 0, show=2)
+    stg_io2.quick_stg_line('cursor/cursor_blue.ac', p0, e0, 0, show=3)
+    stg_io2.quick_stg_line('cursor/cursor_red.ac', p100, e100, 0, show=2)
+    stg_io2.quick_stg_line('cursor/cursor_red.ac', p1k, e1k, 0, show=2)
+    stg_io2.quick_stg_line('cursor/cursor_red.ac', p10k, e10k, 0, show=2)
 
     p0 = vec2d(transform.toGlobal((0, 0)))
     p1 = vec2d(transform.toGlobal((1., 0)))
@@ -311,11 +311,10 @@ def write_xml(path_to_stg, file_name, object_name):
         </PropertyList>
     """  % (file_name, shader_str, object_name)))
 
+
 def main():
-    
     #logging.basicConfig(level=logging.INFO)
     logging.basicConfig(level=logging.DEBUG)
-    
     import argparse
     parser = argparse.ArgumentParser(description="bridge.py reads OSM data and creates bridge models for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
@@ -349,7 +348,7 @@ def main():
     handler.register_way_callback(roads.create_from_way, req_keys=roads.req_keys)
     handler.register_uncategorized_way_callback(roads.store_uncategorized)
     handler.parse(source)
-    
+
     logging.info("done.")
     logging.info("ways: %i", len(roads))
 
