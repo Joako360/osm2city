@@ -1393,7 +1393,7 @@ if __name__ == "__main__":
 
     # Reading elevation data
     logging.info("Reading ground elevation data might take some time ...")
-    elev_interpolator = tools.getInterpolator()
+    elev_interpolator = tools.get_interpolator()
 
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
