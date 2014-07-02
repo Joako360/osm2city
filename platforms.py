@@ -1,8 +1,6 @@
 #!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 # FIXME: check sign of angle
-from objectlist import ObjectList
-import stg_io2
 
 """
 Ugly, highly experimental code.
@@ -22,6 +20,7 @@ import calc_tile
 import os
 import ac3d
 from objectlist import ObjectList
+import stg_io2
 
 import logging
 import osmparser
@@ -72,7 +71,7 @@ class Platforms(ObjectList):
             # tools.init(self.transform) # FIXME. Not a nice design.
 
         col = None
-        if way.tags.has_key('railway'):
+        if 'railway' in way.tags:
             if way.tags['railway'] == 'platform':
                 col = 6
 
@@ -100,10 +99,18 @@ class Platforms(ObjectList):
 
             # obj.node()
 
+    def test_ccw(self, coords):
+        ret = 0
+        previous = None
+        for index, node in enumerate(coords[1:]):
+            previous = coords[index]
+            ret += (node[0] - previous[0]) * (node[1] + previous[1])
+        return ret
+
     def writeArea(self, platform, elev, ac, obj):
     # Writes a platform mapped as an area
         o = obj.next_node_index()
-        if self.testCCW(platform.nodes) > 0:
+        if self.test_ccw(platform.nodes) > 0:
             logging.info("Clockwise")
             platform.nodes = platform.nodes[::-1]
         else:
@@ -231,8 +238,8 @@ def main():
 #        parameters.OVERLAP_CHECK = False
 
     parameters.show()
-    
-    center_global = parameters.get_OSM_file_name()
+
+    center_global = parameters.get_center_global()
     osm_fname = parameters.get_OSM_file_name()
     transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(transform)
@@ -273,7 +280,7 @@ def main():
         # plt.show()
         plt.savefig('platforms.eps')
 
-    elev = tools.getInterpolator()
+    elev = tools.get_interpolator()
     ac = platforms.write(elev)
     ac_fname = 'platforms%07i.ac' % calc_tile.tile_index(center_global)
     logging.info("done.")

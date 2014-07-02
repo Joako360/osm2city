@@ -35,7 +35,7 @@ class Pier(object):
         self.refs = refs
         self.typ = 0
         self.nodes = []
-        self.is_area = tags.has_key('area')
+        self.is_area = 'area' in tags
 
 #    def transform(self, nodes_dict, transform):
         osm_nodes = [nodes_dict[r] for r in refs]
@@ -62,7 +62,7 @@ class Piers(ObjectList):
             # tools.init(self.transform) # FIXME. Not a nice design.
 
         col = None
-        if way.tags.has_key('man_made'):
+        if 'man_made' in way.tags:
             if way.tags['man_made'] == 'pier':
                 col = 6
 
@@ -89,19 +89,18 @@ class Piers(ObjectList):
         return ac
 
             # obj.node()
-    def testCCW(self, list):
+    def test_ccw(self, coords):
         ret = 0
         previous = None
-        for index, node in enumerate(list[1:]):
-            previous = list[index]
+        for index, node in enumerate(coords[1:]):
+            previous = coords[index]
             ret += (node[0] - previous[0]) * (node[1] + previous[1])
         return ret
-
 
     def writeArea(self, pier, elev, ac, obj):
     # Writes a Pier mapped as an area
         o = obj.next_node_index()
-        if self.testCCW(pier.nodes) > 0 :
+        if self.test_ccw(pier.nodes) > 0:
             logging.info("Clockwise")
             pier.nodes = pier.nodes[::-1]
         else:
@@ -135,14 +134,12 @@ class Piers(ObjectList):
             sideface.append((n + o - 1, x, 0.5))
             obj.face(sideface, mat=0)
 
-
-
     def writeLine(self, Pier, elev, ac, obj):
     # Writes a Pier as a area which only is mapped as a line
         o = obj.next_node_index()
         left = Pier.line_string.parallel_offset(2, 'left', resolution=8, join_style=1, mitre_limit=10.0)
         right = Pier.line_string.parallel_offset(2, 'right', resolution=8, join_style=1, mitre_limit=10.0)
-        e = 10000;
+        e = 10000
         idx_left = obj.next_node_index()
         for p in left.coords:
             e = elev(vec2d(p[0], p[1])) + 1
@@ -209,6 +206,7 @@ class Piers(ObjectList):
         sideface.append((idx_right, x, 0.5))
         obj.face(sideface, mat=0)
 
+
 def main():
     logging.basicConfig(level=logging.INFO)
     # logging.basicConfig(level=logging.DEBUG)
@@ -230,9 +228,9 @@ def main():
 #        parameters.OVERLAP_CHECK = False
 
     parameters.show()
-    
+
     osm_fname = parameters.get_OSM_file_name()
-    center_global = parameters.get_OSM_file_name()
+    center_global = parameters.get_center_global()
     transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(transform)
     piers = Piers(transform)
@@ -272,7 +270,7 @@ def main():
         # plt.show()
         plt.savefig('Piers.eps')
 
-    elev = tools.getInterpolator()
+    elev = tools.get_interpolator()
 
     ac = piers.write(elev)
     ac_fname = 'Piers%07i.ac' % calc_tile.tile_index(center_global)
