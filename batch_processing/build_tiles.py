@@ -11,7 +11,8 @@ import re
 import os
 from _io import open
 
-def getFile(name, tilename, lon, lat):
+
+def get_file(name, tilename, lon, lat):
     if "nt" in os.name:
         name = name + tilename + ".cmd"
     else:
@@ -57,12 +58,13 @@ if __name__ == '__main__':
         if e.errno != 17:
             logging.exception("Unable to create path to output")
 
-    downloadfile = getFile("download", args.tilename , lon, lat)
-    osm2city = getFile("osm2city_", args.tilename , lon, lat)
-    osm2pylon = getFile("osm2pylon_", args.tilename , lon, lat)
-    tools = getFile("tools_", args.tilename , lon, lat)
-    platformsfile = getFile("osm2platform_", args.tilename , lon, lat)
-    roads = getFile("roads_", args.tilename , lon, lat)
+    downloadfile = get_file("download_", args.tilename, lon, lat)
+    osm2city = get_file("osm2city_", args.tilename, lon, lat)
+    osm2pylon = get_file("osm2pylon_", args.tilename, lon, lat)
+    tools = get_file("tools_", args.tilename, lon, lat)
+    platformsfile = get_file("osm2platform_", args.tilename, lon, lat)
+    roads = get_file("roads_", args.tilename, lon, lat)
+    pierfile = get_file("piers_", args.tilename, lon, lat)
     for dy in range(0, num_cols):
         for dx in range(0, num_rows):
             index = calc_tile.tile_index((lon, lat), dx, dy)
@@ -94,11 +96,13 @@ if __name__ == '__main__':
             tools.write('python tools.py -f %s/params.ini' % (replacement_path) + os.linesep)
             platformsfile.write('python platforms.py -f %s/params.ini' % (replacement_path) + os.linesep)
             roads.write('python roads.py -f %s/params.ini' % (replacement_path) + os.linesep)
+            pierfile.write('python piers.py -f %s/params.ini' % (replacement_path) + os.linesep)
     downloadfile.close()
     osm2city.close()
     osm2pylon.close()
     tools.close()
     platformsfile.close()
     roads.close()
+    pierfile.close()
 
     sys.exit(0)
