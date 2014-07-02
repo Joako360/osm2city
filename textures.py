@@ -92,6 +92,10 @@ class TextureManager(object):
     def append(self, t):
         # -- prepend each item in t.provides with class name,
         #    except for class-independent keywords: age,region,compat
+        if not os.path.exists(t.filename):
+            logging.info("Skipping non-existing texture %s" % t.filename)
+            return
+
         new_provides = []
         for item in t.provides:
             if item.split(':')[0] in ('age', 'region', 'compat'):
