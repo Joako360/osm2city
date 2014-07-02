@@ -73,7 +73,7 @@ import objectlist
 # debug stuff
 from pdb import pm
 
-OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark edits by osm2platforms
+OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 
 # -----------------------------------------------------------------------------
 def no_transform((x, y)):
@@ -260,8 +260,8 @@ class Roads(objectlist.ObjectList):
 
 
 def scale_test(transform, elev):
-    pass
     """
+    debug:
     put 4 objects into scenery
     2 poles 1000m apart. Two ac, origin same, but one is offset in ac. Put both
     at same location in stg
@@ -400,8 +400,8 @@ def main():
 #    f.close()
     ac.write_to_file(path_to_stg + file_name)
     write_xml(path_to_stg, file_name, 'roads')
+    elev.save_cache()
     logging.info('Done.')
-#     elev.save_cache()
 
 
 if __name__ == "__main__":

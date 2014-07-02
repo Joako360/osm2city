@@ -613,13 +613,14 @@ if __name__ == "__main__":
     # -- prepare transformation to local coordinates
     cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
     cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
-    center = (cmin + cmax)*0.5
+    center = parameters.get_center_global()
+
     #center = (11.38, 47.26)
     tools.init(coordinates.Transformation(center, hdg = 0))
-    print tools.transform.toGlobal(cmin), tools.transform.toGlobal(cmax)
+#    print tools.transform.toGlobal(cmin), tools.transform.toGlobal(cmax)
 
     logging.info("reading elevation data")
-    elev = tools.getInterpolator()
+    elev = tools.get_interpolator(fake=parameters.NO_ELEV)
     #elev.write("elev.out.small", 4)
     #sys.exit(0)
     logging.debug("height at origin" + str(elev(vec2d(0,0))))
