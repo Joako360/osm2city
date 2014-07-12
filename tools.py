@@ -214,8 +214,16 @@ class Probe_fgelev(object):
             #        But since we might also probe just one position, we need to stay
             #        in sync anyway?
 
-            self.fgelev_pipe.stdin.write("%i %g %g\n" % (0, position.lon, position.lat))
-            elev = float(self.fgelev_pipe.stdout.readline().split()[1]) + self.h_offset
+            try:
+                self.fgelev_pipe.stdin.write("%i %g %g\n" % (0, position.lon, position.lat))
+            except IOError, reason:
+                logging.error(reason)
+            try:
+                line = self.fgelev_pipe.stdout.readline()
+                elev = float(line.split()[1]) + self.h_offset
+            except IndexError, reason:
+                logging.exception("FGElev %s, %s", line, reason)
+                return -1
             return elev
 
         if self.fake:
