@@ -20,10 +20,17 @@ import os
 import ac3d
 import stg_io2
 from objectlist import ObjectList
+from random import randint
 
 
 import logging
 import osmparser
+from shapely.geometry.base import CAP_STYLE, JOIN_STYLE
+from tools import transform
+from shapely.geometry.polygon import Polygon
+import math
+from shapely.geometry.linestring import LineString
+from random import random
 
 OUR_MAGIC = "osm2piers"  # Used in e.g. stg files to mark edits by osm2Piers
 
@@ -38,10 +45,8 @@ class Pier(object):
         self.is_area = 'area' in tags
 
 #    def transform(self, nodes_dict, transform):
-        osm_nodes = [nodes_dict[r] for r in refs]
-        self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
-        # self.nodes = np.array([(n.lon, n.lat) for n in osm_nodes])
-        self.line_string = shg.LineString(self.nodes)
+        self.osm_nodes = [nodes_dict[r] for r in refs]
+        self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in self.osm_nodes])
 
 
 class Piers(ObjectList):
@@ -83,34 +88,97 @@ class Piers(ObjectList):
         for pier in self.objects[:]:
             length = len(pier.nodes)
             if(length > 3 and pier.nodes[0][0] == pier.nodes[(length - 1)][0] and pier.nodes[0][1] == pier.nodes[(length - 1)][1]):
-                self.writeArea(pier, elev, ac, obj)
+                self.write_area(pier, elev, ac, obj)
             else:
-                self.writeLine(pier, elev, ac, obj)
+                self.write_line(pier, elev, ac, obj)
         return ac
 
-            # obj.node()
-    def test_ccw(self, coords):
-        ret = 0
-        previous = None
-        for index, node in enumerate(coords[1:]):
-            previous = coords[index]
-            ret += (node[0] - previous[0]) * (node[1] + previous[1])
-        return ret
+    def write_boats(self, elev, stg_manager):
+        for pier in self.objects[:]:
+            self.write_boat(pier, elev, stg_manager)
 
-    def writeArea(self, pier, elev, ac, obj):
+    def write_boat(self, pier, elev, stg_manager):
+        if(len(pier.nodes) < 3):
+            return
+        # Guess a possible position for realistic boat placement
+        linear_ring = shg.LinearRing(pier.nodes)
+        centroid = linear_ring.centroid
+        #Simplyfy
+        ring = linear_ring.convex_hull.buffer(40, cap_style=CAP_STYLE.square, join_style=JOIN_STYLE.bevel).simplify(20)
+        min_elev = 10
+        for p in ring.exterior.coords:
+            coord = vec2d(p[0], p[1])
+            p_elev = elev(coord)
+            if(min_elev > p_elev):
+                print p_elev
+                line_coords = [[centroid.x, centroid.y], p]
+                target_vector = shg.LineString(line_coords)
+                boat_position = linear_ring.intersection(target_vector)
+                coords = linear_ring.coords
+                direction = None
+                for i in range(len(coords) - 1):
+                    segment = LineString(coords[i:i + 2])
+                    if segment.length > 20 and segment.intersects(target_vector):
+                        direction = math.degrees(math.atan2(segment.coords[0][0] - segment.coords[1][0], segment.coords[0][1] - segment.coords[1][1]))
+                        parallel = segment.parallel_offset(10, 'right')
+                        boat_position = parallel.interpolate(segment.length / 2)
+                if direction is None:
+                    return
+                print direction
+                print "Boat"
+                print boat_position
+                print tools.transform.toGlobal(coord)
+                min_elev = p_elev
+        #Ok now we've got the direction and position
+        #OBJECT_SHARED Models/Maritime/Civilian/Pilot_Boat.ac -0.188 54.07603 -0.24 0
+        try:
+            pos_global = tools.transform.toGlobal((boat_position.x, boat_position.y))
+            self.write_model(Polygon(linear_ring).area, stg_manager, pos_global, direction)
+        except AttributeError, reason:
+            logging.error(reason)
+
+    def write_model(self, area, stg_manager, pos_global, direction):
+        if area < 1500:
+            models = [('Models/Maritime/Civilian/small-red-yacht.ac', 0),
+                      ('Models/Maritime/Civilian/small-black-yacht.ac', 0),
+                      ('Models/Maritime/Civilian/small-clear-yacht.ac', 0)]
+            choice = randint(0, len(models) - 1)
+            model = models[choice]
+        elif area < 3000:
+            models = [('Models/Maritime/Civilian/Trawler.xml', 20), ('Models/Maritime/Civilian/MediumFerry.xml', 10)]
+            choice = randint(0, len(models) - 1)
+            model = models[choice]
+        elif area < 8000:
+            models = [('Models/Maritime/Civilian/LargeTrawler.xml', 10), ('Models/Maritime/Civilian/LargeFerry.xml', 100)]
+            choice = randint(0, len(models) - 1)
+            model = models[choice]
+        else:
+            models = [('Models/Maritime/Civilian/SimpleFreighter.ac', 20), ('Models/Maritime/Civilian/FerryBoat1.ac', 70)]
+            choice = randint(0, len(models) - 1)
+            model = models[choice]
+        stg_path = stg_manager.add_object_shared(model[0], vec2d(pos_global), 0, direction + model[1])
+        print stg_path
+
+
+    def write_area(self, pier, elev, ac, obj):
     # Writes a Pier mapped as an area
+        linear_ring = shg.LinearRing(pier.nodes)
+#         print ring_lat_lon
+        #TODO shg.LinearRing().is_ccw
         o = obj.next_node_index()
-        if self.test_ccw(pier.nodes) > 0:
+        if linear_ring.is_ccw:
+            logging.info('CounterClockWise')
+        else:
+            #normalize to CCW
             logging.info("Clockwise")
             pier.nodes = pier.nodes[::-1]
-        else:
-            logging.info('Anti-Clockwise')
+        #top ring
         for p in pier.nodes:
             e = elev(vec2d(p[0], p[1])) + 1
             obj.node(-p[1], e, -p[0])
         top_nodes = np.arange(len(pier.nodes))
-        pier.segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(pier.line_string.coords[i])) for i, coord in enumerate(pier.line_string.coords[1:])])
-        rd_len = len(pier.line_string.coords)
+        pier.segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(linear_ring.coords[i])) for i, coord in enumerate(linear_ring.coords[1:])])
+        rd_len = len(linear_ring.coords)
         pier.dist = np.zeros((rd_len))
         for i in range(1, rd_len):
             pier.dist[i] = pier.dist[i - 1] + pier.segment_len[i]
@@ -123,9 +191,10 @@ class Piers(ObjectList):
         obj.face(face, mat=0)
 # Build bottom ring
         for p in pier.nodes:
-            e = elev(vec2d(p[0], p[1])) - 1
+            e = elev(vec2d(p[0], p[1])) - 5
             obj.node(-p[1], e, -p[0])
 # Build Sides
+        height = 2
         for i, n in enumerate(top_nodes[1:]):
             sideface = []
             sideface.append((n + o + rd_len - 1, x, 0.5))
@@ -134,11 +203,12 @@ class Piers(ObjectList):
             sideface.append((n + o - 1, x, 0.5))
             obj.face(sideface, mat=0)
 
-    def writeLine(self, Pier, elev, ac, obj):
+    def write_line(self, pier, elev, ac, obj):
     # Writes a Pier as a area which only is mapped as a line
+        line_string = shg.LineString(pier.nodes)
         o = obj.next_node_index()
-        left = Pier.line_string.parallel_offset(2, 'left', resolution=8, join_style=1, mitre_limit=10.0)
-        right = Pier.line_string.parallel_offset(2, 'right', resolution=8, join_style=1, mitre_limit=10.0)
+        left = line_string.parallel_offset(2, 'left', resolution=8, join_style=1, mitre_limit=10.0)
+        right = line_string.parallel_offset(2, 'right', resolution=8, join_style=1, mitre_limit=10.0)
         e = 10000
         idx_left = obj.next_node_index()
         for p in left.coords:
@@ -150,11 +220,11 @@ class Piers(ObjectList):
             obj.node(-p[1], e, -p[0])
         nodes_l = np.arange(len(left.coords))
         nodes_r = np.arange(len(right.coords))
-        Pier.segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(Pier.line_string.coords[i])) for i, coord in enumerate(Pier.line_string.coords[1:])])
-        rd_len = len(Pier.line_string.coords)
-        Pier.dist = np.zeros((rd_len))
+        pier.segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(line_string.coords[i])) for i, coord in enumerate(line_string.coords[1:])])
+        rd_len = len(line_string.coords)
+        pier.dist = np.zeros((rd_len))
         for i in range(1, rd_len):
-            Pier.dist[i] = Pier.dist[i - 1] + Pier.segment_len[i]
+            pier.dist[i] = pier.dist[i - 1] + pier.segment_len[i]
 # Top Surface
         face = []
         x = 0.
@@ -252,7 +322,6 @@ def main():
         path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, center_global)
     else:
         path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center_global)
-    stg_fname = calc_tile.construct_stg_file_name(center_global)
 
     # -- quick test output
     col = ['b', 'r', 'y', 'g', '0.75', '0.5', 'k']
@@ -281,10 +350,16 @@ def main():
     f.write(str(ac))
     f.close()
 
-    stg_manager = stg_io2.STG_Manager(path, OUR_MAGIC, overwrite=True)
+    # -- initialize STG_Manager
+    if parameters.PATH_TO_OUTPUT:
+        path_to_output = parameters.PATH_TO_OUTPUT
+    else:
+        path_to_output = parameters.PATH_TO_SCENERY
+    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, overwrite=True)
 
+    piers.write_boats(elev, stg_manager)
     # -- write stg
-    path_to_stg = stg_manager.add_object_static(ac_fname, center_global, 0, 0)
+    stg_manager.add_object_static(ac_fname, center_global, 0, 0)
     stg_manager.write()
     elev.save_cache()
 
