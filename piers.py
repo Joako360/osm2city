@@ -95,21 +95,26 @@ class Piers(ObjectList):
 
     def write_boats(self, elev, stg_manager):
         for pier in self.objects[:]:
-            self.write_boat(pier, elev, stg_manager)
+            length = len(pier.nodes)
+            if(length > 3 and pier.nodes[0][0] == pier.nodes[(length - 1)][0] and pier.nodes[0][1] == pier.nodes[(length - 1)][1]):
+                self.write_boat_area(pier, elev, stg_manager)
+            else:
+                self.write_boat_line(pier, elev, stg_manager)
 
-    def write_boat(self, pier, elev, stg_manager):
+    def write_boat_area(self, pier, elev, stg_manager):
         if(len(pier.nodes) < 3):
             return
         # Guess a possible position for realistic boat placement
         linear_ring = shg.LinearRing(pier.nodes)
         centroid = linear_ring.centroid
-        #Simplyfy
+        # Simplyfy
         ring = linear_ring.convex_hull.buffer(40, cap_style=CAP_STYLE.square, join_style=JOIN_STYLE.bevel).simplify(20)
-        min_elev = 10
+        min_elev = 0.5
         for p in ring.exterior.coords:
             coord = vec2d(p[0], p[1])
             p_elev = elev(coord)
-            if(min_elev > p_elev):
+            if(p_elev < min_elev):
+                #Seems to be water
                 print p_elev
                 line_coords = [[centroid.x, centroid.y], p]
                 target_vector = shg.LineString(line_coords)
@@ -122,34 +127,56 @@ class Piers(ObjectList):
                         direction = math.degrees(math.atan2(segment.coords[0][0] - segment.coords[1][0], segment.coords[0][1] - segment.coords[1][1]))
                         parallel = segment.parallel_offset(10, 'right')
                         boat_position = parallel.interpolate(segment.length / 2)
-                if direction is None:
-                    return
-                print direction
-                print "Boat"
-                print boat_position
-                print tools.transform.toGlobal(coord)
-                min_elev = p_elev
-        #Ok now we've got the direction and position
-        #OBJECT_SHARED Models/Maritime/Civilian/Pilot_Boat.ac -0.188 54.07603 -0.24 0
-        try:
-            pos_global = tools.transform.toGlobal((boat_position.x, boat_position.y))
-            self.write_model(Polygon(linear_ring).area, stg_manager, pos_global, direction)
-        except AttributeError, reason:
-            logging.error(reason)
+                        # Ok now we've got the direction and position
+                        # OBJECT_SHARED Models/Maritime/Civilian/Pilot_Boat.ac -0.188 54.07603 -0.24 0
+                        print direction
+                        print "Boat"
+                        print boat_position
+                        print tools.transform.toGlobal(coord)
+                        try:
+                            pos_global = tools.transform.toGlobal((boat_position.x, boat_position.y))
+                            self.write_model(segment.length, stg_manager, pos_global, direction)
+                        except AttributeError, reason:
+                            logging.error(reason)
 
-    def write_model(self, area, stg_manager, pos_global, direction):
-        if area < 1500:
-            models = [('Models/Maritime/Civilian/small-red-yacht.ac', 0),
-                      ('Models/Maritime/Civilian/small-black-yacht.ac', 0),
-                      ('Models/Maritime/Civilian/small-clear-yacht.ac', 0)]
+    def write_boat_line(self, pier, elev, stg_manager):
+        line_string = LineString(pier.nodes)
+        right_line = line_string.parallel_offset(4, 'left', resolution=8, join_style=1, mitre_limit=10.0)
+        coords = right_line.coords
+        for i in range(len(coords) - 1):
+            segment = LineString(coords[i:i + 2])
+            boat_position = segment.interpolate(segment.length / 2)
+            try:
+                pos_global = tools.transform.toGlobal((boat_position.x, boat_position.y))
+                direction = math.degrees(math.atan2(segment.coords[0][0] - segment.coords[1][0], segment.coords[0][1] - segment.coords[1][1]))
+                if(segment.length > 5):
+                    self.write_model(segment.length, stg_manager, pos_global, direction)
+            except AttributeError, reason:
+                logging.error(reason)
+
+    def write_model(self, length, stg_manager, pos_global, direction):
+        if length < 20:
+            models = [('Models/Maritime/Civilian/wooden_boat.ac', 120),
+                      ('Models/Maritime/Civilian/wooden_blue_boat.ac', 120),
+                      ('Models/Maritime/Civilian/wooden_green_boat.ac', 120)]
             choice = randint(0, len(models) - 1)
             model = models[choice]
-        elif area < 3000:
-            models = [('Models/Maritime/Civilian/Trawler.xml', 20), ('Models/Maritime/Civilian/MediumFerry.xml', 10)]
+        elif length < 70:
+            models = [('Models/Maritime/Civilian/small-red-yacht.ac', 110),
+                      ('Models/Maritime/Civilian/small-black-yacht.ac', 110),
+                      ('Models/Maritime/Civilian/small-clear-yacht.ac', 110),
+                      ('Models/Maritime/Civilian/blue-sailing-boat-20m.ac', 120),
+                      ('Models/Maritime/Civilian/red-sailing-boat-11m.ac', 120),
+                      ('Models/Maritime/Civilian/red-sailing-boat-20m.ac', 120)]
             choice = randint(0, len(models) - 1)
             model = models[choice]
-        elif area < 8000:
-            models = [('Models/Maritime/Civilian/LargeTrawler.xml', 10), ('Models/Maritime/Civilian/LargeFerry.xml', 100)]
+        elif length < 300:
+            #('Models/Maritime/Civilian/Trawler.xml', 300),
+            models = [('Models/Maritime/Civilian/MediumFerry.xml', 100)]
+            choice = randint(0, len(models) - 1)
+            model = models[choice]
+        elif length < 400:
+            models = [('Models/Maritime/Civilian/LargeTrawler.xml', 10), ('Models/Maritime/Civilian/LargeFerry.xml', 100), ('Models/Maritime/Civilian/barge.xml', 60)]
             choice = randint(0, len(models) - 1)
             model = models[choice]
         else:
@@ -157,22 +184,21 @@ class Piers(ObjectList):
             choice = randint(0, len(models) - 1)
             model = models[choice]
         stg_path = stg_manager.add_object_shared(model[0], vec2d(pos_global), 0, direction + model[1])
-        print stg_path
-
+#         print stg_path
 
     def write_area(self, pier, elev, ac, obj):
     # Writes a Pier mapped as an area
         linear_ring = shg.LinearRing(pier.nodes)
 #         print ring_lat_lon
-        #TODO shg.LinearRing().is_ccw
+        # TODO shg.LinearRing().is_ccw
         o = obj.next_node_index()
         if linear_ring.is_ccw:
             logging.info('CounterClockWise')
         else:
-            #normalize to CCW
+            # normalize to CCW
             logging.info("Clockwise")
             pier.nodes = pier.nodes[::-1]
-        #top ring
+        # top ring
         for p in pier.nodes:
             e = elev(vec2d(p[0], p[1])) + 1
             obj.node(-p[1], e, -p[0])
@@ -207,8 +233,8 @@ class Piers(ObjectList):
     # Writes a Pier as a area which only is mapped as a line
         line_string = shg.LineString(pier.nodes)
         o = obj.next_node_index()
-        left = line_string.parallel_offset(2, 'left', resolution=8, join_style=1, mitre_limit=10.0)
-        right = line_string.parallel_offset(2, 'right', resolution=8, join_style=1, mitre_limit=10.0)
+        left = line_string.parallel_offset(1, 'left', resolution=8, join_style=1, mitre_limit=10.0)
+        right = line_string.parallel_offset(1, 'right', resolution=8, join_style=1, mitre_limit=10.0)
         e = 10000
         idx_left = obj.next_node_index()
         for p in left.coords:
