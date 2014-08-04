@@ -9,7 +9,13 @@ Created on Sun Sep 29 10:42:12 2013
 @author: tom
 TODO:
 - clusterize
+  - a road meandering along a cluster boarder should not be clipped all the time.
+  - only clip if on next-to-next tile?
+  - clip at next tile center?
 - LOD
+  - major roads - LOD rough
+  - minor roads - LOD detail
+  - roads LOD? road_rough, road_detail?
 - handle intersections
 - handle layers/bridges
 
@@ -70,7 +76,7 @@ import osmparser
 import stg_io2
 import objectlist
 import tools
-
+from cluster import Clusters
 # debug stuff
 import test
 from pdb import pm
@@ -78,6 +84,8 @@ from memory_profiler import profile
 import mem
 import gc
 import time
+import re
+import random
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 
@@ -195,41 +203,6 @@ class Roads(objectlist.ObjectList):
                 return True
             
 
-    def create_ac(self):
-        ac = ac3d.Writer(tools.stats, show_labels=False)
-
-        # -- debug: write individual .ac for every road
-        if 0:
-            for i, rd in enumerate(self.objects[:]):
-                if rd.osm_id != 205546090: continue
-                ac = ac3d.Writer(tools.stats, show_labels=False)
-                obj = ac.new_object('roads_%s' % rd.osm_id, 'tex/roads.png')
-
-                if not rd.write_to(obj, self.elev, ac): continue
-                #print "write", rd.osm_id
-                #ac.center()
-                f = open('roads_%i_%03i.ac' % (rd.osm_id, i), 'w')
-                f.write(str(ac))
-                f.close()
-            return
-
-        # -- create ac object, then write obj to file
-        # TODO: try emis for night lighting? Didnt look too bad, and gave better range
-        # MATERIAL "" rgb 1 1 1 amb 1 1 1 emis 0.4 0.2 0.05 spec 0.5 0.5 0.5 shi 64 trans 0
-
-        obj = ac.new_object('roads', 'tex/roads.png', default_swap_uv=True)
-        for rd in self.objects:
-            rd.write_to(obj, self.elev, ac)
-
-        if 0:
-            for ref in self.intersections:
-                node = self.nodes_dict[ref]
-                x, y = self.transform.toLocal((node.lon, node.lat))
-                e = self.elev(vec2d(x, y)) + 5
-                ac.add_label('I', -y, e, -x, scale=10)
-
-        return ac
-
     def find_intersections(self):
         """
         find intersections by brute force:
@@ -289,6 +262,58 @@ class Roads(objectlist.ObjectList):
         for the_object in self.objects:
             print the_object
 
+    def clusterize(self):
+        lmin, lmax = [vec2d(self.transform.toLocal(c)) for c in parameters.get_extent_global()]
+        self.clusters = Clusters(lmin, lmax, parameters.TILE_SIZE)
+
+        for the_object in self.objects:
+            self.clusters.append(vec2d(the_object.center.centroid.coords[0]), the_object)
+        #self.objects = None
+        
+def create_ac(file_name, objects, center_global, elev, stg_manager):
+    """unused ATM"""    
+    ac = ac3d.Writer(tools.stats, show_labels=False)
+    
+    # -- debug: write individual .ac for every road
+    if 0:
+        for i, rd in enumerate(self.objects[:]):
+            if rd.osm_id != 205546090: continue
+            ac = ac3d.Writer(tools.stats, show_labels=False)
+            obj = ac.new_object('roads_%s' % rd.osm_id, 'tex/roads.png')
+
+            if not rd.write_to(obj, self.elev, ac): continue
+            #print "write", rd.osm_id
+            #ac.center()
+            f = open('roads_%i_%03i.ac' % (rd.osm_id, i), 'w')
+            f.write(str(ac))
+            f.close()
+        return
+    
+    # -- create ac object, then write obj to file
+    # TODO: try emis for night lighting? Didnt look too bad, and gave better range
+    # MATERIAL "" rgb 1 1 1 amb 1 1 1 emis 0.4 0.2 0.05 spec 0.5 0.5 0.5 shi 64 trans 0
+
+    path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center_global)
+    stg_fname = calc_tile.construct_stg_file_name(center_global)
+
+
+    obj = ac.new_object(file_name, 'tex/roads.png', default_swap_uv=True)
+    for rd in objects:
+        rd.write_to(obj, elev, ac)
+
+    if 0:
+        for ref in self.intersections:
+            node = self.nodes_dict[ref]
+            x, y = self.transform.toLocal((node.lon, node.lat))
+            e = self.elev(vec2d(x, y)) + 5
+            ac.add_label('I', -y, e, -x, scale=10)
+
+    path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, 0, 0)
+    stg_manager.write()
+    ac.write_to_file(path_to_stg + file_name)
+    write_xml(path_to_stg, file_name, 'roads')
+    tools.install_files(['roads.eff'], path_to_stg)
+
 
 def write_xml(path_to_stg, file_name, object_name):
     xml = open(path_to_stg + file_name + '.xml', "w")
@@ -313,20 +338,51 @@ def write_xml(path_to_stg, file_name, object_name):
     """  % (file_name, shader_str, object_name)))
 
 
-def debug_create_eps(roads):
+def debug_create_eps(roads, clusters, elev):
     """debug: plot roads map to .eps"""
-    col = ['b', 'r', 'y', 'g', '0.75', '0.5', 'k']
+    transform = tools.transform
+    if 1:
+        c = np.array([[elev.min.x, elev.min.y], 
+                      [elev.max.x, elev.min.y], 
+                      [elev.max.x, elev.max.y], 
+                      [elev.min.x, elev.max.y],
+                      [elev.min.x, elev.min.y]])
+        #c = np.array([transform.toGlobal(p) for p in c])
+        plt.plot(c[:,0], c[:,1],'r-', label="elev")
+    
+
+    col = ['b', 'r', 'y', 'g', '0.75', '0.5', 'k', 'c']
     col = ['0.5', '0.75', 'y', 'g', 'r', 'b', 'k']
     lw    = [1, 1, 1, 1.2, 1.5, 2, 1]
-    lw_w  = [1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
-    for r in roads:
-        a = np.array(r.center.coords)
-        #np.array([transform.toLocal((n.lon, n.lat)) for n in r.nodes])
-        plt.plot(a[:,0], a[:,1], color=col[r.typ], linewidth=lw[r.typ])
-        plt.plot(a[:,0], a[:,1], color='w', linewidth=lw_w[r.typ], ls=":")
+    lw_w  = np.array([1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]) * 0.1
+
+    if 1:
+        for i, cl in enumerate(clusters):
+            print "cluster id %i" % i
+            cluster_color = col[random.randint(0, len(col)-1)]
+            c = np.array([[cl.min.x, cl.min.y], 
+                          [cl.max.x, cl.min.y], 
+                          [cl.max.x, cl.max.y], 
+                          [cl.min.x, cl.max.y],
+                          [cl.min.x, cl.min.y]])
+            c = np.array([transform.toGlobal(p) for p in c])
+            plt.plot(c[:,0], c[:,1], '-', color=cluster_color)
+            for r in cl.objects:
+                a = np.array(r.center.coords)
+                a = np.array([transform.toGlobal(p) for p in a])
+                #color = col[r.typ]
+                plt.plot(a[:,0], a[:,1], color=cluster_color, linewidth=lw[r.typ])
+        
+    if 0:
+        for r in roads:
+            a = np.array(r.center.coords)
+            a = np.array([transform.toGlobal(p) for p in a])
+            plt.plot(a[:,0], a[:,1], color=col[r.typ], linewidth=lw[r.typ])
+            #plt.plot(a[:,0], a[:,1], color='w', linewidth=lw_w[r.typ], ls=":")
 
     plt.axes().set_aspect('equal')
     #plt.show()
+    plt.legend()
     plt.savefig('roads.eps')
     plt.clf()
 
@@ -355,6 +411,7 @@ def main():
     transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(transform)
     elev = tools.get_interpolator(fake=parameters.NO_ELEV)
+    print "tr 0", transform
     roads = Roads(transform, elev)
     handler = osmparser.OSMContentHandler(valid_node_keys=[])
     source = open(osm_fname)
@@ -375,29 +432,43 @@ def main():
         path_to_output = parameters.PATH_TO_SCENERY
 
 
-    roads.objects = roads.objects[0:1000]
-    roads.clip_at_cluster_border()
-    debug_create_eps(roads)
+#    roads.objects = roads.objects[0:1000]
+    #roads.clip_at_cluster_border()
+    logging.info("done.")
+    logging.info("ways: %i", len(roads))
+
+    roads.clusterize()
     #roads.find_intersections()
     #roads.cleanup_intersections()
 #    roads.objects = [roads.objects[0]]
 
 #    scale_test(transform, elev)
 
-    logging.info("done.")
-    logging.info("ways: %i", len(roads))
-
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, overwrite=True)
 
     # -- write stg
-    ac = roads.create_ac()
+    for cl in roads.clusters:
+        if len(cl.objects) < parameters.CLUSTER_MIN_OBJECTS: continue # skip almost empty clusters
 
-    file_name = 'roads%07i' % calc_tile.tile_index(center_global)
-    path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, 0, 0)
+        replacement_prefix = re.sub('[\/]','_', parameters.PREFIX)
+        file_name = replacement_prefix + "roads%02i%02i" % (cl.I.x, cl.I.y)
+        center_global = vec2d(tools.transform.toGlobal(cl.center))
+        offset = cl.center
+
+        ac = ac3d.Writer(tools.stats, show_labels=False)
+        obj = ac.new_object(file_name, 'tex/roads.png', default_swap_uv=True)
+        for rd in cl.objects:
+            rd.write_to(obj, elev, ac, offset=offset) # fixme: remove .ac, needed only for adding debug labels
+
+        path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, 0, 0)
+        ac.write_to_file(path_to_stg + file_name)
+        write_xml(path_to_stg, file_name, 'roads')
+        tools.install_files(['roads.eff'], path_to_stg)
+
+    debug_create_eps(roads, roads.clusters, elev)
+    print "tr 1", transform
     stg_manager.write()
-    ac.write_to_file(path_to_stg + file_name)
-    write_xml(path_to_stg, file_name, 'roads')
-    tools.install_files(['roads.eff'], path_to_stg)
+
     elev.save_cache()
     logging.info('Done.')
 
