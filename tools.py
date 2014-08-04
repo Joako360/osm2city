@@ -20,7 +20,7 @@ import parameters
 
 stats = None
 
-import vec2d
+from vec2d import vec2d
 import coordinates
 import calc_tile
 import time
@@ -29,6 +29,7 @@ import csv
 import subprocess
 #import Queue
 
+import matplotlib.pyplot as plt
 
 class Interpolator(object):
     """load elevation data from file, interpolate"""
@@ -45,6 +46,7 @@ class Interpolator(object):
         else:
             self.fake = False
         self.clamp = clamp
+        logging.debug("reading elev from %s" % filename)
         f = open(filename, "r")
         x0, y0, size_x, size_y, self.step_x, self.step_y = [float(i) for i in f.readline().split()[1:]]
         f.close()
@@ -62,7 +64,7 @@ class Interpolator(object):
             for row in reader:
                 tmp = np.array(row)
                 if len(tmp) == 5:
-                    elev[i,:]
+                    elev[i,:] = tmp
                     i += 1
         
         self.x = elev[:,0] # -- that's actually lon
@@ -71,10 +73,8 @@ class Interpolator(object):
         if nx * ny != len(self.x):
             raise ValueError("expected %i, but read %i lines." % (nx*ny, len(self.x)))
 
-        self.min_x = min(self.x)
-        self.max_x = max(self.x)
-        self.min_y = min(self.y)
-        self.max_y = max(self.y)
+        self.min = vec2d(min(self.x), min(self.y))
+        self.max = vec2d(max(self.x), max(self.y))
         self.h = self.h.reshape(ny, nx)
         self.x = self.x.reshape(ny, nx)
         self.y = self.y.reshape(ny, nx)
@@ -82,16 +82,17 @@ class Interpolator(object):
         self.dx = self.x[0,1] - self.x[0,0]
         self.dy = self.y[1,0] - self.y[0,0]
         print "dx, dy", self.dx, self.dy
+        print "min %s  max %s" % (self.min, self.max)
 
     def _move_to_boundary(self, p):
-        if p.x <= self.min_x:
-            p.x = self.min_x
-        elif p.x >= self.max_x:
-            p.x = self.max_x
-        if p.y <= self.min_y:
-            p.y = self.min_y
-        elif p.y >= self.max_y:
-            p.y = self.max_y
+        if p.x <= self.min.x:
+            p.x = self.min.x
+        elif p.x >= self.min.x:
+            p.x = self.min.x
+        if p.y <= self.min.x:
+            p.y = self.min.x
+        elif p.y >= self.min.x:
+            p.y = self.min.x
         return p
 
     def __call__(self, p, is_global=False):
@@ -100,18 +101,24 @@ class Interpolator(object):
             return 0.
             #return p.x + p.y
         global transform
+
         if not is_global:
-            p = vec2d.vec2d(transform.toGlobal(p))
+            p = vec2d(transform.toGlobal(p))
+            
 
         if self.clamp:
             p = self._move_to_boundary(p)
         else:
-            if p.x <= self.min_x or p.x >= self.max_x:
+            if p.x <= self.min.x or p.x >= self.max.x:
+                plt.plot(p.x, p.y, 'r.')
                 return -9999
-            elif p.y <= self.min_y or p.y >= self.max_y:
+            elif p.y <= self.min.y or p.y >= self.max.y:
+                plt.plot(p.x, p.y, 'r.')
                 return -9999
-        i = int((p.x - self.min_x)/self.dx)
-        j = int((p.y - self.min_y)/self.dy)
+
+        #plt.plot(p.x, p.y, 'k.')
+        i = int((p.x - self.min.x)/self.dx)
+        j = int((p.y - self.min.y)/self.dy)
         fx = (p.x - self.x[j,i])/self.dx
         fy = (p.y - self.y[j,i])/self.dy
         # rounding errors at boundary.
@@ -222,7 +229,7 @@ class Probe_fgelev(object):
 
         global transform
         if not is_global:
-            position = vec2d.vec2d(transform.toGlobal(position))
+            position = vec2d(transform.toGlobal(position))
 
         if self._cache == None:
             return really_probe(position)
@@ -247,9 +254,9 @@ def test_fgelev(cache, N):
     elev = Probe_fgelev(cache=cache)
     delta = 0.3
     check_btg = True
-    p = vec2d.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
+    p = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
     elev(p, True, check_btg) # -- ensure fgelev is up and running
-    #p = vec2d.vec2d(parameters.BOUNDARY_WEST+delta, parameters.BOUNDARY_SOUTH+delta)
+    #p = vec2d(parameters.BOUNDARY_WEST+delta, parameters.BOUNDARY_SOUTH+delta)
     #elev(p, True, check_btg) # -- ensure fgelev is up and running
     nx = ny = N
     ny = 1
@@ -276,7 +283,7 @@ def test_fgelev(cache, N):
     i = 0
     for y in Y:
         for x in X:
-            p = vec2d.vec2d(x, y)
+            p = vec2d(x, y)
             print i/2,
             e = elev(p, True, check_btg)
             i += 1
@@ -292,12 +299,12 @@ def test_fgelev(cache, N):
     elev.save_cache()
 
 def raster_glob():
-    cmin = vec2d.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
-    cmax = vec2d.vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
+    cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
+    cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
     center = (cmin + cmax) * 0.5
     transform = coordinates.Transformation((center.x, center.y), hdg = 0)
-    lmin = vec2d.vec2d(transform.toLocal(cmin.__iter__()))
-    lmax = vec2d.vec2d(transform.toLocal(cmax.__iter__()))
+    lmin = vec2d(transform.toLocal(cmin.__iter__()))
+    lmax = vec2d(transform.toLocal(cmax.__iter__()))
     delta = (lmax - lmin)*0.5
     print "Distance from center to boundary in meters (x, y):", delta
     err_msg = "Unknown Elevation Query mode : %s Use Manual, Telnet or Fgelev for parameter ELEV_MODE "%(parameters.ELEV_MODE)
@@ -403,7 +410,7 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
     import Queue
     fg_root = "$FG_ROOT"
 
-    center_global = vec2d.vec2d(transform.toGlobal((x0,y0)))
+    center_global = vec2d(transform.toGlobal((x0,y0)))
     btg_file = parameters.PATH_TO_SCENERY + os.sep + "Terrain"
     btg_file = btg_file + os.sep + calc_tile.directory_name(center_global) + os.sep + calc_tile.construct_btg_file_name(center_global)
     if not os.path.exists(btg_file):
@@ -472,10 +479,10 @@ def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=
     f.close()
 
 def write_map(filename, transform, elev, gmin, gmax):
-    lmin = vec2d.vec2d(transform.toLocal((gmin.x, gmin.y)))
-    lmax = vec2d.vec2d(transform.toLocal((gmax.x, gmax.y)))
+    lmin = vec2d(transform.toLocal((gmin.x, gmin.y)))
+    lmax = vec2d(transform.toLocal((gmax.x, gmax.y)))
     map_z0 = 0.
-    elev_offset = elev(vec2d.vec2d(0,0))
+    elev_offset = elev(vec2d(0,0))
     print "offset", elev_offset
 
     nx, ny = ((lmax - lmin)/100.).int().list() # 100m raster
@@ -501,7 +508,7 @@ def write_map(filename, transform, elev, gmin, gmax):
 
     for j in range(ny):
         for i in range(nx):
-            out.write("%g %g %g\n" % (y[j], (elev(vec2d.vec2d(x[i],y[j])) - elev_offset), x[i]))
+            out.write("%g %g %g\n" % (y[j], (elev(vec2d(x[i],y[j])) - elev_offset), x[i]))
 
     out.write("numsurf %i\n" % ((nx-1)*(ny-1)))
     for j in range(ny-1):
