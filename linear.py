@@ -170,13 +170,16 @@ class LinearObject(object):
         self.angle[-1] = self.angle[-2]
 
     def _write_to(self, obj, elev, left, right, tex_y0, tex_y1, n_nodes=None, left_z=None,
-                  right_z=None, ac=None):
+                  right_z=None, ac=None, offset=None):
         """given left and right LineStrings, write quads
            Use height z if given, probe elev otherwise
            
            if left or right is integer, assume nodes are already written and use 
            integer as node index.
         """
+        if not offset:
+            offset = vec2d(0,0)
+            
         try:
             n_nodes = len(left.coords)
         except AttributeError:
@@ -202,7 +205,8 @@ class LinearObject(object):
                     e = left_z[i]
                 else:
                     e = elev(vec2d(the_node[0], the_node[1])) + self.AGL
-                obj.node(-the_node[1], e, -the_node[0])
+                    #print "s", e, vec2d(the_node[0], the_node[1])
+                obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 #                if abs(the_node[1]) > 50000. or abs(the_node[0]) > 50000.:
 #                    print "large node %6.0f %6.0f %i" % (the_node[0], the_node[1], self.osm_id)
                 #ac.add_label(''+str(self.osm_id), -the_node[1], e+5, -the_node[0], scale=5)
@@ -219,7 +223,7 @@ class LinearObject(object):
                     e = right_z[i]
                 else:
                     e = elev(vec2d(the_node[0], the_node[1])) + self.AGL
-                obj.node(-the_node[1], e, -the_node[0])
+                obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 #                ac.add_label(''+str(self.osm_id), -the_node[1], e+5, -the_node[0], scale=5)
                 ni += 1
         except AttributeError:
@@ -249,13 +253,13 @@ class LinearObject(object):
             obj.face(face[::-1])
         return node0_l, node0_r
 
-    def write_to(self, obj, elev, ac=None, left=None, right=None, z=None):
+    def write_to(self, obj, elev, ac=None, left=None, right=None, z=None, offset=None):
         """need adjacency info
            left: node index of left
            right:
         """
         self._write_to(obj, elev, self.left, self.right,
-                                  self.tex_y0, self.tex_y1, ac=ac)
+                                  self.tex_y0, self.tex_y1, ac=ac, offset=offset)
         return True
         # options:
         # - each way has two ends.
