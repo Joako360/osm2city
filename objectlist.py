@@ -9,7 +9,7 @@ from __builtin__ import max
 
 class ObjectList(object):
     '''
-    Class for storing a List  OSM Objects
+    Class for storing a List OSM Objects
     '''
 
     def __init__(self, transform):
