@@ -3,19 +3,31 @@
 """
 Created on Thu Feb 28 23:39:23 2013
 
+"Tile" might be a better name for what we now denote "cluster" in osm2city.
+It was chosen however to avoid confusion with FG's scenery tiles.
+
+A cluster is a collection of scenery objects (buildings, roads, etc), roughly
+bounded by a rectangle. To speed up rendering, these objects will be merged 
+into as few AC3D objects (drawables) as possible.
+
+Cluster borders overlap to make LOD less obvious.
+
 @author: tom
 """
 from vec2d import vec2d
 import tools
 import numpy as np
+import logging
 
 
 class Cluster(object):
-    def __init__(self, I, center):
+    def __init__(self, I, center, size):
         #self.out = open
         self.objects = []
         self.I = I
         self.center = center # -- center in local coord
+        self.min = center - size/2.
+        self.max = center + size/2.
         self.stats = tools.Stats()
 
     def __str__(self):
@@ -49,11 +61,11 @@ class Clusters(object):
 
     def init_cluster(self, I):
         center = self.min + (I + 0.5) * self.size # in meters
-        new_cluster = Cluster(I, center)
+        new_cluster = Cluster(I, center, self.size)
         return new_cluster
 
     def coords_to_index(self, X):
-        """return cluster id for given (x, y)"""
+        """return cluster id for given point X"""
         if X.x < self.min.x: X.x = self.min.x
         if X.x > self.max.x: X.x = self.max.x
         if X.y < self.min.y: X.y = self.min.y
@@ -65,6 +77,7 @@ class Clusters(object):
         return I
 
     def __call__(self, X):
+        """return cluster instance for given point X"""
         I = self.coords_to_index(X)
         #print "  I=(%s)" % I
 
@@ -78,11 +91,15 @@ class Clusters(object):
             for item in each_list: yield item
 
     def append(self, anchor, obj):
+        """find cluster of """
         #print "appending at pos", X
         #print "  to ", self(X)
         self(anchor).objects.append(obj)
-        self(anchor).stats.count(obj)
-
+        try:
+            self(anchor).stats.count(obj)
+        except AttributeError:
+            logging.debug("count broken, fix me")
+        
     def transfer_buildings(self):
         """1|0
            -+-
@@ -164,6 +181,9 @@ self._clusters[I.x][I.y]
 
     def get_center(self, id):
         pass
+    
+
+
 #c = Clusters(0,5,2,  0,7,3)
 #print c.cluster_id(-1111.999,3)
 
