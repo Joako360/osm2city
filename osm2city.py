@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 osm2city.py aims at generating 3D city models for FG, using OSM data.
-Currently, it generates 3D textured buildings, much like bob.pl.
+Currently, it generates 3D textured buildings.
 However, it has a somewhat more advanced texture manager, and comes with a
 number of facade/roof textures.
 
@@ -611,8 +611,7 @@ if __name__ == "__main__":
     tex.init()
 
     # -- prepare transformation to local coordinates
-    cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
-    cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
+    cmin, cmax = parameters.get_extent_global()
     center = (cmin + cmax)*0.5
     #center = (11.38, 47.26)
     tools.init(coordinates.Transformation(center, hdg = 0))
