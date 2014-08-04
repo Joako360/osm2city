@@ -209,7 +209,11 @@ def get_center_global():
     cmax = vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
     return (cmin + cmax) * 0.5
 
-
+def get_extent_global():
+    cmin = vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
+    cmax = vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
+    return cmin, cmax
+    
 def show():
     """
     Prints all parameters as key = value
