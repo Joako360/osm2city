@@ -7,6 +7,7 @@ import linear
 import numpy as np
 import scipy.interpolate
 from pdb import pm
+from vec2d import vec2d
 
 class Deck_shape_linear(object):
     def __init__(self, h0, h1):
@@ -38,20 +39,17 @@ class LinearBridge(linear.LinearObject):
         # -- prepare elevation spline
         #    probe elev at n_probes locations
         n_probes = max(int(self.center.length / 5.), 3)
-        probe_locations = np.linspace(0, 1., n_probes)
+        probe_locations_nondim = np.linspace(0, 1., n_probes)
         elevs = np.zeros(n_probes)
-        probe_coords = np.zeros((n_probes, 2))
-        for i, l in enumerate(probe_locations):
-            local = self.center.interpolate(l, normalized=True)
-            probe_coords[i] = transform.toGlobal(local.coords[0])
-            elevs[i] = elev(probe_coords[i])
+        for i, l in enumerate(probe_locations_nondim):
+            local_point = self.center.interpolate(l, normalized=True)
+            elevs[i] = elev(local_point.coords[0]) # fixme: have elev do the transform?
 #        print "probing at", probe_coords
 #        self.elevs = probe(probe_coords)
 #        print n_probes
-#        print ">>>    ", probe_locations
+#        print ">>>    ", probe_locations_nondim
 #        print ">>> got", elevs
-
-        self.elev_spline = scipy.interpolate.interp1d(probe_locations, elevs)
+        self.elev_spline = scipy.interpolate.interp1d(probe_locations_nondim, elevs)
         self.prep_height()
 
     def elev(self, l, normalized=True):
@@ -97,7 +95,7 @@ class LinearBridge(linear.LinearObject):
         #return 10.
         return self.D(l)
 
-    def write_to(self, obj, elev, ac=None):
+    def write_to(self, obj, elev, ac=None, offset=None):
         """
         write
         - deck
@@ -121,16 +119,16 @@ class LinearBridge(linear.LinearObject):
 
         # -- top
         node0_l, node0_r = self._write_to(obj, elev, self.left, self.right,
-                                          self.tex_y0, self.tex_y1, left_z=z, right_z=z, ac=ac)
+                                          self.tex_y0, self.tex_y1, left_z=z, right_z=z, ac=ac, offset=offset)
         left2, right2 = self.compute_offset(3)
         #left2, right2 = self.left, self.right
 
         # -- right
         tmp, node0_r2 = self._write_to(obj, elev, node0_r, right2,
-                                       1, 0.75, left_z=z-5, right_z=z-5, ac=ac)
+                                       1, 0.75, left_z=z-5, right_z=z-5, ac=ac, offset=offset)
         # left
         node0_l2, tmp = self._write_to(obj, elev, left2, node0_l,
-                                       0.75, 1, left_z=z-5, right_z=z-5, ac=ac)
+                                       0.75, 1, left_z=z-5, right_z=z-5, ac=ac, offset=offset)
         # -- bottom
-        self._write_to(obj, elev, node0_r2, node0_l2, 0.9, 1, ac=ac, n_nodes=n_nodes)
+        self._write_to(obj, elev, node0_r2, node0_l2, 0.9, 1, ac=ac, n_nodes=n_nodes, offset=offset)
 
