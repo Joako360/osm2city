@@ -24,10 +24,10 @@ class ObjectList(object):
         self.maxlat = -91.
         self.min_max_scanned = False
 
-    def _process_nodes(self, nodes):
-        self.nodes_dict = nodes
+    def _process_nodes(self, nodes_dict):
+        self.nodes_dict = nodes_dict
         self.min_max_scanned = True
-        for node in nodes.values():
+        for node in nodes_dict.values():
             #logging.debug('%s %.4f %.4f', node.osm_id, node.lon, node.lat)
                 self.maxlon = max(self.maxlon, node.lon)
                 self.minlon = min(self.minlon, node.lon)
