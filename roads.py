@@ -102,13 +102,15 @@ class Roads(objectlist.ObjectList):
     def __init__(self, transform, elev):
         super(Roads, self).__init__(transform)
         self.elev = elev
-        self.bridges = []
+        self.ways_list = []
+        self.bridges_list = []
+        self.roads_list = []
 
     def store_uncategorized(self, way, nodes_dict):
         pass
 
-    def create_from_way(self, way, nodes_dict):
-        """take one osm way, create a linear object"""
+    def store_way(self, way, nodes_dict):
+        """take one osm way, store it. A linear object is created later."""
         if not self.min_max_scanned:
             self._process_nodes(nodes_dict)
             logging.info("len of nodes_dict %i" % len(nodes_dict))
@@ -124,84 +126,89 @@ class Roads(objectlist.ObjectList):
         #if way.osm_id == 235008364 or way.osm_id == 4374302:
         #    pass
         #else: return
-        if len(self.objects) >= parameters.MAX_OBJECTS:
+        if len(self.ways_list) >= parameters.MAX_OBJECTS:
             return
         
-        prio = None
-        try:
-            access = not (way.tags['access'] == 'no')
-        except:
-            access = 'yes'
-
-        width = 9
-        tex_y0 = 0.5
-        tex_y1 = 0.75
-        AGL_ofs = 0.
-        #if way.tags.has_key('layer'):
-        #    AGL_ofs = 20.*float(way.tags['layer'])
-        #print way.tags
-        #bla
-
-        if 'highway' in way.tags:
-            road_type = way.tags['highway']
-            if road_type == 'motorway' or road_type == 'motorway_link':
-                prio = 5
-            elif road_type == 'primary' or road_type == 'trunk':
-                prio = 4
-            elif road_type == 'secondary':
-                prio = 3
-            elif road_type == 'tertiary' or road_type == 'unclassified':
-                prio = 2
-            elif road_type == 'residential':
-                prio = 1
-            elif road_type == 'service' and access:
-                prio = None
-        elif 'railway' in way.tags:
-            if way.tags['railway'] in ['rail']:
-                prio = 6
-                width = 2.87
-                tex_y0 = 0
-                tex_y1 = 0.25
-
-        if prio in [1, 2]:
-            tex_y0 = 0.25
-            tex_y1 = 0.5
-            width=6
-
-        #if prio != 1: prio = None
-
-        if prio == None:
-#            print "got", way.osm_id,
-#            for t in way.tags.keys():
-#                print (t), "=", (way.tags[t])+" ",
-#            print "(rejected)"
-            return
-
-        #print "(accepted)"
-        is_bridge = "bridge" in way.tags
-        if is_bridge:
-            road = LinearBridge(self.transform, self.elev, way.osm_id, way.tags, way.refs, nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
-            self.bridges.append(road)
-        else:
-            road = LinearObject(self.transform, way.osm_id, way.tags, way.refs, nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
-
-        if road.has_large_angle():
-            print "skipping OSM_ID %i: large angle. OSM error?" % road.osm_id
-            return
-
-        road.typ = prio
-        self.objects.append(road)
-
-#        if self.has_duplicate_nodes(way.refs):
-#            print "dup nodes in", way.osm_id
-            #road.plot(left=False, right=False, angle=False)
-
+        self.ways_list.append(way)
+        #self.create_and_append(way.osm_id, way.tags, way.refs)
+    
+#    self.transform, self.elev, way.osm_id, way.tags, way.refs, nodes_dict, 
+#    width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs
+    def create_linear_objects(self):
+        for the_way in self.ways_list:
+            prio = None
+            try:
+                access = not (the_way.tags['access'] == 'no')
+            except:
+                access = 'yes'
+    
+            width = 9
+            tex_y0 = 0.5
+            tex_y1 = 0.75
+            AGL_ofs = 0.
+            #if way.tags.has_key('layer'):
+            #    AGL_ofs = 20.*float(way.tags['layer'])
+            #print way.tags
+            #bla
+    
+            if 'highway' in the_way.tags:
+                road_type = the_way.tags['highway']
+                if road_type == 'motorway' or road_type == 'motorway_link':
+                    prio = 5
+                elif road_type == 'primary' or road_type == 'trunk':
+                    prio = 4
+                elif road_type == 'secondary':
+                    prio = 3
+                elif road_type == 'tertiary' or road_type == 'unclassified':
+                    prio = 2
+                elif road_type == 'residential':
+                    prio = 1
+                elif road_type == 'service' and access:
+                    prio = None
+            elif 'railway' in the_way.tags:
+                if the_way.tags['railway'] in ['rail']:
+                    prio = 6
+                    width = 2.87
+                    tex_y0 = 0
+                    tex_y1 = 0.25
+    
+            if prio in [1, 2]:
+                tex_y0 = 0.25
+                tex_y1 = 0.5
+                width=6
+    
+            #if prio != 1: prio = None
+    
+            if prio == None:
+    #            print "got", osm_id,
+    #            for t in tags.keys():
+    #                print (t), "=", (tags[t])+" ",
+    #            print "(rejected)"
+                continue
+    
+            #print "(accepted)"
+            is_bridge = "bridge" in the_way.tags
+            if is_bridge:
+                bridge = LinearBridge(self.transform, self.elev, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
+                self.bridges_list.append(bridge)
+            else:
+                road = LinearObject(self.transform, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
+    
+            if road.has_large_angle():
+                print "skipping OSM_ID %i: large angle. OSM error?" % road.osm_id
+                continue
+    
+            road.typ = prio
+            self.roads_list.append(road)
+    
+    #        if self.has_duplicate_nodes(refs):
+    #            print "dup nodes in", osm_id
+                #road.plot(left=False, right=False, angle=False)
 
     def has_duplicate_nodes(self, refs):
         for i, r in enumerate(refs):
             if r in refs[i+1:]:
                 return True
-            
 
     def find_intersections(self):
         """
@@ -212,12 +219,12 @@ class Roads(objectlist.ObjectList):
         """
         logging.info('Finding intersections...')
         self.intersections = []
-        self.attached_ways = {} # a dict: for each node hold a list of attached ways
-        for road in self.objects:
-            for ref in road.refs:
+        self.attached_ways_dict = {} # a dict: for each ref hold a list of attached ways
+        for the_way in self.ways_list:
+            for ref in the_way.refs:
                 try:
-                    self.attached_ways[ref].append(road)
-                    if len(self.attached_ways[ref]) == 2:
+                    self.attached_ways_dict[ref].append(the_way)
+                    if len(self.attached_ways_dict[ref]) == 2:
                         # -- check if ways are actually distinct before declaring
                         #    an intersection?
                         # not an intersection if
@@ -225,9 +232,47 @@ class Roads(objectlist.ObjectList):
                         # easier?: only 2 ways, at least one node is middle node
                         self.intersections.append(ref)
                 except KeyError:
-                    self.attached_ways[ref] = [road]  # initialize node
+                    self.attached_ways_dict[ref] = [the_way]  # initialize node
         logging.info('Done.')
 
+        # kick nodes that belong to one way only
+        # TODO: is there something like dict comprehension?
+        for key, value in self.attached_ways_dict.items():
+            if len(value) < 2:
+                self.attached_ways_dict.pop(key)
+#            else:
+#                pass
+#                check if one is first node and one last node. If so, join_ways
+
+#        for key, value in attached_ways_dict.items():
+#            print key, value
+
+    def count_inner_intersections(self):
+        """count inner nodes which are intersections"""
+        count = 0        
+        for the_way in self.ways_list:
+            for the_ref in the_way.refs[1:-1]:
+                if the_ref in self.attached_ways_dict:
+                    count += 1
+        logging.debug("inner intersections %i" % count)
+        return count
+
+    def split_ways(self):
+        for the_way in self.ways_list:
+            self.ways_list.remove(the_way)
+            new_way = osmparser.Way(the_way.osm_id)
+            new_way.tags = the_way.tags
+            new_way.refs.append(the_way.refs[0])
+            for the_ref in the_way.refs[1:-1]:
+                new_way.refs.append(the_ref)
+                if the_ref in self.attached_ways_dict:
+                    self.ways_list.append(new_way)
+                    new_way = osmparser.Way(the_way.osm_id)
+                    new_way.tags = the_way.tags
+                    new_way.refs.append(the_ref)
+            new_way.refs.append(the_way.refs[-1])
+            self.ways_list.append(new_way)
+                
         if 0:
             for key, value in self.attached_ways.items():
                 if len(value) > 1:
@@ -259,14 +304,14 @@ class Roads(objectlist.ObjectList):
                    - remove it, insert splitted 
                  - put into cluster
         """
-        for the_object in self.objects:
+        for the_object in self.roads_list + self.bridges_list:
             print the_object
 
     def clusterize(self):
         lmin, lmax = [vec2d(self.transform.toLocal(c)) for c in parameters.get_extent_global()]
         self.clusters = Clusters(lmin, lmax, parameters.TILE_SIZE)
 
-        for the_object in self.objects:
+        for the_object in self.roads_list + self.bridges_list:
             self.clusters.append(vec2d(the_object.center.centroid.coords[0]), the_object)
         #self.objects = None
         
@@ -341,7 +386,7 @@ def write_xml(path_to_stg, file_name, object_name):
 def debug_create_eps(roads, clusters, elev):
     """debug: plot roads map to .eps"""
     transform = tools.transform
-    if 1:
+    if 0:
         c = np.array([[elev.min.x, elev.min.y], 
                       [elev.max.x, elev.min.y], 
                       [elev.max.x, elev.max.y], 
@@ -358,20 +403,26 @@ def debug_create_eps(roads, clusters, elev):
 
     if 1:
         for i, cl in enumerate(clusters):
-            print "cluster id %i" % i
-            cluster_color = col[random.randint(0, len(col)-1)]
-            c = np.array([[cl.min.x, cl.min.y], 
-                          [cl.max.x, cl.min.y], 
-                          [cl.max.x, cl.max.y], 
-                          [cl.min.x, cl.max.y],
-                          [cl.min.x, cl.min.y]])
-            c = np.array([transform.toGlobal(p) for p in c])
-            plt.plot(c[:,0], c[:,1], '-', color=cluster_color)
+            if len(cl.objects): 
+                cluster_color = col[random.randint(0, len(col)-1)]
+                c = np.array([[cl.min.x, cl.min.y], 
+                              [cl.max.x, cl.min.y], 
+                              [cl.max.x, cl.max.y], 
+                              [cl.min.x, cl.max.y],
+                              [cl.min.x, cl.min.y]])
+                c = np.array([transform.toGlobal(p) for p in c])
+                plt.plot(c[:,0], c[:,1], '-', color=cluster_color)
             for r in cl.objects:
+                random_color = col[random.randint(0, len(col)-1)]
                 a = np.array(r.center.coords)
                 a = np.array([transform.toGlobal(p) for p in a])
                 #color = col[r.typ]
-                plt.plot(a[:,0], a[:,1], color=cluster_color, linewidth=lw[r.typ])
+                try:
+                    lw = lw_w[r.typ]
+                except:
+                    lw = lw_w[0]
+                    
+                plt.plot(a[:,0], a[:,1], color=random_color, linewidth=lw)
         
     if 0:
         for r in roads:
@@ -419,7 +470,7 @@ def main():
 
 #    handler.register_way_callback(roads.from_way, **roads.req_and_valid_keys)
 #    roads.register_callbacks_in(handler)
-    handler.register_way_callback(roads.create_from_way, req_keys=roads.req_keys)
+    handler.register_way_callback(roads.store_way, req_keys=roads.req_keys)
     handler.register_uncategorized_way_callback(roads.store_uncategorized)
     handler.parse(source)
     
@@ -437,11 +488,20 @@ def main():
     logging.info("done.")
     logging.info("ways: %i", len(roads))
 
-    roads.clusterize()
-    #roads.find_intersections()
+    logging.debug("len before %i" % len(roads.ways_list))
+    roads.find_intersections()
+    roads.count_inner_intersections()
+    roads.split_ways()
+    roads.find_intersections()
+    roads.count_inner_intersections()
+#    roads.join_ways()
+    logging.debug("len after %i" % len(roads.ways_list))
+    roads.create_linear_objects()
+    bla
+
     #roads.cleanup_intersections()
 #    roads.objects = [roads.objects[0]]
-
+    roads.clusterize()
 #    scale_test(transform, elev)
 
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, overwrite=True)
