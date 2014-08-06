@@ -698,7 +698,7 @@ def get_interpolator(**kwargs):
     if parameters.ELEV_MODE == 'FgelevCaching':
         return Probe_fgelev(**kwargs)
     else:
-        filename = filename = parameters.PREFIX + os.sep + 'elev.out'
+        filename = parameters.PREFIX + os.sep + 'elev.out'
         return Interpolator(filename, **kwargs)
 
 
