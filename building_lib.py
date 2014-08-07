@@ -392,7 +392,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
         # -- skip buildings outside elevation raster
         if elev(vec2d(Xo[0])) == -9999:
-            print "-9999"
+            logging.debug("-9999")
             tools.stats.skipped_no_elev += 1
             continue
 
