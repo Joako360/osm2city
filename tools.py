@@ -27,8 +27,10 @@ import time
 import re
 import csv
 import subprocess
-#import Queue
+# import Queue
 
+""""""
+transform = None
 
 class Interpolator(object):
     """load elevation data from file, interpolate"""
@@ -48,13 +50,13 @@ class Interpolator(object):
         f = open(filename, "r")
         x0, y0, size_x, size_y, self.step_x, self.step_y = [float(i) for i in f.readline().split()[1:]]
         f.close()
-        
-        nx = len(np.arange(x0, x0+size_x, self.step_x))
-        ny = len(np.arange(y0, y0+size_y, self.step_y))
 
-        #elev = np.loadtxt(filename)
-        
-        elev = np.zeros((nx*ny, 5))
+        nx = len(np.arange(x0, x0 + size_x, self.step_x))
+        ny = len(np.arange(y0, y0 + size_y, self.step_y))
+
+        # elev = np.loadtxt(filename)
+
+        elev = np.zeros((nx * ny, 5))
         with open(filename, 'r') as f:
             reader = csv.reader(f, delimiter=' ')
             tmp = reader.next()
@@ -64,12 +66,12 @@ class Interpolator(object):
                 if len(tmp) == 5:
                     elev[i,:] = tmp
                     i += 1
-        
-        self.x = elev[:,0] # -- that's actually lon
-        self.y = elev[:,1] #                and lat
-        self.h = elev[:,4]
+
+        self.x = elev[:, 0]  # -- that's actually lon
+        self.y = elev[:, 1]  #                and lat
+        self.h = elev[:, 4]
         if nx * ny != len(self.x):
-            raise ValueError("expected %i, but read %i lines." % (nx*ny, len(self.x)))
+            raise ValueError("expected %i, but read %i lines." % (nx * ny, len(self.x)))
 
         self.min_x = min(self.x)
         self.max_x = max(self.x)
@@ -78,9 +80,9 @@ class Interpolator(object):
         self.h = self.h.reshape(ny, nx)
         self.x = self.x.reshape(ny, nx)
         self.y = self.y.reshape(ny, nx)
-        #print self.h[0,0], self.h[0,1], self.h[0,2]
-        self.dx = self.x[0,1] - self.x[0,0]
-        self.dy = self.y[1,0] - self.y[0,0]
+        # print self.h[0,0], self.h[0,1], self.h[0,2]
+        self.dx = self.x[0, 1] - self.x[0, 0]
+        self.dy = self.y[1, 0] - self.y[0, 0]
         print "dx, dy", self.dx, self.dy
 
     def _move_to_boundary(self, p):
@@ -98,8 +100,7 @@ class Interpolator(object):
         """compute elevation at (x,y) by linear interpolation"""
         if self.fake:
             return 0.
-            #return p.x + p.y
-        global transform
+            # return p.x + p.y
         if not is_global:
             p = vec2d.vec2d(transform.toGlobal(p))
 
@@ -110,20 +111,20 @@ class Interpolator(object):
                 return -9999
             elif p.y <= self.min_y or p.y >= self.max_y:
                 return -9999
-        i = int((p.x - self.min_x)/self.dx)
-        j = int((p.y - self.min_y)/self.dy)
-        fx = (p.x - self.x[j,i])/self.dx
-        fy = (p.y - self.y[j,i])/self.dy
+        i = int((p.x - self.min_x) / self.dx)
+        j = int((p.y - self.min_y) / self.dy)
+        fx = (p.x - self.x[j, i]) / self.dx
+        fy = (p.y - self.y[j, i]) / self.dy
         # rounding errors at boundary.
         if j + 1 >= self.h.shape[0]:
             j -= 1
         if i + 1 >= self.h.shape[1]:
             i -= 1
-        #print fx, fy, i, j
-        h =  (1-fx) * (1-fy) * self.h[j,i] \
-           +    fx  * (1-fy) * self.h[j,i+1] \
-           + (1-fx) *    fy  * self.h[j+1,i] \
-           +    fx  *    fy  * self.h[j+1,i+1]
+        # print fx, fy, i, j
+        h = (1 - fx) * (1 - fy) * self.h[j, i] \
+           + fx * (1 - fy) * self.h[j, i + 1] \
+           + (1 - fx) * fy * self.h[j + 1, i] \
+           + fx * fy * self.h[j + 1, i + 1]
         return h
 
     def shift(self, h):
@@ -131,9 +132,9 @@ class Interpolator(object):
 
     def write(self, filename, downsample=2):
         """Interpolate, write to file. Useful to create a coarser grid that loads faster"""
-        x = self.x[::downsample,::downsample]
-        y = self.y[::downsample,::downsample]
-        h = self.h[::downsample,::downsample]
+        x = self.x[::downsample, ::downsample]
+        y = self.y[::downsample, ::downsample]
+        h = self.h[::downsample, ::downsample]
         ny, nx = x.shape
         zero = np.zeros_like(x).ravel()
         size_x = self.step_x * downsample * nx
@@ -170,7 +171,7 @@ class Probe_fgelev(object):
         if not fake:
             path_to_fgelev = parameters.FG_ELEV
             fg_root = "$FG_ROOT"
-            self.fgelev_pipe = subprocess.Popen(path_to_fgelev + ' --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            self.fgelev_pipe = subprocess.Popen(path_to_fgelev + ' --fg-root ' + fg_root + ' --fg-scenery ' + parameters.PATH_TO_SCENERY, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
         if cache:
             self.pkl_fname = parameters.PREFIX + os.sep + 'elev.pkl'
@@ -213,8 +214,16 @@ class Probe_fgelev(object):
             #        But since we might also probe just one position, we need to stay
             #        in sync anyway?
 
-            self.fgelev_pipe.stdin.write("%i %g %g\n" % (0, position.lon, position.lat))
-            elev = float(self.fgelev_pipe.stdout.readline().split()[1]) + self.h_offset
+            try:
+                self.fgelev_pipe.stdin.write("%i %g %g\n" % (0, position.lon, position.lat))
+            except IOError, reason:
+                logging.error(reason)
+            try:
+                line = self.fgelev_pipe.stdout.readline()
+                elev = float(line.split()[1]) + self.h_offset
+            except IndexError, reason:
+                logging.exception("FGElev %s, %s", line, reason)
+                return -1
             return elev
 
         if self.fake:
@@ -230,7 +239,7 @@ class Probe_fgelev(object):
         key = (position.lon, position.lat)
         try:
             elev = self._cache[key]
-            #logging.debug("hit %s %g" % (str(key), elev))
+            # logging.debug("hit %s %g" % (str(key), elev))
             return elev
         except KeyError:
             logging.debug("miss (%i) %s" % (len(self._cache), str(key)))
@@ -242,19 +251,20 @@ class Probe_fgelev(object):
                 self.save_cache()
             return elev
 
+
 def test_fgelev(cache, N):
     """simple testing for Probe_fgelev class"""
     elev = Probe_fgelev(cache=cache)
     delta = 0.3
     check_btg = True
     p = vec2d.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
-    elev(p, True, check_btg) # -- ensure fgelev is up and running
-    #p = vec2d.vec2d(parameters.BOUNDARY_WEST+delta, parameters.BOUNDARY_SOUTH+delta)
-    #elev(p, True, check_btg) # -- ensure fgelev is up and running
+    elev(p, True, check_btg)  # -- ensure fgelev is up and running
+    # p = vec2d.vec2d(parameters.BOUNDARY_WEST+delta, parameters.BOUNDARY_SOUTH+delta)
+    # elev(p, True, check_btg) # -- ensure fgelev is up and running
     nx = ny = N
     ny = 1
-    #X = np.linspace(parameters.BOUNDARY_WEST, parameters.BOUNDARY_WEST+delta, nx)
-    #Y = np.linspace(parameters.BOUNDARY_SOUTH, parameters.BOUNDARY_SOUTH+delta, ny)
+    # X = np.linspace(parameters.BOUNDARY_WEST, parameters.BOUNDARY_WEST+delta, nx)
+    # Y = np.linspace(parameters.BOUNDARY_SOUTH, parameters.BOUNDARY_SOUTH+delta, ny)
     X = np.linspace(parameters.BOUNDARY_WEST, parameters.BOUNDARY_EAST, nx)
     Y = np.linspace(parameters.BOUNDARY_SOUTH, parameters.BOUNDARY_NORTH, ny)
 
@@ -277,37 +287,37 @@ def test_fgelev(cache, N):
     for y in Y:
         for x in X:
             p = vec2d.vec2d(x, y)
-            print i/2,
+            print i / 2,
             e = elev(p, True, check_btg)
             i += 1
             e = elev(p, True)
             i += 1
 #            e = elev(p, True)
 #            i += 1
-            #s.append("%s %g" % (str(p), e))
+            # s.append("%s %g" % (str(p), e))
     end = time.time()
-    #for item in s:
+    # for item in s:
     #    print item
-    print cache, N, "%d records/s" % (i/(end-start))
+    print cache, N, "%d records/s" % (i / (end - start))
     elev.save_cache()
 
 def raster_glob():
     cmin = vec2d.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
     cmax = vec2d.vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
     center = (cmin + cmax) * 0.5
-    transform = coordinates.Transformation((center.x, center.y), hdg = 0)
+    transform = coordinates.Transformation((center.x, center.y), hdg=0)
     lmin = vec2d.vec2d(transform.toLocal(cmin.__iter__()))
     lmax = vec2d.vec2d(transform.toLocal(cmax.__iter__()))
-    delta = (lmax - lmin)*0.5
+    delta = (lmax - lmin) * 0.5
     print "Distance from center to boundary in meters (x, y):", delta
-    err_msg = "Unknown Elevation Query mode : %s Use Manual, Telnet or Fgelev for parameter ELEV_MODE "%(parameters.ELEV_MODE)
+    err_msg = "Unknown Elevation Query mode : %s Use Manual, Telnet or Fgelev for parameter ELEV_MODE " % (parameters.ELEV_MODE)
     if parameters.ELEV_MODE == '':
         logging.error(err_msg)
         sys.exit(err_msg)
     elif parameters.ELEV_MODE == 'Manual':
         print "Creating elev.in ..."
         fname = parameters.PREFIX + os.sep + "elev.in"
-        raster(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
+        raster(transform, fname, -delta.x, -delta.y, 2 * delta.x, 2 * delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
 
         path = calc_tile.directory_name(center)
         msg = textwrap.dedent("""
@@ -323,14 +333,14 @@ def raster_glob():
         fname = parameters.PREFIX + os.sep + 'elev.in'
         if not os.path.exists(parameters.PREFIX + os.sep + 'elev.out'):
             print "Creating ", fname
-            raster_telnet(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
+            raster_telnet(transform, fname, -delta.x, -delta.y, 2 * delta.x, 2 * delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
         else:
             print "Skipping ", parameters.PREFIX + os.sep + 'elev.out', " exists"
     elif parameters.ELEV_MODE == 'Fgelev':
         if not os.path.exists(parameters.PREFIX + os.sep + 'elev.out'):
             fname = parameters.PREFIX + os.sep + 'elev.out'
             print "Creating ", fname
-            raster_fgelev(transform, fname, -delta.x, -delta.y, 2*delta.x, 2*delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
+            raster_fgelev(transform, fname, -delta.x, -delta.y, 2 * delta.x, 2 * delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
         else:
             print "Skipping ", parameters.PREFIX + os.sep + 'elev.out', " exists"
     else:
@@ -339,7 +349,7 @@ def raster_glob():
 
 def wait_for_fg(fg):
 # Waits for Flightgear to signal, that the elevation processing has finished
-    for count in range(0,1000):
+    for count in range(0, 1000):
         semaphore = fg.get_prop("/osm2city/tiles")
         semaphore = semaphore.split('=')[1]
         m = re.search("([0-9.]+)", semaphore)
@@ -355,8 +365,9 @@ def wait_for_fg(fg):
                 pass
         time.sleep(1)
         if not m2 is None:
-            logging.debug( "Waiting for Semaphore " + m2.groups()[0])
+            logging.debug("Waiting for Semaphore " + m2.groups()[0])
     return False
+
 
 def raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
     # --- need $FGDATA/Nasal/elev.nas and elev.in
@@ -365,29 +376,29 @@ def raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
     #     data gets written to /tmp/elev.xml
 
     # check $FGDATA/Nasal/IOrules
-    fg = telnet.FG_Telnet( "localhost", 5501)
-    center_lat = abs(parameters.BOUNDARY_NORTH - parameters.BOUNDARY_SOUTH)/2 + parameters.BOUNDARY_SOUTH
-    center_lon = abs(parameters.BOUNDARY_WEST - parameters.BOUNDARY_EAST)/2 + parameters.BOUNDARY_WEST
-    fg.set_prop( "/position/latitude-deg", center_lat );
-    fg.set_prop( "/position/longitude-deg", center_lon );
-    fg.set_prop( "/position/altitude-ft", 3000 );
-    f = open( "C:/Users/keith.paterson/AppData/Roaming/flightgear.org/elev.in", "w");
+    fg = telnet.FG_Telnet("localhost", 5501)
+    center_lat = abs(parameters.BOUNDARY_NORTH - parameters.BOUNDARY_SOUTH) / 2 + parameters.BOUNDARY_SOUTH
+    center_lon = abs(parameters.BOUNDARY_WEST - parameters.BOUNDARY_EAST) / 2 + parameters.BOUNDARY_WEST
+    fg.set_prop("/position/latitude-deg", center_lat);
+    fg.set_prop("/position/longitude-deg", center_lon);
+    fg.set_prop("/position/altitude-ft", 3000);
+    f = open("C:/Users/keith.paterson/AppData/Roaming/flightgear.org/elev.in", "w");
 #       f = open(fname, 'w')
 #    f.write("# Tile %s\n" % (parameters.PREFIX))
     f.write("# %g %g %g %g %g %g\n" % (x0, y0, size_x, size_y, step_x, step_y))
-    for y in np.arange(y0, y0+size_y, step_y):
-        for x in np.arange(x0, x0+size_x, step_x):
+    for y in np.arange(y0, y0 + size_y, step_y):
+        for x in np.arange(x0, x0 + size_x, step_x):
             lon, lat = transform.toGlobal((x, y))
             f.write("%1.8f %1.8f %g %g\n" % (lon, lat, x, y))
         f.write("\n")
     f.close()
-    fg.set_prop( "/position/latitude-deg", center_lat );
-    fg.set_prop( "/position/longitude-deg", center_lon );
-    fg.set_prop( "/position/altitude-ft", 3000 );
+    fg.set_prop("/position/latitude-deg", center_lat);
+    fg.set_prop("/position/longitude-deg", center_lon);
+    fg.set_prop("/position/altitude-ft", 3000);
 
     logging.info("Running FG Command")
     fg.set_prop("/osm2city/tiles", 0)
-    if( fg.run_command("get-elevation") ):
+    if(fg.run_command("get-elevation")):
         if not wait_for_fg(fg):
             logging.error("Process in FG timed out")
         else:
@@ -403,7 +414,7 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
     import Queue
     fg_root = "$FG_ROOT"
 
-    center_global = vec2d.vec2d(transform.toGlobal((x0,y0)))
+    center_global = vec2d.vec2d(transform.toGlobal((x0, y0)))
     btg_file = parameters.PATH_TO_SCENERY + os.sep + "Terrain"
     btg_file = btg_file + os.sep + calc_tile.directory_name(center_global) + os.sep + calc_tile.construct_btg_file_name(center_global)
     if not os.path.exists(btg_file):
@@ -412,24 +423,24 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
 
     fg_elev = parameters.FG_ELEV
 
-    fgelev = subprocess.Popen( fg_elev + ' --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-    #fgelev = subprocess.Popen(["/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev", "--fg-root", "$FG_ROOT",  "--fg-scenery", "$FG_SCENERY"],  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-    #time.sleep(5)
+    fgelev = subprocess.Popen(fg_elev + ' --fg-root ' + fg_root + ' --fg-scenery ' + parameters.PATH_TO_SCENERY, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    # fgelev = subprocess.Popen(["/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev", "--fg-root", "$FG_ROOT",  "--fg-scenery", "$FG_SCENERY"],  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    # time.sleep(5)
     print "building buffer"
     buf_in = Queue.Queue(maxsize=0)
     f = open(fname, 'w')
-    #f = sys.stdout
+    # f = sys.stdout
     f.write("# %g %g %g %g %g %g\n" % (x0, y0, size_x, size_y, step_x, step_y))
     i = 0
-    y_array = np.arange(y0, y0+size_y, step_y)
-    x_array = np.arange(x0, x0+size_x, step_x)
+    y_array = np.arange(y0, y0 + size_y, step_y)
+    x_array = np.arange(x0, x0 + size_x, step_x)
     for y in y_array:
         for x in x_array:
             i += 1
             lon, lat = transform.toGlobal((x, y))
             buf_in.put("%i %g %g\n" % (i, lon, lat))
 
-#Doesn't work on Windows. Process will block if output buffer isn't read
+# Doesn't work on Windows. Process will block if output buffer isn't read
 #     print "sending buffer"
 #     for i in range(1000):
 #         fgelev.stdin.write(buf_in.get())
@@ -444,15 +455,15 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
                 fgelev.stdin.write(buf_in.get())
             tmp, elev = fgelev.stdout.readline().split()
             lon, lat = transform.toGlobal((x, y))
-            #f.write("%i " % i)
+            # f.write("%i " % i)
             f.write("%1.8f %1.8f %g %g %g\n" % (lon, lat, x, y, float(elev)))
-            #if i > 10000: return
+            # if i > 10000: return
         f.write("\n")
-        print "done %3.1f %%\r" % ((y - y0)*100/size_y),
+        print "done %3.1f %%\r" % ((y - y0) * 100 / size_y),
 
     f.close()
     end = time.time()
-    print "done %d records/s" % ((i/(end-start)))
+    print "done %d records/s" % ((i / (end - start)))
 
 
 def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
@@ -464,8 +475,8 @@ def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=
     # check $FGDATA/Nasal/IOrules
     f = open(fname, 'w')
     f.write("# %g %g %g %g %g %g\n" % (x0, y0, size_x, size_y, step_x, step_y))
-    for y in np.arange(y0, y0+size_y, step_y):
-        for x in np.arange(x0, x0+size_x, step_x):
+    for y in np.arange(y0, y0 + size_y, step_y):
+        for x in np.arange(x0, x0 + size_x, step_x):
             lon, lat = transform.toGlobal((x, y))
             f.write("%1.8f %1.8f %g %g\n" % (lon, lat, x, y))
         f.write("\n")
@@ -475,10 +486,10 @@ def write_map(filename, transform, elev, gmin, gmax):
     lmin = vec2d.vec2d(transform.toLocal((gmin.x, gmin.y)))
     lmax = vec2d.vec2d(transform.toLocal((gmax.x, gmax.y)))
     map_z0 = 0.
-    elev_offset = elev(vec2d.vec2d(0,0))
+    elev_offset = elev(vec2d.vec2d(0, 0))
     print "offset", elev_offset
 
-    nx, ny = ((lmax - lmin)/100.).int().list() # 100m raster
+    nx, ny = ((lmax - lmin) / 100.).int().list()  # 100m raster
 
     x = np.linspace(lmin.x, lmax.x, nx)
     y = np.linspace(lmin.y, lmax.y, ny)
@@ -497,31 +508,31 @@ def write_map(filename, transform, elev, gmin, gmax):
     name "surface"
     texture "%s"
     numvert %i
-    """ % (filename, nx*ny)))
+    """ % (filename, nx * ny)))
 
     for j in range(ny):
         for i in range(nx):
-            out.write("%g %g %g\n" % (y[j], (elev(vec2d.vec2d(x[i],y[j])) - elev_offset), x[i]))
+            out.write("%g %g %g\n" % (y[j], (elev(vec2d.vec2d(x[i], y[j])) - elev_offset), x[i]))
 
-    out.write("numsurf %i\n" % ((nx-1)*(ny-1)))
-    for j in range(ny-1):
-        for i in range(nx-1):
+    out.write("numsurf %i\n" % ((nx - 1) * (ny - 1)))
+    for j in range(ny - 1):
+        for i in range(nx - 1):
             out.write(textwrap.dedent("""\
             SURF 0x0
             mat 0
             refs 4
             """))
-            out.write("%i %g %g\n" % (i  +j*(nx),     u[i],   v[j]))
-            out.write("%i %g %g\n" % (i+1+j*(nx),     u[i+1], v[j]))
-            out.write("%i %g %g\n" % (i+1+(j+1)*(nx), u[i+1], v[j+1]))
-            out.write("%i %g %g\n" % (i  +(j+1)*(nx), u[i],   v[j+1]))
+            out.write("%i %g %g\n" % (i + j * (nx), u[i], v[j]))
+            out.write("%i %g %g\n" % (i + 1 + j * (nx), u[i + 1], v[j]))
+            out.write("%i %g %g\n" % (i + 1 + (j + 1) * (nx), u[i + 1], v[j + 1]))
+            out.write("%i %g %g\n" % (i + (j + 1) * (nx), u[i], v[j + 1]))
 #            0 0 0
 #            1 1 0
 #            2 1 1
 #            3 0 1
     out.write("kids 0\n")
     out.close()
-    #print "OBJECT_STATIC surface.ac"
+    # print "OBJECT_STATIC surface.ac"
 
 def write_gp(buildings):
     gp = open("buildings.dat", "w")
@@ -535,14 +546,14 @@ def write_gp(buildings):
 
 def write_one_gp(b, filename):
     npv = np.array(b.X_outer)
-    minx = min(npv[:,0])
-    maxx = max(npv[:,0])
-    miny = min(npv[:,1])
-    maxy = max(npv[:,1])
-    dx = 0.1*(maxx - minx)
+    minx = min(npv[:, 0])
+    maxx = max(npv[:, 0])
+    miny = min(npv[:, 1])
+    maxy = max(npv[:, 1])
+    dx = 0.1 * (maxx - minx)
     minx -= dx
     maxx += dx
-    dy = 0.1*(maxy - miny)
+    dy = 0.1 * (maxy - miny)
     miny -= dy
     maxy += dy
 
@@ -580,7 +591,7 @@ class Stats(object):
         self.skipped_texture = 0
         self.skipped_no_elev = 0
         self.buildings_in_LOD = np.zeros(3)
-        self.area_levels = np.array([1,10,20,50,100,200,500,1000,2000,5000,10000,20000,50000])
+        self.area_levels = np.array([1, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000])
         self.area_above = np.zeros_like(self.area_levels)
         self.vertices = 0
         self.surfaces = 0
@@ -620,9 +631,9 @@ class Stats(object):
         lodone = 0
         lodtwo = 0
         if total_written > 0:
-            lodzero = 100.*self.LOD[0]/total_written
-            lodone = 100.*self.LOD[1]/total_written
-            lodtwo = 100.*self.LOD[0]/total_written
+            lodzero = 100.*self.LOD[0] / total_written
+            lodone = 100.*self.LOD[1] / total_written
+            lodtwo = 100.*self.LOD[0] / total_written
         out.write(textwrap.dedent("""
             total buildings %i
             parse errors    %i
@@ -636,11 +647,11 @@ class Stats(object):
                    self.skipped_small, self.skipped_nearby, self.skipped_no_elev, self.skipped_texture)))
         roof_line = "        roof-types"
         for roof_type in self.roof_types:
-            roof_line += """\r\n          %s\t%i""" % (roof_type,self.roof_types[roof_type])
+            roof_line += """\r\n          %s\t%i""" % (roof_type, self.roof_types[roof_type])
         out.write(textwrap.dedent(roof_line))
 
         try:
-            texture_x_repeated_percent = (self.texture_x_repeated * 100. /(self.texture_x_repeated + self.texture_x_simple))
+            texture_x_repeated_percent = (self.texture_x_repeated * 100. / (self.texture_x_repeated + self.texture_x_simple))
         except:
             texture_x_repeated_percent = 0.
 
@@ -667,7 +678,7 @@ class Stats(object):
         if max_area_above < 1: max_area_above = 1
         for i in range(len(self.area_levels)):
             out.write(" %5g m^2  %5i |%s\n" % (self.area_levels[i], self.area_above[i], \
-                      "#" * int(56. * self.area_above[i]/max_area_above)))
+                      "#" * int(56. * self.area_above[i] / max_area_above)))
 #        except Exception, reason:
 #            logging.error(reason)
 #            return
@@ -692,7 +703,7 @@ def get_interpolator(**kwargs):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    #Parse arguments and eventually override Parameters
+    # Parse arguments and eventually override Parameters
     import argparse
     parser = argparse.ArgumentParser(description="tools prepares an elevation grid for Nasal script and then osm2city")
     parser.add_argument("-f", "--file", dest="filename",
@@ -705,7 +716,7 @@ if __name__ == "__main__":
     if 0:
         for N in [1000, 100]:
             test_fgelev(True, N)
-            #test_fgelev(False, N)
+            # test_fgelev(False, N)
         sys.exit(0)
 
     raster_glob()

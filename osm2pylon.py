@@ -1386,7 +1386,7 @@ if __name__ == "__main__":
         parameters.read_from_file(args.filename)
 
     # Initializing tools for global/local coordinate transformations
-    center_global = parameters.get_OSM_file_name()
+    center_global = parameters.get_center_global()
     osm_fname = parameters.get_OSM_file_name()
     coord_transformator = coordinates.Transformation(center_global, hdg=0)
     tools.init(coord_transformator)

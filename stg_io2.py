@@ -71,6 +71,15 @@ class STG_File(object):
         self.make_path_to_stg()
         return self.path_to_stg
 
+    def add_object_shared(self, ac_file_name, lon_lat, elev, hdg):
+        """add OBJECT_STATIC line to our_list. Returns path to stg."""
+#         OBJECT_SHARED Models/Maritime/Civilian/Pilot_Boat.ac -0.188 54.07603 -0.24 0 
+        line = "OBJECT_SHARED %s %1.5f %1.5f %1.2f %g\n" % (ac_file_name, lon_lat.lon, lon_lat.lat, elev, hdg)
+        self.our_list.append(line)
+        logging.debug(self.file_name + ':' + line)
+        self.make_path_to_stg()
+        return self.path_to_stg
+
     def make_path_to_stg(self):
         try:
             os.makedirs(self.path_to_stg)
@@ -121,6 +130,11 @@ class STG_Manager(object):
         """Adds OBJECT_STATIC line. Returns path to stg."""
         the_stg = self(lon_lat)
         return the_stg.add_object_static(ac_file_name, lon_lat, elev, hdg)
+
+    def add_object_shared(self, ac_file_name, lon_lat, elev, hdg):
+        """Adds OBJECT_STATIC line. Returns path to stg it was added to."""
+        the_stg = self(lon_lat)
+        return the_stg.add_object_shared(ac_file_name, lon_lat, elev, hdg)
 
     def drop_ours(self):
         for the_stg in self.stg_dict.values():
