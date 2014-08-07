@@ -62,7 +62,7 @@ class Interpolator(object):
             for row in reader:
                 tmp = np.array(row)
                 if len(tmp) == 5:
-                    elev[i,:]
+                    elev[i,:] = tmp
                     i += 1
         
         self.x = elev[:,0] # -- that's actually lon
@@ -686,7 +686,7 @@ def get_interpolator(**kwargs):
     if parameters.ELEV_MODE == 'FgelevCaching':
         return Probe_fgelev(**kwargs)
     else:
-        filename = filename = parameters.PREFIX + os.sep + 'elev.out'
+        filename = parameters.PREFIX + os.sep + 'elev.out'
         return Interpolator(filename, **kwargs)
 
 
