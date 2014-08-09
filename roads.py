@@ -79,19 +79,21 @@ OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 def no_transform((x, y)):
     return x, y
 
+
 class Road(LinearObject):
     """ATM unused"""
     def __init__(self, transform, osm_id, tags, refs, nodes_dict):
         super(Road, self).__init__(transform, osm_id, tags, refs, nodes_dict)
         self.railway = False
-        if tags.has_key('railway'):
+        if 'railway' in tags:
             self.railway = tags['railway'] in ['rail', 'tram']
+
 
 class Roads(objectlist.ObjectList):
     valid_node_keys = []
 
     #req_and_valid_keys = {"valid_way_keys" : ["highway"], "req_way_keys" : ["highway"]}
-    req_keys = ['highway', 'railway']
+    req_keys = ['highway', 'railway', 'amenity']
 
     def __init__(self, transform, elev):
         super(Roads, self).__init__(transform)
@@ -150,6 +152,9 @@ class Roads(objectlist.ObjectList):
                 width = 2.87
                 tex_y0 = 0
                 tex_y1 = 0.25
+        elif 'amenity' in way.tags:
+            if way.tags['amenity'] in ['parking']:
+                prio = 7
 
         if prio in [1, 2]:
             tex_y0 = 0.25
