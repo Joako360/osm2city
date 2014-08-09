@@ -54,7 +54,7 @@ class STG_File(object):
         try:
             ours_end = lines.index(self.our_magic_end)
         except ValueError:
-            self.ours_end = len(lines)
+            ours_end = len(lines)
 
         self.other_list = lines[:ours_start] + lines[ours_end+1:]
         self.our_list = lines[ours_start+1:ours_end]
