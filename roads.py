@@ -258,7 +258,9 @@ class Roads(objectlist.ObjectList):
         return count
 
     def split_ways(self):
+        plt.clf()
         for the_way in self.ways_list:
+            self.debug_plot_way(the_way, '-', lw=5, color='k')
             self.ways_list.remove(the_way)
             new_way = osmparser.Way(the_way.osm_id)
             new_way.tags = the_way.tags
@@ -267,11 +269,18 @@ class Roads(objectlist.ObjectList):
                 new_way.refs.append(the_ref)
                 if the_ref in self.attached_ways_dict:
                     self.ways_list.append(new_way)
+                    self.debug_plot_way(new_way, '--', lw=10)
                     new_way = osmparser.Way(the_way.osm_id)
                     new_way.tags = the_way.tags
                     new_way.refs.append(the_ref)
             new_way.refs.append(the_way.refs[-1])
             self.ways_list.append(new_way)
+            self.debug_plot_way(new_way, "--", lw=10)
+
+#            plt.show()
+#            plt.clf()
+#            break
+#        plt.savefig("roads.eps")
                 
         if 0:
             for key, value in self.attached_ways.items():
@@ -282,6 +291,21 @@ class Roads(objectlist.ObjectList):
                             print "  ", way.tags['name']
                         except:
                             print "  ", way
+
+
+    def debug_plot_way(self, way, ls, lw, color=False):
+        return
+        col = ['b', 'r', 'y', 'g', '0.75', '0.5', 'k', 'c']
+        if not color:
+            color = col[random.randint(0, len(col)-1)]
+        osm_nodes = np.array([(self.nodes_dict[r].lon, self.nodes_dict[r].lat) for r in way.refs])
+        a = osm_nodes
+#        a = np.array([transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
+
+#        a = np.array(way.center.coords)
+#        a = np.array([transform.toGlobal(p) for p in a])
+        #color = col[r.typ]
+        plt.plot(a[:,0], a[:,1], ls, linewidth=lw, color=color)
 
     def cleanup_intersections(self):
         """Remove intersections that
@@ -497,7 +521,6 @@ def main():
 #    roads.join_ways()
     logging.debug("len after %i" % len(roads.ways_list))
     roads.create_linear_objects()
-    bla
 
     #roads.cleanup_intersections()
 #    roads.objects = [roads.objects[0]]
