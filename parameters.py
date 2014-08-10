@@ -56,6 +56,7 @@ ELEV_MODE = ''              # Either Manual, Telnet, Fgelev
 # -- check for overlap with static models. The scenery folder must contain an "Objects" folder
 OVERLAP_CHECK = True
 OVERLAP_RADIUS = 5
+BUILDING_REMOVE_WITH_PARTS = False
 
 TILE_SIZE = 1000            # -- tile size in meters for clustering of buildings
 

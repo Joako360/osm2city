@@ -97,24 +97,16 @@ class Platforms(ObjectList):
                 self.writeLine(platform, elev, ac, obj)
         return ac
 
-            # obj.node()
-
-    def test_ccw(self, coords):
-        ret = 0
-        previous = None
-        for index, node in enumerate(coords[1:]):
-            previous = coords[index]
-            ret += (node[0] - previous[0]) * (node[1] + previous[1])
-        return ret
-
     def writeArea(self, platform, elev, ac, obj):
     # Writes a platform mapped as an area
+        linear_ring = shg.LinearRing(platform.nodes)
+
         o = obj.next_node_index()
-        if self.test_ccw(platform.nodes) > 0:
+        if linear_ring.is_ccw:
+            logging.info('Anti-Clockwise')
+        else:
             logging.info("Clockwise")
             platform.nodes = platform.nodes[::-1]
-        else:
-            logging.info('Anti-Clockwise')
         for p in platform.nodes:
             e = elev(vec2d(p[0], p[1])) + 1
             obj.node(-p[1], e, -p[0])
