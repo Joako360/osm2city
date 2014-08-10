@@ -23,6 +23,7 @@ from vec2d import vec2d
 import calc_tile
 from pdb import pm
 
+
 class STG_File(object):
     """represents an .stg file.
        takes care of writing/reading/uninstalling OBJECT_* lines
@@ -103,6 +104,7 @@ class STG_File(object):
 
         stg.close()
 
+
 class STG_Manager(object):
     """manages STG objects. Knows about scenery path.
     """
@@ -132,7 +134,7 @@ class STG_Manager(object):
         return the_stg.add_object_static(ac_file_name, lon_lat, elev, hdg)
 
     def add_object_shared(self, ac_file_name, lon_lat, elev, hdg):
-        """Adds OBJECT_STATIC line. Returns path to stg it was added to."""
+        """Adds OBJECT_SHARED line. Returns path to stg it was added to."""
         the_stg = self(lon_lat)
         return the_stg.add_object_shared(ac_file_name, lon_lat, elev, hdg)
 
@@ -143,6 +145,7 @@ class STG_Manager(object):
     def write(self):
         for the_stg in self.stg_dict.values():
             the_stg.write()
+
 
 def read(path, stg_fname, our_magic):
     """Accepts a scenery sub-path, as in 'w010n40/w005n48/', and an .stg file name.

@@ -22,10 +22,10 @@ import argparse
 import logging
 import math
 import os
+import sys
 import unittest
 import xml.sax
 
-import calc_tile
 import coordinates
 import osmparser
 import osmparser_wrapper
@@ -295,7 +295,7 @@ class SharedPylon(object):
         self.lon, self.lat = my_coord_transformator.toGlobal((self.x, self.y))
         self.elevation = my_elev_interpolator(vec2d.vec2d(self.lon, self.lat), True)
 
-    def make_stg_entry(self):
+    def make_stg_entry(self, my_stg_mgr):
         """
         Returns a stg entry for this pylon.
         E.g. OBJECT_SHARED Models/Airport/ils.xml 5.313108 45.364122 374.49 268.92
@@ -311,9 +311,9 @@ class SharedPylon(object):
         elif self.direction_type == SharedPylon.DIRECTION_TYPE_START:
             direction_correction = 180
 
-        entry = ["OBJECT_SHARED", self.pylon_model, str(self.lon), str(self.lat), str(self.elevation)
-                 , str(stg_angle(self.heading - 90 + direction_correction))]  # 90 less because arms are in x-direction in ac-file
-        return " ".join(entry)
+        my_stg_mgr.add_object_shared(self.pylon_model, vec2d.vec2d(self.lon, self.lat)
+                                     , self.elevation
+                                     , stg_angle(self.heading - 90 + direction_correction))  # 90 less because arms are in x-direction in ac-file
 
 
 class Pylon(SharedPylon):
@@ -352,14 +352,13 @@ class LineWithoutCables(object):
         self.osm_id = osm_id
         self.shared_pylons = []  # SharedPylons
 
-    def make_shared_pylons_stg_entries(self):
+    def make_shared_pylons_stg_entries(self, my_stg_mgr):
         """
-        Returns the stg entries for the pylons of this WayLine in a string separated by linebreaks
+        Adds the stg entries for the pylons of this WayLine
         """
         entries = []
         for my_pylon in self.shared_pylons:
-            entries.append(my_pylon.make_stg_entry())
-        return "\n".join(entries)
+            my_pylon.make_stg_entry(my_stg_mgr)
 
     def get_center_coordinates(self):
         """Returns the lon/lat coordinates of the line"""
@@ -507,12 +506,14 @@ class Line(LineWithoutCables):
                               , catenary_a, segment.length)
                 segment.cables.append(cable)
 
-    def make_cables_ac_xml_stg_entries(self, filename, path, cluster_max_length):
+    def make_cables_ac_xml_stg_entries(self, my_stg_mgr, line_index, wayname, cluster_max_length, my_files_to_remove):
         """
-        Returns the stg entries for the cables of this WayLine in a string separated by linebreaks
+        Writes the stg entries for the cables of this WayLine in a string separated by linebreaks
         E.g. OBJECT_STATIC LSZSpylons1901.xml 9.75516 46.4135 2000.48 0
-        Before this it creates the xml-file and ac-file containing the cables.
-        Each WaySegment is represented as an object group in ac with each cable of the WaySegment as a kid
+        After this it creates the xml-file and ac-file containing the cables.
+        Each WaySegment is represented as an object group in ac with each cable of the WaySegment as a child
+
+        files_to_remove is used if the whole operation is only to uninstall
 
         In order to reduce rounding errors clusters of WaySegments are used instead of a whole WayLine per file.
         """
@@ -528,55 +529,60 @@ class Line(LineWithoutCables):
             cluster_segments.append(way_segment)
             cluster_length += way_segment.length
             if (cluster_length >= cluster_max_length) or (len(self.way_segments) - 1 == i):
-                cluster_filename = filename + '_' + str(cluster_index)
-                ac_file_lines = []
-                ac_file_lines.append("AC3Db")
-                ac_file_lines.append('MATERIAL "cable" rgb 0.3 0.3 0.3 amb 0.3 0.3 0.3 emis 0.0 0.0 0.0 spec 0.3 0.3 0.3 shi 1 trans 0')
-                ac_file_lines.append("OBJECT world")
-                ac_file_lines.append("kids " + str(len(cluster_segments)))
-                cluster_segment_index = 0
-                for cluster_segment in cluster_segments:
-                    cluster_segment_index += 1
-                    ac_file_lines.append("OBJECT group")
-                    ac_file_lines.append('name "segment%05d"' % cluster_segment_index)
-                    ac_file_lines.append("kids " + str(len(cluster_segment.cables)))
-                    for cable in cluster_segment.cables:
-                        cable.translate_vertices_relative(start_pylon.x, start_pylon.y, start_pylon.elevation)
-                        ac_file_lines.append(cable.make_ac_entry(0))  # material is 0-indexed
-                with open(path + cluster_filename + ".ac", 'w') as f:
-                    f.write("\n".join(ac_file_lines))
+                # write stuff to files
+                replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)
+                cluster_filename = replacement_prefix + wayname + "%05d_%05d" % (line_index, cluster_index)
+                path_to_stg = my_stg_mgr.add_object_static(cluster_filename + '.xml'
+                                                           , vec2d.vec2d(start_pylon.lon, start_pylon.lat)
+                                                           , start_pylon.elevation, 90)
+                if None is not my_files_to_remove:
+                    my_files_to_remove.append(path_to_stg + cluster_filename + ".ac")
+                    my_files_to_remove.append(path_to_stg + cluster_filename + ".xml")
+                else:
+                    ac_file_lines = []
+                    ac_file_lines.append("AC3Db")
+                    ac_file_lines.append('MATERIAL "cable" rgb 0.3 0.3 0.3 amb 0.3 0.3 0.3 emis 0.0 0.0 0.0 spec 0.3 0.3 0.3 shi 1 trans 0')
+                    ac_file_lines.append("OBJECT world")
+                    ac_file_lines.append("kids " + str(len(cluster_segments)))
+                    cluster_segment_index = 0
+                    for cluster_segment in cluster_segments:
+                        cluster_segment_index += 1
+                        ac_file_lines.append("OBJECT group")
+                        ac_file_lines.append('name "segment%05d"' % cluster_segment_index)
+                        ac_file_lines.append("kids " + str(len(cluster_segment.cables)))
+                        for cable in cluster_segment.cables:
+                            cable.translate_vertices_relative(start_pylon.x, start_pylon.y, start_pylon.elevation)
+                            ac_file_lines.append(cable.make_ac_entry(0))  # material is 0-indexed
 
-                xml_file_lines = []
-                xml_file_lines.append('<?xml version="1.0"?>')
-                xml_file_lines.append('<PropertyList>')
-                xml_file_lines.append('<path>' + cluster_filename + '.ac</path>')  # the ac-file is in the same directory
-                xml_file_lines.append('<animation>')
-                xml_file_lines.append('<type>range</type>')
-                xml_file_lines.append('<min-m>0</min-m>')
-                xml_file_lines.append('<max-property>/sim/rendering/static-lod/rough</max-property>')
-                for j in xrange(1, len(cluster_segments) + 1):
-                    xml_file_lines.append('<object-name>segment%05d</object-name>' % j)
-                xml_file_lines.append('</animation>')
-                if parameters.C2P_CABLES_NO_SHADOW:
+                    xml_file_lines = []
+                    xml_file_lines.append('<?xml version="1.0"?>')
+                    xml_file_lines.append('<PropertyList>')
+                    xml_file_lines.append('<path>' + cluster_filename + '.ac</path>')  # the ac-file is in the same directory
                     xml_file_lines.append('<animation>')
-                    xml_file_lines.append('<type>noshadow</type>')
+                    xml_file_lines.append('<type>range</type>')
+                    xml_file_lines.append('<min-m>0</min-m>')
+                    xml_file_lines.append('<max-property>/sim/rendering/static-lod/rough</max-property>')
                     for j in xrange(1, len(cluster_segments) + 1):
                         xml_file_lines.append('<object-name>segment%05d</object-name>' % j)
                     xml_file_lines.append('</animation>')
-                xml_file_lines.append('</PropertyList>')
-                with open(path + cluster_filename + ".xml", 'w') as f:
-                    f.write("\n".join(xml_file_lines))
+                    if parameters.C2P_CABLES_NO_SHADOW:
+                        xml_file_lines.append('<animation>')
+                        xml_file_lines.append('<type>noshadow</type>')
+                        for j in xrange(1, len(cluster_segments) + 1):
+                            xml_file_lines.append('<object-name>segment%05d</object-name>' % j)
+                        xml_file_lines.append('</animation>')
+                    xml_file_lines.append('</PropertyList>')
 
-                entry = ["OBJECT_STATIC", cluster_filename + ".xml", str(start_pylon.lon)
-                         , str(start_pylon.lat), str(start_pylon.elevation), "90"]
-                stg_entries.append(" ".join(entry))
+                    # -- write .ac and .xml
+                    with open(path_to_stg + cluster_filename + ".ac", 'w') as f:
+                        f.write("\n".join(ac_file_lines))
+                    with open(path_to_stg + cluster_filename + ".xml", 'w') as f:
+                        f.write("\n".join(xml_file_lines))
 
                 cluster_length = 0.0
                 cluster_segments = []
                 cluster_index += 1
                 start_pylon = None
-
-        return "\n".join(stg_entries)
 
 
 class WayLine(Line):  # The name "Line" is also used in e.g. SymPy
@@ -1323,36 +1329,13 @@ def merge_lines(osm_id, line0, line1, shared_nodes):
                 shared_node.append(line0)
 
 
-def write_stg_entries(stg_fp_dict, lines_dict, wayname, cluster_max_length):
+def write_stg_entries(my_stg_mgr, my_files_to_remove, lines_dict, wayname, cluster_max_length):
     line_index = 0
     for line in lines_dict.values():
         line_index += 1
-        line_center = line.get_center_coordinates()
-        stg_fname = calc_tile.construct_stg_file_name(line_center)
-        if parameters.PATH_TO_OUTPUT:
-            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, line_center)
-        else:
-            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, line_center)
-        if not stg_fname in stg_fp_dict:
-            if not os.path.exists(path):
-                try:
-                    os.makedirs(path)
-                except OSError:
-                    logging.exception("Unable to create path to output directory")
-                    pass
-            stg_io.uninstall_ours(path, stg_fname, OUR_MAGIC)
-            stg_file = open(path + stg_fname, "a")
-            logging.info('Opening new stg-file for append: ' + path + stg_fname)
-            stg_file.write(stg_io.delimiter_string(OUR_MAGIC, True) + "\n# do not edit below this line\n#\n")
-            stg_fp_dict[stg_fname] = stg_file
-        else:
-            stg_file = stg_fp_dict[stg_fname]
-        stg_file.write(line.make_shared_pylons_stg_entries() + "\n")
+        line.make_shared_pylons_stg_entries(my_stg_mgr)
         if None is not wayname:
-             #incase Prefix is a path (batch processing)
-            replacement_prefix = re.sub('[\/]','_', parameters.PREFIX)
-            filename = replacement_prefix + wayname + "%05d" % line_index
-            stg_file.write(line.make_cables_ac_xml_stg_entries(filename, path, cluster_max_length) + "\n")
+            line.make_cables_ac_xml_stg_entries(my_stg_mgr, line_index, wayname, cluster_max_length, my_files_to_remove)
 
 
 def calc_heading_nodes(nodes_array):
@@ -1430,19 +1413,28 @@ if __name__ == "__main__":
         description="osm2pylon reads OSM data and creates pylons, powerlines and aerialways for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
+    parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
+    parser.add_argument("-u", dest="uninstall", action="store_true", help="uninstall ours from .stg")
     args = parser.parse_args()
     if args.filename is not None:
         parameters.read_from_file(args.filename)
+    if args.e:
+        parameters.NO_ELEV = True
+    files_to_remove = None
+    if args.uninstall:
+        logging.info("Uninstalling.")
+        files_to_remove = []
+        parameters.NO_ELEV = True
 
     # Initializing tools for global/local coordinate transformations
-    center_global = parameters.get_OSM_file_name()
+    center_global = parameters.get_center_global()
     osm_fname = parameters.get_OSM_file_name()
     coord_transformator = coordinates.Transformation(center_global, hdg=0)
     tools.init(coord_transformator)
 
     # Reading elevation data
     logging.info("Reading ground elevation data might take some time ...")
-    elev_interpolator = tools.get_interpolator()
+    elev_interpolator = tools.get_interpolator(fake=parameters.NO_ELEV)
 
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
@@ -1507,23 +1499,41 @@ if __name__ == "__main__":
     building_refs = None
     handler = None
 
-    # Write to Flightgear
-    stg_file_pointers = {}  # -- dictionary of stg file pointers
-    if parameters.C2P_PROCESS_POWERLINES:
-        write_stg_entries(stg_file_pointers, powerlines, "powerline", parameters.C2P_CLUSTER_POWER_LINE_MAX_LENGTH)
-    if parameters.C2P_PROCESS_AERIALWAYS:
-        write_stg_entries(stg_file_pointers, aerialways, "aerialway", parameters.C2P_CLUSTER_AERIALWAY_MAX_LENGTH)
-    if parameters.C2P_PROCESS_OVERHEAD_LINES:
-        write_stg_entries(stg_file_pointers, rail_lines, "overhead", parameters.C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH)
-    if parameters.C2P_PROCESS_STREETLAMPS:
-        write_stg_entries(stg_file_pointers, highways, None, None)
+    # -- initialize STG_Manager
+    if parameters.PATH_TO_OUTPUT:
+        path_to_output = parameters.PATH_TO_OUTPUT
+    else:
+        path_to_output = parameters.PATH_TO_SCENERY
+    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, overwrite=True)
 
-    for stg in stg_file_pointers.values():
-        stg.write(stg_io.delimiter_string(OUR_MAGIC, False) + "\n")
-        stg.close()
+    # Write to Flightgear
+    if parameters.C2P_PROCESS_POWERLINES:
+        write_stg_entries(stg_manager, files_to_remove, powerlines
+                          , "powerline", parameters.C2P_CLUSTER_POWER_LINE_MAX_LENGTH)
+    if parameters.C2P_PROCESS_AERIALWAYS:
+        write_stg_entries(stg_manager, files_to_remove, aerialways
+                          , "aerialway", parameters.C2P_CLUSTER_AERIALWAY_MAX_LENGTH)
+    if parameters.C2P_PROCESS_OVERHEAD_LINES:
+        write_stg_entries(stg_manager, files_to_remove, rail_lines
+                          , "overhead", parameters.C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH)
+    if parameters.C2P_PROCESS_STREETLAMPS:
+        write_stg_entries(stg_manager, files_to_remove, highways, None, None)
+
+    if args.uninstall:
+        for f in files_to_remove:
+            try:
+                os.remove(f)
+            except IOError:
+                pass
+        stg_manager.drop_ours()
+        stg_manager.write()
+        logging.info("uninstall done.")
+        sys.exit(0)
+
+    stg_manager.write()
+    elev_interpolator.save_cache()
 
     logging.info("******* Finished *******")
-    elev_interpolator.save_cache()
 
 
 # ================ UNITTESTS =======================
@@ -1586,7 +1596,6 @@ class TestOSMPylons(unittest.TestCase):
         self.assertAlmostEqual(0, pylon5.heading, 2)
         # then test other stuff
         self.assertEqual(4, len(wayline1.way_segments))
-        wayline1.make_cables_ac_xml_stg_entries("foo", "foo", parameters.C2P_CLUSTER_POWER_LINE_MAX_LENGTH)
 
     def test_cable_vertex_calc_position(self):
         vertex = CableVertex(10, 5)
