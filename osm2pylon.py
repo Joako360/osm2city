@@ -30,7 +30,7 @@ import coordinates
 import osmparser
 import osmparser_wrapper
 import parameters
-import stg_io
+import stg_io2
 import tools
 import vec2d
 import re
@@ -290,7 +290,6 @@ class SharedPylon(object):
         self.pylon_model = None  # the path to the ac/xml model
         self.needs_stg_entry = True
         self.direction_type = SharedPylon.DIRECTION_TYPE_NORMAL  # correction for which direction mast looks at
-        # maximum one of the following
 
     def calc_global_coordinates(self, my_elev_interpolator, my_coord_transformator):
         self.lon, self.lat = my_coord_transformator.toGlobal((self.x, self.y))
@@ -364,7 +363,7 @@ class LineWithoutCables(object):
 
     def get_center_coordinates(self):
         """Returns the lon/lat coordinates of the line"""
-        if len(self.shared_pylons) == 0:  # fiXME
+        if len(self.shared_pylons) == 0:  # FIXME
             return 0, 0
         else:  # FIXME: needs to be calculated more properly with shapely
             if len(self.shared_pylons) == 1:
@@ -379,11 +378,13 @@ class Landuse(LineWithoutCables):
     TYPE_INDUSTRIAL = 20
     TYPE_RESIDENTIAL = 30
     TYPE_RETAIL = 40
+    TYPE_NON_OSM = 50  # used for landuses constructed by osm2pylons and not in original data from OSM
 
     def __init__(self, osm_id):
         super(Landuse, self).__init__(osm_id)
         self.type_ = 0
         self.polygon = None
+        self.number_of_buildings = 0
 
 
 class Highway(LineWithoutCables):
@@ -429,6 +430,13 @@ class Highway(LineWithoutCables):
             # FIXME: calculate parallel_offset based on lanes
 
             self.shared_pylons = []  # list of SharedPylon
+            x, y = self.linear.coords[0]
+            shared_pylon = SharedPylon()
+            shared_pylon.x = x
+            shared_pylon.y = y
+            shared_pylon.needs_stg_entry = False
+            shared_pylon.calc_global_coordinates(my_elev_interpolator, my_coord_transformator)
+            self.shared_pylons.append(shared_pylon)  # used for calculating heading - especially if only one lamp
 
             my_length = self.linear.length  # omit recalculating length all the time
             my_right_parallel = self.linear.parallel_offset(parallel_offset, 'right', join_style=1)
@@ -447,6 +455,9 @@ class Highway(LineWithoutCables):
                 shared_pylon.calc_global_coordinates(my_elev_interpolator, my_coord_transformator)
                 self.shared_pylons.append(shared_pylon)
                 current_distance += Highway.DEFAULT_DISTANCE
+
+            # calculate heading
+            calc_heading_nodes(self.shared_pylons)
 
 
 class Line(LineWithoutCables):
@@ -710,9 +721,6 @@ class RailMast(SharedPylon):
             self.pylon_model = "Models/StreetFurniture/rail_stop_tension.xml"
         self.direction_type = direction_type
 
-    def is_virtual(self):
-        return self.type_ == RailMast.TYPE_VIRTUAL_MAST
-
 
 class RailLine(Line):
     TYPE_RAILWAY_GAUGE_NARROW = 11
@@ -852,7 +860,9 @@ def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator):
                 my_node = nodes_dict[ref]
                 coordinates.append(my_coord_transformator.toLocal((my_node.lon, my_node.lat)))
         if 2 < len(coordinates):
-            my_buildings[way.osm_id] = Polygon(coordinates)
+            my_polygon = Polygon(coordinates)
+            if my_polygon.is_valid and not my_polygon.is_empty:
+                my_buildings[way.osm_id] = my_polygon.convex_hull
     return my_buildings
 
 
@@ -948,7 +958,6 @@ def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator, landuse_r
     placed - e.g. using a combination of highway type, oneway, number of lanes etc
     """
     my_highways = {}  # osm_id as key, RailLine
-    my_shared_nodes = {}  # node osm_id as key, list of WayLine objects as value
 
     # First reduce to electrified narrow_gauge or rail, no tunnels and no abandoned
     for way in ways_dict.values():
@@ -1011,8 +1020,6 @@ def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator, landuse_r
         if not is_within:
             if len(intersections) == 0:
                 del my_highways[key]
-            elif my_highway.is_roundabout:
-                pass
             else:
                 index = 10000000000
                 for intersection in intersections:
@@ -1041,7 +1048,7 @@ def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator, landuse_r
     return my_highways
 
 
-def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator):
+def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator, building_refs):
     my_landuses = {}  # osm_id as key, Landuse
 
     # First reduce to electrified narrow_gauge or rail, no tunnels and no abandoned
@@ -1073,8 +1080,50 @@ def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator):
                     my_coordinates.append((x, y))
             if len(my_coordinates) >= 3:
                 my_landuse.polygon = Polygon(my_coordinates)
-                if my_landuse.polygon.is_valid:
+                if my_landuse.polygon.is_valid and not my_landuse.polygon.is_empty:
                     my_landuses[my_landuse.osm_id] = my_landuse
+
+    logging.debug("OSM land-uses found: %s", len(my_landuses))
+    if parameters.C2P_LANDUSE_GENERATE_LANDUSE:
+        # Add "missing" landuses based on building clusters
+        my_landuse_candidates = []
+        index = 10000000000
+        for my_building in building_refs.values():
+            # check whether the building already is in a land use
+            within_existing_landuse = False
+            for my_landuse in my_landuses.values():
+                if my_building.intersects(my_landuse.polygon):
+                    within_existing_landuse = True
+                    break
+            if not within_existing_landuse:
+                # create new clusters of land uses
+                buffer_distance = parameters.C2P_LANDUSE_BUILDING_BUFFER_DISTANCE
+                if my_building.area > parameters.C2P_LANDUSE_BUILDING_BUFFER_DISTANCE**2:
+                    factor = math.sqrt(my_building.area / parameters.C2P_LANDUSE_BUILDING_BUFFER_DISTANCE**2)
+                    buffer_distance = min(factor*parameters.C2P_LANDUSE_BUILDING_BUFFER_DISTANCE
+                                          , parameters.C2P_LANDUSE_BUILDING_BUFFER_DISTANCE_MAX)
+                buffer_polygon = my_building.buffer(buffer_distance)
+                buffer_polygon = buffer_polygon.convex_hull
+                within_existing_landuse = False
+                for candidate in my_landuse_candidates:
+                    if buffer_polygon.intersects(candidate.polygon):
+                        candidate.polygon = candidate.polygon.union(buffer_polygon).convex_hull
+                        candidate.number_of_buildings += 1
+                        within_existing_landuse = True
+                        break
+                if not within_existing_landuse:
+                    index += 1
+                    my_candidate = Landuse(index)
+                    my_candidate.polygon = buffer_polygon
+                    my_candidate.number_of_buildings = 1
+                    my_candidate.type_ = Landuse.TYPE_NON_OSM
+                    my_landuse_candidates.append(my_candidate)
+        # add landuse candidates to landuses
+        logging.debug("Candidate land-uses found: %s", len(my_landuses))
+        for candidate in my_landuse_candidates:
+            if candidate.number_of_buildings >= parameters.C2P_LANDUSE_MIN_BUILDINGS:
+                my_landuses[candidate.osm_id] = candidate
+
     return my_landuses
 
 
@@ -1386,7 +1435,7 @@ if __name__ == "__main__":
         parameters.read_from_file(args.filename)
 
     # Initializing tools for global/local coordinate transformations
-    center_global = parameters.get_center_global()
+    center_global = parameters.get_OSM_file_name()
     osm_fname = parameters.get_OSM_file_name()
     coord_transformator = coordinates.Transformation(center_global, hdg=0)
     tools.init(coord_transformator)
@@ -1415,55 +1464,59 @@ if __name__ == "__main__":
     source = open(osm_fname)
     xml.sax.parse(source, handler)
     # References for buildings
-    building_refs = process_osm_building_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
-    logging.info('Number of reference buildings: %s', len(building_refs))
-    # References for landuse
-    landuse_refs = process_osm_landuse_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
+    building_refs = {}
+    if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_AERIALWAYS or parameters.C2P_PROCESS_STREETLAMPS:
+        building_refs = process_osm_building_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
+        logging.info('Number of reference buildings: %s', len(building_refs))
     # Power lines and aerialways
-    powerlines, aerialways = process_osm_power_aerialway(handler.nodes_dict, handler.ways_dict, elev_interpolator
-                                                         , coord_transformator, building_refs)
-    rail_lines = process_osm_rail_overhead(handler.nodes_dict, handler.ways_dict, elev_interpolator
-                                           , coord_transformator)
-    highways = process_osm_highway(handler.nodes_dict, handler.ways_dict, coord_transformator, landuse_refs)
+    powerlines = {}
+    aerialways = {}
+    if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_AERIALWAYS:
+        powerlines, aerialways = process_osm_power_aerialway(handler.nodes_dict, handler.ways_dict, elev_interpolator
+                                                             , coord_transformator, building_refs)
+        if not parameters.C2P_PROCESS_POWERLINES:
+            powerlines.clear()
+        if not parameters.C2P_PROCESS_AERIALWAYS:
+            aerialways.clear()
+        logging.info('Number of power lines to process: %s', len(powerlines))
+        logging.info('Number of aerialways to process: %s', len(aerialways))
+        for wayline in powerlines.values():
+            wayline.calc_and_map()
+        for wayline in aerialways.values():
+            wayline.calc_and_map()
+    # railway overhead lines
+    rail_lines = {}
+    if parameters.C2P_PROCESS_OVERHEAD_LINES:
+        rail_lines = process_osm_rail_overhead(handler.nodes_dict, handler.ways_dict, elev_interpolator
+                                               , coord_transformator)
+        logging.info('Reduced number of rail lines: %s', len(rail_lines))
+        for rail_line in rail_lines.values():
+            rail_line.calc_and_map(elev_interpolator, coord_transformator, rail_lines.values())
+    # street lamps
+    highways = {}
+    if parameters.C2P_PROCESS_STREETLAMPS:
+        landuse_refs = process_osm_landuse_refs(handler.nodes_dict, handler.ways_dict, coord_transformator, building_refs)
+        logging.info('Number of landuse references: %s', len(landuse_refs))
+        highways = process_osm_highway(handler.nodes_dict, handler.ways_dict, coord_transformator, landuse_refs)
+        logging.info('Reduced number of highways: %s', len(highways))
+        for highway in highways.values():
+            highway.calc_and_map(elev_interpolator, coord_transformator)
+        landuse_refs = None
+
     # free some memory
-    landuse_refs = None
     building_refs = None
     handler = None
 
-    # only keep those lines, which should be processed
-    if not parameters.C2P_PROCESS_POWERLINES:
-        powerlines.clear()
-    if not parameters.C2P_PROCESS_AERIALWAYS:
-        aerialways.clear()
-    if not parameters.C2P_PROCESS_OVERHEAD_LINES:
-        rail_lines.clear()
-    if not parameters.C2P_PROCESS_STREETLAMPS:
-        highways.clear()
-
-    logging.info('Number of power lines to process: %s', len(powerlines))
-    logging.info('Number of aerialways to process: %s', len(aerialways))
-    logging.info('Reduced number of rail lines: %s', len(rail_lines))
-    logging.info('Reduced number of highways: %s', len(highways))
-
-    # Work on object
-    for wayline in powerlines.values():
-        wayline.calc_and_map()
-    for wayline in aerialways.values():
-        wayline.calc_and_map()
-
-    # Overhead lines for rail
-    for rail_line in rail_lines.values():
-        rail_line.calc_and_map(elev_interpolator, coord_transformator, rail_lines.values())
-    # streetlamps
-    for highway in highways.values():
-        highway.calc_and_map(elev_interpolator, coord_transformator)
-
     # Write to Flightgear
     stg_file_pointers = {}  # -- dictionary of stg file pointers
-    write_stg_entries(stg_file_pointers, powerlines, "powerline", parameters.C2P_CLUSTER_POWER_LINE_MAX_LENGTH)
-    write_stg_entries(stg_file_pointers, aerialways, "aerialway", parameters.C2P_CLUSTER_AERIALWAY_MAX_LENGTH)
-    write_stg_entries(stg_file_pointers, rail_lines, "overhead", parameters.C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH)
-    write_stg_entries(stg_file_pointers, highways, None, None)
+    if parameters.C2P_PROCESS_POWERLINES:
+        write_stg_entries(stg_file_pointers, powerlines, "powerline", parameters.C2P_CLUSTER_POWER_LINE_MAX_LENGTH)
+    if parameters.C2P_PROCESS_AERIALWAYS:
+        write_stg_entries(stg_file_pointers, aerialways, "aerialway", parameters.C2P_CLUSTER_AERIALWAY_MAX_LENGTH)
+    if parameters.C2P_PROCESS_OVERHEAD_LINES:
+        write_stg_entries(stg_file_pointers, rail_lines, "overhead", parameters.C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH)
+    if parameters.C2P_PROCESS_STREETLAMPS:
+        write_stg_entries(stg_file_pointers, highways, None, None)
 
     for stg in stg_file_pointers.values():
         stg.write(stg_io.delimiter_string(OUR_MAGIC, False) + "\n")

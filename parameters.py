@@ -166,6 +166,11 @@ C2P_CATENARY_MIN_DISTANCE = 30
 
 C2P_POWER_LINE_ALLOW_100M = False
 
+C2P_LANDUSE_GENERATE_LANDUSE = True
+C2P_LANDUSE_BUILDING_BUFFER_DISTANCE = 25
+C2P_LANDUSE_BUILDING_BUFFER_DISTANCE_MAX = 50
+C2P_LANDUSE_MIN_BUILDINGS = 10
+
 #=============================================================================
 # PARAMETERS RELATED TO ROADS IN roads.py
 #=============================================================================
