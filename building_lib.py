@@ -181,7 +181,7 @@ def get_nodes_from_acs(objs, own_prefix):
             ac.close()
 
 #            ac_nodes = R.dot(ac_nodes)
-            ac_nodes += b.anchor.list()
+            ac_nodes += b.anchor.as_array()
             all_nodes = np.append(all_nodes, ac_nodes, 0)
             #print "------"
 
