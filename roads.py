@@ -126,9 +126,10 @@ class Roads(objectlist.ObjectList):
         #if way.osm_id == 235008364 or way.osm_id == 4374302:
         #    pass
         #else: return
-        if len(self.ways_list) >= parameters.MAX_OBJECTS:
+        if len(self.ways_list) >= parameters.MAX_OBJECTS: 
             return
-        
+        if 'railway' in way.tags: 
+            return
         self.ways_list.append(way)
         #self.create_and_append(way.osm_id, way.tags, way.refs)
     
@@ -210,19 +211,31 @@ class Roads(objectlist.ObjectList):
             if r in refs[i+1:]:
                 return True
 
+    def debug_print_dict(self):
+        for key, value in self.attached_ways_dict.iteritems():
+            print key, ": ",
+            for way in value:
+                print way.osm_id, "(", hex(id(way)), ")",
+            print
+
     def find_intersections(self):
         """
         find intersections by brute force:
         - for each node, store attached ways in a dict
         - if a node has 2 ways, store that node as a candidate
+        - one way ends, other way starts: also an intersection
         FIXME: use quadtree/kdtree
         """
         logging.info('Finding intersections...')
         self.intersections = []
         self.attached_ways_dict = {} # a dict: for each ref hold a list of attached ways
         for the_way in self.ways_list:
+#            if the_way.osm_id == 4888143:
+#                print "got 4888143"
             for ref in the_way.refs:
                 try:
+#                    if the_way.osm_id == 4888143:
+#                        print "  ref", self.nodes_dict[ref].osm_id
                     self.attached_ways_dict[ref].append(the_way)
                     if len(self.attached_ways_dict[ref]) == 2:
                         # -- check if ways are actually distinct before declaring
@@ -247,40 +260,64 @@ class Roads(objectlist.ObjectList):
 #        for key, value in attached_ways_dict.items():
 #            print key, value
 
-    def count_inner_intersections(self):
+    def count_inner_intersections(self, style):
         """count inner nodes which are intersections"""
         count = 0        
         for the_way in self.ways_list:
             for the_ref in the_way.refs[1:-1]:
-                if the_ref in self.attached_ways_dict:
+#                if the_ref in self.attached_ways_dict:
+                if the_ref in self.intersections:
                     count += 1
+                    self.debug_plot_ref(the_ref, style)
+                    
         logging.debug("inner intersections %i" % count)
         return count
 
     def split_ways(self):
-        plt.clf()
-        for the_way in self.ways_list:
-            self.debug_plot_way(the_way, '-', lw=5, color='k')
-            self.ways_list.remove(the_way)
-            new_way = osmparser.Way(the_way.osm_id)
-            new_way.tags = the_way.tags
-            new_way.refs.append(the_way.refs[0])
-            for the_ref in the_way.refs[1:-1]:
-                new_way.refs.append(the_ref)
-                if the_ref in self.attached_ways_dict:
-                    self.ways_list.append(new_way)
-                    self.debug_plot_way(new_way, '--', lw=10)
-                    new_way = osmparser.Way(the_way.osm_id)
-                    new_way.tags = the_way.tags
-                    new_way.refs.append(the_ref)
-            new_way.refs.append(the_way.refs[-1])
-            self.ways_list.append(new_way)
-            self.debug_plot_way(new_way, "--", lw=10)
 
+            
+        #plt.clf()
+#        plt.xlim(0.002+1.138e1, 0.016+1.138e1)
+#        plt.ylim(0.006+4.725e1, 0.013+4.725e1)
+
+        #self.ways_list = self.ways_list[0:100]
+
+#        for the_way in self.ways_list:
+#            self.debug_plot_way(the_way, '-', lw=2, color='0.90', mark_nodes=False)
+            #for the_ref in the_way.refs:
+            #    if the_ref in self.attached_ways_dict:
+            #        plt.plot(self.nodes_dict[the_ref].lon, self.nodes_dict[the_ref].lat, 'rx')
+
+        def init_from_existing(way, ref):
+            """return copy of way. The copy will have same osm_id and tags, but only given refs"""
+            new_way = osmparser.Way(way.osm_id)
+            new_way.tags = way.tags
+            new_way.refs.append(ref)
+            return new_way
+
+        new_list = []
+        for the_way in self.ways_list:
+            self.debug_plot_way(the_way, '-', lw=2, color='0.90', show_label=0)
+#            self.ways_list.remove(the_way)
+
+            new_way = init_from_existing(the_way, the_way.refs[0])
+            for the_ref in the_way.refs[1:]:
+                new_way.refs.append(the_ref)
+                if the_ref in self.intersections: #attached_ways_dict:
+                    new_list.append(new_way)
+                    self.debug_plot_way(new_way, '-', lw=1, mark_nodes=0)
+                    new_way = init_from_existing(the_way, the_ref)
+            if the_ref not in self.intersections: #attached_ways_dict:
+                new_list.append(new_way)
+                self.debug_plot_way(new_way, '--', lw=1, mark_nodes=0)
+#            new_way.refs.append(the_way.refs[-1])
+#            self.ways_list.append(new_way)
+#            self.debug_plot_way(new_way, "--", lw=2, mark_nodes=True)
+
+        self.ways_list = new_list
 #            plt.show()
 #            plt.clf()
 #            break
-#        plt.savefig("roads.eps")
                 
         if 0:
             for key, value in self.attached_ways.items():
@@ -292,12 +329,17 @@ class Roads(objectlist.ObjectList):
                         except:
                             print "  ", way
 
+    def debug_plot_ref(self, ref, style): 
+        plt.plot(self.nodes_dict[ref].lon, self.nodes_dict[ref].lat, style)
+#        plt.text(self.nodes_dict[ref].lon, self.nodes_dict[ref].lat, ref.osm_id)
 
-    def debug_plot_way(self, way, ls, lw, color=False):
-        return
-        col = ['b', 'r', 'y', 'g', '0.75', '0.5', 'k', 'c']
+
+    def debug_plot_way(self, way, ls, lw, color=False, mark_nodes=False, show_label=False):
+#        return
+        col = ['b', 'r', 'y', 'g', '0.25', 'k', 'c']
         if not color:
-            color = col[random.randint(0, len(col)-1)]
+            #color = col[random.randint(0, len(col)-1)]
+            color = col[(way.osm_id + len(way.refs)) % len(col)]
         osm_nodes = np.array([(self.nodes_dict[r].lon, self.nodes_dict[r].lat) for r in way.refs])
         a = osm_nodes
 #        a = np.array([transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
@@ -306,6 +348,17 @@ class Roads(objectlist.ObjectList):
 #        a = np.array([transform.toGlobal(p) for p in a])
         #color = col[r.typ]
         plt.plot(a[:,0], a[:,1], ls, linewidth=lw, color=color)
+        if mark_nodes:
+            plt.plot(a[0,0], a[0,1], 'o', linewidth=lw, color=color)
+            plt.plot(a[-1,0], a[-1,1], 'o', linewidth=lw, color=color)
+        if show_label:
+            plt.text(0.5*(a[0,0]+a[-1,0]), 0.5*(a[0,1]+a[-1,1]), way.osm_id)
+    
+    def debug_plot_intersections(self, style):
+        for ref in self.intersections:
+            node = self.nodes_dict[ref]
+            plt.plot(node.lon, node.lat, style, mfc='None')
+            #plt.text(node.lon, node.lat, node.osm_id, color='r')
 
     def cleanup_intersections(self):
         """Remove intersections that
@@ -407,7 +460,7 @@ def write_xml(path_to_stg, file_name, object_name):
     """  % (file_name, shader_str, object_name)))
 
 
-def debug_create_eps(roads, clusters, elev):
+def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
     """debug: plot roads map to .eps"""
     transform = tools.transform
     if 0:
@@ -427,7 +480,7 @@ def debug_create_eps(roads, clusters, elev):
 
     if 1:
         for i, cl in enumerate(clusters):
-            if len(cl.objects): 
+            if plot_cluster_borders and len(cl.objects): 
                 cluster_color = col[random.randint(0, len(col)-1)]
                 c = np.array([[cl.min.x, cl.min.y], 
                               [cl.max.x, cl.min.y], 
@@ -447,6 +500,9 @@ def debug_create_eps(roads, clusters, elev):
                     lw = lw_w[0]
                     
                 plt.plot(a[:,0], a[:,1], color=random_color, linewidth=lw)
+
+    #plt.show()
+    sys.exit(0)
         
     if 0:
         for r in roads:
@@ -458,6 +514,8 @@ def debug_create_eps(roads, clusters, elev):
     plt.axes().set_aspect('equal')
     #plt.show()
     plt.legend()
+    plt.xlim(0+1.138e1, 0.04+1.138e1)
+    plt.ylim(0+4.725e1, 0.03+4.725e1)
     plt.savefig('roads.eps')
     plt.clf()
 
@@ -512,14 +570,26 @@ def main():
     logging.info("done.")
     logging.info("ways: %i", len(roads))
 
-    logging.debug("len before %i" % len(roads.ways_list))
-    roads.find_intersections()
-    roads.count_inner_intersections()
-    roads.split_ways()
-    roads.find_intersections()
-    roads.count_inner_intersections()
-#    roads.join_ways()
-    logging.debug("len after %i" % len(roads.ways_list))
+    for the_way in roads.ways_list:
+        roads.debug_plot_way(the_way, '-', lw=2)
+
+    if 1:
+        logging.debug("len before %i" % len(roads.ways_list))
+        roads.find_intersections()
+        roads.debug_plot_intersections('ks')
+        roads.count_inner_intersections('bs')
+        plt.savefig("r_org.eps")
+        plt.clf()
+        roads.split_ways()
+        roads.find_intersections()
+        #roads.debug_print_dict()
+        roads.debug_plot_intersections('k.')
+        roads.count_inner_intersections('rs')
+        plt.savefig("r_spl.eps")
+
+    #    roads.join_ways()
+        logging.debug("len after %i" % len(roads.ways_list))
+#        sys.exit(0)
     roads.create_linear_objects()
 
     #roads.cleanup_intersections()
