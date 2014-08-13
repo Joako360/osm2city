@@ -474,7 +474,14 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
         # -- determine facade and roof textures
         logging.debug("___find facade")
-        b.facade_texture = facades.find_matching(facade_requires, b.tags, b.height, b.longest_edge_len)
+        if b.parent is None:
+            b.facade_texture = facades.find_matching(facade_requires, b.tags, b.height, b.longest_edge_len)
+        else:
+            if b.parent.facade_texture is None:
+                b.facade_texture = facades.find_matching(facade_requires, b.parent.tags, b.height, b.longest_edge_len)
+                b.parent.facade_texture = b.facade_texture
+            else:
+                b.facade_texture = b.parent.facade_texture
         logging.debug("__done" + str(b.facade_texture))
         if not b.facade_texture:
             tools.stats.skipped_texture += 1

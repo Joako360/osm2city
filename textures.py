@@ -153,12 +153,11 @@ class FacadeManager(TextureManager):
         ranked_list = []
         for t in candidates:
             match = 0
-            for tag in tags:
-                if(tag == 'building:material'):
-                    val = tags[tag]
-                    new_key = ("facade:%s:%s") % (tag, val)
-                    if new_key in t.provides:
-                        match += 1
+            if 'building:material' in tags:
+                val = tags['building:material']
+                new_key = ("facade:building:material:%s") % (val)
+                if new_key in t.provides:
+                    match += 1
             ranked_list.append([match, t])
 #         b = ranked_list[:,0]
         ranked_list.sort(key=lambda tup: tup[0], reverse=True)
@@ -417,14 +416,16 @@ def init():
 #                            provides=['shape:urban','shape:residential','age:modern','age:old',
 #                                     'compat:roof-flat','compat:roof-pitched']))
     facades.append(Texture('tex.src/castle.jpg',
-       h_size_meters=12, h_splits=[512, 1024, 1536, 2048], h_can_repeat=True,
-       v_size_meters=12, v_splits=[512, 1024, 1536, 2048], v_can_repeat=False,
-       has_roof_section=False,
-       height_min=1.,
-       provides=['building:material:stone',
-                 'compat:roof-gabled',
-                 'compat:roof-flat',
-                 'compat:roof-hipped']))
+                           h_size_meters=4, h_splits=[512, 1024, 1536, 2048], h_can_repeat=True,
+                           v_size_meters=4, v_splits=[512, 1024, 1536, 2048], v_can_repeat=False,
+                           has_roof_section=False,
+                           height_min=1.,
+                           provides=['building:material:stone',
+                                     'age:old',
+                                     'compat:roof-gabled',
+                                     'compat:roof-pitched',
+                                     'compat:roof-flat',
+                                     'compat:roof-hipped']))
 
 
 #    roofs.append(Texture('tex.src/roof_tiled_black',

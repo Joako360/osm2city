@@ -80,6 +80,7 @@ import parameters
 from pdb import pm
 from cluster import Clusters
 from numpy.core.numeric import True_
+from shapely.geometry.multipoint import MultiPoint
 
 buildings = []  # -- master list, holds all buildings
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
@@ -322,6 +323,9 @@ class Buildings(object):
             return False
 
         building = Building(osm_id, tags, outer_ring, name, height, levels, inner_rings_list=inner_rings_list, building_type=_building_type, roof_type=_roof_type)
+#        if building.osm_id == 3825399:
+#            print building
+#
         if parameters.BUILDING_REMOVE_WITH_PARTS:
             for ref in refs:
                 # Build a lookup table
@@ -335,20 +339,19 @@ class Buildings(object):
                             if(cand_building in self.buildings):
                                 # We don't need it since it'll be replaced by its parts
                                 self.buildings.remove(cand_building)
-                                way_list_by_ref.remove(cand_building)
                             logging.info('Found Building for removing %d' % cand_building.osm_id)
                             building.parent = cand_building
     #                         print cand_building.name
                             break
     #                     if 'building' in building.tags and building.polygon.intersection(cand_building.polygon).equals(cand_building.polygon):
     #                         print 'Found Building:part'
-            way_list_by_ref.append(building)
-            self.node_way_dict[ref] = way_list_by_ref
+                way_list_by_ref.append(building)
+                self.node_way_dict[ref] = way_list_by_ref
         self.buildings.append(building)
 
         tools.stats.objects += 1
         # show progress here?
-        #if tools.stats.objects % 50 == 0:
+        # if tools.stats.objects % 50 == 0:
         #    logging.info(tools.stats.objects)
         return True
 
