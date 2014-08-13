@@ -74,7 +74,7 @@ class vec2d(object):
         print "deprecated call to vec2d.list(). Iterate instead."
         return self.x, self.y
 
-    def array(self):
+    def as_array(self):
         """return as numpy array"""
         return np.array((self.x, self.y))
 
