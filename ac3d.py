@@ -27,7 +27,7 @@ class Face(object):
         s = "SURF %s\n" % self.typ
         s += "mat %i\n" % self.mat
         s += "refs %i\n" % len(self.nodes_uv_list)
-        s += string.join(["%i %g %g\n" % (n[0], n[1], n[2]) for n in self.nodes_uv_list], '')
+        s += string.join(["%i %1.4g %1.4g\n" % (n[0], n[1], n[2]) for n in self.nodes_uv_list], '')
         return s
 
 
