@@ -14,7 +14,7 @@ def _flat_relation(b):
     # -- find inner node i that is closest to first outer node
     xo = shg.Point(b.X_outer[0])
     dists = np.array([shg.Point(xi).distance(xo) for xi in b.polygon.interiors[0].coords])
-    #i = dists.argmin()
+    # i = dists.argmin()
     out += "SURF 0x0\n"
     out += "mat %i\n" % b.roof_mat
     out += "refs %i\n" % (b._nnodes_ground + 2)
@@ -30,7 +30,10 @@ def _flat_relation(b):
     out += "%i %g %g\n" % (Xi[0], 0, 0)
     return out
 
-def flat(out, b, X, ac_name = ""):
+
+def flat(out, b, X, ac_name=""):
+    if b.roof_texture is None:
+        raise ValueError("Roof texture None")
     """Flat roof. Separate model if ac_name is not empty. Also works for relations."""
     #   3-----------------2  Outer is CCW: 0 1 2 3
     #   |                /|  Inner[0] is CW: 4 5 6 7

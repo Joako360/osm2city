@@ -478,6 +478,8 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             b.facade_texture = facades.find_matching(facade_requires, b.tags, b.height, b.longest_edge_len)
         else:
             if b.parent.facade_texture is None:
+#                 if b.parent.osm_id == 3825399:
+#                     print b.parent
                 b.facade_texture = facades.find_matching(facade_requires, b.parent.tags, b.height, b.longest_edge_len)
                 b.parent.facade_texture = b.facade_texture
             else:
@@ -496,7 +498,15 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         else:
             roof_requires.append('compat:roof-flat')
 
-        b.roof_texture = roofs.find_matching(roof_requires)
+        # make roof equal across parts
+        if b.parent is None:
+            b.roof_texture = roofs.find_matching(roof_requires)
+        else:
+            if b.parent.roof_texture is None:
+                b.roof_texture = roofs.find_matching(roof_requires)
+                b.parent.roof_texture = b.roof_texture
+            else:
+                b.roof_texture = b.parent.roof_texture
 
         # -- finally: append building to new list
         new_buildings.append(b)
