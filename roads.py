@@ -274,7 +274,8 @@ class Roads(objectlist.ObjectList):
         return count
 
     def split_ways(self):
-
+        """split ways such that none of the interiour nodes are intersections.
+        """
             
         #plt.clf()
 #        plt.xlim(0.002+1.138e1, 0.016+1.138e1)
@@ -462,6 +463,7 @@ def write_xml(path_to_stg, file_name, object_name):
 
 def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
     """debug: plot roads map to .eps"""
+    plt.clf()
     transform = tools.transform
     if 0:
         c = np.array([[elev.min.x, elev.min.y], 
@@ -491,6 +493,7 @@ def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
                 plt.plot(c[:,0], c[:,1], '-', color=cluster_color)
             for r in cl.objects:
                 random_color = col[random.randint(0, len(col)-1)]
+                osmid_color = col[(r.osm_id + len(r.refs)) % len(col)]                
                 a = np.array(r.center.coords)
                 a = np.array([transform.toGlobal(p) for p in a])
                 #color = col[r.typ]
@@ -499,10 +502,10 @@ def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
                 except:
                     lw = lw_w[0]
                     
-                plt.plot(a[:,0], a[:,1], color=random_color, linewidth=lw)
+                plt.plot(a[:,0], a[:,1], color=cluster_color, linewidth=lw)
 
     #plt.show()
-    sys.exit(0)
+    #sys.exit(0)
         
     if 0:
         for r in roads:
@@ -514,8 +517,8 @@ def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
     plt.axes().set_aspect('equal')
     #plt.show()
     plt.legend()
-    plt.xlim(0+1.138e1, 0.04+1.138e1)
-    plt.ylim(0+4.725e1, 0.03+4.725e1)
+#    plt.xlim(0+1.138e1, 0.04+1.138e1)
+#    plt.ylim(0+4.725e1, 0.03+4.725e1)
     plt.savefig('roads.eps')
     plt.clf()
 
@@ -576,14 +579,14 @@ def main():
     if 1:
         logging.debug("len before %i" % len(roads.ways_list))
         roads.find_intersections()
-        roads.debug_plot_intersections('ks')
+        #roads.debug_plot_intersections('ks')
         roads.count_inner_intersections('bs')
         plt.savefig("r_org.eps")
         plt.clf()
         roads.split_ways()
         roads.find_intersections()
         #roads.debug_print_dict()
-        roads.debug_plot_intersections('k.')
+        #roads.debug_plot_intersections('k.')
         roads.count_inner_intersections('rs')
         plt.savefig("r_spl.eps")
 
@@ -618,7 +621,7 @@ def main():
         write_xml(path_to_stg, file_name, 'roads')
         tools.install_files(['roads.eff'], path_to_stg)
 
-    debug_create_eps(roads, roads.clusters, elev)
+    debug_create_eps(roads, roads.clusters, elev, plot_cluster_borders=1)
     print "tr 1", transform
     stg_manager.write()
 
