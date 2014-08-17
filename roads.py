@@ -246,7 +246,6 @@ class Roads(objectlist.ObjectList):
                         self.intersections.append(ref)
                 except KeyError:
                     self.attached_ways_dict[ref] = [the_way]  # initialize node
-        logging.info('Done.')
 
         # kick nodes that belong to one way only
         # TODO: is there something like dict comprehension?
@@ -465,7 +464,7 @@ def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
     """debug: plot roads map to .eps"""
     plt.clf()
     transform = tools.transform
-    if 0:
+    if 1:
         c = np.array([[elev.min.x, elev.min.y], 
                       [elev.max.x, elev.min.y], 
                       [elev.max.x, elev.max.y], 
@@ -559,7 +558,6 @@ def main():
     handler.register_uncategorized_way_callback(roads.store_uncategorized)
     handler.parse(source)
     
-    logging.info("done.")
     logging.info("ways: %i", len(roads))
     
     if parameters.PATH_TO_OUTPUT:
@@ -570,8 +568,6 @@ def main():
 
 #    roads.objects = roads.objects[0:1000]
     #roads.clip_at_cluster_border()
-    logging.info("done.")
-    logging.info("ways: %i", len(roads))
 
     for the_way in roads.ways_list:
         roads.debug_plot_way(the_way, '-', lw=2)
@@ -622,7 +618,6 @@ def main():
         tools.install_files(['roads.eff'], path_to_stg)
 
     debug_create_eps(roads, roads.clusters, elev, plot_cluster_borders=1)
-    print "tr 1", transform
     stg_manager.write()
 
     elev.save_cache()
