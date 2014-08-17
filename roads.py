@@ -80,7 +80,7 @@ from cluster import Clusters
 # debug stuff
 import test
 from pdb import pm
-from memory_profiler import profile
+#from memory_profiler import profile
 import mem
 import gc
 import time
@@ -614,7 +614,7 @@ def main():
 
         path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, 0, 0)
         ac.write_to_file(path_to_stg + file_name)
-        write_xml(path_to_stg, file_name, 'roads')
+        write_xml(path_to_stg, file_name, file_name)
         tools.install_files(['roads.eff'], path_to_stg)
 
     debug_create_eps(roads, roads.clusters, elev, plot_cluster_borders=1)
