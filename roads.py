@@ -123,18 +123,35 @@ class Roads(objectlist.ObjectList):
             #self.transform = coordinates.Transformation(center_global, hdg = 0)
             #tools.init(self.transform) # FIXME. Not a nice design.
 
-        #if way.osm_id == 235008364 or way.osm_id == 4374302:
         #    pass
         #else: return
         if len(self.ways_list) >= parameters.MAX_OBJECTS: 
             return
-        if 'railway' in way.tags: 
+        if 'railway' in way.tags and (not 'highway' in way.tags):
             return
         self.ways_list.append(way)
         #self.create_and_append(way.osm_id, way.tags, way.refs)
     
 #    self.transform, self.elev, way.osm_id, way.tags, way.refs, nodes_dict, 
 #    width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs
+    def prio(self, highway_tag, access):
+        if highway_tag == 'motorway' or highway_tag == 'motorway_link':
+            prio = 5
+        elif highway_tag == 'primary' or highway_tag == 'trunk':
+            prio = 4
+        elif highway_tag == 'secondary':
+            prio = 3
+        elif highway_tag == 'tertiary' or highway_tag == 'unclassified':
+            prio = 2
+        elif highway_tag == 'residential':
+            prio = 1
+        elif highway_tag == 'service' and access:
+            prio = 0 # None
+        else:
+            prio = 0
+        return prio
+        
+    
     def create_linear_objects(self):
         for the_way in self.ways_list:
             prio = None
@@ -146,26 +163,14 @@ class Roads(objectlist.ObjectList):
             width = 9
             tex_y0 = 0.5
             tex_y1 = 0.75
-            AGL_ofs = 0.
+            AGL_ofs = 1.0
             #if way.tags.has_key('layer'):
             #    AGL_ofs = 20.*float(way.tags['layer'])
             #print way.tags
             #bla
     
             if 'highway' in the_way.tags:
-                road_type = the_way.tags['highway']
-                if road_type == 'motorway' or road_type == 'motorway_link':
-                    prio = 5
-                elif road_type == 'primary' or road_type == 'trunk':
-                    prio = 4
-                elif road_type == 'secondary':
-                    prio = 3
-                elif road_type == 'tertiary' or road_type == 'unclassified':
-                    prio = 2
-                elif road_type == 'residential':
-                    prio = 1
-                elif road_type == 'service' and access:
-                    prio = None
+                prio = self.prio(the_way.tags['highway'], access)
             elif 'railway' in the_way.tags:
                 if the_way.tags['railway'] in ['rail']:
                     prio = 6
@@ -180,7 +185,7 @@ class Roads(objectlist.ObjectList):
     
             #if prio != 1: prio = None
     
-            if prio == None:
+            if prio == 0:
     #            print "got", osm_id,
     #            for t in tags.keys():
     #                print (t), "=", (tags[t])+" ",
@@ -274,6 +279,7 @@ class Roads(objectlist.ObjectList):
 
     def split_ways(self):
         """split ways such that none of the interiour nodes are intersections.
+           I.e., each way object connects to at most two intersections.
         """
             
         #plt.clf()
@@ -339,7 +345,9 @@ class Roads(objectlist.ObjectList):
         col = ['b', 'r', 'y', 'g', '0.25', 'k', 'c']
         if not color:
             #color = col[random.randint(0, len(col)-1)]
-            color = col[(way.osm_id + len(way.refs)) % len(col)]
+            #color = col[(way.osm_id + len(way.refs)) % len(col)]
+            color = col[self.prio(way.tags['highway'], True) % len(col)]
+
         osm_nodes = np.array([(self.nodes_dict[r].lon, self.nodes_dict[r].lat) for r in way.refs])
         a = osm_nodes
 #        a = np.array([transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
@@ -560,6 +568,7 @@ def main():
     
     logging.info("ways: %i", len(roads))
     
+    
     if parameters.PATH_TO_OUTPUT:
         path_to_output = parameters.PATH_TO_OUTPUT
     else:
@@ -570,7 +579,8 @@ def main():
     #roads.clip_at_cluster_border()
 
     for the_way in roads.ways_list:
-        roads.debug_plot_way(the_way, '-', lw=2)
+        roads.debug_plot_way(the_way, '-', lw=0.5)
+#    plt.savefig("r_org.eps")
 
     if 1:
         logging.debug("len before %i" % len(roads.ways_list))
@@ -608,9 +618,9 @@ def main():
         offset = cl.center
 
         ac = ac3d.Writer(tools.stats, show_labels=False)
-        obj = ac.new_object(file_name, 'tex/roads.png', default_swap_uv=True)
+        ac3d_obj = ac.new_object(file_name, 'tex/roads.png', default_swap_uv=True)
         for rd in cl.objects:
-            rd.write_to(obj, elev, ac, offset=offset) # fixme: remove .ac, needed only for adding debug labels
+            rd.write_to(ac3d_obj, elev, ac, offset=offset) # fixme: remove .ac, needed only for adding debug labels
 
         path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, 0, 0)
         ac.write_to_file(path_to_stg + file_name)
