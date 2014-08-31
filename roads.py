@@ -129,6 +129,8 @@ class Roads(objectlist.ObjectList):
             return
         if 'railway' in way.tags and (not 'highway' in way.tags):
             return
+        if self.prio(way.tags['highway'], True) == 0:
+            return
         self.ways_list.append(way)
         #self.create_and_append(way.osm_id, way.tags, way.refs)
     
@@ -183,7 +185,7 @@ class Roads(objectlist.ObjectList):
                 tex_y1 = 0.5
                 width=6
     
-            #if prio != 1: prio = None
+            #if prio != 1: prio = None  
     
             if prio == 0:
     #            print "got", osm_id,
@@ -276,6 +278,17 @@ class Roads(objectlist.ObjectList):
                     
         logging.debug("inner intersections %i" % count)
         return count
+
+    def print_intersections_stats(self):
+        num = np.zeros(10)
+        for key, value in self.attached_ways_dict.items():
+            num[len(value)] += 1
+            if len(value) >= 5:
+                print "m", len(value), key
+
+        print "stats"
+        for i, v in enumerate(num):
+            print i, v
 
     def split_ways(self):
         """split ways such that none of the interiour nodes are intersections.
@@ -567,8 +580,7 @@ def main():
     handler.parse(source)
     
     logging.info("ways: %i", len(roads))
-    
-    
+        
     if parameters.PATH_TO_OUTPUT:
         path_to_output = parameters.PATH_TO_OUTPUT
     else:
@@ -591,6 +603,8 @@ def main():
         plt.clf()
         roads.split_ways()
         roads.find_intersections()
+        roads.print_intersections_stats()
+        sys.exit(0)
         #roads.debug_print_dict()
         #roads.debug_plot_intersections('k.')
         roads.count_inner_intersections('rs')
