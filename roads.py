@@ -3,6 +3,8 @@
 
 """
 Experimental code.
+python -m cProfile -o prof ./roads.py -f LOWI/params-small
+python -m cProfile -s 'cumtime' ./roads.py -f LOWI/params-small
 
 Created on Sun Sep 29 10:42:12 2013
 
@@ -336,7 +338,7 @@ class Roads(objectlist.ObjectList):
                     new_list.append(new_way)
                     self.debug_plot_way(new_way, '-', lw=1, mark_nodes=0)
                     new_way = init_from_existing(the_way, the_ref)
-            if the_ref not in self.intersections_set: #attached_ways_dict:
+            if the_ref not in self.intersections_set: #attached_ways_dict: # FIXME: store previous test?
                 new_list.append(new_way)
                 self.debug_plot_way(new_way, '--', lw=1, mark_nodes=0)
 #            new_way.refs.append(the_way.refs[-1])
@@ -603,21 +605,22 @@ def main():
     for the_way in roads.ways_list:
         roads.debug_plot_way(the_way, '-', lw=0.5)
 #    plt.savefig("r_org.eps")
-
+    info = False
     if 1:
         logging.debug("len before %i" % len(roads.ways_list))
         roads.find_intersections()
         #roads.debug_plot_intersections('ks')
-        roads.count_inner_intersections('bs')
-        plt.savefig("r_org.eps")
-        plt.clf()
+        if info: 
+            roads.count_inner_intersections('bs')
+            plt.savefig("r_org.eps")
+            plt.clf()
         roads.split_ways()
         roads.find_intersections()
-        roads.print_intersections_stats()
+            roads.print_intersections_stats()
         #roads.debug_print_dict()
         #roads.debug_plot_intersections('k.')
-        roads.count_inner_intersections('rs')
-        plt.savefig("r_spl.eps")
+            roads.count_inner_intersections('rs')
+            plt.savefig("r_spl.eps")
 
     #    roads.join_ways()
         logging.debug("len after %i" % len(roads.ways_list))
