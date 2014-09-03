@@ -27,10 +27,18 @@ Intersections:
     #if only 2 nodes, and both end nodes, and road types compatible:
     #put way into joining list
 
+we have
+   intersections_set: a list of all nodes that are true intersections
+   attached_ways_dict: for each intersection node, store a list of attached ways
 Render intersection:
   if 2 ways:
     simply join here. Or ignore for now.
   else:
+      for the_intersection in self.intersections_set:
+          # each intersection knows about the attached ways
+          sort (the_intersection.ways) by angle
+          for i, first_way in enumerate(the_intersection.ways):
+              
       for the_way in ways:
         left_neighbor = compute from angles and width
         store end nodes coords separately
@@ -227,32 +235,34 @@ class Roads(objectlist.ObjectList):
 
     def find_intersections(self):
         """
+        N = number of nodes
         find intersections by brute force:
-        - for each node, store attached ways in a dict
+        - for each node, store attached ways in a dict                O(N)
         - if a node has 2 ways, store that node as a candidate
+        - remove entries/nodes that have less than 2 ways attached    O(N)
         - one way ends, other way starts: also an intersection
         FIXME: use quadtree/kdtree
         """
         logging.info('Finding intersections...')
-        self.intersections = []
-        self.attached_ways_dict = {} # a dict: for each ref hold a list of attached ways
+        self.intersections_set = set()
+        self.attached_ways_dict = {} # a dict: for each ref (aka node) hold a list of attached ways
         for the_way in self.ways_list:
 #            if the_way.osm_id == 4888143:
 #                print "got 4888143"
-            for ref in the_way.refs:
+            for i, ref in enumerate(the_way.refs):
                 try:
 #                    if the_way.osm_id == 4888143:
 #                        print "  ref", self.nodes_dict[ref].osm_id
-                    self.attached_ways_dict[ref].append(the_way)
+                    self.attached_ways_dict[ref].append((the_way, i == 0)) # store tuple (the_way, is_first)
                     if len(self.attached_ways_dict[ref]) == 2:
                         # -- check if ways are actually distinct before declaring
                         #    an intersection?
                         # not an intersection if
                         # - only 2 ways && one ends && other starts
                         # easier?: only 2 ways, at least one node is middle node
-                        self.intersections.append(ref)
+                        self.intersections_set.add(ref)
                 except KeyError:
-                    self.attached_ways_dict[ref] = [the_way]  # initialize node
+                    self.attached_ways_dict[ref] = [(the_way, i == 0)]  # initialize node
 
         # kick nodes that belong to one way only
         # TODO: is there something like dict comprehension?
@@ -272,7 +282,7 @@ class Roads(objectlist.ObjectList):
         for the_way in self.ways_list:
             for the_ref in the_way.refs[1:-1]:
 #                if the_ref in self.attached_ways_dict:
-                if the_ref in self.intersections:
+                if the_ref in self.intersections_set:
                     count += 1
                     self.debug_plot_ref(the_ref, style)
                     
@@ -322,11 +332,11 @@ class Roads(objectlist.ObjectList):
             new_way = init_from_existing(the_way, the_way.refs[0])
             for the_ref in the_way.refs[1:]:
                 new_way.refs.append(the_ref)
-                if the_ref in self.intersections: #attached_ways_dict:
+                if the_ref in self.intersections_set: #attached_ways_dict:
                     new_list.append(new_way)
                     self.debug_plot_way(new_way, '-', lw=1, mark_nodes=0)
                     new_way = init_from_existing(the_way, the_ref)
-            if the_ref not in self.intersections: #attached_ways_dict:
+            if the_ref not in self.intersections_set: #attached_ways_dict:
                 new_list.append(new_way)
                 self.debug_plot_way(new_way, '--', lw=1, mark_nodes=0)
 #            new_way.refs.append(the_way.refs[-1])
@@ -376,7 +386,7 @@ class Roads(objectlist.ObjectList):
             plt.text(0.5*(a[0,0]+a[-1,0]), 0.5*(a[0,1]+a[-1,1]), way.osm_id)
     
     def debug_plot_intersections(self, style):
-        for ref in self.intersections:
+        for ref in self.intersections_set:
             node = self.nodes_dict[ref]
             plt.plot(node.lon, node.lat, style, mfc='None')
             #plt.text(node.lon, node.lat, node.osm_id, color='r')
@@ -445,7 +455,7 @@ def create_ac(file_name, objects, center_global, elev, stg_manager):
         rd.write_to(obj, elev, ac)
 
     if 0:
-        for ref in self.intersections:
+        for ref in self.intersections_set:
             node = self.nodes_dict[ref]
             x, y = self.transform.toLocal((node.lon, node.lat))
             e = self.elev(vec2d(x, y)) + 5
@@ -604,7 +614,6 @@ def main():
         roads.split_ways()
         roads.find_intersections()
         roads.print_intersections_stats()
-        sys.exit(0)
         #roads.debug_print_dict()
         #roads.debug_plot_intersections('k.')
         roads.count_inner_intersections('rs')
@@ -612,7 +621,7 @@ def main():
 
     #    roads.join_ways()
         logging.debug("len after %i" % len(roads.ways_list))
-#        sys.exit(0)
+        sys.exit(0)
     roads.create_linear_objects()
 
     #roads.cleanup_intersections()
