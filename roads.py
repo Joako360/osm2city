@@ -361,40 +361,47 @@ class Roads(objectlist.ObjectList):
 #            if a < 0:
 #                a += (2 * np.pi)
             print "%5.1f " % (a * 57.3),
-                
+
+        def angle_from(lin_obj, is_first):
+            """if IS_FIRST, the way is pointing away from us, and we can use the angle straight away.
+               Otherwise, add 180 deg.
+            """
+            if is_first:
+                angle = lin_obj.angle[0]
+            else:
+                angle = lin_obj.angle[-1] + np.pi
+                if angle > np.pi: angle -= np.pi * 2
+            return angle
 
         for the_ref, ways_list in self.attached_ways_dict.items():
-#            print the_ref, ways_list
             # each intersection knows about the attached ways
-#            sort (the_intersection.ways) by angle, taking into account is_first. 
-#               Is_first == True -> from, angle OK else angle = 180 - angle
-            # -- This is tricky. x[0] is our linear_object. x[1] is our IS_FIRST flag.
+            # -- Sort (the_intersection.ways) by angle, taking into account is_first. 
+            #    This is tricky. x[0] is our linear_object (which has a property "angle").
+            #    x[1] is our IS_FIRST flag.
             #    According to IS_FIRST use either first or last angle in list,
             #    (-1 + is_first) evaluates to 0 or -1.
             #    
-#            FIXME: sort!
-#            ways_list.sort(key=lambda x: x[0].angle[-1 + x[1]] if x[0] else np.pi + x[0].angle[-1 + x[1]] )
-            ways_list.sort(key=lambda x: x[0].angle[-1 + x[1]] )
-THATS FUNNY.
+            #    Sorting results in LHS neighbours.
+            ways_list.sort(key=lambda x: angle_from(x[0], x[1])) 
 
             flag = False
-            pref_an = -999
+            pref_an = 999
             print the_ref, " : ",
             for way, is_first in ways_list:
-                if is_first: 
-                    an = way.angle[0]
-                else: an = way.angle[-1]
-                if an < 0:
-                    an += (2 * np.pi)
+                an = angle_from(way, is_first)
 
-                pr_angle(an)
                 print " (%i)" % way.osm_id, is_first,
-                if not an > pref_an: flag = True
+                pr_angle(an)
+                if not an < pref_an: flag = True
                 pref_an = an
-            if flag: 
-                print " aaaaaaaaaa"
-                bla
-            else: print
+#            if flag: 
+#                print " aaaaaaaaaa"
+                
+#            else: 
+            print
+            if len(ways_list) > 3: bla
+            
+            #if the_ref == 290863179: bla
 
             continue
             for i, (way_1, is_first_1) in enumerate(ways_list):
