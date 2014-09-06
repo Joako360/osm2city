@@ -108,7 +108,7 @@ class LinearBridge(linear.LinearObject):
         - deck elev
         -
         """
-        n_nodes = len(self.left.coords)
+        n_nodes = len(self.edge[0].coords)
 
         # -- deck height
         z = np.zeros(n_nodes)
@@ -118,10 +118,10 @@ class LinearBridge(linear.LinearObject):
             l += self.segment_len[i]
 
         # -- top
-        node0_l, node0_r = self._write_to(obj, elev, self.left, self.right,
+        node0_l, node0_r = self._write_to(obj, elev, self.edge[0], self.edge[1],
                                           self.tex_y0, self.tex_y1, left_z=z, right_z=z, ac=ac, offset=offset)
         left2, right2 = self.compute_offset(3)
-        #left2, right2 = self.left, self.right
+        #left2, right2 = self.edge[0], self.edge[1]
 
         # -- right
         tmp, node0_r2 = self._write_to(obj, elev, node0_r, right2,

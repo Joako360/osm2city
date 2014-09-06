@@ -47,7 +47,7 @@ class LinearObject(object):
         self.center = shg.LineString(nodes)
         try:
             self.compute_angle_etc()
-            self.left, self.right = self.compute_offset(self.width / 2.)
+            self.edge = self.compute_offset(self.width / 2.)
         except Warning, reason:
             print "Warning in OSM_ID %i: %s" % (self.osm_id, reason)
 
@@ -55,7 +55,7 @@ class LinearObject(object):
         self.tex_y1 = tex_y1
 
 #        if self.osm_id == 235008364:
-#            test.show_nodes(osm_id, nodes, refs, nodes_dict, self.left, self.right)
+#            test.show_nodes(osm_id, nodes, refs, nodes_dict, self.edge[0], self.edge[1])
 #            self.plot(left=False, right=False, angle=True)
 
     def has_large_angle(self):
@@ -104,14 +104,14 @@ class LinearObject(object):
 
             return left, right
 
-    def plot(self, center=True, left=False, right=False, angle=True):
+    def plot(self, center=True, left=False, right=False, angle=True, clf=True, show=True):
         """debug"""
         c = np.array(self.center.coords)
-        l = np.array(self.left.coords)
-        r = np.array(self.right.coords)
+        l = np.array(self.edge[0].coords)
+        r = np.array(self.edge[1].coords)
 #        l1 = np.array(self.left1.coords)
 #        r1 = np.array(self.right1.coords)
-        plt.clf()
+        if clf: plt.clf()
         #np.array([transform.toLocal((n.lon, n.lat)) for n in r.nodes])
         if center: plt.plot(c[:,0], c[:,1], '-o', color='k')
         if left:   plt.plot(l[:,0], l[:,1], '-o', color='g')
@@ -140,9 +140,9 @@ class LinearObject(object):
  #       for i, n in enumerate(r1):
  #           plt.text(n[0]+6, n[1], "(%i)" % (i), color='r')
 
-
-        plt.show()
-        plt.savefig('roads_%i.eps' % self.osm_id)
+        if show:
+            plt.show()
+            plt.savefig('roads_%i.eps' % self.osm_id)
 
 
     def compute_angle_etc(self):
@@ -258,7 +258,7 @@ class LinearObject(object):
            left: node index of left
            right:
         """
-        self._write_to(obj, elev, self.left, self.right,
+        self._write_to(obj, elev, self.edge[0], self.edge[1],
                                   self.tex_y0, self.tex_y1, ac=ac, offset=offset)
         return True
         # options:
@@ -281,8 +281,8 @@ class LinearObject(object):
         #face = np.zeros((len(left.coords) + len(right.coords)))
         try:
             do_tex = True
-            len_left = len(self.left.coords)
-            len_right = len(self.right.coords)
+            len_left = len(self.edge[0].coords)
+            len_right = len(self.edge[1].coords)
 
             if len_left != len_right:
                 print "different lengths not yet implemented ", self.osm_id
@@ -298,7 +298,7 @@ class LinearObject(object):
 
             # -- write OSM_ID label
             if 0:
-                anchor = self.left.coords[len_left/2]
+                anchor = self.edge[0].coords[len_left/2]
                 e = elev(vec2d(anchor[0], anchor[1])) + self.AGL
                 ac.add_label('   ' + str(self.osm_id), -anchor[1], e+4.8, -anchor[0], scale=2)
 
@@ -306,21 +306,21 @@ class LinearObject(object):
             if 1:
                 ni = 0
                 ofs_l = obj.next_node_index()
-                for p in self.left.coords:
+                for p in self.edge[0].coords:
                     e = elev(vec2d(p[0], p[1])) + self.AGL
                     obj.node(-p[1], e, -p[0])
 #                    ac.add_label('l'+str(ni), -p[1], e+5, -p[0], scale=5)
                     ni += 1
 
                 ofs_r = obj.next_node_index()
-                for p in self.right.coords[::-1]:
+                for p in self.edge[1].coords[::-1]:
                     e = elev(vec2d(p[0], p[1])) + self.AGL
                     obj.node(-p[1], e, -p[0])
 #                    ac.add_label('r'+str(ni), -p[1], e+5, -p[0], scale=5)
                     ni += 1
                 #refs = np.arange(len_left + len_right) + o
-                nodes_l = np.arange(len(self.left.coords))
-                nodes_r = np.arange(len(self.right.coords))
+                nodes_l = np.arange(len(self.edge[0].coords))
+                nodes_r = np.arange(len(self.edge[1].coords))
 
             if 0:
                 # -- write face as one polygon. Seems to produce artifacts
@@ -331,7 +331,7 @@ class LinearObject(object):
                 for i, n in enumerate(nodes_l):
                     if do_tex: x = self.dist[i]/scale
                     face.append((n+o, x, self.tex_y0))
-                o += len(self.left.coords)
+                o += len(self.edge[0].coords)
 
                 for i, n in enumerate(nodes_r):
                     if do_tex: x = self.dist[-i-1]/scale
@@ -343,7 +343,7 @@ class LinearObject(object):
                 scale = 30.
                 l = ofs_l
                 r = ofs_r
-                for i in range(len(self.left.coords)-1):
+                for i in range(len(self.edge[0].coords)-1):
                     xl = self.dist[i]/scale
                     xr = self.dist[i+1]/scale
                     face = [ (l,   xl, self.tex_y0),
