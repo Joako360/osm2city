@@ -18,21 +18,21 @@ x clusterize (however, you don't see residential roads in cities from low alt an
   - major roads - LOD rough
   - minor roads - LOD detail
   - roads LOD? road_rough, road_detail?
-- handle intersections
+- handle junctions
 - handle layers/bridges
 
-Intersections:
+junctions:
 - currently, we get false positives: one road ends, another one begins.
-- loop intersections:
+- loop junctions:
     for the_node in nodes:
     if the_node is not endpoint: put way into splitting list
     #if only 2 nodes, and both end nodes, and road types compatible:
     #put way into joining list
 
 we have
-   attached_ways_dict: for each (true) intersection node, store a list of tuples (attached way, is_first)
+   attached_ways_dict: for each (true) junction node, store a list of tuples (attached way, is_first)
 
-Render intersection:
+Render junction:
   if 2 ways:
     simply join here. Or ignore for now.
   else:
@@ -44,16 +44,16 @@ Render intersection:
         add to object, get node index
         - store end nodes index in way
         - way does not write end node coords, central method does it
-      write intersection face
+      write junction face
 
 Splitting:
-  find all intersections for the_way
-  normally a way would have exactly two intersections (at the ends)
-  sort intersections in way's node order:
-    add intersection node index to dict
+  find all junctions for the_way
+  normally a way would have exactly two junctions (at the ends)
+  sort junctions in way's node order:
+    add junction node index to dict
     sort list
-  split into nintersections-1 ways
-Now each way's end node is either intersection or dead-end.
+  split into njunctions-1 ways
+Now each way's end node is either junction or dead-end.
 
 Joining:
 
@@ -233,47 +233,49 @@ class Roads(objectlist.ObjectList):
                 print way.osm_id, "(", hex(id(way)), ")",
             print
 
-    def find_intersections(self, ways_list):
+    def find_junctions(self, ways_list, degree=2):
         """
         N = number of nodes
-        find intersections by brute force:
+        find junctions by brute force:
         - for each node, store attached ways in a dict                O(N)
         - if a node has 2 ways, store that node as a candidate
         - remove entries/nodes that have less than 2 ways attached    O(N)
-        - one way ends, other way starts: also an intersection
+        - one way ends, other way starts: also an junction
         FIXME: use quadtree/kdtree
         """
-        logging.info('Finding intersections...')
+        logging.info('Finding junctions...')
         self.attached_ways_dict = {} # a dict: for each ref (aka node) hold a list of attached ways
         for the_way in ways_list:
 #            if the_way.osm_id == 4888143:
 #                print "got 4888143"
             for i, ref in enumerate(the_way.refs):
+                if ref == 1132288594:
+                    print "F (%i)" % (the_way.osm_id), the_way.refs
                 try:
 #                    if the_way.osm_id == 4888143:
 #                        print "  ref", self.nodes_dict[ref].osm_id
                     self.attached_ways_dict[ref].append((the_way, i == 0)) # store tuple (the_way, is_first)
 #                    if len(self.attached_ways_dict[ref]) == 2:
                         # -- check if ways are actually distinct before declaring
-                        #    an intersection?
-                        # not an intersection if
+                        #    an junction?
+                        # not an junction if
                         # - only 2 ways && one ends && other starts
                         # easier?: only 2 ways, at least one node is middle node
-#                        self.intersections_set.add(ref)
+#                        self.junctions_set.add(ref)
                 except KeyError:
                     self.attached_ways_dict[ref] = [(the_way, i == 0)]  # initialize node
 
         # kick nodes that belong to one way only
         # TODO: is there something like dict comprehension?
         for key, value in self.attached_ways_dict.items():
-            if len(value) < 2:
+            if len(value) < degree: # FIXME: join_ways, then return 2 here
                 self.attached_ways_dict.pop(key)
 #            else:
 #                pass
 #                check if one is first node and one last node. If so, join_ways
 
-    def count_inner_intersections(self, style):
-        """count inner nodes which are intersections"""
+    def count_inner_junctions(self, style):
+        """count inner nodes which are junctions"""
         count = 0        
         for the_way in self.ways_list:
             for the_ref in the_way.refs[1:-1]:
@@ -281,10 +283,10 @@ class Roads(objectlist.ObjectList):
                     count += 1
                     self.debug_plot_ref(the_ref, style)
                     
-        logging.debug("inner intersections %i" % count)
+        logging.debug("inner junctions %i" % count)
         return count
 
-    def print_intersections_stats(self):
+    def print_junctions_stats(self):
         num = np.zeros(10)
         for key, value in self.attached_ways_dict.items():
             num[len(value)] += 1
@@ -296,8 +298,8 @@ class Roads(objectlist.ObjectList):
             print i, v
 
     def split_ways(self):
-        """split ways such that none of the interiour nodes are intersections.
-           I.e., each way object connects to at most two intersections.
+        """split ways such that none of the interiour nodes are junctions.
+           I.e., each way object connects to at most two junctions.
         """
             
         #plt.clf()
@@ -353,13 +355,11 @@ class Roads(objectlist.ObjectList):
                         except:
                             print "  ", way
 
-    def compute_intersection_nodes(self):
-        """ac3d nodes that belong to an intersection need special treatment to make sure
-           the ways attached to an intersection join exactly, i.e., without gaps or overlap. 
+    def compute_junction_nodes(self):
+        """ac3d nodes that belong to an junction need special treatment to make sure
+           the ways attached to an junction join exactly, i.e., without gaps or overlap. 
         """
         def pr_angle(a):
-#            if a < 0:
-#                a += (2 * np.pi)
             print "%5.1f " % (a * 57.3),
 
         def angle_from(lin_obj, is_first):
@@ -374,49 +374,75 @@ class Roads(objectlist.ObjectList):
             return angle
 
         for the_ref, ways_list in self.attached_ways_dict.items():
-            # each intersection knows about the attached ways
-            # -- Sort (the_intersection.ways) by angle, taking into account is_first. 
+            # each junction knows about the attached ways
+            # -- Sort (the_junction.ways) by angle, taking into account is_first. 
             #    This is tricky. x[0] is our linear_object (which has a property "angle").
             #    x[1] is our IS_FIRST flag.
             #    According to IS_FIRST use either first or last angle in list,
             #    (-1 + is_first) evaluates to 0 or -1.
-            #    
             #    Sorting results in LHS neighbours.
             ways_list.sort(key=lambda x: angle_from(x[0], x[1])) 
 
-            flag = False
-            pref_an = 999
-            print the_ref, " : ",
-            for way, is_first in ways_list:
-                an = angle_from(way, is_first)
+            # testing            
+            if 1:
+                pref_an = -999
+    #            print the_ref, " : ",
+                for way, is_first in ways_list:
+                    an = angle_from(way, is_first)
+    
+    #                print " (%i)" % way.osm_id, is_first,
+    #                pr_angle(an)
+                    assert(an > pref_an)
+                    pref_an = an
+                    
+    #            if len(ways_list) > 3: bla
+                #if the_ref == 290863179: bla
 
-                print " (%i)" % way.osm_id, is_first,
-                pr_angle(an)
-                if not an < pref_an: flag = True
-                pref_an = an
-#            if flag: 
-#                print " aaaaaaaaaa"
-                
-#            else: 
-            print
-            if len(ways_list) > 3: bla
-            
-            #if the_ref == 290863179: bla
-
-            continue
-            for i, (way_1, is_first_1) in enumerate(ways_list):
-                (way_2, is_first_2) = ways_list[(i+1) % len(ways_list)] # wrap around
+            our_node = np.array(ways_list[0][0].center.coords[-1 + ways_list[0][1]])
+            for i, (way_a, is_first_a) in enumerate(ways_list):
+                (way_b, is_first_b) = ways_list[(i+1) % len(ways_list)] # wrap around
                 # now we have two neighboring ways
-                print way_1, is_first_1, "joins with", way_2, is_first_2
-
-                bla
+                print way_a, is_first_a, "joins with", way_b, is_first_b
                 # compute their joining node
+                index_a = -1 + is_first_a                
+                index_b = -1 + is_first_b                
+                if 1:
+                    va = way_a.vectors[index_a]
+                    na = way_a.normals[index_a] * way_a.width / 2.
+                    vb = way_b.vectors[index_b]
+                    nb = way_b.normals[index_b] * way_b.width / 2.
+                    if not is_first_a:
+                        va *= -1
+                        na *= -1
+                    if is_first_b:
+                        vb *= -1
+                        nb *= -1
+                    
+                    Ainv = 1./(va[1]*vb[0]-va[0]*vb[1]) * np.array([[-vb[1], vb[0]], [-va[1], va[0]]])
+                    RHS = (nb - na)
+                    s = np.dot(Ainv, RHS)
+    # FIXME: check which is faster
+                    A = np.vstack((va, -vb)).transpose()
+                    s = scipy.linalg.solve(A, RHS)
+                    q = our_node + na * s[0]
+
+                way_a_lr = way_a.edge[1-is_first_a] #.coords [index_a]
+                way_b_lr = way_b.edge[is_first_b]  #.coords[index_b]
+
+                q1 = way_a_lr.junction(way_b_lr)
+                print q, q1
+                way_a.plot(center=False, left=True, right=True, show=False)
+                way_b.plot(center=False, left=True, right=True, clf=False, show=False)
+                plt.plot(q[0], q[1], 'b+')
+                plt.plot(q1.coords[0][0], q1.coords[0][1], 'bo')
+                plt.show()
+                
                 
                 # create ac3d node, insert, get index                
-                # store index for intersection area polygon
+                # store index for junction area polygon
                 # store that node index in each way as first_left, first_right, last_left, last_right
 
-            # write intersection area polygon
+            # write junction area polygon
 
     def debug_plot_ref(self, ref, style): 
         plt.plot(self.nodes_dict[ref].lon, self.nodes_dict[ref].lat, style)
@@ -445,21 +471,39 @@ class Roads(objectlist.ObjectList):
         if show_label:
             plt.text(0.5*(a[0,0]+a[-1,0]), 0.5*(a[0,1]+a[-1,1]), way.osm_id)
     
-    def debug_plot_intersections(self, style):
+    def debug_plot_junctions(self, style):
         for ref in self.attached_ways_dict:
             node = self.nodes_dict[ref]
             plt.plot(node.lon, node.lat, style, mfc='None')
             #plt.text(node.lon, node.lat, node.osm_id, color='r')
+    def debug_label_node(self, ref):
+            node = self.nodes_dict[ref]
+            plt.plot(node.lon, node.lat, 'rs', mfc='None', ms=10)
+            plt.text(node.lon+0.0001, node.lat, node.osm_id)
 
-    def cleanup_intersections(self):
-        """Remove intersections that
+    def debug_plot(self, save=False, plot_junctions=False, show=False, label_nodes=[]):
+        if plot_junctions:
+            self.debug_plot_junctions('o')            
+        for ref in label_nodes:
+            self.debug_label_node(ref)
+            
+        for the_way in self.ways_list:
+            self.debug_plot_way(the_way, '-', lw=0.5)
+        if save:
+            plt.savefig(save)
+        if show:
+            plt.show()
+            
+
+    def cleanup_junctions(self):
+        """Remove junctions that
            - have less than 3 ways attached
         """
         pass
 
     def join_ways(self):
         """join ways that
-           - don't make an intersection and
+           - don't make an junction and
            - are of compatible type
         """
         pass
@@ -554,7 +598,7 @@ def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
     """debug: plot roads map to .eps"""
     plt.clf()
     transform = tools.transform
-    if 1:
+    if 0:
         c = np.array([[elev.min.x, elev.min.y], 
                       [elev.max.x, elev.min.y], 
                       [elev.max.x, elev.max.y], 
@@ -659,37 +703,36 @@ def main():
 #    roads.objects = roads.objects[0:1000]
     #roads.clip_at_cluster_border()
 
-    for the_way in roads.ways_list:
-        roads.debug_plot_way(the_way, '-', lw=0.5)
-#    plt.savefig("r_org.eps")
 
     if 1:
         logging.debug("len before %i" % len(roads.ways_list))
-        roads.find_intersections(roads.ways_list)
-        #roads.debug_plot_intersections('ks')
-        roads.count_inner_intersections('bs')
-        plt.savefig("r_org.eps")
-        plt.clf()
+        roads.find_junctions(roads.ways_list)
+        #roads.debug_plot_junctions('ks')
+        roads.count_inner_junctions('bs')
         roads.split_ways()
-        roads.find_intersections(roads.ways_list)
-        roads.print_intersections_stats()
+        roads.find_junctions(roads.ways_list, 3)
+#        roads.print_junctions_stats()
+        plt.clf()
+        roads.count_inner_junctions('rs')
+        roads.debug_plot(show=True, plot_junctions=True)#, label_nodes=[1132288594, 1132288612])
+        bla
         #roads.debug_print_dict()
-        #roads.debug_plot_intersections('k.')
-        roads.count_inner_intersections('rs')
-        plt.savefig("r_spl.eps")
+        #roads.debug_plot_junctions('k.')
+        sys.exit(0)
 
     #    roads.join_ways()
         logging.debug("len after %i" % len(roads.ways_list))
     roads.create_linear_objects()
 #    print "before", len(roads.attached_ways_dict)
 
-    roads.find_intersections(roads.roads_list)
-    roads.compute_intersection_nodes()
+    roads.find_junctions(roads.roads_list)
+    if 1:
+        roads.compute_junction_nodes()
 #    print "after", len(roads.attached_ways_dict)
     
-    sys.exit(0)
+        sys.exit(0)
 
-    #roads.cleanup_intersections()
+    #roads.cleanup_junctions()
 #    roads.objects = [roads.objects[0]]
     roads.clusterize()
 #    scale_test(transform, elev)
