@@ -1427,7 +1427,7 @@ def optimize_catenary(half_distance_pylons, max_value, sag, max_variation):
     return -1, -1
 
 
-if __name__ == "__main__":
+def main():
     logging.basicConfig(level=logging.DEBUG)
     # Handling arguments and parameters
     parser = argparse.ArgumentParser(
@@ -1557,6 +1557,10 @@ if __name__ == "__main__":
     elev_interpolator.save_cache()
 
     logging.info("******* Finished *******")
+
+
+if __name__ == "__main__":
+    main()
 
 
 # ================ UNITTESTS =======================
