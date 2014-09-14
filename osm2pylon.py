@@ -404,7 +404,7 @@ class Highway(LineWithoutCables):
     def __init__(self, osm_id):
         super(Highway, self).__init__(osm_id)
         self.type_ = 0
-        self.linear = None  # The LineaString of the line
+        self.linear = None  # The LinearString of the line
         self.is_roundabout = False
 
     def calc_and_map(self, my_elev_interpolator, my_coord_transformator):
@@ -860,15 +860,17 @@ class RailLine(Line):
 def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator):
     my_buildings = {}  # osm_id as key, Polygon
     for way in ways_dict.values():
-        coordinates = []
-        for ref in way.refs:
-            if ref in nodes_dict:
-                my_node = nodes_dict[ref]
-                coordinates.append(my_coord_transformator.toLocal((my_node.lon, my_node.lat)))
-        if 2 < len(coordinates):
-            my_polygon = Polygon(coordinates)
-            if my_polygon.is_valid and not my_polygon.is_empty:
-                my_buildings[way.osm_id] = my_polygon.convex_hull
+        for key in way.tags:
+            if "building" == key:
+                coordinates = []
+                for ref in way.refs:
+                    if ref in nodes_dict:
+                        my_node = nodes_dict[ref]
+                        coordinates.append(my_coord_transformator.toLocal((my_node.lon, my_node.lat)))
+                if 2 < len(coordinates):
+                    my_polygon = Polygon(coordinates)
+                    if my_polygon.is_valid and not my_polygon.is_empty:
+                        my_buildings[way.osm_id] = my_polygon.convex_hull
     return my_buildings
 
 
@@ -959,9 +961,9 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_co
 
 def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator, landuse_refs):
     """
-    No attempt to merge lines because most probably the lines are split at corssing.
-    No attempt to guess whether there there is a division in the conter, where a street lamp with two lamps could be
-    placed - e.g. using a combination of highway type, oneway, number of lanes etc
+    No attempt to merge lines because most probably the lines are split at crossing.
+    No attempt to guess whether there there is a division in the center, where a street lamp with two lamps could be
+    placed - e.g. using a combination of highway type, one-way, number of lanes etc
     """
     my_highways = {}  # osm_id as key, RailLine
 
@@ -1013,16 +1015,19 @@ def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator, landuse_r
                 my_highways[my_highway.osm_id] = my_highway
 
     # Test whether the highway is within appropriate land use or intersects with appropriate land use
+    landuse_buffers = []
+    for landuse_ref in landuse_refs.values():
+        landuse_buffers.append(landuse_ref.polygon.buffer(parameters.C2P_STREETLAMPS_MAX_DISTANCE_LANDUSE))
     for key in my_highways.keys():
         my_highway = my_highways[key]
         is_within = False
         intersections = []
-        for landuse_ref in landuse_refs.values():
-            if my_highway.linear.within(landuse_ref.polygon):
+        for lu_buffer in landuse_buffers:
+            if my_highway.linear.within(lu_buffer):
                 is_within = True
                 break
-            elif my_highway.linear.intersects(landuse_ref.polygon):
-                intersections.append(my_highway.linear.intersection(landuse_ref.polygon))
+            elif my_highway.linear.intersects(lu_buffer):
+                intersections.append(my_highway.linear.intersection(lu_buffer))
         if not is_within:
             if len(intersections) == 0:
                 del my_highways[key]
@@ -1057,7 +1062,6 @@ def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator, landuse_r
 def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator, building_refs):
     my_landuses = {}  # osm_id as key, Landuse
 
-    # First reduce to electrified narrow_gauge or rail, no tunnels and no abandoned
     for way in ways_dict.values():
         my_landuse = Landuse(way.osm_id)
         valid_landuse = True
@@ -1109,11 +1113,11 @@ def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator, buil
                     buffer_distance = min(factor*parameters.C2P_LANDUSE_BUILDING_BUFFER_DISTANCE
                                           , parameters.C2P_LANDUSE_BUILDING_BUFFER_DISTANCE_MAX)
                 buffer_polygon = my_building.buffer(buffer_distance)
-                buffer_polygon = buffer_polygon.convex_hull
+                buffer_polygon = buffer_polygon  # FIXME .convex_hull
                 within_existing_landuse = False
                 for candidate in my_landuse_candidates:
                     if buffer_polygon.intersects(candidate.polygon):
-                        candidate.polygon = candidate.polygon.union(buffer_polygon).convex_hull
+                        candidate.polygon = candidate.polygon.union(buffer_polygon)  # FIXME .convex_hull
                         candidate.number_of_buildings += 1
                         within_existing_landuse = True
                         break
@@ -1125,9 +1129,9 @@ def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator, buil
                     my_candidate.type_ = Landuse.TYPE_NON_OSM
                     my_landuse_candidates.append(my_candidate)
         # add landuse candidates to landuses
-        logging.debug("Candidate land-uses found: %s", len(my_landuses))
+        logging.debug("Candidate land-uses found: %s", len(my_landuse_candidates))
         for candidate in my_landuse_candidates:
-            if candidate.number_of_buildings >= parameters.C2P_LANDUSE_MIN_BUILDINGS:
+            if candidate.polygon.area >= parameters.C2P_LANDUSE_MIN_AREA:
                 my_landuses[candidate.osm_id] = candidate
 
     return my_landuses
