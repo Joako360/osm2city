@@ -398,8 +398,7 @@ class Highway(LineWithoutCables):
     TYPE_LIVING_STREET = 19
     TYPE_SERVICE = 20
 
-    OFFSET = 5
-    DEFAULT_DISTANCE = 50
+    OFFSET = 10
 
     def __init__(self, osm_id):
         super(Highway, self).__init__(osm_id)
@@ -417,9 +416,11 @@ class Highway(LineWithoutCables):
             self.shared_pylons.append(shared_pylon)
         else:
             model = "Models/StreetFurniture/Streetlamp2.xml"
+            default_distance = parameters.C2P_STREETLAMPS_OTHER_DISTANCE
             parallel_offset = 2.5
             if self.type_ in [Highway.TYPE_SERVICE, Highway.TYPE_RESIDENTIAL, Highway.TYPE_LIVING_STREET]:
                 model = "Models/StreetFurniture/Streetlamp1.xml"
+                default_distance = parameters.C2P_STREETLAMPS_RESIDENTIAL_DISTANCE
             elif self.type_ in [Highway.TYPE_ROAD, Highway.TYPE_UNCLASSIFIED, Highway.TYPE_TERTIARY]:
                 parallel_offset = 3.0
             elif self.type_ in [Highway.TYPE_SECONDARY, Highway.TYPE_PRIMARY, Highway.TYPE_TRUNK]:
@@ -443,9 +444,9 @@ class Highway(LineWithoutCables):
             current_distance = Highway.OFFSET  # the distance from the origin of the current streetlamp
 
             while True:
-                if current_distance > my_length:
+                if current_distance > my_right_parallel_length:
                     break
-                point_on_line = my_right_parallel.interpolate(my_right_parallel_length - current_distance * (my_right_parallel_length / my_length))
+                point_on_line = my_right_parallel.interpolate(my_right_parallel_length - current_distance)
                 shared_pylon = SharedPylon()
                 shared_pylon.x = point_on_line.x
                 shared_pylon.y = point_on_line.y
@@ -453,7 +454,7 @@ class Highway(LineWithoutCables):
                 shared_pylon.direction_type = SharedPylon.DIRECTION_TYPE_MIRROR
                 shared_pylon.calc_global_coordinates(my_elev_interpolator, my_coord_transformator)
                 self.shared_pylons.append(shared_pylon)
-                current_distance += Highway.DEFAULT_DISTANCE
+                current_distance += default_distance
 
             # calculate heading
             calc_heading_nodes(self.shared_pylons)
@@ -959,15 +960,14 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_co
     return my_railways
 
 
-def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator, landuse_refs):
+def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator, landuse_buffers):
     """
     No attempt to merge lines because most probably the lines are split at crossing.
     No attempt to guess whether there there is a division in the center, where a street lamp with two lamps could be
     placed - e.g. using a combination of highway type, one-way, number of lanes etc
     """
-    my_highways = {}  # osm_id as key, RailLine
+    my_highways = {}  # osm_id as key, Highway
 
-    # First reduce to electrified narrow_gauge or rail, no tunnels and no abandoned
     for way in ways_dict.values():
         my_highway = Highway(way.osm_id)
         valid_highway = False
@@ -1015,9 +1015,6 @@ def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator, landuse_r
                 my_highways[my_highway.osm_id] = my_highway
 
     # Test whether the highway is within appropriate land use or intersects with appropriate land use
-    landuse_buffers = []
-    for landuse_ref in landuse_refs.values():
-        landuse_buffers.append(landuse_ref.polygon.buffer(parameters.C2P_STREETLAMPS_MAX_DISTANCE_LANDUSE))
     for key in my_highways.keys():
         my_highway = my_highways[key]
         is_within = False
@@ -1057,6 +1054,26 @@ def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator, landuse_r
             del my_highways[key]
 
     return my_highways
+
+
+def merge_streetlamp_buffers(landuse_refs):
+    """Based on existing landuses applies extra buffer and then unions as many as possible"""
+    landuse_buffers = []
+    for landuse_ref in landuse_refs.values():
+        streetlamp_buffer = landuse_ref.polygon.buffer(parameters.C2P_STREETLAMPS_MAX_DISTANCE_LANDUSE)
+        if 0 == len(landuse_buffers):
+            landuse_buffers.append(streetlamp_buffer)
+        else:
+            is_found = False
+            for i in range(len(landuse_buffers)):
+                merged_buffer = landuse_buffers[i]
+                if streetlamp_buffer.intersects(merged_buffer):
+                    landuse_buffers[i] = merged_buffer.union(streetlamp_buffer)
+                    is_found = True
+                    break
+            if not is_found:
+                landuse_buffers.append(streetlamp_buffer)
+    return landuse_buffers
 
 
 def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator, building_refs):
@@ -1113,11 +1130,11 @@ def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator, buil
                     buffer_distance = min(factor*parameters.C2P_LANDUSE_BUILDING_BUFFER_DISTANCE
                                           , parameters.C2P_LANDUSE_BUILDING_BUFFER_DISTANCE_MAX)
                 buffer_polygon = my_building.buffer(buffer_distance)
-                buffer_polygon = buffer_polygon  # FIXME .convex_hull
+                buffer_polygon = buffer_polygon
                 within_existing_landuse = False
                 for candidate in my_landuse_candidates:
                     if buffer_polygon.intersects(candidate.polygon):
-                        candidate.polygon = candidate.polygon.union(buffer_polygon)  # FIXME .convex_hull
+                        candidate.polygon = candidate.polygon.union(buffer_polygon)
                         candidate.number_of_buildings += 1
                         within_existing_landuse = True
                         break
@@ -1493,7 +1510,9 @@ if __name__ == "__main__":
     if parameters.C2P_PROCESS_STREETLAMPS:
         landuse_refs = process_osm_landuse_refs(handler.nodes_dict, handler.ways_dict, coord_transformator, building_refs)
         logging.info('Number of landuse references: %s', len(landuse_refs))
-        highways = process_osm_highway(handler.nodes_dict, handler.ways_dict, coord_transformator, landuse_refs)
+        streetlamp_buffers = merge_streetlamp_buffers(landuse_refs)
+        logging.info('Number of streetlamp buffers: %s', len(streetlamp_buffers))
+        highways = process_osm_highway(handler.nodes_dict, handler.ways_dict, coord_transformator, streetlamp_buffers)
         logging.info('Reduced number of highways: %s', len(highways))
         for highway in highways.values():
             highway.calc_and_map(elev_interpolator, coord_transformator)
