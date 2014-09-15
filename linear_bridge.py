@@ -8,15 +8,23 @@ import numpy as np
 import scipy.interpolate
 from pdb import pm
 from vec2d import vec2d
+import matplotlib.pyplot as plt
 
 class Deck_shape_linear(object):
     def __init__(self, h0, h1):
         self.h0 = h0
         self.h1 = h1
 
+    def _compute(self, x):
+        return (1-x) * self.h0 + x * self.h1
+
     def __call__(self, s):
         #assert(s <= 1. and s >= 0.)
-        return (1-s) * self.h0 + s * self.h1
+        try:
+            return [self._compute(x) for x in s]
+        except TypeError:
+            return self._compute(s) 
+#        return (1-s) * self.h0 + s * self.h1
 
 class Deck_shape_poly(object):
     def __init__(self, h0, hm, h1):
@@ -50,14 +58,14 @@ class LinearBridge(linear.LinearObject):
 #        print ">>>    ", probe_locations_nondim
 #        print ">>> got", elevs
         self.elev_spline = scipy.interpolate.interp1d(probe_locations_nondim, elevs)
-        self.prep_height()
+        self.prep_height(nodes_dict)
 
     def elev(self, l, normalized=True):
         """given linear distance [m], interpolate and return terrain elevation"""
         if not normalized: l /= self.center.length
         return self.elev_spline(l)
 
-    def prep_height(self):
+    def prep_height(self, nodes_dict):
         """Set deck shape depending on elevation."""
         # deck slope more or less continuous!
         # d2z/dx2 limit
@@ -75,16 +83,46 @@ class LinearBridge(linear.LinearObject):
         #     deck slope OK?
         #     if not: raise end-node
         #
+        # at node:
+        # - store MSL
+        # - store elev
+        # loop:
+        #   lowering MSL towards elev, respect max slope
+        #   if terrain is sloping, keep MSL, such that terrain approaches MSL
+        # eventually write MSL
         #
-        h0 = self.elev(0.)
-        hm = self.elev(0.5)
-        h1 = self.elev(1.)
+        h0, hm, h1 = self.elev([0,0.5,1])
+        self.avg_slope = (h1 - h0)/self.center.length
 #        print "# h0, hm, h1:", h0, hm, h1
         self.D = Deck_shape_linear(h0, h1)
-        min_height = 6.
-        if self.D(0.5) - hm < min_height:
-#            print "# poly", h0, hm+min_height, h1
-            self.D = Deck_shape_poly(h0, hm+min_height, h1)
+        min_height = 8.
+        h_add = max(0, min_height - (self.D(0.5) - hm))
+#        if h_add > 0.:
+#            self.D = Deck_shape_linear(h0 + h_add, h1 + h_add)
+
+        node0 = nodes_dict[self.refs[0]]
+        node1 = nodes_dict[self.refs[-1]]
+        if node0.h_add != 0:
+            node0.h_add = 0.5*(node0.h_add + h_add)
+        else:
+            node0.h_add = h_add
+            
+        if node1.h_add != 0:
+            node1.h_add = 0.5*(node1.h_add + h_add)
+        else:
+            node1.h_add = h_add
+#        if self.D(0.5) - hm < min_height:
+#            self.D = Deck_shape_poly(h0, hm+min_height, h1)
+
+        if 0:
+            plt.clf()
+            X = np.linspace(0,1,11)
+            plt.plot(X, self.D(X), 'r-o')
+#            plt.plot(X, self.D(X) + h_add, 'r-o')
+            plt.plot(X, self.elev(X), 'g-o')
+            plt.show()
+
+#        bla
 
     def deck_height(self, l, normalized=True):
         """given linear distance [m], interpolate and return deck height"""
@@ -109,7 +147,6 @@ class LinearBridge(linear.LinearObject):
         -
         """
         n_nodes = len(self.edge[0].coords)
-
         # -- deck height
         z = np.zeros(n_nodes)
         l = 0.
@@ -125,10 +162,10 @@ class LinearBridge(linear.LinearObject):
 
         # -- right
         tmp, node0_r2 = self._write_to(obj, elev, node0_r, right2,
-                                       1, 0.75, left_z=z-5, right_z=z-5, ac=ac, offset=offset)
+                                       1, 0.75, left_z=z-3, right_z=z-3, ac=ac, offset=offset)
         # left
         node0_l2, tmp = self._write_to(obj, elev, left2, node0_l,
-                                       0.75, 1, left_z=z-5, right_z=z-5, ac=ac, offset=offset)
+                                       0.75, 1, left_z=z-3, right_z=z-3, ac=ac, offset=offset)
         # -- bottom
         self._write_to(obj, elev, node0_r2, node0_l2, 0.9, 1, ac=ac, n_nodes=n_nodes, offset=offset)
 

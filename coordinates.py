@@ -19,27 +19,36 @@ Created on Sat Jun  7 22:38:59 2014
 """
 #http://williams.best.vwh.net/avform.htm
 #Local, flat earth approximation
-#If you stay in the vicinity of a given fixed point (lat0,lon0), it may be a good enough approximation to consider the earth as "flat", and use a North, East, Down rectangular coordinate system with origin at the fixed point. If we call the changes in latitude and longitude dlat=lat-lat0, dlon=lon-lon0 (Here treating North and East as positive!), then
+# If you stay in the vicinity of a given fixed point (lat0,lon0), it may be a 
+# good enough approximation to consider the earth as "flat", and use a North,
+# East, Down rectangular coordinate system with origin at the fixed point. If
+# we call the changes in latitude and longitude dlat=lat-lat0, dlon=lon-lon0 
+# (Here treating North and East as positive!), then
 #
 #       distance_North=R1*dlat
 #       distance_East=R2*cos(lat0)*dlon
 #
-#R1 and R2 are called the meridional radius of curvature and the radius of curvature in the prime vertical, respectively.
+# R1 and R2 are called the meridional radius of curvature and the radius of 
+# curvature in the prime vertical, respectively.
 #
 #      R1=a(1-e^2)/(1-e^2*(sin(lat0))^2)^(3/2)
 #      R2=a/sqrt(1-e^2*(sin(lat0))^2)
 #
-#a is the equatorial radius of the earth (=6378.137000km for WGS84), and e^2=f*(2-f) with the flattening f=1/298.257223563 for WGS84.
+# a is the equatorial radius of the earth (=6378.137000km for WGS84), and
+# e^2=f*(2-f) with the flattening f=1/298.257223563 for WGS84.
 #
-#In the spherical model used elsewhere in the Formulary, R1=R2=R, the earth's radius. (using R=1 we get distances in radians, using R=60*180/pi distances are in nm.)
+# In the spherical model used elsewhere in the Formulary, R1=R2=R, the earth's
+# radius. (using R=1 we get distances in radians, using R=60*180/pi distances are in nm.)
 #
-#In the flat earth approximation, distances and bearings are given by the usual plane trigonometry formulae, i.e:
+# In the flat earth approximation, distances and bearings are given by the
+# usual plane trigonometry formulae, i.e:
 #
 #    distance = sqrt(distance_North^2 + distance_East^2)
 #    bearing to (lat,lon) = mod(atan2(distance_East, distance_North), 2*pi)
 #                        (= mod(atan2(cos(lat0)*dlon, dlat), 2*pi) in the spherical case)
 #
-#These approximations fail in the vicinity of either pole and at large distances. The fractional errors are of order (distance/R)^2.
+# These approximations fail in the vicinity of either pole and at large 
+# distances. The fractional errors are of order (distance/R)^2.
 
 
 #import utm

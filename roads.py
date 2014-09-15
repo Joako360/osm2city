@@ -93,6 +93,7 @@ import gc
 import time
 import re
 import random
+import networkx as nx
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 
@@ -160,8 +161,54 @@ class Roads(objectlist.ObjectList):
             prio = 0
         return prio
         
+    def probe_elev_at_nodes(self):
+        """add elevation info to all nodes"""
+        for the_node in self.nodes_dict.values():
+            the_node.MSL = self.elev(vec2d(the_node.lon, the_node.lat), is_global=True)
+            the_node.h_add = 0.
+    
+    def propagate_h_add(self):
+        """start at bridges, propagate h_add through nodes"""
+        for the_bridge in self.bridges_list:
+            # build tree starting at node0
+            # take out bridge edge
+            node0 = the_bridge.refs[0]
+            node1 = the_bridge.refs[-1]
+            self.G.remove_edge(node0, node1)
+
+            dh_dx = 0.1
+
+            for n0, n1 in nx.bfs_edges(self.G, node0):
+                obj = self.G[n0][n1]['obj']
+                n0 = self.nodes_dict[n0]
+                n1 = self.nodes_dict[n1]
+                n1.h_add = max(0, n0.h_add - obj.center.length * dh_dx)
+                print n1.h_add
+                if n1.h_add <= 0.:
+                    break
+
+            for n0, n1 in nx.bfs_edges(self.G, node1):
+                obj = self.G[n0][n1]['obj']
+                n0 = self.nodes_dict[n0]
+                n1 = self.nodes_dict[n1]
+                n1.h_add = max(0, n0.h_add - obj.center.length * dh_dx)
+                print n1.h_add
+                if n1.h_add <= 0.:
+                    break
+
+            # traverse tree:
+#            bla
+            #   h_add_0 at start node
+            # if h_add_1 == 0:
+            #   h_add_1 at end node = max(0, h_add_0 - edge_len * dh_dl)
+            # else:
+            #   bla
+            # same with node1
+            self.G.add_edge(node0, node1, obj=the_bridge)
     
     def create_linear_objects(self):
+        self.G=nx.Graph()
+
         for the_way in self.ways_list:
             prio = None
             try:
@@ -172,7 +219,7 @@ class Roads(objectlist.ObjectList):
             width = 9
             tex_y0 = 0.5
             tex_y1 = 0.75
-            AGL_ofs = 1.0
+            AGL_ofs = 1.0 + random.uniform(0.01, 0.1)
             #if way.tags.has_key('layer'):
             #    AGL_ofs = 20.*float(way.tags['layer'])
             #print way.tags
@@ -204,18 +251,28 @@ class Roads(objectlist.ObjectList):
             #print "(accepted)"
             is_bridge = "bridge" in the_way.tags
             if is_bridge:
-                bridge = LinearBridge(self.transform, self.elev, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
-                self.bridges_list.append(bridge)
-                continue
+                obj = LinearBridge(self.transform, self.elev, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
+                self.bridges_list.append(obj)
             else:
-                road = LinearObject(self.transform, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
+                obj = LinearObject(self.transform, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
     
-            if road.has_large_angle():
-                print "skipping OSM_ID %i: large angle. OSM error?" % road.osm_id
-                continue
+                if obj.has_large_angle():
+                    print "skipping OSM_ID %i: large angle. OSM error?" % obj.osm_id
+                    continue
     
-            road.typ = prio
-            self.roads_list.append(road)
+                obj.typ = prio
+                self.roads_list.append(obj)
+            self.G.add_edge(the_way.refs[0], the_way.refs[-1], obj=obj)
+
+        # debug: plot graph
+        if 0:
+            pos = {}
+            for ref, the_node in self.nodes_dict.iteritems():
+                pos[ref] = (the_node.lon, the_node.lat)
+            nx.draw(self.G, pos)
+            plt.show() # display
+
+    
     
     #        if self.has_duplicate_nodes(refs):
     #            print "dup nodes in", osm_id
@@ -444,6 +501,7 @@ class Roads(objectlist.ObjectList):
 
             # write junction area polygon
 
+
     def debug_plot_ref(self, ref, style): 
         plt.plot(self.nodes_dict[ref].lon, self.nodes_dict[ref].lat, style)
 #        plt.text(self.nodes_dict[ref].lon, self.nodes_dict[ref].lat, ref.osm_id)
@@ -655,6 +713,7 @@ def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
     plt.savefig('roads.eps')
     plt.clf()
 
+    
 def main():
     
     #logging.basicConfig(level=logging.INFO)
@@ -691,7 +750,6 @@ def main():
     handler.register_way_callback(roads.store_way, req_keys=roads.req_keys)
     handler.register_uncategorized_way_callback(roads.store_uncategorized)
     handler.parse(source)
-    
     logging.info("ways: %i", len(roads))
         
     if parameters.PATH_TO_OUTPUT:
@@ -703,34 +761,36 @@ def main():
 #    roads.objects = roads.objects[0:1000]
     #roads.clip_at_cluster_border()
 
-
     if 1:
         logging.debug("len before %i" % len(roads.ways_list))
         roads.find_junctions(roads.ways_list)
         #roads.debug_plot_junctions('ks')
-        roads.count_inner_junctions('bs')
+        #roads.count_inner_junctions('bs')
         roads.split_ways()
         roads.find_junctions(roads.ways_list, 3)
 #        roads.print_junctions_stats()
         plt.clf()
         roads.count_inner_junctions('rs')
-        roads.debug_plot(show=True, plot_junctions=True)#, label_nodes=[1132288594, 1132288612])
-        bla
+#        roads.debug_plot(show=True, plot_junctions=True)#, label_nodes=[1132288594, 1132288612])
+        #bla
         #roads.debug_print_dict()
         #roads.debug_plot_junctions('k.')
-        sys.exit(0)
+        #sys.exit(0)
 
     #    roads.join_ways()
         logging.debug("len after %i" % len(roads.ways_list))
+
+    roads.probe_elev_at_nodes()
     roads.create_linear_objects()
+    roads.propagate_h_add()
 #    print "before", len(roads.attached_ways_dict)
 
-    roads.find_junctions(roads.roads_list)
-    if 1:
+#    roads.find_junctions(roads.roads_list)
+    if 0:
         roads.compute_junction_nodes()
 #    print "after", len(roads.attached_ways_dict)
     
-        sys.exit(0)
+#        sys.exit(0)
 
     #roads.cleanup_junctions()
 #    roads.objects = [roads.objects[0]]

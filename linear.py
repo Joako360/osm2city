@@ -177,8 +177,11 @@ class LinearObject(object):
            if left or right is integer, assume nodes are already written and use 
            integer as node index.
         """
+        if "tunnel" in self.tags: 
+            return
+            
         if not offset:
-            offset = vec2d(0,0)
+            offset = vec2d(0,0)            
             
         try:
             n_nodes = len(left.coords)
@@ -188,6 +191,11 @@ class LinearObject(object):
             except AttributeError:
                 if n_nodes is None:
                     raise ValueError("Neither left nor right are iterable: need n_nodes.")
+
+        # -- elevated road
+        h_add_0 = self.nodes_dict[self.refs[0]].h_add
+        h_add_1 = self.nodes_dict[self.refs[-1]].h_add
+        h_add = np.linspace(h_add_0, h_add_1, n_nodes)
 
         # -- get elev
         if left_z is not None:
@@ -206,6 +214,7 @@ class LinearObject(object):
                 else:
                     e = elev(vec2d(the_node[0], the_node[1])) + self.AGL
                     #print "s", e, vec2d(the_node[0], the_node[1])
+                e += h_add[i]
                 obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 #                if abs(the_node[1]) > 50000. or abs(the_node[0]) > 50000.:
 #                    print "large node %6.0f %6.0f %i" % (the_node[0], the_node[1], self.osm_id)
@@ -223,6 +232,7 @@ class LinearObject(object):
                     e = right_z[i]
                 else:
                     e = elev(vec2d(the_node[0], the_node[1])) + self.AGL
+                e += h_add[i]
                 obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 #                ac.add_label(''+str(self.osm_id), -the_node[1], e+5, -the_node[0], scale=5)
                 ni += 1
@@ -253,13 +263,15 @@ class LinearObject(object):
             obj.face(face[::-1])
         return node0_l, node0_r
 
-    def write_to(self, obj, elev, ac=None, left=None, right=None, z=None, offset=None):
+    def write_to(self, obj, elev, ac=None, left=None, right=None, z=None, 
+                 offset=None):
         """need adjacency info
            left: node index of left
            right:
+           offset accounts for tile center
         """
         self._write_to(obj, elev, self.edge[0], self.edge[1],
-                                  self.tex_y0, self.tex_y1, ac=ac, offset=offset)
+                       self.tex_y0, self.tex_y1, ac=ac, offset=offset)
         return True
         # options:
         # - each way has two ends.
