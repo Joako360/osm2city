@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 """
 Specialized LinearObject for bridges. Overrides write_to() method.
+
+TODO: linear deck: limit slope
+      stitch road to bridge
+      limit transverse slope of road
+      if h_add too high, continue/insert bridge
 """
 
 import linear
@@ -95,8 +100,10 @@ class LinearBridge(linear.LinearObject):
         self.avg_slope = (h1 - h0)/self.center.length
 #        print "# h0, hm, h1:", h0, hm, h1
         self.D = Deck_shape_linear(h0, h1)
-        min_height = 8.
+        min_height = 8. * int(self.tags['layer'])
         h_add = max(0, min_height - (self.D(0.5) - hm))
+        
+#        h_add = 0. # debug: no h_add at all
 #        if h_add > 0.:
 #            self.D = Deck_shape_linear(h0 + h_add, h1 + h_add)
 

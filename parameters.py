@@ -171,6 +171,7 @@ C2P_POWER_LINE_ALLOW_100M = False
 #=============================================================================
 
 TRAFFIC_SHADER_ENABLE = False
+DH_DX = 0.1
 
 
 def set_parameters(param_dict):

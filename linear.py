@@ -7,6 +7,7 @@ import shapely.geometry as shg
 import matplotlib.pyplot as plt
 import math
 import copy
+import parameters
 
 # debug
 import test
@@ -195,7 +196,13 @@ class LinearObject(object):
         # -- elevated road
         h_add_0 = self.nodes_dict[self.refs[0]].h_add
         h_add_1 = self.nodes_dict[self.refs[-1]].h_add
-        h_add = np.linspace(h_add_0, h_add_1, n_nodes)
+        
+        if h_add_0 == 0 and h_add_1 > 0:
+            h_add = np.array([max(0, h_add_1 - (self.dist[-1] - self.dist[i]) * parameters.DH_DX) for i in range(n_nodes)])
+        elif h_add_0 > 0 and h_add_1 == 0:
+            h_add = np.array([max(0, h_add_0 - self.dist[i] * parameters.DH_DX) for i in range(n_nodes)])
+        else:
+            h_add = np.array([max(0, h_add_0 + (h_add_1 - h_add_0) * self.dist[i]/self.dist[-1]) for i in range(n_nodes)])
 
         # -- get elev
         if left_z is not None:
@@ -210,7 +217,7 @@ class LinearObject(object):
             node0_l = obj.next_node_index()
             for i, the_node in enumerate(left.coords):
                 if left_z is not None:
-                    e = left_z[i]
+                    e = left_z[i] + self.AGL
                 else:
                     e = elev(vec2d(the_node[0], the_node[1])) + self.AGL
                     #print "s", e, vec2d(the_node[0], the_node[1])
@@ -229,7 +236,7 @@ class LinearObject(object):
             node0_r = obj.next_node_index()
             for i, the_node in enumerate(right.coords):
                 if right_z is not None:
-                    e = right_z[i]
+                    e = right_z[i] + self.AGL
                 else:
                     e = elev(vec2d(the_node[0], the_node[1])) + self.AGL
                 e += h_add[i]

@@ -176,13 +176,12 @@ class Roads(objectlist.ObjectList):
             node1 = the_bridge.refs[-1]
             self.G.remove_edge(node0, node1)
 
-            dh_dx = 0.1
 
             for n0, n1 in nx.bfs_edges(self.G, node0):
                 obj = self.G[n0][n1]['obj']
                 n0 = self.nodes_dict[n0]
                 n1 = self.nodes_dict[n1]
-                n1.h_add = max(0, n0.h_add - obj.center.length * dh_dx)
+                n1.h_add = max(0, n0.h_add - obj.center.length * parameters.DH_DX)
                 print n1.h_add
                 if n1.h_add <= 0.:
                     break
@@ -191,7 +190,7 @@ class Roads(objectlist.ObjectList):
                 obj = self.G[n0][n1]['obj']
                 n0 = self.nodes_dict[n0]
                 n1 = self.nodes_dict[n1]
-                n1.h_add = max(0, n0.h_add - obj.center.length * dh_dx)
+                n1.h_add = max(0, n0.h_add - obj.center.length * parameters.DH_DX)
                 print n1.h_add
                 if n1.h_add <= 0.:
                     break
@@ -220,6 +219,7 @@ class Roads(objectlist.ObjectList):
             tex_y0 = 0.5
             tex_y1 = 0.75
             AGL_ofs = 1.0 + random.uniform(0.01, 0.1)
+            AGL_ofs = 0.05
             #if way.tags.has_key('layer'):
             #    AGL_ofs = 20.*float(way.tags['layer'])
             #print way.tags
