@@ -48,7 +48,6 @@ class Deck_shape_poly(object):
 class LinearBridge(linear.LinearObject):
     def __init__(self, transform, elev, osm_id, tags, refs, nodes_dict, width=9, tex_y0=0.5, tex_y1=0.75, AGL=0.5):
         super(LinearBridge, self).__init__(transform, osm_id, tags, refs, nodes_dict, width, tex_y0, tex_y1, AGL)
-
         # -- prepare elevation spline
         #    probe elev at n_probes locations
         n_probes = max(int(self.center.length / 5.), 3)
@@ -104,8 +103,8 @@ class LinearBridge(linear.LinearObject):
         h_add = max(0, min_height - (self.D(0.5) - hm))
         
 #        h_add = 0. # debug: no h_add at all
-#        if h_add > 0.:
-#            self.D = Deck_shape_linear(h0 + h_add, h1 + h_add)
+        if h_add > 0.:
+            self.D = Deck_shape_linear(h0 + h_add, h1 + h_add)
 
         node0 = nodes_dict[self.refs[0]]
         node1 = nodes_dict[self.refs[-1]]
@@ -158,21 +157,21 @@ class LinearBridge(linear.LinearObject):
         z = np.zeros(n_nodes)
         l = 0.
         for i in range(n_nodes):
-            z[i] = self.deck_height(l, normalized=False)
+            z[i] = self.deck_height(l, normalized=False) + self.AGL
             l += self.segment_len[i]
 
         # -- top
         node0_l, node0_r = self._write_to(obj, elev, self.edge[0], self.edge[1],
-                                          self.tex_y0, self.tex_y1, left_z=z, right_z=z, ac=ac, offset=offset)
+                                          self.tex_y0, self.tex_y1, left_z_set=z, right_z_set=z, ac=ac, offset=offset)
         left2, right2 = self.compute_offset(3)
         #left2, right2 = self.edge[0], self.edge[1]
 
         # -- right
         tmp, node0_r2 = self._write_to(obj, elev, node0_r, right2,
-                                       1, 0.75, left_z=z-3, right_z=z-3, ac=ac, offset=offset)
+                                       1, 0.75, right_z_set=z-3, ac=ac, offset=offset)
         # left
         node0_l2, tmp = self._write_to(obj, elev, left2, node0_l,
-                                       0.75, 1, left_z=z-3, right_z=z-3, ac=ac, offset=offset)
+                                       0.75, 1, left_z_set=z-3, ac=ac, offset=offset)
         # -- bottom
         self._write_to(obj, elev, node0_r2, node0_l2, 0.9, 1, ac=ac, n_nodes=n_nodes, offset=offset)
 

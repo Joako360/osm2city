@@ -164,7 +164,7 @@ class Roads(objectlist.ObjectList):
     def probe_elev_at_nodes(self):
         """add elevation info to all nodes"""
         for the_node in self.nodes_dict.values():
-            the_node.MSL = self.elev(vec2d(the_node.lon, the_node.lat), is_global=True)
+            the_node.MSL = self.elev((the_node.lon, the_node.lat), is_global=True)
             the_node.h_add = 0.
     
     def propagate_h_add(self):
@@ -181,8 +181,8 @@ class Roads(objectlist.ObjectList):
                 obj = self.G[n0][n1]['obj']
                 n0 = self.nodes_dict[n0]
                 n1 = self.nodes_dict[n1]
-                n1.h_add = max(0, n0.h_add - obj.center.length * parameters.DH_DX)
-                print n1.h_add
+                #n1.h_add = max(0, n0.h_add - obj.center.length * parameters.DH_DX)
+                n1.h_add = max(0, n0.MSL + n0.h_add - obj.center.length * parameters.DH_DX - n1.MSL)
                 if n1.h_add <= 0.:
                     break
 
@@ -190,8 +190,7 @@ class Roads(objectlist.ObjectList):
                 obj = self.G[n0][n1]['obj']
                 n0 = self.nodes_dict[n0]
                 n1 = self.nodes_dict[n1]
-                n1.h_add = max(0, n0.h_add - obj.center.length * parameters.DH_DX)
-                print n1.h_add
+                n1.h_add = max(0, n0.MSL + n0.h_add - obj.center.length * parameters.DH_DX - n1.MSL)
                 if n1.h_add <= 0.:
                     break
 
@@ -580,7 +579,7 @@ class Roads(objectlist.ObjectList):
         lmin, lmax = [vec2d(self.transform.toLocal(c)) for c in parameters.get_extent_global()]
         self.clusters = Clusters(lmin, lmax, parameters.TILE_SIZE)
 
-        for the_object in self.roads_list + self.bridges_list:
+        for the_object in self.bridges_list + self.roads_list:
             self.clusters.append(vec2d(the_object.center.centroid.coords[0]), the_object)
         #self.objects = None
         

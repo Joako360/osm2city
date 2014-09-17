@@ -43,6 +43,7 @@ class LinearObject(object):
         self.refs = refs
         self.tags = tags
         self.nodes_dict = nodes_dict
+        self.written_to_ac = False
         osm_nodes = [nodes_dict[r] for r in refs]
         nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
         self.center = shg.LineString(nodes)
@@ -170,8 +171,8 @@ class LinearObject(object):
         self.normals[-1] = self.normals[-2]
         self.angle[-1] = self.angle[-2]
 
-    def _write_to(self, obj, elev, left, right, tex_y0, tex_y1, n_nodes=None, left_z=None,
-                  right_z=None, ac=None, offset=None):
+    def _write_to(self, obj, elev, left, right, tex_y0, tex_y1, n_nodes=None, left_z_set=None,
+                  right_z_set=None, ac=None, offset=None):
         """given left and right LineStrings, write quads
            Use height z if given, probe elev otherwise
            
@@ -180,23 +181,28 @@ class LinearObject(object):
         """
         if "tunnel" in self.tags: 
             return
-            
+
         if not offset:
             offset = vec2d(0,0)            
             
         try:
             n_nodes = len(left.coords)
+            left_index = None
         except AttributeError:
-            try:
-                n_nodes = len(right.coords)
-            except AttributeError:
-                if n_nodes is None:
-                    raise ValueError("Neither left nor right are iterable: need n_nodes.")
+            left_index = left
+        try:
+            n_nodes = len(right.coords)
+            right_index = None
+        except AttributeError:
+            right_index = right
+        if n_nodes is None:
+            raise ValueError("Neither left nor right are iterable: need n_nodes.")
 
-        # -- elevated road
+        # -- elevated road. Got h_add data for first and last node. Now lift intermediate
+        #    nodes. So far, h_add is for center only.
+        # FIXME: when do we need this? if left_z_set is None and right_z_set is None?
         h_add_0 = self.nodes_dict[self.refs[0]].h_add
         h_add_1 = self.nodes_dict[self.refs[-1]].h_add
-        
         if h_add_0 == 0 and h_add_1 > 0:
             h_add = np.array([max(0, h_add_1 - (self.dist[-1] - self.dist[i]) * parameters.DH_DX) for i in range(n_nodes)])
         elif h_add_0 > 0 and h_add_1 == 0:
@@ -205,23 +211,96 @@ class LinearObject(object):
             h_add = np.array([max(0, h_add_0 + (h_add_1 - h_add_0) * self.dist[i]/self.dist[-1]) for i in range(n_nodes)])
 
         # -- get elev
-        if left_z is not None:
-            assert(len(left_z) == n_nodes)
+        if left_z_set is not None:
+            assert(len(left_z_set) == n_nodes)
 
-        if right_z is not None:
-            assert(len(right_z) == n_nodes)
+        if right_z_set is not None:
+            assert(len(right_z_set) == n_nodes)
+
+        # no elev given:
+        #  probe left and right
+        #  if transversal grad too large at a node:
+        #     use higher elev, add to h_add_left or h_add_right
+       
+        # if left node index given: no use for left_z_set
+        # same for right
+        left_z = np.zeros(n_nodes)
+        right_z = np.zeros(n_nodes)
+        
+        # conditions for left z probing:
+        # left coord given, no left z        
+        
+        
+        # normal road:
+        # - left and right coord given     NO INDEX AT ALL
+        # - neither left/right elev given: NO ELEV AT ALL
+        #   -> probe elev, respect max transverse grad and h_add
+        # bridge:
+        #   deck:
+        #   - left and right coord given
+        #   - left and right elev given
+        #   -> just write
+        #   side:
+        #   - right index, left coord given
+        #   - n/a          left elev given
+        #   -> just write
+        #   bottom
+        #   - left and right index given
+        #   -> just write
+        # embankemnt
+        # - left index, right coord given
+        # - n/a         right elev given
+        # -> just write
+        #        
+        # Is there a case with
+        # ONE index given, but need to probe elev on other side? Perhaps.
+        #left_is_coords == left.coords
+
+        if left_z_set is None and left_index is None:
+            left_z = np.array([elev(the_node) for the_node in left.coords])  + self.AGL
+            
+        if right_z_set is None and right_index is None:
+            right_z = np.array([elev(the_node) for the_node in right.coords]) + self.AGL
+
+        if left_index is None and right_index is None:
+            if left_z_set is None and right_z_set is None:
+                diff_elev = left_z - right_z
+                for i, the_diff in enumerate(diff_elev):
+                    # -- h_add larger than terrain gradient
+                    if h_add[i] > the_diff/2:
+                         left_z[i]  += (h_add[i] - the_diff/2)
+                         right_z[i] += (h_add[i] + the_diff/2)
+                    else:
+                        # there might be a small h_add. 
+                        if the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT: #  left > right
+                            right_z[i] += the_diff
+                        elif - the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT: # right > left
+                            left_z[i] += - the_diff
+
+        if left_z_set is not None: left_z = left_z_set
+        if right_z_set is not None: right_z = right_z_set
+        # diff = (left_elev[i] - right_elev[i])
+        # if diff / self.width > max_grad: #  left > right
+        #   right_h_add = diff
+        # elif diff / self.width < -max_grad:  #   right > left
+        #   left_h_add = -diff
+        
 
         # -- write left nodes
+        # left_coords = left.coords
+        # right_coords = right.coords
+        # if joint0 == 1D:
+        #     if neighbour0.already_written:
+        #         left_coords = left.coords[1:]
+        #         right_coords = left.coords[1:]
+        #     else:
+        #         nodes_l = np.arange(n_nodes) + obj.next_node_index()
+
         ni = 0
         try:
             node0_l = obj.next_node_index()
             for i, the_node in enumerate(left.coords):
-                if left_z is not None:
-                    e = left_z[i] + self.AGL
-                else:
-                    e = elev(vec2d(the_node[0], the_node[1])) + self.AGL
-                    #print "s", e, vec2d(the_node[0], the_node[1])
-                e += h_add[i]
+                e = left_z[i]
                 obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 #                if abs(the_node[1]) > 50000. or abs(the_node[0]) > 50000.:
 #                    print "large node %6.0f %6.0f %i" % (the_node[0], the_node[1], self.osm_id)
@@ -235,11 +314,7 @@ class LinearObject(object):
         try:
             node0_r = obj.next_node_index()
             for i, the_node in enumerate(right.coords):
-                if right_z is not None:
-                    e = right_z[i] + self.AGL
-                else:
-                    e = elev(vec2d(the_node[0], the_node[1])) + self.AGL
-                e += h_add[i]
+                e = right_z[i]
                 obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 #                ac.add_label(''+str(self.osm_id), -the_node[1], e+5, -the_node[0], scale=5)
                 ni += 1
