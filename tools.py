@@ -84,43 +84,44 @@ class Interpolator(object):
         print "dx, dy", self.dx, self.dy
         print "min %s  max %s" % (self.min, self.max)
 
-    def _move_to_boundary(self, p):
-        if p.x <= self.min.x:
-            p.x = self.min.x
-        elif p.x >= self.min.x:
-            p.x = self.min.x
-        if p.y <= self.min.x:
-            p.y = self.min.x
-        elif p.y >= self.min.x:
-            p.y = self.min.x
-        return p
+    def _move_to_boundary(self, x, y):
+        if x <= self.min.x:
+            x = self.min.x
+        elif x >= self.min.x:
+            x = self.min.x
+        if y <= self.min.x:
+            y = self.min.x
+        elif y >= self.min.x:
+            y = self.min.x
+        return x, y
 
     def __call__(self, p, is_global=False):
         """compute elevation at (x,y) by linear interpolation"""
         if self.fake:
             return 0.
-            #return p.x + p.y
+            #return x + y
         global transform
 
         if not is_global:
-            p = vec2d(transform.toGlobal(p))
-            
-
-        if self.clamp:
-            p = self._move_to_boundary(p)
+            x, y = transform.toGlobal(p)
         else:
-            if p.x <= self.min.x or p.x >= self.max.x:
-                plt.plot(p.x, p.y, 'r.')
+            x, y = p
+        
+        if self.clamp:
+            x, y = self._move_to_boundary(x, y)
+        else:
+            if x <= self.min.x or x >= self.max.x:
+                plt.plot(x, y, 'r.')
                 return -9999
-            elif p.y <= self.min.y or p.y >= self.max.y:
-                plt.plot(p.x, p.y, 'r.')
+            elif y <= self.min.y or y >= self.max.y:
+                plt.plot(x, y, 'r.')
                 return -9999
 
-        #plt.plot(p.x, p.y, 'k.')
-        i = int((p.x - self.min.x)/self.dx)
-        j = int((p.y - self.min.y)/self.dy)
-        fx = (p.x - self.x[j,i])/self.dx
-        fy = (p.y - self.y[j,i])/self.dy
+        #plt.plot(x, y, 'k.')
+        i = int((x - self.min.x)/self.dx)
+        j = int((y - self.min.y)/self.dy)
+        fx = (x - self.x[j,i])/self.dx
+        fy = (y - self.y[j,i])/self.dy
         # rounding errors at boundary.
         if j + 1 >= self.h.shape[0]:
             j -= 1
