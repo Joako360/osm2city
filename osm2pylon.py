@@ -27,6 +27,7 @@ import unittest
 import xml.sax
 
 import coordinates
+import landuse
 import osmparser
 import osmparser_wrapper
 import parameters
@@ -370,20 +371,6 @@ class LineWithoutCables(object):
             else:
                 my_shared_pylon = self.shared_pylons[1]
             return my_shared_pylon.lon, my_shared_pylon.lat
-
-
-class Landuse(LineWithoutCables):
-    TYPE_COMMERCIAL = 10
-    TYPE_INDUSTRIAL = 20
-    TYPE_RESIDENTIAL = 30
-    TYPE_RETAIL = 40
-    TYPE_NON_OSM = 50  # used for landuses constructed by osm2pylons and not in original data from OSM
-
-    def __init__(self, osm_id):
-        super(Landuse, self).__init__(osm_id)
-        self.type_ = 0
-        self.polygon = None
-        self.number_of_buildings = 0
 
 
 class Highway(LineWithoutCables):
@@ -858,23 +845,6 @@ class RailLine(Line):
         return is_right
 
 
-def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator):
-    my_buildings = {}  # osm_id as key, Polygon
-    for way in ways_dict.values():
-        for key in way.tags:
-            if "building" == key:
-                coordinates = []
-                for ref in way.refs:
-                    if ref in nodes_dict:
-                        my_node = nodes_dict[ref]
-                        coordinates.append(my_coord_transformator.toLocal((my_node.lon, my_node.lat)))
-                if 2 < len(coordinates):
-                    my_polygon = Polygon(coordinates)
-                    if my_polygon.is_valid and not my_polygon.is_empty:
-                        my_buildings[way.osm_id] = my_polygon.convex_hull
-    return my_buildings
-
-
 def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_coord_transformator):
     my_railways = {}  # osm_id as key, RailLine
     my_shared_nodes = {}  # node osm_id as key, list of WayLine objects as value
@@ -1074,84 +1044,6 @@ def merge_streetlamp_buffers(landuse_refs):
             if not is_found:
                 landuse_buffers.append(streetlamp_buffer)
     return landuse_buffers
-
-
-def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator, building_refs):
-    my_landuses = {}  # osm_id as key, Landuse
-
-    for way in ways_dict.values():
-        my_landuse = Landuse(way.osm_id)
-        valid_landuse = True
-        for key in way.tags:
-            value = way.tags[key]
-            if "landuse" == key:
-                if value == "commercial":
-                    my_landuse.type_ = Landuse.TYPE_COMMERCIAL
-                elif value == "industrial":
-                    my_landuse.type_ = Landuse.TYPE_INDUSTRIAL
-                elif value == "residential":
-                    my_landuse.type_ = Landuse.TYPE_RESIDENTIAL
-                elif value == "retail":
-                    my_landuse.type_ = Landuse.TYPE_RETAIL
-                else:
-                    valid_landuse = False
-            else:
-                valid_landuse = False
-        if valid_landuse:
-            # Process the Nodes
-            my_coordinates = []
-            for ref in way.refs:
-                if ref in nodes_dict:
-                    my_node = nodes_dict[ref]
-                    x, y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
-                    my_coordinates.append((x, y))
-            if len(my_coordinates) >= 3:
-                my_landuse.polygon = Polygon(my_coordinates)
-                if my_landuse.polygon.is_valid and not my_landuse.polygon.is_empty:
-                    my_landuses[my_landuse.osm_id] = my_landuse
-
-    logging.debug("OSM land-uses found: %s", len(my_landuses))
-    if parameters.C2P_LANDUSE_GENERATE_LANDUSE:
-        # Add "missing" landuses based on building clusters
-        my_landuse_candidates = []
-        index = 10000000000
-        for my_building in building_refs.values():
-            # check whether the building already is in a land use
-            within_existing_landuse = False
-            for my_landuse in my_landuses.values():
-                if my_building.intersects(my_landuse.polygon):
-                    within_existing_landuse = True
-                    break
-            if not within_existing_landuse:
-                # create new clusters of land uses
-                buffer_distance = parameters.C2P_LANDUSE_BUILDING_BUFFER_DISTANCE
-                if my_building.area > parameters.C2P_LANDUSE_BUILDING_BUFFER_DISTANCE**2:
-                    factor = math.sqrt(my_building.area / parameters.C2P_LANDUSE_BUILDING_BUFFER_DISTANCE**2)
-                    buffer_distance = min(factor*parameters.C2P_LANDUSE_BUILDING_BUFFER_DISTANCE
-                                          , parameters.C2P_LANDUSE_BUILDING_BUFFER_DISTANCE_MAX)
-                buffer_polygon = my_building.buffer(buffer_distance)
-                buffer_polygon = buffer_polygon
-                within_existing_landuse = False
-                for candidate in my_landuse_candidates:
-                    if buffer_polygon.intersects(candidate.polygon):
-                        candidate.polygon = candidate.polygon.union(buffer_polygon)
-                        candidate.number_of_buildings += 1
-                        within_existing_landuse = True
-                        break
-                if not within_existing_landuse:
-                    index += 1
-                    my_candidate = Landuse(index)
-                    my_candidate.polygon = buffer_polygon
-                    my_candidate.number_of_buildings = 1
-                    my_candidate.type_ = Landuse.TYPE_NON_OSM
-                    my_landuse_candidates.append(my_candidate)
-        # add landuse candidates to landuses
-        logging.debug("Candidate land-uses found: %s", len(my_landuse_candidates))
-        for candidate in my_landuse_candidates:
-            if candidate.polygon.area >= parameters.C2P_LANDUSE_MIN_AREA:
-                my_landuses[candidate.osm_id] = candidate
-
-    return my_landuses
 
 
 def process_osm_power_aerialway(nodes_dict, ways_dict, my_elev_interpolator, my_coord_transformator, building_refs):
@@ -1461,14 +1353,12 @@ def main():
     logging.info("Transforming OSM data to Line and Pylon objects")
     # the lists below are in sequence: buildings references, power/aerialway, railway overhead, landuse and highway
     valid_node_keys = ["power", "structure", "material", "height", "colour", "aerialway"
-                       , "railway"
-    ]
+                       , "railway"]
     valid_way_keys = ["building"
                       , "power", "aerialway", "voltage", "cables", "wires"
                       , "railway", "electrified", "tunnel"
                       , "landuse"
-                      , "highway", "junction"
-    ]
+                      , "highway", "junction"]
     valid_relation_keys = []
     req_relation_keys = []
     req_way_keys = ["building", "power", "aerialway", "railway", "landuse", "highway"]
@@ -1479,7 +1369,7 @@ def main():
     # References for buildings
     building_refs = {}
     if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_AERIALWAYS or parameters.C2P_PROCESS_STREETLAMPS:
-        building_refs = process_osm_building_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
+        building_refs = landuse.process_osm_building_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
         logging.info('Number of reference buildings: %s', len(building_refs))
     # Power lines and aerialways
     powerlines = {}
@@ -1508,7 +1398,11 @@ def main():
     # street lamps
     highways = {}
     if parameters.C2P_PROCESS_STREETLAMPS:
-        landuse_refs = process_osm_landuse_refs(handler.nodes_dict, handler.ways_dict, coord_transformator, building_refs)
+        landuse_refs = landuse.process_osm_landuse_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
+        if parameters.LU_LANDUSE_GENERATE_LANDUSE:
+            generated_landuses = landuse.generate_landuse_from_buildings(landuse_refs, building_refs)
+            for generated in generated_landuses.values():
+                landuse_refs[generated.osm_id] = generated
         logging.info('Number of landuse references: %s', len(landuse_refs))
         streetlamp_buffers = merge_streetlamp_buffers(landuse_refs)
         logging.info('Number of streetlamp buffers: %s', len(streetlamp_buffers))
