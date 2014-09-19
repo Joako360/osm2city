@@ -296,6 +296,56 @@ def generate_landuse_from_buildings(osm_landuses, building_refs):
     return my_landuse_candidates
 
 
+def process_osm_openspaces_refs(nodes_dict, ways_dict, my_coord_transformator):
+    """Parses OSM way input for areas, where there would be open space with no buildings"""
+    my_areas = {}  # osm_id as key, Polygon as value
+
+    for way in ways_dict.values():
+        valid_area = False
+        is_building = False
+        has_pedestrian = False
+        is_area = False
+        for key in way.tags:
+            value = way.tags[key]
+            if "building" == key:
+                is_building = True
+                break
+            elif "parking" == key and "multi-storey" == value:
+                is_building = True
+                break
+            elif "landuse" == key:
+                if value not in ["commercial", "industrial", "residential", "retail"]:  # must be in sync with Landuse
+                    valid_area = True
+            elif "amenity" == key:
+                if value in ["grave_yard", "parking"]:
+                    valid_area = True
+            elif key in ["leisure", "natural", "public_transport"]:
+                valid_area = True
+            elif "highway" == key:
+                if "pedestrian" == value:
+                    has_pedestrian = True
+            elif "area" == key:
+                if "yes" == value:
+                    is_area = True
+        if has_pedestrian and is_area:  # pedestrian street or place
+            valid_area = True
+        if valid_area and not is_building:
+            # Process the Nodes
+            my_coordinates = []
+            for ref in way.refs:
+                if ref in nodes_dict:
+                    my_node = nodes_dict[ref]
+                    x, y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
+                    my_coordinates.append((x, y))
+            if len(my_coordinates) >= 3:
+                my_poly = Polygon(my_coordinates)
+                if my_poly.is_valid and not my_poly.is_empty:
+                    my_areas[way.osm_id] = my_poly
+
+    logging.debug("OSM open spaces found: %s", len(my_areas))
+    return my_areas
+
+
 def parse_ac_file_name(xml_string):
     """Finds the corresponding ac-file in an xml-file"""
     try:
@@ -376,7 +426,7 @@ def plot_line(ax, ob, my_color, my_width):
     ax.plot(x, y, color=my_color, alpha=0.7, linewidth=my_width, solid_capstyle='round', zorder=2)
 
 
-def draw_polygons(highways, buildings, land_uses, static_obj_boxes, my_transformator):
+def draw_polygons(highways, open_spaces, buildings, land_uses, static_obj_boxes, my_transformator):
     cmin = my_transformator.toLocal(vec2d.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH))
     cmax = my_transformator.toLocal(vec2d.vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH))
 
@@ -394,7 +444,7 @@ def draw_polygons(highways, buildings, land_uses, static_obj_boxes, my_transform
         elif Landuse.TYPE_INDUSTRIAL == my_land_use.type_:
             my_color = "cyan"
         elif Landuse.TYPE_RETAIL == my_land_use.type_:
-            my_color = "green"
+            my_color = "cyan"
         elif Landuse.TYPE_RESIDENTIAL == my_land_use.type_:
             my_color = "pink"
 
@@ -414,6 +464,10 @@ def draw_polygons(highways, buildings, land_uses, static_obj_boxes, my_transform
             plot_line(ax, my_highway.linear, "black", 1)
         else:
             plot_line(ax, my_highway.linear, "gray", 1)
+
+    for open_space in open_spaces.values():
+        patch = PolygonPatch(open_space, facecolor='green', edgecolor='green')
+        ax.add_patch(patch)
 
 
     # Fit the figure around the polygons, bounds, render, and show
@@ -442,10 +496,12 @@ def main():
     logging.info("Transforming OSM data to Line and Pylon objects")
     # the lists below are in sequence: buildings references, power/aerialway, railway overhead, landuse and highway
     valid_node_keys = ["place", "population"]
-    valid_way_keys = ["building", "landuse", "place", "population", "highway", "junction"]
+    valid_way_keys = ["building", "landuse", "place", "population", "highway", "junction"
+                      , "leisure", "natural", "public_transport", "amenity", "area", "parking"]
     valid_relation_keys = []
     req_relation_keys = []
-    req_way_keys = ["building", "landuse", "place", "highway"]
+    req_way_keys = ["building", "landuse", "place", "highway"
+                    , "leisure", "natural", "public_transport", "amenity"]
     handler = osmparser_wrapper.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
                                                   req_relation_keys)
     source = open(osm_fname)
@@ -461,9 +517,10 @@ def main():
     logging.info('Number of landuse references: %s', len(landuse_refs))
     places_refs = process_osm_place_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
     highways = process_osm_highway(handler.nodes_dict, handler.ways_dict, coord_transformator)
+    open_spaces = process_osm_openspaces_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
 
     boxes = create_static_obj_boxes(coord_transformator)
-    draw_polygons(highways, building_refs, landuse_refs, boxes, coord_transformator)
+    draw_polygons(highways, open_spaces, building_refs, landuse_refs, boxes, coord_transformator)
     i = 0
 
 if __name__ == "__main__":
