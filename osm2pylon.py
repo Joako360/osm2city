@@ -28,6 +28,7 @@ import xml.sax
 
 import coordinates
 import landuse
+from landuse import Highway
 import osmparser
 import osmparser_wrapper
 import parameters
@@ -373,31 +374,16 @@ class LineWithoutCables(object):
             return my_shared_pylon.lon, my_shared_pylon.lat
 
 
-class Highway(LineWithoutCables):
-    TYPE_MOTORWAY = 11
-    TYPE_TRUNK = 12
-    TYPE_PRIMARY = 13
-    TYPE_SECONDARY = 14
-    TYPE_TERTIARY = 15
-    TYPE_UNCLASSIFIED = 16
-    TYPE_ROAD = 17
-    TYPE_RESIDENTIAL = 18
-    TYPE_LIVING_STREET = 19
-    TYPE_SERVICE = 20
-
-    OFFSET = 10
-
-    def __init__(self, osm_id):
-        super(Highway, self).__init__(osm_id)
-        self.type_ = 0
-        self.linear = None  # The LinearString of the line
-        self.is_roundabout = False
+class StreetlampWay(LineWithoutCables):
+    def __init__(self, osm_id, highway):
+        super(StreetlampWay, self).__init__(osm_id)
+        self.highway = highway
 
     def calc_and_map(self, my_elev_interpolator, my_coord_transformator):
-        if self.is_roundabout:
+        if self.highway.is_roundabout:
             shared_pylon = SharedPylon()
             shared_pylon.pylon_model = "Models/StreetFurniture/Streetlamp3.xml"
-            p = Polygon(self.linear)
+            p = Polygon(self.highway.linear)
             shared_pylon.x = p.centroid.x
             shared_pylon.y = p.centroid.y
             self.shared_pylons.append(shared_pylon)
@@ -405,19 +391,19 @@ class Highway(LineWithoutCables):
             model = "Models/StreetFurniture/Streetlamp2.xml"
             default_distance = parameters.C2P_STREETLAMPS_OTHER_DISTANCE
             parallel_offset = 2.5
-            if self.type_ in [Highway.TYPE_SERVICE, Highway.TYPE_RESIDENTIAL, Highway.TYPE_LIVING_STREET]:
+            if self.highway.type_ in [Highway.TYPE_SERVICE, Highway.TYPE_RESIDENTIAL, Highway.TYPE_LIVING_STREET]:
                 model = "Models/StreetFurniture/Streetlamp1.xml"
                 default_distance = parameters.C2P_STREETLAMPS_RESIDENTIAL_DISTANCE
-            elif self.type_ in [Highway.TYPE_ROAD, Highway.TYPE_UNCLASSIFIED, Highway.TYPE_TERTIARY]:
+            elif self.highway.type_ in [Highway.TYPE_ROAD, Highway.TYPE_UNCLASSIFIED, Highway.TYPE_TERTIARY]:
                 parallel_offset = 3.0
-            elif self.type_ in [Highway.TYPE_SECONDARY, Highway.TYPE_PRIMARY, Highway.TYPE_TRUNK]:
+            elif self.highway.type_ in [Highway.TYPE_SECONDARY, Highway.TYPE_PRIMARY, Highway.TYPE_TRUNK]:
                 parallel_offset = 3.5
             else:  # MOTORWAY
                 parallel_offset = 7
             # FIXME: calculate parallel_offset based on lanes
 
             self.shared_pylons = []  # list of SharedPylon
-            x, y = self.linear.coords[0]
+            x, y = self.highway.linear.coords[0]
             shared_pylon = SharedPylon()
             shared_pylon.x = x
             shared_pylon.y = y
@@ -425,10 +411,9 @@ class Highway(LineWithoutCables):
             shared_pylon.calc_global_coordinates(my_elev_interpolator, my_coord_transformator)
             self.shared_pylons.append(shared_pylon)  # used for calculating heading - especially if only one lamp
 
-            my_length = self.linear.length  # omit recalculating length all the time
-            my_right_parallel = self.linear.parallel_offset(parallel_offset, 'right', join_style=1)
+            my_right_parallel = self.highway.linear.parallel_offset(parallel_offset, 'right', join_style=1)
             my_right_parallel_length = my_right_parallel.length
-            current_distance = Highway.OFFSET  # the distance from the origin of the current streetlamp
+            current_distance = 10  # the distance from the origin of the current streetlamp
 
             while True:
                 if current_distance > my_right_parallel_length:
@@ -930,61 +915,14 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_co
     return my_railways
 
 
-def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator, landuse_buffers):
+def process_highways_for_streetlamps(my_highways, landuse_buffers):
     """
+    Test whether the highway is within appropriate land use or intersects with appropriate land use
     No attempt to merge lines because most probably the lines are split at crossing.
     No attempt to guess whether there there is a division in the center, where a street lamp with two lamps could be
     placed - e.g. using a combination of highway type, one-way, number of lanes etc
     """
-    my_highways = {}  # osm_id as key, Highway
-
-    for way in ways_dict.values():
-        my_highway = Highway(way.osm_id)
-        valid_highway = False
-        is_challenged = False
-        for key in way.tags:
-            value = way.tags[key]
-            if "highway" == key:
-                valid_highway = True
-                if value in ["motorway", "motorway_link"]:
-                    my_highway.type_ = Highway.TYPE_MOTORWAY
-                elif value in ["trunk", "trunk_link"]:
-                    my_highway.type_ = Highway.TYPE_TRUNK
-                elif value in ["primary", "primary_link"]:
-                    my_highway.type_ = Highway.TYPE_PRIMARY
-                elif value in ["secondary", "secondary_link"]:
-                    my_highway.type_ = Highway.TYPE_SECONDARY
-                elif value in ["tertiary", "tertiary_link"]:
-                    my_highway.type_ = Highway.TYPE_TERTIARY
-                elif value == "unclassified":
-                    my_highway.type_ = Highway.TYPE_UNCLASSIFIED
-                elif value == "road":
-                    my_highway.type_ = Highway.TYPE_ROAD
-                elif value == "residential":
-                    my_highway.type_ = Highway.TYPE_RESIDENTIAL
-                elif value == "living_street":
-                    my_highway.type_ = Highway.TYPE_LIVING_STREET
-                elif value == "service":
-                    my_highway.type_ = Highway.TYPE_SERVICE
-                else:
-                    valid_highway = False
-            elif ("tunnel" == key) and ("yes" == value):
-                is_challenged = True
-            elif ("junction" == key) and ("roundabout" == value):
-                my_highway.is_roundabout = True
-        if valid_highway and not is_challenged:
-            # Process the Nodes
-            my_coordinates = []
-            for ref in way.refs:
-                if ref in nodes_dict:
-                    my_node = nodes_dict[ref]
-                    x, y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
-                    my_coordinates.append((x, y))
-            if len(my_coordinates) >= 2:
-                my_highway.linear = LineString(my_coordinates)
-                my_highways[my_highway.osm_id] = my_highway
-
-    # Test whether the highway is within appropriate land use or intersects with appropriate land use
+    my_streetlamps = {}
     for key in my_highways.keys():
         my_highway = my_highways[key]
         is_within = False
@@ -995,10 +933,10 @@ def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator, landuse_b
                 break
             elif my_highway.linear.intersects(lu_buffer):
                 intersections.append(my_highway.linear.intersection(lu_buffer))
-        if not is_within:
-            if len(intersections) == 0:
-                del my_highways[key]
-            else:
+        if is_within:
+            my_streetlamps[my_highway.osm_id] = StreetlampWay(my_highway.osm_id, my_highway)
+        else:
+            if len(intersections) > 0:
                 index = 10000000000
                 for intersection in intersections:
                     if isinstance(intersection, MultiLineString):
@@ -1010,20 +948,20 @@ def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator, landuse_b
                     new_highway = Highway(index + key)
                     new_highway.type_ = my_highway.type_
                     new_highway.linear = intersection
-                    my_highways[new_highway.osm_id] = new_highway
+                    my_streetlamps[new_highway.osm_id] = StreetlampWay(new_highway.osm_id, new_highway)
                 del my_highways[key]
 
     # Remove the too short lines
-    for key in my_highways.keys():
-        my_highway = my_highways[key]
-        if not isinstance(my_highway.linear, LineString):
-            del my_highways[key]
-        elif my_highway.is_roundabout and (50 > my_highway.linear.length or 300 < my_highway.linear.length):
-            del my_highways[key]
-        elif my_highway.linear.length < (2 * Highway.OFFSET):
-            del my_highways[key]
+    for key in my_streetlamps.keys():
+        my_streetlamp = my_streetlamps[key]
+        if not isinstance(my_streetlamp.highway.linear, LineString):
+            del my_streetlamps[key]
+        elif my_streetlamp.highway.is_roundabout and (50 > my_streetlamp.highway.linear.length or 300 < my_streetlamp.highway.linear.length):
+            del my_streetlamps[key]
+        elif my_streetlamp.highway.linear.length < parameters.C2P_STREETLAMPS_MIN_STREET_LENGTH:
+            del my_streetlamps[key]
 
-    return my_highways
+    return my_streetlamps
 
 
 def merge_streetlamp_buffers(landuse_refs):
@@ -1396,7 +1334,7 @@ def main():
         for rail_line in rail_lines.values():
             rail_line.calc_and_map(elev_interpolator, coord_transformator, rail_lines.values())
     # street lamps
-    highways = {}
+    streetlamp_ways = {}
     if parameters.C2P_PROCESS_STREETLAMPS:
         landuse_refs = landuse.process_osm_landuse_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
         if parameters.LU_LANDUSE_GENERATE_LANDUSE:
@@ -1406,9 +1344,10 @@ def main():
         logging.info('Number of landuse references: %s', len(landuse_refs))
         streetlamp_buffers = merge_streetlamp_buffers(landuse_refs)
         logging.info('Number of streetlamp buffers: %s', len(streetlamp_buffers))
-        highways = process_osm_highway(handler.nodes_dict, handler.ways_dict, coord_transformator, streetlamp_buffers)
-        logging.info('Reduced number of highways: %s', len(highways))
-        for highway in highways.values():
+        highways = landuse.process_osm_highway(handler.nodes_dict, handler.ways_dict, coord_transformator)
+        streetlamp_ways = process_highways_for_streetlamps(highways, streetlamp_buffers)
+        logging.info('Reduced number of streetlamp ways: %s', len(streetlamp_ways))
+        for highway in streetlamp_ways.values():
             highway.calc_and_map(elev_interpolator, coord_transformator)
         landuse_refs = None
 
@@ -1434,7 +1373,7 @@ def main():
         write_stg_entries(stg_manager, files_to_remove, rail_lines
                           , "overhead", parameters.C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH)
     if parameters.C2P_PROCESS_STREETLAMPS:
-        write_stg_entries(stg_manager, files_to_remove, highways, None, None)
+        write_stg_entries(stg_manager, files_to_remove, streetlamp_ways, None, None)
 
     if args.uninstall:
         for f in files_to_remove:

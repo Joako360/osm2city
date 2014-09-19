@@ -9,11 +9,14 @@ import xml.sax
 
 from shapely import affinity
 from shapely.geometry import box
+from shapely.geometry import LineString
+from shapely.geometry import Point
 from shapely.geometry import Polygon
 
 import vec2d
 import calc_tile
 import coordinates
+import osmparser
 import osmparser_wrapper
 import parameters
 import stg_io2
@@ -36,6 +39,77 @@ def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator):
     return my_buildings
 
 
+class Highway(object):
+    TYPE_MOTORWAY = 11
+    TYPE_TRUNK = 12
+    TYPE_PRIMARY = 13
+    TYPE_SECONDARY = 14
+    TYPE_TERTIARY = 15
+    TYPE_UNCLASSIFIED = 16
+    TYPE_ROAD = 17
+    TYPE_RESIDENTIAL = 18
+    TYPE_LIVING_STREET = 19
+    TYPE_SERVICE = 20
+
+    def __init__(self, osm_id):
+        self.osm_id = osm_id
+        self.type_ = 0
+        self.linear = None  # The LinearString of the line
+        self.is_roundabout = False
+
+
+def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
+    my_highways = {}  # osm_id as key, Highway
+
+    for way in ways_dict.values():
+        my_highway = Highway(way.osm_id)
+        valid_highway = False
+        is_challenged = False
+        for key in way.tags:
+            value = way.tags[key]
+            if "highway" == key:
+                valid_highway = True
+                if value in ["motorway", "motorway_link"]:
+                    my_highway.type_ = Highway.TYPE_MOTORWAY
+                elif value in ["trunk", "trunk_link"]:
+                    my_highway.type_ = Highway.TYPE_TRUNK
+                elif value in ["primary", "primary_link"]:
+                    my_highway.type_ = Highway.TYPE_PRIMARY
+                elif value in ["secondary", "secondary_link"]:
+                    my_highway.type_ = Highway.TYPE_SECONDARY
+                elif value in ["tertiary", "tertiary_link"]:
+                    my_highway.type_ = Highway.TYPE_TERTIARY
+                elif value == "unclassified":
+                    my_highway.type_ = Highway.TYPE_UNCLASSIFIED
+                elif value == "road":
+                    my_highway.type_ = Highway.TYPE_ROAD
+                elif value == "residential":
+                    my_highway.type_ = Highway.TYPE_RESIDENTIAL
+                elif value == "living_street":
+                    my_highway.type_ = Highway.TYPE_LIVING_STREET
+                elif value == "service":
+                    my_highway.type_ = Highway.TYPE_SERVICE
+                else:
+                    valid_highway = False
+            elif ("tunnel" == key) and ("yes" == value):
+                is_challenged = True
+            elif ("junction" == key) and ("roundabout" == value):
+                my_highway.is_roundabout = True
+        if valid_highway and not is_challenged:
+            # Process the Nodes
+            my_coordinates = []
+            for ref in way.refs:
+                if ref in nodes_dict:
+                    my_node = nodes_dict[ref]
+                    x, y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
+                    my_coordinates.append((x, y))
+            if len(my_coordinates) >= 2:
+                my_highway.linear = LineString(my_coordinates)
+                my_highways[my_highway.osm_id] = my_highway
+
+    return my_highways
+
+
 class Landuse(object):
     TYPE_COMMERCIAL = 10
     TYPE_INDUSTRIAL = 20
@@ -50,8 +124,98 @@ class Landuse(object):
         self.number_of_buildings = 0
 
 
+class Place(object):
+    """ Cf. http://wiki.openstreetmap.org/wiki/Key:place"""
+    TYPE_CITY = 10
+    TYPE_BOROUGH = 11
+    TYPE_SUBURB = 12
+    TYPE_QUARTER = 13
+    TYPE_NEIGHBOURHOOD = 14
+    TYPE_CITY_BLOCK = 15
+    TYPE_TOWN = 20
+    TYPE_VILLAGE = 30
+    TYPE_HAMLET = 40
+
+    def __init__(self, osm_id, is_node):
+        self.osm_id = osm_id
+        self.is_node = is_node  # A Place in OSM can either be a node or a way
+        self.type_ = 0
+        self.polygon = None
+        self.point = None
+        self.population = -1  # based on OSM population tag
+
+
+def process_osm_place_refs(nodes_dict, ways_dict, my_coord_transformator):
+    my_places = {}  # osm_id as key, Place as value
+
+    # First get all Places from OSM ways
+    for way in ways_dict.values():
+        my_type, my_population = _parse_place_tags(way.tags)
+        if my_type > 0:
+            my_place = Place(way.osm_id, False)
+            if my_population > 0:
+                my_place.population = my_population
+
+            # Process the Nodes
+            my_coordinates = []
+            for ref in way.refs:
+                if ref in nodes_dict:
+                    my_node = nodes_dict[ref]
+                    x, y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
+                    my_coordinates.append((x, y))
+            if len(my_coordinates) >= 3:
+                my_place.polygon = Polygon(my_coordinates)
+                if my_place.polygon.is_valid and not my_place.polygon.is_empty:
+                    my_places[my_place.osm_id] = my_place
+    logging.debug("OSM places of type polygon found: %s", len(my_places))
+
+    # Get the Places from OSM nodes
+    for node in nodes_dict.values():
+        my_type, my_population = _parse_place_tags(node.tags)
+        if my_type > 0:
+            my_place = Place(node.osm_id, True)
+            if my_population > 0:
+                my_place.population = my_population
+            x, y = my_coord_transformator.toLocal((node.lon, node.lat))
+            my_place.point = Point(x, y)
+            my_places[my_place.osm_id] = my_place
+
+    logging.debug("Total OSM places (points and polygons) found: %s", len(my_places))
+    return my_places
+
+
+def _parse_place_tags(tags_dict):
+    """Parses OSM tags for Places"""
+    my_type = 0
+    my_population = 0
+    for key in tags_dict:
+        value = tags_dict[key]
+        if "place" == key:
+            if value == "city":
+                my_type = Place.TYPE_CITY
+            elif value == "borough":
+                my_type = Place.TYPE_BOROUGH
+            elif value == "suburb":
+                my_type = Place.TYPE_SUBURB
+            elif value == "quarter":
+                my_type = Place.TYPE_QUARTER
+            elif value == "neighbourhood":
+                my_type = Place.TYPE_NEIGHBOURHOOD
+            elif value == "city_block":
+                my_type = Place.TYPE_CITY_BLOCK
+            elif value == "town":
+                my_type = Place.TYPE_TOWN
+            elif value == "village":
+                my_type = Place.TYPE_VILLAGE
+            elif value == "hamlet":
+                my_type = Place.TYPE_HAMLET
+        if ("population" == key) and osmparser.is_parsable_int(value):
+            my_population = int(value)
+    return my_type, my_population
+
+
 def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator):
-    my_landuses = {}  # osm_id as key, Landuse
+    my_landuses = {}  # osm_id as key, Landuse as value
 
     for way in ways_dict.values():
         my_landuse = Landuse(way.osm_id)
@@ -212,7 +376,7 @@ def plot_line(ax, ob, my_color, my_width):
     ax.plot(x, y, color=my_color, alpha=0.7, linewidth=my_width, solid_capstyle='round', zorder=2)
 
 
-def draw_polygons(land_uses, static_obj_boxes, my_transformator):
+def draw_polygons(highways, buildings, land_uses, static_obj_boxes, my_transformator):
     cmin = my_transformator.toLocal(vec2d.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH))
     cmax = my_transformator.toLocal(vec2d.vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH))
 
@@ -226,7 +390,7 @@ def draw_polygons(land_uses, static_obj_boxes, my_transformator):
     for my_land_use in land_uses.values():
         my_color = "red"  # TYPE_NON_OSM
         if Landuse.TYPE_COMMERCIAL == my_land_use.type_:
-            my_color = "blue"
+            my_color = "magenta"
         elif Landuse.TYPE_INDUSTRIAL == my_land_use.type_:
             my_color = "cyan"
         elif Landuse.TYPE_RETAIL == my_land_use.type_:
@@ -237,9 +401,20 @@ def draw_polygons(land_uses, static_obj_boxes, my_transformator):
         patch = PolygonPatch(my_land_use.polygon, facecolor=my_color, edgecolor='#999999')
         ax.add_patch(patch)
 
-    for my_box in static_obj_boxes:
-        patch = PolygonPatch(my_box, facecolor='black', edgecolor='#999999')
+    for building in buildings.values():
+        patch = PolygonPatch(building, facecolor='blue', edgecolor='blue')
         ax.add_patch(patch)
+
+    for my_box in static_obj_boxes:
+        patch = PolygonPatch(my_box, facecolor='black', edgecolor='black', alpha=0.5)
+        ax.add_patch(patch)
+
+    for my_highway in highways.values():
+        if Highway.TYPE_ROAD < my_highway.type_:
+            plot_line(ax, my_highway.linear, "black", 1)
+        else:
+            plot_line(ax, my_highway.linear, "gray", 1)
+
 
     # Fit the figure around the polygons, bounds, render, and show
     w, h = cmax[0] - cmin[0], cmax[1] - cmin[1]
@@ -253,7 +428,7 @@ def main():
     logging.basicConfig(level=logging.DEBUG)
     # Handling arguments and parameters
     parser = argparse.ArgumentParser(
-        description="osm2pylon reads OSM data and creates pylons, powerlines and aerialways for use with FlightGear")
+        description="landuse reads OSM data and creates landuses and places for support of osm2city/osm2pyons in FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
     args = parser.parse_args()
@@ -266,11 +441,11 @@ def main():
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
     # the lists below are in sequence: buildings references, power/aerialway, railway overhead, landuse and highway
-    valid_node_keys = []
-    valid_way_keys = ["building", "landuse"]
+    valid_node_keys = ["place", "population"]
+    valid_way_keys = ["building", "landuse", "place", "population", "highway", "junction"]
     valid_relation_keys = []
     req_relation_keys = []
-    req_way_keys = ["building", "landuse"]
+    req_way_keys = ["building", "landuse", "place", "highway"]
     handler = osmparser_wrapper.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
                                                   req_relation_keys)
     source = open(osm_fname)
@@ -284,9 +459,11 @@ def main():
     for generated in generated_landuses.values():
         landuse_refs[generated.osm_id] = generated
     logging.info('Number of landuse references: %s', len(landuse_refs))
+    places_refs = process_osm_place_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
+    highways = process_osm_highway(handler.nodes_dict, handler.ways_dict, coord_transformator)
 
     boxes = create_static_obj_boxes(coord_transformator)
-    draw_polygons(landuse_refs, boxes, coord_transformator)
+    draw_polygons(highways, building_refs, landuse_refs, boxes, coord_transformator)
     i = 0
 
 if __name__ == "__main__":
