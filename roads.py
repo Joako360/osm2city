@@ -762,14 +762,18 @@ def main():
         replacement_prefix = re.sub('[\/]','_', parameters.PREFIX)
         file_name = replacement_prefix + "roads%02i%02i" % (cl.I.x, cl.I.y)
         center_global = vec2d(tools.transform.toGlobal(cl.center))
-        offset = cl.center
-
+        offset_local = cl.center
+        cluster_elev = elev(center_global, True)
+        #cluster_elev = 0.
+        # -- Now write cluster to disk.
+        #    First create ac object. Write cluster's objects. Register stg object.
+        #    Write ac to file.
         ac = ac3d.Writer(tools.stats, show_labels=False)
         ac3d_obj = ac.new_object(file_name, 'tex/roads.png', default_swap_uv=True)
         for rd in cl.objects:
-            rd.write_to(ac3d_obj, elev, ac, offset=offset) # fixme: remove .ac, needed only for adding debug labels
+            rd.write_to(ac3d_obj, elev, cluster_elev, ac, offset=offset_local) # fixme: remove .ac, needed only for adding debug labels
 
-        path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, 0, 0)
+        path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, cluster_elev, 0)
         ac.write_to_file(path_to_stg + file_name)
         write_xml(path_to_stg, file_name, file_name)
         tools.install_files(['roads.eff'], path_to_stg)

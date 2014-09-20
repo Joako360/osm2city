@@ -98,7 +98,8 @@ class Clusters(object):
         try:
             self(anchor).stats.count(obj)
         except AttributeError:
-            logging.debug("count broken, fix me")
+            #logging.debug("count broken, fix me")
+            pass
         
     def transfer_buildings(self):
         """1|0

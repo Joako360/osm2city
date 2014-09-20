@@ -139,7 +139,7 @@ class LinearBridge(linear.LinearObject):
         #return 10.
         return self.D(l)
 
-    def write_to(self, obj, elev, ac=None, offset=None):
+    def write_to(self, obj, elev, elev_offset, ac=None, offset=None):
         """
         write
         - deck
@@ -161,17 +161,17 @@ class LinearBridge(linear.LinearObject):
             l += self.segment_len[i]
 
         # -- top
-        node0_l, node0_r = self._write_to(obj, elev, self.edge[0], self.edge[1],
+        node0_l, node0_r = self._write_to(obj, elev, elev_offset, self.edge[0], self.edge[1],
                                           self.tex_y0, self.tex_y1, left_z_set=z, right_z_set=z, ac=ac, offset=offset)
         left2, right2 = self.compute_offset(3)
         #left2, right2 = self.edge[0], self.edge[1]
 
         # -- right
-        tmp, node0_r2 = self._write_to(obj, elev, node0_r, right2,
+        tmp, node0_r2 = self._write_to(obj, elev, elev_offset, node0_r, right2,
                                        1, 0.75, right_z_set=z-3, ac=ac, offset=offset)
         # left
-        node0_l2, tmp = self._write_to(obj, elev, left2, node0_l,
+        node0_l2, tmp = self._write_to(obj, elev, elev_offset, left2, node0_l,
                                        0.75, 1, left_z_set=z-3, ac=ac, offset=offset)
         # -- bottom
-        self._write_to(obj, elev, node0_r2, node0_l2, 0.9, 1, ac=ac, n_nodes=n_nodes, offset=offset)
+        self._write_to(obj, elev, elev_offset, node0_r2, node0_l2, 0.9, 1, ac=ac, n_nodes=n_nodes, offset=offset)
 

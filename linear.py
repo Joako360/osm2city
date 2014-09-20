@@ -171,7 +171,7 @@ class LinearObject(object):
         self.normals[-1] = self.normals[-2]
         self.angle[-1] = self.angle[-2]
 
-    def _write_to(self, obj, elev, left, right, tex_y0, tex_y1, n_nodes=None, left_z_set=None,
+    def _write_to(self, obj, elev, cluster_elev, left, right, tex_y0, tex_y1, n_nodes=None, left_z_set=None,
                   right_z_set=None, ac=None, offset=None):
         """
            Write a series of quads bound by left and right. 
@@ -179,6 +179,8 @@ class LinearObject(object):
 
            Left/right can also be LineStrings, in which case we first create nodes. Use left_z_set
            as the node's height coordinate if given, otherwise probe elevation.
+           
+           Elev_offset is subtracted from probed or given elev.
         """
 
         if "tunnel" in self.tags: 
@@ -300,11 +302,10 @@ class LinearObject(object):
         #         right_coords = left.coords[1:]
         #     else:
         #         nodes_l = np.arange(n_nodes) + obj.next_node_index()
-        
         if not left_nodes:
             left_nodes = np.arange(n_nodes) + obj.next_node_index()
             for i, the_node in enumerate(left.coords):
-                e = left_z[i]
+                e = left_z[i] - cluster_elev
                 obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 #                if abs(the_node[1]) > 50000. or abs(the_node[0]) > 50000.:
 #                    print "large node %6.0f %6.0f %i" % (the_node[0], the_node[1], self.osm_id)
@@ -319,7 +320,7 @@ class LinearObject(object):
         if not right_nodes:
             right_nodes = np.arange(n_nodes) + obj.next_node_index()
             for i, the_node in enumerate(right.coords):
-                e = right_z[i]
+                e = right_z[i] - cluster_elev
                 obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 #                ac.add_label(''+str(self.osm_id), -the_node[1], e+5, -the_node[0], scale=5)
 #        nodes_r = range(node0_r, node0_r + n_nodes)
@@ -343,14 +344,14 @@ class LinearObject(object):
             obj.face(face[::-1])
         return list(left_nodes), list(right_nodes)
 
-    def write_to(self, obj, elev, ac=None, left=None, right=None, z=None, 
+    def write_to(self, obj, elev, elev_offset, ac=None, left=None, right=None, z=None, 
                  offset=None):
         """need adjacency info
            left: node index of left
            right:
            offset accounts for tile center
         """
-        self._write_to(obj, elev, self.edge[0], self.edge[1],
+        self._write_to(obj, elev, elev_offset, self.edge[0], self.edge[1],
                        self.tex_y0, self.tex_y1, ac=ac, offset=offset)
         return True
         # options:
