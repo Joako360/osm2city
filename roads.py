@@ -305,8 +305,8 @@ class Roads(objectlist.ObjectList):
 #            if the_way.osm_id == 4888143:
 #                print "got 4888143"
             for i, ref in enumerate(the_way.refs):
-                if ref == 1132288594:
-                    print "F (%i)" % (the_way.osm_id), the_way.refs
+#                if ref == 1132288594:
+#                    print "F (%i)" % (the_way.osm_id), the_way.refs
                 try:
 #                    if the_way.osm_id == 4888143:
 #                        print "  ref", self.nodes_dict[ref].osm_id
@@ -323,9 +323,10 @@ class Roads(objectlist.ObjectList):
 
         # kick nodes that belong to one way only
         # TODO: is there something like dict comprehension?
-        for key, value in self.attached_ways_dict.items():
+        for ref, value in self.attached_ways_dict.items():
+            if len(value) >= 2: self.nodes_dict[ref].n_attached_ways = len(value)
             if len(value) < degree: # FIXME: join_ways, then return 2 here
-                self.attached_ways_dict.pop(key)
+                self.attached_ways_dict.pop(ref)
 #            else:
 #                pass
 #                check if one is first node and one last node. If so, join_ways

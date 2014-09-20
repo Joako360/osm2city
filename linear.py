@@ -173,36 +173,41 @@ class LinearObject(object):
 
     def _write_to(self, obj, elev, left, right, tex_y0, tex_y1, n_nodes=None, left_z_set=None,
                   right_z_set=None, ac=None, offset=None):
-        """given left and right LineStrings, write quads
-           Use height z if given, probe elev otherwise
-           
-           if left or right is integer, assume nodes are already written and use 
-           integer as node index.
         """
+           Write a series of quads bound by left and right. 
+           Left/right can be lists of node indices which will be used to form a series of quads.
+
+           Left/right can also be LineStrings, in which case we first create nodes. Use left_z_set
+           as the node's height coordinate if given, otherwise probe elevation.
+        """
+
         if "tunnel" in self.tags: 
             return
 
         if not offset:
             offset = vec2d(0,0)            
             
+        left_nodes = []    # node indices. Eventually build faces from these.
+        right_nodes = []
+
         try:
             n_nodes = len(left.coords)
-            left_index = None
         except AttributeError:
-            left_index = left
+            left_nodes = left
         try:
             n_nodes = len(right.coords)
-            right_index = None
         except AttributeError:
-            right_index = right
+            right_nodes = right
         if n_nodes is None:
             raise ValueError("Neither left nor right are iterable: need n_nodes.")
 
+        first_node = self.nodes_dict[self.refs[0]]
+        last_node = self.nodes_dict[self.refs[-1]]
         # -- elevated road. Got h_add data for first and last node. Now lift intermediate
-        #    nodes. So far, h_add is for center only.
+        #    nodes. So far, h_add is for centerline only.
         # FIXME: when do we need this? if left_z_set is None and right_z_set is None?
-        h_add_0 = self.nodes_dict[self.refs[0]].h_add
-        h_add_1 = self.nodes_dict[self.refs[-1]].h_add
+        h_add_0 = first_node.h_add
+        h_add_1 = last_node.h_add
         if h_add_0 == 0 and h_add_1 > 0:
             h_add = np.array([max(0, h_add_1 - (self.dist[-1] - self.dist[i]) * parameters.DH_DX) for i in range(n_nodes)])
         elif h_add_0 > 0 and h_add_1 == 0:
@@ -256,13 +261,13 @@ class LinearObject(object):
         # ONE index given, but need to probe elev on other side? Perhaps.
         #left_is_coords == left.coords
 
-        if left_z_set is None and left_index is None:
+        if left_z_set is None and not left_nodes:
             left_z = np.array([elev(the_node) for the_node in left.coords])  + self.AGL
             
-        if right_z_set is None and right_index is None:
+        if right_z_set is None and not right_nodes:
             right_z = np.array([elev(the_node) for the_node in right.coords]) + self.AGL
 
-        if left_index is None and right_index is None:
+        if not left_nodes and not right_nodes:
             if left_z_set is None and right_z_set is None:
                 diff_elev = left_z - right_z
                 for i, the_diff in enumerate(diff_elev):
@@ -295,31 +300,28 @@ class LinearObject(object):
         #         right_coords = left.coords[1:]
         #     else:
         #         nodes_l = np.arange(n_nodes) + obj.next_node_index()
-
-        ni = 0
-        try:
-            node0_l = obj.next_node_index()
+        
+        if not left_nodes:
+            left_nodes = np.arange(n_nodes) + obj.next_node_index()
             for i, the_node in enumerate(left.coords):
                 e = left_z[i]
                 obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 #                if abs(the_node[1]) > 50000. or abs(the_node[0]) > 50000.:
 #                    print "large node %6.0f %6.0f %i" % (the_node[0], the_node[1], self.osm_id)
                 #ac.add_label(''+str(self.osm_id), -the_node[1], e+5, -the_node[0], scale=5)
-                ni += 1
-        except AttributeError:
-            node0_l = left
 #        nodes_l = range(node0_l, node0_l + n_nodes)
 
+#        if joint:
+#            remove left.coords[0]
+#            remove left_z[0]
+
         # -- write right nodes
-        try:
-            node0_r = obj.next_node_index()
+        if not right_nodes:
+            right_nodes = np.arange(n_nodes) + obj.next_node_index()
             for i, the_node in enumerate(right.coords):
                 e = right_z[i]
                 obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 #                ac.add_label(''+str(self.osm_id), -the_node[1], e+5, -the_node[0], scale=5)
-                ni += 1
-        except AttributeError:
-            node0_r = right
 #        nodes_r = range(node0_r, node0_r + n_nodes)
 
 
@@ -331,19 +333,15 @@ class LinearObject(object):
                 # -- write face as series of quads. Works OK, but produces more
                 #    SURFs in .ac.
         scale = 30.
-        l = node0_l
-        r = node0_r
         for i in range(n_nodes-1):
             xl = self.dist[i]/scale
             xr = self.dist[i+1]/scale
-            face = [ (l,   xl, tex_y0),
-                     (l+1, xr, tex_y0),
-                     (r+1, xr, tex_y1),
-                     (r,   xl, tex_y1) ]
-            l += 1
-            r += 1
+            face = [ (left_nodes[i],    xl, tex_y0),
+                     (left_nodes[i+1],  xr, tex_y0),
+                     (right_nodes[i+1], xr, tex_y1),
+                     (right_nodes[i],   xl, tex_y1) ]
             obj.face(face[::-1])
-        return node0_l, node0_r
+        return list(left_nodes), list(right_nodes)
 
     def write_to(self, obj, elev, ac=None, left=None, right=None, z=None, 
                  offset=None):
