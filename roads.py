@@ -584,50 +584,6 @@ class Roads(objectlist.ObjectList):
             self.clusters.append(vec2d(the_object.center.centroid.coords[0]), the_object)
         #self.objects = None
         
-def create_ac(file_name, objects, center_global, elev, stg_manager):
-    """unused ATM"""    
-    ac = ac3d.Writer(tools.stats, show_labels=False)
-    
-    # -- debug: write individual .ac for every road
-    if 0:
-        for i, rd in enumerate(self.objects[:]):
-            if rd.osm_id != 205546090: continue
-            ac = ac3d.Writer(tools.stats, show_labels=False)
-            obj = ac.new_object('roads_%s' % rd.osm_id, 'tex/roads.png')
-
-            if not rd.write_to(obj, self.elev, ac): continue
-            #print "write", rd.osm_id
-            #ac.center()
-            f = open('roads_%i_%03i.ac' % (rd.osm_id, i), 'w')
-            f.write(str(ac))
-            f.close()
-        return
-    
-    # -- create ac object, then write obj to file
-    # TODO: try emis for night lighting? Didnt look too bad, and gave better range
-    # MATERIAL "" rgb 1 1 1 amb 1 1 1 emis 0.4 0.2 0.05 spec 0.5 0.5 0.5 shi 64 trans 0
-
-    path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center_global)
-    stg_fname = calc_tile.construct_stg_file_name(center_global)
-
-
-    obj = ac.new_object(file_name, 'tex/roads.png', default_swap_uv=True)
-    for rd in objects:
-        rd.write_to(obj, elev, ac)
-
-    if 0:
-        for ref in self.attached_ways_dict:
-            node = self.nodes_dict[ref]
-            x, y = self.transform.toLocal((node.lon, node.lat))
-            e = self.elev(vec2d(x, y)) + 5
-            ac.add_label('I', -y, e, -x, scale=10)
-
-    path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, 0, 0)
-    stg_manager.write()
-    ac.write_to_file(path_to_stg + file_name)
-    write_xml(path_to_stg, file_name, 'roads')
-    tools.install_files(['roads.eff'], path_to_stg)
-
 
 def write_xml(path_to_stg, file_name, object_name):
     xml = open(path_to_stg + file_name + '.xml', "w")
