@@ -95,17 +95,19 @@ class Interpolator(object):
             y = self.min.x
         return x, y
 
-    def __call__(self, p, is_global=False):
-        """compute elevation at (x,y) by linear interpolation"""
+    def __call__(self, position, is_global=False):
+        """compute elevation at (x,y) by linear interpolation
+           Work with global coordinates: x, y is in fact lon, lat.        
+        """
         if self.fake:
             return 0.
             #return x + y
         global transform
 
         if not is_global:
-            x, y = transform.toGlobal(p)
+            x, y = transform.toGlobal(position)
         else:
-            x, y = p
+            x, y = position
         
         if self.clamp:
             x, y = self._move_to_boundary(x, y)
@@ -231,6 +233,8 @@ class Probe_fgelev(object):
         global transform
         if not is_global:
             position = vec2d(transform.toGlobal(position))
+        else:
+            position = vec2d(position[0], position[1])
 
         if self._cache == None:
             return really_probe(position)
@@ -693,7 +697,10 @@ def install_files(file_list, dst):
     """link files in file_list to dst"""
     for the_file in file_list:
         print "cp %s %s" % (the_file, dst)
-        #os.link(the_file, dst)
+        try:
+            os.link(the_file, dst)
+        except OSError, reason:
+            logging.warn("Error while installing %s: %s" % (the_file, reason))
 
 def get_interpolator(**kwargs):
     if parameters.ELEV_MODE == 'FgelevCaching':
