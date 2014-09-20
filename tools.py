@@ -411,6 +411,9 @@ def raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
 
 
 def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
+    """fgelev seems to freeze every now and then, so this can be really slow.
+       Same happens when run from bash: fgelev < fgelev.in
+    """
     import subprocess
     import Queue
     fg_root = "$FG_ROOT"
@@ -427,7 +430,6 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
     fgelev = subprocess.Popen( fg_elev + ' --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     #fgelev = subprocess.Popen(["/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev", "--fg-root", "$FG_ROOT",  "--fg-scenery", "$FG_SCENERY"],  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     #time.sleep(5)
-    print "building buffer"
     buf_in = Queue.Queue(maxsize=0)
     f = open(fname, 'w')
     #f = sys.stdout
@@ -435,6 +437,9 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
     i = 0
     y_array = np.arange(y0, y0+size_y, step_y)
     x_array = np.arange(x0, x0+size_x, step_x)
+    n_total = len(x_array) * len(y_array)
+    print "building buffer %i (%i x %i)" % (n_total, len(x_array), len(y_array))
+
     for y in y_array:
         for x in x_array:
             i += 1
@@ -442,25 +447,29 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
             buf_in.put("%i %g %g\n" % (i, lon, lat))
 
 #Doesn't work on Windows. Process will block if output buffer isn't read
-#     print "sending buffer"
-#     for i in range(1000):
-#         fgelev.stdin.write(buf_in.get())
+    if 0:
+        print "sending buffer"
+        for i in range(1000):
+            fgelev.stdin.write(buf_in.get())
     start = time.time()
 
     print "reading"
     i = 0
     for y in y_array:
         for x in x_array:
+            print "done %i %3.1f %%\r" % (i, i*100/n_total),
             i += 1
             if not buf_in.empty():
-                fgelev.stdin.write(buf_in.get())
+                line = buf_in.get()
+                print line
+                fgelev.stdin.write(line)
             tmp, elev = fgelev.stdout.readline().split()
             lon, lat = transform.toGlobal((x, y))
             #f.write("%i " % i)
             f.write("%1.8f %1.8f %g %g %g\n" % (lon, lat, x, y, float(elev)))
             #if i > 10000: return
         f.write("\n")
-        print "done %3.1f %%\r" % ((y - y0)*100/size_y),
+        print "done %i %3.1f %%\r" % (i, i*100/n_total),
 
     f.close()
     end = time.time()
@@ -696,9 +705,10 @@ def init(new_transform):
 def install_files(file_list, dst):
     """link files in file_list to dst"""
     for the_file in file_list:
-        print "cp %s %s" % (the_file, dst)
+        the_dst = dst + os.sep + the_file
+        print "cp %s %s" % (the_file, the_dst)
         try:
-            os.link(the_file, dst)
+            os.link(the_file, the_dst)
         except OSError, reason:
             logging.warn("Error while installing %s: %s" % (the_file, reason))
 
