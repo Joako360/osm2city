@@ -379,6 +379,12 @@ class StreetlampWay(LineWithoutCables):
         super(StreetlampWay, self).__init__(osm_id)
         self.highway = highway
 
+    @staticmethod
+    def has_lamps(highway_type):
+        if Highway.TYPE_SLOW == highway_type:
+            return False
+        return True
+
     def calc_and_map(self, my_elev_interpolator, my_coord_transformator):
         if self.highway.is_roundabout:
             shared_pylon = SharedPylon()
@@ -390,17 +396,11 @@ class StreetlampWay(LineWithoutCables):
         else:
             model = "Models/StreetFurniture/Streetlamp2.xml"
             default_distance = parameters.C2P_STREETLAMPS_OTHER_DISTANCE
-            parallel_offset = 2.5
-            if self.highway.type_ in [Highway.TYPE_SERVICE, Highway.TYPE_RESIDENTIAL, Highway.TYPE_LIVING_STREET]:
+            parallel_offset = self.highway.get_width()/2
+            if self.highway.type_ in [Highway.TYPE_SERVICE, Highway.TYPE_RESIDENTIAL, Highway.TYPE_LIVING_STREET
+                                      , Highway.TYPE_PEDESTRIAN]:
                 model = "Models/StreetFurniture/Streetlamp1.xml"
                 default_distance = parameters.C2P_STREETLAMPS_RESIDENTIAL_DISTANCE
-            elif self.highway.type_ in [Highway.TYPE_ROAD, Highway.TYPE_UNCLASSIFIED, Highway.TYPE_TERTIARY]:
-                parallel_offset = 3.0
-            elif self.highway.type_ in [Highway.TYPE_SECONDARY, Highway.TYPE_PRIMARY, Highway.TYPE_TRUNK]:
-                parallel_offset = 3.5
-            else:  # MOTORWAY
-                parallel_offset = 7
-            # FIXME: calculate parallel_offset based on lanes
 
             self.shared_pylons = []  # list of SharedPylon
             x, y = self.highway.linear.coords[0]
@@ -925,6 +925,8 @@ def process_highways_for_streetlamps(my_highways, landuse_buffers):
     my_streetlamps = {}
     for key in my_highways.keys():
         my_highway = my_highways[key]
+        if not StreetlampWay.has_lamps(my_highway.type_):
+            continue
         is_within = False
         intersections = []
         for lu_buffer in landuse_buffers:

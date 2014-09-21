@@ -1,5 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
+"""
+TODO:
+* what to do if another valid land-use is intersecting or within another land-use
+* link places to land-uses and use in logic
+"""
 import argparse
 import logging
 import math
@@ -39,7 +45,18 @@ def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator):
     return my_buildings
 
 
-class Highway(object):
+class LinearOSMFeature(object):
+    def __init__(self, osm_id):
+        self.osm_id = osm_id
+        self.type_ = 0
+        self.linear = None  # The LinearString of the line
+
+    def get_width(self):
+        """The width incl. border as a float in meters"""
+        raise NotImplementedError("Please Implement this method")
+
+
+class Highway(LinearOSMFeature):
     TYPE_MOTORWAY = 11
     TYPE_TRUNK = 12
     TYPE_PRIMARY = 13
@@ -50,12 +67,25 @@ class Highway(object):
     TYPE_RESIDENTIAL = 18
     TYPE_LIVING_STREET = 19
     TYPE_SERVICE = 20
+    TYPE_PEDESTRIAN = 21
+    TYPE_SLOW = 30  # cycle ways, tracks, footpaths etc
 
     def __init__(self, osm_id):
-        self.osm_id = osm_id
-        self.type_ = 0
-        self.linear = None  # The LinearString of the line
+        super(Highway, self).__init__(osm_id)
         self.is_roundabout = False
+
+    def get_width(self):  # FIXME: replace with parameters and a bit of logic including number of lanes
+        my_width = 3.0  # TYPE_SLOW
+        if self.type_ in [Highway.TYPE_SERVICE, Highway.TYPE_RESIDENTIAL, Highway.TYPE_LIVING_STREET
+                          , Highway.TYPE_PEDESTRIAN]:
+            my_width = 5.0
+        elif self.type_ in [Highway.TYPE_ROAD, Highway.TYPE_UNCLASSIFIED, Highway.TYPE_TERTIARY]:
+            my_width = 6.0
+        elif self.type_ in [Highway.TYPE_SECONDARY, Highway.TYPE_PRIMARY, Highway.TYPE_TRUNK]:
+            my_width = 7.0
+        else:  # MOTORWAY
+            my_width = 14.0
+        return my_width
 
 
 def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
@@ -89,6 +119,10 @@ def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
                     my_highway.type_ = Highway.TYPE_LIVING_STREET
                 elif value == "service":
                     my_highway.type_ = Highway.TYPE_SERVICE
+                elif value == "pedestrian":
+                    my_highway.type_ = Highway.TYPE_PEDESTRIAN
+                elif value in ["tack", "footway", "cycleway", "bridleway", "steps", "path"]:
+                    my_highway.type_ = Highway.TYPE_SLOW
                 else:
                     valid_highway = False
             elif ("tunnel" == key) and ("yes" == value):
@@ -110,6 +144,92 @@ def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
     return my_highways
 
 
+class Railway(LinearOSMFeature):
+    """FIXME: should be merged with osm2pylon.Railway"""
+
+    def __init__(self, osm_id):
+        super(Railway, self).__init__(osm_id)
+
+    def get_width(self):  # FIXME: replace with parameters and a bit of logic
+        return 6.0
+
+
+def process_osm_railway(nodes_dict, ways_dict, my_coord_transformator):
+    my_railways = {}  # osm_id as key, Railway as value
+
+    for way in ways_dict.values():
+        valid_railway = False
+        is_challenged = False
+        my_railway = Railway(way.osm_id)
+        for key in way.tags:
+            value = way.tags[key]
+            if "railway" == key:
+                if value in ["abandoned", "construction", "disused", "funicular", "light_rail", "monorail"
+                             , "narrow_gauge", "preserved", "rail", "subway"]:
+                    valid_railway = True
+            elif ("tunnel" == key) and ("yes" == value):
+                is_challenged = True
+        if valid_railway and not is_challenged:
+            # Process the Nodes
+            my_coordinates = []
+            for ref in way.refs:
+                if ref in nodes_dict:
+                    my_node = nodes_dict[ref]
+                    x, y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
+                    my_coordinates.append((x, y))
+            if len(my_coordinates) >= 2:
+                my_railway.linear = LineString(my_coordinates)
+                my_railways[way.osm_id] = my_railway
+
+    return my_railways
+
+
+class Waterway(LinearOSMFeature):
+    TYPE_LARGE = 10
+    TYPE_NARROW = 20
+
+    def __init__(self, osm_id):
+        super(Waterway, self).__init__(osm_id)
+
+    def get_width(self):  # FIXME: replace with parameters
+        if self.type_ == Waterway.TYPE_LARGE:
+            return 15.0
+        return 5.0
+
+
+def process_osm_waterway(nodes_dict, ways_dict, my_coord_transformator):
+    my_waterways = {}  # osm_id as key, Waterway as value
+
+    for way in ways_dict.values():
+        my_waterway = Waterway(way.osm_id)
+        valid_waterway = False
+        is_challenged = False
+        for key in way.tags:
+            value = way.tags[key]
+            if "waterway" == key:
+                if value in ["river", "canal"]:
+                    valid_waterway = True
+                    my_waterway.type_ = Waterway.TYPE_LARGE
+                elif value in ["stream", "wadi", "drain", "ditch"]:
+                    valid_waterway = True
+                    my_waterway.type_ = Waterway.TYPE_NARROW
+            elif ("tunnel" == key) and ("culvert" == value):
+                is_challenged = True
+        if valid_waterway and not is_challenged:
+            # Process the Nodes
+            my_coordinates = []
+            for ref in way.refs:
+                if ref in nodes_dict:
+                    my_node = nodes_dict[ref]
+                    x, y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
+                    my_coordinates.append((x, y))
+            if len(my_coordinates) >= 2:
+                my_waterway.linear = LineString(my_coordinates)
+                my_waterways[way.osm_id] = my_waterway
+
+    return my_waterways
+
+
 class Landuse(object):
     TYPE_COMMERCIAL = 10
     TYPE_INDUSTRIAL = 20
@@ -120,8 +240,11 @@ class Landuse(object):
     def __init__(self, osm_id):
         self.osm_id = osm_id
         self.type_ = 0
-        self.polygon = None
-        self.number_of_buildings = 0
+        self.polygon = None  # the polygon defining its outer boundary
+        self.number_of_buildings = 0  # only set for generated TYPE_NON_OSM land-uses during generation
+        self.linked_highways = None  # Array of Highways
+        self.linked_blocked_areas = None  # Array of Polygons for blocked areas. E.g.
+                                          # open-space, existing building, static objects, *-buffers
 
 
 class Place(object):
@@ -426,10 +549,8 @@ def plot_line(ax, ob, my_color, my_width):
     ax.plot(x, y, color=my_color, alpha=0.7, linewidth=my_width, solid_capstyle='round', zorder=2)
 
 
-def draw_polygons(highways, open_spaces, buildings, land_uses, static_obj_boxes, my_transformator):
-    cmin = my_transformator.toLocal(vec2d.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH))
-    cmax = my_transformator.toLocal(vec2d.vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH))
-
+def draw_polygons(highways, open_spaces, buildings, land_uses, static_obj_boxes
+                  , x_min, y_min, x_max, y_max):
     # Create a matplotlib figure
     my_figure = pyplot.figure(num=1, figsize=(16, 10), dpi=90)
 
@@ -471,11 +592,17 @@ def draw_polygons(highways, open_spaces, buildings, land_uses, static_obj_boxes,
 
 
     # Fit the figure around the polygons, bounds, render, and show
-    w, h = cmax[0] - cmin[0], cmax[1] - cmin[1]
-    ax.set_xlim(cmin[0] - 0.2*w, cmax[0] + 0.2*w)
-    ax.set_ylim(cmin[1] - 0.2*h, cmax[1] + 0.2*h)
+    w, h = x_max - x_min, y_max - y_min
+    ax.set_xlim(x_min - 0.2*w, x_max + 0.2*w)
+    ax.set_ylim(y_min - 0.2*h, y_max + 0.2*h)
     ax.set_aspect(1)
     pyplot.show()
+
+
+def generate_extra_buildings(building_refs, static_obj_boxes, landuse_refs, places_refs, open_spaces
+                             , highways, railways, waterways, x_min, y_min, x_max, y_max):
+    draw_polygons(highways, open_spaces, building_refs, landuse_refs, static_obj_boxes, x_min, y_min, x_max, y_max)
+    i = 0
 
 
 def main():
@@ -496,20 +623,22 @@ def main():
     logging.info("Transforming OSM data to Line and Pylon objects")
     # the lists below are in sequence: buildings references, power/aerialway, railway overhead, landuse and highway
     valid_node_keys = ["place", "population"]
-    valid_way_keys = ["building", "landuse", "place", "population", "highway", "junction"
-                      , "leisure", "natural", "public_transport", "amenity", "area", "parking"]
+    valid_way_keys = ["building", "landuse", "place", "population", "highway", "junction", "tunnel"
+                      , "leisure", "natural", "public_transport", "amenity", "area", "parking"
+                      , "railway", "waterway"]
     valid_relation_keys = []
     req_relation_keys = []
     req_way_keys = ["building", "landuse", "place", "highway"
-                    , "leisure", "natural", "public_transport", "amenity"]
+                    , "leisure", "natural", "public_transport", "amenity"
+                    , "railway", "waterway"]
     handler = osmparser_wrapper.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
                                                   req_relation_keys)
     source = open(osm_fname)
     xml.sax.parse(source, handler)
     # References for buildings
-    building_refs = {}
     building_refs = process_osm_building_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
     logging.info('Number of reference buildings: %s', len(building_refs))
+    static_obj_boxes = create_static_obj_boxes(coord_transformator)
     landuse_refs = process_osm_landuse_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
     generated_landuses = generate_landuse_from_buildings(landuse_refs, building_refs)
     for generated in generated_landuses.values():
@@ -518,10 +647,15 @@ def main():
     places_refs = process_osm_place_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
     highways = process_osm_highway(handler.nodes_dict, handler.ways_dict, coord_transformator)
     open_spaces = process_osm_openspaces_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
+    railways = process_osm_railway(handler.nodes_dict, handler.ways_dict, coord_transformator)
+    waterways = process_osm_waterway(handler.nodes_dict, handler.ways_dict, coord_transformator)
 
-    boxes = create_static_obj_boxes(coord_transformator)
-    draw_polygons(highways, open_spaces, building_refs, landuse_refs, boxes, coord_transformator)
-    i = 0
+    cmin = coord_transformator.toLocal(vec2d.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH))
+    cmax = coord_transformator.toLocal(vec2d.vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH))
+
+    generate_extra_buildings(building_refs, static_obj_boxes, landuse_refs, places_refs, open_spaces
+                             , highways, railways, waterways
+                             , cmin[0], cmin[1], cmax[0], cmax[1])
 
 if __name__ == "__main__":
     main()
@@ -547,3 +681,83 @@ class TestExtraBuildings(unittest.TestCase):
         boundary = extract_boundary(ac_lines)
         self.assertEqual(-2.0, boundary[0], "x_min")
         self.assertEqual(4, boundary[3], "y_max")
+
+    def test_extra_building_generation(self):
+        highways = {}
+        # Create the streets
+        linear = LineString([(60, 270), (100, 270)])
+        my_highway = Highway(1)
+        my_highway.linear = linear
+        my_highway.type_ = Highway.TYPE_RESIDENTIAL
+        highways[my_highway.osm_id] = my_highway
+        linear = LineString([(40, 270), (40, 230)])
+        my_highway = Highway(2)
+        my_highway.linear = linear
+        my_highway.type_ = Highway.TYPE_RESIDENTIAL
+        highways[my_highway.osm_id] = my_highway
+        linear = LineString([(80, 250), (80, 150)])
+        my_highway = Highway(3)
+        my_highway.linear = linear
+        my_highway.type_ = Highway.TYPE_RESIDENTIAL
+        highways[my_highway.osm_id] = my_highway
+        linear = LineString([(0, 180), (170, 180)])
+        my_highway = Highway(4)
+        my_highway.linear = linear
+        my_highway.type_ = Highway.TYPE_RESIDENTIAL
+        highways[my_highway.osm_id] = my_highway
+        linear = LineString([(80, 150), (70, 140), (80, 130), (90, 140), (80, 150)])
+        my_highway = Highway(5)
+        my_highway.linear = linear
+        my_highway.type_ = Highway.TYPE_RESIDENTIAL
+        my_highway.is_roundabout = True
+        highways[my_highway.osm_id] = my_highway
+        linear = LineString([(90, 140), (110, 140), (130, 120), (130, 100), (110, 80), (110, 60), (130, 40), (150, 60), (190, 60)])
+        my_highway = Highway(6)
+        my_highway.linear = linear
+        my_highway.type_ = Highway.TYPE_RESIDENTIAL
+        highways[my_highway.osm_id] = my_highway
+        linear = LineString([(50, 80), (50, 120)])
+        my_highway = Highway(7)
+        my_highway.linear = linear
+        my_highway.type_ = Highway.TYPE_RESIDENTIAL
+        highways[my_highway.osm_id] = my_highway
+        linear = LineString([(70, 20), (100, 20)])
+        my_highway = Highway(8)
+        my_highway.linear = linear
+        my_highway.type_ = Highway.TYPE_RESIDENTIAL
+        highways[my_highway.osm_id] = my_highway
+        # railways
+        railways = {}
+        linear = LineString([(140, 250), (140, 200), (200, 200)])
+        my_rail = Railway(11)
+        my_rail.linear = linear
+        railways[my_rail.osm_id] = my_rail
+        # waterways
+        waterways = {}
+        linear = LineString([(150, 250), (150, 140)])
+        my_water = Waterway(21)
+        my_water.linear = linear
+        my_water.type_ = Waterway.TYPE_NARROW
+        waterways[my_water.osm_id] = my_water
+        # buildings
+        building_refs = {}
+        polygon = Polygon([(90, 200), (90, 190), (100, 190), (100, 200), (90, 200)])
+        building_refs[100] = polygon
+        polygon = Polygon([(80, 250), (80, 240), (90, 240), (90, 250), (80, 250)])
+        building_refs[101] = polygon
+        # static object boxes
+        static_obj_boxes = [box(50, 160, 70, 180)]
+        # open spaces
+        open_spaces = {500: Polygon([(30, 100), (50, 100), (50, 120), (30, 120), (30, 100)])}
+        # land-uses
+        landuse_refs = {}
+        polygon = box(20, 20, 170, 230)
+        my_lu = Landuse(1000)
+        my_lu.type_ = Landuse.TYPE_RESIDENTIAL
+        my_lu.polygon = polygon
+        landuse_refs[my_lu.osm_id] = my_lu
+        generate_extra_buildings(building_refs, static_obj_boxes, landuse_refs, None, open_spaces
+                                 , highways, railways, waterways
+                                 , 0, 0, 200, 280)
+
+
