@@ -230,8 +230,8 @@ class Roads(objectlist.ObjectList):
                 access = 'yes'
     
             width = 9
-            tex_y0 = 0.5
-            tex_y1 = 0.75
+            tex_y0 = 2/8.
+            tex_y1 = 3/8.
             AGL_ofs = 1.0 + random.uniform(0.01, 0.1)
             AGL_ofs = 0.05
             #if way.tags.has_key('layer'):
@@ -246,11 +246,11 @@ class Roads(objectlist.ObjectList):
                     prio = 6
                     width = 2.87
                     tex_y0 = 0
-                    tex_y1 = 0.25
+                    tex_y1 = 1/8.
     
             if prio in [1, 2]:
-                tex_y0 = 0.25
-                tex_y1 = 0.5
+                tex_y0 = 1/8.
+                tex_y1 = 2/8.
                 width=6
     
             #if prio != 1: prio = None  

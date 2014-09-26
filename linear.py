@@ -368,9 +368,9 @@ class LinearObject(object):
         if h_add is not None:
             if h_add.max() > 0.1:
                 self._write_to(obj, elev, elev_offset, right, self.edge[1],
-                               1, 0.75, ac=ac, offset=offset)
-                self._write_to(obj, elev, elev_offset, self.edge[1], left,
-                               0.75, 1, ac=ac, offset=offset)
+                               4/8., 5/8., ac=ac, offset=offset)
+                self._write_to(obj, elev, elev_offset, self.edge[0], left,
+                               4/8., 5/8., ac=ac, offset=offset)
         return True
         # options:
         # - each way has two ends.

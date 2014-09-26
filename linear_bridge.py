@@ -176,10 +176,10 @@ class LinearBridge(linear.LinearObject):
 
         # -- right
         tmp, node0_r2, h_add = self._write_to(obj, elev, elev_offset, node0_r, right2,
-                                       1, 0.75, right_z_set=z-3, ac=ac, offset=offset)
+                                       4/8., 3/8., right_z_set=z-3, ac=ac, offset=offset)
         # left
         node0_l2, tmp, h_add = self._write_to(obj, elev, elev_offset, left2, node0_l,
-                                       0.75, 1, left_z_set=z-3, ac=ac, offset=offset)
+                                       3/8., 4/8., left_z_set=z-3, ac=ac, offset=offset)
         # -- bottom
         self._write_to(obj, elev, elev_offset, node0_r2, node0_l2, 0.9, 1, ac=ac, n_nodes=n_nodes, offset=offset)
 
