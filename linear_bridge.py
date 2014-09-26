@@ -108,6 +108,7 @@ class LinearBridge(linear.LinearObject):
 
         node0 = nodes_dict[self.refs[0]]
         node1 = nodes_dict[self.refs[-1]]
+        
         if node0.h_add != 0:
             node0.h_add = 0.5*(node0.h_add + h_add)
         else:
@@ -119,6 +120,13 @@ class LinearBridge(linear.LinearObject):
             node1.h_add = h_add
 #        if self.D(0.5) - hm < min_height:
 #            self.D = Deck_shape_poly(h0, hm+min_height, h1)
+
+        if self.osm_id == 126452863:
+            print "hj", node0.h_add, node1.h_add
+
+#        node0.h_add = h_add
+#        node1.h_add = h_add
+
 
         if 0:
             plt.clf()

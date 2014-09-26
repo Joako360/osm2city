@@ -186,6 +186,9 @@ class LinearObject(object):
         if "tunnel" in self.tags: 
             return
 
+        if self.osm_id == 126452864:
+            print "h"
+
         if not offset:
             offset = vec2d(0,0)            
             
@@ -205,6 +208,7 @@ class LinearObject(object):
 
         first_node = self.nodes_dict[self.refs[0]]
         last_node = self.nodes_dict[self.refs[-1]]
+                
         # -- elevated road. Got h_add data for first and last node. Now lift intermediate
         #    nodes. So far, h_add is for centerline only.
         # FIXME: when do we need this? if left_z_set is None and right_z_set is None?
@@ -273,16 +277,24 @@ class LinearObject(object):
             if left_z_set is None and right_z_set is None:
                 diff_elev = left_z - right_z
                 for i, the_diff in enumerate(diff_elev):
-                    # -- h_add larger than terrain gradient
-                    if h_add[i] > the_diff/2:
-                         left_z[i]  += (h_add[i] - the_diff/2)
-                         right_z[i] += (h_add[i] + the_diff/2)
+                    # -- h_add larger than terrain gradient:
+                    #    terrain gradient doesnt matter, just create level road at h_add
+                    if h_add[i] > abs(the_diff/2.):
+                         left_z[i]  += (h_add[i] - the_diff/2.)
+                         right_z[i] += (h_add[i] + the_diff/2.)
                     else:
-                        # there might be a small h_add. 
+                        # h_add smaller than terrain gradient. 
+                        # In case terrain gradient is significant, create level
+                        # road which is then higher than h_add anyway.
+                        # Otherwise, create sloped road and ignore h_add.
+                        # FIXME: is this a bug?
                         if the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT: #  left > right
-                            right_z[i] += the_diff
-                        elif - the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT: # right > left
-                            left_z[i] += - the_diff
+                            right_z[i] += the_diff  # dirty
+                        elif -the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT: # right > left
+                            left_z[i] += - the_diff # dirty
+                        else:
+                            # terrain gradient negligible and h_add small
+                            pass
 
         if left_z_set is not None: left_z = left_z_set
         if right_z_set is not None: right_z = right_z_set
@@ -291,7 +303,7 @@ class LinearObject(object):
         #   right_h_add = diff
         # elif diff / self.width < -max_grad:  #   right > left
         #   left_h_add = -diff
-        
+
 
         # -- write left nodes
         # left_coords = left.coords
@@ -309,12 +321,8 @@ class LinearObject(object):
                 obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 #                if abs(the_node[1]) > 50000. or abs(the_node[0]) > 50000.:
 #                    print "large node %6.0f %6.0f %i" % (the_node[0], the_node[1], self.osm_id)
-                #ac.add_label(''+str(self.osm_id), -the_node[1], e+5, -the_node[0], scale=5)
+#            ac.add_label(''+str(self.osm_id), -the_node[1], e+5, -the_node[0], scale=5)
 #        nodes_l = range(node0_l, node0_l + n_nodes)
-
-#        if joint:
-#            remove left.coords[0]
-#            remove left_z[0]
 
         # -- write right nodes
         if not right_nodes:
@@ -325,6 +333,10 @@ class LinearObject(object):
 #                ac.add_label(''+str(self.osm_id), -the_node[1], e+5, -the_node[0], scale=5)
 #        nodes_r = range(node0_r, node0_r + n_nodes)
 
+
+#        if joint:
+#            remove left.coords[0]
+#            remove left_z[0]
 
         # make left node index list
         # write right nodes
