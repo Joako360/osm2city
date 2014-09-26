@@ -184,7 +184,7 @@ class LinearObject(object):
         """
 
         if "tunnel" in self.tags: 
-            return
+            return None, None, None
 
         if self.osm_id == 126452864:
             print "h"
@@ -354,7 +354,7 @@ class LinearObject(object):
                      (right_nodes[i+1], xr, tex_y1),
                      (right_nodes[i],   xl, tex_y1) ]
             obj.face(face[::-1])
-        return list(left_nodes), list(right_nodes)
+        return list(left_nodes), list(right_nodes), h_add
 
     def write_to(self, obj, elev, elev_offset, ac=None, left=None, right=None, z=None, 
                  offset=None):
@@ -363,8 +363,14 @@ class LinearObject(object):
            right:
            offset accounts for tile center
         """
-        self._write_to(obj, elev, elev_offset, self.edge[0], self.edge[1],
+        left, right, h_add = self._write_to(obj, elev, elev_offset, self.edge[0], self.edge[1],
                        self.tex_y0, self.tex_y1, ac=ac, offset=offset)
+        if h_add is not None:
+            if h_add.max() > 0.1:
+                self._write_to(obj, elev, elev_offset, right, self.edge[1],
+                               1, 0.75, ac=ac, offset=offset)
+                self._write_to(obj, elev, elev_offset, self.edge[1], left,
+                               0.75, 1, ac=ac, offset=offset)
         return True
         # options:
         # - each way has two ends.
