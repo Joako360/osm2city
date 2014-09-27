@@ -186,7 +186,7 @@ class LinearObject(object):
         if "tunnel" in self.tags: 
             return None, None, None
 
-        if self.osm_id == 126452864:
+        if self.osm_id == 204383381:
             print "h"
 
         if not offset:
@@ -212,15 +212,34 @@ class LinearObject(object):
         # -- elevated road. Got h_add data for first and last node. Now lift intermediate
         #    nodes. So far, h_add is for centerline only.
         # FIXME: when do we need this? if left_z_set is None and right_z_set is None?
+        center_z = np.array([elev(the_node) for the_node in self.center.coords])  + self.AGL
+
+        EPS = 0.001
+
         h_add_0 = first_node.h_add
         h_add_1 = last_node.h_add
         dh_dx = max_slope_for_road(self)
-        if h_add_0 == 0 and h_add_1 > 0:
+
+        if h_add_0 <= EPS and h_add_1 <= EPS:
+            h_add = np.zeros(n_nodes)
+        elif h_add_0 <= EPS:
             h_add = np.array([max(0, h_add_1 - (self.dist[-1] - self.dist[i]) * dh_dx) for i in range(n_nodes)])
-        elif h_add_0 > 0 and h_add_1 == 0:
+        elif h_add_1 <= EPS:
             h_add = np.array([max(0, h_add_0 - self.dist[i] * dh_dx) for i in range(n_nodes)])
         else:
-            h_add = np.array([max(0, h_add_0 + (h_add_1 - h_add_0) * self.dist[i]/self.dist[-1]) for i in range(n_nodes)])
+            #actual_slope = 
+#            h_add = np.array([max(0, h_add_0 + (h_add_1 - h_add_0) * self.dist[i]/self.dist[-1]) for i in range(n_nodes)])
+            h_add = np.zeros(n_nodes)
+            for i in range(n_nodes):
+                h_add[i] = max(0, h_add_0 - self.dist[i] * dh_dx - (center_z[i] - center_z[0]))
+                if h_add[i] < 0.001:
+                    break
+            for i in range(n_nodes)[::-1]:
+                other_h_add = h_add[i]
+                h_add[i] = max(0, h_add_1 - (self.dist[-1] - self.dist[i]) * dh_dx - (center_z[i] - center_z[-1]))
+                if other_h_add > h_add[i]:
+                    h_add[i] = other_h_add
+                    break
 
         # -- get elev
         if left_z_set is not None:

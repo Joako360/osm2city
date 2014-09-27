@@ -77,6 +77,8 @@ import os
 import ac3d
 from linear import LinearObject, max_slope_for_road
 from linear_bridge import LinearBridge
+import shapely.geometry as shg
+
 
 import logging
 import osmparser
@@ -100,6 +102,9 @@ OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 # -----------------------------------------------------------------------------
 def no_transform((x, y)):
     return x, y
+    
+def is_bridge(way):
+    return "bridge" in  way.tags
 
 class Roads(objectlist.ObjectList):
     valid_node_keys = []
@@ -167,14 +172,16 @@ class Roads(objectlist.ObjectList):
             the_node.MSL = self.elev((the_node.lon, the_node.lat), is_global=True)
             the_node.h_add = 0.
     
+#    def my_bfs():
+        
     
     def propagate_h_add(self):
         """start at bridges, propagate h_add through nodes"""
         for the_bridge in self.bridges_list:
-            if the_bridge.osm_id == 126452863:
+            if the_bridge.osm_id == 240409294:
 #                print "here"
                 label=True
-                continue
+#                continue
             else:
                 label=False
             # build tree starting at node0
@@ -185,7 +192,7 @@ class Roads(objectlist.ObjectList):
 
             for ref0, ref1 in nx.bfs_edges(self.G, node0):
                 obj = self.G[ref0][ref1]['obj']
-                dh_dx = max_slope_for_road(obj) 
+                dh_dx = max_slope_for_road(obj)
                 n0 = self.nodes_dict[ref0]
                 n1 = self.nodes_dict[ref1]
                 if n1.h_add > 0:
@@ -196,6 +203,7 @@ class Roads(objectlist.ObjectList):
                 if label: self.debug_label_node(ref1, n1.h_add)
                 if n1.h_add <= 0.:
                     break
+            #here: can't just stop once ONE hits zero. Must complete full breadth.
 
             for ref0, ref1 in nx.bfs_edges(self.G, node1):
                 obj = self.G[ref0][ref1]['obj']
@@ -219,6 +227,78 @@ class Roads(objectlist.ObjectList):
             #   bla
             # same with node1
             self.G.add_edge(node0, node1, obj=the_bridge)
+
+    def build_graph(self, source_iterable):
+        self.G=nx.Graph()
+        for the_way in source_iterable:
+            self.G.add_edge(the_way.refs[0], the_way.refs[-1], obj=the_way)
+
+    def split_long_roads_between_bridges(self):
+        """Split long roads between bridges."""
+
+        def find_edges(node0):
+            """start at given node, find next-to-next edge. If that is a bridge, add to list"""
+            N1 = nx.all_neighbors(self.G, node0)
+            new_ways_to_split = []
+            for node1 in N1:
+                N2 = nx.all_neighbors(self.G, node1)
+                for node2 in N2:
+                    if node2 == node0: continue
+                    obj = self.G[node1][node2]['obj'] 
+                    if is_bridge(obj):
+                        obj = self.G[node0][node1]['obj']
+                        new_ways_to_split.append(obj)
+                        break
+            return new_ways_to_split
+
+        ways_to_split = set()
+        for the_way in self.ways_list:
+            if not is_bridge(the_way): continue
+            if the_way.osm_id == 24797900:
+                pass
+#            if the_bridge.osm_id == 126452863:
+##                print "here"
+#                label=True
+#                continue
+#            else:
+#                label=False
+            # take out bridge edge
+            bridge_node0 = the_way.refs[0]
+            bridge_node1 = the_way.refs[-1]
+            self.G.remove_edge(bridge_node0, bridge_node1)
+            a = find_edges(bridge_node0)
+            [ways_to_split.add(i) for i in a]
+            a = find_edges(bridge_node1)
+            [ways_to_split.add(i) for i in a]
+            self.G.add_edge(bridge_node0, bridge_node1, obj=the_way)
+
+#        print edges_to_split
+        
+        for the_way in ways_to_split:
+            # if linearObject:
+            if the_way.osm_id == 6268548:
+                bla
+            if 0:            
+                osm_nodes = [self.nodes_dict[r] for r in the_way.refs]
+                nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
+                n = len(nodes)
+                for i in range(n-1):
+                    dx, dy = nodes[n+1] - nodes[n]
+                    bla
+#                split_index = 
+            else:
+                n = len(the_way.refs)
+                if n < 3: continue
+                split_index = n/2
+                
+            self.ways_list.remove(the_way)
+            self.G.remove_edge(the_way.refs[0], the_way.refs[-1])
+            new_way1 = self.init_way_from_existing(the_way, the_way.refs[:split_index+1])
+            new_way2 = self.init_way_from_existing(the_way, the_way.refs[split_index:])
+            self.ways_list += [new_way1, new_way2]
+            self.G.add_edge(new_way1.refs[0], new_way1.refs[-1], obj=new_way1)
+            self.G.add_edge(new_way2.refs[0], new_way2.refs[-1], obj=new_way2)
+
     
     def create_linear_objects(self):
         self.G=nx.Graph()
@@ -264,8 +344,7 @@ class Roads(objectlist.ObjectList):
                 continue
     
             #print "(accepted)"
-            is_bridge = "bridge" in the_way.tags
-            if is_bridge:
+            if is_bridge(the_way):
                 obj = LinearBridge(self.transform, self.elev, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
                 self.bridges_list.append(obj)
             else:
@@ -370,7 +449,17 @@ class Roads(objectlist.ObjectList):
         for i, v in enumerate(num):
             print i, v
 
-    def split_ways(self):
+    def init_way_from_existing(self, way, ref):
+        """return copy of way. The copy will have same osm_id and tags, but only given refs"""
+        new_way = osmparser.Way(way.osm_id)
+        new_way.tags = way.tags
+        try:
+            new_way.refs += ref
+        except TypeError:
+            new_way.refs.append(ref)
+        return new_way
+        
+    def split_ways_at_inner_junctions(self):
         """split ways such that none of the interiour nodes are junctions.
            I.e., each way object connects to at most two junctions.
         """
@@ -387,25 +476,18 @@ class Roads(objectlist.ObjectList):
             #    if the_ref in self.attached_ways_dict:
             #        plt.plot(self.nodes_dict[the_ref].lon, self.nodes_dict[the_ref].lat, 'rx')
 
-        def init_from_existing(way, ref):
-            """return copy of way. The copy will have same osm_id and tags, but only given refs"""
-            new_way = osmparser.Way(way.osm_id)
-            new_way.tags = way.tags
-            new_way.refs.append(ref)
-            return new_way
-
         new_list = []
         for the_way in self.ways_list:
             self.debug_plot_way(the_way, '-', lw=2, color='0.90', show_label=0)
 #            self.ways_list.remove(the_way)
 
-            new_way = init_from_existing(the_way, the_way.refs[0])
+            new_way = self.init_way_from_existing(the_way, the_way.refs[0])
             for the_ref in the_way.refs[1:]:
                 new_way.refs.append(the_ref)
                 if the_ref in self.attached_ways_dict:
                     new_list.append(new_way)
                     self.debug_plot_way(new_way, '-', lw=1, mark_nodes=0)
-                    new_way = init_from_existing(the_way, the_ref)
+                    new_way = self.init_way_from_existing(the_way, the_ref)
             if the_ref not in self.attached_ways_dict: # FIXME: store previous test?
                 new_list.append(new_way)
                 self.debug_plot_way(new_way, '--', lw=1, mark_nodes=0)
@@ -608,18 +690,20 @@ class Roads(objectlist.ObjectList):
         file_name = "labels"
 #        ac3d_obj = ac.new_object(file_name, '', default_swap_uv=True)
         
-        for way in self.bridges_list:
+
+        for way in self.bridges_list + self.roads_list:
             the_node = self.nodes_dict[way.refs[0]]
             anchor = vec2d(self.transform.toLocal(vec2d(the_node.lon, the_node.lat)))
-            anchor.x += random.uniform(-1,1)
-            e = self.elev(anchor) + 20.
-            ac.add_label('   ' + str(the_node.osm_id) + " h="+str(the_node.h_add), -anchor.y, e, -anchor.x, scale=2)
+#            anchor.x += random.uniform(-1,1)
+            e = self.elev(anchor) + the_node.h_add + 3.
+            ac.add_label(' %i h=%1.1f' % (the_node.osm_id, the_node.h_add), -anchor.y, e, -anchor.x, scale=1.)
 
-            the_node = self.nodes_dict[way.refs[-1]]
-            anchor = vec2d(self.transform.toLocal(vec2d(the_node.lon, the_node.lat)))
-            anchor.x += random.uniform(-1,1)
-            e = self.elev(anchor)
-            ac.add_label('   ' + str(the_node.osm_id) + " h="+str(the_node.h_add), -anchor.y, e, -anchor.x, scale=2)
+            if 1:
+                the_node = self.nodes_dict[way.refs[-1]]
+                anchor = vec2d(self.transform.toLocal(vec2d(the_node.lon, the_node.lat)))
+#                anchor.x += random.uniform(-1,1)
+                e = self.elev(anchor) + the_node.h_add + 3.
+                ac.add_label(' %i h=%1.1f' % (the_node.osm_id, the_node.h_add), -anchor.y, e, -anchor.x, scale=1.)
 #            bla            
         path_to_stg = stg_manager.add_object_static(file_name + '.ac', vec2d(self.transform.toGlobal((0,0))), 0, 0)
         ac.write_to_file(path_to_stg + file_name)
@@ -780,7 +864,7 @@ def main():
         roads.find_junctions(roads.ways_list)
         #roads.debug_plot_junctions('ks')
         #roads.count_inner_junctions('bs')
-        roads.split_ways()
+        roads.split_ways_at_inner_junctions()
         roads.find_junctions(roads.ways_list, 3)
 #        roads.print_junctions_stats()
         plt.clf()
@@ -794,12 +878,14 @@ def main():
         logging.debug("len after %i" % len(roads.ways_list))
 
     roads.probe_elev_at_nodes()
+#    roads.build_graph(roads.ways_list)
+#    roads.split_long_roads_between_bridges()
     roads.create_linear_objects()
-    roads.debug_test()
+#    roads.debug_test()
     roads.join_degree2_junctions()
-    roads.debug_test()
+#    roads.debug_test()
     roads.propagate_h_add()
-    roads.debug_test()
+#    roads.debug_test()
 #    roads.debug_plot(show=True, plot_junctions=True)#, label_nodes=[1132288594, 1132288612])
 #    print "before", len(roads.attached_ways_dict)
 
