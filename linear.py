@@ -214,10 +214,11 @@ class LinearObject(object):
         # FIXME: when do we need this? if left_z_set is None and right_z_set is None?
         h_add_0 = first_node.h_add
         h_add_1 = last_node.h_add
+        dh_dx = max_slope_for_road(self)
         if h_add_0 == 0 and h_add_1 > 0:
-            h_add = np.array([max(0, h_add_1 - (self.dist[-1] - self.dist[i]) * parameters.DH_DX) for i in range(n_nodes)])
+            h_add = np.array([max(0, h_add_1 - (self.dist[-1] - self.dist[i]) * dh_dx) for i in range(n_nodes)])
         elif h_add_0 > 0 and h_add_1 == 0:
-            h_add = np.array([max(0, h_add_0 - self.dist[i] * parameters.DH_DX) for i in range(n_nodes)])
+            h_add = np.array([max(0, h_add_0 - self.dist[i] * dh_dx) for i in range(n_nodes)])
         else:
             h_add = np.array([max(0, h_add_0 + (h_add_1 - h_add_0) * self.dist[i]/self.dist[-1]) for i in range(n_nodes)])
 
@@ -469,6 +470,13 @@ class LinearObject(object):
             print "error in osm_id", self.osm_id
 
         return True
+        
+def max_slope_for_road(obj): 
+    if obj.tags['highway'] in ['motorway']:
+        return parameters.MAX_SLOPE_HIGHWAY
+    else:
+        return parameters.MAX_SLOPE_ROAD
+
 
 def main():
     ac = ac3d.Writer(tools.stats)

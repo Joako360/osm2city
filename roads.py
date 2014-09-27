@@ -75,7 +75,7 @@ import math
 import calc_tile
 import os
 import ac3d
-from linear import LinearObject
+from linear import LinearObject, max_slope_for_road
 from linear_bridge import LinearBridge
 
 import logging
@@ -167,6 +167,7 @@ class Roads(objectlist.ObjectList):
             the_node.MSL = self.elev((the_node.lon, the_node.lat), is_global=True)
             the_node.h_add = 0.
     
+    
     def propagate_h_add(self):
         """start at bridges, propagate h_add through nodes"""
         for the_bridge in self.bridges_list:
@@ -182,29 +183,29 @@ class Roads(objectlist.ObjectList):
             node1 = the_bridge.refs[-1]
             self.G.remove_edge(node0, node1)
 
-
             for ref0, ref1 in nx.bfs_edges(self.G, node0):
                 obj = self.G[ref0][ref1]['obj']
-
+                dh_dx = max_slope_for_road(obj) 
                 n0 = self.nodes_dict[ref0]
                 n1 = self.nodes_dict[ref1]
                 if n1.h_add > 0:
                     break
                 if label: self.debug_label_node(ref0, n0.h_add)
                 #n1.h_add = max(0, n0.h_add - obj.center.length * parameters.DH_DX)
-                n1.h_add = max(0, n0.MSL + n0.h_add - obj.center.length * parameters.DH_DX - n1.MSL)
+                n1.h_add = max(0, n0.MSL + n0.h_add - obj.center.length * dh_dx - n1.MSL)
                 if label: self.debug_label_node(ref1, n1.h_add)
                 if n1.h_add <= 0.:
                     break
 
             for ref0, ref1 in nx.bfs_edges(self.G, node1):
                 obj = self.G[ref0][ref1]['obj']
+                dh_dx = max_slope_for_road(obj) 
                 n0 = self.nodes_dict[ref0]
                 n1 = self.nodes_dict[ref1]
                 if n1.h_add > 0:
                     break
                 if label: self.debug_label_node(ref0, n0.h_add)
-                n1.h_add = max(0, n0.MSL + n0.h_add - obj.center.length * parameters.DH_DX - n1.MSL)
+                n1.h_add = max(0, n0.MSL + n0.h_add - obj.center.length * dh_dx - n1.MSL)
                 if label: self.debug_label_node(ref1, n1.h_add)
                 if n1.h_add <= 0.:
                     break
