@@ -223,18 +223,16 @@ class MyFrame(wx.Frame):
 
     def write(self):
         self.x_splits.sort()
-        self.x_splits.append(self.pilImageOrg.size[0])
         self.y_splits.sort()
-        self.y_splits.append(self.pilImageOrg.size[1])
         s = textwrap.dedent("""
-        facades.append(Texture('%s',
+        facades.append(Texture('tex.src/%s',
             %1.1f, %s, True,
             %1.1f, %s, False, True,
             v_split_from_bottom = True,
             requires=[],
             provides=[]))
-        """ % (self.in_file_name, self.width_m, str(self.x_splits),
-               self.height_m, str(self.y_splits)))
+        """ % (self.in_file_name, self.width_m, str(self.x_splits + [self.pilImageOrg.size[0]]),
+               self.height_m, str(self.y_splits + [self.pilImageOrg.size[1]])))
 #        f.close()
         f = open(self.out_file_name, "w")
         f.write(s)
@@ -244,7 +242,7 @@ class MyFrame(wx.Frame):
 
     def dump_pressed(self, event): # wxGlade: MyFrame.<event_handler>
         self.write()
-        #sys.exit(1)
+        sys.exit(1)
 
     def toggle2_pressed(self, event):
         f = open('fit.fail', 'w')
