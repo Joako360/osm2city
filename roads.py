@@ -141,10 +141,16 @@ class Roads(objectlist.ObjectList):
         #else: return
         if len(self.ways_list) >= parameters.MAX_OBJECTS: 
             return
-        if 'railway' in way.tags and (not 'highway' in way.tags):
-            return
-        if self.prio(way.tags['highway'], True) == 0:
-            return
+        #if 'railway' in way.tags and (not 'highway' in way.tags):
+        #    return
+        if 'railway' in way.tags:
+            if way.tags['railway'] != 'rail':
+                return
+        try:
+            if self.prio(way.tags['highway'], True) == 0:
+                return
+        except:
+            pass
         self.ways_list.append(way)
         #self.create_and_append(way.osm_id, way.tags, way.refs)
     

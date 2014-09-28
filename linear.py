@@ -491,7 +491,7 @@ class LinearObject(object):
         return True
         
 def max_slope_for_road(obj): 
-    if obj.tags['highway'] in ['motorway']:
+    if 'highway' in obj.tags and obj.tags['highway'] in ['motorway']:
         return parameters.MAX_SLOPE_HIGHWAY
     else:
         return parameters.MAX_SLOPE_ROAD
