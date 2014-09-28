@@ -99,7 +99,7 @@ LOD_ALWAYS_DETAIL_BELOW_LEVELS = 3  # -- below this number of levels, buildings 
 LOD_PERCENTAGE_DETAIL = 0.5         # -- of the remaining buildings, this percentage will be LOD detail,
                                     #    the rest will be LOD rough.
 
-LIGHTMAP_ENABLE = 0                 # -- include LM to xml
+LIGHTMAP_ENABLE = 1                 # -- include LM to xml
 OBSTRUCTION_LIGHT_MIN_LEVELS = 15   # -- put obstruction lights on buildings with >= given levels
 
 EXPERIMENTAL_USE_SKEL = 0           # -- generate complex roofs with pySkeleton?
