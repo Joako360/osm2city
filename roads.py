@@ -96,6 +96,7 @@ import time
 import re
 import random
 import networkx as nx
+import graph
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 
@@ -172,8 +173,21 @@ class Roads(objectlist.ObjectList):
             the_node.MSL = self.elev((the_node.lon, the_node.lat), is_global=True)
             the_node.h_add = 0.
     
-#    def my_bfs():
-        
+    def propagate_h_add_over_edge(self, ref0, ref1, args):
+        obj = self.G[ref0][ref1]['obj']
+        dh_dx = max_slope_for_road(obj)
+        n0 = self.nodes_dict[ref0]
+        n1 = self.nodes_dict[ref1]
+        if n1.h_add > 0:
+            return False
+            # FIXME: should we really just stop here? Probably yes.
+#        if label: self.debug_label_node(ref0, n0.h_add)
+        #n1.h_add = max(0, n0.h_add - obj.center.length * parameters.DH_DX)
+        n1.h_add = max(0, n0.MSL + n0.h_add - obj.center.length * dh_dx - n1.MSL)
+#        if label: self.debug_label_node(ref1, n1.h_add)
+        if n1.h_add <= 0.:
+            return False
+        return True
     
     def propagate_h_add(self):
         """start at bridges, propagate h_add through nodes"""
@@ -188,45 +202,53 @@ class Roads(objectlist.ObjectList):
             # take out bridge edge
             node0 = the_bridge.refs[0]
             node1 = the_bridge.refs[-1]
-            self.G.remove_edge(node0, node1)
+#            self.G.remove_edge(node0, node1)
 
-            for ref0, ref1 in nx.bfs_edges(self.G, node0):
-                obj = self.G[ref0][ref1]['obj']
-                dh_dx = max_slope_for_road(obj)
-                n0 = self.nodes_dict[ref0]
-                n1 = self.nodes_dict[ref1]
-                if n1.h_add > 0:
-                    break
-                if label: self.debug_label_node(ref0, n0.h_add)
-                #n1.h_add = max(0, n0.h_add - obj.center.length * parameters.DH_DX)
-                n1.h_add = max(0, n0.MSL + n0.h_add - obj.center.length * dh_dx - n1.MSL)
-                if label: self.debug_label_node(ref1, n1.h_add)
-                if n1.h_add <= 0.:
-                    break
-            #here: can't just stop once ONE hits zero. Must complete full breadth.
+            node0s = set([node1])
+            visited = set([node0, node1])
+            graph.for_edges_in_bfs(self.propagate_h_add_over_edge, None, self.G, node0s, visited)
+            node0s = set([node0])
+            visited = set([node0, node1])
+            graph.for_edges_in_bfs(self.propagate_h_add_over_edge, None, self.G, node0s, visited)
 
-            for ref0, ref1 in nx.bfs_edges(self.G, node1):
-                obj = self.G[ref0][ref1]['obj']
-                dh_dx = max_slope_for_road(obj) 
-                n0 = self.nodes_dict[ref0]
-                n1 = self.nodes_dict[ref1]
-                if n1.h_add > 0:
-                    break
-                if label: self.debug_label_node(ref0, n0.h_add)
-                n1.h_add = max(0, n0.MSL + n0.h_add - obj.center.length * dh_dx - n1.MSL)
-                if label: self.debug_label_node(ref1, n1.h_add)
-                if n1.h_add <= 0.:
-                    break
-
-            # traverse tree:
-#            bla
-            #   h_add_0 at start node
-            # if h_add_1 == 0:
-            #   h_add_1 at end node = max(0, h_add_0 - edge_len * dh_dl)
-            # else:
-            #   bla
-            # same with node1
-            self.G.add_edge(node0, node1, obj=the_bridge)
+            if 0:
+                for ref0, ref1 in nx.bfs_edges(self.G, node0):
+                    obj = self.G[ref0][ref1]['obj']
+                    dh_dx = max_slope_for_road(obj)
+                    n0 = self.nodes_dict[ref0]
+                    n1 = self.nodes_dict[ref1]
+                    if n1.h_add > 0:
+                        break
+                    if label: self.debug_label_node(ref0, n0.h_add)
+                    #n1.h_add = max(0, n0.h_add - obj.center.length * parameters.DH_DX)
+                    n1.h_add = max(0, n0.MSL + n0.h_add - obj.center.length * dh_dx - n1.MSL)
+                    if label: self.debug_label_node(ref1, n1.h_add)
+                    if n1.h_add <= 0.:
+                        break
+                #here: can't just stop once ONE hits zero. Must complete full breadth.
+    
+                for ref0, ref1 in nx.bfs_edges(self.G, node1):
+                    obj = self.G[ref0][ref1]['obj']
+                    dh_dx = max_slope_for_road(obj) 
+                    n0 = self.nodes_dict[ref0]
+                    n1 = self.nodes_dict[ref1]
+                    if n1.h_add > 0:
+                        break
+                    if label: self.debug_label_node(ref0, n0.h_add)
+                    n1.h_add = max(0, n0.MSL + n0.h_add - obj.center.length * dh_dx - n1.MSL)
+                    if label: self.debug_label_node(ref1, n1.h_add)
+                    if n1.h_add <= 0.:
+                        break
+    
+                # traverse tree:
+    #            bla
+                #   h_add_0 at start node
+                # if h_add_1 == 0:
+                #   h_add_1 at end node = max(0, h_add_0 - edge_len * dh_dl)
+                # else:
+                #   bla
+                # same with node1
+                self.G.add_edge(node0, node1, obj=the_bridge)
 
     def build_graph(self, source_iterable):
         self.G=nx.Graph()
@@ -902,7 +924,7 @@ def main():
 #    scale_test(transform, elev)
 
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, overwrite=True)
-    roads.debug_label_nodes(stg_manager)
+#    roads.debug_label_nodes(stg_manager)
 
     # -- write stg
     for cl in roads.clusters:
