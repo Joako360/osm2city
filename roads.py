@@ -262,7 +262,8 @@ class Roads(objectlist.ObjectList):
             self.G.add_edge(the_way.refs[0], the_way.refs[-1], obj=the_way)
 
     def split_long_roads_between_bridges(self):
-        """Split long roads between bridges."""
+        """UNUSED.
+           Split long roads between bridges."""
 
         def find_edges(node0):
             """start at given node, find next-to-next edge. If that is a bridge, add to list"""
@@ -327,6 +328,22 @@ class Roads(objectlist.ObjectList):
             self.G.add_edge(new_way1.refs[0], new_way1.refs[-1], obj=new_way1)
             self.G.add_edge(new_way2.refs[0], new_way2.refs[-1], obj=new_way2)
 
+
+    def LineString_from_way(self, way):
+        osm_nodes = [self.nodes_dict[r] for r in way.refs]
+        nodes = np.array([self.transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
+        return shg.LineString(nodes)
+#        n = len(nodes)
+#        for i in range(n-1):
+#            dx, dy = nodes[n+1] - nodes[n]
+
+
+    def remove_short_bridges(self):
+        for the_way in self.ways_list:
+            if is_bridge(the_way):
+                center = self.LineString_from_way(the_way)
+                if center.length < parameters.BRIDGE_MIN_LENGTH:
+                    the_way.tags.pop('bridge')
     
     def create_linear_objects(self):
         self.G=nx.Graph()
@@ -719,7 +736,7 @@ class Roads(objectlist.ObjectList):
 #        ac3d_obj = ac.new_object(file_name, '', default_swap_uv=True)
         
 
-        for way in self.bridges_list + self.roads_list:
+        for way in self.bridges_list: # + self.roads_list:
             the_node = self.nodes_dict[way.refs[0]]
             anchor = vec2d(self.transform.toLocal(vec2d(the_node.lon, the_node.lat)))
 #            anchor.x += random.uniform(-1,1)
@@ -886,7 +903,7 @@ def main():
 
 #    roads.objects = roads.objects[0:1000]
     #roads.clip_at_cluster_border()
-
+    roads.remove_short_bridges()
     if 1:
         logging.debug("len before %i" % len(roads.ways_list))
         roads.find_junctions(roads.ways_list)
@@ -930,7 +947,7 @@ def main():
 #    scale_test(transform, elev)
 
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, overwrite=True)
-#    roads.debug_label_nodes(stg_manager)
+    roads.debug_label_nodes(stg_manager)
 
     # -- write stg
     for cl in roads.clusters:
