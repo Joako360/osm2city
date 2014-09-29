@@ -21,6 +21,7 @@ import copy
 import wx3_to_pil as wx2pil
 from optparse import OptionParser
 import textwrap
+import logging
 
 import importruntime
 #import umrech
@@ -50,9 +51,13 @@ class MyFrame(wx.Frame):
         # begin wxGlade: MyFrame.__init__
         kwds["style"] = wx.DEFAULT_FRAME_STYLE
         wx.Frame.__init__(self, *args, **kwds)
+
+        self.in_file_name = sys.argv[-1]
+        self.load_image(self.in_file_name)
+
         self.panel = wx.Panel(self, -1)
         self.label = wx.StaticText(self, -1, "label")
-        self.button_dump = wx.Button(self, -1, "dump and quit")
+        self.button_dump = wx.Button(self, -1, "save and quit")
         self.button_toggle1 = wx.Button(self, -1, "toggle 1")
         self.button_toggle2 = wx.Button(self, -1, "fail and quit")
         self.button_toggle3 = wx.Button(self, -1, "loop")
@@ -60,6 +65,7 @@ class MyFrame(wx.Frame):
         self.label_x = wx.StaticText(self, -1, "x scale")
         self.text_ctrl_y = wx.TextCtrl(self, wx.ID_ANY, "0")
         self.label_y = wx.StaticText(self, -1, "y scale")
+#        self.text_ctrl_file = wx.TextCtrl(self, wx.ID_ANY, self.out_file_name())
 
         self.bitmap_width = 900
         self.bitmap_height = 700
@@ -81,10 +87,6 @@ class MyFrame(wx.Frame):
         self.panel.Bind(wx.EVT_MOUSEWHEEL, self.OnMouseWheel)
         #self.Bind(wx.EVT_SIZE, self.OnSize)
         #self.Bind(wx.EVT_KEY_DOWN, self.OnKey)
-
-        self.in_file_name = sys.argv[-1]
-        self.out_file_name = os.path.splitext(self.in_file_name)[0] + '.py'
-        self.load_image(self.in_file_name)
 
         self.x_splits = []
         self.y_splits = []
@@ -134,6 +136,12 @@ class MyFrame(wx.Frame):
 
     def load_image(self, img):
         self.pilImageOrg = Image.open(img)
+
+    def out_case_name(self):
+        """automatically append 'WIDTHxHEIGHTm' to out file name"""
+        out = os.path.splitext(self.in_file_name)[0]
+        out += "_%02.0fx%02.0fm" % (self.width_m, self.height_m)
+        return out        
 
     def fit_image(self):
         org_x, org_y = self.pilImageOrg.size
@@ -224,6 +232,8 @@ class MyFrame(wx.Frame):
     def write(self):
         self.x_splits.sort()
         self.y_splits.sort()
+        out_case_name = self.out_case_name()
+        in_ext = os.path.splitext(self.in_file_name)[1]
         s = textwrap.dedent("""
         facades.append(Texture('tex.src/%s',
             %1.1f, %s, True,
@@ -231,12 +241,20 @@ class MyFrame(wx.Frame):
             v_split_from_bottom = True,
             requires=[],
             provides=[]))
-        """ % (self.in_file_name, self.width_m, str(self.x_splits + [self.pilImageOrg.size[0]]),
+        """ % (out_case_name + in_ext, self.width_m, str(self.x_splits + [self.pilImageOrg.size[0]]),
                self.height_m, str(self.y_splits + [self.pilImageOrg.size[1]])))
 #        f.close()
-        f = open(self.out_file_name, "w")
+
+        f = open(out_case_name + '.py', "w")
         f.write(s)
         f.close()
+        
+        dst = out_case_name + in_ext
+        try:
+            os.link(self.in_file_name, dst)
+        except OSError, reason:
+            logging.warn("Error while copying %s to %s: %s" % (self.in_file_name, dst, reason))
+
         print s
 
 
