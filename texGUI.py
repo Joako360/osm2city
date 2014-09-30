@@ -22,6 +22,7 @@ import wx3_to_pil as wx2pil
 from optparse import OptionParser
 import textwrap
 import logging
+import shutil
 
 import importruntime
 #import umrech
@@ -237,7 +238,7 @@ class MyFrame(wx.Frame):
         s = textwrap.dedent("""
         facades.append(Texture('tex.src/%s',
             %1.1f, %s, True,
-            %1.1f, %s, False, True,
+            %1.1f, %s, False,
             v_split_from_bottom = True,
             requires=[],
             provides=[]))
@@ -251,7 +252,7 @@ class MyFrame(wx.Frame):
         
         dst = out_case_name + in_ext
         try:
-            os.link(self.in_file_name, dst)
+            shutil.copyfile(self.in_file_name, dst)
         except OSError, reason:
             logging.warn("Error while copying %s to %s: %s" % (self.in_file_name, dst, reason))
 
