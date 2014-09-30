@@ -87,8 +87,8 @@ class MyFrame(wx.Frame):
         #self.Bind(wx.EVT_SIZE, self.OnSize)
         #self.Bind(wx.EVT_KEY_DOWN, self.OnKey)
 
-        self.x_splits = []
-        self.y_splits = []
+        self.x_cuts = []
+        self.y_cuts = []
         self.last_split_was_left = []
         self.width_m = 1.
         self.height_m = 1.
@@ -201,8 +201,8 @@ class MyFrame(wx.Frame):
         self.label.SetLabel(label_text)
 
     def write(self):
-        self.x_splits.sort()
-        self.y_splits.sort()
+        self.x_cuts.sort()
+        self.y_cuts.sort()
         out_case_name = self.out_case_name()
         in_ext = os.path.splitext(self.in_file_name)[1]
         s = textwrap.dedent("""
@@ -212,8 +212,8 @@ class MyFrame(wx.Frame):
             v_align_bottom = True,
             requires=[],
             provides=[]))
-        """ % (out_case_name + in_ext, self.width_m, str(self.x_splits + [self.pilImageOrg.size[0]]),
-               self.height_m, str(self.y_splits + [self.pilImageOrg.size[1]])))
+        """ % (out_case_name + in_ext, self.width_m, str(self.x_cuts + [self.pilImageOrg.size[0]]),
+               self.height_m, str(self.y_cuts + [self.pilImageOrg.size[1]])))
 
         f = open(out_case_name + '.py', "w")
         f.write(s)
@@ -263,7 +263,7 @@ class MyFrame(wx.Frame):
         dc.SetPen(wx.Pen('red', 2))
         x1, y1 = self.pilImage.size
 
-        for x in self.x_splits:
+        for x in self.x_cuts:
             x = self.img2screen(x)
             dc.DrawLine(x, 0, x, y1)
 
@@ -277,7 +277,7 @@ class MyFrame(wx.Frame):
             dc.DrawLine(p0[0], p0[1], p1, p0[1])
 
         dc.SetPen(wx.Pen('blue', 2))
-        for y in self.y_splits:
+        for y in self.y_cuts:
             y = self.img2screen(y)
             dc.DrawLine(0, y, x1, y)
 
@@ -296,9 +296,9 @@ class MyFrame(wx.Frame):
         self.left_click = self.screen2img(self.GetMousePos(event))
         if not self.IsLeftDragging:
             if event.ShiftDown():
-                self.x_splits = self.x_splits[:-1]
+                self.x_cuts = self.x_cuts[:-1]
             else:
-                self.x_splits.append(int(self.left_click[0]))
+                self.x_cuts.append(int(self.left_click[0]))
         else:
             self.IsLeftDragging = False
             self.x_scale_p0 = copy.copy(self.drag_start)
@@ -312,9 +312,9 @@ class MyFrame(wx.Frame):
         self.right_click = self.screen2img(self.GetMousePos(event))
         if not self.IsRightDragging:
             if event.ShiftDown():
-                self.y_splits = self.y_splits[:-1]
+                self.y_cuts = self.y_cuts[:-1]
             else:
-                self.y_splits.append(int(self.right_click[1]))
+                self.y_cuts.append(int(self.right_click[1]))
         else:
             self.IsRightDragging = False
             self.y_scale_p0 = copy.copy(self.drag_start)

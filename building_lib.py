@@ -91,38 +91,38 @@ def check_height(building_height, t):
         tex_y1 = 1.
         tex_y0 = 1 - building_height / t.v_size_meters
         return tex_y0, tex_y1
-        # FIXME: respect v_splits
+        # FIXME: respect v_cuts
     else:
         # x min_height < height < max_height
         # x find closest match
         # - evaluate error
 
         # - error acceptable?
-        if building_height >= t.v_splits_meters[0] and building_height <= t.v_size_meters:
+        if building_height >= t.v_cuts_meters[0] and building_height <= t.v_size_meters:
 #            print "--->"
             if 0 and t.v_align_bottom:
                 logging.debug("from bottom")
-                for i in range(len(t.v_splits_meters)):
-                    if t.v_splits_meters[i] >= building_height:
-#                        print "bot trying %g >= %g ?" % (t.v_splits_meters[i],  building_height)
+                for i in range(len(t.v_cuts_meters)):
+                    if t.v_cuts_meters[i] >= building_height:
+#                        print "bot trying %g >= %g ?" % (t.v_cuts_meters[i],  building_height)
                         tex_y0 = 0
-                        tex_y1 = t.v_splits[i]
+                        tex_y1 = t.v_cuts[i]
                         #print "# height %g storey %i" % (building_height, i)
                         return tex_y0, tex_y1
             else:
-#                print "got", t.v_splits_meters
-                for i in range(len(t.v_splits_meters)-2, -1, -1):
-#                    print "%i top trying %g >= %g ?" % (i, t.v_splits_meters[-1] - t.v_splits_meters[i],  building_height)
-                    if t.v_splits_meters[-1] - t.v_splits_meters[i] >= building_height:
+#                print "got", t.v_cuts_meters
+                for i in range(len(t.v_cuts_meters)-2, -1, -1):
+#                    print "%i top trying %g >= %g ?" % (i, t.v_cuts_meters[-1] - t.v_cuts_meters[i],  building_height)
+                    if t.v_cuts_meters[-1] - t.v_cuts_meters[i] >= building_height:
                         # FIXME: probably a bug. Should use distance to height?
-                        tex_y0 = t.v_splits[i]
+                        tex_y0 = t.v_cuts[i]
                         tex_y1 = 1
                         #logging.debug("from top %s y0=%4.2f y1=%4.2f" % (t.filename, tex_y0, tex_y1))
 
                         return tex_y0, tex_y1
-            raise ValueError("SHOULD NOT HAPPEN! found no tex_y0, tex_y1 (building_height %g splits %s %g)" % (building_height, str(t.v_splits_meters), t.v_size_meters))
+            raise ValueError("SHOULD NOT HAPPEN! found no tex_y0, tex_y1 (building_height %g splits %s %g)" % (building_height, str(t.v_cuts_meters), t.v_size_meters))
         else:
-            raise ValueError("SHOULD NOT HAPPEN! building_height %g outside %g %g" % (building_height, t.v_splits_meters[0], t.v_size_meters))
+            raise ValueError("SHOULD NOT HAPPEN! building_height %g outside %g %g" % (building_height, t.v_cuts_meters[0], t.v_size_meters))
             return 0, 0
 
 
@@ -604,7 +604,7 @@ def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner = False):
             tex_x1 = texture.x(b.lenX[i] / texture.h_size_meters) # -- simply repeat texture to fit length
         else:
             # FIXME: respect facade texture split_h
-            #FIXME: there is a nan in textures.h_splits of tex/facade_modern36x36_12
+            #FIXME: there is a nan in textures.h_cuts of tex/facade_modern36x36_12
             a = b.lenX[i] / texture.h_size_meters
             ia = int(a)
             frac = a - ia

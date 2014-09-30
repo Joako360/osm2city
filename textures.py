@@ -201,8 +201,8 @@ class Texture(object):
 
     """
     def __init__(self, filename,
-                 h_size_meters, h_splits, h_can_repeat, \
-                 v_size_meters, v_splits, v_can_repeat, \
+                 h_size_meters, h_cuts, h_can_repeat, \
+                 v_size_meters, v_cuts, v_can_repeat, \
                  height_min = 0, height_max = 9999, \
                  v_align_bottom = False, \
                  provides = [], requires = []):
@@ -217,46 +217,46 @@ class Texture(object):
         self.width_min = 0
         self.width_max = 9999
         self.v_align_bottom = v_align_bottom
-        h_splits.sort()
-        v_splits.sort()
+        h_cuts.sort()
+        v_cuts.sort()
         # roof type, color
 #        self.v_min = v_min
 #        self.v_max = v_max
         self.v_size_meters = v_size_meters
-        if v_splits != None:
-            v_splits.insert(0,0)
-            self.v_splits = np.array(v_splits, dtype=np.float)
-            if len(self.v_splits) > 1:
+        if v_cuts != None:
+            v_cuts.insert(0,0)
+            self.v_cuts = np.array(v_cuts, dtype=np.float)
+            if len(self.v_cuts) > 1:
                 # FIXME            test for not type list
-                self.v_splits /= self.v_splits[-1]
-#                print self.v_splits
+                self.v_cuts /= self.v_cuts[-1]
+#                print self.v_cuts
                 # -- Gimp origin is upper left, convert to OpenGL lower left
-                self.v_splits = (1. - self.v_splits)[::-1]
-#                print self.v_splits
+                self.v_cuts = (1. - self.v_cuts)[::-1]
+#                print self.v_cuts
         else:
-            self.v_splits = 1.
-        self.v_splits_meters = self.v_splits * self.v_size_meters
+            self.v_cuts = 1.
+        self.v_cuts_meters = self.v_cuts * self.v_size_meters
 
         self.v_can_repeat = v_can_repeat
 
         if not self.v_can_repeat:
-            self.height_min = self.v_splits_meters[0]
+            self.height_min = self.v_cuts_meters[0]
             self.height_max = self.v_size_meters
 
         self.h_size_meters = h_size_meters
-        self.h_splits = np.array(h_splits, dtype=np.float)
-        #print "h1", self.h_splits
-        #print "h2", h_splits
+        self.h_cuts = np.array(h_cuts, dtype=np.float)
+        #print "h1", self.h_cuts
+        #print "h2", h_cuts
 
-        if h_splits == None or h_splits == []:
-            self.h_splits = np.array([1.])
-        elif len(self.h_splits) > 1:
-            self.h_splits /= self.h_splits[-1]
-        self.h_splits_meters = self.h_splits * self.h_size_meters
+        if h_cuts == None or h_cuts == []:
+            self.h_cuts = np.array([1.])
+        elif len(self.h_cuts) > 1:
+            self.h_cuts /= self.h_cuts[-1]
+        self.h_cuts_meters = self.h_cuts * self.h_size_meters
         self.h_can_repeat = h_can_repeat
 
         if not self.h_can_repeat:
-            self.width_min = self.h_splits_meters[0]
+            self.width_min = self.h_cuts_meters[0]
             self.width_max = self.h_size_meters
 
         if self.h_can_repeat + self.v_can_repeat > 1:
@@ -291,8 +291,8 @@ class Texture(object):
         # - modern
         # european, north_american, south_american, mediterreanian, african, asian
     def closest_h_match(self, frac):
-        return self.h_splits[np.abs(self.h_splits - frac).argmin()]
-        #self.h_splits[np.abs(self.h_splits - frac).argmin()]
+        return self.h_cuts[np.abs(self.h_cuts - frac).argmin()]
+        #self.h_cuts[np.abs(self.h_cuts - frac).argmin()]
         #bla
 
 # pitched roof: requires = facade:age:old
@@ -435,7 +435,7 @@ def init():
         print "red   roofs: ", [str(i) for i in roofs.find_candidates(['roof:color:red'])]
         print "old facades: "
         for i in facades.find_candidates(['facade:shape:residential','age:old'], 10):
-            print i, i.v_splits * i.v_size_meters
+            print i, i.v_cuts * i.v_size_meters
     #print facades[0].provides
 
     if False:
