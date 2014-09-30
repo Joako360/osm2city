@@ -203,7 +203,6 @@ class Texture(object):
     def __init__(self, filename,
                  h_size_meters, h_splits, h_can_repeat, \
                  v_size_meters, v_splits, v_can_repeat, \
-                 has_roof_section = False, \
                  height_min = 0, height_max = 9999, \
                  v_split_from_bottom = False, \
                  provides = [], requires = []):
@@ -306,9 +305,16 @@ def init():
     facades = FacadeManager('facade')
     roofs = TextureManager('roof')
 
+    facades.append(Texture('tex.src/facade_industrial_red_white_24x18m.jpg',
+        23.8, [364, 742, 1086], True,
+        18.5, [295, 565, 842], False,
+        v_split_from_bottom = True,
+        requires=[],
+        provides=['shape:industrial','age:old', 'compat:roof-flat','compat:roof-pitched']))
+
     facades.append(Texture('tex.src/DSCF9495_pow2.png',
         14, [585, 873, 1179, 1480, 2048], True,
-        19.4, [274, 676, 1114, 1542, 2048], False, True,
+        19.4, [274, 676, 1114, 1542, 2048], False,
         height_max = 13.,
         v_split_from_bottom = True,
         requires=['roof:color:black'],
@@ -316,40 +322,40 @@ def init():
 
     facades.append(Texture('tex.src/LZ_old_bright_bc2.png',
         17.9, [345,807,1023,1236,1452,1686,2048], True,
-        14.8, [558,1005,1446,2048], False, True,
+        14.8, [558,1005,1446,2048], False,
         provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
 
     facades.append(Texture('tex.src/facade_modern_21x42m.jpg',
         43., [40, 79, 115, 156, 196, 235, 273, 312, 351, 389, 428, 468, 507, 545, 584, 624, 662], True,
-        88., [667, 597, 530, 460, 391, 322, 254, 185, 117, 48, 736, 804, 873, 943, 1012, 1080, 1151, 1218, 1288, 1350], False, True,
+        88., [667, 597, 530, 460, 391, 322, 254, 185, 117, 48, 736, 804, 873, 943, 1012, 1080, 1151, 1218, 1288, 1350], False,
         v_split_from_bottom = True,
         requires=[],
         provides=['shape:urban','age:modern', 'compat:roof-flat']))
 
     facades.append(Texture('tex.src/facade_modern_black_46x60m.jpg',
         45.9, [167, 345, 521, 700, 873, 944], True,
-        60.5, [144, 229, 311, 393, 480, 562, 645, 732, 818, 901, 983, 1067, 1154, 1245], False, True,
+        60.5, [144, 229, 311, 393, 480, 562, 645, 732, 818, 901, 983, 1067, 1154, 1245], False,
         v_split_from_bottom = True,
         requires=[],
         provides=['shape:urban','age:modern', 'compat:roof-flat']))
 
     facades.append(Texture('tex.src/facade_industrial_white_26x14m.jpg',
         25.7, [165, 368, 575, 781, 987, 1191, 1332], True,
-        13.5, [383, 444, 501, 562, 621, 702], False, True,
+        13.5, [383, 444, 501, 562, 621, 702], False,
         v_split_from_bottom = True,
         requires=[],
         provides=['shape:industrial','age:modern', 'compat:roof-flat']))
 
     facades.append(Texture('tex.src/facade_modern_commercial_35x20m.jpg',
         34.6, [105, 210, 312, 417, 519, 622, 726, 829, 933, 1039, 1144, 1245, 1350], True,
-        20.4, [177, 331, 489, 651, 796], False, True,
+        20.4, [177, 331, 489, 651, 796], False,
         v_split_from_bottom = True,
         requires=[],
         provides=['shape:commercial','age:modern', 'compat:roof-flat']))
 
     facades.append(Texture('tex.src/facade_modern36x36_12.png',
         36., [], True,
-        36., [158, 234, 312, 388, 465, 542, 619, 697, 773, 870, 1024], False, True,
+        36., [158, 234, 312, 388, 465, 542, 619, 697, 773, 870, 1024], False,
         provides=['shape:urban','shape:residential','age:modern',
                  'compat:roof-flat']))
 
@@ -360,7 +366,7 @@ def init():
 #                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
     facades.append(Texture('tex.src/DSCF9503_noroofsec_pow2.png',
         12.85, [360, 708, 1044, 1392, 2048], True,
-        17.66, [556,1015,1474,2048], False, True,
+        17.66, [556,1015,1474,2048], False,
         requires=['roof:color:black'],
         provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
 
@@ -371,23 +377,23 @@ def init():
 
     facades.append(Texture('tex.src/DSCF9710.png',
        29.9, [142,278,437,590,756,890,1024], True,
-       19.8, [130,216,297,387,512], False, True,
+       19.8, [130,216,297,387,512], False,
        provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
 
 
     facades.append(Texture('tex.src/DSCF9678_pow2.png',
        10.4, [97,152,210,299,355,411,512], True,
-       15.5, [132,211,310,512], False, True,
+       15.5, [132,211,310,512], False,
        provides=['shape:residential','shape:commercial','age:modern','compat:roof-flat']))
 
     facades.append(Texture('tex.src/DSCF9726_noroofsec_pow2.png',
        15.1, [321,703,1024], True,
-       9.6, [227,512], False, True,
+       9.6, [227,512], False,
        provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
 
     facades.append(Texture('tex.src/wohnheime_petersburger.png',
        15.6, [215, 414, 614, 814, 1024], False,
-       15.6, [112, 295, 477, 660, 843, 1024], True, True,
+       15.6, [112, 295, 477, 660, 843, 1024], True,
        height_min = 15.,
        provides=['shape:urban','shape:residential','age:modern',
                  'compat:roof-flat']))
@@ -465,9 +471,10 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     init()
 
-    cands = facades.find_candidates([], 14)
-    #print "cands are", cands
-    for t in cands:
-        #print "%5.2g  %s" % (t.height_min, t.filename)
-        logging.debug('%s (%4.2f, %4.2f) (%4.2f, %4.2f)' % (t.filename, t.x0, t.y0, t.x1, t.y1))
+    if 0:
+        cands = facades.find_candidates([], 14)
+        #print "cands are", cands
+        for t in cands:
+            #print "%5.2g  %s" % (t.height_min, t.filename)
+            logging.debug('%s (%4.2f, %4.2f) (%4.2f, %4.2f)' % (t.filename, t.x0, t.y0, t.x1, t.y1))
 
