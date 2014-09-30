@@ -99,7 +99,10 @@ class LinearBridge(linear.LinearObject):
         self.avg_slope = (h1 - h0)/self.center.length
 #        print "# h0, hm, h1:", h0, hm, h1
         self.D = Deck_shape_linear(h0, h1)
-        min_height = 8. * int(self.tags['layer'])
+        try:
+            min_height = 8. * int(self.tags['layer'])
+        except KeyError:
+            min_height = 8.
         h_add = max(0, min_height - (self.D(0.5) - hm))
         
 #        h_add = 0. # debug: no h_add at all
