@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import math
 import copy
 import parameters
+import logging
 
 # debug
 import test
@@ -91,7 +92,11 @@ class LinearObject(object):
                 l = (mean_normal[0]**2 + mean_normal[1]**2)**0.5
                 mean_normal /= l
                 angle = (np.pi + self.angle[i-1] - self.angle[i])/2.
-                o = abs(offset / math.sin(angle))
+                try:
+                    o = abs(offset / math.sin(angle))
+                except ZeroDivisionError:
+                    logging.debug("ZeroDiv in %i, angle=%g" % (self.osm_id, angle))
+                    o = abs(offset / math.sin(1.01))
                 our_node = np.array(self.center.coords[i])
                 left[i] = our_node + mean_normal * o
                 right[i] = our_node - mean_normal * o
