@@ -304,6 +304,8 @@ def init():
     facades = FacadeManager('facade')
     roofs = TextureManager('roof')
 
+    # ---------------- ADD YOUR FACADE TEXTURES HERE -------------------
+
     facades.append(Texture('tex.src/facade_industrial_red_white_24x18m.jpg',
         23.8, [364, 742, 1086], True,
         18.5, [295, 565, 842], False,
@@ -399,6 +401,8 @@ def init():
 #                            provides=['shape:urban','shape:residential','age:modern','age:old',
 #                                     'compat:roof-flat','compat:roof-pitched']))
 
+
+    # ---------------- ADD YOUR ROOF TEXTURES HERE -------------------
 
 #    roofs.append(Texture('tex.src/roof_tiled_black',
 #                         1., [], True, 1., [], False, provides=['color:black']))
