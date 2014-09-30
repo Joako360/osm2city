@@ -62,7 +62,7 @@ def make_texture_atlas(texture_list, atlas_filename, size_x = 256, pad_y = 0, li
 
     # -- create atlas image
     atlas_sy = next_pow2(atlas_sy)
-    atlas = Image.new("RGBA", (atlas_sx, atlas_sy))
+    atlas = Image.new("RGB", (atlas_sx, atlas_sy))
 
     # -- paste, compute atlas coords
     #    lower left corner of texture is x0, y0
@@ -212,7 +212,6 @@ class Texture(object):
         self.rotated = False
         self.provides = provides
         self.requires = requires
-        self.has_roof_section = has_roof_section
         self.height_min = height_min
         self.height_max = height_max
         self.width_min = 0
