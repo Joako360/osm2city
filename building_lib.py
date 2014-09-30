@@ -100,7 +100,7 @@ def check_height(building_height, t):
         # - error acceptable?
         if building_height >= t.v_splits_meters[0] and building_height <= t.v_size_meters:
 #            print "--->"
-            if 0 and t.v_split_from_bottom:
+            if 0 and t.v_align_bottom:
                 logging.debug("from bottom")
                 for i in range(len(t.v_splits_meters)):
                     if t.v_splits_meters[i] >= building_height:

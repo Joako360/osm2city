@@ -204,7 +204,7 @@ class Texture(object):
                  h_size_meters, h_splits, h_can_repeat, \
                  v_size_meters, v_splits, v_can_repeat, \
                  height_min = 0, height_max = 9999, \
-                 v_split_from_bottom = False, \
+                 v_align_bottom = False, \
                  provides = [], requires = []):
         self.filename = filename
         self.x0 = self.x1 = self.y0 = self.y1 = 0
@@ -216,7 +216,7 @@ class Texture(object):
         self.height_max = height_max
         self.width_min = 0
         self.width_max = 9999
-        self.v_split_from_bottom = v_split_from_bottom
+        self.v_align_bottom = v_align_bottom
         h_splits.sort()
         v_splits.sort()
         # roof type, color
@@ -309,7 +309,7 @@ def init():
     facades.append(Texture('tex.src/facade_industrial_red_white_24x18m.jpg',
         23.8, [364, 742, 1086], True,
         18.5, [295, 565, 842], False,
-        v_split_from_bottom = True,
+        v_align_bottom = True,
         requires=[],
         provides=['shape:industrial','age:old', 'compat:roof-flat','compat:roof-pitched']))
 
@@ -317,7 +317,7 @@ def init():
         14, [585, 873, 1179, 1480, 2048], True,
         19.4, [274, 676, 1114, 1542, 2048], False,
         height_max = 13.,
-        v_split_from_bottom = True,
+        v_align_bottom = True,
         requires=['roof:color:black'],
         provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
 
@@ -329,28 +329,28 @@ def init():
     facades.append(Texture('tex.src/facade_modern_21x42m.jpg',
         43., [40, 79, 115, 156, 196, 235, 273, 312, 351, 389, 428, 468, 507, 545, 584, 624, 662], True,
         88., [667, 597, 530, 460, 391, 322, 254, 185, 117, 48, 736, 804, 873, 943, 1012, 1080, 1151, 1218, 1288, 1350], False,
-        v_split_from_bottom = True,
+        v_align_bottom = True,
         requires=[],
         provides=['shape:urban','age:modern', 'compat:roof-flat']))
 
     facades.append(Texture('tex.src/facade_modern_black_46x60m.jpg',
         45.9, [167, 345, 521, 700, 873, 944], True,
         60.5, [144, 229, 311, 393, 480, 562, 645, 732, 818, 901, 983, 1067, 1154, 1245], False,
-        v_split_from_bottom = True,
+        v_align_bottom = True,
         requires=[],
         provides=['shape:urban','age:modern', 'compat:roof-flat']))
 
     facades.append(Texture('tex.src/facade_industrial_white_26x14m.jpg',
         25.7, [165, 368, 575, 781, 987, 1191, 1332], True,
         13.5, [383, 444, 501, 562, 621, 702], False,
-        v_split_from_bottom = True,
+        v_align_bottom = True,
         requires=[],
         provides=['shape:industrial','age:modern', 'compat:roof-flat']))
 
     facades.append(Texture('tex.src/facade_modern_commercial_35x20m.jpg',
         34.6, [105, 210, 312, 417, 519, 622, 726, 829, 933, 1039, 1144, 1245, 1350], True,
         20.4, [177, 331, 489, 651, 796], False,
-        v_split_from_bottom = True,
+        v_align_bottom = True,
         requires=[],
         provides=['shape:commercial','age:modern', 'compat:roof-flat']))
 
