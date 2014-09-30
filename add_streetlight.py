@@ -1,10 +1,20 @@
 #!/usr/bin/env python
 """
-Add 'ambient' light to facade textures.
-- read window LM from file into red channel
-- add constant + gradient or gaussian to blue channel, simulating ambient light
-- save to LM/
+osm2city uses
+- red channel for window lights
+- green channel for ambient street lights shining onto facade.
+- blue and alpha unused
+
+This script
+1. reads window LM from given file into red channel
+2. adds 'ambient' light to facade textures. The ambient light depends on the type of texture, deduced from the file name.
+  If the file name contains 'roof':
+  - add small constant + vertical gradient to green channel
+  Otherwise:
+  - add vertical gradient and horizontal gaussian to green channel
+3. saves to LM/filename.png
 """
+
 import numpy as np
 import scipy.stats
 from PIL import Image
@@ -60,7 +70,7 @@ else:
     raise NotImplementedError("can't handle number of channels")
 
 aspect = float(height_px) / width_px
-height_m = 10. # read from meta data
+height_m = 10. # TODO: read from meta data
 width_m = 10. / aspect
 y = np.linspace(1, 0, height_px)
 x = np.linspace(0, 1, width_px)
@@ -75,7 +85,10 @@ Y_m = Y * height_m
 # window light in R
 R = R * A
 
-if not roof:
+if roof:
+    G = copy(zero)
+    G += 0.3 - 0.1*Y
+else:
     # street light in G
     # vertical gradient, plus horizonal gaussian for
     v = scipy.stats.norm(loc = 0.5, scale = 0.7).pdf(x)
@@ -84,10 +97,6 @@ if not roof:
     G = copy(zero)
     G += 0.3 + 0.7 * np.exp(-Y_m/5.)
     G *= gauss_x
-
-else:
-    G = copy(zero)
-    G += 0.3 - 0.1*Y
 
 
 # B and A unused. Set A = 1 to ease vis
