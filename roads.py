@@ -107,6 +107,12 @@ def no_transform((x, y)):
 def is_bridge(way):
     return "bridge" in  way.tags
 
+def progress(i, max_i):
+    if i % (max_i / 1000) == 0:
+        print "%i %i %6.2f\r" % (i, max_i, (float(i)/max_i) * 100),
+#            print "%g\r" % (float(i)/max_i) * 100,
+
+
 class Roads(objectlist.ObjectList):
     valid_node_keys = []
 
@@ -439,9 +445,11 @@ class Roads(objectlist.ObjectList):
         - one way ends, other way starts: also an junction
         FIXME: use quadtree/kdtree
         """
+        
         logging.info('Finding junctions...')
         self.attached_ways_dict = {} # a dict: for each ref (aka node) hold a list of attached ways
-        for the_way in ways_list:
+        for j, the_way in enumerate(ways_list):
+            progress(j, len(ways_list))
 #            if the_way.osm_id == 4888143:
 #                print "got 4888143"
             for i, ref in enumerate(the_way.refs):
@@ -508,7 +516,8 @@ class Roads(objectlist.ObjectList):
         """split ways such that none of the interiour nodes are junctions.
            I.e., each way object connects to at most two junctions.
         """
-            
+        logging.info('Splitting ways at inner junctions...')
+
         #plt.clf()
 #        plt.xlim(0.002+1.138e1, 0.016+1.138e1)
 #        plt.ylim(0.006+4.725e1, 0.013+4.725e1)
@@ -522,7 +531,8 @@ class Roads(objectlist.ObjectList):
             #        plt.plot(self.nodes_dict[the_ref].lon, self.nodes_dict[the_ref].lat, 'rx')
 
         new_list = []
-        for the_way in self.ways_list:
+        for i, the_way in enumerate(self.ways_list):
+            progress(i, len(self.ways_list))
             self.debug_plot_way(the_way, '-', lw=2, color='0.90', show_label=0)
 #            self.ways_list.remove(the_way)
 
