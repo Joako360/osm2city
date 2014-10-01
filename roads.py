@@ -215,10 +215,10 @@ class Roads(objectlist.ObjectList):
 
             node0s = set([node1])
             visited = set([node0, node1])
-            graph.for_edges_in_bfs(self.propagate_h_add_over_edge, None, self.G, node0s, visited)
+            graph.for_edges_in_bfs_call(self.propagate_h_add_over_edge, None, self.G, node0s, visited)
             node0s = set([node0])
             visited = set([node0, node1])
-            graph.for_edges_in_bfs(self.propagate_h_add_over_edge, None, self.G, node0s, visited)
+            graph.for_edges_in_bfs_call(self.propagate_h_add_over_edge, None, self.G, node0s, visited)
 
     def build_graph(self, source_iterable):
         self.G=nx.Graph()

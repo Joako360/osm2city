@@ -6,13 +6,12 @@ graph support stuff
 """
 import networkx as nx
 
-def for_edges_in_bfs(func, args, G, node0_set, visited_set):
+def for_edges_in_bfs_call(func, args, G, node0_set, visited_set):
     """Start at nodes in node0_set. Breadth-first search, excluding nodes 
        in visited_set. 
        For each edge, call func(node0, node1, args). 
        Stop search on one branch if func returns False.
     """
-    i = 0
     while True:
         # get neighbors not visited        
         next_nodes = {}
