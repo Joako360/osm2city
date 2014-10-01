@@ -401,6 +401,15 @@ def init():
 #                            provides=['shape:urban','shape:residential','age:modern','age:old',
 #                                     'compat:roof-flat','compat:roof-pitched']))
 
+    # debug fallback texture for very large facades. 
+    facades.append(Texture('tex.src/facade_modern_black_46x60m.jpg',
+        450.9, [167, 345, 521, 700, 873, 944], True,
+        600.5, [144, 229, 311, 393, 480, 562, 645, 732, 818, 901, 983, 1067, 1154, 1245], False,
+        v_align_bottom = True,
+        requires=[],
+        provides=['shape:urban','age:modern', 'compat:roof-flat']))
+
+
 
     # ---------------- ADD YOUR ROOF TEXTURES HERE -------------------
 
