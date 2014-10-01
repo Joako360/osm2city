@@ -175,6 +175,7 @@ MAX_SLOPE_HIGHWAY = 0.03
 MAX_SLOPE_ROAD = 0.08
 MAX_TRANSVERSE_GRADIENT = 0.1
 BRIDGE_MIN_LENGTH = 20.
+DEBUG_PLOT = 0
 
 def set_parameters(param_dict):
     for k in param_dict:
