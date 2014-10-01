@@ -110,7 +110,6 @@ def is_bridge(way):
 def progress(i, max_i):
     if i % (max_i / 1000) == 0:
         print "%i %i %6.2f\r" % (i, max_i, (float(i)/max_i) * 100),
-#            print "%g\r" % (float(i)/max_i) * 100,
 
 
 class Roads(objectlist.ObjectList):
@@ -211,10 +210,8 @@ class Roads(objectlist.ObjectList):
             else:
                 label=False
             # build tree starting at node0
-            # take out bridge edge
             node0 = the_bridge.refs[0]
             node1 = the_bridge.refs[-1]
-#            self.G.remove_edge(node0, node1)
 
             node0s = set([node1])
             visited = set([node0, node1])
@@ -222,45 +219,6 @@ class Roads(objectlist.ObjectList):
             node0s = set([node0])
             visited = set([node0, node1])
             graph.for_edges_in_bfs(self.propagate_h_add_over_edge, None, self.G, node0s, visited)
-
-            if 0:
-                for ref0, ref1 in nx.bfs_edges(self.G, node0):
-                    obj = self.G[ref0][ref1]['obj']
-                    dh_dx = max_slope_for_road(obj)
-                    n0 = self.nodes_dict[ref0]
-                    n1 = self.nodes_dict[ref1]
-                    if n1.h_add > 0:
-                        break
-                    if label: self.debug_label_node(ref0, n0.h_add)
-                    #n1.h_add = max(0, n0.h_add - obj.center.length * parameters.DH_DX)
-                    n1.h_add = max(0, n0.MSL + n0.h_add - obj.center.length * dh_dx - n1.MSL)
-                    if label: self.debug_label_node(ref1, n1.h_add)
-                    if n1.h_add <= 0.:
-                        break
-                #here: can't just stop once ONE hits zero. Must complete full breadth.
-    
-                for ref0, ref1 in nx.bfs_edges(self.G, node1):
-                    obj = self.G[ref0][ref1]['obj']
-                    dh_dx = max_slope_for_road(obj) 
-                    n0 = self.nodes_dict[ref0]
-                    n1 = self.nodes_dict[ref1]
-                    if n1.h_add > 0:
-                        break
-                    if label: self.debug_label_node(ref0, n0.h_add)
-                    n1.h_add = max(0, n0.MSL + n0.h_add - obj.center.length * dh_dx - n1.MSL)
-                    if label: self.debug_label_node(ref1, n1.h_add)
-                    if n1.h_add <= 0.:
-                        break
-    
-                # traverse tree:
-    #            bla
-                #   h_add_0 at start node
-                # if h_add_1 == 0:
-                #   h_add_1 at end node = max(0, h_add_0 - edge_len * dh_dl)
-                # else:
-                #   bla
-                # same with node1
-                self.G.add_edge(node0, node1, obj=the_bridge)
 
     def build_graph(self, source_iterable):
         self.G=nx.Graph()
@@ -291,12 +249,6 @@ class Roads(objectlist.ObjectList):
             if not is_bridge(the_way): continue
             if the_way.osm_id == 24797900:
                 pass
-#            if the_bridge.osm_id == 126452863:
-##                print "here"
-#                label=True
-#                continue
-#            else:
-#                label=False
             # take out bridge edge
             bridge_node0 = the_way.refs[0]
             bridge_node1 = the_way.refs[-1]
@@ -307,12 +259,7 @@ class Roads(objectlist.ObjectList):
             [ways_to_split.add(i) for i in a]
             self.G.add_edge(bridge_node0, bridge_node1, obj=the_way)
 
-#        print edges_to_split
-        
         for the_way in ways_to_split:
-            # if linearObject:
-            if the_way.osm_id == 6268548:
-                bla
             if 0:            
                 osm_nodes = [self.nodes_dict[r] for r in the_way.refs]
                 nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
@@ -320,7 +267,6 @@ class Roads(objectlist.ObjectList):
                 for i in range(n-1):
                     dx, dy = nodes[n+1] - nodes[n]
                     bla
-#                split_index = 
             else:
                 n = len(the_way.refs)
                 if n < 3: continue
@@ -339,10 +285,6 @@ class Roads(objectlist.ObjectList):
         osm_nodes = [self.nodes_dict[r] for r in way.refs]
         nodes = np.array([self.transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
         return shg.LineString(nodes)
-#        n = len(nodes)
-#        for i in range(n-1):
-#            dx, dy = nodes[n+1] - nodes[n]
-
 
     def remove_short_bridges(self):
         for the_way in self.ways_list:
@@ -369,7 +311,6 @@ class Roads(objectlist.ObjectList):
             #if way.tags.has_key('layer'):
             #    AGL_ofs = 20.*float(way.tags['layer'])
             #print way.tags
-            #bla
     
             if 'highway' in the_way.tags:
                 prio = self.prio(the_way.tags['highway'], access)
@@ -385,8 +326,6 @@ class Roads(objectlist.ObjectList):
                 tex_y1 = 2/8.
                 width=6
     
-            #if prio != 1: prio = None  
-    
             if prio == 0:
     #            print "got", osm_id,
     #            for t in tags.keys():
@@ -394,7 +333,6 @@ class Roads(objectlist.ObjectList):
     #            print "(rejected)"
                 continue
     
-            #print "(accepted)"
             try:
                 if is_bridge(the_way):
                     obj = LinearBridge(self.transform, self.elev, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
@@ -450,27 +388,19 @@ class Roads(objectlist.ObjectList):
         self.attached_ways_dict = {} # a dict: for each ref (aka node) hold a list of attached ways
         for j, the_way in enumerate(ways_list):
             progress(j, len(ways_list))
-#            if the_way.osm_id == 4888143:
-#                print "got 4888143"
             for i, ref in enumerate(the_way.refs):
-#                if ref == 1132288594:
-#                    print "F (%i)" % (the_way.osm_id), the_way.refs
                 try:
-#                    if the_way.osm_id == 4888143:
-#                        print "  ref", self.nodes_dict[ref].osm_id
                     self.attached_ways_dict[ref].append((the_way, i == 0)) # store tuple (the_way, is_first)
-#                    if len(self.attached_ways_dict[ref]) == 2:
-                        # -- check if ways are actually distinct before declaring
-                        #    an junction?
-                        # not an junction if
-                        # - only 2 ways && one ends && other starts
-                        # easier?: only 2 ways, at least one node is middle node
+                    # -- check if ways are actually distinct before declaring
+                    #    an junction?
+                    # not an junction if
+                    # - only 2 ways && one ends && other starts
+                    # easier?: only 2 ways, at least one node is middle node
 #                        self.junctions_set.add(ref)
                 except KeyError:
                     self.attached_ways_dict[ref] = [(the_way, i == 0)]  # initialize node
 
         # kick nodes that belong to one way only
-        # TODO: is there something like dict comprehension?
         for ref, value in self.attached_ways_dict.items():
 #            if len(value) >= 2: self.nodes_dict[ref].n_attached_ways = len(value)
             if len(value) < degree: # FIXME: join_ways, then return 2 here
@@ -518,18 +448,6 @@ class Roads(objectlist.ObjectList):
         """
         logging.info('Splitting ways at inner junctions...')
 
-        #plt.clf()
-#        plt.xlim(0.002+1.138e1, 0.016+1.138e1)
-#        plt.ylim(0.006+4.725e1, 0.013+4.725e1)
-
-        #self.ways_list = self.ways_list[0:100]
-
-#        for the_way in self.ways_list:
-#            self.debug_plot_way(the_way, '-', lw=2, color='0.90', mark_nodes=False)
-            #for the_ref in the_way.refs:
-            #    if the_ref in self.attached_ways_dict:
-            #        plt.plot(self.nodes_dict[the_ref].lon, self.nodes_dict[the_ref].lat, 'rx')
-
         new_list = []
         for i, the_way in enumerate(self.ways_list):
             progress(i, len(self.ways_list))
@@ -551,19 +469,6 @@ class Roads(objectlist.ObjectList):
 #            self.debug_plot_way(new_way, "--", lw=2, mark_nodes=True)
 
         self.ways_list = new_list
-#            plt.show()
-#            plt.clf()
-#            break
-                
-        if 0:
-            for key, value in self.attached_ways.items():
-                if len(value) > 1:
-                    print key
-                    for way in value:
-                        try:
-                            print "  ", way.tags['name']
-                        except:
-                            print "  ", way
 
     def compute_junction_nodes(self):
         """ac3d nodes that belong to an junction need special treatment to make sure
@@ -774,13 +679,14 @@ class Roads(objectlist.ObjectList):
             print the_object
 
     def clusterize(self):
+        """create cluster.
+           put objects in clusters based on their centroid
+        """
         lmin, lmax = [vec2d(self.transform.toLocal(c)) for c in parameters.get_extent_global()]
         self.clusters = Clusters(lmin, lmax, parameters.TILE_SIZE)
 
         for the_object in self.bridges_list + self.roads_list:
             self.clusters.append(vec2d(the_object.center.centroid.coords[0]), the_object)
-        #self.objects = None
-        
 
 def write_xml(path_to_stg, file_name, object_name):
     xml = open(path_to_stg + file_name + '.xml', "w")
@@ -911,7 +817,6 @@ def main():
         path_to_output = parameters.PATH_TO_SCENERY
 
 
-#    roads.objects = roads.objects[0:1000]
     #roads.clip_at_cluster_border()
     roads.remove_short_bridges()
     if 1:
