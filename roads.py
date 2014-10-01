@@ -101,11 +101,6 @@ def no_transform((x, y)):
 def is_bridge(way):
     return "bridge" in  way.tags
 
-def progress(i, max_i):
-    if i % (max_i / 1000) == 0:
-        print "%i %i %6.2f\r" % (i, max_i, (float(i)/max_i) * 100),
-
-
 class Roads(objectlist.ObjectList):
     valid_node_keys = []
 
@@ -375,7 +370,7 @@ class Roads(objectlist.ObjectList):
         logging.info('Finding junctions...')
         self.attached_ways_dict = {} # a dict: for each ref (aka node) hold a list of attached ways
         for j, the_way in enumerate(ways_list):
-            progress(j, len(ways_list))
+            tools.progress(j, len(ways_list))
             for i, ref in enumerate(the_way.refs):
                 try:
                     self.attached_ways_dict[ref].append((the_way, i == 0)) # store tuple (the_way, is_first)
@@ -438,7 +433,7 @@ class Roads(objectlist.ObjectList):
 
         new_list = []
         for i, the_way in enumerate(self.ways_list):
-            progress(i, len(self.ways_list))
+            tools.progress(i, len(self.ways_list))
             self.debug_plot_way(the_way, '-', lw=2, color='0.90', show_label=0)
 #            self.ways_list.remove(the_way)
 

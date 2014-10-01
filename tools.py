@@ -719,6 +719,10 @@ def get_interpolator(**kwargs):
         filename = parameters.PREFIX + os.sep + 'elev.out'
         return Interpolator(filename, **kwargs)
 
+def progress(i, max_i):
+    """progress indicator"""
+    if i % (max_i / 1000) == 0:
+        print "%i %i %6.2f\r" % (i, max_i, (float(i)/max_i) * 100),
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
