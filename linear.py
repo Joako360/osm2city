@@ -61,18 +61,6 @@ class LinearObject(object):
 #            test.show_nodes(osm_id, nodes, refs, nodes_dict, self.edge[0], self.edge[1])
 #            self.plot(left=False, right=False, angle=True)
 
-    def has_large_angle(self):
-        """check for angle > 179 in way, most likely OSM errors"""
-        for i, a in enumerate(self.angle[:-1]):
-            diff = abs(math.degrees(a - self.angle[i+1]))
-            if diff > 180.: diff = 360 - diff
-            if diff > 179.: 
-                #self.plot()
-                #raise ValueError('angle > 179 in OSM_ID %i' % self.osm_id)
-                return True
-        return False
-
-
     def compute_offset(self, offset):
 
         if 0:
@@ -92,11 +80,9 @@ class LinearObject(object):
                 l = (mean_normal[0]**2 + mean_normal[1]**2)**0.5
                 mean_normal /= l
                 angle = (np.pi + self.angle[i-1] - self.angle[i])/2.
-                try:
-                    o = abs(offset / math.sin(angle))
-                except ZeroDivisionError:
-                    logging.debug("ZeroDiv in %i, angle=%g" % (self.osm_id, angle))
-                    o = abs(offset / math.sin(1.01))
+                if abs(angle) < 0.0175: # 1 deg 
+                    raise ValueError('angle > 179 in OSM_ID %i with refs %s' % (self.osm_id, str(self.refs)))
+                o = abs(offset / math.sin(angle))
                 our_node = np.array(self.center.coords[i])
                 left[i] = our_node + mean_normal * o
                 right[i] = our_node - mean_normal * o

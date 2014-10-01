@@ -395,18 +395,18 @@ class Roads(objectlist.ObjectList):
                 continue
     
             #print "(accepted)"
-            if is_bridge(the_way):
-                obj = LinearBridge(self.transform, self.elev, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
-                self.bridges_list.append(obj)
-            else:
-                obj = LinearObject(self.transform, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
-    
-                if obj.has_large_angle():
-                    print "skipping OSM_ID %i: large angle. OSM error?" % obj.osm_id
-                    continue
-    
+            try:
+                if is_bridge(the_way):
+                    obj = LinearBridge(self.transform, self.elev, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
+                    self.bridges_list.append(obj)
+                else:
+                    obj = LinearObject(self.transform, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
                 obj.typ = prio
                 self.roads_list.append(obj)
+            except ValueError, reason:
+                logging.warn("skipping OSM_ID %i: %s" % (the_way.osm_id, reason))
+                continue
+
             self.G.add_edge(the_way.refs[0], the_way.refs[-1], obj=obj)
 
         # debug: plot graph
