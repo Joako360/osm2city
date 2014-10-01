@@ -61,6 +61,7 @@ required graph functions:
 - find neighbours
 -
 """
+# 24722952 OSMID
 
 import scipy.interpolate
 import matplotlib.pyplot as plt
@@ -802,7 +803,6 @@ def main():
         path_to_output = parameters.PATH_TO_OUTPUT
     else:
         path_to_output = parameters.PATH_TO_SCENERY
-
 
     #roads.clip_at_cluster_border()
     roads.remove_short_bridges()

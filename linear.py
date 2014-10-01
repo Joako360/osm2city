@@ -81,7 +81,7 @@ class LinearObject(object):
                 mean_normal /= l
                 angle = (np.pi + self.angle[i-1] - self.angle[i])/2.
                 if abs(angle) < 0.0175: # 1 deg 
-                    raise ValueError('angle > 179 in OSM_ID %i with refs %s' % (self.osm_id, str(self.refs)))
+                    raise ValueError('AGAIN angle > 179 in OSM_ID %i with refs %s' % (self.osm_id, str(self.refs)))
                 o = abs(offset / math.sin(angle))
                 our_node = np.array(self.center.coords[i])
                 left[i] = our_node + mean_normal * o
@@ -141,6 +141,9 @@ class LinearObject(object):
     def compute_angle_etc(self):
         """Compute normals, angle, segment_length, cumulated distance start"""
         n = len(self.center.coords)
+        if self.osm_id == 24722952:
+            pass
+
 
         self.vectors = np.zeros((n-1, 2))
         self.normals = np.zeros((n, 2))
@@ -152,6 +155,11 @@ class LinearObject(object):
             vector = np.array(self.center.coords[i+1]) - np.array(self.center.coords[i])
             dx, dy = vector
             self.angle[i] = math.atan2(dy, dx)
+            angle = np.pi - abs(self.angle[i-1] - self.angle[i])
+            if i > 0 and abs(angle) < 0.0175: # 1 deg 
+                raise ValueError('CONSTR angle > 179 in OSM_ID %i at (%i, %i) with refs %s' 
+                    % (self.osm_id, i, i-1, str(self.refs)))
+
             self.segment_len[i] = (dy*dy + dx*dx)**0.5
             cumulated_distance += self.segment_len[i]
             self.dist[i+1] = cumulated_distance
@@ -277,6 +285,8 @@ class LinearObject(object):
         # Is there a case with
         # ONE index given, but need to probe elev on other side? Perhaps.
         #left_is_coords == left.coords
+        if self.osm_id == 24722952:
+            pass
 
         if left_z_set is None and not left_nodes:
             left_z = np.array([elev(the_node) for the_node in left.coords])  + self.AGL
