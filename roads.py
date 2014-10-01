@@ -70,15 +70,10 @@ import textwrap
 import coordinates
 import tools
 import parameters
-import sys
-import math
-import calc_tile
-import os
 import ac3d
 from linear import LinearObject, max_slope_for_road
 from linear_bridge import LinearBridge
 import shapely.geometry as shg
-
 
 import logging
 import osmparser
@@ -86,17 +81,15 @@ import stg_io2
 import objectlist
 import tools
 from cluster import Clusters
-# debug stuff
-import test
-from pdb import pm
-#from memory_profiler import profile
-import mem
-import gc
-import time
 import re
 import random
 import networkx as nx
 import graph
+
+# debug stuff
+import test
+from pdb import pm
+#from memory_profiler import profile
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 
@@ -137,13 +130,7 @@ class Roads(objectlist.ObjectList):
             cmin = vec2d(self.minlon, self.minlat)
             cmax = vec2d(self.maxlon, self.maxlat)
             logging.info("min/max " + str(cmin) + " " + str(cmax))
-#            center_global = (cmin + cmax)*0.5
-            #center_global = vec2d(1.135e1+0.03, 0.02+4.724e1)
-            #self.transform = coordinates.Transformation(center_global, hdg = 0)
-            #tools.init(self.transform) # FIXME. Not a nice design.
 
-        #    pass
-        #else: return
         if len(self.ways_list) >= parameters.MAX_OBJECTS: 
             return
         #if 'railway' in way.tags and (not 'highway' in way.tags):
