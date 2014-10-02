@@ -423,9 +423,8 @@ def init():
 #                            provides=['shape:urban','shape:residential','age:modern','age:old',
 #                                     'compat:roof-flat','compat:roof-pitched']))
     facades.append(Texture('tex.src/castle.jpg',
-                           h_size_meters=4, h_splits=[512, 1024, 1536, 2048], h_can_repeat=True,
-                           v_size_meters=4, v_splits=[512, 1024, 1536, 2048], v_can_repeat=False,
-                           has_roof_section=False,
+                           h_size_meters=4, h_cuts=[512, 1024, 1536, 2048], h_can_repeat=True,
+                           v_size_meters=4, v_cuts=[512, 1024, 1536, 2048], v_can_repeat=False,
                            height_min=1.,
                            provides=['building:material:stone',
                                      'age:old',
