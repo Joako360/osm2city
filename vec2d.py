@@ -34,6 +34,9 @@ class vec2d(object):
     @lat.setter
     def lat(self, value):
         self.y = value
+        
+    def __getitem__(self, key):
+        return (self.x, self.y)[key]
 
     def __fixtype(self, other):
         if type(other) == type(self): return other
