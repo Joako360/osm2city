@@ -167,7 +167,7 @@ class Probe_fgelev(object):
        By default, queries are cached. Call save_cache() to
        save the cache to disk before freeing the object.
     """
-    def __init__(self, fake=False, cache=True, auto_save_every=1000):
+    def __init__(self, fake=False, cache=True, auto_save_every=10000):
         """Open pipe to fgelev.
            Unless disabled by cache=False, initialize the cache and try to read
            it from disk. Automatically save the cache to disk every auto_save_every misses.
@@ -180,7 +180,7 @@ class Probe_fgelev(object):
         if not fake:
             path_to_fgelev = parameters.FG_ELEV
             fg_root = "$FG_ROOT"
-            self.fgelev_pipe = subprocess.Popen(path_to_fgelev + ' --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            self.fgelev_pipe = subprocess.Popen(path_to_fgelev + '  --expire 1000000 --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
         if cache:
             self.pkl_fname = parameters.PREFIX + os.sep + 'elev.pkl'
@@ -427,7 +427,7 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
 
     fg_elev = parameters.FG_ELEV
 
-    fgelev = subprocess.Popen( fg_elev + ' --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    fgelev = subprocess.Popen( fg_elev + ' --expire 1000000 --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     #fgelev = subprocess.Popen(["/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev", "--fg-root", "$FG_ROOT",  "--fg-scenery", "$FG_SCENERY"],  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     #time.sleep(5)
     buf_in = Queue.Queue(maxsize=0)
@@ -447,7 +447,7 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
             buf_in.put("%i %g %g\n" % (i, lon, lat))
 
 #Doesn't work on Windows. Process will block if output buffer isn't read
-    if 0:
+    if 1:
         print "sending buffer"
         for i in range(1000):
             fgelev.stdin.write(buf_in.get())

@@ -544,14 +544,14 @@ class Roads(objectlist.ObjectList):
 
 
     def debug_plot_ref(self, ref, style): 
-        if not parameters.debug_plot: return
+        if not parameters.DEBUG_PLOT: return
         plt.plot(self.nodes_dict[ref].lon, self.nodes_dict[ref].lat, style)
 #        plt.text(self.nodes_dict[ref].lon, self.nodes_dict[ref].lat, ref.osm_id)
 
 
     def debug_plot_way(self, way, ls, lw, color=False, mark_nodes=False, show_label=False):
 #        return
-        if not parameters.debug_plot: return
+        if not parameters.DEBUG_PLOT: return
         col = ['b', 'r', 'y', 'g', '0.25', 'k', 'c']
         if not color:
             color = col[random.randint(0, len(col)-1)]
@@ -573,20 +573,20 @@ class Roads(objectlist.ObjectList):
             plt.text(0.5*(a[0,0]+a[-1,0]), 0.5*(a[0,1]+a[-1,1]), way.osm_id)
     
     def debug_plot_junctions(self, style):
-        if not parameters.debug_plot: return
+        if not parameters.DEBUG_PLOT: return
         for ref in self.attached_ways_dict:
             node = self.nodes_dict[ref]
             plt.plot(node.lon, node.lat, style, mfc='None')
             #plt.text(node.lon, node.lat, node.osm_id, color='r')
     def debug_label_node(self, ref, text=""):
-        if not parameters.debug_plot: return
+        if not parameters.DEBUG_PLOT: return
 
         node = self.nodes_dict[ref]
         plt.plot(node.lon, node.lat, 'rs', mfc='None', ms=10)
         plt.text(node.lon+0.0001, node.lat, str(node.osm_id) + " h" + str(text))
 
     def debug_plot(self, save=False, plot_junctions=False, show=False, label_nodes=[]):
-        if not parameters.debug_plot: return
+        if not parameters.DEBUG_PLOT: return
         if plot_junctions:
             self.debug_plot_junctions('o')            
         for ref in label_nodes:
@@ -702,7 +702,7 @@ def write_xml(path_to_stg, file_name, object_name):
 
 def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
     """debug: plot roads map to .eps"""
-    if not parameters.debug_plot: return
+    if not parameters.DEBUG_PLOT: return
     plt.clf()
     transform = tools.transform
     if 0:
@@ -827,6 +827,7 @@ def main():
         logging.debug("len after %i" % len(roads.ways_list))
 
     roads.probe_elev_at_nodes()
+    elev.save_cache()
 #    roads.build_graph(roads.ways_list)
 #    roads.split_long_roads_between_bridges()
     roads.create_linear_objects()
