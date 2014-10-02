@@ -32,8 +32,7 @@ class Face(object):
 
 
 class Object(object):
-    """
-    """
+    """An object (3D) in a AC3D filed with faces and nodes"""
     def __init__(self, name, stats=None, texture=None, default_type=0x0, default_mat=0, default_swap_uv=False):
         self._nodes = []
         self._faces = []

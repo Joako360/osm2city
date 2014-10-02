@@ -14,6 +14,7 @@ import scipy.interpolate
 from pdb import pm
 from vec2d import vec2d
 import matplotlib.pyplot as plt
+from turtle import Vec2D
 
 class Deck_shape_linear(object):
     def __init__(self, h0, h1):
@@ -66,7 +67,8 @@ class LinearBridge(linear.LinearObject):
 
     def elev(self, l, normalized=True):
         """given linear distance [m], interpolate and return terrain elevation"""
-        if not normalized: l /= self.center.length
+        if not normalized:
+            l /= self.center.length
         return self.elev_spline(l)
 
     def prep_height(self, nodes_dict):

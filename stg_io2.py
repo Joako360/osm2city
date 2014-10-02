@@ -23,6 +23,7 @@ from vec2d import vec2d
 import calc_tile
 from pdb import pm
 
+
 class STG_File(object):
     """represents an .stg file.
        takes care of writing/reading/uninstalling OBJECT_* lines
@@ -54,7 +55,7 @@ class STG_File(object):
         try:
             ours_end = lines.index(self.our_magic_end)
         except ValueError:
-            self.ours_end = len(lines)
+            ours_end = len(lines)
 
         self.other_list = lines[:ours_start] + lines[ours_end+1:]
         self.our_list = lines[ours_start+1:ours_end]
@@ -66,6 +67,15 @@ class STG_File(object):
     def add_object_static(self, ac_file_name, lon_lat, elev, hdg):
         """add OBJECT_STATIC line to our_list. Returns path to stg."""
         line = "OBJECT_STATIC %s %1.5f %1.5f %1.2f %g\n" % (ac_file_name, lon_lat.lon, lon_lat.lat, elev, hdg)
+        self.our_list.append(line)
+        logging.debug(self.file_name + ':' + line)
+        self.make_path_to_stg()
+        return self.path_to_stg
+
+    def add_object_shared(self, ac_file_name, lon_lat, elev, hdg):
+        """add OBJECT_STATIC line to our_list. Returns path to stg."""
+#         OBJECT_SHARED Models/Maritime/Civilian/Pilot_Boat.ac -0.188 54.07603 -0.24 0 
+        line = "OBJECT_SHARED %s %1.5f %1.5f %1.2f %g\n" % (ac_file_name, lon_lat.lon, lon_lat.lat, elev, hdg)
         self.our_list.append(line)
         logging.debug(self.file_name + ':' + line)
         self.make_path_to_stg()
@@ -93,6 +103,7 @@ class STG_File(object):
             stg.write(self.our_magic_end)
 
         stg.close()
+
 
 class STG_Manager(object):
     """manages STG objects. Knows about scenery path.
@@ -122,6 +133,11 @@ class STG_Manager(object):
         the_stg = self(lon_lat)
         return the_stg.add_object_static(ac_file_name, lon_lat, elev, hdg)
 
+    def add_object_shared(self, ac_file_name, lon_lat, elev, hdg):
+        """Adds OBJECT_SHARED line. Returns path to stg it was added to."""
+        the_stg = self(lon_lat)
+        return the_stg.add_object_shared(ac_file_name, lon_lat, elev, hdg)
+
     def drop_ours(self):
         for the_stg in self.stg_dict.values():
             the_stg.drop_ours()
@@ -130,45 +146,84 @@ class STG_Manager(object):
         for the_stg in self.stg_dict.values():
             the_stg.write()
 
-def read(path, stg_fname, our_magic):
-    """Accepts a scenery sub-path, as in 'w010n40/w005n48/', and an .stg file name.
-       In the future, take care of multiple scenery paths here.
-       Returns list of buildings representing static/shared objects in .stg, with full path.
-    """
-    objs = []
-    our_magic_start = delimiter_string(our_magic, True)
-    our_magic_end = delimiter_string(our_magic, False)
 
-    ours = False
+class STGEntry(object):
+    SHARED_OBJECT = "OBJECT_SHARED"
+    STATIC_OBJECT = "OBJECT_STATIC"
+
+    def __init__(self, type_string, obj_filename, stg_path, lon, lat, elev, hdg):
+        self.is_static = True
+        if type_string == STGEntry.SHARED_OBJECT:
+            self.is_static = False
+        self.obj_filename = obj_filename
+        self.stg_path = stg_path  # the path of the stg_file without file name and trailing path-separator
+        self.lon = lon
+        self.lat = lat
+        self.elev = elev
+        self.hdg = hdg
+
+    def get_object_type_as_string(self):
+        if self.is_static:
+            return STGEntry.STATIC_OBJECT
+        return STGEntry.SHARED_OBJECT
+
+    def get_obj_path_and_name(self):
+        return self.stg_path + os.sep + self.obj_filename
+
+
+def read_stg_entries(stg_path_and_name, our_magic):
+    """Reads an stg-file and extracts STGEntry objects outside of marked areas for our_magic.
+    TODO: In the future, take care of multiple scenery paths here.
+    TODO: should be able to take a list of our_magic"""
+    entries = []  # list of STGEntry objects
+
+    if None is not our_magic:
+        our_magic_start = delimiter_string(our_magic, True)
+        our_magic_end = delimiter_string(our_magic, False)
+        ours = False
     try:
-        f = open(path + stg_fname)
-        for line in f.readlines():
-            if line.startswith(our_magic_start):
-                ours = True
-                continue
-            if line.startswith(our_magic_end):
-                ours = False
-                continue
-            if ours:
-                continue
+        with open(stg_path_and_name, 'r') as my_file:
+            path, stg_name = os.path.split(stg_path_and_name)
+            for line in my_file:
+                if None is not our_magic:
+                    if line.startswith(our_magic_start):
+                        ours = True
+                        continue
+                    if line.startswith(our_magic_end):
+                        ours = False
+                        continue
+                    if ours:
+                        continue
 
-            if line.startswith('#') or line.lstrip() == "":
-                continue
-            splitted = line.split()
-            typ, ac_path = splitted[0:2]
-            lon = float(splitted[2])
-            lat = float(splitted[3])
-            # alt = float(splitted[4])
-            point = shg.Point(tools.transform.toLocal((lon, lat)))
-            hdg = float(splitted[5])
-            logging.debug("stg: %s %s", typ, path + ac_path)
-            objs.append(osm2city.Building(osm_id=-1, tags=-1, outer_ring=point, name=path + ac_path, height=0, levels=0, stg_typ=typ, stg_hdg=hdg))
-        f.close()
+                if line.startswith('#') or line.lstrip() == "":
+                    continue
+                splitted = line.split()
+                type_ = splitted[0]
+                obj_filename = splitted[1]
+                lon = float(splitted[2])
+                lat = float(splitted[3])
+                elev = float(splitted[4])
+                hdg = float(splitted[5])
+                entries.append(STGEntry(type_, obj_filename, path, lon, lat, elev, hdg))
+                logging.debug("stg: %s %s", type_, path + os.sep + obj_filename)
     except IOError, reason:
         logging.warning("stg_io:read: Ignoring unreadable file %s", reason)
         return []
+    return entries
 
-    return objs
+
+def read(path, stg_fname, our_magic):
+    """Same as read_stg_entries, but returns osm2city.Building objects"""
+    stg_entries = read_stg_entries(path + stg_fname, our_magic)
+    building_objs = []
+    for entry in stg_entries:
+        point = shg.Point(tools.transform.toLocal((entry.lon, entry.lat)))
+        building_objs.append(osm2city.Building(osm_id=-1, tags=-1, outer_ring=point
+                                               , name=entry.get_obj_path_and_name()
+                                               , height=0, levels=0, stg_typ=entry.get_object_type_as_string()
+                                               , stg_hdg=entry.hdg))
+
+    return building_objs
 
 
 def delimiter_string(our_magic, is_start):

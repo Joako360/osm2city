@@ -11,6 +11,7 @@ import xml.sax
 import logging
 import unittest
 
+
 class OSMElement(object):
     def __init__(self, osm_id):
         self.osm_id = osm_id
@@ -50,6 +51,7 @@ class Member(object):
         self.ref = ref
         self.type_ = type_
         self.role = role
+
 
 class OSMContentHandler(xml.sax.ContentHandler):
     """
@@ -211,6 +213,14 @@ def is_parsable_float(str_float):
         return False
 
 
+def is_parsable_int(str_int):
+    try:
+        x = int(str_int)
+        return True
+    except ValueError:
+        return False
+
+
 def main(source_file_name):
     """Only for test of parser. Normally Parser should be instantiated from other module and then run"""
     logging.basicConfig(level=logging.INFO)
@@ -229,7 +239,9 @@ def main(source_file_name):
 if __name__ == "__main__":
     main("C:\\FlightGear\\customscenery2\\LSZS\\ch.osm")
 
+
 # ================ UNITTESTS =======================
+
 
 class TestOSMParser(unittest.TestCase):
     def test_parse_length(self):
@@ -243,9 +255,12 @@ class TestOSMParser(unittest.TestCase):
         self.assertEquals(0, parse_length('m'), "Only valid unit")
         self.assertEquals(0, parse_length('"'), "Only inches, no feet")
 
-
     def test_is_parsable_float(self):
         self.assertFalse(is_parsable_float('1,2'))
         self.assertFalse(is_parsable_float('x'))
         self.assertTrue(is_parsable_float('1.2'))
 
+    def test_is_parsable_int(self):
+        self.assertFalse(is_parsable_int('1.2'))
+        self.assertFalse(is_parsable_int('x'))
+        self.assertTrue(is_parsable_int(1))

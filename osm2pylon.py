@@ -22,15 +22,17 @@ import argparse
 import logging
 import math
 import os
+import sys
 import unittest
 import xml.sax
 
-import calc_tile
 import coordinates
+import landuse
+from landuse import Highway
 import osmparser
 import osmparser_wrapper
 import parameters
-import stg_io
+import stg_io2
 import tools
 import vec2d
 import re
@@ -290,13 +292,12 @@ class SharedPylon(object):
         self.pylon_model = None  # the path to the ac/xml model
         self.needs_stg_entry = True
         self.direction_type = SharedPylon.DIRECTION_TYPE_NORMAL  # correction for which direction mast looks at
-        # maximum one of the following
 
     def calc_global_coordinates(self, my_elev_interpolator, my_coord_transformator):
         self.lon, self.lat = my_coord_transformator.toGlobal((self.x, self.y))
         self.elevation = my_elev_interpolator(vec2d.vec2d(self.lon, self.lat), True)
 
-    def make_stg_entry(self):
+    def make_stg_entry(self, my_stg_mgr):
         """
         Returns a stg entry for this pylon.
         E.g. OBJECT_SHARED Models/Airport/ils.xml 5.313108 45.364122 374.49 268.92
@@ -312,9 +313,9 @@ class SharedPylon(object):
         elif self.direction_type == SharedPylon.DIRECTION_TYPE_START:
             direction_correction = 180
 
-        entry = ["OBJECT_SHARED", self.pylon_model, str(self.lon), str(self.lat), str(self.elevation)
-                 , str(stg_angle(self.heading - 90 + direction_correction))]  # 90 less because arms are in x-direction in ac-file
-        return " ".join(entry)
+        my_stg_mgr.add_object_shared(self.pylon_model, vec2d.vec2d(self.lon, self.lat)
+                                     , self.elevation
+                                     , stg_angle(self.heading - 90 + direction_correction))  # 90 less because arms are in x-direction in ac-file
 
 
 class Pylon(SharedPylon):
@@ -353,18 +354,17 @@ class LineWithoutCables(object):
         self.osm_id = osm_id
         self.shared_pylons = []  # SharedPylons
 
-    def make_shared_pylons_stg_entries(self):
+    def make_shared_pylons_stg_entries(self, my_stg_mgr):
         """
-        Returns the stg entries for the pylons of this WayLine in a string separated by linebreaks
+        Adds the stg entries for the pylons of this WayLine
         """
         entries = []
         for my_pylon in self.shared_pylons:
-            entries.append(my_pylon.make_stg_entry())
-        return "\n".join(entries)
+            my_pylon.make_stg_entry(my_stg_mgr)
 
     def get_center_coordinates(self):
         """Returns the lon/lat coordinates of the line"""
-        if len(self.shared_pylons) == 0:  # fiXME
+        if len(self.shared_pylons) == 0:  # FIXME
             return 0, 0
         else:  # FIXME: needs to be calculated more properly with shapely
             if len(self.shared_pylons) == 1:
@@ -374,71 +374,51 @@ class LineWithoutCables(object):
             return my_shared_pylon.lon, my_shared_pylon.lat
 
 
-class Landuse(LineWithoutCables):
-    TYPE_COMMERCIAL = 10
-    TYPE_INDUSTRIAL = 20
-    TYPE_RESIDENTIAL = 30
-    TYPE_RETAIL = 40
+class StreetlampWay(LineWithoutCables):
+    def __init__(self, osm_id, highway):
+        super(StreetlampWay, self).__init__(osm_id)
+        self.highway = highway
 
-    def __init__(self, osm_id):
-        super(Landuse, self).__init__(osm_id)
-        self.type_ = 0
-        self.polygon = None
-
-
-class Highway(LineWithoutCables):
-    TYPE_MOTORWAY = 11
-    TYPE_TRUNK = 12
-    TYPE_PRIMARY = 13
-    TYPE_SECONDARY = 14
-    TYPE_TERTIARY = 15
-    TYPE_UNCLASSIFIED = 16
-    TYPE_ROAD = 17
-    TYPE_RESIDENTIAL = 18
-    TYPE_LIVING_STREET = 19
-    TYPE_SERVICE = 20
-
-    OFFSET = 5
-    DEFAULT_DISTANCE = 50
-
-    def __init__(self, osm_id):
-        super(Highway, self).__init__(osm_id)
-        self.type_ = 0
-        self.linear = None  # The LineaString of the line
-        self.is_roundabout = False
+    @staticmethod
+    def has_lamps(highway_type):
+        if Highway.TYPE_SLOW == highway_type:
+            return False
+        return True
 
     def calc_and_map(self, my_elev_interpolator, my_coord_transformator):
-        if self.is_roundabout:
+        if self.highway.is_roundabout:
             shared_pylon = SharedPylon()
             shared_pylon.pylon_model = "Models/StreetFurniture/Streetlamp3.xml"
-            p = Polygon(self.linear)
+            p = Polygon(self.highway.linear)
             shared_pylon.x = p.centroid.x
             shared_pylon.y = p.centroid.y
             self.shared_pylons.append(shared_pylon)
         else:
             model = "Models/StreetFurniture/Streetlamp2.xml"
-            parallel_offset = 2.5
-            if self.type_ in [Highway.TYPE_SERVICE, Highway.TYPE_RESIDENTIAL, Highway.TYPE_LIVING_STREET]:
+            default_distance = parameters.C2P_STREETLAMPS_OTHER_DISTANCE
+            parallel_offset = self.highway.get_width()/2
+            if self.highway.type_ in [Highway.TYPE_SERVICE, Highway.TYPE_RESIDENTIAL, Highway.TYPE_LIVING_STREET
+                                      , Highway.TYPE_PEDESTRIAN]:
                 model = "Models/StreetFurniture/Streetlamp1.xml"
-            elif self.type_ in [Highway.TYPE_ROAD, Highway.TYPE_UNCLASSIFIED, Highway.TYPE_TERTIARY]:
-                parallel_offset = 3.0
-            elif self.type_ in [Highway.TYPE_SECONDARY, Highway.TYPE_PRIMARY, Highway.TYPE_TRUNK]:
-                parallel_offset = 3.5
-            else:  # MOTORWAY
-                parallel_offset = 7
-            # FIXME: calculate parallel_offset based on lanes
+                default_distance = parameters.C2P_STREETLAMPS_RESIDENTIAL_DISTANCE
 
             self.shared_pylons = []  # list of SharedPylon
+            x, y = self.highway.linear.coords[0]
+            shared_pylon = SharedPylon()
+            shared_pylon.x = x
+            shared_pylon.y = y
+            shared_pylon.needs_stg_entry = False
+            shared_pylon.calc_global_coordinates(my_elev_interpolator, my_coord_transformator)
+            self.shared_pylons.append(shared_pylon)  # used for calculating heading - especially if only one lamp
 
-            my_length = self.linear.length  # omit recalculating length all the time
-            my_right_parallel = self.linear.parallel_offset(parallel_offset, 'right', join_style=1)
+            my_right_parallel = self.highway.linear.parallel_offset(parallel_offset, 'right', join_style=1)
             my_right_parallel_length = my_right_parallel.length
-            current_distance = Highway.OFFSET  # the distance from the origin of the current streetlamp
+            current_distance = 10  # the distance from the origin of the current streetlamp
 
             while True:
-                if current_distance > my_length:
+                if current_distance > my_right_parallel_length:
                     break
-                point_on_line = my_right_parallel.interpolate(my_right_parallel_length - current_distance * (my_right_parallel_length / my_length))
+                point_on_line = my_right_parallel.interpolate(my_right_parallel_length - current_distance)
                 shared_pylon = SharedPylon()
                 shared_pylon.x = point_on_line.x
                 shared_pylon.y = point_on_line.y
@@ -446,7 +426,10 @@ class Highway(LineWithoutCables):
                 shared_pylon.direction_type = SharedPylon.DIRECTION_TYPE_MIRROR
                 shared_pylon.calc_global_coordinates(my_elev_interpolator, my_coord_transformator)
                 self.shared_pylons.append(shared_pylon)
-                current_distance += Highway.DEFAULT_DISTANCE
+                current_distance += default_distance
+
+            # calculate heading
+            calc_heading_nodes(self.shared_pylons)
 
 
 class Line(LineWithoutCables):
@@ -496,12 +479,14 @@ class Line(LineWithoutCables):
                               , catenary_a, segment.length)
                 segment.cables.append(cable)
 
-    def make_cables_ac_xml_stg_entries(self, filename, path, cluster_max_length):
+    def make_cables_ac_xml_stg_entries(self, my_stg_mgr, line_index, wayname, cluster_max_length, my_files_to_remove):
         """
-        Returns the stg entries for the cables of this WayLine in a string separated by linebreaks
+        Writes the stg entries for the cables of this WayLine in a string separated by linebreaks
         E.g. OBJECT_STATIC LSZSpylons1901.xml 9.75516 46.4135 2000.48 0
-        Before this it creates the xml-file and ac-file containing the cables.
-        Each WaySegment is represented as an object group in ac with each cable of the WaySegment as a kid
+        After this it creates the xml-file and ac-file containing the cables.
+        Each WaySegment is represented as an object group in ac with each cable of the WaySegment as a child
+
+        files_to_remove is used if the whole operation is only to uninstall
 
         In order to reduce rounding errors clusters of WaySegments are used instead of a whole WayLine per file.
         """
@@ -517,55 +502,60 @@ class Line(LineWithoutCables):
             cluster_segments.append(way_segment)
             cluster_length += way_segment.length
             if (cluster_length >= cluster_max_length) or (len(self.way_segments) - 1 == i):
-                cluster_filename = filename + '_' + str(cluster_index)
-                ac_file_lines = []
-                ac_file_lines.append("AC3Db")
-                ac_file_lines.append('MATERIAL "cable" rgb 0.3 0.3 0.3 amb 0.3 0.3 0.3 emis 0.0 0.0 0.0 spec 0.3 0.3 0.3 shi 1 trans 0')
-                ac_file_lines.append("OBJECT world")
-                ac_file_lines.append("kids " + str(len(cluster_segments)))
-                cluster_segment_index = 0
-                for cluster_segment in cluster_segments:
-                    cluster_segment_index += 1
-                    ac_file_lines.append("OBJECT group")
-                    ac_file_lines.append('name "segment%05d"' % cluster_segment_index)
-                    ac_file_lines.append("kids " + str(len(cluster_segment.cables)))
-                    for cable in cluster_segment.cables:
-                        cable.translate_vertices_relative(start_pylon.x, start_pylon.y, start_pylon.elevation)
-                        ac_file_lines.append(cable.make_ac_entry(0))  # material is 0-indexed
-                with open(path + cluster_filename + ".ac", 'w') as f:
-                    f.write("\n".join(ac_file_lines))
+                # write stuff to files
+                replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)
+                cluster_filename = replacement_prefix + wayname + "%05d_%05d" % (line_index, cluster_index)
+                path_to_stg = my_stg_mgr.add_object_static(cluster_filename + '.xml'
+                                                           , vec2d.vec2d(start_pylon.lon, start_pylon.lat)
+                                                           , start_pylon.elevation, 90)
+                if None is not my_files_to_remove:
+                    my_files_to_remove.append(path_to_stg + cluster_filename + ".ac")
+                    my_files_to_remove.append(path_to_stg + cluster_filename + ".xml")
+                else:
+                    ac_file_lines = []
+                    ac_file_lines.append("AC3Db")
+                    ac_file_lines.append('MATERIAL "cable" rgb 0.3 0.3 0.3 amb 0.3 0.3 0.3 emis 0.0 0.0 0.0 spec 0.3 0.3 0.3 shi 1 trans 0')
+                    ac_file_lines.append("OBJECT world")
+                    ac_file_lines.append("kids " + str(len(cluster_segments)))
+                    cluster_segment_index = 0
+                    for cluster_segment in cluster_segments:
+                        cluster_segment_index += 1
+                        ac_file_lines.append("OBJECT group")
+                        ac_file_lines.append('name "segment%05d"' % cluster_segment_index)
+                        ac_file_lines.append("kids " + str(len(cluster_segment.cables)))
+                        for cable in cluster_segment.cables:
+                            cable.translate_vertices_relative(start_pylon.x, start_pylon.y, start_pylon.elevation)
+                            ac_file_lines.append(cable.make_ac_entry(0))  # material is 0-indexed
 
-                xml_file_lines = []
-                xml_file_lines.append('<?xml version="1.0"?>')
-                xml_file_lines.append('<PropertyList>')
-                xml_file_lines.append('<path>' + cluster_filename + '.ac</path>')  # the ac-file is in the same directory
-                xml_file_lines.append('<animation>')
-                xml_file_lines.append('<type>range</type>')
-                xml_file_lines.append('<min-m>0</min-m>')
-                xml_file_lines.append('<max-property>/sim/rendering/static-lod/rough</max-property>')
-                for j in xrange(1, len(cluster_segments) + 1):
-                    xml_file_lines.append('<object-name>segment%05d</object-name>' % j)
-                xml_file_lines.append('</animation>')
-                if parameters.C2P_CABLES_NO_SHADOW:
+                    xml_file_lines = []
+                    xml_file_lines.append('<?xml version="1.0"?>')
+                    xml_file_lines.append('<PropertyList>')
+                    xml_file_lines.append('<path>' + cluster_filename + '.ac</path>')  # the ac-file is in the same directory
                     xml_file_lines.append('<animation>')
-                    xml_file_lines.append('<type>noshadow</type>')
+                    xml_file_lines.append('<type>range</type>')
+                    xml_file_lines.append('<min-m>0</min-m>')
+                    xml_file_lines.append('<max-property>/sim/rendering/static-lod/rough</max-property>')
                     for j in xrange(1, len(cluster_segments) + 1):
                         xml_file_lines.append('<object-name>segment%05d</object-name>' % j)
                     xml_file_lines.append('</animation>')
-                xml_file_lines.append('</PropertyList>')
-                with open(path + cluster_filename + ".xml", 'w') as f:
-                    f.write("\n".join(xml_file_lines))
+                    if parameters.C2P_CABLES_NO_SHADOW:
+                        xml_file_lines.append('<animation>')
+                        xml_file_lines.append('<type>noshadow</type>')
+                        for j in xrange(1, len(cluster_segments) + 1):
+                            xml_file_lines.append('<object-name>segment%05d</object-name>' % j)
+                        xml_file_lines.append('</animation>')
+                    xml_file_lines.append('</PropertyList>')
 
-                entry = ["OBJECT_STATIC", cluster_filename + ".xml", str(start_pylon.lon)
-                         , str(start_pylon.lat), str(start_pylon.elevation), "90"]
-                stg_entries.append(" ".join(entry))
+                    # -- write .ac and .xml
+                    with open(path_to_stg + cluster_filename + ".ac", 'w') as f:
+                        f.write("\n".join(ac_file_lines))
+                    with open(path_to_stg + cluster_filename + ".xml", 'w') as f:
+                        f.write("\n".join(xml_file_lines))
 
                 cluster_length = 0.0
                 cluster_segments = []
                 cluster_index += 1
                 start_pylon = None
-
-        return "\n".join(stg_entries)
 
 
 class WayLine(Line):  # The name "Line" is also used in e.g. SymPy
@@ -710,9 +700,6 @@ class RailMast(SharedPylon):
             self.pylon_model = "Models/StreetFurniture/rail_stop_tension.xml"
         self.direction_type = direction_type
 
-    def is_virtual(self):
-        return self.type_ == RailMast.TYPE_VIRTUAL_MAST
-
 
 class RailLine(Line):
     TYPE_RAILWAY_GAUGE_NARROW = 11
@@ -843,19 +830,6 @@ class RailLine(Line):
         return is_right
 
 
-def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator):
-    my_buildings = {}  # osm_id as key, Polygon
-    for way in ways_dict.values():
-        coordinates = []
-        for ref in way.refs:
-            if ref in nodes_dict:
-                my_node = nodes_dict[ref]
-                coordinates.append(my_coord_transformator.toLocal((my_node.lon, my_node.lat)))
-        if 2 < len(coordinates):
-            my_buildings[way.osm_id] = Polygon(coordinates)
-    return my_buildings
-
-
 def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_coord_transformator):
     my_railways = {}  # osm_id as key, RailLine
     my_shared_nodes = {}  # node osm_id as key, list of WayLine objects as value
@@ -941,79 +915,30 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_co
     return my_railways
 
 
-def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator, landuse_refs):
+def process_highways_for_streetlamps(my_highways, landuse_buffers):
     """
-    No attempt to merge lines because most probably the lines are split at corssing.
-    No attempt to guess whether there there is a division in the conter, where a street lamp with two lamps could be
-    placed - e.g. using a combination of highway type, oneway, number of lanes etc
+    Test whether the highway is within appropriate land use or intersects with appropriate land use
+    No attempt to merge lines because most probably the lines are split at crossing.
+    No attempt to guess whether there there is a division in the center, where a street lamp with two lamps could be
+    placed - e.g. using a combination of highway type, one-way, number of lanes etc
     """
-    my_highways = {}  # osm_id as key, RailLine
-    my_shared_nodes = {}  # node osm_id as key, list of WayLine objects as value
-
-    # First reduce to electrified narrow_gauge or rail, no tunnels and no abandoned
-    for way in ways_dict.values():
-        my_highway = Highway(way.osm_id)
-        valid_highway = False
-        is_challenged = False
-        for key in way.tags:
-            value = way.tags[key]
-            if "highway" == key:
-                valid_highway = True
-                if value in ["motorway", "motorway_link"]:
-                    my_highway.type_ = Highway.TYPE_MOTORWAY
-                elif value in ["trunk", "trunk_link"]:
-                    my_highway.type_ = Highway.TYPE_TRUNK
-                elif value in ["primary", "primary_link"]:
-                    my_highway.type_ = Highway.TYPE_PRIMARY
-                elif value in ["secondary", "secondary_link"]:
-                    my_highway.type_ = Highway.TYPE_SECONDARY
-                elif value in ["tertiary", "tertiary_link"]:
-                    my_highway.type_ = Highway.TYPE_TERTIARY
-                elif value == "unclassified":
-                    my_highway.type_ = Highway.TYPE_UNCLASSIFIED
-                elif value == "road":
-                    my_highway.type_ = Highway.TYPE_ROAD
-                elif value == "residential":
-                    my_highway.type_ = Highway.TYPE_RESIDENTIAL
-                elif value == "living_street":
-                    my_highway.type_ = Highway.TYPE_LIVING_STREET
-                elif value == "service":
-                    my_highway.type_ = Highway.TYPE_SERVICE
-                else:
-                    valid_highway = False
-            elif ("tunnel" == key) and ("yes" == value):
-                is_challenged = True
-            elif ("junction" == key) and ("roundabout" == value):
-                my_highway.is_roundabout = True
-        if valid_highway and not is_challenged:
-            # Process the Nodes
-            my_coordinates = []
-            for ref in way.refs:
-                if ref in nodes_dict:
-                    my_node = nodes_dict[ref]
-                    x, y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
-                    my_coordinates.append((x, y))
-            if len(my_coordinates) >= 2:
-                my_highway.linear = LineString(my_coordinates)
-                my_highways[my_highway.osm_id] = my_highway
-
-    # Test whether the highway is within appropriate land use or intersects with appropriate land use
+    my_streetlamps = {}
     for key in my_highways.keys():
         my_highway = my_highways[key]
+        if not StreetlampWay.has_lamps(my_highway.type_):
+            continue
         is_within = False
         intersections = []
-        for landuse_ref in landuse_refs.values():
-            if my_highway.linear.within(landuse_ref.polygon):
+        for lu_buffer in landuse_buffers:
+            if my_highway.linear.within(lu_buffer):
                 is_within = True
                 break
-            elif my_highway.linear.intersects(landuse_ref.polygon):
-                intersections.append(my_highway.linear.intersection(landuse_ref.polygon))
-        if not is_within:
-            if len(intersections) == 0:
-                del my_highways[key]
-            elif my_highway.is_roundabout:
-                pass
-            else:
+            elif my_highway.linear.intersects(lu_buffer):
+                intersections.append(my_highway.linear.intersection(lu_buffer))
+        if is_within:
+            my_streetlamps[my_highway.osm_id] = StreetlampWay(my_highway.osm_id, my_highway)
+        else:
+            if len(intersections) > 0:
                 index = 10000000000
                 for intersection in intersections:
                     if isinstance(intersection, MultiLineString):
@@ -1025,57 +950,40 @@ def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator, landuse_r
                     new_highway = Highway(index + key)
                     new_highway.type_ = my_highway.type_
                     new_highway.linear = intersection
-                    my_highways[new_highway.osm_id] = new_highway
+                    my_streetlamps[new_highway.osm_id] = StreetlampWay(new_highway.osm_id, new_highway)
                 del my_highways[key]
 
     # Remove the too short lines
-    for key in my_highways.keys():
-        my_highway = my_highways[key]
-        if not isinstance(my_highway.linear, LineString):
-            del my_highways[key]
-        elif my_highway.is_roundabout and (50 > my_highway.linear.length or 300 < my_highway.linear.length):
-            del my_highways[key]
-        elif my_highway.linear.length < (2 * Highway.OFFSET):
-            del my_highways[key]
+    for key in my_streetlamps.keys():
+        my_streetlamp = my_streetlamps[key]
+        if not isinstance(my_streetlamp.highway.linear, LineString):
+            del my_streetlamps[key]
+        elif my_streetlamp.highway.is_roundabout and (50 > my_streetlamp.highway.linear.length or 300 < my_streetlamp.highway.linear.length):
+            del my_streetlamps[key]
+        elif my_streetlamp.highway.linear.length < parameters.C2P_STREETLAMPS_MIN_STREET_LENGTH:
+            del my_streetlamps[key]
 
-    return my_highways
+    return my_streetlamps
 
 
-def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator):
-    my_landuses = {}  # osm_id as key, Landuse
-
-    # First reduce to electrified narrow_gauge or rail, no tunnels and no abandoned
-    for way in ways_dict.values():
-        my_landuse = Landuse(way.osm_id)
-        valid_landuse = True
-        for key in way.tags:
-            value = way.tags[key]
-            if "landuse" == key:
-                if value == "commercial":
-                    my_landuse.type_ = Landuse.TYPE_COMMERCIAL
-                elif value == "industrial":
-                    my_landuse.type_ = Landuse.TYPE_INDUSTRIAL
-                elif value == "residential":
-                    my_landuse.type_ = Landuse.TYPE_RESIDENTIAL
-                elif value == "retail":
-                    my_landuse.type_ = Landuse.TYPE_RETAIL
-                else:
-                    valid_landuse = False
-            else:
-                valid_landuse = False
-        if valid_landuse:
-            # Process the Nodes
-            my_coordinates = []
-            for ref in way.refs:
-                if ref in nodes_dict:
-                    my_node = nodes_dict[ref]
-                    x, y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
-                    my_coordinates.append((x, y))
-            if len(my_coordinates) >= 3:
-                my_landuse.polygon = Polygon(my_coordinates)
-                if my_landuse.polygon.is_valid:
-                    my_landuses[my_landuse.osm_id] = my_landuse
-    return my_landuses
+def merge_streetlamp_buffers(landuse_refs):
+    """Based on existing landuses applies extra buffer and then unions as many as possible"""
+    landuse_buffers = []
+    for landuse_ref in landuse_refs.values():
+        streetlamp_buffer = landuse_ref.polygon.buffer(parameters.C2P_STREETLAMPS_MAX_DISTANCE_LANDUSE)
+        if 0 == len(landuse_buffers):
+            landuse_buffers.append(streetlamp_buffer)
+        else:
+            is_found = False
+            for i in range(len(landuse_buffers)):
+                merged_buffer = landuse_buffers[i]
+                if streetlamp_buffer.intersects(merged_buffer):
+                    landuse_buffers[i] = merged_buffer.union(streetlamp_buffer)
+                    is_found = True
+                    break
+            if not is_found:
+                landuse_buffers.append(streetlamp_buffer)
+    return landuse_buffers
 
 
 def process_osm_power_aerialway(nodes_dict, ways_dict, my_elev_interpolator, my_coord_transformator, building_refs):
@@ -1274,36 +1182,13 @@ def merge_lines(osm_id, line0, line1, shared_nodes):
                 shared_node.append(line0)
 
 
-def write_stg_entries(stg_fp_dict, lines_dict, wayname, cluster_max_length):
+def write_stg_entries(my_stg_mgr, my_files_to_remove, lines_dict, wayname, cluster_max_length):
     line_index = 0
     for line in lines_dict.values():
         line_index += 1
-        line_center = line.get_center_coordinates()
-        stg_fname = calc_tile.construct_stg_file_name(line_center)
-        if parameters.PATH_TO_OUTPUT:
-            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, line_center)
-        else:
-            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, line_center)
-        if not stg_fname in stg_fp_dict:
-            if not os.path.exists(path):
-                try:
-                    os.makedirs(path)
-                except OSError:
-                    logging.exception("Unable to create path to output directory")
-                    pass
-            stg_io.uninstall_ours(path, stg_fname, OUR_MAGIC)
-            stg_file = open(path + stg_fname, "a")
-            logging.info('Opening new stg-file for append: ' + path + stg_fname)
-            stg_file.write(stg_io.delimiter_string(OUR_MAGIC, True) + "\n# do not edit below this line\n#\n")
-            stg_fp_dict[stg_fname] = stg_file
-        else:
-            stg_file = stg_fp_dict[stg_fname]
-        stg_file.write(line.make_shared_pylons_stg_entries() + "\n")
+        line.make_shared_pylons_stg_entries(my_stg_mgr)
         if None is not wayname:
-             #incase Prefix is a path (batch processing)
-            replacement_prefix = re.sub('[\/]','_', parameters.PREFIX)
-            filename = replacement_prefix + wayname + "%05d" % line_index
-            stg_file.write(line.make_cables_ac_xml_stg_entries(filename, path, cluster_max_length) + "\n")
+            line.make_cables_ac_xml_stg_entries(my_stg_mgr, line_index, wayname, cluster_max_length, my_files_to_remove)
 
 
 def calc_heading_nodes(nodes_array):
@@ -1374,102 +1259,143 @@ def optimize_catenary(half_distance_pylons, max_value, sag, max_variation):
     return -1, -1
 
 
-if __name__ == "__main__":
+def main():
     logging.basicConfig(level=logging.DEBUG)
     # Handling arguments and parameters
     parser = argparse.ArgumentParser(
         description="osm2pylon reads OSM data and creates pylons, powerlines and aerialways for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
+    parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
+    parser.add_argument("-u", dest="uninstall", action="store_true", help="uninstall ours from .stg")
     args = parser.parse_args()
     if args.filename is not None:
         parameters.read_from_file(args.filename)
+    if args.e:
+        parameters.NO_ELEV = True
+    files_to_remove = None
+    if args.uninstall:
+        logging.info("Uninstalling.")
+        files_to_remove = []
+        parameters.NO_ELEV = True
 
     # Initializing tools for global/local coordinate transformations
-    cmin = vec2d.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
-    cmax = vec2d.vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
-    center = (cmin + cmax) * 0.5
-    coord_transformator = coordinates.Transformation(center, hdg=0)
+    center_global = parameters.get_center_global()
+    osm_fname = parameters.get_OSM_file_name()
+    coord_transformator = coordinates.Transformation(center_global, hdg=0)
     tools.init(coord_transformator)
+
     # Reading elevation data
     logging.info("Reading ground elevation data might take some time ...")
-    elev_interpolator = tools.Interpolator(parameters.PREFIX + os.sep + "elev.out", fake=parameters.NO_ELEV)
+    elev_interpolator = tools.get_interpolator(fake=parameters.NO_ELEV)
 
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
     # the lists below are in sequence: buildings references, power/aerialway, railway overhead, landuse and highway
     valid_node_keys = ["power", "structure", "material", "height", "colour", "aerialway"
-                       , "railway"
-    ]
+                       , "railway"]
     valid_way_keys = ["building"
                       , "power", "aerialway", "voltage", "cables", "wires"
                       , "railway", "electrified", "tunnel"
                       , "landuse"
-                      , "highway", "junction"
-    ]
+                      , "highway", "junction"]
     valid_relation_keys = []
     req_relation_keys = []
     req_way_keys = ["building", "power", "aerialway", "railway", "landuse", "highway"]
     handler = osmparser_wrapper.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
                                                   req_relation_keys)
-    source = open(parameters.PREFIX + os.sep + parameters.OSM_FILE)
+    source = open(osm_fname)
     xml.sax.parse(source, handler)
     # References for buildings
-    building_refs = process_osm_building_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
-    logging.info('Number of reference buildings: %s', len(building_refs))
-    # References for landuse
-    landuse_refs = process_osm_landuse_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
+    building_refs = {}
+    if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_AERIALWAYS or parameters.C2P_PROCESS_STREETLAMPS:
+        building_refs = landuse.process_osm_building_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
+        logging.info('Number of reference buildings: %s', len(building_refs))
     # Power lines and aerialways
-    powerlines, aerialways = process_osm_power_aerialway(handler.nodes_dict, handler.ways_dict, elev_interpolator
-                                                         , coord_transformator, building_refs)
-    rail_lines = process_osm_rail_overhead(handler.nodes_dict, handler.ways_dict, elev_interpolator
-                                           , coord_transformator)
-    highways = process_osm_highway(handler.nodes_dict, handler.ways_dict, coord_transformator, landuse_refs)
+    powerlines = {}
+    aerialways = {}
+    if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_AERIALWAYS:
+        powerlines, aerialways = process_osm_power_aerialway(handler.nodes_dict, handler.ways_dict, elev_interpolator
+                                                             , coord_transformator, building_refs)
+        if not parameters.C2P_PROCESS_POWERLINES:
+            powerlines.clear()
+        if not parameters.C2P_PROCESS_AERIALWAYS:
+            aerialways.clear()
+        logging.info('Number of power lines to process: %s', len(powerlines))
+        logging.info('Number of aerialways to process: %s', len(aerialways))
+        for wayline in powerlines.values():
+            wayline.calc_and_map()
+        for wayline in aerialways.values():
+            wayline.calc_and_map()
+    # railway overhead lines
+    rail_lines = {}
+    if parameters.C2P_PROCESS_OVERHEAD_LINES:
+        rail_lines = process_osm_rail_overhead(handler.nodes_dict, handler.ways_dict, elev_interpolator
+                                               , coord_transformator)
+        logging.info('Reduced number of rail lines: %s', len(rail_lines))
+        for rail_line in rail_lines.values():
+            rail_line.calc_and_map(elev_interpolator, coord_transformator, rail_lines.values())
+    # street lamps
+    streetlamp_ways = {}
+    if parameters.C2P_PROCESS_STREETLAMPS:
+        landuse_refs = landuse.process_osm_landuse_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
+        if parameters.LU_LANDUSE_GENERATE_LANDUSE:
+            generated_landuses = landuse.generate_landuse_from_buildings(landuse_refs, building_refs)
+            for generated in generated_landuses.values():
+                landuse_refs[generated.osm_id] = generated
+        logging.info('Number of landuse references: %s', len(landuse_refs))
+        streetlamp_buffers = merge_streetlamp_buffers(landuse_refs)
+        logging.info('Number of streetlamp buffers: %s', len(streetlamp_buffers))
+        highways = landuse.process_osm_highway(handler.nodes_dict, handler.ways_dict, coord_transformator)
+        streetlamp_ways = process_highways_for_streetlamps(highways, streetlamp_buffers)
+        logging.info('Reduced number of streetlamp ways: %s', len(streetlamp_ways))
+        for highway in streetlamp_ways.values():
+            highway.calc_and_map(elev_interpolator, coord_transformator)
+        landuse_refs = None
+
     # free some memory
-    landuse_refs = None
     building_refs = None
     handler = None
 
-    # only keep those lines, which should be processed
-    if not parameters.C2P_PROCESS_POWERLINES:
-        powerlines.clear()
-    if not parameters.C2P_PROCESS_AERIALWAYS:
-        aerialways.clear()
-    if not parameters.C2P_PROCESS_OVERHEAD_LINES:
-        rail_lines.clear()
-    if not parameters.C2P_PROCESS_STREETLAMPS:
-        highways.clear()
-
-    logging.info('Number of power lines to process: %s', len(powerlines))
-    logging.info('Number of aerialways to process: %s', len(aerialways))
-    logging.info('Reduced number of rail lines: %s', len(rail_lines))
-    logging.info('Reduced number of highways: %s', len(highways))
-
-    # Work on object
-    for wayline in powerlines.values():
-        wayline.calc_and_map()
-    for wayline in aerialways.values():
-        wayline.calc_and_map()
-
-    # Overhead lines for rail
-    for rail_line in rail_lines.values():
-        rail_line.calc_and_map(elev_interpolator, coord_transformator, rail_lines.values())
-    # streetlamps
-    for highway in highways.values():
-        highway.calc_and_map(elev_interpolator, coord_transformator)
+    # -- initialize STG_Manager
+    if parameters.PATH_TO_OUTPUT:
+        path_to_output = parameters.PATH_TO_OUTPUT
+    else:
+        path_to_output = parameters.PATH_TO_SCENERY
+    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, overwrite=True)
 
     # Write to Flightgear
-    stg_file_pointers = {}  # -- dictionary of stg file pointers
-    write_stg_entries(stg_file_pointers, powerlines, "powerline", parameters.C2P_CLUSTER_POWER_LINE_MAX_LENGTH)
-    write_stg_entries(stg_file_pointers, aerialways, "aerialway", parameters.C2P_CLUSTER_AERIALWAY_MAX_LENGTH)
-    write_stg_entries(stg_file_pointers, rail_lines, "overhead", parameters.C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH)
-    write_stg_entries(stg_file_pointers, highways, None, None)
+    if parameters.C2P_PROCESS_POWERLINES:
+        write_stg_entries(stg_manager, files_to_remove, powerlines
+                          , "powerline", parameters.C2P_CLUSTER_POWER_LINE_MAX_LENGTH)
+    if parameters.C2P_PROCESS_AERIALWAYS:
+        write_stg_entries(stg_manager, files_to_remove, aerialways
+                          , "aerialway", parameters.C2P_CLUSTER_AERIALWAY_MAX_LENGTH)
+    if parameters.C2P_PROCESS_OVERHEAD_LINES:
+        write_stg_entries(stg_manager, files_to_remove, rail_lines
+                          , "overhead", parameters.C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH)
+    if parameters.C2P_PROCESS_STREETLAMPS:
+        write_stg_entries(stg_manager, files_to_remove, streetlamp_ways, None, None)
 
-    for stg in stg_file_pointers.values():
-        stg.write(stg_io.delimiter_string(OUR_MAGIC, False) + "\n")
-        stg.close()
+    if args.uninstall:
+        for f in files_to_remove:
+            try:
+                os.remove(f)
+            except IOError:
+                pass
+        stg_manager.drop_ours()
+        stg_manager.write()
+        logging.info("uninstall done.")
+        sys.exit(0)
+
+    stg_manager.write()
+    elev_interpolator.save_cache()
 
     logging.info("******* Finished *******")
+
+
+if __name__ == "__main__":
+    main()
 
 
 # ================ UNITTESTS =======================
@@ -1532,7 +1458,6 @@ class TestOSMPylons(unittest.TestCase):
         self.assertAlmostEqual(0, pylon5.heading, 2)
         # then test other stuff
         self.assertEqual(4, len(wayline1.way_segments))
-        wayline1.make_cables_ac_xml_stg_entries("foo", "foo", parameters.C2P_CLUSTER_POWER_LINE_MAX_LENGTH)
 
     def test_cable_vertex_calc_position(self):
         vertex = CableVertex(10, 5)

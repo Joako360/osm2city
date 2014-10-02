@@ -101,11 +101,12 @@ def no_transform((x, y)):
 def is_bridge(way):
     return "bridge" in  way.tags
 
+
 class Roads(objectlist.ObjectList):
     valid_node_keys = []
 
     #req_and_valid_keys = {"valid_way_keys" : ["highway"], "req_way_keys" : ["highway"]}
-    req_keys = ['highway', 'railway']
+    req_keys = ['highway', 'railway', 'amenity']
 
     def __init__(self, transform, elev):
         super(Roads, self).__init__(transform)
@@ -303,6 +304,9 @@ class Roads(objectlist.ObjectList):
                     width = 2.87
                     tex_y0 = 0
                     tex_y1 = 1/8.
+            elif 'amenity' in way.tags:
+                if way.tags['amenity'] in ['parking']:
+                    prio = 7
     
             if prio in [1, 2]:
                 tex_y0 = 1/8.
@@ -763,11 +767,10 @@ def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
     plt.clf()
 
     
+
 def main():
-    
     #logging.basicConfig(level=logging.INFO)
     logging.basicConfig(level=logging.DEBUG)
-    
     import argparse
     parser = argparse.ArgumentParser(description="bridge.py reads OSM data and creates bridge models for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
@@ -788,7 +791,6 @@ def main():
     transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(transform)
     elev = tools.get_interpolator(fake=parameters.NO_ELEV)
-    print "tr 0", transform
     roads = Roads(transform, elev)
     handler = osmparser.OSMContentHandler(valid_node_keys=[])
     source = open(osm_fname)

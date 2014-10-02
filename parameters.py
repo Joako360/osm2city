@@ -56,6 +56,7 @@ ELEV_MODE = ''              # Either Manual, Telnet, Fgelev
 # -- check for overlap with static models. The scenery folder must contain an "Objects" folder
 OVERLAP_CHECK = True
 OVERLAP_RADIUS = 5
+BUILDING_REMOVE_WITH_PARTS = False
 
 TILE_SIZE = 1000            # -- tile size in meters for clustering of buildings
 
@@ -165,6 +166,19 @@ C2P_CATENARY_A_OVERHEAD_LINE = 600
 C2P_CATENARY_MIN_DISTANCE = 30
 
 C2P_POWER_LINE_ALLOW_100M = False
+
+C2P_STREETLAMPS_MAX_DISTANCE_LANDUSE = 100
+C2P_STREETLAMPS_RESIDENTIAL_DISTANCE = 40
+C2P_STREETLAMPS_OTHER_DISTANCE = 70
+C2P_STREETLAMPS_MIN_STREET_LENGTH = 20
+
+#=============================================================================
+# PARAMETERS RELATED TO landuse.py
+#=============================================================================
+LU_LANDUSE_GENERATE_LANDUSE = True
+LU_LANDUSE_BUILDING_BUFFER_DISTANCE = 25
+LU_LANDUSE_BUILDING_BUFFER_DISTANCE_MAX = 50
+LU_LANDUSE_MIN_AREA = 5000
 
 #=============================================================================
 # PARAMETERS RELATED TO ROADS IN roads.py

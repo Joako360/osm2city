@@ -41,6 +41,7 @@ class LinearObject(object):
         self.width = width
         self.AGL = AGL  # drape distance above terrain
         self.osm_id = osm_id
+#        print "OSMID", osm_id
         self.refs = refs
         self.tags = tags
         self.nodes_dict = nodes_dict

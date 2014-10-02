@@ -79,6 +79,8 @@ import osmparser
 import parameters
 from pdb import pm
 from cluster import Clusters
+from numpy.core.numeric import True_
+from shapely.geometry.multipoint import MultiPoint
 
 buildings = []  # -- master list, holds all buildings
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
@@ -119,6 +121,7 @@ class Building(object):
         if self.inner_rings_list: self.roll_inner_nodes()
         self.building_type = building_type
         self.roof_type = roof_type
+        self.parent = None
 
 
     def roll_inner_nodes(self):
@@ -223,6 +226,7 @@ class Buildings(object):
     def __init__(self):
         self.buildings = []
         self.nodes_dict = {}
+        self.node_way_dict = {}
         self.way_list = []
         self.minlon = 181.
         self.maxlon = -181.
@@ -235,7 +239,7 @@ class Buildings(object):
         handler.register_relation_callback(self.process_relation, self.req_relation_keys)
 
 #            valid_relation_keys, req_relation_keys)
-    def _refs_to_ring(self, refs, inner = False):
+    def _refs_to_ring(self, refs, inner=False):
         """accept a list of OSM refs, return a linear ring. Also
            fixes face orientation, depending on inner/outer.
         """
@@ -253,6 +257,7 @@ class Buildings(object):
         return ring
 
     def make_way_buildings(self):
+        #Converts all the ways into buildings
         def tag_matches(tags, req_tags):
             for tag in tags:
                 if tag in req_tags:
@@ -263,8 +268,10 @@ class Buildings(object):
             if tag_matches(way.tags, self.req_way_keys):
                 self._make_building_from_way(way.osm_id, way.tags, way.refs)
 
-    def _make_building_from_way(self, osm_id, tags, refs, inner_ways = []):
-        if refs[0] == refs[-1]: refs = refs[0:-1] # -- kick last ref if it coincides with first
+    def _make_building_from_way(self, osm_id, tags, refs, inner_ways=[]):
+        #Creates a building object from a way
+        if refs[0] == refs[-1]:
+            refs = refs[0:-1]  # -- kick last ref if it coincides with first
 
         name = ""
         height = 0.
@@ -315,11 +322,36 @@ class Buildings(object):
             tools.stats.parse_errors += 1
             return False
 
-        self.buildings.append(Building(osm_id, tags, outer_ring, name, height, levels, inner_rings_list = inner_rings_list, building_type = _building_type, roof_type=_roof_type))
+        building = Building(osm_id, tags, outer_ring, name, height, levels, inner_rings_list=inner_rings_list, building_type=_building_type, roof_type=_roof_type)
+#        if building.osm_id == 3825399:
+#            print building
+#
+        if parameters.BUILDING_REMOVE_WITH_PARTS:
+            for ref in refs:
+                # Build a lookup table
+                if ref not in self.node_way_dict:
+                    way_list_by_ref = []
+                else:
+                    way_list_by_ref = self.node_way_dict[ref]
+                    for cand_building in way_list_by_ref:
+                        if 'building:part' in building.tags and cand_building.polygon.intersection(building.polygon).equals(building.polygon):
+                            # Our building:part belongs to the building
+                            if(cand_building in self.buildings):
+                                # We don't need it since it'll be replaced by its parts
+                                self.buildings.remove(cand_building)
+                            logging.info('Found Building for removing %d' % cand_building.osm_id)
+                            building.parent = cand_building
+    #                         print cand_building.name
+                            break
+    #                     if 'building' in building.tags and building.polygon.intersection(cand_building.polygon).equals(cand_building.polygon):
+    #                         print 'Found Building:part'
+                way_list_by_ref.append(building)
+                self.node_way_dict[ref] = way_list_by_ref
+        self.buildings.append(building)
 
         tools.stats.objects += 1
         # show progress here?
-        #if tools.stats.objects % 50 == 0:
+        # if tools.stats.objects % 50 == 0:
         #    logging.info(tools.stats.objects)
         return True
 
@@ -335,7 +367,8 @@ class Buildings(object):
         """
         if not self.nodes_dict:
             self.nodes_dict = nodes_dict
-        if tools.stats.objects >= parameters.MAX_OBJECTS: return
+        if tools.stats.objects >= parameters.MAX_OBJECTS: 
+            return
         self.way_list.append(way)
 
     def process_relation(self, relation):
@@ -391,7 +424,6 @@ class Buildings(object):
                     self.way_list.remove(_way)
             else:
                 logging.info("Skipping relation %i: no outer way." % relation.osm_id)
-
 
     def _get_min_max_coords(self):
         for node in self.nodes_dict.values():
@@ -612,10 +644,11 @@ if __name__ == "__main__":
 
     # -- prepare transformation to local coordinates
     cmin, cmax = parameters.get_extent_global()
-    center = (cmin + cmax)*0.5
+    center = parameters.get_center_global()
+
     #center = (11.38, 47.26)
     tools.init(coordinates.Transformation(center, hdg = 0))
-    print tools.transform.toGlobal(cmin), tools.transform.toGlobal(cmax)
+#    print tools.transform.toGlobal(cmin), tools.transform.toGlobal(cmax)
 
     logging.info("reading elevation data")
     elev = tools.get_interpolator(fake=parameters.NO_ELEV)
@@ -642,7 +675,7 @@ if __name__ == "__main__":
             if raw_input().lower() != 'y':
                 sys.exit(-1)
 
-        handler = osmparser.OSMContentHandler(valid_node_keys = [])
+        handler = osmparser.OSMContentHandler(valid_node_keys=[])
         buildings = Buildings()
         buildings.register_callbacks_with(handler)
         source = open(osm_fname)
@@ -657,8 +690,6 @@ if __name__ == "__main__":
         logging.info("min/max " + str(cmin) + " " + str(cmax))
         buildings = buildings.buildings
         logging.info("parsed %i buildings." % len(buildings))
-
-
 
         # -- cache parsed data. To prevent accidentally overwriting,
         #    write to local dir, while we later read from $PREFIX/buildings.pkl
@@ -787,6 +818,7 @@ if __name__ == "__main__":
         logging.info("uninstall done.")
         sys.exit(0)
 
+    elev.save_cache()
     stg_manager.write()
     tools.stats.print_summary()
     logging.info("done.")
