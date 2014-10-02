@@ -736,14 +736,6 @@ def progress(i, max_i):
         print "%i %i %6.2f\r" % (i, max_i, (float(i)/max_i) * 100),
 
 
-def get_interpolator(**kwargs):
-    if parameters.ELEV_MODE == 'FgelevCaching':
-        return Probe_fgelev(**kwargs)
-    else:
-        filename = parameters.PREFIX + os.sep + 'elev.out'
-        return Interpolator(filename, **kwargs)
-
-
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     # Parse arguments and eventually override Parameters
