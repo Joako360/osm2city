@@ -14,7 +14,7 @@ import scipy.interpolate
 from pdb import pm
 from vec2d import vec2d
 import matplotlib.pyplot as plt
-from turtle import Vec2D
+#from turtle import Vec2D
 
 class Deck_shape_linear(object):
     def __init__(self, h0, h1):
