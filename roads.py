@@ -316,7 +316,7 @@ class Roads(objectlist.ObjectList):
                 tex_y1 = 2/8.
                 width=6
     
-            if prio == 0:
+            if prio == 0 or prio == None:
     #            print "got", osm_id,
     #            for t in tags.keys():
     #                print (t), "=", (tags[t])+" ",
