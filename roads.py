@@ -304,9 +304,12 @@ class Roads(objectlist.ObjectList):
                     width = 2.87
                     tex_y0 = 0
                     tex_y1 = 1/8.
-            elif 'amenity' in way.tags:
-                if way.tags['amenity'] in ['parking']:
-                    prio = 7
+#            TA: disabled parking for now. While certainly good to have,
+#                parking in OSM is not a linear feature in general.
+#                We'd need to add areas.    
+#            elif 'amenity' in the_way.tags:
+#                if the_way.tags['amenity'] in ['parking']:
+#                    prio = 7
     
             if prio in [1, 2]:
                 tex_y0 = 1/8.
