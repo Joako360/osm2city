@@ -691,7 +691,8 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
     global nb  # FIXME: still need this?
 
-    for b in buildings:
+    for ib, b in enumerate(buildings):
+        tools.progress(ib, len(buildings))
         out = LOD_objects[b.LOD]
         b.X = np.array(b.X_outer + b.X_inner)
     #    Xo = np.array(b.X_outer)
@@ -706,8 +707,8 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
         write_and_count_vert(out, b, elev, offset, tile_elev)
 
         nb += 1
-        if nb % 70 == 0: print nb
-        else: sys.stdout.write(".")
+#        if nb % 70 == 0: print nb
+#        else: sys.stdout.write(".")
 
         b.ac_name = "b%i" % nb
 

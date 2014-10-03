@@ -768,7 +768,7 @@ if __name__ == "__main__":
     stg_fp_dict = {}    # -- dictionary of stg file pointers
     stg = None  # stg-file object
 
-    for cl in clusters:
+    for ic, cl in enumerate(clusters):
         nb = len(cl.objects)
         if nb < parameters.CLUSTER_MIN_OBJECTS: continue # skip almost empty clusters
 
@@ -796,6 +796,7 @@ if __name__ == "__main__":
         # -- incase PREFIX is a path (batch processing)
         replacement_prefix = re.sub('[\/]','_', parameters.PREFIX)
         file_name = replacement_prefix + "city%02i%02i" % (cl.I.x, cl.I.y)
+        logging.info("writing cluster %s (%i/%i)" % (file_name, ic, len(clusters)))
 
         path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, tile_elev, 0)
 
