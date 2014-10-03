@@ -193,6 +193,7 @@ class Probe_fgelev(object):
             self._cache = None
 
     def open_fgelev(self):
+        logging.info("Spawning fgelev")
         path_to_fgelev = parameters.FG_ELEV
         fg_root = "$FG_ROOT"
         self.fgelev_pipe = subprocess.Popen(path_to_fgelev + ' --expire 1000000 --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -731,8 +732,11 @@ def get_interpolator(**kwargs):
 
 def progress(i, max_i):
     """progress indicator"""
-    if i % (max_i / 1000) == 0:
-        print "%i %i %6.2f\r" % (i, max_i, (float(i)/max_i) * 100),
+    try:
+        if i % (max_i / 100) == 0:
+            print "%i %i %6.2f\r" % (i, max_i, (float(i)/max_i) * 100),
+    except ZeroDivisionError:
+            print "%i %i %6.2f\r" % (i, max_i, (float(i)/max_i) * 100),
 
 
 if __name__ == "__main__":
