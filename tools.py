@@ -161,19 +161,17 @@ class Interpolator(object):
 
 class Probe_fgelev(object):
     """A drop-in replacement for Interpolator. Probes elevation via fgelev.
-       Performance (can only test on OSX at the moment) about 17k/sec if there
-       is not much spatial separation between queries. Fgelev seems to take
-       quite a while though if queries are somewhat separated.
+       Make sure to use the patched version of fgelev (see osm2city/fgelev/) or
+       performance is likely to be terrible.
 
        By default, queries are cached. Call save_cache() to
        save the cache to disk before freeing the object.
     """
-    def __init__(self, fake=False, cache=True, auto_save_every=10000):
+    def __init__(self, fake=False, cache=True, auto_save_every=50000):
         """Open pipe to fgelev.
            Unless disabled by cache=False, initialize the cache and try to read
            it from disk. Automatically save the cache to disk every auto_save_every misses.
-           If fake=True, never do any probing. Instead return 0 on all queries.
-
+           If fake=True, never do any probing and return 0 on all queries.
         """
         self.fake = fake
         self.auto_save_every = auto_save_every
@@ -219,10 +217,6 @@ class Probe_fgelev(object):
                 if not os.path.exists(btg_file):
                     logging.error("Terrain File " + btg_file + " does not exist. Set scenery path correctly or fly there with TerraSync enabled")
                     sys.exit(2)
-
-            # FIXME: raster_fgelev has buffering (though disabled due to Windows probs)
-            #        But since we might also probe just one position, we need to stay
-            #        in sync anyway?
 
             try:
                 self.fgelev_pipe.stdin.write("%i %g %g\n" % (0, position.lon, position.lat))
