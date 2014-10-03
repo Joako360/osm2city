@@ -176,11 +176,8 @@ class Probe_fgelev(object):
         self.fake = fake
         self.auto_save_every = auto_save_every
         self.h_offset = 0
-        if not fake:
-            path_to_fgelev = parameters.FG_ELEV
-            fg_root = "$FG_ROOT"
-            self.fgelev_pipe = subprocess.Popen(path_to_fgelev + '  --expire 1000000 --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-
+        self.fgelev_pipe = None
+            
         if cache:
             self.pkl_fname = parameters.PREFIX + os.sep + 'elev.pkl'
             try:
@@ -194,6 +191,11 @@ class Probe_fgelev(object):
                 self._cache = {}
         else:
             self._cache = None
+
+    def open_fgelev(self):
+        path_to_fgelev = parameters.FG_ELEV
+        fg_root = "$FG_ROOT"
+        self.fgelev_pipe = subprocess.Popen(path_to_fgelev + ' --expire 1000000 --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
     def save_cache(self):
         "save cache to disk"
@@ -218,10 +220,13 @@ class Probe_fgelev(object):
                     logging.error("Terrain File " + btg_file + " does not exist. Set scenery path correctly or fly there with TerraSync enabled")
                     sys.exit(2)
 
+            if not self.fgelev_pipe:
+                self.open_fgelev()
             try:
                 self.fgelev_pipe.stdin.write("%i %g %g\n" % (0, position.lon, position.lat))
             except IOError, reason:
                 logging.error(reason)
+                
             try:
                 line = self.fgelev_pipe.stdout.readline()
                 elev = float(line.split()[1]) + self.h_offset
