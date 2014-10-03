@@ -44,6 +44,7 @@ class Clusters(object):
         self.delta = max - min
         self.size = size
         self.n = (self.delta / size).int() + 1
+        self.__len = self.n.x * self.n.y
 
         #self.list = []
         self._clusters = [[self.init_cluster(vec2d(i,j)) 
@@ -58,7 +59,9 @@ class Clusters(object):
         print "  max: ", self.max
 
         #print self._clusters
-
+    def __len__(self):
+        return self.__len
+        
     def init_cluster(self, I):
         center = self.min + (I + 0.5) * self.size # in meters
         new_cluster = Cluster(I, center, self.size)
