@@ -47,7 +47,7 @@ IGNORE_PKL_OVERWRITE = True # -- Ignore overwriting of Cache File
 PATH_TO_OUTPUT = ""
 
 NO_ELEV = False             # -- skip elevation interpolation
-ELEV_MODE = ''              # Either Manual, Telnet, Fgelev
+ELEV_MODE = ''              # Either Manual, Telnet, Fgelev, FgelevCaching
 
 #=============================================================================
 # PARAMETERS RELATED TO BUILDINGS IN osm2city
@@ -181,14 +181,14 @@ LU_LANDUSE_BUILDING_BUFFER_DISTANCE_MAX = 50
 LU_LANDUSE_MIN_AREA = 5000
 
 #=============================================================================
-# PARAMETERS RELATED TO ROADS IN roads.py
+# PARAMETERS RELATED TO roads.py
 #=============================================================================
 
 TRAFFIC_SHADER_ENABLE = False
-MAX_SLOPE_HIGHWAY = 0.03
+MAX_SLOPE_MOTORWAY = 0.03       # max slope for motorways
 MAX_SLOPE_ROAD = 0.08
-MAX_TRANSVERSE_GRADIENT = 0.1
-BRIDGE_MIN_LENGTH = 20.
+MAX_TRANSVERSE_GRADIENT = 0.1   # 
+BRIDGE_MIN_LENGTH = 20.         # discard short bridges, draw road instead
 DEBUG_PLOT = 0
 
 def set_parameters(param_dict):
