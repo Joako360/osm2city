@@ -259,9 +259,9 @@ class Probe_fgelev(object):
             # logging.debug("hit %s %g" % (str(key), elev))
             return elev
         except KeyError:
-            logging.debug("miss (%i) %s" % (len(self._cache), str(key)))
+            #logging.debug("miss (%i) %s" % (len(self._cache), str(key)))
             elev = really_probe(position)
-            logging.debug("   %g" % elev)
+            #logging.debug("   %g" % elev)
             self._cache[key] = elev
 
             if self.auto_save_every and len(self._cache) % self.auto_save_every == 0:
