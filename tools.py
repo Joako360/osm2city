@@ -196,7 +196,11 @@ class Probe_fgelev(object):
         logging.info("Spawning fgelev")
         path_to_fgelev = parameters.FG_ELEV
         fg_root = "$FG_ROOT"
-        self.fgelev_pipe = subprocess.Popen(path_to_fgelev + ' --expire 1000000 --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        self.fgelev_pipe = subprocess.Popen(path_to_fgelev + ' --expire 1000000 --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        # -- This should catch spawn errors, but it doesn't. We 
+        #    check for sane return values on fgelev calls later.
+#        if self.fgelev_pipe.poll() != 0:
+#            raise RuntimeError("Spawning fgelev failed.")
 
     def save_cache(self):
         "save cache to disk"
@@ -227,13 +231,14 @@ class Probe_fgelev(object):
                 self.fgelev_pipe.stdin.write("%i %g %g\n" % (0, position.lon, position.lat))
             except IOError, reason:
                 logging.error(reason)
-                
+ 
             try:
                 line = self.fgelev_pipe.stdout.readline()
                 elev = float(line.split()[1]) + self.h_offset
             except IndexError, reason:
-                logging.exception("FGElev %s, %s", line, reason)
-                return -1
+                logging.fatal("fgelev returned <%s>, resulting in %s. Did fgelev start OK?", line, reason)
+                raise RuntimeError("fgelev errors are fatal.")
+
             return elev
 
         if self.fake:
