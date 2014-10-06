@@ -282,11 +282,14 @@ class Buildings(object):
         # -- funny things might happen while parsing OSM
         try:
 #        if 1:
+            if str(osm_id) in parameters.SKIP_LIST:
+                logging.info("SKIPPING", osm_id)
+                return False
             if 'name' in tags:
                 name = tags['name']
                 #print "%s" % _name
                 if name in parameters.SKIP_LIST:
-                    print "SKIPPING", name
+                    logging.info("SKIPPING", name)
                     return False
             if 'height' in tags:
                 height = osmparser.parse_length(tags['height'])
