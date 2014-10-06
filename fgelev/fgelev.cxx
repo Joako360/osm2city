@@ -93,8 +93,7 @@ main(int argc, char** argv)
     // use an ArgumentParser object to manage the program arguments.
     osg::ArgumentParser arguments(&argc, argv);
 
-    //std::int64_t expire;
-    int expire;
+    unsigned expire;
     if (arguments.read("--expire", expire)) {
     } else expire = 10;
     
