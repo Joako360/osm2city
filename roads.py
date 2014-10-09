@@ -114,6 +114,7 @@ class Roads(objectlist.ObjectList):
         self.ways_list = []
         self.bridges_list = []
         self.roads_list = []
+        self.nodes_dict = {}
 
     def store_uncategorized(self, way, nodes_dict):
         pass
@@ -882,7 +883,7 @@ def main():
         path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, cluster_elev, 0)
         ac.write_to_file(path_to_stg + file_name)
         write_xml(path_to_stg, file_name, file_name)
-        tools.install_files(['roads.eff'], path_to_stg)
+        #tools.install_files(['roads.eff'], path_to_stg)
 
     #debug_create_eps(roads, roads.clusters, elev, plot_cluster_borders=1)
     stg_manager.write()
