@@ -726,7 +726,8 @@ def install_files(file_list, dst):
         try:
             os.link(the_file, the_dst)
         except OSError, reason:
-            logging.warn("Error while installing %s: %s" % (the_file, reason))
+            if reason.errno not in [17]:
+                logging.warn("Error while installing %s: %s" % (the_file, reason))
 
 def get_interpolator(**kwargs):
     if parameters.ELEV_MODE == 'FgelevCaching':
