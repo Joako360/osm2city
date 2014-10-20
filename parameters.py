@@ -18,10 +18,10 @@ from os.path import os
 from vec2d import vec2d
 from pdb import pm
 
+# default_args_start # DO NOT MODIFY THIS LINE
 #=============================================================================
 # PARAMETERS FOR ALL osm2city MODULES
 #=============================================================================
-# default_args_start # DO NOT MODIFY THIS LINE
 
 # -- Scenery folder, typically a geographic name or the ICAO code of the airport
 PREFIX = "LSZR"
