@@ -392,9 +392,9 @@ class Roads(objectlist.ObjectList):
                     self.attached_ways_dict[ref] = [(the_way, i == 0)]  # initialize node
 
         # kick nodes that belong to one way only
-        for ref, value in self.attached_ways_dict.items():
+        for ref, the_ways in self.attached_ways_dict.items():
 #            if len(value) >= 2: self.nodes_dict[ref].n_attached_ways = len(value)
-            if len(value) < degree: # FIXME: join_ways, then return 2 here
+            if len(the_ways) < degree: # FIXME: join_ways, then return 2 here
                 self.attached_ways_dict.pop(ref)
 #            else:
 #                pass
@@ -424,7 +424,8 @@ class Roads(objectlist.ObjectList):
             print i, v
 
     def init_way_from_existing(self, way, ref):
-        """return copy of way. The copy will have same osm_id and tags, but only given refs"""
+        """return copy of way. The copy will have same osm_id and tags, but
+           only given refs"""
         new_way = osmparser.Way(way.osm_id)
         new_way.tags = way.tags
         try:
@@ -438,7 +439,8 @@ class Roads(objectlist.ObjectList):
            I.e., each way object connects to at most two junctions.
         """
         logging.info('Splitting ways at inner junctions...')
-
+        # FIXME: auch splitten, wenn Weg1 von Weg2 erst abzweigt und später wieder hinzukommt 
+        #        i.e. way1 and way2 share TWO nodes, both end nodes of one of them 
         new_list = []
         for i, the_way in enumerate(self.ways_list):
             tools.progress(i, len(self.ways_list))
@@ -614,28 +616,71 @@ class Roads(objectlist.ObjectList):
         if show:
             plt.show()
             
-
     def cleanup_junctions(self):
         """Remove junctions that
            - have less than 3 ways attached
         """
         pass
+    
+    def compatible_ways(self, way1, way2):
+        if is_bridge(way1) == is_bridge(way2):
+            return True
+        else:
+            return False
 
-    def join_ways(self):
+    def join_ways(self, way1, way2):
         """join ways that
            - don't make an junction and
            - are of compatible type
+           must share exactly one node
         """
-        pass
-
+        logging.debug("Joining %i and %i" % (way1.osm_id, way2.osm_id))
+        if way1.refs[0] == way2.refs[0]:
+            new_refs = way1.refs[::-1] + way2.refs[1:]
+        elif way1.refs[0] == way2.refs[-1]:
+            new_refs = way2.refs + way1.refs[1:]
+        elif way1.refs[-1] == way2.refs[0]:
+            new_refs = way1.refs + way2.refs[1:]
+        elif way1.refs[-1] == way2.refs[-1]:
+            new_refs = way1.refs[:-1] + way2.refs[::-1]
+        else:
+            logging.warn("not joining ways that share no endpoint %i %i" % (way1.osm_id, way2.osm_id))
+            return
+            
+        new_way = self.init_way_from_existing(way1, new_refs)
+        try:
+            self.ways_list.remove(way1)
+            print "1ok ",
+        except ValueError:
+            self.ways_list.remove(self.debug_find_way_by_osm_id(way1.osm_id))
+            print "1not ",
+        try:
+            self.ways_list.remove(way2)
+            print "2ok"
+        except ValueError:
+            self.ways_list.remove(self.debug_find_way_by_osm_id(way2.osm_id))
+            print "2not"
+        self.ways_list.append(new_way)
 
     def join_degree2_junctions(self):
         """bla"""
-        for ref, ways in self.attached_ways_dict.iteritems():
-            if len(ways) == 2:
-#                bla
-                pass
+        for ref, ways_tuple_list in self.attached_ways_dict.iteritems():
+            if len(ways_tuple_list) == 2:
+                if self.compatible_ways(ways_tuple_list[0][0], ways_tuple_list[1][0]):
+                    self.join_ways(ways_tuple_list[0][0], ways_tuple_list[1][0])
+                    
+    def debug_find_way_by_osm_id(self, osm_id):
+        for the_way in self.ways_list:
+            if the_way.osm_id == osm_id:
+                return the_way
+        raise ValueError("way %i not found" % the_way.osm_id)
 
+    def debug_is_osm_id_in_ways_list(self, osm_id):
+        for the_way in self.ways_list:
+            if the_way.osm_id == osm_id:
+                return True
+        return False
+    
     def debug_test(self):
         print "138: ", self.nodes_dict[1401732138].h_add
         print "139: ", self.nodes_dict[1401732138].h_add
@@ -661,10 +706,9 @@ class Roads(objectlist.ObjectList):
 #                anchor.x += random.uniform(-1,1)
                 e = self.elev(anchor) + the_node.h_add + 3.
                 ac.add_label(' %i h=%1.1f' % (the_node.osm_id, the_node.h_add), -anchor.y, e, -anchor.x, scale=1.)
-#            bla            
         path_to_stg = stg_manager.add_object_static(file_name + '.ac', vec2d(self.transform.toGlobal((0,0))), 0, 0)
         ac.write_to_file(path_to_stg + file_name)
-
+#269416158
     def clip_at_cluster_border(self):
         """
                - loop all objects
@@ -820,6 +864,7 @@ def main():
         #roads.debug_plot_junctions('ks')
         #roads.count_inner_junctions('bs')
         roads.split_ways_at_inner_junctions()
+        if 0: roads.join_degree2_junctions()
         roads.find_junctions(roads.ways_list, 3)
 #        roads.print_junctions_stats()
         plt.clf()
@@ -829,7 +874,6 @@ def main():
         #roads.debug_plot_junctions('k.')
         #sys.exit(0)
 
-    #    roads.join_ways()
         logging.debug("len after %i" % len(roads.ways_list))
 
     roads.probe_elev_at_nodes()
@@ -838,7 +882,6 @@ def main():
 #    roads.split_long_roads_between_bridges()
     roads.create_linear_objects()
 #    roads.debug_test()
-    roads.join_degree2_junctions()
 #    roads.debug_test()
     roads.propagate_h_add()
 #    roads.debug_test()
@@ -858,7 +901,7 @@ def main():
 #    scale_test(transform, elev)
 
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, overwrite=True)
-#    roads.debug_label_nodes(stg_manager)
+    roads.debug_label_nodes(stg_manager)
 
     # -- write stg
     for cl in roads.clusters:
@@ -883,12 +926,13 @@ def main():
         path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, cluster_elev, 0)
         ac.write_to_file(path_to_stg + file_name)
         write_xml(path_to_stg, file_name, file_name)
-        #tools.install_files(['roads.eff'], path_to_stg)
+        tools.install_files(['roads.eff'], path_to_stg)
 
     #debug_create_eps(roads, roads.clusters, elev, plot_cluster_borders=1)
     stg_manager.write()
 
     elev.save_cache()
+    troubleshoot.troubleshoot(tools.stats)
     logging.info('Done.')
 
 

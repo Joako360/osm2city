@@ -77,6 +77,7 @@ import tools
 import calc_tile
 import osmparser
 import parameters
+import troubleshoot
 from pdb import pm
 from cluster import Clusters
 from numpy.core.numeric import True_
@@ -826,6 +827,7 @@ if __name__ == "__main__":
     elev.save_cache()
     stg_manager.write()
     tools.stats.print_summary()
+    troubleshoot.troubleshoot(tools.stats)
     logging.info("done.")
     sys.exit(0)
 
