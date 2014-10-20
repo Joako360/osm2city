@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Central place to store parameters / settings / variables in osm2city.
@@ -15,10 +16,12 @@ import sys
 import types
 from os.path import os
 from vec2d import vec2d
+from pdb import pm
 
 #=============================================================================
 # PARAMETERS FOR ALL osm2city MODULES
 #=============================================================================
+# default_args_start # DO NOT MODIFY THIS LINE
 
 # -- Scenery folder, typically a geographic name or the ICAO code of the airport
 PREFIX = "LSZR"
@@ -28,11 +31,6 @@ BOUNDARY_WEST = 9.54
 BOUNDARY_SOUTH = 47.48
 BOUNDARY_EAST = 9.58
 BOUNDARY_NORTH = 47.50
-
-# -- Distance between raster points for the derived elevation map (x is horizontal, y is vertical)
-ELEV_RASTER_X = 10
-ELEV_RASTER_Y = 10
-FG_ELEV = '"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'
 
 # -- Full path to the scenery folder without trailing slash. There must be
 #    an OBJECTS/ folder below PATH_TO_SCENERY
@@ -46,8 +44,11 @@ IGNORE_PKL_OVERWRITE = True # -- Ignore overwriting of Cache File
 #    in $PATH_TO_SCENERY
 PATH_TO_OUTPUT = ""
 
-NO_ELEV = False             # -- skip elevation interpolation
-ELEV_MODE = ''              # Either Manual, Telnet, Fgelev, FgelevCaching
+NO_ELEV = False             # -- skip elevation probing
+ELEV_MODE = "FgelevCaching" # -- elev probing mode. Possible values are FgelevCaching (recommended), Manual, or Telnet
+ELEV_RASTER_X = 10          # -- Distance between raster points for the derived 
+ELEV_RASTER_Y = 10          #    elevation map (x is horizontal, y is vertical)
+FG_ELEV = '"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'
 
 #=============================================================================
 # PARAMETERS RELATED TO BUILDINGS IN osm2city
@@ -58,15 +59,15 @@ OVERLAP_CHECK = True
 OVERLAP_RADIUS = 5
 BUILDING_REMOVE_WITH_PARTS = False
 
-TILE_SIZE = 1000            # -- tile size in meters for clustering of buildings
+TILE_SIZE = 2000            # -- tile size in meters for clustering of buildings
 
 MAX_OBJECTS = 50000         # -- maximum number of buildings to read from OSM data
-CONCURRENCY = 1             # -- number of parallel OSM parsing threads
+CONCURRENCY = 1             # -- number of parallel OSM parsing threads. Unused ATM.
 
-# -- skip reading named buildings from OSM (in case there's already a static model for these, and the overlap check fails)
+# -- skip buildings based on their OSM name tag or OSM ID, in case there's already a static model for these, and the overlap check fails.
 SKIP_LIST = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
   "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
-  "Residenzschloss Dresden", "Fernsehturm", "Fernsehturm Dresden"]
+  "Residenzschloss Dresden", "Fernsehturm", "Fernsehturm Dresden", "87807683"]
 
 # -- Parameters which influence the number of buildings from OSM taken to output
 BUILDING_MIN_HEIGHT = 3.4           # -- minimum height of a building to be included in output (does not include roof)
@@ -80,6 +81,7 @@ BUILDING_NEVER_SKIP_LEVELS = 6      # -- buildings that tall will never be skipp
 BUILDING_COMPLEX_ROOFS = 1          # -- generate complex roofs on buildings?
 BUILDING_COMPLEX_ROOFS_MAX_LEVELS = 5 # -- don't put complex roofs on buildings taller than this
 BUILDING_COMPLEX_ROOFS_MAX_AREA   = 2000 # -- don't put complex roofs on buildings larger than this
+
 # -- Parameters which influence the height of buildings if no info from OSM is available.
 #    It uses a triangular distribution (see http://en.wikipedia.org/wiki/Triangular_distribution)
 BUILDING_CITY_LEVELS_LOW = 2.0
@@ -100,7 +102,7 @@ LOD_ALWAYS_DETAIL_BELOW_LEVELS = 3  # -- below this number of levels, buildings 
 LOD_PERCENTAGE_DETAIL = 0.5         # -- of the remaining buildings, this percentage will be LOD detail,
                                     #    the rest will be LOD rough.
 
-LIGHTMAP_ENABLE = 1                 # -- include LM to xml
+LIGHTMAP_ENABLE = 1                 # -- include lightmap in xml
 OBSTRUCTION_LIGHT_MIN_LEVELS = 15   # -- put obstruction lights on buildings with >= given levels
 
 EXPERIMENTAL_USE_SKEL = 0           # -- generate complex roofs with pySkeleton?
@@ -109,6 +111,11 @@ SKEL_MAX_HEIGHT_RATIO = 0.7         # --
 EXPERIMENTAL_INNER = 0
 
 CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if to little objects
+
+#=============================================================================
+# EXPERIMENTAL PARAMETERS, work in progress, YMMV
+#=============================================================================
+
 
 
 #=============================================================================
@@ -187,9 +194,12 @@ LU_LANDUSE_MIN_AREA = 5000
 TRAFFIC_SHADER_ENABLE = False
 MAX_SLOPE_MOTORWAY = 0.03       # max slope for motorways
 MAX_SLOPE_ROAD = 0.08
-MAX_TRANSVERSE_GRADIENT = 0.1   # 
+MAX_TRANSVERSE_GRADIENT = 0.1   #
 BRIDGE_MIN_LENGTH = 20.         # discard short bridges, draw road instead
 DEBUG_PLOT = 0
+
+# default_args_end # DO NOT MODIFY THIS LINE
+
 
 def set_parameters(param_dict):
     for k in param_dict:
@@ -231,7 +241,7 @@ def get_extent_global():
     cmin = vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
     cmax = vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
     return cmin, cmax
-    
+
 def show():
     """
     Prints all parameters as key = value
@@ -338,6 +348,20 @@ def read_from_file(filename):
         print "Error processing file with parameters:", reason
         sys.exit(1)
 
+def show_default():
+    """show default parameters by printing all params defined above between
+        # default_args_start and # default_args_end to screen.
+    """
+    f = open(sys.argv[0], 'r')
+    do_print = False
+    for line in f.readlines():
+        if line.startswith('# default_args_start'):
+            do_print = True
+            continue
+        elif line.startswith('# default_args_end'):
+            return
+        if do_print:
+            print line,
 
 if __name__ == "__main__":
     # Handling arguments and parameters
@@ -345,7 +369,11 @@ if __name__ == "__main__":
         description="The parameters module provides parameters to osm2city - used as main it shows the parameters used.")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
+    parser.add_argument("-d", "--show-default", action="store_true", help="show default parameters")
     args = parser.parse_args()
     if args.filename is not None:
         read_from_file(args.filename)
         show()
+    if args.show_default:
+        show_default()
+        
