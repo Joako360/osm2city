@@ -216,7 +216,7 @@ def set_parameters(param_dict):
                     globals()[k] = int_value
             elif isinstance(globals()[k], types.StringType):
                 if None is not param_dict[k]:
-                    globals()[k] = param_dict[k]
+                    globals()[k] = param_dict[k].strip().strip('"\'')
             elif isinstance(globals()[k], types.ListType):
                 globals()[k] = parse_list(param_dict[k])
             else:
