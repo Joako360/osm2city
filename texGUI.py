@@ -207,9 +207,9 @@ class MyFrame(wx.Frame):
         in_ext = os.path.splitext(self.in_file_name)[1]
         s = textwrap.dedent("""
         facades.append(Texture('tex.src/%s',
-            %1.1f, %s, h_can_repeat=True,
-            %1.1f, %s, v_can_repeat=False,
-            v_align_bottom = True,
+            h_size_meters=%1.1f, h_cuts=%s, h_can_repeat=True,
+            v_size_meters=%1.1f, v_cuts=%s, v_can_repeat=False,
+            v_align_bottom=True, height_min=0,
             requires=[],
             provides=[]))
         """ % (out_case_name + in_ext, self.width_m, str(self.x_cuts + [self.pilImageOrg.size[0]]),
