@@ -380,13 +380,21 @@ def init():
         36., [], True,
         36., [158, 234, 312, 388, 465, 542, 619, 697, 773, 870, 1024], False,
         provides=['shape:urban','shape:residential','age:modern',
-                 'compat:roof-flat']))
+                  'compat:roof-flat']))
+
+    facades.append(Texture('tex.src/facade_modern_residential_26x34m.jpg',
+        26.3, [429, 1723, 2142], True,
+        33.9, [429, 666, 919, 1167, 1415, 1660, 1905, 2145, 2761], False,
+        v_align_bottom = True,
+        provides=['shape:urban','shape:residential','age:modern',
+                  'compat:roof-flat']))
 
 #    facades.append(Texture('tex.src/DSCF9503_pow2',
 #                            12.85, None, True,
 #                            17.66, (1168, 1560, 2048), False, True,
 #                            requires=['roof:color:black'],
 #                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
+
     facades.append(Texture('tex.src/DSCF9503_noroofsec_pow2.png',
         12.85, [360, 708, 1044, 1392, 2048], True,
         17.66, [556,1015,1474,2048], False,
@@ -422,6 +430,7 @@ def init():
                  'compat:roof-flat']))
 #                            provides=['shape:urban','shape:residential','age:modern','age:old',
 #                                     'compat:roof-flat','compat:roof-pitched']))
+
     facades.append(Texture('tex.src/castle.jpg',
                            h_size_meters=4, h_cuts=[512, 1024, 1536, 2048], h_can_repeat=True,
                            v_size_meters=4, v_cuts=[512, 1024, 1536, 2048], v_can_repeat=False,
@@ -433,7 +442,7 @@ def init():
                                      'compat:roof-flat',
                                      'compat:roof-hipped']))
 
-    # debug fallback texture for very large facades. 
+    # debug fallback texture for very large facades.
     facades.append(Texture('tex.src/facade_modern_black_46x60m.jpg',
         450.9, [167, 345, 521, 700, 873, 944], True,
         600.5, [144, 229, 311, 393, 480, 562, 645, 732, 818, 901, 983, 1067, 1154, 1245], False,
