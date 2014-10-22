@@ -740,14 +740,15 @@ def get_interpolator(**kwargs):
 
 def progress(i, max_i):
     """progress indicator"""
-    try:
-        if i % (max_i / 100) > 0:
-            return
-    except ZeroDivisionError:
-        pass
-    print "%i %i %5.1f%%     \r" % (i+1, max_i, (float(i+1)/max_i) * 100),
-    if i > max_i - 2:
-        print
+    if sys.stdout.isatty():
+        try:
+            if i % (max_i / 100) > 0:
+                return
+        except ZeroDivisionError:
+            pass
+        print "%i %i %5.1f%%     \r" % (i+1, max_i, (float(i+1)/max_i) * 100),
+        if i > max_i - 2:
+            print
 
 
 if __name__ == "__main__":
