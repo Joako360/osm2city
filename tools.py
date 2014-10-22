@@ -196,7 +196,9 @@ class Probe_fgelev(object):
         logging.info("Spawning fgelev")
         path_to_fgelev = parameters.FG_ELEV
         fg_root = "$FG_ROOT"
-        self.fgelev_pipe = subprocess.Popen(path_to_fgelev + ' --expire 1000000 --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        fgelev_cmd = path_to_fgelev + ' --expire 1000000 --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY
+        logging.info("cmd line: " + fgelev_cmd)
+        self.fgelev_pipe = subprocess.Popen(fgelev_cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         # -- This should catch spawn errors, but it doesn't. We 
         #    check for sane return values on fgelev calls later.
 #        if self.fgelev_pipe.poll() != 0:
