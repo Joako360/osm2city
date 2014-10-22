@@ -351,14 +351,14 @@ def init():
     facades.append(Texture('tex.src/facade_modern_21x42m.jpg',
         43., [40, 79, 115, 156, 196, 235, 273, 312, 351, 389, 428, 468, 507, 545, 584, 624, 662], True,
         88., [667, 597, 530, 460, 391, 322, 254, 185, 117, 48, 736, 804, 873, 943, 1012, 1080, 1151, 1218, 1288, 1350], False,
-        v_align_bottom = True,
+        v_align_bottom = True, height_min=20.,
         requires=[],
         provides=['shape:urban','age:modern', 'compat:roof-flat']))
 
     facades.append(Texture('tex.src/facade_modern_black_46x60m.jpg',
         45.9, [167, 345, 521, 700, 873, 944], True,
         60.5, [144, 229, 311, 393, 480, 562, 645, 732, 818, 901, 983, 1067, 1154, 1245], False,
-        v_align_bottom = True,
+        v_align_bottom = True, height_min=20.,
         requires=[],
         provides=['shape:urban','age:modern', 'compat:roof-flat']))
 
@@ -379,13 +379,14 @@ def init():
     facades.append(Texture('tex.src/facade_modern36x36_12.png',
         36., [], True,
         36., [158, 234, 312, 388, 465, 542, 619, 697, 773, 870, 1024], False,
+        height_min=20,
         provides=['shape:urban','shape:residential','age:modern',
                   'compat:roof-flat']))
 
     facades.append(Texture('tex.src/facade_modern_residential_26x34m.jpg',
         26.3, [429, 1723, 2142], True,
         33.9, [429, 666, 919, 1167, 1415, 1660, 1905, 2145, 2761], False,
-        v_align_bottom = True,
+        v_align_bottom = True, height_min=20,
         provides=['shape:urban','shape:residential','age:modern',
                   'compat:roof-flat']))
 
@@ -416,6 +417,27 @@ def init():
        10.4, [97,152,210,299,355,411,512], True,
        15.5, [132,211,310,512], False,
        provides=['shape:residential','shape:commercial','age:modern','compat:roof-flat']))
+
+    facades.append(Texture('tex.src/facade_modern_residential_25x15m.jpg',
+        25.0, [436, 1194, 2121, 2809, 3536], True,
+        14.8, [718, 2096], False,
+        v_align_bottom = True,
+        requires=['roof:color:black'],
+        provides=['shape:residential','age:modern','compat:roof-flat']))
+
+    facades.append(Texture('tex.src/facade_modern_commercial_red_gray_20x14m.jpg',
+        20.0, [588, 1169, 1750, 2327, 2911, 3485], True,
+        14.1, [755, 1289, 1823, 2453], False,
+        v_align_bottom = True,
+        requires=['roof:color:black'],
+        provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+
+    facades.append(Texture('tex.src/facade_modern_commercial_green_red_27x39m.jpg',
+        27.3, [486, 944, 1398, 1765, 2344], True,
+        38.9, [338, 582, 839, 1087, 1340, 1593, 1856, 2094, 3340], False,
+        v_align_bottom = True,
+        requires=['roof:color:black'],
+        provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
     facades.append(Texture('tex.src/DSCF9726_noroofsec_pow2.png',
        15.1, [321,703,1024], True,
