@@ -284,13 +284,13 @@ class Buildings(object):
         try:
 #        if 1:
             if str(osm_id) in parameters.SKIP_LIST:
-                logging.info("SKIPPING", osm_id)
+                logging.info("SKIPPING OSM_ID %i" % osm_id)
                 return False
             if 'name' in tags:
                 name = tags['name']
                 #print "%s" % _name
                 if name in parameters.SKIP_LIST:
-                    logging.info("SKIPPING", name)
+                    logging.info("SKIPPING " + name)
                     return False
             if 'height' in tags:
                 height = osmparser.parse_length(tags['height'])
@@ -371,7 +371,7 @@ class Buildings(object):
         """
         if not self.nodes_dict:
             self.nodes_dict = nodes_dict
-        if tools.stats.objects >= parameters.MAX_OBJECTS: 
+        if tools.stats.objects >= parameters.MAX_OBJECTS:
             return
         self.way_list.append(way)
 
@@ -444,72 +444,6 @@ class Buildings(object):
 #        cmin = vec2d(self.minlon, self.minlat)
 #        cmax = vec2d(self.maxlon, self.maxlat)
 #        logging.info("min/max coord" + str(cmin) + " " + str(cmax))
-
-
-
-# -----------------------------------------------------------------------------
-
-
-
-#write_map('dresden.png', transform, elev, vec2d(50.9697, 13.667), vec2d(51.1285, 13.8936))
-#write_map('dresden_fine.png', transform, elev, vec2d(51.029, 13.7061), vec2d(51.0891, 13.7861))
-
-#write_map('altstadt.png', transform, elev, vec2d(51.0317900, 13.7149300), vec2d(51.0583100, 13.7551800))
-#sys.exit()
-#elev.shift(-elev(vec2d(0,0))) # -- shift to zero height at origin
-
-
-
-# RGB mat for LOD testing
-#MATERIAL "" rgb 1.0  0.0  0.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-#MATERIAL "" rgb 0.0  1.0  0.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-#MATERIAL "" rgb 0.0  0.0  1.0  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-
-#MATERIAL "" rgb 0.9  0.9  0.9  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-#MATERIAL "" rgb 0.85 0.85 0.85 amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-#MATERIAL "" rgb 0.8  0.8  0.8  amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-#MATERIAL "" rgb 0.75 0.75 0.75 amb 0.2 0.2 0.2  emis 0 0 0  spec 0.5 0.5 0.5  shi 10  trans 0
-
-mats = ['MATERIAL "" rgb 1.0  0.0  0.0  amb 0.2 0.2 0.2  emis 1 0 0  spec 0.5 0.5 0.5  shi 10  trans 0',
-        'MATERIAL "" rgb 0.0  1.0  0.0  amb 0.2 0.2 0.2  emis 0 1 0  spec 0.5 0.5 0.5  shi 10  trans 0',
-        'MATERIAL "" rgb 0.0  0.0  1.0  amb 0.2 0.2 0.2  emis 0 0 1  spec 0.5 0.5 0.5  shi 10  trans 0']
-
-def write_ac_header(out, nb):
-
-    out.write("AC3Db\n")
-#    out.write("%s\n" % mats[random.randint(0,2)])
-    out.write("""MATERIAL "" rgb 1   1   1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0\n""")
-#    out.write("""MATERIAL "" rgb 1   0   0 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0\n""")
-#    out.write("""MATERIAL "" rgb 0   1   0 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0\n""")
-#    MATERIAL "" rgb 1   1    1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
-#    MATERIAL "" rgb .95 1    1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
-#    MATERIAL "" rgb 1   0.95 1 amb 1 1 1  emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
-#    MATERIAL "" rgb 1   1    0.95 amb 1 1 1 emis 0.0 0.0 0.0  spec 0.5 0.5 0.5  shi 64  trans 0
-
-    out.write("OBJECT world\nkids %i\n" % nb)
-
-    if 0:
-        map_z0 = -1
-        out.write(textwrap.dedent("""
-        OBJECT poly
-        name "rect"
-        texture "xapi.png"
-        numvert 4
-        """))
-        out.write("%g %g %g\n" % (miny, map_z0, minx))
-        out.write("%g %g %g\n" % (miny, map_z0, maxx))
-        out.write("%g %g %g\n" % (maxy, map_z0, maxx))
-        out.write("%g %g %g\n" % (maxy, map_z0, minx))
-        out.write("""numsurf 1
-        SURF 0x0
-        mat 0
-        refs 4
-        0 0 0
-        1 1 0
-        2 1 1
-        3 0 1
-        kids 0
-        """)
 
 # -----------------------------------------------------------------------------
 # -- write xml
