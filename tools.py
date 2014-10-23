@@ -51,7 +51,7 @@ class Interpolator(object):
         f = open(filename, "r")
         x0, y0, size_x, size_y, self.step_x, self.step_y = [float(i) for i in f.readline().split()[1:]]
         f.close()
-        
+
         nx = len(np.arange(x0, x0 + size_x, self.step_x))
         ny = len(np.arange(y0, y0 + size_y, self.step_y))
 
@@ -98,7 +98,7 @@ class Interpolator(object):
 
     def __call__(self, position, is_global=False):
         """compute elevation at (x,y) by linear interpolation
-           Work with global coordinates: x, y is in fact lon, lat.        
+           Work with global coordinates: x, y is in fact lon, lat.
         """
         if self.fake:
             return 0.
@@ -109,7 +109,7 @@ class Interpolator(object):
             x, y = transform.toGlobal(position)
         else:
             x, y = position
-        
+
         if self.clamp:
             x, y = self._move_to_boundary(x, y)
         else:
@@ -177,7 +177,7 @@ class Probe_fgelev(object):
         self.auto_save_every = auto_save_every
         self.h_offset = 0
         self.fgelev_pipe = None
-            
+
         if cache:
             self.pkl_fname = parameters.PREFIX + os.sep + 'elev.pkl'
             try:
@@ -197,9 +197,10 @@ class Probe_fgelev(object):
         path_to_fgelev = parameters.FG_ELEV
         fg_root = "$FG_ROOT"
         fgelev_cmd = path_to_fgelev + ' --expire 1000000 --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY
+        # fgelev_cmd = path_to_fgelev + ' --expire 1000000  --fg-scenery '+ parameters.PATH_TO_SCENERY
         logging.info("cmd line: " + fgelev_cmd)
         self.fgelev_pipe = subprocess.Popen(fgelev_cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        # -- This should catch spawn errors, but it doesn't. We 
+        # -- This should catch spawn errors, but it doesn't. We
         #    check for sane return values on fgelev calls later.
 #        if self.fgelev_pipe.poll() != 0:
 #            raise RuntimeError("Spawning fgelev failed.")
@@ -233,7 +234,7 @@ class Probe_fgelev(object):
                 self.fgelev_pipe.stdin.write("%i %g %g\n" % (0, position.lon, position.lat))
             except IOError, reason:
                 logging.error(reason)
- 
+
             try:
                 line = self.fgelev_pipe.stdout.readline()
                 elev = float(line.split()[1]) + self.h_offset
