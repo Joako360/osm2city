@@ -32,23 +32,30 @@ BOUNDARY_SOUTH = 47.48
 BOUNDARY_EAST = 9.58
 BOUNDARY_NORTH = 47.50
 
-# -- Full path to the scenery folder without trailing slash. There must be
-#    an OBJECTS/ folder below PATH_TO_SCENERY
-PATH_TO_SCENERY = "/home/user/fgfs/scenery"
-
 OSM_FILE = "buildings.osm"  # -- file name of the file with OSM data. Must reside in $PREFIX
 USE_PKL = False             # -- instead of parsing the OSM file, read a previously created cache file $PREFIX/buildings.pkl
 IGNORE_PKL_OVERWRITE = True # -- Ignore overwriting of Cache File
 
-# -- write .stg, .ac, .xml to this path. If empty, data is automatically written to correct location
-#    in $PATH_TO_SCENERY
-PATH_TO_OUTPUT = ""
+# -- Full path to the scenery folder without trailing slash. This is where we
+#    will probe elevation and check for overlap with static objects. Most
+#    likely you'll want to use your TerraSync path here.
+PATH_TO_SCENERY = "/home/user/fgfs/scenery/TerraSync"
+
+# -- The generated scenery (.stg, .ac, .xml) will be written to this path.
+#    If empty, we'll use the correct location in PATH_TO_SCENERY. Note that
+#    if you use TerraSync for PATH_TO_SCENERY, you MUST choose a different
+#    path here. Otherwise, TerraSync will overwrite the generated scenery.
+#    Also make sure PATH_TO_OUTPUT is included in your $FG_SCENERY.
+PATH_TO_OUTPUT = "/home/user/fgfs/scenery/osm2city"
 
 NO_ELEV = False             # -- skip elevation probing
 ELEV_MODE = "FgelevCaching" # -- elev probing mode. Possible values are FgelevCaching (recommended), Manual, or Telnet
-ELEV_RASTER_X = 10          # -- Distance between raster points for the derived 
-ELEV_RASTER_Y = 10          #    elevation map (x is horizontal, y is vertical)
 FG_ELEV = '"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'
+
+# -- Distance between raster points for elevation map. Xx is horizontal, y is
+#    vertical. Relevant only for ELEV_MODE = Manual or Telnet.
+ELEV_RASTER_X = 10
+ELEV_RASTER_Y = 10
 
 #=============================================================================
 # PARAMETERS RELATED TO BUILDINGS IN osm2city
@@ -376,4 +383,4 @@ if __name__ == "__main__":
         show()
     if args.show_default:
         show_default()
-        
+
