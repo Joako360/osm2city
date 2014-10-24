@@ -195,9 +195,9 @@ class Probe_fgelev(object):
     def open_fgelev(self):
         logging.info("Spawning fgelev")
         path_to_fgelev = parameters.FG_ELEV
-        fg_root = "$FG_ROOT"
-        fgelev_cmd = path_to_fgelev + ' --expire 1000000 --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY
-        # fgelev_cmd = path_to_fgelev + ' --expire 1000000  --fg-scenery '+ parameters.PATH_TO_SCENERY
+        #fg_root = "$FG_ROOT"
+#        fgelev_cmd = path_to_fgelev + ' --expire 1000000 --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY
+        fgelev_cmd = path_to_fgelev + ' --expire 1000000 --fg-scenery '+ parameters.PATH_TO_SCENERY
         logging.info("cmd line: " + fgelev_cmd)
         self.fgelev_pipe = subprocess.Popen(fgelev_cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         # -- This should catch spawn errors, but it doesn't. We
@@ -435,7 +435,7 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
     """
     import subprocess
     import Queue
-    fg_root = "$FG_ROOT"
+    #fg_root = "$FG_ROOT"
 
     center_global = vec2d(transform.toGlobal((x0,y0)))
     btg_file = parameters.PATH_TO_SCENERY + os.sep + "Terrain"
@@ -446,7 +446,8 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
 
     fg_elev = parameters.FG_ELEV
 
-    fgelev = subprocess.Popen( fg_elev + ' --expire 1000000 --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+#    fgelev = subprocess.Popen( fg_elev + ' --expire 1000000 --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    fgelev = subprocess.Popen( fg_elev + ' --expire 1000000 --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     # fgelev = subprocess.Popen(["/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev", "--fg-root", "$FG_ROOT",  "--fg-scenery", "$FG_SCENERY"],  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     # time.sleep(5)
     buf_in = Queue.Queue(maxsize=0)
