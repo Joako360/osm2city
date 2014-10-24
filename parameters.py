@@ -88,6 +88,8 @@ BUILDING_NEVER_SKIP_LEVELS = 6      # -- buildings that tall will never be skipp
 BUILDING_COMPLEX_ROOFS = 1          # -- generate complex roofs on buildings?
 BUILDING_COMPLEX_ROOFS_MAX_LEVELS = 5 # -- don't put complex roofs on buildings taller than this
 BUILDING_COMPLEX_ROOFS_MAX_AREA   = 2000 # -- don't put complex roofs on buildings larger than this
+BUILDING_SKEL_ROOFS_MIN_ANGLE = 20  # -- straight skeleton based complex roofs will  
+BUILDING_SKEL_ROOFS_MAX_ANGLE = 50  #    have a random angle between MIN and MAX
 
 # -- Parameters which influence the height of buildings if no info from OSM is available.
 #    It uses a triangular distribution (see http://en.wikipedia.org/wiki/Triangular_distribution)
