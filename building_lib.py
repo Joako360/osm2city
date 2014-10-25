@@ -456,8 +456,8 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             if not b.polygon.interiors and b.area < parameters.BUILDING_COMPLEX_ROOFS_MAX_AREA:
                 if b._nnodes_ground == 4:
                     b.roof_complex = True
-                if (parameters.EXPERIMENTAL_USE_SKEL and \
-                    b._nnodes_ground in range(4, parameters.SKEL_MAX_NODES)):
+                if (parameters.BUILDING_SKEL_ROOFS and \
+                    b._nnodes_ground in range(4, parameters.BUILDING_SKEL_MAX_NODES)):
                     b.roof_complex = True
 
             # -- no pitched roof on tall buildings
@@ -756,10 +756,10 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
             # FIXME: put roofs again into seperate LOD
             # -- pitched roof for > 4 ground nodes
 
-            if b._nnodes_ground > 4 and parameters.EXPERIMENTAL_USE_SKEL:
+            if b._nnodes_ground > 4 and parameters.BUILDING_SKEL_ROOFS:
                 s = myskeleton.myskel(out, b, offset_xy=offset,
                                       offset_z=b.ground_elev + b.height,
-                                      max_height=b.height * parameters.SKEL_MAX_HEIGHT_RATIO)
+                                      max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
                 if s:
                     tools.stats.have_complex_roof += 1
                 else:  # -- fall back to flat roof
