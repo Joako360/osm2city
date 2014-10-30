@@ -177,6 +177,7 @@ class Probe_fgelev(object):
         self.auto_save_every = auto_save_every
         self.h_offset = 0
         self.fgelev_pipe = None
+        self.record = 0
 
         if cache:
             self.pkl_fname = parameters.PREFIX + os.sep + 'elev.pkl'
@@ -231,7 +232,7 @@ class Probe_fgelev(object):
             if not self.fgelev_pipe:
                 self.open_fgelev()
             try:
-                self.fgelev_pipe.stdin.write("%i %g %g\n" % (0, position.lon, position.lat))
+                self.fgelev_pipe.stdin.write("%i %g %g\r\n" % (self.record, position.lon, position.lat))
             except IOError, reason:
                 logging.error(reason)
 
@@ -239,7 +240,8 @@ class Probe_fgelev(object):
                 line = self.fgelev_pipe.stdout.readline()
                 elev = float(line.split()[1]) + self.h_offset
             except IndexError, reason:
-                logging.fatal("fgelev returned <%s>, resulting in %s. Did fgelev start OK?", line, reason)
+                self.save_cache()
+                logging.fatal("fgelev returned <%s>, resulting in %s. Did fgelev start OK (Record : %i)?", line, reason, self.record)
                 raise RuntimeError("fgelev errors are fatal.")
 
             return elev
@@ -253,6 +255,7 @@ class Probe_fgelev(object):
         else:
             position = vec2d(position[0], position[1])
 
+        self.record = self.record + 1
         if self._cache == None:
             return really_probe(position)
 
@@ -732,6 +735,8 @@ def install_files(file_list, dst):
         except OSError, reason:
             if reason.errno not in [17]:
                 logging.warn("Error while installing %s: %s" % (the_file, reason))
+        except AttributeError, reason:
+            logging.warn("Error while installing %s: %s" % (the_file, reason))
 
 def get_interpolator(**kwargs):
     if parameters.ELEV_MODE == 'FgelevCaching':
