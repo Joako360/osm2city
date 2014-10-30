@@ -82,6 +82,7 @@ from pdb import pm
 from cluster import Clusters
 from numpy.core.numeric import True_
 from shapely.geometry.multipoint import MultiPoint
+from shapely.geos import TopologicalError, PredicateError
 
 buildings = []  # -- master list, holds all buildings
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
@@ -338,15 +339,24 @@ class Buildings(object):
                 else:
                     way_list_by_ref = self.node_way_dict[ref]
                     for cand_building in way_list_by_ref:
-                        if 'building:part' in building.tags and cand_building.polygon.intersection(building.polygon).equals(building.polygon):
-                            # Our building:part belongs to the building
-                            if(cand_building in self.buildings):
-                                # We don't need it since it'll be replaced by its parts
-                                self.buildings.remove(cand_building)
-                            logging.info('Found Building for removing %d' % cand_building.osm_id)
-                            building.parent = cand_building
-    #                         print cand_building.name
-                            break
+                        try:
+                            if building.osm_id == cand_building.osm_id:
+                                continue
+                            if 'building:part' in building.tags and cand_building.polygon.intersection(building.polygon).equals(building.polygon):
+                                # Our building:part belongs to the building
+                                if(cand_building in self.buildings):
+                                    # We don't need it since it'll be replaced by its parts
+                                    self.buildings.remove(cand_building)
+                                logging.info('Found Building for removing %d' % cand_building.osm_id)
+                                building.parent = cand_building
+        #                         print cand_building.name
+                                break
+                        except TopologicalError, reason:
+                            logging.warn("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d "%(reason, building.osm_id, cand_building.osm_id))
+                        except PredicateError, reason:
+                            logging.warn("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d "%(reason, building.osm_id, cand_building.osm_id))
+            
+                        
     #                     if 'building' in building.tags and building.polygon.intersection(cand_building.polygon).equals(cand_building.polygon):
     #                         print 'Found Building:part'
                 way_list_by_ref.append(building)
