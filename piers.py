@@ -220,7 +220,7 @@ class Piers(ObjectList):
             e = elev(vec2d(p[0], p[1])) - 5
             obj.node(-p[1], e, -p[0])
 # Build Sides
-        height = 2
+        height = 1
         for i, n in enumerate(top_nodes[1:]):
             sideface = []
             sideface.append((n + o + rd_len - 1, x, 0.5))
