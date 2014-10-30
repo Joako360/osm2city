@@ -281,7 +281,12 @@ def main():
     f.write(str(ac))
     f.close()
 
-    stg_manager = stg_io2.STG_Manager(path, OUR_MAGIC, overwrite=True)
+    # -- initialize STG_Manager
+    if parameters.PATH_TO_OUTPUT:
+        path_to_output = parameters.PATH_TO_OUTPUT
+    else:
+        path_to_output = parameters.PATH_TO_SCENERY
+    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, overwrite=True)
 
     # -- write stg
     path_to_stg = stg_manager.add_object_static(ac_fname, center_global, 0, 0)
