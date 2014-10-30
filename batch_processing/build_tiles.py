@@ -13,6 +13,9 @@ from _io import open
 
 
 def get_file(name, tilename, lon, lat):
+    """
+    Returns a command file (Extension cmd for windows)
+    """
     if "nt" in os.name:
         name = name + tilename + ".cmd"
     else:
