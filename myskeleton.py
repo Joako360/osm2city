@@ -97,7 +97,7 @@ def myskel(out, b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header 
         tools.stats.roof_errors += 1
         gp = parameters.PREFIX + os.sep + 'roof-error-%04i' % tools.stats.roof_errors
         tools.write_one_gp(b, gp)
-        os.system("gnuplot %s.gp" % gp)
+        #os.system("gnuplot %s.gp" % gp)
         return False
 
     if False and header:
