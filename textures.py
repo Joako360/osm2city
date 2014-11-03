@@ -439,6 +439,13 @@ def init():
         requires=['roof:color:black'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
+    facades.append(Texture('tex.src/facade_modern_commercial_46x169m.jpg',
+        h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=True,
+        v_size_meters=169.2, v_cuts=[309, 443, 577, 712, 846, 1204, 1383, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
+        v_align_bottom=True, height_min=40,
+        requires=['roof:color:brown'],
+        provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+
     facades.append(Texture('tex.src/DSCF9726_noroofsec_pow2.png',
        15.1, [321,703,1024], True,
        9.6, [227,512], False,
@@ -465,12 +472,12 @@ def init():
                                      'compat:roof-hipped']))
 
     # debug fallback texture for very large facades.
-    facades.append(Texture('tex.src/facade_modern_black_46x60m.jpg',
-        450.9, [167, 345, 521, 700, 873, 944], True,
-        600.5, [144, 229, 311, 393, 480, 562, 645, 732, 818, 901, 983, 1067, 1154, 1245], False,
-        v_align_bottom = True,
-        requires=[],
-        provides=['shape:urban','age:modern', 'compat:roof-flat']))
+    #facades.append(Texture('tex.src/facade_modern_black_46x60m.jpg',
+        #450.9, [167, 345, 521, 700, 873, 944], True,
+        #600.5, [144, 229, 311, 393, 480, 562, 645, 732, 818, 901, 983, 1067, 1154, 1245], False,
+        #v_align_bottom = True,
+        #requires=[],
+        #provides=['shape:urban','age:modern', 'compat:roof-flat']))
 
 
 
@@ -490,6 +497,8 @@ def init():
         100., [], True, 100., [], False, provides=['color:red', 'compat:roof-flat']))
     roofs.append(Texture('tex.src/roof_gen_black_1.png',
         100., [], True, 100., [], False, provides=['color:black', 'compat:roof-flat']))
+    roofs.append(Texture('tex.src/roof_gen_brown_1.png',
+        100., [], True, 100., [], False, provides=['color:brown', 'compat:roof-flat']))
 
 #    roofs.append(Texture('tex.src/roof_black2',
 #                             1.39, [], True, 0.89, [], True, provides=['color:black']))
