@@ -38,6 +38,10 @@ class STG_File(object):
         self.magic = magic
         self.our_magic_start = delimiter_string(self.magic, True)
         self.our_magic_end = delimiter_string(self.magic, False)
+        self.read()
+
+    def read(self):
+        """read others and ours from file"""
         try:
             stg = open(self.file_name, 'r')
             lines = stg.readlines()
@@ -46,19 +50,25 @@ class STG_File(object):
             logging.warning("error reading %s: %s", self.file_name, reason)
             return
 
-        try:
-            ours_start = lines.index(self.our_magic_start)
-        except ValueError:
-            self.other_list = lines
-            return
 
-        try:
-            ours_end = lines.index(self.our_magic_end)
-        except ValueError:
-            ours_end = len(lines)
+        self.other_list = []
+        while lines.count(self.our_magic_start) > 0:
+            try:
+                ours_start = lines.index(self.our_magic_start)
+            except ValueError:
+                self.other_list = lines
+                return
+    
+            try:
+                ours_end = lines.index(self.our_magic_end)
+            except ValueError:
+                ours_end = len(lines)
 
-        self.other_list = lines[:ours_start] + lines[ours_end+1:]
-        self.our_list = lines[ours_start+1:ours_end]
+            self.other_list = self.other_list + lines[:ours_start]
+#            self.our_list = lines[ours_start+1:ours_end]
+            lines = lines[ours_end+1:]
+        self.other_list = self.other_list + lines
+
 
     def drop_ours(self):
         """Clear our list. Call write() afterwards to finish uninstall"""
@@ -90,15 +100,20 @@ class STG_File(object):
 
     def write(self):
         """write others and ours to file"""
+        #read directly before write to 
+        self.read()
         self.make_path_to_stg()
         stg = open(self.file_name, 'w')
+        logging.info("Writing %d other lines"%len(self.other_list))
         for line in self.other_list:
             stg.write(line)
 
         if self.our_list:
+            logging.info("Writing %d lines"%len(self.our_list))
             stg.write(self.our_magic_start)
             stg.write("# do not edit below this line\n#\n")
             for line in self.our_list:
+                logging.info(line.strip())
                 stg.write(line)
             stg.write(self.our_magic_end)
 
