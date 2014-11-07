@@ -212,6 +212,7 @@ class LinearObject(object):
         # -- elevated road. Got h_add data for first and last node. Now lift intermediate
         #    nodes. So far, h_add is for centerline only.
         # FIXME: when do we need this? if left_z_set is None and right_z_set is None?
+
         center_z = np.array([elev(the_node) for the_node in self.center.coords])  + self.AGL
 
         EPS = 0.001
