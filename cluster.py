@@ -18,6 +18,7 @@ from vec2d import vec2d
 import tools
 import numpy as np
 import logging
+import os
 
 
 class Cluster(object):
@@ -38,13 +39,14 @@ def clamp(i, vmin, vmax):
 
 
 class Clusters(object):
-    def __init__(self, min, max, size):
+    def __init__(self, min, max, size, prefix):
         self.max = max
         self.min = min
         self.delta = max - min
         self.size = size
         self.n = (self.delta / size).int() + 1
         self.__len = self.n.x * self.n.y
+        self.prefix = prefix
 
         #self.list = []
         self._clusters = [[self.init_cluster(vec2d(i,j)) 
@@ -127,7 +129,7 @@ self._clusters[I.x][I.y]
         print "clusters", self.n
         newclusters = [[self.init_cluster(vec2d(i,j)) for j in range(self.n.y)] for i in range(self.n.x)]
 
-        f = open("reclustered.dat", "w")
+        f = open(self.prefix + os.sep + "reclustered.dat", "w")
         for j in range(self.n.y):
             for i in range(self.n.x):
                 cluster = self._clusters[i][j]
@@ -174,7 +176,7 @@ self._clusters[I.x][I.y]
 #
 
     def write_stats(self):
-        f = open("cluster_stats.dat", "w")
+        f = open(self.prefix + os.sep + "cluster_stats.dat", "w")
         for j in range(self.n.y):
             for i in range(self.n.x):
                 #id = j * self.n.x + i

@@ -666,7 +666,7 @@ if __name__ == "__main__":
     # -- create (empty) clusters
     lmin = vec2d(tools.transform.toLocal(cmin))
     lmax = vec2d(tools.transform.toLocal(cmax))
-    clusters = Clusters(lmin, lmax, parameters.TILE_SIZE)
+    clusters = Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
 
     if parameters.OVERLAP_CHECK:
         # -- read static/shared objects in our area from .stg(s)
