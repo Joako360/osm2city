@@ -737,7 +737,7 @@ class Roads(objectlist.ObjectList):
            put objects in clusters based on their centroid
         """
         lmin, lmax = [vec2d(self.transform.toLocal(c)) for c in parameters.get_extent_global()]
-        self.clusters = Clusters(lmin, lmax, parameters.TILE_SIZE)
+        self.clusters = Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
 
         for the_object in self.bridges_list + self.roads_list:
             self.clusters.append(vec2d(the_object.center.centroid.coords[0]), the_object)
