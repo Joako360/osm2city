@@ -162,6 +162,8 @@ class LinearObject(object):
                     % (self.osm_id, i, i-1, str(self.refs)))
 
             self.segment_len[i] = (dy*dy + dx*dx)**0.5
+            if self.segment_len[i] == 0:
+                logging.error("osm id: %i contains a segment with zero len"%self.osm_id)
             cumulated_distance += self.segment_len[i]
             self.dist[i+1] = cumulated_distance
             self.normals[i] = np.array((-dy, dx))/self.segment_len[i]
