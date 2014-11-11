@@ -91,6 +91,7 @@ import troubleshoot
 # debug stuff
 import test
 from pdb import pm
+import math
 #from memory_profiler import profile
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
@@ -167,6 +168,9 @@ class Roads(objectlist.ObjectList):
     def probe_elev_at_nodes(self):
         """add elevation info to all nodes"""
         for the_node in self.nodes_dict.values():
+            if math.isnan(the_node.lon) or math.isnan(the_node.lat):
+                logging.error("Nan encountered while probing elevation")
+                continue
             the_node.MSL = self.elev((the_node.lon, the_node.lat), is_global=True)
             the_node.h_add = 0.
     
@@ -698,6 +702,10 @@ class Roads(objectlist.ObjectList):
             the_node = self.nodes_dict[way.refs[0]]
             anchor = vec2d(self.transform.toLocal(vec2d(the_node.lon, the_node.lat)))
 #            anchor.x += random.uniform(-1,1)
+            if math.isnan(anchor.lon) or math.isnan(anchor.lat):
+                logging.error("Nan encountered while probing anchor elevation")
+                continue
+
             e = self.elev(anchor) + the_node.h_add + 3.
             ac.add_label(' %i h=%1.1f' % (the_node.osm_id, the_node.h_add), -anchor.y, e, -anchor.x, scale=1.)
 
@@ -705,6 +713,10 @@ class Roads(objectlist.ObjectList):
                 the_node = self.nodes_dict[way.refs[-1]]
                 anchor = vec2d(self.transform.toLocal(vec2d(the_node.lon, the_node.lat)))
 #                anchor.x += random.uniform(-1,1)
+                if math.isnan(anchor.lon) or math.isnan(anchor.lat):
+                    logging.error("Nan encountered while probing anchor elevation")
+                    continue
+
                 e = self.elev(anchor) + the_node.h_add + 3.
                 ac.add_label(' %i h=%1.1f' % (the_node.osm_id, the_node.h_add), -anchor.y, e, -anchor.x, scale=1.)
         path_to_stg = stg_manager.add_object_static(file_name + '.ac', vec2d(self.transform.toGlobal((0,0))), 0, 0)
@@ -725,7 +737,7 @@ class Roads(objectlist.ObjectList):
            put objects in clusters based on their centroid
         """
         lmin, lmax = [vec2d(self.transform.toLocal(c)) for c in parameters.get_extent_global()]
-        self.clusters = Clusters(lmin, lmax, parameters.TILE_SIZE)
+        self.clusters = Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
 
         for the_object in self.bridges_list + self.roads_list:
             self.clusters.append(vec2d(the_object.center.centroid.coords[0]), the_object)

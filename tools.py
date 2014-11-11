@@ -17,6 +17,7 @@ import batch_processing.fg_telnet as telnet
 import shutil
 import cPickle
 import parameters
+import math
 
 stats = None
 
@@ -231,6 +232,10 @@ class Probe_fgelev(object):
 
             if not self.fgelev_pipe:
                 self.open_fgelev()
+            if math.isnan(position.lon) or math.isnan(position.lat):
+                logging.error("Nan encountered while probing elevation")
+                return -100
+
             try:
                 self.fgelev_pipe.stdin.write("%i %g %g\r\n" % (self.record, position.lon, position.lat))
             except IOError, reason:
@@ -241,6 +246,7 @@ class Probe_fgelev(object):
                 elev = float(line.split()[1]) + self.h_offset
             except IndexError, reason:
                 self.save_cache()
+                logging.fatal("%i %g %g\r\n" % (self.record, position.lon, position.lat))
                 logging.fatal("fgelev returned <%s>, resulting in %s. Did fgelev start OK (Record : %i)?", line, reason, self.record)
                 raise RuntimeError("fgelev errors are fatal.")
 

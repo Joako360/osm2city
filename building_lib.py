@@ -126,7 +126,7 @@ def check_height(building_height, t):
                         return tex_y0, tex_y1
             raise ValueError("SHOULD NOT HAPPEN! found no tex_y0, tex_y1 (building_height %g splits %s %g)" % (building_height, str(t.v_cuts_meters), t.v_size_meters))
         else:
-            raise ValueError("SHOULD NOT HAPPEN! building_height %g outside %g %g" % (building_height, t.v_cuts_meters[0], t.v_size_meters))
+           # raise ValueError("SHOULD NOT HAPPEN! building_height %g outside %g %g" % (building_height, t.v_cuts_meters[0], t.v_size_meters))
             return 0, 0
 
 
@@ -489,7 +489,9 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             tools.stats.skipped_texture += 1
             logging.info("Skipping building (no matching texture)")
             continue
-        assert(b.longest_edge_len <= b.facade_texture.width_max)
+        if(b.longest_edge_len > b.facade_texture.width_max):
+            logging.error("OsmID : %d b.longest_edge_len <= b.facade_texture.width_max"%b.osm_id)
+            continue
         # print "long", b.longest_edge_len, b.facade_texture.width_max, str(b.facade_texture)
 
         roof_requires = copy.copy(b.facade_texture.requires)
