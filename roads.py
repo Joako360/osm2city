@@ -849,8 +849,6 @@ def main():
     args = parser.parse_args()
 
     if args.filename is not None:
-
-    if args.filename is not None:
         parameters.read_from_file(args.filename)
 
     if args.e:
@@ -860,6 +858,8 @@ def main():
 
     #parameters.show()
 
+    center_global = parameters.get_center_global()
+    osm_fname = parameters.get_OSM_file_name()
     transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(transform)
     elev = tools.get_interpolator(fake=parameters.NO_ELEV)
