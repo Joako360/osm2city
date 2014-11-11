@@ -737,7 +737,7 @@ def install_files(file_list, dst):
         the_dst = dst + os.sep + the_file
         print "cp %s %s" % (the_file, the_dst)
         try:
-            os.link(the_file, the_dst)
+            shutil.copy2(the_file, the_dst)
         except OSError, reason:
             if reason.errno not in [17]:
                 logging.warn("Error while installing %s: %s" % (the_file, reason))
