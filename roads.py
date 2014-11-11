@@ -283,6 +283,14 @@ class Roads(objectlist.ObjectList):
                 if center.length < parameters.BRIDGE_MIN_LENGTH:
                     the_way.tags.pop('bridge')
     
+    def keep_only_bridges_and_embankments(self):
+        """remove everything that is not elevated""" 
+        for the_way in self.roads_list:
+            h_add = np.array([abs(self.nodes_dict[the_ref].h_add) for the_ref in the_way.refs])
+            if h_add.sum() == 0:
+                self.roads_list.remove(the_way)
+                logging.info("kick %i", the_way.osm_id)
+    
     def create_linear_objects(self):
         self.G=nx.Graph()
 
@@ -837,18 +845,21 @@ def main():
     parser.add_argument("-f", "--file", dest="filename",
                       help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
     parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
+    parser.add_argument("-b", "--bridges-only", action="store_true", help="create only bridges and embankments")
     args = parser.parse_args()
+
+    if args.filename is not None:
 
     if args.filename is not None:
         parameters.read_from_file(args.filename)
 
     if args.e:
         parameters.NO_ELEV = True
+    if args.bridges_only:
+        parameters.CREATE_BRIDGES_ONLY = True
 
     #parameters.show()
 
-    center_global = parameters.get_center_global()
-    osm_fname = parameters.get_OSM_file_name()
     transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(transform)
     elev = tools.get_interpolator(fake=parameters.NO_ELEV)
@@ -910,6 +921,8 @@ def main():
 
     #roads.cleanup_junctions()
 #    roads.objects = [roads.objects[0]]
+    if parameters.CREATE_BRIDGES_ONLY:
+        roads.keep_only_bridges_and_embankments()
     roads.clusterize()
 #    scale_test(transform, elev)
 
