@@ -206,7 +206,7 @@ MAX_SLOPE_ROAD = 0.08
 MAX_TRANSVERSE_GRADIENT = 0.1   #
 BRIDGE_MIN_LENGTH = 20.         # discard short bridges, draw road instead
 DEBUG_PLOT = 0
-
+CREATE_BRIDGES_ONLY = 0         # create only bridges and embankments
 # default_args_end # DO NOT MODIFY THIS LINE
 
 
