@@ -22,6 +22,7 @@ import tools
 from vec2d import vec2d
 import calc_tile
 from pdb import pm
+import time
 
 
 class STG_File(object):
@@ -111,7 +112,8 @@ class STG_File(object):
         if self.our_list:
             logging.info("Writing %d lines"%len(self.our_list))
             stg.write(self.our_magic_start)
-            stg.write("# do not edit below this line\n#\n")
+            stg.write("# do not edit below this line\n")
+            stg.write("# Last Written %s\n#\n"%time.strftime("%c"))
             for line in self.our_list:
                 logging.info(line.strip())
                 stg.write(line)
