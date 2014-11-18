@@ -30,7 +30,7 @@ if __name__ == '__main__':
     parser.add_argument("-f", "--properties", dest="properties",
                       help="The name of the property file to be copied")
     parser.add_argument("-o", "--out", dest="out",
-                      help="The name of the property file to be copied")
+                      help="The name of the property file to be generated")
     args = parser.parse_args()
 
     if(args.tilename is None):
@@ -38,7 +38,11 @@ if __name__ == '__main__':
         parser.print_usage()
         exit(1)
     if(args.properties is None):
-        logging.error("Properties is required")
+        logging.error("Input properties are required")
+        parser.print_usage()
+        exit(1)
+    if(args.out is None):
+        logging.error("Output properties are required")
         parser.print_usage()
         exit(1)
     logging.info('Generating directory structure for %s ', args.tilename)
