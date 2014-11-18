@@ -16,12 +16,14 @@ import xml.sax
 from shapely import affinity
 from shapely.geometry import box
 from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
 from shapely.geometry import Point
 from shapely.geometry import Polygon
 
 import vec2d
 import calc_tile
 import coordinates
+# import osm2pylon
 import osmparser
 import osmparser_wrapper
 import parameters
@@ -53,7 +55,7 @@ class LinearOSMFeature(object):
 
     def get_width(self):
         """The width incl. border as a float in meters"""
-        raise NotImplementedError("Please Implement this method")
+        raise NotImplementedError("Please implement this method")
 
 
 class Highway(LinearOSMFeature):
@@ -86,6 +88,12 @@ class Highway(LinearOSMFeature):
         else:  # MOTORWAY
             my_width = 14.0
         return my_width
+
+    def populate_buildings_along(self):
+        """Whether or not the highway determines were buildings are built. E.g. motorway would be false"""
+        if self.type_ in (Highway.TYPE_MOTORWAY, Highway.TYPE_TRUNK):
+            return False
+        return True
 
 
 def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
@@ -230,6 +238,65 @@ def process_osm_waterway(nodes_dict, ways_dict, my_coord_transformator):
     return my_waterways
 
 
+class GenBuilding(object):
+    """An object representing a generated non-OSM building"""
+    max_id = 0
+
+    TYPE_HOUSE = 10
+
+    def __init__(self, building_type, highway_width):
+        self.gen_id = GenBuilding._next_gen_id()
+        self.type_ = building_type
+        self.width = 10  # FIXME: hard-coded
+        self.depth = 7  # FIXME: hard-coded
+        self.ideal_buffer_front = 5  # FIXME: hard-coded
+        # takes into account that ideal buffer_front is challenged in curve
+        self.min_buffer_front = 3  # FIXME: hard-coded,
+        self.buffer_back = 5  # FIXME: hard-coded
+        self.buffer_side = 5  # FIXME: hard-coded
+        self.area_polygon = None  # A polygon representing only the building, not the buffer around
+        self.buffer_polygon = None  # A polygon representing the building incl. front/back/side buffers
+        self._create_area_polygons(highway_width)
+        # below location attributes are set after population
+        self.x = 0  # the x coordinate of the mid-point in relation to the local coordinate system
+        self.y = 0  # the y coordinate of the mid-point in relation to the local coordinate system
+        self.angle = 0  # the angle in degrees from North (y-axis) in the local coordinate system for the building's
+                        # static object local x-axis
+
+    @staticmethod
+    def _next_gen_id():
+        GenBuilding.max_id += 1
+        return GenBuilding.max_id
+
+    def _create_area_polygons(self, highway_width):
+        """Creates polygons at (0,0) and no angle"""
+        self.buffer_polygon = box(-1*(self.width/2 + self.buffer_side)
+                                  , highway_width/2 + (self.ideal_buffer_front - self.min_buffer_front)
+                                  , self.width/2 + self.buffer_side
+                                  , highway_width/2 + self.ideal_buffer_front + self.depth + self.buffer_back)
+        self.area_polygon = box(-1*(self.width/2)
+                                , highway_width/2 + self.ideal_buffer_front
+                                , self.width/2
+                                , highway_width/2 + self.ideal_buffer_front + self.depth)
+
+    def get_area_polygon(self, has_buffer, highway_point, highway_angle):
+        """
+        Create a polygon for the building and place it in relation to the point and angle of the highway.
+        """
+        if has_buffer:
+            my_box = self.buffer_polygon
+        else:
+            my_box = self.area_polygon
+        rotated_box = affinity.rotate(my_box, -1 * (90 + highway_angle), (0, 0))  # plus 90 degrees because right side of
+                                                                          # street along; -1 to go clockwise
+        return affinity.translate(rotated_box, highway_point.x, highway_point.y)
+
+    def set_location(self, point_on_line, angle, area_polygon, buffer_polygon):
+        # FIXME: calculate x, y and angle based on parameters plus self.buffer_*
+        self.area_polygon = area_polygon
+        self.buffer_polygon = buffer_polygon
+
+
 class Landuse(object):
     TYPE_COMMERCIAL = 10
     TYPE_INDUSTRIAL = 20
@@ -242,9 +309,9 @@ class Landuse(object):
         self.type_ = 0
         self.polygon = None  # the polygon defining its outer boundary
         self.number_of_buildings = 0  # only set for generated TYPE_NON_OSM land-uses during generation
-        self.linked_highways = None  # Array of Highways
-        self.linked_blocked_areas = None  # Array of Polygons for blocked areas. E.g.
+        self.linked_blocked_areas = []  # List of Polygon objects for blocked areas. E.g.
                                           # open-space, existing building, static objects, *-buffers
+        self.generated_buildings = []  # List og GenBuilding objects for generated non-osm buildings along the highways
 
 
 class Place(object):
@@ -531,12 +598,103 @@ def create_static_obj_boxes(my_coord_transformator):
                 x_y_point = my_coord_transformator.toLocal(vec2d.vec2d(entry.lon, entry.lat))
                 my_box = box(boundary_tuple[0] + x_y_point[0], boundary_tuple[1] + x_y_point[1]
                              , boundary_tuple[2] + x_y_point[0], boundary_tuple[3] + x_y_point[1])
-                rotated_box = affinity.rotate(my_box, entry.hdg + 90)  # FIXME: no sure +90 or -90 degrees
+                rotated_box = affinity.rotate(my_box, entry.hdg + 90)  # FIXME: not sure whether +90 or -90 degrees
                 static_obj_boxes.append(rotated_box)
             except IOError, reason:
                 logging.warning("Ignoring unreadable stg_entry %s", reason)
 
     return static_obj_boxes
+
+
+def process_ways_for_blocked_areas(my_ways, landuses):
+    """
+    Adds intersecting ways with buffer to blocked areas in landuse
+    """
+    for way in my_ways.values():
+        for landuse in landuses.values():
+            if way.linear.within(landuse.polygon):
+                landuse.linked_blocked_areas.append(way.linear.buffer(way.get_width()/2))
+                break
+            intersection = way.linear.intersection(landuse.polygon)
+            if not intersection.is_empty:
+                if isinstance(intersection, LineString):
+                    landuse.linked_blocked_areas.append(intersection.buffer(way.get_width()/2))
+                elif isinstance(intersection, MultiLineString):
+                    for my_line in intersection:
+                        if isinstance(my_line, LineString):
+                            landuse.linked_blocked_areas.append(my_line.buffer(way.get_width()/2))
+
+
+def process_open_spaces_for_blocked_areas(open_spaces, landuses):
+    for open_space in open_spaces.values():
+        for landuse in landuses.values():
+            if open_space.within(landuse.polygon) or open_space.intersects(landuse.polygon):
+                landuse.linked_blocked_areas.append(open_space)
+
+
+def process_building_refs_for_blocked_areas(building_refs, landuses):
+    for building in building_refs.values():
+        for landuse in landuses.values():
+            if building.within(landuse.polygon) or building.intersects(landuse.polygon):
+                landuse.linked_blocked_areas.append(building)
+
+
+def process_static_obj_boxes_for_blocked_areas(static_obj_boxes, landuses):
+    for box in static_obj_boxes:
+        for landuse in landuses.values():
+            if box.within(landuse.polygon) or box.intersects(landuse.polygon):
+                landuse.linked_blocked_areas.append(box)
+
+
+def calc_angle_of_line(x1, y1, x2, y2):
+    """Returns the angle in degrees of a line relative to North"""
+    # FIXME: copy of osm2pylon
+    angle = math.atan2(x2 - x1, y2 - y1)
+    degree = math.degrees(angle)
+    if degree < 0:
+        degree += 360
+    return degree
+
+
+def generate_buildings_along_highway(landuse, highway, is_reverse, step_length):
+    """
+    The central assumption is that existing blocked areas incl. buildings du not need a buffer.
+    The to be populated buildings all bring their own constraints with regards to distance to road, distance to other
+    buildings etc.
+    A populated buildings is appended to the current landuse's generated_buildings list.
+    FIXME: parameter for list of possible GenBuildings
+    """
+    travelled_along = 0
+    highway_length = highway.linear.length
+    my_gen_building = GenBuilding(GenBuilding.TYPE_HOUSE, highway.get_width())
+    if not is_reverse:
+        point_on_line = highway.linear.interpolate(0)
+    else:
+        point_on_line = highway.linear.interpolate(highway_length)
+    while travelled_along < highway_length:
+        travelled_along += step_length
+        prev_point_on_line = point_on_line
+        if not is_reverse:
+            point_on_line = highway.linear.interpolate(travelled_along)
+        else:
+            point_on_line = highway.linear.interpolate(highway_length - travelled_along)
+        angle = calc_angle_of_line(prev_point_on_line.x, prev_point_on_line.y
+                                             , point_on_line.x, point_on_line.y)
+        buffer_polygon = my_gen_building.get_area_polygon(True, point_on_line, angle)
+        if buffer_polygon.within(landuse.polygon):
+            valid_new_gen_place = True
+            for blocked_area in landuse.linked_blocked_areas:
+                #if buffer_polygon.crosses(blocked_area) or buffer_polygon.contains(blocked_area) \
+                        #or buffer_polygon.within(blocked_area):
+                if buffer_polygon.intersects(blocked_area):
+                    valid_new_gen_place = False
+                    break
+            if valid_new_gen_place:
+                area_polygon = my_gen_building.get_area_polygon(False, point_on_line, angle)
+                my_gen_building.set_location(point_on_line, angle, area_polygon, buffer_polygon)
+                landuse.generated_buildings.append(my_gen_building)
+                landuse.linked_blocked_areas.append(area_polygon)
+                my_gen_building = GenBuilding(GenBuilding.TYPE_HOUSE, highway.get_width())  # new building needed
 
 
 # ================ PLOTTING FOR VISUAL TEST ========
@@ -549,7 +707,7 @@ def plot_line(ax, ob, my_color, my_width):
     ax.plot(x, y, color=my_color, alpha=0.7, linewidth=my_width, solid_capstyle='round', zorder=2)
 
 
-def draw_polygons(highways, open_spaces, buildings, land_uses, static_obj_boxes
+def draw_polygons(highways, buildings, landuses, static_obj_boxes
                   , x_min, y_min, x_max, y_max):
     # Create a matplotlib figure
     my_figure = pyplot.figure(num=1, figsize=(16, 10), dpi=90)
@@ -558,7 +716,7 @@ def draw_polygons(highways, open_spaces, buildings, land_uses, static_obj_boxes
     ax = my_figure.add_subplot(111)
 
     # Make the polygons into a patch and add it to the subplot
-    for my_land_use in land_uses.values():
+    for my_land_use in landuses.values():
         my_color = "red"  # TYPE_NON_OSM
         if Landuse.TYPE_COMMERCIAL == my_land_use.type_:
             my_color = "magenta"
@@ -585,14 +743,17 @@ def draw_polygons(highways, open_spaces, buildings, land_uses, static_obj_boxes
             plot_line(ax, my_highway.linear, "black", 1)
         else:
             plot_line(ax, my_highway.linear, "gray", 1)
-
-    for open_space in open_spaces.values():
-        patch = PolygonPatch(open_space, facecolor='green', edgecolor='green')
-        ax.add_patch(patch)
-
+    for my_land_use in landuses.values():
+        for blocked in my_land_use.linked_blocked_areas:
+            patch = PolygonPatch(blocked, facecolor='green', edgecolor='green')
+            ax.add_patch(patch)
+        for gen_building in my_land_use.generated_buildings:
+            patch = PolygonPatch(gen_building.area_polygon, facecolor='yellow', edgecolor='black')
+            ax.add_patch(patch)
 
     # Fit the figure around the polygons, bounds, render, and show
-    w, h = x_max - x_min, y_max - y_min
+    w = x_max - x_min
+    h = y_max - y_min
     ax.set_xlim(x_min - 0.2*w, x_max + 0.2*w)
     ax.set_ylim(y_min - 0.2*h, y_max + 0.2*h)
     ax.set_aspect(1)
@@ -601,7 +762,33 @@ def draw_polygons(highways, open_spaces, buildings, land_uses, static_obj_boxes
 
 def generate_extra_buildings(building_refs, static_obj_boxes, landuse_refs, places_refs, open_spaces
                              , highways, railways, waterways, x_min, y_min, x_max, y_max):
-    draw_polygons(highways, open_spaces, building_refs, landuse_refs, static_obj_boxes, x_min, y_min, x_max, y_max)
+    # FIXME: use place_refs to influence type and density of buildings
+    # FIXME: break land-uses up into blocks (e.g. to determine default building densities and speed up to find blocked
+    # areas - also if density of buildings in block already enough, then do not calculate
+    # FIXME: use slope to determine angle of houses
+    process_open_spaces_for_blocked_areas(open_spaces, landuse_refs)
+    process_ways_for_blocked_areas(highways, landuse_refs)
+    process_ways_for_blocked_areas(railways, landuse_refs)
+    process_ways_for_blocked_areas(waterways, landuse_refs)
+    process_building_refs_for_blocked_areas(building_refs, landuse_refs)
+    process_static_obj_boxes_for_blocked_areas(static_obj_boxes, landuse_refs)
+
+    for landuse in landuse_refs.values():
+        if not landuse.type_ == Landuse.TYPE_NON_OSM:  # assume generated land-uses already have the needed buildings
+            for highway in highways.values():
+                if highway.populate_buildings_along():  # e.g. do not populate buildings along motorways
+                    process_this_highway = False
+                    if highway.linear.within(landuse.polygon):
+                        process_this_highway = True
+                    else:
+                        intersection = highway.linear.intersection(landuse.polygon)
+                        if not intersection.is_empty and not isinstance(intersection, Point):
+                            process_this_highway = True
+                    if process_this_highway:
+                        generate_buildings_along_highway(landuse, highway, False, 2)  # FIXME: hard_coded step size
+                        generate_buildings_along_highway(landuse, highway, True, 2)  # FIXME: hard_coded step size
+
+    draw_polygons(highways, building_refs, landuse_refs, static_obj_boxes, x_min, y_min, x_max, y_max)
     i = 0
 
 
@@ -725,6 +912,11 @@ class TestExtraBuildings(unittest.TestCase):
         my_highway = Highway(8)
         my_highway.linear = linear
         my_highway.type_ = Highway.TYPE_RESIDENTIAL
+        highways[my_highway.osm_id] = my_highway
+        linear = LineString([(70, 50), (100, 50)])
+        my_highway = Highway(9)
+        my_highway.linear = linear
+        my_highway.type_ = Highway.TYPE_MOTORWAY
         highways[my_highway.osm_id] = my_highway
         # railways
         railways = {}

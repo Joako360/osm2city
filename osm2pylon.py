@@ -946,11 +946,12 @@ def process_highways_for_streetlamps(my_highways, landuse_buffers):
                             if isinstance(my_line, LineString):
                                 intersections.append(my_line)
                         continue
-                    index += 1
-                    new_highway = Highway(index + key)
-                    new_highway.type_ = my_highway.type_
-                    new_highway.linear = intersection
-                    my_streetlamps[new_highway.osm_id] = StreetlampWay(new_highway.osm_id, new_highway)
+                    elif isinstance(intersection, LineString):
+                        index += 1
+                        new_highway = Highway(index + key)
+                        new_highway.type_ = my_highway.type_
+                        new_highway.linear = intersection
+                        my_streetlamps[new_highway.osm_id] = StreetlampWay(new_highway.osm_id, new_highway)
                 del my_highways[key]
 
     # Remove the too short lines
