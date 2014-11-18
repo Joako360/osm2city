@@ -353,7 +353,7 @@ def init():
         88., [667, 597, 530, 460, 391, 322, 254, 185, 117, 48, 736, 804, 873, 943, 1012, 1080, 1151, 1218, 1288, 1350], False,
         v_align_bottom = True, height_min=20.,
         requires=[],
-        provides=['shape:urban','age:modern', 'compat:roof-flat']))
+        provides=['age:modern', 'compat:roof-flat', 'shape:terminal']))
 
     facades.append(Texture('tex.src/facade_modern_black_46x60m.jpg',
         45.9, [167, 345, 521, 700, 873, 944], True,
@@ -445,6 +445,15 @@ def init():
         v_align_bottom=True, height_min=40,
         requires=['roof:color:brown'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+
+    # FIXME:
+    facades.append(Texture('tex.src/facade_modern_commercial_90x340m.jpg',
+        h_size_meters=90.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=True,
+        v_size_meters=340.2, v_cuts=[309, 443, 577, 712, 846, 1204, 1383, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
+        v_align_bottom=True, height_min=40,
+        requires=['roof:color:brown'],
+        provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+
 
     facades.append(Texture('tex.src/DSCF9726_noroofsec_pow2.png',
        15.1, [321,703,1024], True,

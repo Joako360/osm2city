@@ -471,7 +471,13 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             facade_requires.append('compat:roof-pitched')
         else:
             facade_requires.append('compat:roof-flat')
-
+            
+        try:
+            if 'terminal' in string.lower(b.tags['aeroway']):
+                facade_requires.append('facade:shape:terminal')
+        except KeyError:
+            pass
+#
         # -- determine facade and roof textures
         logging.debug("___find facade")
         if b.parent is None:
