@@ -1,6 +1,7 @@
 #!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 # FIXME: check sign of angle
+import re
 
 """
 Ugly, highly experimental code.
@@ -286,7 +287,8 @@ def main():
         path_to_output = parameters.PATH_TO_OUTPUT
     else:
         path_to_output = parameters.PATH_TO_SCENERY
-    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, overwrite=True)
+    replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)        
+    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
 
     # -- write stg
     path_to_stg = stg_manager.add_object_static(ac_fname, center_global, 0, 0)

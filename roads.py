@@ -926,7 +926,8 @@ def main():
     roads.clusterize()
 #    scale_test(transform, elev)
 
-    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, overwrite=True)
+    replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)        
+    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
 #    roads.debug_label_nodes(stg_manager)
 
     # -- write stg

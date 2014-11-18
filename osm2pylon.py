@@ -1363,7 +1363,8 @@ def main():
         path_to_output = parameters.PATH_TO_OUTPUT
     else:
         path_to_output = parameters.PATH_TO_SCENERY
-    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, overwrite=True)
+    replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)
+    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
 
     # Write to Flightgear
     if parameters.C2P_PROCESS_POWERLINES:

@@ -29,7 +29,7 @@ class STG_File(object):
     """represents an .stg file.
        takes care of writing/reading/uninstalling OBJECT_* lines
     """
-    def __init__(self, lon_lat, tile_index, path_to_scenery, magic):
+    def __init__(self, lon_lat, tile_index, path_to_scenery, magic, prefix):
         """Read all lines from stg to memory.
            Store our/other lines in two separate lists."""
         self.path_to_stg = calc_tile.construct_path_to_stg(path_to_scenery, lon_lat)
@@ -37,8 +37,12 @@ class STG_File(object):
         self.other_list = []
         self.our_list = []
         self.magic = magic
-        self.our_magic_start = delimiter_string(self.magic, True)
-        self.our_magic_end = delimiter_string(self.magic, False)
+        self.prefix = prefix
+        #deprecated usage
+        self.our_magic_start = delimiter_string(self.magic, None, True)
+        self.our_magic_end = delimiter_string(self.magic, None, False)
+        self.our_magic_start_new = delimiter_string(self.magic, prefix , True)
+        self.our_magic_end_new = delimiter_string(self.magic, prefix, False)
         self.read()
 
     def read(self):
@@ -52,23 +56,43 @@ class STG_File(object):
             return
 
 
-        self.other_list = []
+        temp_other_list = []
+        #deal with broken files containing several sections (old version) 
         while lines.count(self.our_magic_start) > 0:
             try:
                 ours_start = lines.index(self.our_magic_start)
             except ValueError:
-                self.other_list = lines
-                return
+                temp_other_list = lines
+                break
     
             try:
                 ours_end = lines.index(self.our_magic_end)
             except ValueError:
                 ours_end = len(lines)
 
-            self.other_list = self.other_list + lines[:ours_start]
+            temp_other_list = temp_other_list + lines[:ours_start]
 #            self.our_list = lines[ours_start+1:ours_end]
             lines = lines[ours_end+1:]
-        self.other_list = self.other_list + lines
+        temp_other_list = temp_other_list + lines
+        
+        self.other_list = []
+        #deal with broken files containing several sections (new version) 
+        while temp_other_list.count(self.our_magic_start_new) > 0:
+            try:
+                ours_start = temp_other_list.index(self.our_magic_start_new)
+            except ValueError:
+                self.other_list = temp_other_list
+                return
+    
+            try:
+                ours_end = temp_other_list.index(self.our_magic_end_new)
+            except ValueError:
+                ours_end = len(temp_other_list)
+
+            self.other_list = self.other_list + lines[:ours_start]
+#            self.our_list = lines[ours_start+1:ours_end]
+            temp_other_list = temp_other_list[ours_end+1:]
+        self.other_list = self.other_list + temp_other_list
 
 
     def drop_ours(self):
@@ -111,25 +135,27 @@ class STG_File(object):
 
         if self.our_list:
             logging.info("Writing %d lines"%len(self.our_list))
-            stg.write(self.our_magic_start)
+            stg.write(self.our_magic_start_new)
             stg.write("# do not edit below this line\n")
             stg.write("# Last Written %s\n#\n"%time.strftime("%c"))
             for line in self.our_list:
                 logging.info(line.strip())
                 stg.write(line)
-            stg.write(self.our_magic_end)
+            stg.write(self.our_magic_end_new)
 
         stg.close()
 
 
 class STG_Manager(object):
     """manages STG objects. Knows about scenery path.
+       prefix separates different writers to work around two PREFIX areas interleaving 
     """
-    def __init__(self, path_to_scenery, magic, overwrite=False):
+    def __init__(self, path_to_scenery, magic, prefix=None, overwrite=False):
         self.stg_dict = {} # maps tile index to stg object
         self.path_to_scenery = path_to_scenery
         self.overwrite = overwrite
         self.magic = magic
+        self.prefix = prefix
 
     def __call__(self, lon_lat, overwrite=None):
         """return STG object. If overwrite is given, it overrides default"""
@@ -137,11 +163,12 @@ class STG_Manager(object):
         try:
             return self.stg_dict[tile_index]
         except KeyError:
-            the_stg = STG_File(lon_lat, tile_index, self.path_to_scenery, self.magic)
+            the_stg = STG_File(lon_lat, tile_index, self.path_to_scenery, self.magic, self.prefix)
             self.stg_dict[tile_index] = the_stg
             if overwrite == None:
                 overwrite = self.overwrite
             if overwrite:
+                # this will only drop the section we previously wrote ()
                 the_stg.drop_ours()
         return the_stg
 
@@ -243,11 +270,14 @@ def read(path, stg_fname, our_magic):
     return building_objs
 
 
-def delimiter_string(our_magic, is_start):
+def delimiter_string(our_magic, prefix, is_start):
     delimiter = '# '
     if not is_start:
         delimiter += 'END '
-    return delimiter + our_magic + '\n'
+    if prefix is None:
+        return delimiter + our_magic + '\n'
+    else:
+        return delimiter + our_magic + '_' + prefix + '\n'
 
 
 def quick_stg_line(path_to_scenery, ac_fname, position, elevation, heading, show=True):
