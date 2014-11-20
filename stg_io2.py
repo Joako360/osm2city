@@ -222,8 +222,8 @@ def read_stg_entries(stg_path_and_name, our_magic):
     entries = []  # list of STGEntry objects
 
     if None is not our_magic:
-        our_magic_start = delimiter_string(our_magic, True)
-        our_magic_end = delimiter_string(our_magic, False)
+        our_magic_start = delimiter_string(our_magic, None, True)
+        our_magic_end = delimiter_string(our_magic, None, False)
         ours = False
     try:
         with open(stg_path_and_name, 'r') as my_file:
