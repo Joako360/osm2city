@@ -88,8 +88,8 @@ BUILDING_NEVER_SKIP_LEVELS = 6      # -- buildings that tall will never be skipp
 BUILDING_COMPLEX_ROOFS = 1          # -- generate complex roofs on buildings?
 BUILDING_COMPLEX_ROOFS_MAX_LEVELS = 5 # -- don't put complex roofs on buildings taller than this
 BUILDING_COMPLEX_ROOFS_MAX_AREA   = 2000 # -- don't put complex roofs on buildings larger than this
-BUILDING_SKEL_ROOFS = 1             # -- generate complex roofs with pySkeleton? Used to be EXPERIMENTAL_USE_SKEL 
-BUILDING_SKEL_ROOFS_MIN_ANGLE = 20  # -- pySkeleton based complex roofs will  
+BUILDING_SKEL_ROOFS = 1             # -- generate complex roofs with pySkeleton? Used to be EXPERIMENTAL_USE_SKEL
+BUILDING_SKEL_ROOFS_MIN_ANGLE = 20  # -- pySkeleton based complex roofs will
 BUILDING_SKEL_ROOFS_MAX_ANGLE = 50  #    have a random angle between MIN and MAX
 BUILDING_SKEL_MAX_NODES = 10        # -- max number of nodes for which we generate pySkeleton roofs
 BUILDING_SKEL_MAX_HEIGHT_RATIO = 0.7 # --
@@ -119,7 +119,7 @@ LOD_PERCENTAGE_DETAIL = 0.5         # -- of the remaining buildings, this percen
 LIGHTMAP_ENABLE = 1                 # -- include lightmap in xml
 OBSTRUCTION_LIGHT_MIN_LEVELS = 15   # -- put obstruction lights on buildings with >= given levels
 
-CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if to little objects
+CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if too little objects
 
 #=============================================================================
 # EXPERIMENTAL PARAMETERS, work in progress, YMMV
