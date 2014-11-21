@@ -18,6 +18,7 @@ import shutil
 import cPickle
 import parameters
 import math
+import string
 
 stats = None
 
@@ -241,12 +242,18 @@ class Probe_fgelev(object):
             except IOError, reason:
                 logging.error(reason)
 
+            empty_lines = 0
             try:
-                line = self.fgelev_pipe.stdout.readline()
+                line = ""
+                while line == "" and (empty_lines) < 20:
+                    empty_lines+=1
+                    line = self.fgelev_pipe.stdout.readline().strip()
                 elev = float(line.split()[1]) + self.h_offset
             except IndexError, reason:
                 self.save_cache()
-                logging.fatal("%i %g %g\r\n" % (self.record, position.lon, position.lat))
+                if empty_lines > 1:
+                    logging.fatal("Skipped %i lines" % (empty_lines))
+                logging.fatal("%i %g %g" % (self.record, position.lon, position.lat))
                 logging.fatal("fgelev returned <%s>, resulting in %s. Did fgelev start OK (Record : %i)?", line, reason, self.record)
                 raise RuntimeError("fgelev errors are fatal.")
 
