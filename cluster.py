@@ -101,7 +101,10 @@ class Clusters(object):
         #print "  to ", self(X)
         self(anchor).objects.append(obj)
         try:
+            # Local stats
             self(anchor).stats.count(obj)
+            # Global stats
+            tools.stats.count(obj)
         except AttributeError:
             #logging.debug("count broken, fix me")
             pass

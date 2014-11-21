@@ -746,7 +746,6 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
         if not b.roof_complex:
         # if True:
             roofs.flat(out, b, b.X)
-            tools.stats.count(b)
             continue
 
         # -- roof
@@ -789,8 +788,6 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
                 LOD_lists[4].append(roof_ac_name_flat)
                 out_surf.write(roofs.flat(b, X, roof_ac_name_flat))
                 out_surf.write("kids 0\n")
-
-        tools.stats.count(b)
 
     f = open(ac_file_name, "w")
     f.write(str(ac))
