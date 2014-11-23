@@ -250,6 +250,10 @@ def read_stg_entries(stg_path_and_name, our_magic):
                 hdg = float(splitted[5])
                 entries.append(STGEntry(type_, obj_filename, path, lon, lat, elev, hdg))
                 logging.debug("stg: %s %s", type_, path + os.sep + obj_filename)
+    except IndexError, reason:
+        logging.warning("stg_io:read: Ignoring unreadable file %s", reason)
+        logging.warning("Offending line: %s", line)
+        return []
     except IOError, reason:
         logging.warning("stg_io:read: Ignoring unreadable file %s", reason)
         return []
