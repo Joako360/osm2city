@@ -92,7 +92,7 @@ BUILDING_SKEL_ROOFS = 1             # -- generate complex roofs with pySkeleton?
 BUILDING_SKEL_ROOFS_MIN_ANGLE = 20  # -- pySkeleton based complex roofs will
 BUILDING_SKEL_ROOFS_MAX_ANGLE = 50  #    have a random angle between MIN and MAX
 BUILDING_SKEL_MAX_NODES = 10        # -- max number of nodes for which we generate pySkeleton roofs
-BUILDING_SKEL_MAX_HEIGHT_RATIO = 0.7 # --
+BUILDING_SKEL_MAX_HEIGHT_RATIO = 0.7 # -- skip skel roofs if ratio of roof height to base building height is larger than this
 
 EXPERIMENTAL_INNER = 0              # -- do we still need this?
 
