@@ -14,6 +14,7 @@ import math
 import cPickle
 import string
 import os
+import sys
 
 def next_pow2(value):
     return 2**(int(math.log(value) / math.log(2)) + 1)
@@ -23,6 +24,10 @@ def make_texture_atlas(texture_list, atlas_filename, size_x = 256, pad_y = 0, li
     create texture atlas from all textures. Update all our item coordinates.
     """
     logging.debug("Making texture atlas")
+    
+    if len(texture_list) < 1:
+        logging.error('Got an empty texture list. Check installation of tex.src/ folder!')
+        sys.exit(-1)
 
     atlas_sx = size_x
     keep_aspect = True # FIXME: False won't work -- im.thumbnail seems to keep aspect no matter what
