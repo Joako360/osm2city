@@ -96,6 +96,9 @@ if __name__ == '__main__':
                     line = re.sub('^\s*(BOUNDARY_SOUTH\s*=)([ A-Za-z0-9.,]*)', '\\1 %f' % (calc_tile.get_south_lat(lat, dy)), line)
                     sources.write(line)
             download_command = 'wget -O %s/buildings.osm http://overpass-api.de/api/map?bbox=%f,%f,%f,%f   ' + os.linesep
+#            download_command = 'curl --proxy-ntlm -o %s/buildings.osm http://overpass-api.de/api/map?bbox=%f,%f,%f,%f   ' + os.linesep            
+#             download_command = 'wget -O %s/buildings.osm http://overpass-api.de/api/map?bbox=%f,%f,%f,%f   ' + os.linesep
+            
             # wget -O FT_WILLIAM/buildings.osm http://overpass-api.de/api/map?bbox=-5.2,56.8,-5.,56.9
             downloadfile.write(download_command % (replacement_path, calc_tile.get_west_lon(lon, lat, dx), calc_tile.get_south_lat(lat, dy), calc_tile.get_east_lon(lon, lat, dx), calc_tile.get_north_lat(lat, dy)))
             osm2city.write('python osm2city.py -f %s/params.ini' % (replacement_path) + os.linesep)
