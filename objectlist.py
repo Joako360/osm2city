@@ -12,7 +12,7 @@ class ObjectList(object):
     Class for storing a List OSM Objects
     '''
 
-    def __init__(self, transform):
+    def __init__(self, transform=None):
         '''
         Constructor
         '''
