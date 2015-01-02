@@ -435,7 +435,10 @@ class Buildings(object):
 #                    print relation.tags['name']
                 # -- way could have a 'building' tag, too. Prevent processing this twice.
                 for _way in outer_ways:
-                    self.way_list.remove(_way)
+                    if _way in self.way_list:
+                        self.way_list.remove(_way)
+                    else:
+                        logging.error("Outer way (%d) not in list of ways. Building type missing?"%_way.osm_id)
             else:
                 logging.info("Skipping relation %i: no outer way." % relation.osm_id)
 
