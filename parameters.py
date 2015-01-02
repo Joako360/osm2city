@@ -17,6 +17,7 @@ import types
 from os.path import os
 from vec2d import vec2d
 from pdb import pm
+import logging
 
 # default_args_start # DO NOT MODIFY THIS LINE
 #=============================================================================
@@ -328,7 +329,7 @@ def parse_bool(key, string_value):
 
 
 def read_from_file(filename):
-    print 'Reading parameters from file:', filename
+    logging.info('Reading parameters from file:%s'%filename)
     try:
         f = open(filename, 'r')
         param_dict = {}
