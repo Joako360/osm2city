@@ -736,7 +736,7 @@ def init(new_transform):
 
     global stats
     stats = Stats()
-    print "tools: init", stats
+    logging.debug("tools: init %s"%stats)
 
 def install_files(file_list, dst):
     """link files in file_list to dst"""
