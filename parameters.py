@@ -197,6 +197,21 @@ LU_LANDUSE_BUILDING_BUFFER_DISTANCE = 25
 LU_LANDUSE_BUILDING_BUFFER_DISTANCE_MAX = 50
 LU_LANDUSE_MIN_AREA = 5000
 
+LU_GENB_PATH_TO_MODELS = "/home/vanosten/bin/fgfs_scenery/terrasync/Models/"
+LU_GENB_STEP_DISTANCE = 2
+LU_GENB_MIN_STREET_LENGTH = 10
+
+LU_GENB_RESIDENTIAL_HOUSES = ["Residential/MontserratHse3Green.xml"
+                              , "Residential/French_House.ac"
+                              , "Residential/French_House.ac"
+                              , "Residential/germanvillagehouse1.xml"]
+LU_GENB_RESIDENTIAL_HOUSE_FRONT_MIN = 4
+LU_GENB_RESIDENTIAL_HOUSE_FRONT_MAX = 8
+LU_GENB_RESIDENTIAL_HOUSE_BACK_MIN = 5
+LU_GENB_RESIDENTIAL_HOUSE_BACK_MAX = 15
+LU_GENB_RESIDENTIAL_HOUSE_SIDE_MIN = 5
+LU_GENB_RESIDENTIAL_HOUSE_SIDE_MAX = 15
+
 #=============================================================================
 # PARAMETERS RELATED TO roads.py
 #=============================================================================

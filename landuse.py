@@ -7,9 +7,14 @@ TODO:
 * link places to land-uses and use in logic
 """
 import argparse
+import datetime
 import logging
 import math
+import random
 import os
+import re
+import sys
+import time
 import unittest
 import xml.sax
 
@@ -20,14 +25,16 @@ from shapely.geometry import MultiLineString
 from shapely.geometry import Point
 from shapely.geometry import Polygon
 
-import vec2d
 import calc_tile
 import coordinates
-# import osm2pylon
 import osmparser
 import osmparser_wrapper
 import parameters
 import stg_io2
+import tools
+import vec2d
+
+OUR_MAGIC = "genbuild"  # Used in e.g. stg files to mark edits by landuse.py for building generation
 
 
 def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator):
@@ -242,20 +249,13 @@ class GenBuilding(object):
     """An object representing a generated non-OSM building"""
     max_id = 0
 
-    TYPE_HOUSE = 10
-
-    def __init__(self, building_type, highway_width):
+    def __init__(self, shared_model, highway_width):
         self.gen_id = GenBuilding._next_gen_id()
-        self.type_ = building_type
-        self.width = 10  # FIXME: hard-coded
-        self.depth = 7  # FIXME: hard-coded
-        self.ideal_buffer_front = 5  # FIXME: hard-coded
+        self.shared_model = shared_model
         # takes into account that ideal buffer_front is challenged in curve
-        self.min_buffer_front = 3  # FIXME: hard-coded,
-        self.buffer_back = 5  # FIXME: hard-coded
-        self.buffer_side = 5  # FIXME: hard-coded
         self.area_polygon = None  # A polygon representing only the building, not the buffer around
         self.buffer_polygon = None  # A polygon representing the building incl. front/back/side buffers
+        self.distance_to_street = 0  # The distance from the building's midpoint to the middle of the street
         self._create_area_polygons(highway_width)
         # below location attributes are set after population
         self.x = 0  # the x coordinate of the mid-point in relation to the local coordinate system
@@ -270,14 +270,21 @@ class GenBuilding(object):
 
     def _create_area_polygons(self, highway_width):
         """Creates polygons at (0,0) and no angle"""
-        self.buffer_polygon = box(-1*(self.width/2 + self.buffer_side)
-                                  , highway_width/2 + (self.ideal_buffer_front - self.min_buffer_front)
-                                  , self.width/2 + self.buffer_side
-                                  , highway_width/2 + self.ideal_buffer_front + self.depth + self.buffer_back)
-        self.area_polygon = box(-1*(self.width/2)
-                                , highway_width/2 + self.ideal_buffer_front
-                                , self.width/2
-                                , highway_width/2 + self.ideal_buffer_front + self.depth)
+        buffer_front = self.shared_model.get_front_buffer()
+        min_buffer_front = self.shared_model.get_min_front_buffer()
+        buffer_side = self.shared_model.get_side_buffer()
+        buffer_back = self.shared_model.get_back_buffer()
+
+        self.buffer_polygon = box(-1*(self.shared_model.width/2 + buffer_side)
+                                  , highway_width/2 + (buffer_front - min_buffer_front)
+                                  , self.shared_model.width/2 + buffer_side
+                                  , highway_width/2 + buffer_front + self.shared_model.depth + buffer_back)
+        self.area_polygon = box(-1*(self.shared_model.width/2)
+                                , highway_width/2 + buffer_front
+                                , self.shared_model.width/2
+                                , highway_width/2 + buffer_front + self.shared_model.depth)
+
+        self.distance_to_street = highway_width/2 + buffer_front + self.shared_model.depth/2
 
     def get_area_polygon(self, has_buffer, highway_point, highway_angle):
         """
@@ -292,9 +299,107 @@ class GenBuilding(object):
         return affinity.translate(rotated_box, highway_point.x, highway_point.y)
 
     def set_location(self, point_on_line, angle, area_polygon, buffer_polygon):
-        # FIXME: calculate x, y and angle based on parameters plus self.buffer_*
         self.area_polygon = area_polygon
         self.buffer_polygon = buffer_polygon
+        self.angle = angle
+        my_angle = math.radians(angle+90)  # angle plus 90 because the angle is along the street, not square from street
+        self.x = point_on_line.x + (self.distance_to_street - self.shared_model.offset_y)*math.sin(my_angle) - self.shared_model.offset_x*math.cos(my_angle)
+        self.y = point_on_line.y + (self.distance_to_street - self.shared_model.offset_y)*math.cos(my_angle) + self.shared_model.offset_x*math.sin(my_angle)
+
+    def make_stg_entry(self, my_stg_mgr, my_elev_interpolator, my_coord_transformator):
+        lon, lat = my_coord_transformator.toGlobal((self.x, self.y))
+        elevation = my_elev_interpolator(vec2d.vec2d(lon, lat), True)
+        my_stg_mgr.add_object_shared("Models" + os.sep + self.shared_model.path, vec2d.vec2d(lon, lat)
+                                     , elevation
+                                     , stg_angle(self.angle))
+
+
+class SharedModelsLibrary(object):
+    TYPE_RESIDENTIAL_HOUSE = 1
+
+    def __init__(self):
+        self.residential_houses = []
+        self._read_from_models_library()
+
+    def _read_from_models_library(self):
+        for b in parameters.LU_GENB_RESIDENTIAL_HOUSES:
+            my_model = SharedModel(b)
+            if my_model.is_valid():
+                self.residential_houses.append(my_model)
+
+    def is_valid(self):
+        return len(self.residential_houses) > 0
+
+    def next_building(self, building_type):
+        # FIXME: error handling if unknown type
+        if building_type is SharedModelsLibrary.TYPE_RESIDENTIAL_HOUSE:
+            return random.choice(self.residential_houses)
+        else:
+            return None
+
+
+class SharedModel(object):
+    def __init__(self, path):
+        self.path = path
+        self.width = 0
+        self.depth = 0
+        self.offset_x = 0
+        self.offset_y = 0
+        self._read_from_file()
+
+    def _read_from_file(self):
+        """Reads the model's data from file and sets the variables"""
+        try:
+            ac_filename = self.path
+            if self.path.endswith(".xml"):
+                with open(parameters.LU_GENB_PATH_TO_MODELS + ac_filename, 'r') as f:
+                    xml_data = f.read()
+                    sep_index = ac_filename.rfind(os.sep)
+                    model_dir = ac_filename[0:sep_index+1]
+                    ac_filename = model_dir + parse_ac_file_name(xml_data)
+            boundary_tuple = extract_boundary(parameters.LU_GENB_PATH_TO_MODELS + ac_filename)
+            self.width = boundary_tuple[2] - boundary_tuple[0]
+            self.depth = boundary_tuple[3] - boundary_tuple[1]
+            self.offset_x = boundary_tuple[0] + self.width/2
+            self.offset_y = boundary_tuple[1] + self.depth/2
+        except IOError, reason:
+            logging.error("Unreadable model %s. Reason %s", self.path, reason)
+
+    def is_valid(self):
+        """Should normally only be False if something went wrong in reading data"""
+        return self.width > 0 and self.depth > 0
+
+    def get_front_buffer(self):
+        # FIXME: reflection depending on type
+        my_buffer = self.width/2 + math.sqrt(self.width)
+        if my_buffer < parameters.LU_GENB_RESIDENTIAL_HOUSE_FRONT_MIN:
+            my_buffer = parameters.LU_GENB_RESIDENTIAL_HOUSE_FRONT_MIN
+        if my_buffer > parameters.LU_GENB_RESIDENTIAL_HOUSE_FRONT_MAX:
+            my_buffer = parameters.LU_GENB_RESIDENTIAL_HOUSE_FRONT_MAX
+        return my_buffer
+
+    def get_min_front_buffer(self):
+        """The absolute minimal distance tolerable, e.g. in a curve at the edges of the lot"""
+        # FIXME: reflection depending on type
+        return math.sqrt(parameters.LU_GENB_RESIDENTIAL_HOUSE_FRONT_MIN)
+
+    def get_back_buffer(self):
+        # FIXME: reflection depending on type
+        my_buffer = self.width/2 + math.sqrt(self.width)
+        if my_buffer < parameters.LU_GENB_RESIDENTIAL_HOUSE_BACK_MIN:
+            my_buffer = parameters.LU_GENB_RESIDENTIAL_HOUSE_BACK_MIN
+        if my_buffer > parameters.LU_GENB_RESIDENTIAL_HOUSE_BACK_MAX:
+            my_buffer = parameters.LU_GENB_RESIDENTIAL_HOUSE_BACK_MAX
+        return my_buffer
+
+    def get_side_buffer(self):
+        # FIXME: reflection depending on type
+        my_buffer = self.width/2 + math.sqrt(self.width)
+        if my_buffer < parameters.LU_GENB_RESIDENTIAL_HOUSE_SIDE_MIN:
+            my_buffer = parameters.LU_GENB_RESIDENTIAL_HOUSE_SIDE_MIN
+        if my_buffer > parameters.LU_GENB_RESIDENTIAL_HOUSE_SIDE_MAX:
+            my_buffer = parameters.LU_GENB_RESIDENTIAL_HOUSE_SIDE_MAX
+        return my_buffer
 
 
 class Landuse(object):
@@ -312,6 +417,13 @@ class Landuse(object):
         self.linked_blocked_areas = []  # List of Polygon objects for blocked areas. E.g.
                                           # open-space, existing building, static objects, *-buffers
         self.generated_buildings = []  # List og GenBuilding objects for generated non-osm buildings along the highways
+        self.linked_genways = []  # List of Highways that are available for generating buildings
+                                  # see process_ways_for_building_generation(...)
+
+    def make_generated_buildings_stg_entries(self, my_stg_mgr, my_elev_interpolator, my_coord_transformator):
+        """Adds the stg entries for the generated buildings of this landuse"""
+        for gen_building in self.generated_buildings:
+            gen_building.make_stg_entry(my_stg_mgr, my_elev_interpolator, my_coord_transformator)
 
 
 class Place(object):
@@ -570,7 +682,8 @@ def extract_boundary(ac_filename):
                     numvert -= 1
     except IOError as e:
         raise e
-    return x_min, y_min, x_max, y_max
+    # minus factor in y-axis due to ac3d coordinate system. Switch of y_min and y_max for same reason
+    return x_min, -y_max, x_max, -y_min
 
 
 def create_static_obj_boxes(my_coord_transformator):
@@ -625,6 +738,40 @@ def process_ways_for_blocked_areas(my_ways, landuses):
                             landuse.linked_blocked_areas.append(my_line.buffer(way.get_width()/2))
 
 
+def process_ways_for_building_generation(my_highways, landuses):
+    """
+    Link highways to landuse: either as whole if entirely within or as a set of intersections if intersecting
+    """
+    index = 10000000000
+    for landuse in landuses.values():
+        if not landuse.type_ is Landuse.TYPE_NON_OSM:
+            for my_highway in my_highways.values():
+                if not my_highway.populate_buildings_along():
+                    continue
+                if my_highway.linear.length < parameters.LU_GENB_MIN_STREET_LENGTH:
+                    continue
+                if my_highway.linear.within(landuse.polygon):
+                    landuse.linked_genways.append(my_highway)
+                    continue
+                # process intersections
+                if my_highway.linear.intersects(landuse.polygon):
+                    intersections = []
+                    intersections.append(my_highway.linear.intersection(landuse.polygon))
+                    if len(intersections) > 0:
+                        for intersection in intersections:
+                            if isinstance(intersection, MultiLineString):
+                                for my_line in intersection:
+                                    if isinstance(my_line, LineString):
+                                        intersections.append(my_line)
+                            elif isinstance(intersection, LineString):
+                                if intersection.length >= parameters.LU_GENB_MIN_STREET_LENGTH:
+                                    index += 1
+                                    new_highway = Highway(index + my_highway.osm_id)
+                                    new_highway.type_ = my_highway.type_
+                                    new_highway.linear = intersection
+                                    landuse.linked_genways.append(new_highway)
+
+
 def process_open_spaces_for_blocked_areas(open_spaces, landuses):
     for open_space in open_spaces.values():
         for landuse in landuses.values():
@@ -640,10 +787,15 @@ def process_building_refs_for_blocked_areas(building_refs, landuses):
 
 
 def process_static_obj_boxes_for_blocked_areas(static_obj_boxes, landuses):
-    for box in static_obj_boxes:
+    for my_box in static_obj_boxes:
         for landuse in landuses.values():
-            if box.within(landuse.polygon) or box.intersects(landuse.polygon):
-                landuse.linked_blocked_areas.append(box)
+            if my_box.within(landuse.polygon) or my_box.intersects(landuse.polygon):
+                landuse.linked_blocked_areas.append(my_box)
+
+
+def write_stg_entries(my_stg_mgr, landuse_refs, my_elev_interpolator, my_coord_transformator):
+    for landuse in landuse_refs.values():
+        landuse.make_generated_buildings_stg_entries(my_stg_mgr, my_elev_interpolator, my_coord_transformator)
 
 
 def calc_angle_of_line(x1, y1, x2, y2):
@@ -656,36 +808,45 @@ def calc_angle_of_line(x1, y1, x2, y2):
     return degree
 
 
-def generate_buildings_along_highway(landuse, highway, is_reverse, step_length):
+def stg_angle(angle_normal):
+    """Returns the input angle in degrees to an angle for the stg-file in degrees.
+    stg-files use angles counter-clockwise starting with 0 in North."""
+    # FIXME: direct copy from osm2pylon
+    if 0 == angle_normal:
+        return 0
+    else:
+        return 360 - angle_normal
+
+
+def generate_buildings_along_highway(landuse, highway, shared_models_library, is_reverse):
     """
     The central assumption is that existing blocked areas incl. buildings du not need a buffer.
     The to be populated buildings all bring their own constraints with regards to distance to road, distance to other
     buildings etc.
     A populated buildings is appended to the current landuse's generated_buildings list.
-    FIXME: parameter for list of possible GenBuildings
     """
+    # FIXME: shared model type needs to be set based on landuse information
     travelled_along = 0
     highway_length = highway.linear.length
-    my_gen_building = GenBuilding(GenBuilding.TYPE_HOUSE, highway.get_width())
+    my_gen_building = GenBuilding(shared_models_library.next_building(SharedModelsLibrary.TYPE_RESIDENTIAL_HOUSE)
+                                  , highway.get_width())
     if not is_reverse:
         point_on_line = highway.linear.interpolate(0)
     else:
         point_on_line = highway.linear.interpolate(highway_length)
     while travelled_along < highway_length:
-        travelled_along += step_length
+        travelled_along += parameters.LU_GENB_STEP_DISTANCE
         prev_point_on_line = point_on_line
         if not is_reverse:
             point_on_line = highway.linear.interpolate(travelled_along)
         else:
             point_on_line = highway.linear.interpolate(highway_length - travelled_along)
         angle = calc_angle_of_line(prev_point_on_line.x, prev_point_on_line.y
-                                             , point_on_line.x, point_on_line.y)
+                                   , point_on_line.x, point_on_line.y)
         buffer_polygon = my_gen_building.get_area_polygon(True, point_on_line, angle)
         if buffer_polygon.within(landuse.polygon):
             valid_new_gen_place = True
             for blocked_area in landuse.linked_blocked_areas:
-                #if buffer_polygon.crosses(blocked_area) or buffer_polygon.contains(blocked_area) \
-                        #or buffer_polygon.within(blocked_area):
                 if buffer_polygon.intersects(blocked_area):
                     valid_new_gen_place = False
                     break
@@ -694,7 +855,8 @@ def generate_buildings_along_highway(landuse, highway, is_reverse, step_length):
                 my_gen_building.set_location(point_on_line, angle, area_polygon, buffer_polygon)
                 landuse.generated_buildings.append(my_gen_building)
                 landuse.linked_blocked_areas.append(area_polygon)
-                my_gen_building = GenBuilding(GenBuilding.TYPE_HOUSE, highway.get_width())  # new building needed
+                my_gen_building = GenBuilding(shared_models_library.next_building(SharedModelsLibrary.TYPE_RESIDENTIAL_HOUSE)
+                                              , highway.get_width())  # new building needed
 
 
 # ================ PLOTTING FOR VISUAL TEST ========
@@ -761,7 +923,9 @@ def draw_polygons(highways, buildings, landuses, static_obj_boxes
 
 
 def generate_extra_buildings(building_refs, static_obj_boxes, landuse_refs, places_refs, open_spaces
-                             , highways, railways, waterways, x_min, y_min, x_max, y_max):
+                             , highways, railways, waterways
+                             , shared_models_library
+                             , x_min, y_min, x_max, y_max):
     # FIXME: use place_refs to influence type and density of buildings
     # FIXME: break land-uses up into blocks (e.g. to determine default building densities and speed up to find blocked
     # areas - also if density of buildings in block already enough, then do not calculate
@@ -772,21 +936,15 @@ def generate_extra_buildings(building_refs, static_obj_boxes, landuse_refs, plac
     process_ways_for_blocked_areas(waterways, landuse_refs)
     process_building_refs_for_blocked_areas(building_refs, landuse_refs)
     process_static_obj_boxes_for_blocked_areas(static_obj_boxes, landuse_refs)
+    process_ways_for_building_generation(highways, landuse_refs)
 
     for landuse in landuse_refs.values():
-        if not landuse.type_ == Landuse.TYPE_NON_OSM:  # assume generated land-uses already have the needed buildings
-            for highway in highways.values():
-                if highway.populate_buildings_along():  # e.g. do not populate buildings along motorways
-                    process_this_highway = False
-                    if highway.linear.within(landuse.polygon):
-                        process_this_highway = True
-                    else:
-                        intersection = highway.linear.intersection(landuse.polygon)
-                        if not intersection.is_empty and not isinstance(intersection, Point):
-                            process_this_highway = True
-                    if process_this_highway:
-                        generate_buildings_along_highway(landuse, highway, False, 2)  # FIXME: hard_coded step size
-                        generate_buildings_along_highway(landuse, highway, True, 2)  # FIXME: hard_coded step size
+        if landuse.type_ is Landuse.TYPE_NON_OSM:
+            continue
+        logging.debug("Landuse OSM ID: %s", landuse.osm_id)
+        for highway in landuse.linked_genways:
+            generate_buildings_along_highway(landuse, highway, shared_models_library, False)
+            generate_buildings_along_highway(landuse, highway, shared_models_library, True)
 
     draw_polygons(highways, building_refs, landuse_refs, static_obj_boxes, x_min, y_min, x_max, y_max)
     i = 0
@@ -799,12 +957,28 @@ def main():
         description="landuse reads OSM data and creates landuses and places for support of osm2city/osm2pyons in FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
+    parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
+    parser.add_argument("-u", dest="uninstall", action="store_true", help="uninstall ours from .stg")
     args = parser.parse_args()
     if args.filename is not None:
         parameters.read_from_file(args.filename)
+    if args.e:
+        parameters.NO_ELEV = True
+    files_to_remove = None
+    if args.uninstall:
+        logging.info("Uninstalling.")
+        files_to_remove = []
+        parameters.NO_ELEV = True
+
+    # Initializing tools for global/local coordinate transformations
     center_global = parameters.get_center_global()
     osm_fname = parameters.get_OSM_file_name()
     coord_transformator = coordinates.Transformation(center_global, hdg=0)
+    tools.init(coord_transformator)
+
+    # Reading elevation data
+    logging.info("Reading ground elevation data might take some time ...")
+    elev_interpolator = tools.get_interpolator(fake=parameters.NO_ELEV)
 
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
@@ -837,12 +1011,47 @@ def main():
     railways = process_osm_railway(handler.nodes_dict, handler.ways_dict, coord_transformator)
     waterways = process_osm_waterway(handler.nodes_dict, handler.ways_dict, coord_transformator)
 
+    shared_models_library = SharedModelsLibrary()
+    if not shared_models_library.is_valid():
+        logging.error("The SharedModelsLibrary is not valid. Therefore no buildings can be generated")
+        sys.exit(0)
+
+    st = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
+    logging.info(st)
     cmin = coord_transformator.toLocal(vec2d.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH))
     cmax = coord_transformator.toLocal(vec2d.vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH))
-
     generate_extra_buildings(building_refs, static_obj_boxes, landuse_refs, places_refs, open_spaces
                              , highways, railways, waterways
+                             , shared_models_library
                              , cmin[0], cmin[1], cmax[0], cmax[1])
+    st = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
+    logging.info(st)
+
+    # -- initialize STG_Manager
+    if parameters.PATH_TO_OUTPUT:
+        path_to_output = parameters.PATH_TO_OUTPUT
+    else:
+        path_to_output = parameters.PATH_TO_SCENERY
+    replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)
+    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
+
+    # Write for FlightGear
+    write_stg_entries(stg_manager, landuse_refs, elev_interpolator, coord_transformator)
+
+    if args.uninstall:
+        for f in files_to_remove:
+            try:
+                os.remove(f)
+            except IOError:
+                pass
+        stg_manager.drop_ours()
+        stg_manager.write()
+        logging.info("uninstall done.")
+        sys.exit(0)
+
+    stg_manager.write()
+    elev_interpolator.save_cache()
+
 
 if __name__ == "__main__":
     main()
@@ -854,20 +1063,6 @@ class TestExtraBuildings(unittest.TestCase):
     def test_parse_ac_file_name(self):
         self.assertEqual("foo.ac", parse_ac_file_name("sdfsfsdf <path>  foo.ac </path> sdfsdf"))
         self.assertRaises(ValueError, parse_ac_file_name, "foo")  # do not use () and instead add parameter as arg
-
-    def test_extract_boundary(self):
-        ac_lines = ["foo", "hello"]
-        ac_lines.append("numvert 2")
-        ac_lines.append("0 12 0")
-        ac_lines.append("-2.0 4 -4.2")
-        ac_lines.append("-99 99 -99")
-        ac_lines.append("numsurf 6")
-        ac_lines.append("numvert 1")
-        ac_lines.append("4 4 4")
-        ac_lines.append(("99 99 99"))
-        boundary = extract_boundary(ac_lines)
-        self.assertEqual(-2.0, boundary[0], "x_min")
-        self.assertEqual(4, boundary[3], "y_max")
 
     def test_extra_building_generation(self):
         highways = {}
@@ -948,8 +1143,13 @@ class TestExtraBuildings(unittest.TestCase):
         my_lu.type_ = Landuse.TYPE_RESIDENTIAL
         my_lu.polygon = polygon
         landuse_refs[my_lu.osm_id] = my_lu
+        # shared models
+        library = SharedModelsLibrary()
+        self.assertTrue(library.is_valid(), "The models library may not be empty")
+        # generate buildings
         generate_extra_buildings(building_refs, static_obj_boxes, landuse_refs, None, open_spaces
                                  , highways, railways, waterways
+                                 , library
                                  , 0, 0, 200, 280)
 
 
