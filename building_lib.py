@@ -104,7 +104,7 @@ def check_height(building_height, t):
         # - error acceptable?
         if building_height >= t.v_cuts_meters[0] and building_height <= t.v_size_meters:
 #            print "--->"
-            if 0 and t.v_align_bottom:
+            if t.v_align_bottom or parameters.BUILDING_FAKE_AMBIENT_OCCLUSION:
                 logging.debug("from bottom")
                 for i in range(len(t.v_cuts_meters)):
                     if t.v_cuts_meters[i] >= building_height:
