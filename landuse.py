@@ -919,13 +919,17 @@ def draw_polygons(highways, buildings, landuses, static_obj_boxes
     ax.set_xlim(x_min - 0.2*w, x_max + 0.2*w)
     ax.set_ylim(y_min - 0.2*h, y_max + 0.2*h)
     ax.set_aspect(1)
-    pyplot.show()
+    pyplot.savefig('landuse_debug_plot.pdf', dpi=None, facecolor='w', edgecolor='w'
+                   , orientation='landscape', papertype='a0'
+                   , transparent=False, bbox_inches=None, pad_inches=0.1
+                   , frameon=None)
 
 
 def generate_extra_buildings(building_refs, static_obj_boxes, landuse_refs, places_refs, open_spaces
                              , highways, railways, waterways
                              , shared_models_library
-                             , x_min, y_min, x_max, y_max):
+                             , x_min, y_min, x_max, y_max
+                             , plot_drawing=False):
     # FIXME: use place_refs to influence type and density of buildings
     # FIXME: break land-uses up into blocks (e.g. to determine default building densities and speed up to find blocked
     # areas - also if density of buildings in block already enough, then do not calculate
@@ -946,12 +950,13 @@ def generate_extra_buildings(building_refs, static_obj_boxes, landuse_refs, plac
             generate_buildings_along_highway(landuse, highway, shared_models_library, False)
             generate_buildings_along_highway(landuse, highway, shared_models_library, True)
 
-    draw_polygons(highways, building_refs, landuse_refs, static_obj_boxes, x_min, y_min, x_max, y_max)
+    if plot_drawing:
+        draw_polygons(highways, building_refs, landuse_refs, static_obj_boxes, x_min, y_min, x_max, y_max)
     i = 0
 
 
 def main():
-    logging.basicConfig(level=logging.DEBUG)
+    start_time = time.time()
     # Handling arguments and parameters
     parser = argparse.ArgumentParser(
         description="landuse reads OSM data and creates landuses and places for support of osm2city/osm2pyons in FlightGear")
@@ -959,7 +964,13 @@ def main():
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
     parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
     parser.add_argument("-u", dest="uninstall", action="store_true", help="uninstall ours from .stg")
+    parser.add_argument("-d", dest="debug", action="store_true", help="log on debug level instead of info")
+    parser.add_argument("-p", dest="plot", action="store_true", help="plot a drawing for debugging")
     args = parser.parse_args()
+    if args.debug:
+       logging.basicConfig(level=logging.DEBUG)
+    else:
+       logging.basicConfig(level=logging.INFO)
     if args.filename is not None:
         parameters.read_from_file(args.filename)
     if args.e:
@@ -979,6 +990,8 @@ def main():
     # Reading elevation data
     logging.info("Reading ground elevation data might take some time ...")
     elev_interpolator = tools.get_interpolator(fake=parameters.NO_ELEV)
+
+    logging.info("Time used in seconds until now: %f", time.time() - start_time)
 
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
@@ -1023,7 +1036,8 @@ def main():
     generate_extra_buildings(building_refs, static_obj_boxes, landuse_refs, places_refs, open_spaces
                              , highways, railways, waterways
                              , shared_models_library
-                             , cmin[0], cmin[1], cmax[0], cmax[1])
+                             , cmin[0], cmin[1], cmax[0], cmax[1]
+                             , args.plot)
     st = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
     logging.info(st)
 
@@ -1052,6 +1066,7 @@ def main():
     stg_manager.write()
     elev_interpolator.save_cache()
 
+    logging.info("Finished in total seconds: %f", time.time() - start_time)
 
 if __name__ == "__main__":
     main()
@@ -1150,6 +1165,7 @@ class TestExtraBuildings(unittest.TestCase):
         generate_extra_buildings(building_refs, static_obj_boxes, landuse_refs, None, open_spaces
                                  , highways, railways, waterways
                                  , library
-                                 , 0, 0, 200, 280)
+                                 , 0, 0, 200, 280
+                                 , True)
 
 
