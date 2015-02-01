@@ -212,6 +212,9 @@ LU_GENB_RESIDENTIAL_HOUSE_BACK_MAX = 15
 LU_GENB_RESIDENTIAL_HOUSE_SIDE_MIN = 5
 LU_GENB_RESIDENTIAL_HOUSE_SIDE_MAX = 15
 
+LU_GENB_RESIDENTIAL_ROWHOUSES = ["Residential/French_House.ac"]
+LU_GENB_RESIDENTIAL_ROWHOUSE_SHARE = 0.4
+
 LU_GENB_INDUSTRIAL_BUILDINGS = ["Industrial/Industrial10x20.xml"
                                 , "Industrial/Schenker_storehouse35x30.xml"
                                 , "Industrial/scotch-distillery.ac"]

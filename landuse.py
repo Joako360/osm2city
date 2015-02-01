@@ -245,6 +245,18 @@ def process_osm_waterway(nodes_dict, ways_dict, my_coord_transformator):
     return my_waterways
 
 
+class BlockedArea(object):
+    """An object representing a specific type of blocked area - blocked for new generated buildings"""
+    TYPE_OSM_BUILDING = 1
+    TYPE_GEN_BUILDING = 2
+    TYPE_STATIC_OBJECT = 3
+    TYPE_OPEN_SPACE = 4
+    TYPE_WAY = 5
+
+    def __init__(self, type_, polygon):
+        self.type_ = type_
+        self.polygon = polygon
+
 class GenBuilding(object):
     """An object representing a generated non-OSM building"""
     max_id = 0
@@ -316,10 +328,12 @@ class GenBuilding(object):
 
 class SharedModelsLibrary(object):
     TYPE_RESIDENTIAL_HOUSE = 10
+    TYPE_RESIDENTIAL_ROWHOUSE = 11
     TYPE_INDUSTRIAL_BUILDING = 20
 
     def __init__(self):
         self.residential_houses = []
+        self.residential_rowhouses = []
         self.industrial_buildings = []
         self._read_from_models_library()
 
@@ -328,6 +342,10 @@ class SharedModelsLibrary(object):
             my_model = SharedModel(b, SharedModelsLibrary.TYPE_RESIDENTIAL_HOUSE)
             if my_model.is_valid():
                 self.residential_houses.append(my_model)
+        for b in parameters.LU_GENB_RESIDENTIAL_ROWHOUSES:
+            my_model = SharedModel(b, SharedModelsLibrary.TYPE_RESIDENTIAL_ROWHOUSE)
+            if my_model.is_valid():
+                self.residential_rowhouses.append(my_model)
         for b in parameters.LU_GENB_INDUSTRIAL_BUILDINGS:
             my_model = SharedModel(b, SharedModelsLibrary.TYPE_INDUSTRIAL_BUILDING)
             if my_model.is_valid():
@@ -335,6 +353,8 @@ class SharedModelsLibrary(object):
 
     def is_valid(self):
         if 0 == len(self.residential_houses):
+            return False
+        if 0 == len(self.residential_rowhouses):
             return False
         if 0 == len(self.industrial_buildings):
             return False
@@ -359,7 +379,6 @@ class SharedModel(object):
         self.offset_x = 0
         self.offset_y = 0
         self.front_buffer = 0
-        self.min_front_buffer = 0
         self.back_buffer = 0
         self.side_buffer = 0
         self._read_from_file()
@@ -408,7 +427,6 @@ class SharedModel(object):
         if my_buffer > front_max:
             my_buffer = front_max
         self.front_buffer = my_buffer
-        self.min_front_buffer = math.sqrt(front_min)
 
         my_buffer = self.width/2 + math.sqrt(self.width)
         if my_buffer < back_min:
@@ -433,7 +451,7 @@ class SharedModel(object):
 
     def get_min_front_buffer(self):
         """The absolute minimal distance tolerable, e.g. in a curve at the edges of the lot"""
-        return self.min_front_buffer
+        return math.sqrt(self.front_buffer)
 
     def get_back_buffer(self):
         return self.back_buffer
@@ -454,7 +472,7 @@ class Landuse(object):
         self.type_ = 0
         self.polygon = None  # the polygon defining its outer boundary
         self.number_of_buildings = 0  # only set for generated TYPE_NON_OSM land-uses during generation
-        self.linked_blocked_areas = []  # List of Polygon objects for blocked areas. E.g.
+        self.linked_blocked_areas = []  # List of BlockedArea objects for blocked areas. E.g.
                                           # open-space, existing building, static objects, *-buffers
         self.generated_buildings = []  # List og GenBuilding objects for generated non-osm buildings along the highways
         self.linked_genways = []  # List of Highways that are available for generating buildings
@@ -766,16 +784,16 @@ def process_ways_for_blocked_areas(my_ways, landuses):
     for way in my_ways.values():
         for landuse in landuses.values():
             if way.linear.within(landuse.polygon):
-                landuse.linked_blocked_areas.append(way.linear.buffer(way.get_width()/2))
+                landuse.linked_blocked_areas.append(BlockedArea(BlockedArea.TYPE_WAY, way.linear.buffer(way.get_width()/2)))
                 break
             intersection = way.linear.intersection(landuse.polygon)
             if not intersection.is_empty:
                 if isinstance(intersection, LineString):
-                    landuse.linked_blocked_areas.append(intersection.buffer(way.get_width()/2))
+                    landuse.linked_blocked_areas.append(BlockedArea(BlockedArea.TYPE_WAY, intersection.buffer(way.get_width()/2)))
                 elif isinstance(intersection, MultiLineString):
                     for my_line in intersection:
                         if isinstance(my_line, LineString):
-                            landuse.linked_blocked_areas.append(my_line.buffer(way.get_width()/2))
+                            landuse.linked_blocked_areas.append(BlockedArea(BlockedArea.TYPE_WAY, my_line.buffer(way.get_width()/2)))
 
 
 def process_ways_for_building_generation(my_highways, landuses):
@@ -816,21 +834,21 @@ def process_open_spaces_for_blocked_areas(open_spaces, landuses):
     for open_space in open_spaces.values():
         for landuse in landuses.values():
             if open_space.within(landuse.polygon) or open_space.intersects(landuse.polygon):
-                landuse.linked_blocked_areas.append(open_space)
+                landuse.linked_blocked_areas.append(BlockedArea(BlockedArea.TYPE_OPEN_SPACE, open_space))
 
 
 def process_building_refs_for_blocked_areas(building_refs, landuses):
     for building in building_refs.values():
         for landuse in landuses.values():
             if building.within(landuse.polygon) or building.intersects(landuse.polygon):
-                landuse.linked_blocked_areas.append(building)
+                landuse.linked_blocked_areas.append(BlockedArea(BlockedArea.TYPE_OSM_BUILDING, building))
 
 
 def process_static_obj_boxes_for_blocked_areas(static_obj_boxes, landuses):
     for my_box in static_obj_boxes:
         for landuse in landuses.values():
             if my_box.within(landuse.polygon) or my_box.intersects(landuse.polygon):
-                landuse.linked_blocked_areas.append(my_box)
+                landuse.linked_blocked_areas.append(BlockedArea(BlockedArea.TYPE_STATIC_OBJECT, my_box))
 
 
 def write_stg_entries(my_stg_mgr, landuse_refs, my_elev_interpolator, my_coord_transformator):
@@ -865,12 +883,14 @@ def generate_buildings_along_highway(landuse, highway, shared_models_library, is
     buildings etc.
     A populated buildings is appended to the current landuse's generated_buildings list.
     """
-    # FIXME: shared model type needs to be set based on landuse information
     travelled_along = 0
     highway_length = highway.linear.length
-    building_type = SharedModelsLibrary.TYPE_RESIDENTIAL_HOUSE
-    if landuse.type_ is Landuse.TYPE_INDUSTRIAL:
+    if landuse.type_ is Landuse.TYPE_RESIDENTIAL:
+        building_type = SharedModelsLibrary.TYPE_RESIDENTIAL_HOUSE
+    elif landuse.type_ is Landuse.TYPE_INDUSTRIAL:
         building_type = SharedModelsLibrary.TYPE_INDUSTRIAL_BUILDING
+    else:
+        building_type = SharedModelsLibrary.TYPE_RESIDENTIAL_HOUSE  # FIXME with correct types
     my_gen_building = GenBuilding(shared_models_library.next_building(building_type)
                                   , highway.get_width())
     if not is_reverse:
@@ -888,16 +908,16 @@ def generate_buildings_along_highway(landuse, highway, shared_models_library, is
                                    , point_on_line.x, point_on_line.y)
         buffer_polygon = my_gen_building.get_area_polygon(True, point_on_line, angle)
         if buffer_polygon.within(landuse.polygon):
-            valid_new_gen_place = True
+            valid_new_gen_building = True
             for blocked_area in landuse.linked_blocked_areas:
-                if buffer_polygon.intersects(blocked_area):
-                    valid_new_gen_place = False
+                if buffer_polygon.intersects(blocked_area.polygon):
+                    valid_new_gen_building = False
                     break
-            if valid_new_gen_place:
+            if valid_new_gen_building:
                 area_polygon = my_gen_building.get_area_polygon(False, point_on_line, angle)
                 my_gen_building.set_location(point_on_line, angle, area_polygon, buffer_polygon)
                 landuse.generated_buildings.append(my_gen_building)
-                landuse.linked_blocked_areas.append(area_polygon)
+                landuse.linked_blocked_areas.append(BlockedArea(BlockedArea.TYPE_GEN_BUILDING, area_polygon))
                 my_gen_building = GenBuilding(shared_models_library.next_building(building_type)
                                               , highway.get_width())  # new building needed
 
@@ -912,8 +932,7 @@ def plot_line(ax, ob, my_color, my_width):
     ax.plot(x, y, color=my_color, alpha=0.7, linewidth=my_width, solid_capstyle='round', zorder=2)
 
 
-def draw_polygons(highways, buildings, landuses, static_obj_boxes
-                  , x_min, y_min, x_max, y_max):
+def draw_polygons(highways, landuses, x_min, y_min, x_max, y_max):
     # Create a matplotlib figure
     my_figure = pyplot.figure(num=1, figsize=(16, 10), dpi=90)
 
@@ -943,19 +962,23 @@ def draw_polygons(highways, buildings, landuses, static_obj_boxes
 
     for my_land_use in landuses.values():
         for blocked in my_land_use.linked_blocked_areas:
-            patch = PolygonPatch(blocked, facecolor='green', edgecolor='green')
+            if blocked.type_ is BlockedArea.TYPE_OPEN_SPACE:
+                my_facecolor = 'darkgreen'
+                my_edgecolor = 'darkgreen'
+            elif blocked.type_ is BlockedArea.TYPE_GEN_BUILDING:
+                my_facecolor = 'yellow'
+                my_edgecolor = 'yellow'
+            elif blocked.type_ is BlockedArea.TYPE_OSM_BUILDING:
+                my_facecolor = 'blue'
+                my_edgecolor = 'blue'
+            elif blocked.type_ is BlockedArea.TYPE_STATIC_OBJECT:
+                my_facecolor = 'black'
+                my_edgecolor = 'black'
+            else:
+                my_facecolor = 'green'
+                my_edgecolor = 'green'
+            patch = PolygonPatch(blocked.polygon, facecolor=my_facecolor, edgecolor=my_edgecolor)
             ax.add_patch(patch)
-        for gen_building in my_land_use.generated_buildings:
-            patch = PolygonPatch(gen_building.area_polygon, facecolor='yellow', edgecolor='black')
-            ax.add_patch(patch)
-
-    for building in buildings.values():
-        patch = PolygonPatch(building, facecolor='blue', edgecolor='blue')
-        ax.add_patch(patch)
-
-    for my_box in static_obj_boxes:
-        patch = PolygonPatch(my_box, facecolor='black', edgecolor='black', alpha=0.5)
-        ax.add_patch(patch)
 
     # Fit the figure around the polygons, bounds, render, and show
     w = x_max - x_min
@@ -995,7 +1018,7 @@ def generate_extra_buildings(building_refs, static_obj_boxes, landuse_refs, plac
             generate_buildings_along_highway(landuse, highway, shared_models_library, True)
 
     if plot_drawing:
-        draw_polygons(highways, building_refs, landuse_refs, static_obj_boxes, x_min, y_min, x_max, y_max)
+        draw_polygons(highways, landuse_refs, x_min, y_min, x_max, y_max)
     i = 0
 
 
