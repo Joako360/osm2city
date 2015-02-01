@@ -212,6 +212,16 @@ LU_GENB_RESIDENTIAL_HOUSE_BACK_MAX = 15
 LU_GENB_RESIDENTIAL_HOUSE_SIDE_MIN = 5
 LU_GENB_RESIDENTIAL_HOUSE_SIDE_MAX = 15
 
+LU_GENB_INDUSTRIAL_BUILDINGS = ["Industrial/Industrial10x20.xml"
+                                , "Industrial/Schenker_storehouse35x30.xml"
+                                , "Industrial/scotch-distillery.ac"]
+LU_GENB_INDUSTRIAL_BUILDING_FRONT_MIN = 10
+LU_GENB_INDUSTRIAL_BUILDING_FRONT_MAX = 20
+LU_GENB_INDUSTRIAL_BUILDING_BACK_MIN = 10
+LU_GENB_INDUSTRIAL_BUILDING_BACK_MAX = 20
+LU_GENB_INDUSTRIAL_BUILDING_SIDE_MIN = 10
+LU_GENB_INDUSTRIAL_BUILDING_SIDE_MAX = 20
+
 #=============================================================================
 # PARAMETERS RELATED TO roads.py
 #=============================================================================

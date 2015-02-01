@@ -315,37 +315,55 @@ class GenBuilding(object):
 
 
 class SharedModelsLibrary(object):
-    TYPE_RESIDENTIAL_HOUSE = 1
+    TYPE_RESIDENTIAL_HOUSE = 10
+    TYPE_INDUSTRIAL_BUILDING = 20
 
     def __init__(self):
         self.residential_houses = []
+        self.industrial_buildings = []
         self._read_from_models_library()
 
     def _read_from_models_library(self):
         for b in parameters.LU_GENB_RESIDENTIAL_HOUSES:
-            my_model = SharedModel(b)
+            my_model = SharedModel(b, SharedModelsLibrary.TYPE_RESIDENTIAL_HOUSE)
             if my_model.is_valid():
                 self.residential_houses.append(my_model)
+        for b in parameters.LU_GENB_INDUSTRIAL_BUILDINGS:
+            my_model = SharedModel(b, SharedModelsLibrary.TYPE_INDUSTRIAL_BUILDING)
+            if my_model.is_valid():
+                self.industrial_buildings.append(my_model)
 
     def is_valid(self):
-        return len(self.residential_houses) > 0
+        if 0 == len(self.residential_houses):
+            return False
+        if 0 == len(self.industrial_buildings):
+            return False
+        return True
 
     def next_building(self, building_type):
         # FIXME: error handling if unknown type
         if building_type is SharedModelsLibrary.TYPE_RESIDENTIAL_HOUSE:
             return random.choice(self.residential_houses)
+        if building_type is SharedModelsLibrary.TYPE_INDUSTRIAL_BUILDING:
+            return random.choice(self.industrial_buildings)
         else:
             return None
 
 
 class SharedModel(object):
-    def __init__(self, path):
+    def __init__(self, path, type_):
         self.path = path
+        self.type_ = type_
         self.width = 0
         self.depth = 0
         self.offset_x = 0
         self.offset_y = 0
+        self.front_buffer = 0
+        self.min_front_buffer = 0
+        self.back_buffer = 0
+        self.side_buffer = 0
         self._read_from_file()
+        self._calc_buffers()
 
     def _read_from_file(self):
         """Reads the model's data from file and sets the variables"""
@@ -368,41 +386,60 @@ class SharedModel(object):
         except IOError, reason:
             logging.error("Unreadable model %s. Reason %s", self.path, reason)
 
+    def _calc_buffers(self):
+        # FIXME: reflection depending on type
+        if self.type_ is SharedModelsLibrary.TYPE_RESIDENTIAL_HOUSE:
+            front_min = parameters.LU_GENB_RESIDENTIAL_HOUSE_FRONT_MIN
+            front_max = parameters.LU_GENB_RESIDENTIAL_HOUSE_FRONT_MAX
+            back_min = parameters.LU_GENB_RESIDENTIAL_HOUSE_BACK_MIN
+            back_max = parameters.LU_GENB_RESIDENTIAL_HOUSE_BACK_MAX
+            side_min = parameters.LU_GENB_RESIDENTIAL_HOUSE_SIDE_MIN
+            side_max = parameters.LU_GENB_RESIDENTIAL_HOUSE_SIDE_MAX
+        else:
+            front_min = parameters.LU_GENB_INDUSTRIAL_BUILDING_FRONT_MIN
+            front_max = parameters.LU_GENB_INDUSTRIAL_BUILDING_FRONT_MIN
+            back_min = parameters.LU_GENB_INDUSTRIAL_BUILDING_BACK_MIN
+            back_max = parameters.LU_GENB_INDUSTRIAL_BUILDING_BACK_MIN
+            side_min = parameters.LU_GENB_INDUSTRIAL_BUILDING_SIDE_MIN
+            side_max = parameters.LU_GENB_INDUSTRIAL_BUILDING_SIDE_MIN
+        my_buffer = self.width/2 + math.sqrt(self.width)
+        if my_buffer < front_min:
+            my_buffer = front_min
+        if my_buffer > front_max:
+            my_buffer = front_max
+        self.front_buffer = my_buffer
+        self.min_front_buffer = math.sqrt(front_min)
+
+        my_buffer = self.width/2 + math.sqrt(self.width)
+        if my_buffer < back_min:
+            my_buffer = back_min
+        if my_buffer > back_max:
+            my_buffer = back_max
+        self.back_buffer = my_buffer
+
+        my_buffer = self.width/2 + math.sqrt(self.width)
+        if my_buffer < side_min:
+            my_buffer = side_min
+        if my_buffer > side_max:
+            my_buffer = side_max
+        self.side_buffer = my_buffer
+
     def is_valid(self):
         """Should normally only be False if something went wrong in reading data"""
         return self.width > 0 and self.depth > 0
 
     def get_front_buffer(self):
-        # FIXME: reflection depending on type
-        my_buffer = self.width/2 + math.sqrt(self.width)
-        if my_buffer < parameters.LU_GENB_RESIDENTIAL_HOUSE_FRONT_MIN:
-            my_buffer = parameters.LU_GENB_RESIDENTIAL_HOUSE_FRONT_MIN
-        if my_buffer > parameters.LU_GENB_RESIDENTIAL_HOUSE_FRONT_MAX:
-            my_buffer = parameters.LU_GENB_RESIDENTIAL_HOUSE_FRONT_MAX
-        return my_buffer
+        return self.front_buffer
 
     def get_min_front_buffer(self):
         """The absolute minimal distance tolerable, e.g. in a curve at the edges of the lot"""
-        # FIXME: reflection depending on type
-        return math.sqrt(parameters.LU_GENB_RESIDENTIAL_HOUSE_FRONT_MIN)
+        return self.min_front_buffer
 
     def get_back_buffer(self):
-        # FIXME: reflection depending on type
-        my_buffer = self.width/2 + math.sqrt(self.width)
-        if my_buffer < parameters.LU_GENB_RESIDENTIAL_HOUSE_BACK_MIN:
-            my_buffer = parameters.LU_GENB_RESIDENTIAL_HOUSE_BACK_MIN
-        if my_buffer > parameters.LU_GENB_RESIDENTIAL_HOUSE_BACK_MAX:
-            my_buffer = parameters.LU_GENB_RESIDENTIAL_HOUSE_BACK_MAX
-        return my_buffer
+        return self.back_buffer
 
     def get_side_buffer(self):
-        # FIXME: reflection depending on type
-        my_buffer = self.width/2 + math.sqrt(self.width)
-        if my_buffer < parameters.LU_GENB_RESIDENTIAL_HOUSE_SIDE_MIN:
-            my_buffer = parameters.LU_GENB_RESIDENTIAL_HOUSE_SIDE_MIN
-        if my_buffer > parameters.LU_GENB_RESIDENTIAL_HOUSE_SIDE_MAX:
-            my_buffer = parameters.LU_GENB_RESIDENTIAL_HOUSE_SIDE_MAX
-        return my_buffer
+        return self.side_buffer
 
 
 class Landuse(object):
@@ -831,7 +868,10 @@ def generate_buildings_along_highway(landuse, highway, shared_models_library, is
     # FIXME: shared model type needs to be set based on landuse information
     travelled_along = 0
     highway_length = highway.linear.length
-    my_gen_building = GenBuilding(shared_models_library.next_building(SharedModelsLibrary.TYPE_RESIDENTIAL_HOUSE)
+    building_type = SharedModelsLibrary.TYPE_RESIDENTIAL_HOUSE
+    if landuse.type_ is Landuse.TYPE_INDUSTRIAL:
+        building_type = SharedModelsLibrary.TYPE_INDUSTRIAL_BUILDING
+    my_gen_building = GenBuilding(shared_models_library.next_building(building_type)
                                   , highway.get_width())
     if not is_reverse:
         point_on_line = highway.linear.interpolate(0)
@@ -858,7 +898,7 @@ def generate_buildings_along_highway(landuse, highway, shared_models_library, is
                 my_gen_building.set_location(point_on_line, angle, area_polygon, buffer_polygon)
                 landuse.generated_buildings.append(my_gen_building)
                 landuse.linked_blocked_areas.append(area_polygon)
-                my_gen_building = GenBuilding(shared_models_library.next_building(SharedModelsLibrary.TYPE_RESIDENTIAL_HOUSE)
+                my_gen_building = GenBuilding(shared_models_library.next_building(building_type)
                                               , highway.get_width())  # new building needed
 
 
@@ -1085,6 +1125,9 @@ class TestExtraBuildings(unittest.TestCase):
                                                  , "Residential\\French_House.ac"
                                                  , "Residential\\French_House.ac"
                                                  , "Residential\\germanvillagehouse1.xml"]
+        parameters.LU_GENB_INDUSTRIAL_BUILDINGS = ["Industrial\\Industrial10x20.xml"
+                                                   , "Industrial\\Schenker_storehouse35x30.xml"
+                                                   , "Industrial\\scotch-distillery.ac"]
 
     def test_parse_ac_file_name(self):
         self.assertEqual("foo.ac", parse_ac_file_name("sdfsfsdf <path>  foo.ac </path> sdfsdf"))
@@ -1223,7 +1266,7 @@ class TestExtraBuildings(unittest.TestCase):
         landuse_refs[my_lu.osm_id] = my_lu
         polygon = box(180, 210, 450, 350)
         my_lu = Landuse(1002)
-        my_lu.type_ = Landuse.TYPE_COMMERCIAL
+        my_lu.type_ = Landuse.TYPE_INDUSTRIAL
         my_lu.polygon = polygon
         landuse_refs[my_lu.osm_id] = my_lu
         polygon = box(0, 240, 180, 450)
