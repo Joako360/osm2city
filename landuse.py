@@ -349,15 +349,18 @@ class SharedModel(object):
 
     def _read_from_file(self):
         """Reads the model's data from file and sets the variables"""
+        models_path = parameters.LU_GENB_PATH_TO_MODELS
+        if not models_path.endswith(os.sep):
+            models_path = models_path + os.sep
         try:
             ac_filename = self.path
             if self.path.endswith(".xml"):
-                with open(parameters.LU_GENB_PATH_TO_MODELS + ac_filename, 'r') as f:
+                with open(models_path + ac_filename, 'r') as f:
                     xml_data = f.read()
                     sep_index = ac_filename.rfind(os.sep)
                     model_dir = ac_filename[0:sep_index+1]
                     ac_filename = model_dir + parse_ac_file_name(xml_data)
-            boundary_tuple = extract_boundary(parameters.LU_GENB_PATH_TO_MODELS + ac_filename)
+            boundary_tuple = extract_boundary(models_path + ac_filename)
             self.width = boundary_tuple[2] - boundary_tuple[0]
             self.depth = boundary_tuple[3] - boundary_tuple[1]
             self.offset_x = boundary_tuple[0] + self.width/2
@@ -885,12 +888,26 @@ def draw_polygons(highways, buildings, landuses, static_obj_boxes
         elif Landuse.TYPE_INDUSTRIAL == my_land_use.type_:
             my_color = "cyan"
         elif Landuse.TYPE_RETAIL == my_land_use.type_:
-            my_color = "cyan"
+            my_color = "skyblue"
         elif Landuse.TYPE_RESIDENTIAL == my_land_use.type_:
             my_color = "pink"
 
         patch = PolygonPatch(my_land_use.polygon, facecolor=my_color, edgecolor='#999999')
         ax.add_patch(patch)
+
+    for my_highway in highways.values():
+        if Highway.TYPE_ROAD < my_highway.type_:
+            plot_line(ax, my_highway.linear, "black", 1)
+        else:
+            plot_line(ax, my_highway.linear, "lime", 1)
+
+    for my_land_use in landuses.values():
+        for blocked in my_land_use.linked_blocked_areas:
+            patch = PolygonPatch(blocked, facecolor='green', edgecolor='green')
+            ax.add_patch(patch)
+        for gen_building in my_land_use.generated_buildings:
+            patch = PolygonPatch(gen_building.area_polygon, facecolor='yellow', edgecolor='black')
+            ax.add_patch(patch)
 
     for building in buildings.values():
         patch = PolygonPatch(building, facecolor='blue', edgecolor='blue')
@@ -899,19 +916,6 @@ def draw_polygons(highways, buildings, landuses, static_obj_boxes
     for my_box in static_obj_boxes:
         patch = PolygonPatch(my_box, facecolor='black', edgecolor='black', alpha=0.5)
         ax.add_patch(patch)
-
-    for my_highway in highways.values():
-        if Highway.TYPE_ROAD < my_highway.type_:
-            plot_line(ax, my_highway.linear, "black", 1)
-        else:
-            plot_line(ax, my_highway.linear, "gray", 1)
-    for my_land_use in landuses.values():
-        for blocked in my_land_use.linked_blocked_areas:
-            patch = PolygonPatch(blocked, facecolor='green', edgecolor='green')
-            ax.add_patch(patch)
-        for gen_building in my_land_use.generated_buildings:
-            patch = PolygonPatch(gen_building.area_polygon, facecolor='yellow', edgecolor='black')
-            ax.add_patch(patch)
 
     # Fit the figure around the polygons, bounds, render, and show
     w = x_max - x_min
@@ -1075,6 +1079,13 @@ if __name__ == "__main__":
 # ================ UNITTESTS =======================
 
 class TestExtraBuildings(unittest.TestCase):
+    def setUp(self):
+        parameters.LU_GENB_PATH_TO_MODELS = "C:\\flightgear\\terrasync\\Models"
+        parameters.LU_GENB_RESIDENTIAL_HOUSES = ["Residential\\MontserratHse3Green.xml"
+                                                 , "Residential\\French_House.ac"
+                                                 , "Residential\\French_House.ac"
+                                                 , "Residential\\germanvillagehouse1.xml"]
+
     def test_parse_ac_file_name(self):
         self.assertEqual("foo.ac", parse_ac_file_name("sdfsfsdf <path>  foo.ac </path> sdfsdf"))
         self.assertRaises(ValueError, parse_ac_file_name, "foo")  # do not use () and instead add parameter as arg
@@ -1082,25 +1093,25 @@ class TestExtraBuildings(unittest.TestCase):
     def test_extra_building_generation(self):
         highways = {}
         # Create the streets
-        linear = LineString([(60, 270), (100, 270)])
+        linear = LineString([(40, 270), (140, 270)])
         my_highway = Highway(1)
         my_highway.linear = linear
-        my_highway.type_ = Highway.TYPE_RESIDENTIAL
+        my_highway.type_ = Highway.TYPE_PEDESTRIAN
         highways[my_highway.osm_id] = my_highway
-        linear = LineString([(40, 270), (40, 230)])
+        linear = LineString([(40, 450), (40, 230)])
         my_highway = Highway(2)
         my_highway.linear = linear
-        my_highway.type_ = Highway.TYPE_RESIDENTIAL
+        my_highway.type_ = Highway.TYPE_ROAD
         highways[my_highway.osm_id] = my_highway
         linear = LineString([(80, 250), (80, 150)])
         my_highway = Highway(3)
         my_highway.linear = linear
         my_highway.type_ = Highway.TYPE_RESIDENTIAL
         highways[my_highway.osm_id] = my_highway
-        linear = LineString([(0, 180), (170, 180)])
+        linear = LineString([(0, 180), (200, 180), (200,100), (420,100)])
         my_highway = Highway(4)
         my_highway.linear = linear
-        my_highway.type_ = Highway.TYPE_RESIDENTIAL
+        my_highway.type_ = Highway.TYPE_TERTIARY
         highways[my_highway.osm_id] = my_highway
         linear = LineString([(80, 150), (70, 140), (80, 130), (90, 140), (80, 150)])
         my_highway = Highway(5)
@@ -1108,7 +1119,7 @@ class TestExtraBuildings(unittest.TestCase):
         my_highway.type_ = Highway.TYPE_RESIDENTIAL
         my_highway.is_roundabout = True
         highways[my_highway.osm_id] = my_highway
-        linear = LineString([(90, 140), (110, 140), (130, 120), (130, 100), (110, 80), (110, 60), (130, 40), (150, 60), (190, 60)])
+        linear = LineString([(90, 140), (110, 140), (130, 120), (130, 100), (110, 80), (110, 60), (130, 40), (150, 60), (200, 60), (200, 100)])
         my_highway = Highway(6)
         my_highway.linear = linear
         my_highway.type_ = Highway.TYPE_RESIDENTIAL
@@ -1127,6 +1138,51 @@ class TestExtraBuildings(unittest.TestCase):
         my_highway = Highway(9)
         my_highway.linear = linear
         my_highway.type_ = Highway.TYPE_MOTORWAY
+        highways[my_highway.osm_id] = my_highway
+        linear = LineString([(200, 180), (250, 180), (250, 100)])
+        my_highway = Highway(10)
+        my_highway.linear = linear
+        my_highway.type_ = Highway.TYPE_RESIDENTIAL
+        highways[my_highway.osm_id] = my_highway
+        linear = LineString([(300, 100), (300, 180), (350, 180), (350, 100)])
+        my_highway = Highway(11)
+        my_highway.linear = linear
+        my_highway.type_ = Highway.TYPE_LIVING_STREET
+        highways[my_highway.osm_id] = my_highway
+        linear = LineString([(400, 100), (400, 210)])
+        my_highway = Highway(12)
+        my_highway.linear = linear
+        my_highway.type_ = Highway.TYPE_LIVING_STREET
+        highways[my_highway.osm_id] = my_highway
+        linear = LineString([(300, 100), (300, 30)])
+        my_highway = Highway(13)
+        my_highway.linear = linear
+        my_highway.type_ = Highway.TYPE_LIVING_STREET
+        highways[my_highway.osm_id] = my_highway
+        linear = LineString([(350, 100), (350, 30)])
+        my_highway = Highway(14)
+        my_highway.linear = linear
+        my_highway.type_ = Highway.TYPE_LIVING_STREET
+        highways[my_highway.osm_id] = my_highway
+        linear = LineString([(200, 60), (260, 60)])
+        my_highway = Highway(15)
+        my_highway.linear = linear
+        my_highway.type_ = Highway.TYPE_LIVING_STREET
+        highways[my_highway.osm_id] = my_highway
+        linear = LineString([(0, 250), (470, 250)])
+        my_highway = Highway(20)
+        my_highway.linear = linear
+        my_highway.type_ = Highway.TYPE_PRIMARY
+        highways[my_highway.osm_id] = my_highway
+        linear = LineString([(300, 250), (300, 350)])
+        my_highway = Highway(21)
+        my_highway.linear = linear
+        my_highway.type_ = Highway.TYPE_SERVICE
+        highways[my_highway.osm_id] = my_highway
+        linear = LineString([(200, 250), (200, 300), (150, 350), (40, 450)])
+        my_highway = Highway(22)
+        my_highway.linear = linear
+        my_highway.type_ = Highway.TYPE_SERVICE
         highways[my_highway.osm_id] = my_highway
         # railways
         railways = {}
@@ -1147,15 +1203,32 @@ class TestExtraBuildings(unittest.TestCase):
         building_refs[100] = polygon
         polygon = Polygon([(80, 250), (80, 240), (90, 240), (90, 250), (80, 250)])
         building_refs[101] = polygon
+        polygon = Polygon([(10, 300), (30, 300), (30, 320), (10, 320), (10, 300)])
+        building_refs[102] = polygon
         # static object boxes
         static_obj_boxes = [box(50, 160, 70, 180)]
         # open spaces
         open_spaces = {500: Polygon([(30, 100), (50, 100), (50, 120), (30, 120), (30, 100)])}
         # land-uses
         landuse_refs = {}
-        polygon = box(20, 20, 170, 230)
+        polygon = box(0, 0, 170, 230)
         my_lu = Landuse(1000)
         my_lu.type_ = Landuse.TYPE_RESIDENTIAL
+        my_lu.polygon = polygon
+        landuse_refs[my_lu.osm_id] = my_lu
+        polygon = box(170, 0, 450, 210)
+        my_lu = Landuse(1001)
+        my_lu.type_ = Landuse.TYPE_RESIDENTIAL
+        my_lu.polygon = polygon
+        landuse_refs[my_lu.osm_id] = my_lu
+        polygon = box(180, 210, 450, 350)
+        my_lu = Landuse(1002)
+        my_lu.type_ = Landuse.TYPE_COMMERCIAL
+        my_lu.polygon = polygon
+        landuse_refs[my_lu.osm_id] = my_lu
+        polygon = box(0, 240, 180, 450)
+        my_lu = Landuse(1003)
+        my_lu.type_ = Landuse.TYPE_RETAIL
         my_lu.polygon = polygon
         landuse_refs[my_lu.osm_id] = my_lu
         # shared models
@@ -1165,7 +1238,7 @@ class TestExtraBuildings(unittest.TestCase):
         generate_extra_buildings(building_refs, static_obj_boxes, landuse_refs, None, open_spaces
                                  , highways, railways, waterways
                                  , library
-                                 , 0, 0, 200, 280
+                                 , 0, 0, 500, 500
                                  , True)
 
 
