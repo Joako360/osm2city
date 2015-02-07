@@ -38,11 +38,11 @@ OUR_MAGIC = "genbuild"  # Used in e.g. stg files to mark edits by landuse.py for
 
 
 def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator):
-    my_buildings = {}  # osm_id as key, Polygon
+    my_buildings = dict()  # osm_id as key, Polygon
     for way in ways_dict.values():
         for key in way.tags:
             if "building" == key:
-                coordinates = []
+                coordinates = list()
                 for ref in way.refs:
                     if ref in nodes_dict:
                         my_node = nodes_dict[ref]
@@ -102,9 +102,12 @@ class Highway(LinearOSMFeature):
             return False
         return True
 
+    def is_sideway(self):
+        """Not a main street in an urban area. I.e. residential, walking or service"""
+        return self.type_ > Highway.TYPE_ROAD
 
 def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
-    my_highways = {}  # osm_id as key, Highway
+    my_highways = dict()  # osm_id as key, Highway
 
     for way in ways_dict.values():
         my_highway = Highway(way.osm_id)
@@ -146,7 +149,7 @@ def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
                 my_highway.is_roundabout = True
         if valid_highway and not is_challenged:
             # Process the Nodes
-            my_coordinates = []
+            my_coordinates = list()
             for ref in way.refs:
                 if ref in nodes_dict:
                     my_node = nodes_dict[ref]
@@ -170,7 +173,7 @@ class Railway(LinearOSMFeature):
 
 
 def process_osm_railway(nodes_dict, ways_dict, my_coord_transformator):
-    my_railways = {}  # osm_id as key, Railway as value
+    my_railways = dict()  # osm_id as key, Railway as value
 
     for way in ways_dict.values():
         valid_railway = False
@@ -186,7 +189,7 @@ def process_osm_railway(nodes_dict, ways_dict, my_coord_transformator):
                 is_challenged = True
         if valid_railway and not is_challenged:
             # Process the Nodes
-            my_coordinates = []
+            my_coordinates = list()
             for ref in way.refs:
                 if ref in nodes_dict:
                     my_node = nodes_dict[ref]
@@ -213,7 +216,7 @@ class Waterway(LinearOSMFeature):
 
 
 def process_osm_waterway(nodes_dict, ways_dict, my_coord_transformator):
-    my_waterways = {}  # osm_id as key, Waterway as value
+    my_waterways = dict()  # osm_id as key, Waterway as value
 
     for way in ways_dict.values():
         my_waterway = Waterway(way.osm_id)
@@ -232,7 +235,7 @@ def process_osm_waterway(nodes_dict, ways_dict, my_coord_transformator):
                 is_challenged = True
         if valid_waterway and not is_challenged:
             # Process the Nodes
-            my_coordinates = []
+            my_coordinates = list()
             for ref in way.refs:
                 if ref in nodes_dict:
                     my_node = nodes_dict[ref]
@@ -256,6 +259,7 @@ class BlockedArea(object):
     def __init__(self, type_, polygon):
         self.type_ = type_
         self.polygon = polygon
+
 
 class GenBuilding(object):
     """An object representing a generated non-OSM building"""
@@ -329,12 +333,14 @@ class GenBuilding(object):
 class SharedModelsLibrary(object):
     TYPE_RESIDENTIAL_HOUSE = 10
     TYPE_RESIDENTIAL_ROWHOUSE = 11
-    TYPE_INDUSTRIAL_BUILDING = 20
+    TYPE_INDUSTRIAL_BUILDING_LARGE = 20
+    TYPE_INDUSTRIAL_BUILDING_SMALL = 21
 
     def __init__(self):
-        self.residential_houses = []
-        self.residential_rowhouses = []
-        self.industrial_buildings = []
+        self.residential_houses = list()
+        self.residential_rowhouses = list()
+        self.industrial_buildings_large = list()
+        self.industrial_buildings_small = list()
         self._read_from_models_library()
 
     def _read_from_models_library(self):
@@ -346,28 +352,25 @@ class SharedModelsLibrary(object):
             my_model = SharedModel(b, SharedModelsLibrary.TYPE_RESIDENTIAL_ROWHOUSE)
             if my_model.is_valid():
                 self.residential_rowhouses.append(my_model)
-        for b in parameters.LU_GENB_INDUSTRIAL_BUILDINGS:
-            my_model = SharedModel(b, SharedModelsLibrary.TYPE_INDUSTRIAL_BUILDING)
+        for b in parameters.LU_GENB_INDUSTRIAL_BUILDINGS_LARGE:
+            my_model = SharedModel(b, SharedModelsLibrary.TYPE_INDUSTRIAL_BUILDING_LARGE)
             if my_model.is_valid():
-                self.industrial_buildings.append(my_model)
+                self.industrial_buildings_large.append(my_model)
+        for b in parameters.LU_GENB_INDUSTRIAL_BUILDINGS_SMALL:
+            my_model = SharedModel(b, SharedModelsLibrary.TYPE_INDUSTRIAL_BUILDING_SMALL)
+            if my_model.is_valid():
+                self.industrial_buildings_small.append(my_model)
 
     def is_valid(self):
         if 0 == len(self.residential_houses):
             return False
         if 0 == len(self.residential_rowhouses):
             return False
-        if 0 == len(self.industrial_buildings):
+        if 0 == len(self.industrial_buildings_large):
+            return False
+        if 0 == len(self.industrial_buildings_small):
             return False
         return True
-
-    def next_building(self, building_type):
-        # FIXME: error handling if unknown type
-        if building_type is SharedModelsLibrary.TYPE_RESIDENTIAL_HOUSE:
-            return random.choice(self.residential_houses)
-        if building_type is SharedModelsLibrary.TYPE_INDUSTRIAL_BUILDING:
-            return random.choice(self.industrial_buildings)
-        else:
-            return None
 
 
 class SharedModel(object):
@@ -406,7 +409,6 @@ class SharedModel(object):
             logging.error("Unreadable model %s. Reason %s", self.path, reason)
 
     def _calc_buffers(self):
-        # FIXME: reflection depending on type
         if self.type_ is SharedModelsLibrary.TYPE_RESIDENTIAL_HOUSE:
             front_min = parameters.LU_GENB_RESIDENTIAL_HOUSE_FRONT_MIN
             front_max = parameters.LU_GENB_RESIDENTIAL_HOUSE_FRONT_MAX
@@ -414,6 +416,13 @@ class SharedModel(object):
             back_max = parameters.LU_GENB_RESIDENTIAL_HOUSE_BACK_MAX
             side_min = parameters.LU_GENB_RESIDENTIAL_HOUSE_SIDE_MIN
             side_max = parameters.LU_GENB_RESIDENTIAL_HOUSE_SIDE_MAX
+        elif self.type_ is SharedModelsLibrary.TYPE_RESIDENTIAL_ROWHOUSE:
+            front_min = parameters.LU_GENB_RESIDENTIAL_ROWHOUSE_FRONT_MIN
+            front_max = parameters.LU_GENB_RESIDENTIAL_ROWHOUSE_FRONT_MAX
+            back_min = parameters.LU_GENB_RESIDENTIAL_ROWHOUSE_BACK_MIN
+            back_max = parameters.LU_GENB_RESIDENTIAL_ROWHOUSE_BACK_MAX
+            side_min = parameters.LU_GENB_RESIDENTIAL_ROWHOUSE_SIDE_MIN
+            side_max = parameters.LU_GENB_RESIDENTIAL_ROWHOUSE_SIDE_MAX
         else:
             front_min = parameters.LU_GENB_INDUSTRIAL_BUILDING_FRONT_MIN
             front_max = parameters.LU_GENB_INDUSTRIAL_BUILDING_FRONT_MIN
@@ -472,16 +481,88 @@ class Landuse(object):
         self.type_ = 0
         self.polygon = None  # the polygon defining its outer boundary
         self.number_of_buildings = 0  # only set for generated TYPE_NON_OSM land-uses during generation
-        self.linked_blocked_areas = []  # List of BlockedArea objects for blocked areas. E.g.
+        self.linked_blocked_areas = list()  # List of BlockedArea objects for blocked areas. E.g.
                                           # open-space, existing building, static objects, *-buffers
-        self.generated_buildings = []  # List og GenBuilding objects for generated non-osm buildings along the highways
-        self.linked_genways = []  # List of Highways that are available for generating buildings
+        self.generated_buildings = list()  # List og GenBuilding objects for generated non-osm buildings along the highways
+        self.linked_genways = list()  # List of Highways that are available for generating buildings
                                   # see process_ways_for_building_generation(...)
 
     def make_generated_buildings_stg_entries(self, my_stg_mgr, my_elev_interpolator, my_coord_transformator):
         """Adds the stg entries for the generated buildings of this landuse"""
         for gen_building in self.generated_buildings:
             gen_building.make_stg_entry(my_stg_mgr, my_elev_interpolator, my_coord_transformator)
+
+    def commit_temp_gen_buildings(self, temp_buildings):
+        """Commits a set of generated buildings to be definitively be part of a Landuse"""
+        self.linked_blocked_areas.extend(temp_buildings.generated_blocked_areas)
+        self.generated_buildings.extend(temp_buildings.generated_buildings)
+
+
+class LanduseTempGenBuildings(object):
+    """Stores generated buildings temporarily before validations shows that they can be committed"""
+    def __init__(self):
+        self.generated_blocked_areas = list()  # List of BlockedArea objects from temp generated buildings
+        self.generated_buildings = list()  # List of GenBuildings
+        self.blocked_areas_along_objects = dict()  # key=BlockedArea value=None found during generation along specific highway
+        self.blocked_areas_along_sequence = list()  # BlockedArea objects
+
+    def add_other_blocked_area(self, blocked_area):
+        if blocked_area.type_ in [BlockedArea.TYPE_STATIC_OBJECT, BlockedArea.TYPE_OSM_BUILDING, BlockedArea.TYPE_GEN_BUILDING]:
+            if blocked_area not in self.blocked_areas_along_objects:
+                self.blocked_areas_along_objects[blocked_area] = False
+                self.blocked_areas_along_sequence.append(blocked_area)
+
+    def add_generated(self, building, blocked_area):
+        self.generated_blocked_areas.append(blocked_area)
+        self.generated_buildings.append(building)
+        self.blocked_areas_along_objects[blocked_area] = True
+        self.blocked_areas_along_sequence.append(blocked_area)
+
+    def validate_uninterrupted_sequence(self, min_share, min_number):
+        """
+        First validates that the min_share is fulfilled.
+        Then validates if there either only are temp. generated buildings or all generated buildings are in just
+        one sequence.
+        E.g. for row houses all houses should be the same - but at the street start/end there might be other houses.
+        Finally validate if the number of generated buildings is at least min_number."""
+        if not self.validate_min_share_generated(min_share):
+            return False
+
+        seq_started = False
+        seq_stopped = False
+        counter = 0
+        for blocked_area in self.blocked_areas_along_sequence:
+            is_temp_generated = self.blocked_areas_along_objects[blocked_area]
+            if is_temp_generated:
+                if not seq_started:
+                    seq_started = True
+                    counter += 1
+                    continue
+                elif seq_started:
+                    counter += 1
+                elif seq_stopped:
+                    return 0
+            elif not is_temp_generated:
+                if seq_started and not seq_stopped:
+                    seq_stopped = True
+                    continue
+        if counter < min_number:
+            return False
+        return True
+
+    def validate_min_share_generated(self, min_share):
+        """Returns true if the share of generated buildings is at least as large as the min_share parameter"""
+        count_temp_generated = 0.0
+        count_others = 0.0
+        for my_bool in self.blocked_areas_along_objects.values():
+            if my_bool:
+                count_temp_generated += 1.0
+            else:
+                count_others += 1.0
+        my_share = count_temp_generated + count_others
+        if my_share > 0 and (count_temp_generated / my_share) >= min_share:
+            return True
+        return False
 
 
 class Place(object):
@@ -506,7 +587,7 @@ class Place(object):
 
 
 def process_osm_place_refs(nodes_dict, ways_dict, my_coord_transformator):
-    my_places = {}  # osm_id as key, Place as value
+    my_places = dict()  # osm_id as key, Place as value
 
     # First get all Places from OSM ways
     for way in ways_dict.values():
@@ -517,7 +598,7 @@ def process_osm_place_refs(nodes_dict, ways_dict, my_coord_transformator):
                 my_place.population = my_population
 
             # Process the Nodes
-            my_coordinates = []
+            my_coordinates = list()
             for ref in way.refs:
                 if ref in nodes_dict:
                     my_node = nodes_dict[ref]
@@ -575,7 +656,7 @@ def _parse_place_tags(tags_dict):
 
 
 def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator):
-    my_landuses = {}  # osm_id as key, Landuse as value
+    my_landuses = dict()  # osm_id as key, Landuse as value
 
     for way in ways_dict.values():
         my_landuse = Landuse(way.osm_id)
@@ -597,7 +678,7 @@ def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator):
                 valid_landuse = False
         if valid_landuse:
             # Process the Nodes
-            my_coordinates = []
+            my_coordinates = list()
             for ref in way.refs:
                 if ref in nodes_dict:
                     my_node = nodes_dict[ref]
@@ -614,7 +695,7 @@ def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator):
 
 def generate_landuse_from_buildings(osm_landuses, building_refs):
     """Adds "missing" landuses based on building clusters"""
-    my_landuse_candidates = {}
+    my_landuse_candidates = dict()
     index = 10000000000
     for my_building in building_refs.values():
         # check whether the building already is in a land use
@@ -658,7 +739,7 @@ def generate_landuse_from_buildings(osm_landuses, building_refs):
 
 def process_osm_openspaces_refs(nodes_dict, ways_dict, my_coord_transformator):
     """Parses OSM way input for areas, where there would be open space with no buildings"""
-    my_areas = {}  # osm_id as key, Polygon as value
+    my_areas = dict()  # osm_id as key, Polygon as value
 
     for way in ways_dict.values():
         valid_area = False
@@ -691,7 +772,7 @@ def process_osm_openspaces_refs(nodes_dict, ways_dict, my_coord_transformator):
             valid_area = True
         if valid_area and not is_building:
             # Process the Nodes
-            my_coordinates = []
+            my_coordinates = list()
             for ref in way.refs:
                 if ref in nodes_dict:
                     my_node = nodes_dict[ref]
@@ -749,7 +830,7 @@ def create_static_obj_boxes(my_coord_transformator):
     Finds all static objects referenced in stg-files within the scenery boundaries and returns them as a list of
     Shapely box geometries in the local x/y coordinate system
     """
-    static_obj_boxes = []
+    static_obj_boxes = list()
     stg_files = calc_tile.get_stg_files_in_boundary(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH
                                                     , parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH
                                                     , parameters.PATH_TO_SCENERY)
@@ -813,7 +894,7 @@ def process_ways_for_building_generation(my_highways, landuses):
                     continue
                 # process intersections
                 if my_highway.linear.intersects(landuse.polygon):
-                    intersections = []
+                    intersections = list()
                     intersections.append(my_highway.linear.intersection(landuse.polygon))
                     if len(intersections) > 0:
                         for intersection in intersections:
@@ -876,23 +957,17 @@ def stg_angle(angle_normal):
         return 360 - angle_normal
 
 
-def generate_buildings_along_highway(landuse, highway, shared_models_library, is_reverse):
+def generate_buildings_along_highway(landuse, highway, shared_models_list, is_reverse, temp_buildings):
     """
     The central assumption is that existing blocked areas incl. buildings du not need a buffer.
     The to be populated buildings all bring their own constraints with regards to distance to road, distance to other
     buildings etc.
-    A populated buildings is appended to the current landuse's generated_buildings list.
+
+    Returns a LanduseTempGenBuildings object with all potential new generated buildings
     """
     travelled_along = 0
     highway_length = highway.linear.length
-    if landuse.type_ is Landuse.TYPE_RESIDENTIAL:
-        building_type = SharedModelsLibrary.TYPE_RESIDENTIAL_HOUSE
-    elif landuse.type_ is Landuse.TYPE_INDUSTRIAL:
-        building_type = SharedModelsLibrary.TYPE_INDUSTRIAL_BUILDING
-    else:
-        building_type = SharedModelsLibrary.TYPE_RESIDENTIAL_HOUSE  # FIXME with correct types
-    my_gen_building = GenBuilding(shared_models_library.next_building(building_type)
-                                  , highway.get_width())
+    my_gen_building = GenBuilding(random.choice(shared_models_list), highway.get_width())
     if not is_reverse:
         point_on_line = highway.linear.interpolate(0)
     else:
@@ -914,12 +989,15 @@ def generate_buildings_along_highway(landuse, highway, shared_models_library, is
                     valid_new_gen_building = False
                     break
             if valid_new_gen_building:
+                for blocked_area in temp_buildings.generated_blocked_areas:
+                    if buffer_polygon.intersects(blocked_area.polygon):
+                        valid_new_gen_building = False
+                        break
+            if valid_new_gen_building:
                 area_polygon = my_gen_building.get_area_polygon(False, point_on_line, angle)
                 my_gen_building.set_location(point_on_line, angle, area_polygon, buffer_polygon)
-                landuse.generated_buildings.append(my_gen_building)
-                landuse.linked_blocked_areas.append(BlockedArea(BlockedArea.TYPE_GEN_BUILDING, area_polygon))
-                my_gen_building = GenBuilding(shared_models_library.next_building(building_type)
-                                              , highway.get_width())  # new building needed
+                temp_buildings.add_generated(my_gen_building, BlockedArea(BlockedArea.TYPE_GEN_BUILDING, area_polygon))
+                my_gen_building = GenBuilding(random.choice(shared_models_list), highway.get_width())
 
 
 # ================ PLOTTING FOR VISUAL TEST ========
@@ -955,7 +1033,7 @@ def draw_polygons(highways, landuses, x_min, y_min, x_max, y_max):
         ax.add_patch(patch)
 
     for my_highway in highways.values():
-        if Highway.TYPE_ROAD < my_highway.type_:
+        if my_highway.is_sideway():
             plot_line(ax, my_highway.linear, "black", 1)
         else:
             plot_line(ax, my_highway.linear, "lime", 1)
@@ -1013,13 +1091,55 @@ def generate_extra_buildings(building_refs, static_obj_boxes, landuse_refs, plac
         if landuse.type_ is Landuse.TYPE_NON_OSM:
             continue
         logging.debug("Landuse OSM ID: %s", landuse.osm_id)
+
         for highway in landuse.linked_genways:
-            generate_buildings_along_highway(landuse, highway, shared_models_library, False)
-            generate_buildings_along_highway(landuse, highway, shared_models_library, True)
+            if landuse.type_ is Landuse.TYPE_RESIDENTIAL:
+                shared_models_list = shared_models_library.residential_houses
+                # choose row house already now, so the same row house is potentially applied on both sides of street
+                index = random.randint(0, len(shared_models_library.residential_rowhouses) - 1)
+                row_house_list = shared_models_library.residential_rowhouses[index:index + 1]
+                if highway.is_sideway() and (random.random() <= parameters.LU_GENB_RESIDENTIAL_ROWHOUSE_SHARE):
+                    try_rowhouse = True
+                else:
+                    try_rowhouse = False
+                generate_extra_buildings_residential(landuse, highway, shared_models_list, row_house_list
+                                                     , False, try_rowhouse)
+                generate_extra_buildings_residential(landuse, highway, shared_models_list, row_house_list
+                                                     , True, try_rowhouse)
+
+            else:  # elif landuse.type_ is Landuse.TYPE_INDUSTRIAL:
+                generate_extra_buildings_industrial(landuse, highway, shared_models_library, False)
+                generate_extra_buildings_industrial(landuse, highway, shared_models_library, True)
 
     if plot_drawing:
         draw_polygons(highways, landuse_refs, x_min, y_min, x_max, y_max)
-    i = 0
+
+
+def generate_extra_buildings_residential(landuse, highway, houses_list, row_house_list, is_reverse, try_rowhouse):
+    if highway.is_sideway() and (random.random() <= parameters.LU_GENB_RESIDENTIAL_ROWHOUSE_SHARE):
+        temp_buildings = LanduseTempGenBuildings()
+        generate_buildings_along_highway(landuse, highway, row_house_list, is_reverse, temp_buildings)
+        if 0 < temp_buildings.validate_uninterrupted_sequence(parameters.LU_GENB_RESIDENTIAL_MIN_GEN_SHARE
+                                                              , parameters.LU_GENB_RESIDENTIAL_ROWHOUSE_MIN_NUMBER):
+            landuse.commit_temp_gen_buildings(temp_buildings)
+            return  # we do not want to spoil row houses with other houses to fill up
+
+    # start from scratch - either because rowhouse not chosen or not successfully validated
+    temp_buildings = LanduseTempGenBuildings()
+    generate_buildings_along_highway(landuse, highway, houses_list, is_reverse, temp_buildings)
+    if temp_buildings.validate_min_share_generated(parameters.LU_GENB_RESIDENTIAL_MIN_GEN_SHARE):
+        landuse.commit_temp_gen_buildings(temp_buildings)
+
+
+def generate_extra_buildings_industrial(landuse, highway, shared_models_library, is_reverse):
+    temp_buildings = LanduseTempGenBuildings()
+    if random.random() <= parameters.LU_GENB_INDUSTRIAL_LARGE_SHARE:
+        shared_models_list = shared_models_library.industrial_buildings_large
+        generate_buildings_along_highway(landuse, highway, shared_models_list, is_reverse, temp_buildings)
+
+    shared_models_list = shared_models_library.industrial_buildings_small
+    generate_buildings_along_highway(landuse, highway, shared_models_list, is_reverse, temp_buildings)
+    landuse.commit_temp_gen_buildings(temp_buildings)
 
 
 def main():
@@ -1045,7 +1165,7 @@ def main():
     files_to_remove = None
     if args.uninstall:
         logging.info("Uninstalling.")
-        files_to_remove = []
+        files_to_remove = list()
         parameters.NO_ELEV = True
 
     # Initializing tools for global/local coordinate transformations
@@ -1067,8 +1187,8 @@ def main():
     valid_way_keys = ["building", "landuse", "place", "population", "highway", "junction", "tunnel"
                       , "leisure", "natural", "public_transport", "amenity", "area", "parking"
                       , "railway", "waterway"]
-    valid_relation_keys = []
-    req_relation_keys = []
+    valid_relation_keys = list()
+    req_relation_keys = list()
     req_way_keys = ["building", "landuse", "place", "highway"
                     , "leisure", "natural", "public_transport", "amenity"
                     , "railway", "waterway"]
@@ -1148,16 +1268,19 @@ class TestExtraBuildings(unittest.TestCase):
                                                  , "Residential\\French_House.ac"
                                                  , "Residential\\French_House.ac"
                                                  , "Residential\\germanvillagehouse1.xml"]
-        parameters.LU_GENB_INDUSTRIAL_BUILDINGS = ["Industrial\\Industrial10x20.xml"
-                                                   , "Industrial\\Schenker_storehouse35x30.xml"
-                                                   , "Industrial\\scotch-distillery.ac"]
+        parameters.LU_GENB_INDUSTRIAL_BUILDINGS_LARGE = ["Industrial\\Industrial10x20.xml"
+                                                         , "Industrial\\Schenker_storehouse35x30.xml"
+                                                         , "Industrial\\scotch-distillery.ac"]
+        parameters.LU_GENB_INDUSTRIAL_BUILDINGS_SMALL = ["Industrial\\WaterTower_DDmoritzweg.xml"
+                                                         , "Communications/communication-building1-without-antenna.ac"]
+        parameters.LU_GENB_RESIDENTIAL_ROWHOUSE_SHARE = 0.8
 
     def test_parse_ac_file_name(self):
         self.assertEqual("foo.ac", parse_ac_file_name("sdfsfsdf <path>  foo.ac </path> sdfsdf"))
         self.assertRaises(ValueError, parse_ac_file_name, "foo")  # do not use () and instead add parameter as arg
 
     def test_extra_building_generation(self):
-        highways = {}
+        highways = dict()
         # Create the streets
         linear = LineString([(40, 270), (140, 270)])
         my_highway = Highway(1)
@@ -1215,7 +1338,7 @@ class TestExtraBuildings(unittest.TestCase):
         my_highway.linear = linear
         my_highway.type_ = Highway.TYPE_LIVING_STREET
         highways[my_highway.osm_id] = my_highway
-        linear = LineString([(400, 100), (400, 210)])
+        linear = LineString([(420, 100), (420, 210)])
         my_highway = Highway(12)
         my_highway.linear = linear
         my_highway.type_ = Highway.TYPE_LIVING_STREET
@@ -1251,20 +1374,20 @@ class TestExtraBuildings(unittest.TestCase):
         my_highway.type_ = Highway.TYPE_SERVICE
         highways[my_highway.osm_id] = my_highway
         # railways
-        railways = {}
+        railways = dict()
         linear = LineString([(140, 250), (140, 200), (200, 200)])
         my_rail = Railway(11)
         my_rail.linear = linear
         railways[my_rail.osm_id] = my_rail
         # waterways
-        waterways = {}
+        waterways = dict()
         linear = LineString([(150, 250), (150, 140)])
         my_water = Waterway(21)
         my_water.linear = linear
         my_water.type_ = Waterway.TYPE_NARROW
         waterways[my_water.osm_id] = my_water
         # buildings
-        building_refs = {}
+        building_refs = dict()
         polygon = Polygon([(90, 200), (90, 190), (100, 190), (100, 200), (90, 200)])
         building_refs[100] = polygon
         polygon = Polygon([(80, 250), (80, 240), (90, 240), (90, 250), (80, 250)])
@@ -1276,7 +1399,7 @@ class TestExtraBuildings(unittest.TestCase):
         # open spaces
         open_spaces = {500: Polygon([(30, 100), (50, 100), (50, 120), (30, 120), (30, 100)])}
         # land-uses
-        landuse_refs = {}
+        landuse_refs = dict()
         polygon = box(0, 0, 170, 230)
         my_lu = Landuse(1000)
         my_lu.type_ = Landuse.TYPE_RESIDENTIAL
