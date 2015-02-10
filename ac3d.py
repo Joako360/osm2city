@@ -2,6 +2,12 @@
 import string
 import matplotlib.pyplot as plt
 import logging
+from pdb import pm
+
+from pyparsing import Literal, Word, quotedString, alphas, Optional, OneOrMore, \
+    Group, ParseException, nums, Combine, Regex, alphanums, LineEnd
+
+fmt_node = '%1.6f'
 
 class Node(object):
     def __init__(self, x, y, z):
@@ -9,12 +15,12 @@ class Node(object):
         self.y = y
         self.z = z
     def __str__(self):
-        return "%1.2f %1.2f %1.2f\n" % (self.x, self.y, self.z)
+        return (fmt_node + ' ' + fmt_node + ' ' + fmt_node + '\n') % (self.x, self.y, self.z)
 
 class Face(object):
     """if our texture is rotated in texture_atlas, set swap_uv=True"""
     def __init__(self, nodes_uv_list, typ, mat, swap_uv):
-        assert len(nodes_uv_list) >= 3
+        assert len(nodes_uv_list) >= 2
         for n in nodes_uv_list:
             assert len(n) == 3
         if swap_uv:
@@ -151,7 +157,7 @@ class Writer(object):
         self.objects.append(o)
         self._current_object = o
         return o
-
+        
     def add_label(self, text, x, y, z, orientation=0, scale=1.):
         if not self.label_object:
             self.label_object = Label()
@@ -209,14 +215,95 @@ class Writer(object):
         non_empty = [o for o in self.objects if not o.is_empty()]
         for o in non_empty:
             o.plot()
+    
+    
+    def parse(self):
+        def convertObject(tokens):
+            print "got tokens!", tokens
+            print "--------"
+            #bla
+            #o = Object(name, self.stats, texture, **kwargs)
+            #self.objects.append(o)
+            #self._current_object = o
+            #return o
+        def convertLObj(tokens):
+            #print "got LObj", tokens
+            self.new_object(None, None)
 
+        def convertLName(tokens):
+            #print "got LName", tokens
+            self._current_object.name = tokens[1].strip('"\'')
+
+        def convertLTexture(tokens):
+            #print "got LText", tokens
+            self._current_object.texture = tokens[1].strip('"\'')
+
+        def convertLVertex(tokens):
+            #print "got LVert", tokens
+            self._current_object.node(tokens[0], tokens[1], tokens[2])
+
+        def convertSurf(tokens):
+            #print "got Surf", tokens
+            assert(tokens[0] == 'SURF')
+            assert(tokens[2] == 'mat')
+            assert(tokens[4] == 'refs')
+            
+            self._current_object.face(nodes_uv_list = tokens[6], typ = tokens[1], mat = tokens[3])
+
+        def convertIntegers(tokens):
+            return int(tokens[0])
+        
+        def convertFloats(tokens):
+            return float(tokens[0])
+            
+        integer = Word( nums ).setParseAction( convertIntegers ) 
+        floatNumber = Regex(r'[+-]?\d+(\.\d*)?([eE][+-]\d+)?').setParseAction( convertFloats )
+        
+        anything = Regex(r'.*')
+        
+        lHeader = Literal('AC3Db') + LineEnd()
+        lObject = (Literal('OBJECT') + Word(alphas)).setParseAction(convertLObj)
+        lKids = (Literal('kids') + integer).setResultsName('kids')
+        lName = (Literal('name') + anything + LineEnd()).setParseAction(convertLName)
+        lTexture = (Literal('texture') + anything + LineEnd()).setParseAction(convertLTexture)
+        lTexrep = Literal('texrep') + floatNumber + floatNumber
+        lNumvert = Literal('numvert') + Word(nums)
+        lVertex = (floatNumber + floatNumber + floatNumber).setParseAction(convertLVertex)
+        lMaterial = Literal('MATERIAL') + anything + LineEnd()
+        lNumsurf = Literal('numsurf') + Word(nums)
+        lSurf = Literal('SURF') + Word(alphanums)
+        lMat = Literal('mat') + integer
+        lRefs = Literal('refs') + integer
+        lNodes = Group(integer + floatNumber + floatNumber)
+        
+        pObjectWorld = Group(lObject + lKids)
+        pSurf = (lSurf + Optional(lMat) + lRefs + Group(OneOrMore(lNodes))).setParseAction( convertSurf )
+        pObject = Group(lObject + lName + Optional(lTexture) + Optional(lTexrep) \
+          + lNumvert + Group(OneOrMore(lVertex)) \
+          + Optional(lNumsurf + Group(OneOrMore(pSurf))) + lKids).setParseAction( convertObject ) 
+
+        pFile = lHeader + Group(OneOrMore(lMaterial)) + pObjectWorld \
+          + Group(OneOrMore(pObject))
+        
+        self.p = pFile.parseFile('tower-usaf-40m.ac')
+    
+        # todo: texrep rot loc url data
+        # groups -- how do they work?
+    
+    
 if __name__ == "__main__":
     a = Writer(None)
-    a.new_object('bla', '')
-    a.node(0,0,0)
-    a.node(0,1,0)
-    a.node(1,1,0)
-    a.node(1,0,0)
-    a.face([(0,0,0), (1,0,0), (2,0,0), (3,0,0)])
-    print a
+    a.parse()
+    
+    print "print\n", a
+
+    if 0:
+        a = Writer(None)
+        a.new_object('bla', '')
+        a.node(0,0,0)
+        a.node(0,1,0)
+        a.node(1,1,0)
+        a.node(1,0,0)
+        a.face([(0,0,0), (1,0,0), (2,0,0), (3,0,0)])
+        print a
 
