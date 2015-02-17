@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
 Created on Wed Mar 13 22:22:05 2013
@@ -15,6 +15,8 @@ import cPickle
 import string
 import os
 import sys
+import textureatlas
+
 
 def next_pow2(value):
     return 2**(int(math.log(value) / math.log(2)) + 1)
@@ -35,7 +37,10 @@ def make_texture_atlas(texture_list, atlas_filename, size_x = 256, pad_y = 0, li
     atlas_sy = 0
     next_y = 0
 
-    # -- load and rotate images
+    # -- load and rotate images, store image data in TextureManager object
+    #    append to either can_repeat or non_repeat list
+    can_repeat_list = []
+    non_repeat_list = []
     for l in texture_list:
         if lightmap:
             filename, fileext = os.path.splitext(l.filename)
@@ -48,42 +53,76 @@ def make_texture_atlas(texture_list, atlas_filename, size_x = 256, pad_y = 0, li
         if l.v_can_repeat:
             l.rotated = True
             l.im = l.im.transpose(Image.ROTATE_270)
+        
+        if l.v_can_repeat or l.h_can_repeat: 
+            can_repeat_list.append(l)
+        else:
+            non_repeat_list.append(l)
 
     # FIXME: maybe auto-calc x-size here
 
-    # -- scale
-    for l in texture_list:
+    # -- Compute atlas height.
+    # -- If image can repeat, scale to full atlas width
+    for l in can_repeat_list:
         scale_x = 1. * atlas_sx / l.im.size[0]
         if keep_aspect:
             scale_y = scale_x
         else:
             scale_y = 1.
         org_size = l.im.size
+        
         nx = int(org_size[0] * scale_x)
         ny = int(org_size[1] * scale_y)
         l.im = l.im.resize((nx, ny), Image.ANTIALIAS)
         logging.debug("scale:" + str(org_size) + str(l.im.size))
         atlas_sy += l.im.size[1] + pad_y
 
+    # assert(max(sx) <= altas_sx)
+
     # -- create atlas image
-    atlas_sy = next_pow2(atlas_sy)
-    atlas = Image.new("RGB", (atlas_sx, atlas_sy))
+    #atlas_sy = next_pow2(atlas_sy)
+    #atlas = Image.new("RGB", (atlas_sx, atlas_sy))
+
+    atlas = textureatlas.Atlas(0, 0, atlas_sx, 10000)
 
     # -- paste, compute atlas coords
     #    lower left corner of texture is x0, y0
     for l in texture_list:
-        atlas.paste(l.im, (0, next_y))
-        sx, sy = l.im.size
+        #atlas.paste(l.im, (0, next_y))
+        l.width_px, l.height_px = l.im.size
         l.x0 = 0
-        l.x1 = float(sx) / atlas_sx
+        l.x1 = float(l.width_px) / atlas_sx
         l.y1 = 1 - float(next_y) / atlas_sy
-        l.y0 = 1 - float(next_y + sy) / atlas_sy
-        l.sy = float(sy) / atlas_sy
+        l.y0 = 1 - float(next_y + l.height_px) / atlas_sy
+        l.sy_float = float(l.height_px) / atlas_sy
         l.sx = 1.
 
-        next_y += sy + pad_y
+        next_y += l.height_px + pad_y
+        if atlas.pack(l):
+            #atlas.write('atlas.png', 'RGBA')
+            #raw_input("Press Enter to continue...")
+            pass
+        else:
+            logging.info("Failed to pack", l)
 
-    atlas.save(atlas_filename, optimize=True)
+        
+    # -- pack non_repeatables
+
+    # Sort textures by perimeter size in non-increasing order
+    non_repeat_list = sorted(non_repeat_list, key=lambda i:i.sy, reverse=True)
+
+    for the_texture in non_repeat_list:
+        if atlas.pack(the_texture):
+            atlas.write("atlas.png", "RGBA")
+            raw_input("Press Enter to continue...")
+            pass
+        else:
+            print "no"
+
+    atlas.write("atlas.png", "RGBA")
+
+
+    #atlas.save(atlas_filename, optimize=True)
 
     for l in texture_list:
         logging.debug('%s (%4.2f, %4.2f) (%4.2f, %4.2f)' % (l.filename, l.x0, l.y0, l.x1, l.y1))
@@ -236,6 +275,8 @@ class Texture(object):
         self.filename = filename
         self.x0 = self.x1 = self.y0 = self.y1 = 0
         self.sy = self.sx = 0
+        self.width_px = 0
+        self.height_px = 0
         self.rotated = False
         self.provides = provides
         self.requires = requires
@@ -290,14 +331,14 @@ class Texture(object):
             raise ValueError('%s: Textures can repeat in one direction only. '\
               'Please set either h_can_repeat or v_can_repeat to False.' % self.filename)
 
-    def x(self, x):
+    def atlas_x(self, x):
         """given non-dimensional texture coord, return position in atlas"""
         if self.rotated:
             return self.y0 + x * self.sy
         else:
             return self.x0 + x * self.sx
 
-    def y(self, y):
+    def atlas_y(self, y):
         """given non-dimensional texture coord, return position in atlas"""
         if self.rotated:
             return self.x0 + y * self.sx
@@ -485,6 +526,49 @@ def init():
                                      'compat:roof-flat',
                                      'compat:roof-hipped']))
 
+    # -- testing
+    facades.append(Texture('tex.src/10storymodernconcrete.jpg',
+        h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
+        v_size_meters=169.2, v_cuts=[309, 443, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
+        v_align_bottom=True, height_min=40,
+        requires=['roof:color:brown'],
+        provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+
+    facades.append(Texture('tex.src/11storymodernsq.jpg',
+        h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
+        v_size_meters=169.2, v_cuts=[309, 443, 1383, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
+        v_align_bottom=True, height_min=40,
+        requires=['roof:color:brown'],
+        provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+
+    facades.append(Texture('tex.src/12storyconcrglassblkwhtmodern.jpg',
+        h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
+        v_size_meters=169.2, v_cuts=[309, 443,  1204, 3135], v_can_repeat=False,
+        v_align_bottom=True, height_min=40,
+        requires=['roof:color:brown'],
+        provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+
+    facades.append(Texture('tex.src/12storygovtmodern.jpg',
+        h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
+        v_size_meters=169.2, v_cuts=[309, 443, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
+        v_align_bottom=True, height_min=40,
+        requires=['roof:color:brown'],
+        provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+
+    facades.append(Texture('tex.src/14storyconcrwhite.jpg',
+        h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
+        v_size_meters=169.2, v_cuts=[309, 443, 577, 712, 846, 1204, 1383, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
+        v_align_bottom=True, height_min=40,
+        requires=['roof:color:brown'],
+        provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+
+
+
+
+
+
+
+
     # debug fallback texture for very large facades.
     #facades.append(Texture('tex.src/facade_modern_black_46x60m.jpg',
         #450.9, [167, 345, 521, 700, 873, 944], True,
@@ -550,7 +634,7 @@ def init():
 #        facades.make_texture_atlas(filename + '.png')
         texture_list = facades.get_list() + roofs.get_list()
         make_texture_atlas(texture_list, filename + '.png')
-        make_texture_atlas(texture_list, filename + '_LM.png', lightmap=True)
+        #make_texture_atlas(texture_list, filename + '_LM.png', lightmap=True)
 
         logging.info("Saving %s", pkl_fname)
         fpickle = open(pkl_fname, 'wb')
