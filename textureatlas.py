@@ -7,17 +7,23 @@ import PIL.Image as Image
 
 class Region(object):
     def __init__(self, x, y, width, height):
-        print "  New Region (%i x %i + %i + %i)" % (width, height, x, y)
         self.x = x
         self.y = y        
         self.width_px = width
         self.height_px = height
+        print "  New Region " + str(self)
+
+    def __str__(self):
+        return "(%i x %i + %i + %i)" % (self.width_px, self.height_px, self.x, self.y)
+        
 
 class Atlas(Region):
     def __init__(self, x, y, width, height):
         super(Atlas, self).__init__(x, y, width, height)
         self.regions = [Region(x, y, width, height)]
         self._textures = []
+        self.min_width = 1
+        self.min_height = 1
         
     def write(self, filename, format):
         atlas = Image.new("RGB", (self.width_px, self.height_px))
@@ -33,9 +39,25 @@ class Atlas(Region):
             if self._pack(the_texture, the_region):
                 self._textures.append(the_texture)
                 print "  packed at %i %i" % (the_texture.x, the_texture.y)
+                print "now have %i regions" % len(self.regions)
+                for the_region in self.regions:
+                    print "  - ", the_region
                 return True
         return False
         
+    def check_regions(self):
+        for region1 in self.regions:
+            if region1.width_px < self.min_width or region1.height_px < self.min_height:
+                self.regions.remove(region1)
+            for region2 in self.regions:
+                if region2 == region1: continue
+                # -- check if we can join two regions
+                if region1.x == region2.x and region1.width_px == region2.width_px \
+                   and region1.y + region1.height_px == region2.y:
+                       region1.height_px += region2.height_px
+                       self.regions.remove(region2)
+            
+
     def _pack(self, the_texture, the_region):
         assert(the_texture.height_px > 0)
         assert(the_texture.width_px > 0)
@@ -53,6 +75,7 @@ class Atlas(Region):
                 the_texture.y = the_region.y
                 the_region.x += the_texture.width_px
                 the_region.width_px -= the_texture.width_px
+                self.check_regions()
                 return True
             else:
                 print "H too small (%i < %i), trying next" % (the_region.width_px, the_texture.width_px)
@@ -73,6 +96,7 @@ class Atlas(Region):
             the_region.width_px -= the_texture.width_px
             the_region.height_px = the_texture.height_px
             self.regions.insert(self.regions.index(the_region) + 1, new_region)
+            self.check_regions()
             return True
         
 class Texture(object):
@@ -92,7 +116,7 @@ def mk_atlas(filenames_list):
     import glob
     textures = []
     filenames_list = glob.glob("textureatlas/textureatlas-master/samples/*.jpg")
-    atlas = Atlas(0, 0, 512, 14000)
+    atlas = Atlas(0, 0, 256, 14000)
     for filename in filenames_list:
         
         # Add frames to texture object list
@@ -105,6 +129,7 @@ def mk_atlas(filenames_list):
         if atlas.pack(the_texture):
             atlas.write("atlas.png", "RGBA")
             raw_input("Press Enter to continue...")
+            pass
         else:
             print "no"
 
