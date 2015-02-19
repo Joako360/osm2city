@@ -29,7 +29,7 @@ class Atlas(Region):
         atlas = Image.new("RGB", (self.width_px, self.height_px))
 
         for the_texture in self._textures:
-            atlas.paste(the_texture.im, (the_texture.x, the_texture.y))
+            atlas.paste(the_texture.im, (the_texture._x, the_texture._y))
 
         atlas.save(filename, optimize=True)
 
@@ -38,7 +38,7 @@ class Atlas(Region):
         for the_region in self.regions:
             if self._pack(the_texture, the_region):
                 self._textures.append(the_texture)
-                print "  packed at %i %i" % (the_texture.x, the_texture.y)
+                print "  packed at %i %i" % (the_texture._x, the_texture._y)
                 print "now have %i regions" % len(self.regions)
                 for the_region in self.regions:
                     print "  - ", the_region
@@ -64,15 +64,15 @@ class Atlas(Region):
         if the_texture.height_px == the_region.height_px:
             if the_texture.width_px == the_region.width_px:
                 print "H split exact fit"
-                the_texture.x = the_region.x
-                the_texture.y = the_region.y
+                the_texture._x = the_region.x
+                the_texture._y = the_region.y
                 self.regions.remove(the_region)
                 return True
             elif the_texture.width_px < the_region.width_px:
                 print "H split"
                 # split horiz
-                the_texture.x = the_region.x
-                the_texture.y = the_region.y
+                the_texture._x = the_region.x
+                the_texture._y = the_region.y
                 the_region.x += the_texture.width_px
                 the_region.width_px -= the_texture.width_px
                 self.check_regions()
@@ -89,8 +89,8 @@ class Atlas(Region):
                 return False
             print "V split"
             # vertical split
-            the_texture.x = the_region.x
-            the_texture.y = the_region.y
+            the_texture._x = the_region.x
+            the_texture._y = the_region.y
             new_region = Region(the_region.x, the_region.y + the_texture.height_px, the_region.width_px, the_region.height_px - the_texture.height_px)
             the_region.x += the_texture.width_px
             the_region.width_px -= the_texture.width_px

@@ -591,7 +591,7 @@ if __name__ == "__main__":
     parameters.show()
 
     # -- initialize modules
-    tex.init()
+    tex.manager.init()
 
     # -- prepare transformation to local coordinates
     cmin, cmax = parameters.get_extent_global()
@@ -697,7 +697,7 @@ if __name__ == "__main__":
     #   - location clash with stg static models? drop building
     #   - TODO: analyze surrounding: similar shaped buildings nearby? will get same texture
     #   - set building type, roof type etc
-    buildings = building_lib.analyse(buildings, static_objects, tools.transform, elev, tex.facades, tex.roofs)
+    buildings = building_lib.analyse(buildings, static_objects, tools.transform, elev, tex.manager.facades, tex.manager.roofs)
 
     # -- initialize STG_Manager
     if parameters.PATH_TO_OUTPUT:
