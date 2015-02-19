@@ -1,0 +1,1020 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Mar 13 22:22:05 2013
+
+@author: tom
+"""
+import numpy as np
+import random
+from pdb import pm
+import logging
+from PIL import Image
+import math
+import cPickle
+import string
+import os
+import sys
+import textureatlas
+#import textures_src
+
+def next_pow2(value):
+    return 2**(int(math.log(value) / math.log(2)) + 1)
+
+def make_texture_atlas(texture_list, atlas_filename, size_x = 256, pad_y = 0, lightmap=False):
+    """
+    create texture atlas from all textures. Update all our item coordinates.
+    """
+    logging.debug("Making texture atlas")
+    
+    if len(texture_list) < 1:
+        logging.error('Got an empty texture list. Check installation of tex.src/ folder!')
+        sys.exit(-1)
+
+    atlas_sx = size_x
+    keep_aspect = True # FIXME: False won't work -- im.thumbnail seems to keep aspect no matter what
+
+    atlas_sy = 0
+    next_y = 0
+
+    # -- load and rotate images, store image data in TextureManager object
+    #    append to either can_repeat or non_repeat list
+    can_repeat_list = []
+    non_repeat_list = []
+    for l in texture_list:
+        if lightmap:
+            filename, fileext = os.path.splitext(l.filename)
+            filename += '_LM' + fileext
+        else:
+            filename = l.filename
+        l.im = Image.open(filename)
+        logging.debug("name %s size " % filename + str(l.im.size))
+        assert (l.v_can_repeat + l.h_can_repeat < 2)
+        if l.v_can_repeat:
+            l.rotated = True
+            l.im = l.im.transpose(Image.ROTATE_270)
+        
+        if l.v_can_repeat or l.h_can_repeat: 
+            can_repeat_list.append(l)
+        else:
+            non_repeat_list.append(l)
+
+    # FIXME: maybe auto-calc x-size here
+
+    #can_repeat_list = []
+
+    # -- work on repeatable textures.
+    #    Scale each to full atlas width
+    #    Compute total height of repeatable section
+    for l in can_repeat_list:
+        scale_x = 1. * atlas_sx / l.im.size[0]
+        if keep_aspect:
+            scale_y = scale_x
+        else:
+            scale_y = 1.
+        org_size = l.im.size
+        
+        nx = int(org_size[0] * scale_x)
+        ny = int(org_size[1] * scale_y)
+        l.im = l.im.resize((nx, ny), Image.ANTIALIAS)
+        logging.debug("scale:" + str(org_size) + str(l.im.size))
+        atlas_sy += l.im.size[1] + pad_y
+        l.width_px, l.height_px = l.im.size
+
+    # assert(max(sx) <= altas_sx)
+
+    # -- create atlas image
+    #atlas_sy = next_pow2(atlas_sy)
+    #atlas = Image.new("RGB", (atlas_sx, atlas_sy))
+
+    atlas = textureatlas.Atlas(0, 0, atlas_sx, 2**14)
+    # -- paste, compute atlas coords
+    #    lower left corner of texture is x0, y0
+    deb = 0
+    for l in can_repeat_list:
+        #atlas.paste(l.im, (0, next_y))
+        l.x0 = 0
+        l.x1 = float(l.width_px) / atlas_sx
+        l.y1 = 1 - float(next_y) / atlas_sy
+        l.y0 = 1 - float(next_y + l.height_px) / atlas_sy
+        l.sy_float = float(l.height_px) / atlas_sy
+        l.sx = 1.
+
+        next_y += l.height_px + pad_y
+#        print "pack?", l.width_px, l.height_px
+        if atlas.pack(l):
+            pass
+        else:
+            logging.info("Failed to pack" + str(l))
+        try:        
+            #l.x0 = x_px / atlas_sx
+            #l.y0 = y_px / atlas_sy
+            #atlas.write('atlas.png', 'RGBA')
+            #raw_input("Press Enter to continue...")
+            pass
+        except:
+            logging.info("Failed to pack", l)
+
+#    atlas.write("atlas.png", "RGBA")
+#    return
+        
+    # -- pack non_repeatables
+    # Sort textures by perimeter size in non-increasing order
+    non_repeat_list = sorted(non_repeat_list, key=lambda i:i.sy, reverse=True)
+
+    for the_texture in non_repeat_list:
+        the_texture.width_px, the_texture.height_px = the_texture.im.size
+        #if the_texture.filename == "tex.src/samples/US-dcwhiteconc10st2.jpg":
+            #atlas.write("atlas.png", "RGBA")
+            #raw_input("Press Enter to continue...")
+            #deb = 1
+
+        if atlas.pack(the_texture):
+            print "packed"
+            if deb:
+                atlas.write("atlas.png", "RGBA")
+                raw_input("Press Enter to continue...")
+            pass
+        else:
+            print "no"
+
+    atlas.write(atlas_filename, "RGBA")
+
+    for l in texture_list:
+        logging.debug('%s (%4.2f, %4.2f) (%4.2f, %4.2f)' % (l.filename, l.x0, l.y0, l.x1, l.y1))
+        del l.im
+
+class TextureManager(object):
+    def __init__(self,cls):
+        self.__l = []
+        self.__cls = cls # -- class (roof, facade, ...)
+
+    def append(self, t):
+        # -- prepend each item in t.provides with class name,
+        #    except for class-independent keywords: age,region,compat
+        if not os.path.exists(t.filename):
+            logging.info("Skipping non-existing texture %s" % t.filename)
+            return
+
+        new_provides = []
+        for item in t.provides:
+            if item.split(':')[0] in ('age', 'region', 'compat'):
+                new_provides.append(item)
+            else:
+                new_provides.append(self.__cls + ':' + item)
+        #t.provides = [self.__cls + ':' + i for i in t.provides]
+        t.provides = new_provides
+        self.__l.append(t)
+
+    def keep_only(self, i):
+        """debug: loose all but this texture"""
+        self.__l = [self.__l[i]]
+
+    def find_matching(self, requires = []):
+        candidates = self.find_candidates(requires)
+        logging.debug("looking for texture" + str(requires))
+        for c in candidates:
+            logging.debug("  candidate " + c.filename + " provides " + str(c.provides))
+        if len(candidates) == 0:
+            logging.warn("WARNING: no matching texture for <%s>" % str(requires))
+            return None
+        #print "cands are\n", string.join(["  " + str(c) for c in candidates], '\n')
+        #return candidates[3]
+        return candidates[random.randint(0, len(candidates)-1)]
+
+    def find_candidates(self, requires = []):
+        #return [self.__l[0]]
+        candidates = []
+        for cand in self.__l:
+            if set(requires).issubset(cand.provides):
+                candidates.append(cand)
+        return candidates
+
+    def __str__(self):
+        return string.join([str(t) + '\n' for t in self.__l])
+
+    def __getitem__(self, i):
+        return self.__l[i]
+
+    def get_list(self):
+        return self.__l
+
+
+class FacadeManager(TextureManager):
+    def find_matching(self, requires, tags, height, width):
+        candidates = self.find_candidates(requires, height, width)
+        if len(candidates) == 0:
+            logging.warn("no matching texture for %1.f m x %1.1f m <%s>" % (height, width, str(requires)))
+            return None
+        ranked_list = self.rank_candidates(candidates, tags)
+        return ranked_list[random.randint(0, len(ranked_list) - 1)]
+
+    def rank_candidates(self, candidates, tags):
+        ranked_list = []
+        for t in candidates:
+            match = 0
+            if 'building:material' in tags:
+                val = tags['building:material']
+                new_key = ("facade:building:material:%s") % (val)
+                if new_key in t.provides:
+                    match += 1
+            ranked_list.append([match, t])
+#         b = ranked_list[:,0]
+        ranked_list.sort(key=lambda tup: tup[0], reverse=True)
+        max_val = ranked_list[0][0]
+        if(max_val > 0):
+            logging.info("Max Rank %d" % max_val)
+        return [t[1] for t in ranked_list if t[0] >= max_val]
+
+    def find_candidates(self, requires, height, width):
+        candidates = TextureManager.find_candidates(self, requires)
+#        print "\ncands", [str(t.filename) for t in candidates]
+        # -- check height
+#        print " Candidates:"
+        new_candidates = []
+        for t in candidates:
+#            print "  <<<", t.filename
+#            print "     building_height", building_height
+#            print "     min/max", t.height_min, t.height_max
+            if height < t.height_min or height > t.height_max:
+                continue
+            if width < t.width_min or width > t.width_max:
+                continue
+
+            new_candidates.append(t)
+
+#                candidates.remove(t)
+#        print "remaining cands", [str(t.filename) for t in new_candidates]
+        return new_candidates
+
+def find_matching_texture(cls, textures):
+    candidates = []
+    for t in textures:
+        if t.cls == cls: candidates.append(t)
+    if len(candidates) == 0: return None
+    return candidates[random.randint(0, len(candidates)-1)]
+
+class Texture(object):
+    """
+    possible texture types:
+        - facade
+        - roof
+
+    facade:
+      provides
+        - shape:skyscraper
+        - shape:residential
+        - shape:commercial/business
+        - shape:industrial
+        - age:modern/old
+        - color: white
+        - region: europe-middle
+        - region: europe-north
+        - minlevels: 2
+        - maxlevels: 4
+      requires
+        - roof:shape:flat
+        - roof:color:red|black
+
+    roof:
+      provides
+        - color:black (red, ..)
+        - shape:flat  (pitched, ..)
+
+    """
+    def __init__(self, filename,
+                 h_size_meters, h_cuts, h_can_repeat, \
+                 v_size_meters, v_cuts, v_can_repeat, \
+                 height_min = 0, height_max = 9999, \
+                 v_align_bottom = False, \
+                 provides = [], requires = []):
+        self.filename = filename
+        self.x0 = self.x1 = self.y0 = self.y1 = 0
+        self.sy = self.sx = 0
+        self.width_px = 0
+        self.height_px = 0
+        self.rotated = False
+        self.provides = provides
+        self.requires = requires
+        self.height_min = height_min
+        self.height_max = height_max
+        self.width_min = 0
+        self.width_max = 9999
+        self.v_align_bottom = v_align_bottom
+        h_cuts.sort()
+        v_cuts.sort()
+        # roof type, color
+#        self.v_min = v_min
+#        self.v_max = v_max
+        self.v_size_meters = v_size_meters
+        if v_cuts != None:
+            v_cuts.insert(0,0)
+            self.v_cuts = np.array(v_cuts, dtype=np.float)
+            if len(self.v_cuts) > 1:
+                # FIXME            test for not type list
+                self.v_cuts /= self.v_cuts[-1]
+#                print self.v_cuts
+                # -- Gimp origin is upper left, convert to OpenGL lower left
+                self.v_cuts = (1. - self.v_cuts)[::-1]
+#                print self.v_cuts
+        else:
+            self.v_cuts = 1.
+        self.v_cuts_meters = self.v_cuts * self.v_size_meters
+
+        self.v_can_repeat = v_can_repeat
+
+        if not self.v_can_repeat:
+            self.height_min = self.v_cuts_meters[0]
+            self.height_max = self.v_size_meters
+
+        self.h_size_meters = h_size_meters
+        self.h_cuts = np.array(h_cuts, dtype=np.float)
+        #print "h1", self.h_cuts
+        #print "h2", h_cuts
+
+        if h_cuts == None or h_cuts == []:
+            self.h_cuts = np.array([1.])
+        elif len(self.h_cuts) > 1:
+            self.h_cuts /= self.h_cuts[-1]
+        self.h_cuts_meters = self.h_cuts * self.h_size_meters
+        self.h_can_repeat = h_can_repeat
+
+        if not self.h_can_repeat:
+            self.width_min = self.h_cuts_meters[0]
+            self.width_max = self.h_size_meters
+
+        if self.h_can_repeat + self.v_can_repeat > 1:
+            raise ValueError('%s: Textures can repeat in one direction only. '\
+              'Please set either h_can_repeat or v_can_repeat to False.' % self.filename)
+
+    def atlas_x(self, x):
+        """given non-dimensional texture coord, return position in atlas"""
+        if self.rotated:
+            return self.y0 + x * self.sy
+        else:
+            return self.x0 + x * self.sx
+
+    def atlas_y(self, y):
+        """given non-dimensional texture coord, return position in atlas"""
+        if self.rotated:
+            return self.x0 + y * self.sx
+        else:
+            return self.y0 + y * self.sy
+
+    def __str__(self):
+        return "<%s> x0,1 %4.2f %4.2f  y0,1 %4.2f %4.2f  sh,v %4.2fm %4.2fm" % \
+                (self.filename, self.x0, self.x1, self.y0, self.y1, \
+                 self.h_size_meters, self.v_size_meters)
+        # self.type = type
+        # commercial-
+        # - warehouse
+        # - skyscraper
+        # industrial
+        # residential
+        # - old
+        # - modern
+        # european, north_american, south_american, mediterreanian, african, asian
+    def closest_h_match(self, frac):
+        return self.h_cuts[np.abs(self.h_cuts - frac).argmin()]
+        #self.h_cuts[np.abs(self.h_cuts - frac).argmin()]
+        #bla
+
+# pitched roof: requires = facade:age:old
+
+def init():
+    print "textures: init"
+    global facades
+    global roofs
+    facades = FacadeManager('facade')
+    roofs = TextureManager('roof')
+    
+    def append_facades():
+        """---------------- ADD YOUR FACADE TEXTURES HERE -------------------"""
+
+        facades.append(Texture('tex.src/facade_industrial_red_white_24x18m.jpg',
+            23.8, [364, 742, 1086], True,
+            18.5, [295, 565, 842], False,
+            v_align_bottom = True,
+            requires=[],
+            provides=['shape:industrial','age:old', 'compat:roof-flat','compat:roof-pitched']))
+        #return 
+        
+        facades.append(Texture('tex.src/DSCF9495_pow2.png',
+            14, [585, 873, 1179, 1480, 2048], True,
+            19.4, [274, 676, 1114, 1542, 2048], False,
+            height_max = 13.,
+            v_align_bottom = True,
+            requires=['roof:color:black'],
+            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
+    
+        facades.append(Texture('tex.src/LZ_old_bright_bc2.png',
+            17.9, [345,807,1023,1236,1452,1686,2048], True,
+            14.8, [558,1005,1446,2048], False,
+            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
+    
+        facades.append(Texture('tex.src/facade_modern_21x42m.jpg',
+            43., [40, 79, 115, 156, 196, 235, 273, 312, 351, 389, 428, 468, 507, 545, 584, 624, 662], True,
+            88., [667, 597, 530, 460, 391, 322, 254, 185, 117, 48, 736, 804, 873, 943, 1012, 1080, 1151, 1218, 1288, 1350], False,
+            v_align_bottom = True, height_min=20.,
+            requires=[],
+            provides=['age:modern', 'compat:roof-flat', 'shape:terminal']))
+    
+        facades.append(Texture('tex.src/facade_modern_black_46x60m.jpg',
+            45.9, [167, 345, 521, 700, 873, 944], True,
+            60.5, [144, 229, 311, 393, 480, 562, 645, 732, 818, 901, 983, 1067, 1154, 1245], False,
+            v_align_bottom = True, height_min=20.,
+            requires=[],
+            provides=['shape:urban','age:modern', 'compat:roof-flat']))
+    
+        facades.append(Texture('tex.src/facade_industrial_white_26x14m.jpg',
+            25.7, [165, 368, 575, 781, 987, 1191, 1332], True,
+            13.5, [383, 444, 501, 562, 621, 702], False,
+            v_align_bottom = True,
+            requires=[],
+            provides=['shape:industrial','age:modern', 'compat:roof-flat']))
+    
+        facades.append(Texture('tex.src/facade_modern_commercial_35x20m.jpg',
+            34.6, [105, 210, 312, 417, 519, 622, 726, 829, 933, 1039, 1144, 1245, 1350], True,
+            20.4, [177, 331, 489, 651, 796], False,
+            v_align_bottom = True,
+            requires=[],
+            provides=['shape:commercial','age:modern', 'compat:roof-flat']))
+    
+        facades.append(Texture('tex.src/facade_modern36x36_12.png',
+            36., [], True,
+            36., [158, 234, 312, 388, 465, 542, 619, 697, 773, 870, 1024], False,
+            height_min=20,
+            provides=['shape:urban','shape:residential','age:modern',
+                      'compat:roof-flat']))
+    
+        facades.append(Texture('tex.src/facade_modern_residential_26x34m.jpg',
+            26.3, [429, 1723, 2142], True,
+            33.9, [429, 666, 919, 1167, 1415, 1660, 1905, 2145, 2761], False,
+            v_align_bottom = True, height_min=20,
+            provides=['shape:urban','shape:residential','age:modern',
+                      'compat:roof-flat']))
+    
+    #    facades.append(Texture('tex.src/DSCF9503_pow2',
+    #                            12.85, None, True,
+    #                            17.66, (1168, 1560, 2048), False, True,
+    #                            requires=['roof:color:black'],
+    #                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
+    
+        facades.append(Texture('tex.src/DSCF9503_noroofsec_pow2.png',
+            12.85, [360, 708, 1044, 1392, 2048], True,
+            17.66, [556,1015,1474,2048], False,
+            requires=['roof:color:black'],
+            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
+    
+    #    facades.append(Texture('tex.src/DSCF9710_pow2',
+    #                           29.9, (284,556,874,1180,1512,1780,2048), True,
+    #                           19.8, (173,329,490,645,791,1024), False, True,
+    #                           provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
+    
+        facades.append(Texture('tex.src/DSCF9710.png',
+           29.9, [142,278,437,590,756,890,1024], True,
+           19.8, [130,216,297,387,512], False,
+           provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
+    
+    
+        facades.append(Texture('tex.src/DSCF9678_pow2.png',
+           10.4, [97,152,210,299,355,411,512], True,
+           15.5, [132,211,310,512], False,
+           provides=['shape:residential','shape:commercial','age:modern','compat:roof-flat']))
+    
+        facades.append(Texture('tex.src/facade_modern_residential_25x15m.jpg',
+            25.0, [436, 1194, 2121, 2809, 3536], True,
+            14.8, [718, 2096], False,
+            v_align_bottom = True,
+            requires=['roof:color:black'],
+            provides=['shape:residential','age:modern','compat:roof-flat']))
+    
+        facades.append(Texture('tex.src/facade_modern_commercial_red_gray_20x14m.jpg',
+            20.0, [588, 1169, 1750, 2327, 2911, 3485], True,
+            14.1, [755, 1289, 1823, 2453], False,
+            v_align_bottom = True,
+            requires=['roof:color:black'],
+            provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+        facades.append(Texture('tex.src/facade_modern_commercial_green_red_27x39m.jpg',
+            27.3, [486, 944, 1398, 1765, 2344], True,
+            38.9, [338, 582, 839, 1087, 1340, 1593, 1856, 2094, 3340], False,
+            v_align_bottom = True,
+            requires=['roof:color:black'],
+            provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+        facades.append(Texture('tex.src/facade_modern_commercial_46x169m.jpg',
+            h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=True,
+            v_size_meters=169.2, v_cuts=[309, 443, 577, 712, 846, 1204, 1383, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
+            v_align_bottom=True, height_min=40,
+            requires=['roof:color:brown'],
+            provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+        # FIXME:
+        facades.append(Texture('tex.src/facade_modern_commercial_90x340m.jpg',
+            h_size_meters=90.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=True,
+            v_size_meters=340.2, v_cuts=[309, 443, 577, 712, 846, 1204, 1383, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
+            v_align_bottom=True, height_min=40,
+            requires=['roof:color:brown'],
+            provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+        facades.append(Texture('tex.src/DSCF9726_noroofsec_pow2.png',
+           15.1, [321,703,1024], True,
+           9.6, [227,512], False,
+           provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
+    
+        facades.append(Texture('tex.src/wohnheime_petersburger.png',
+           15.6, [215, 414, 614, 814, 1024], False,
+           15.6, [112, 295, 477, 660, 843, 1024], True,
+           height_min = 15.,
+           provides=['shape:urban', 'shape:residential', 'age:modern',
+                     'compat:roof-flat']))
+    #                            provides=['shape:urban','shape:residential','age:modern','age:old',
+    #                                     'compat:roof-flat','compat:roof-pitched']))
+    
+        facades.append(Texture('tex.src/castle.jpg',
+                               h_size_meters=4, h_cuts=[512, 1024, 1536, 2048], h_can_repeat=True,
+                               v_size_meters=4, v_cuts=[512, 1024, 1536, 2048], v_can_repeat=False,
+                               height_min=1.,
+                               provides=['building:material:stone',
+                                         'age:old',
+                                         'compat:roof-gabled',
+                                         'compat:roof-pitched',
+                                         'compat:roof-flat',
+                                         'compat:roof-hipped']))
+    
+    
+        # debug fallback texture for very large facades.
+        #facades.append(Texture('tex.src/facade_modern_black_46x60m.jpg',
+            #450.9, [167, 345, 521, 700, 873, 944], True,
+            #600.5, [144, 229, 311, 393, 480, 562, 645, 732, 818, 901, 983, 1067, 1154, 1245], False,
+            #v_align_bottom = True,
+            #requires=[],
+            #provides=['shape:urban','age:modern', 'compat:roof-flat']))
+
+    def append_facades_test():
+        """---------------- ADD YOUR FACADE TEXTURES HERE -------------------"""
+
+        # -- testing
+        facades.append(Texture('tex.src/10storymodernconcrete.jpg',
+            h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
+            v_size_meters=169.2, v_cuts=[309, 443, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
+            v_align_bottom=True, height_min=40,
+            requires=['roof:color:brown'],
+            provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+        facades.append(Texture('tex.src/11storymodernsq.jpg',
+            h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
+            v_size_meters=169.2, v_cuts=[309, 443, 1383, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
+            v_align_bottom=True, height_min=40,
+            requires=['roof:color:brown'],
+            provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+        
+        facades.append(Texture('tex.src/12storyconcrglassblkwhtmodern.jpg',
+            h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
+            v_size_meters=169.2, v_cuts=[309, 443,  1204, 3135], v_can_repeat=False,
+            v_align_bottom=True, height_min=40,
+            requires=['roof:color:brown'],
+            provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+        facades.append(Texture('tex.src/12storygovtmodern.jpg',
+            h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
+            v_size_meters=169.2, v_cuts=[309, 443, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
+            v_align_bottom=True, height_min=40,
+            requires=['roof:color:brown'],
+            provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+        facades.append(Texture('tex.src/14storyconcrwhite.jpg',
+            h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
+            v_size_meters=169.2, v_cuts=[309, 443, 577, 712, 846, 1204, 1383, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
+            v_align_bottom=True, height_min=40,
+            requires=['roof:color:brown'],
+            provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+
+    def import_us():
+    
+      facades.append(Texture('tex.src/textures_us/commercial/50storySteelGlassmodern1.jpg',
+          h_size_meters=27, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=108, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/45storyglassmodern.jpg',
+          h_size_meters=40, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=80, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/US-OfficeModern-42st.jpg',
+          h_size_meters=39, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=156, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/41storyconcrglasswhitemodern2.jpg',
+          h_size_meters=20, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=80, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/40storymodern.jpg',
+          h_size_meters=40, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=160, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/36storyconcrglassmodern.jpg',
+          h_size_meters=32, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=128, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/35storyconcrmodernwhite.jpg',
+          h_size_meters=25, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=100, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/30storyconcrbrown4.jpg',
+          h_size_meters=29, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=58, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/28storymodern.jpg',
+          h_size_meters=29, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=58, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/27storyConcrBrownGlass.jpg',
+          h_size_meters=17, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=68, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/25storyBrownWide1.jpg',
+          h_size_meters=60, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=60, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/20storybrownconcrmodern.jpg',
+          h_size_meters=29, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=58, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/20storygreycncrglassmodern.jpg',
+          h_size_meters=27, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=54, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/19storyretromodern.jpg',
+          h_size_meters=30, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=120, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/18storyoffice.jpg',
+          h_size_meters=28, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=56, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/16storyconcrglassgreymodern4.jpg',
+          h_size_meters=14, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=28, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/15storybrownconcr.jpg',
+          h_size_meters=38, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=76, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/15storyltbrownconcroffice3.jpg',
+          h_size_meters=29, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=58, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/12storygovtmodern.jpg',
+          h_size_meters=21, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=21, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/10storymodernconcrete.jpg',
+          h_size_meters=27, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=54, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/US-dcofficeconcrwhite8st.jpg',
+          h_size_meters=24, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=24, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/US-dchotelDC2_8st.jpg',
+          h_size_meters=15, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=30, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/US-dcofficeconcrwhite6-7st.jpg',
+          h_size_meters=34, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=17, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/7storymodernsq.jpg',
+          h_size_meters=19, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=19, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/US-dcdupontconcr5st.jpg',
+          h_size_meters=7, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=14, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/5storywhite.jpg',
+          h_size_meters=12, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=12, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/US-dcgovtconcrtan4st.jpg',
+          h_size_meters=18, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=9, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/3storystorefronttown.jpg',
+          h_size_meters=9, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=9, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/salmon_3_story_0_scale.jpg',
+          h_size_meters=8, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=8, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/2stFancyconcrete1.jpg',
+          h_size_meters=14, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=7, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/US-dcwhiteconcr2st.jpg',
+          h_size_meters=16, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=8, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/US-dctbrickcomm2st.jpg',
+          h_size_meters=21, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=5.25, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/USUAE-4stCommercial.jpg',
+          h_size_meters=20, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=10, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/US-OfficeComm-2st.jpg',
+          h_size_meters=15, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=3.75, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/US-1stCommWarehousewhite1.jpg',
+          h_size_meters=15, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=3.75, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/US-1stCommBrick2.jpg',
+          h_size_meters=15, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=3.75, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/commercial/US-1stCommStFront3.jpg',
+          h_size_meters=10, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=5, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/residential/tiles/USUAE-8stTile_rep.jpg',
+          h_size_meters=15, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=30, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/residential/6storybrickbrown1.jpg',
+          h_size_meters=21, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=21, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/residential/5storyCondo_concrglasswhite.jpg',
+          h_size_meters=14, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=28, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/residential/US-CityCondo_brick_4st.jpg',
+          h_size_meters=16, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=16, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+    
+    
+      facades.append(Texture('tex.src/textures_us/residential/US-CityCondo2st.jpg',
+          h_size_meters=11, h_cuts=[0, 500, 1000], h_can_repeat=False,
+          v_size_meters=11, v_cuts=[0, 500, 1000], v_can_repeat=False,
+          v_align_bottom=True, height_min=10,
+          requires=['roof:color:brown'],
+          provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+
+
+    def append_roofs():
+        """------------ ADD YOUR ROOF TEXTURES HERE -------------------"""
+    
+    #    roofs.append(Texture('tex.src/roof_tiled_black',
+    #                         1., [], True, 1., [], False, provides=['color:black']))
+    #    roofs.append(Texture('tex.src/roof_tiled_red',
+    #                         1., [], True, 1., [], False, provides=['color:red']))
+        roofs.append(Texture('tex.src/roof_red_1.png',
+            31.8, [], True, 16.1, [], False, provides=['color:red', 'compat:roof-pitched']))
+        roofs.append(Texture('tex.src/roof_black_1.png',
+            31.8, [], True, 16.1, [], False, provides=['color:black', 'compat:roof-pitched']))
+        roofs.append(Texture('tex.src/roof_black4.jpg',
+            6., [], True, 3.5, [], False, provides=['color:black', 'compat:roof-pitched']))
+        roofs.append(Texture('tex.src/roof_gen_black_1.png',
+            100., [], True, 100., [], False, provides=['color:red', 'compat:roof-flat']))
+        roofs.append(Texture('tex.src/roof_gen_black_1.png',
+            100., [], True, 100., [], False, provides=['color:black', 'compat:roof-flat']))
+        roofs.append(Texture('tex.src/roof_gen_brown_1.png',
+            100., [], True, 100., [], False, provides=['color:brown', 'compat:roof-flat']))
+    
+    #    roofs.append(Texture('tex.src/roof_black2',
+    #                             1.39, [], True, 0.89, [], True, provides=['color:black']))
+    #    roofs.append(Texture('tex.src/roof_black3',
+    #                             0.6, [], True, 0.41, [], True, provides=['color:black']))
+    
+    #    roofs.append(Texture('tex.src/roof_black3_small_256x128',
+    #                             0.25, [], True, 0.12, [], True, provides=['color:black']))
+    
+
+    append_facades()
+    #append_facades_test()
+    append_roofs()
+    #facades = textures_src.import_us(facades)
+    #import_us()
+    #facades.keep_only(1)
+
+    if False:
+        print roofs[0].provides
+        print "black roofs: ", [str(i) for i in roofs.find_candidates(['roof:color:black'])]
+        print "red   roofs: ", [str(i) for i in roofs.find_candidates(['roof:color:red'])]
+        print "old facades: "
+        for i in facades.find_candidates(['facade:shape:residential','age:old'], 10):
+            print i, i.v_cuts * i.v_size_meters
+    #print facades[0].provides
+
+    if False:
+        facades = FacadeManager('facade')
+        roofs = TextureManager('roof')
+        facades.append(Texture('tex.src/test.png',
+                               10, [142,278,437,590,756,890,1024], True,
+                               10, [130,216,297,387,512], True, True,
+                               provides=['shape:urban','shape:residential','age:modern','age:old','compat:roof-flat','compat:roof-pitched']))
+        roofs.append(Texture('tex.src/test.png',
+                             10., [], True, 10., [], True, provides=['color:black', 'color:red']))
+
+    # -- make texture atlas (or unpickle)
+    filename = 'tex/atlas_facades'
+    pkl_fname = filename + '.pkl'
+    if 1:
+#        facades.make_texture_atlas(filename + '.png')
+        texture_list = facades.get_list() + roofs.get_list()
+        make_texture_atlas(texture_list, filename + '.png')
+        #make_texture_atlas(texture_list, filename + '_LM.png', lightmap=True)
+
+        logging.info("Saving %s", pkl_fname)
+        fpickle = open(pkl_fname, 'wb')
+        cPickle.dump(facades, fpickle, -1)
+        fpickle.close()
+    else:
+        logging.info("Loading %s", pkl_fname)
+        fpickle = open(pkl_fname, 'rb')
+        facades = cPickle.load(fpickle)
+        fpickle.close()
+
+    logging.info(facades)
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
+    init()
+
+    if 0:
+        cands = facades.find_candidates([], 14)
+        #print "cands are", cands
+        for t in cands:
+            #print "%5.2g  %s" % (t.height_min, t.filename)
+            logging.debug('%s (%4.2f, %4.2f) (%4.2f, %4.2f)' % (t.filename, t.x0, t.y0, t.x1, t.y1))
+
