@@ -562,8 +562,6 @@ def write_xml(path, fname, buildings):
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    #logging.basicConfig(level=logging.DEBUG)
 
     # -- Parse arguments. Command line overrides config file.
     parser = argparse.ArgumentParser(description="osm2city reads OSM data and creates buildings for use with FlightGear")
@@ -572,7 +570,13 @@ if __name__ == "__main__":
     parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
     parser.add_argument("-c", dest="c", action="store_true", help="do not check for overlapping with static objects")
     parser.add_argument("-u", dest="uninstall", action="store_true", help="uninstall ours from .stg")
+    parser.add_argument("-d", dest="debug", default=False, action="store_true", help="set loglevel=DEBUG")
     args = parser.parse_args()
+
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
 
     if args.filename is not None:
         parameters.read_from_file(args.filename)

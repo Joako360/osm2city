@@ -4,6 +4,7 @@
 """generate texture atlas"""
 
 import PIL.Image as Image
+import logging
 
 class Region(object):
     def __init__(self, x, y, width, height):
@@ -11,7 +12,7 @@ class Region(object):
         self.y = y        
         self.width_px = width
         self.height_px = height
-        print "  New Region " + str(self)
+        logging.debug("  New Region " + str(self))
 
     def __str__(self):
         return "(%i x %i + %i + %i)" % (self.width_px, self.height_px, self.x, self.y)
@@ -25,6 +26,14 @@ class Atlas(Region):
         self.min_width = 1
         self.min_height = 1
         
+    def cur_height(self):
+        """return the current height"""
+        return self.regions[-1].y
+
+    def set_height(self, height):
+        self.height_px = height
+        self._compute_nondim_tex_coords()
+        
     def write(self, filename, format):
         atlas = Image.new("RGB", (self.width_px, self.height_px))
 
@@ -34,16 +43,30 @@ class Atlas(Region):
         atlas.save(filename, optimize=True)
 
     def pack(self, the_texture):
-        print "packing %s (%i %i)" % (the_texture.filename, the_texture.width_px, the_texture.height_px)
+        logging.debug("packing %s (%i %i)" % 
+          (the_texture.filename, the_texture.width_px, the_texture.height_px))
         for the_region in self.regions:
             if self._pack(the_texture, the_region):
                 self._textures.append(the_texture)
-                print "  packed at %i %i" % (the_texture._x, the_texture._y)
-                print "now have %i regions" % len(self.regions)
+                logging.debug("  packed at %i %i" % (the_texture._x, the_texture._y))
+                logging.debug("now have %i regions" % len(self.regions))
                 for the_region in self.regions:
-                    print "  - ", the_region
+                    logging.debug("  - " + str(the_region))
                 return True
         return False
+        
+
+    def _compute_nondim_tex_coords(self):      
+        """compute non-dim texture coords"""
+        for t in self._textures:
+            #atlas.paste(l.im, (0, next_y))
+            t.x0 = float(t._x) / self.width_px
+            t.x1 = float(t._x + t.width_px) / self.width_px
+            t.y1 = 1 - float(t._y) / self.height_px
+            t.y0 = 1 - float(t._y + t.height_px) / self.height_px
+            t.sx = float(t.width_px) / self.width_px
+            t.sy = float(t.height_px) / self.height_px
+
         
     def check_regions(self):
         for region1 in self.regions:
@@ -63,13 +86,13 @@ class Atlas(Region):
         assert(the_texture.width_px > 0)
         if the_texture.height_px == the_region.height_px:
             if the_texture.width_px == the_region.width_px:
-                print "H split exact fit"
+                logging.debug("H split exact fit")
                 the_texture._x = the_region.x
                 the_texture._y = the_region.y
                 self.regions.remove(the_region)
                 return True
             elif the_texture.width_px < the_region.width_px:
-                print "H split"
+                logging.debug("H split")
                 # split horiz
                 the_texture._x = the_region.x
                 the_texture._y = the_region.y
@@ -78,16 +101,16 @@ class Atlas(Region):
                 self.check_regions()
                 return True
             else:
-                print "H too small (%i < %i), trying next" % (the_region.width_px, the_texture.width_px)
+                logging.debug("H too small (%i < %i), trying next" % (the_region.width_px, the_texture.width_px))
                 return False
         elif the_texture.height_px > the_region.height_px:
-            print "V too small, trying next"
+            logging.debug("V too small, trying next")
             return False
         else:
             # check if it fits width
             if the_texture.width_px > the_region.width_px:
                 return False
-            print "V split"
+            logging.debug("V split")
             # vertical split
             the_texture._x = the_region.x
             the_texture._y = the_region.y
@@ -131,7 +154,7 @@ def mk_atlas(filenames_list):
             raw_input("Press Enter to continue...")
             pass
         else:
-            print "no"
+            logging.debug("no")
 
     atlas.write("atlast.png", "RGBA")
 

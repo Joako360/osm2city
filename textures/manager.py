@@ -64,6 +64,29 @@ def make_texture_atlas(texture_list, atlas_filename, size_x = 256, pad_y = 0, li
 
     # FIXME: maybe auto-calc x-size here
 
+    # -- pack non_repeatables
+    # Sort textures by perimeter size in non-increasing order
+    the_atlas = atlas.Atlas(0, 0, atlas_sx, 1e10)
+    if 1:
+        non_repeat_list = sorted(non_repeat_list, key=lambda i:i.sy, reverse=True)
+        deb = 0
+        for the_texture in non_repeat_list:
+            the_texture.width_px, the_texture.height_px = the_texture.im.size
+            #if the_texture.filename == "tex.src/samples/US-dcwhiteconc10st2.jpg":
+                #the_atlas.write("atlas.png", "RGBA")
+                #raw_input("Press Enter to continue...")
+                #deb = 1
+    
+            if the_atlas.pack(the_texture):
+                if deb:
+                    the_atlas.write("atlas.png", "RGBA")
+                    raw_input("Press Enter to continue...")
+                pass
+            else:
+                print "no"
+
+    atlas_sy = the_atlas.cur_height()
+
     #can_repeat_list = []
 
     # -- work on repeatable textures.
@@ -87,20 +110,17 @@ def make_texture_atlas(texture_list, atlas_filename, size_x = 256, pad_y = 0, li
     # assert(max(sx) <= altas_sx)
 
     # -- create atlas image
-    #atlas_sy = next_pow2(atlas_sy)
     #atlas = Image.new("RGB", (atlas_sx, atlas_sy))
 
-    the_atlas = atlas.Atlas(0, 0, atlas_sx, 2**14)
     # -- paste, compute atlas coords
     #    lower left corner of texture is x0, y0
-    deb = 0
     for l in can_repeat_list:
         #atlas.paste(l.im, (0, next_y))
         l.x0 = 0
         l.x1 = float(l.width_px) / atlas_sx
         l.y1 = 1 - float(next_y) / atlas_sy
         l.y0 = 1 - float(next_y + l.height_px) / atlas_sy
-        l.sy_float = float(l.height_px) / atlas_sy
+        l.sy = float(l.height_px) / atlas_sy
         l.sx = 1.
 
         next_y += l.height_px + pad_y
@@ -121,25 +141,9 @@ def make_texture_atlas(texture_list, atlas_filename, size_x = 256, pad_y = 0, li
 #    the_atlas.write("atlas.png", "RGBA")
 #    return
         
-    # -- pack non_repeatables
-    # Sort textures by perimeter size in non-increasing order
-    non_repeat_list = sorted(non_repeat_list, key=lambda i:i.sy, reverse=True)
-
-    for the_texture in non_repeat_list:
-        the_texture.width_px, the_texture.height_px = the_texture.im.size
-        #if the_texture.filename == "tex.src/samples/US-dcwhiteconc10st2.jpg":
-            #the_atlas.write("atlas.png", "RGBA")
-            #raw_input("Press Enter to continue...")
-            #deb = 1
-
-        if the_atlas.pack(the_texture):
-            print "packed"
-            if deb:
-                the_atlas.write("atlas.png", "RGBA")
-                raw_input("Press Enter to continue...")
-            pass
-        else:
-            print "no"
+    atlas_sy = next_pow2(atlas_sy)
+    the_atlas.set_height(atlas_sy)
+    logging.info("Final atlas height %i" % atlas_sy)
 
     the_atlas.write(atlas_filename, "RGBA")
 
@@ -270,7 +274,6 @@ def init(tex_prefix=''):
     catalog.append_facades(tex_prefix, facades)
     #append_facades_test()
     catalog.append_roofs(tex_prefix, roofs)
-    #facades = textures_src.import_us(facades)
     catalog.import_us(tex_prefix, facades)
     #facades.keep_only(1)
 

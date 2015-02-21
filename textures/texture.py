@@ -103,8 +103,10 @@ class Texture(object):
     def y(self, y):
         """given non-dimensional texture coord, return position in atlas"""
         if self.rotated:
+#            print "Yr self.x0 + y * self.sx  %g + (%s) * %g:", (self.x0, str(y), self.sx)
             return self.x0 + y * self.sx
         else:
+#            print "YY self.y0 + y * self.sy : %g + (%s) * %g" % (self.y0, str(y), self.sy)
             return self.y0 + y * self.sy
 
     def __str__(self):
