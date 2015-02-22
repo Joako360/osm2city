@@ -160,7 +160,6 @@ class TextureManager(object):
         # -- prepend each item in t.provides with class name,
         #    except for class-independent keywords: age,region,compat
         if not os.path.exists(t.filename):
-            logging.info("Skipping non-existing texture %s" % t.filename)
             return
 
         new_provides = []
@@ -271,10 +270,10 @@ def init(tex_prefix=''):
     facades = FacadeManager('facade')
     roofs = TextureManager('roof')
 
-    catalog.append_facades(tex_prefix, facades)
+    catalog.append_facades_de(tex_prefix, facades)
     #append_facades_test()
     catalog.append_roofs(tex_prefix, roofs)
-    catalog.import_us(tex_prefix, facades)
+    catalog.append_facades_us(tex_prefix, facades)
     #facades.keep_only(1)
 
     if False:

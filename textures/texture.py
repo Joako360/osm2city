@@ -1,4 +1,6 @@
 import numpy as np
+from PIL import Image
+import logging
 
 class Texture(object):
     """
@@ -29,16 +31,14 @@ class Texture(object):
 
     """
     def __init__(self, filename,
-                 h_size_meters, h_cuts, h_can_repeat, \
-                 v_size_meters, v_cuts, v_can_repeat, \
+                 h_size_meters=None, h_cuts=[], h_can_repeat=False, \
+                 v_size_meters=None, v_cuts=[], v_can_repeat=False, \
                  height_min = 0, height_max = 9999, \
                  v_align_bottom = False, \
-                 provides = [], requires = []):
+                 provides = [], requires = [], levels=None):
         self.filename = filename
         self.x0 = self.x1 = self.y0 = self.y1 = 0
         self.sy = self.sx = 0
-        self.width_px = 0
-        self.height_px = 0
         self.rotated = False
         self.provides = provides
         self.requires = requires
@@ -52,7 +52,42 @@ class Texture(object):
         # roof type, color
 #        self.v_min = v_min
 #        self.v_max = v_max
-        self.v_size_meters = v_size_meters
+
+        try:
+            self.im = Image.open(self.filename)
+        except:
+             logging.warning("Skipping non-existing texture %s" % self.filename)
+             return
+        self.width_px, self.height_px = self.im.size
+        image_aspect = self.height_px / self.width_px
+
+        if v_size_meters:
+            if levels:
+                logging.warning("Ignoring levels=%g because v_size_meters=%g is given for texture %s."
+                    % (levels, v_size_meters, filename))
+            self.v_size_meters = v_size_meters
+        else:
+            if not levels:
+                logging.warning("Ignoring texture %s because neither v_size_meters nor levels is given"
+                    % filename)
+                # Set filename to "" to make TextureManger reject us. Bad style, but raising
+                # an exception instead would prohobit the nice, simple structure of catalog.py
+                self.filename = "" 
+                return
+            else:
+                self.v_size_meters = levels * 3.3                 
+            
+        if h_size_meters: 
+            self.h_size_meters = h_size_meters
+        else:
+            self.h_size_meters = self.v_size_meters / image_aspect
+            print "No hsize, using image aspect %i x %i = %g. h_size = %g v_size = %g" % \
+              (self.width_px, self.height_px, image_aspect, self.h_size_meters, self.v_size_meters)
+            
+        # aspect = v / h
+        if v_cuts == []:
+            v_cuts = [1,2,3,4,5,6,7,8,9,10]
+            
         if v_cuts != None:
             v_cuts.insert(0,0)
             self.v_cuts = np.array(v_cuts, dtype=np.float)
@@ -73,12 +108,14 @@ class Texture(object):
             self.height_min = self.v_cuts_meters[0]
             self.height_max = self.v_size_meters
 
-        self.h_size_meters = h_size_meters
+        if h_cuts == []:
+            h_cuts = [1,2,3,4,5,6,7,8,9,10]
+
         self.h_cuts = np.array(h_cuts, dtype=np.float)
         #print "h1", self.h_cuts
         #print "h2", h_cuts
 
-        if h_cuts == None or h_cuts == []:
+        if h_cuts == None:
             self.h_cuts = np.array([1.])
         elif len(self.h_cuts) > 1:
             self.h_cuts /= self.h_cuts[-1]
