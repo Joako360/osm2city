@@ -1,7 +1,7 @@
 #!/bin/bash
 rm *.stg
 rm ????city*.ac ????city*.xml
-rm *.pyc pySkeleton/*.pyc
+rm *.pyc pySkeleton/*.pyc textures/*.pyc batch_processing/*.pyc
 rm roof-error*
 rm roads_*.ac roads_*.eps
 
