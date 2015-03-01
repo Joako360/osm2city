@@ -59,7 +59,7 @@ class Texture(object):
              logging.warning("Skipping non-existing texture %s" % self.filename)
              return
         self.width_px, self.height_px = self.im.size
-        image_aspect = self.height_px / self.width_px
+        image_aspect = self.height_px / float(self.width_px)
 
         if v_size_meters:
             if levels:
