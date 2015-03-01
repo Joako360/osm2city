@@ -281,7 +281,7 @@ def find_matching_texture(cls, textures):
 
 # pitched roof: requires = facade:age:old
 
-def init(tex_prefix=''):
+def init(tex_prefix='', create_atlas=False):
     print "textures: init"
     global facades
     global roofs
@@ -314,22 +314,23 @@ def init(tex_prefix=''):
                              10., [], True, 10., [], True, provides=['color:black', 'color:red']))
 
     # -- make texture atlas (or unpickle)
-    filename = tex_prefix + 'tex/atlas_facades'
-    pkl_fname = filename + '.pkl'
-    if 1:
-#        facades.make_texture_atlas(filename + '.png')
-        texture_list = facades.get_list() + roofs.get_list()
-        make_texture_atlas(texture_list, filename, '.png', lightmap=True)
-
-        logging.info("Saving %s", pkl_fname)
-        #fpickle = open(pkl_fname, 'wb')
-        #cPickle.dump(facades, fpickle, -1)
-        #fpickle.close()
-    else:
-        logging.info("Loading %s", pkl_fname)
-        fpickle = open(pkl_fname, 'rb')
-        facades = cPickle.load(fpickle)
-        fpickle.close()
+    if create_atlas:
+        filename = tex_prefix + 'tex/atlas_facades'
+        pkl_fname = filename + '.pkl'
+        if 1:
+    #        facades.make_texture_atlas(filename + '.png')
+            texture_list = facades.get_list() + roofs.get_list()
+            make_texture_atlas(texture_list, filename, '.png', lightmap=True)
+    
+            logging.info("Saving %s", pkl_fname)
+            #fpickle = open(pkl_fname, 'wb')
+            #cPickle.dump(facades, fpickle, -1)
+            #fpickle.close()
+        else:
+            logging.info("Loading %s", pkl_fname)
+            fpickle = open(pkl_fname, 'rb')
+            facades = cPickle.load(fpickle)
+            fpickle.close()
 
     logging.info(facades)
 
