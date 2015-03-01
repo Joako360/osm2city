@@ -7,6 +7,7 @@ import PIL.Image as Image
 import logging
 
 class Region(object):
+    """Also used as a container for a single image"""
     def __init__(self, x, y, width, height):
         self.x = x
         self.y = y        
@@ -15,16 +16,18 @@ class Region(object):
         logging.debug("  New Region " + str(self))
 
     def __str__(self):
-        return "(%i x %i + %i + %i)" % (self.width_px, self.height_px, self.x, self.y)
+        return "(%i x %i + %i + %i)" % (self.width_px, self.height_px, 
+                self.x, self.y)
         
 
 class Atlas(Region):
-    def __init__(self, x, y, width, height):
+    def __init__(self, x, y, width, height, name):
         super(Atlas, self).__init__(x, y, width, height)
         self.regions = [Region(x, y, width, height)]
         self._textures = []
         self.min_width = 1
         self.min_height = 1
+        self.name = name
         
     def cur_height(self):
         """return the current height"""
@@ -34,17 +37,23 @@ class Atlas(Region):
         self.height_px = height
         self._compute_nondim_tex_coords()
         
-    def write(self, filename, format):
+    def write(self, filename, format, image_var):
+        """Allocate memory for the actual atlas image, paste images, write to disk.
+           image_var is the name (string) of the class variable that stores the image;
+           usually in osm2city it's im or im_LM."""
         atlas = Image.new("RGB", (self.width_px, self.height_px))
 
         for the_texture in self._textures:
-            atlas.paste(the_texture.im, (the_texture._x, the_texture._y))
-
+            the_image = getattr(the_texture, image_var)
+            try:
+                atlas.paste(the_image, (the_texture._x, the_texture._y))
+            except ValueError:
+                logging.info("%s: Skipping an empty texture" % self.name)
         atlas.save(filename, optimize=True)
 
     def pack(self, the_texture):
         logging.debug("packing %s (%i %i)" % 
-          (the_texture.filename, the_texture.width_px, the_texture.height_px))
+            (the_texture.filename, the_texture.width_px, the_texture.height_px))
         for the_region in self.regions:
             if self._pack(the_texture, the_region):
                 self._textures.append(the_texture)
@@ -54,12 +63,18 @@ class Atlas(Region):
                     logging.debug("  - " + str(the_region))
                 return True
         return False
+
+    def pack_at(self, the_texture, x, y):
+        logging.debug("packing %s (%i %i) at (%i %i)" % 
+            (the_texture.filename, the_texture.width_px, the_texture.height_px, x, y))
+        the_texture._x = x
+        the_texture._y = y
+        self._textures.append(the_texture)
         
 
     def _compute_nondim_tex_coords(self):      
         """compute non-dim texture coords"""
         for t in self._textures:
-            #atlas.paste(l.im, (0, next_y))
             t.x0 = float(t._x) / self.width_px
             t.x1 = float(t._x + t.width_px) / self.width_px
             t.y1 = 1 - float(t._y) / self.height_px

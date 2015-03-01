@@ -24,7 +24,7 @@ import catalog
 def next_pow2(value):
     return 2**(int(math.log(value) / math.log(2)) + 1)
 
-def make_texture_atlas(texture_list, atlas_filename, size_x = 256, pad_y = 0, lightmap=False):
+def make_texture_atlas(texture_list, atlas_filename, ext, size_x = 256, pad_y = 0, lightmap=False):
     """
     create texture atlas from all textures. Update all our item coordinates.
     """
@@ -37,7 +37,7 @@ def make_texture_atlas(texture_list, atlas_filename, size_x = 256, pad_y = 0, li
     atlas_sx = size_x
     keep_aspect = True # FIXME: False won't work -- im.thumbnail seems to keep aspect no matter what
 
-    atlas_sy = 0
+#    atlas_sy = 0
     next_y = 0
 
     # -- load and rotate images, store image data in TextureManager object
@@ -45,17 +45,23 @@ def make_texture_atlas(texture_list, atlas_filename, size_x = 256, pad_y = 0, li
     can_repeat_list = []
     non_repeat_list = []
     for l in texture_list:
+        filename = l.filename
+        l.im = Image.open(filename)
+        logging.debug("name %s size " % filename + str(l.im.size))
         if lightmap:
             filename, fileext = os.path.splitext(l.filename)
             filename += '_LM' + fileext
-        else:
-            filename = l.filename
-        l.im = Image.open(filename)
-        logging.debug("name %s size " % filename + str(l.im.size))
+            try:
+                l.im_LM = Image.open(filename)
+            except IOError:
+                l.im_LM = None
+
         assert (l.v_can_repeat + l.h_can_repeat < 2)
         if l.v_can_repeat:
             l.rotated = True
             l.im = l.im.transpose(Image.ROTATE_270)
+            if lightmap:
+                l.im_LM = l.im_LM.transpose(Image.ROTATE_270)
         
         if l.v_can_repeat or l.h_can_repeat: 
             can_repeat_list.append(l)
@@ -66,7 +72,7 @@ def make_texture_atlas(texture_list, atlas_filename, size_x = 256, pad_y = 0, li
 
     # -- pack non_repeatables
     # Sort textures by perimeter size in non-increasing order
-    the_atlas = atlas.Atlas(0, 0, atlas_sx, 1e10)
+    the_atlas = atlas.Atlas(0, 0, atlas_sx, 1e10, 'Facades')
     if 1:
         non_repeat_list = sorted(non_repeat_list, key=lambda i:i.sy, reverse=True)
         deb = 0
@@ -103,14 +109,13 @@ def make_texture_atlas(texture_list, atlas_filename, size_x = 256, pad_y = 0, li
         nx = int(org_size[0] * scale_x)
         ny = int(org_size[1] * scale_y)
         l.im = l.im.resize((nx, ny), Image.ANTIALIAS)
+        if lightmap:
+            l.im_LM = l.im_LM.resize((nx, ny), Image.ANTIALIAS)
         logging.debug("scale:" + str(org_size) + str(l.im.size))
         atlas_sy += l.im.size[1] + pad_y
         l.width_px, l.height_px = l.im.size
 
     # assert(max(sx) <= altas_sx)
-
-    # -- create atlas image
-    #atlas = Image.new("RGB", (atlas_sx, atlas_sy))
 
     # -- paste, compute atlas coords
     #    lower left corner of texture is x0, y0
@@ -125,7 +130,11 @@ def make_texture_atlas(texture_list, atlas_filename, size_x = 256, pad_y = 0, li
 
         next_y += l.height_px + pad_y
 #        print "pack?", l.width_px, l.height_px
+#        success = the_atlas.pack(l)
         if the_atlas.pack(l):
+#        if success:
+#            l._x = x
+#            l._y = y
             pass
         else:
             logging.info("Failed to pack" + str(l))
@@ -145,11 +154,20 @@ def make_texture_atlas(texture_list, atlas_filename, size_x = 256, pad_y = 0, li
     the_atlas.set_height(atlas_sy)
     logging.info("Final atlas height %i" % atlas_sy)
 
-    the_atlas.write(atlas_filename, "RGBA")
+    the_atlas.write(atlas_filename + ext, "RGBA", 'im')
+
+    # -- create LM atlas, using the coords of the main atlas
+    if lightmap:
+        LM_atlas = atlas.Atlas(0, 0, atlas_sx, the_atlas.height_px, 'FacadesLM')
+        for l in texture_list:
+            LM_atlas.pack_at(l, l._x, l._y)
+        LM_atlas.write(atlas_filename + '_LM' + ext, "RGBA", 'im_LM')
 
     for l in texture_list:
         logging.debug('%s (%4.2f, %4.2f) (%4.2f, %4.2f)' % (l.filename, l.x0, l.y0, l.x1, l.y1))
         del l.im
+        if lightmap:
+            del l.im_LM
 
 class TextureManager(object):
     def __init__(self,cls):
@@ -301,13 +319,12 @@ def init(tex_prefix=''):
     if 1:
 #        facades.make_texture_atlas(filename + '.png')
         texture_list = facades.get_list() + roofs.get_list()
-        make_texture_atlas(texture_list, filename + '.png')
-        #make_texture_atlas(texture_list, filename + '_LM.png', lightmap=True)
+        make_texture_atlas(texture_list, filename, '.png', lightmap=True)
 
         logging.info("Saving %s", pkl_fname)
-        fpickle = open(pkl_fname, 'wb')
-        cPickle.dump(facades, fpickle, -1)
-        fpickle.close()
+        #fpickle = open(pkl_fname, 'wb')
+        #cPickle.dump(facades, fpickle, -1)
+        #fpickle.close()
     else:
         logging.info("Loading %s", pkl_fname)
         fpickle = open(pkl_fname, 'rb')
