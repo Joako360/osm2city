@@ -569,6 +569,7 @@ if __name__ == "__main__":
                       help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
     parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
     parser.add_argument("-c", dest="c", action="store_true", help="do not check for overlapping with static objects")
+    parser.add_argument("-t", "--textures-only", action="store_true", help="only create texture atlas")
     parser.add_argument("-u", dest="uninstall", action="store_true", help="uninstall ours from .stg")
     parser.add_argument("-d", dest="debug", default=False, action="store_true", help="set loglevel=DEBUG")
     args = parser.parse_args()
@@ -596,6 +597,9 @@ if __name__ == "__main__":
 
     # -- initialize modules
     tex.manager.init()
+    
+    if args.textures_only:
+        sys.exit(0)
 
     # -- prepare transformation to local coordinates
     cmin, cmax = parameters.get_extent_global()
