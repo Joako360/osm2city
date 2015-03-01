@@ -112,7 +112,7 @@ def make_texture_atlas(texture_list, atlas_filename, ext, size_x = 256, pad_y = 
         nx = int(org_size[0] * scale_x)
         ny = int(org_size[1] * scale_y)
         l.im = l.im.resize((nx, ny), Image.ANTIALIAS)
-        if lightmap:
+        if lightmap and l.im_LM:
             l.im_LM = l.im_LM.resize((nx, ny), Image.ANTIALIAS)
         logging.debug("scale:" + str(org_size) + str(l.im.size))
         atlas_sy += l.im.size[1] + pad_y
