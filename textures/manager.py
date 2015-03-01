@@ -21,11 +21,13 @@ import catalog
 import tools
 
 #import textures_src
+import img2np
+import parameters
 
 def next_pow2(value):
     return 2**(int(math.log(value) / math.log(2)) + 1)
 
-def make_texture_atlas(texture_list, atlas_filename, ext, size_x = 256, pad_y = 0, lightmap=False):
+def make_texture_atlas(texture_list, atlas_filename, ext, size_x = 256, pad_y = 0, lightmap=False, ambient_occlusion=False):
     """
     create texture atlas from all textures. Update all our item coordinates.
     """
@@ -116,8 +118,21 @@ def make_texture_atlas(texture_list, atlas_filename, ext, size_x = 256, pad_y = 
         atlas_sy += l.im.size[1] + pad_y
         l.width_px, l.height_px = l.im.size
 
-    # assert(max(sx) <= altas_sx)
+    # -- bake fake ambient occlusion. Multiply all channels of a facade texture by
+    #      1. - parameters.BUILDING_FAKE_AMBIENT_OCCLUSION_VALUE * np.exp(-z / parameters.BUILDING_FAKE_AMBIENT_OCCLUSION_HEIGHT)
+    #    where z is height above ground. 
+    if ambient_occlusion:
+        for l in texture_list:
+            if l.cls == 'facade':
+                print l.provides
+                R, G, B, A = img2np.img2RGBA(l.im)
+                height_px = R.shape[0]
+                # reversed height
+                Z = np.linspace(l.v_size_meters, 0, height_px).reshape(height_px, 1)
+                fac = 1. - parameters.BUILDING_FAKE_AMBIENT_OCCLUSION_VALUE * np.exp(-Z / parameters.BUILDING_FAKE_AMBIENT_OCCLUSION_HEIGHT)
+                l.im = img2np.RGBA2img(R * fac, G * fac, B * fac)
 
+    
     # -- paste, compute atlas coords
     #    lower left corner of texture is x0, y0
     for l in can_repeat_list:
@@ -189,6 +204,7 @@ class TextureManager(object):
                 new_provides.append(self.__cls + ':' + item)
         #t.provides = [self.__cls + ':' + i for i in t.provides]
         t.provides = new_provides
+        t.cls = self.__cls
         
         tools.stats.textures_total += 1        
         self.__l.append(t)
@@ -332,7 +348,7 @@ def init(tex_prefix='', create_atlas=False):
     
         # -- make texture atlas
         texture_list = facades.get_list() + roofs.get_list()
-        make_texture_atlas(texture_list, filename, '.png', lightmap=True)
+        make_texture_atlas(texture_list, filename, '.png', lightmap=True, ambient_occlusion=parameters.BUILDING_FAKE_AMBIENT_OCCLUSION)
 
         logging.info("Saving %s", pkl_fname)
         fpickle = open(pkl_fname, 'wb')
