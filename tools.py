@@ -648,8 +648,8 @@ class Stats(object):
         self.LOD = np.zeros(3)
         self.nodes_ground = 0
         self.nodes_simplified = 0
-        self.texture_x_repeated = 0
-        self.texture_x_simple = 0
+        self.textures_total = 0
+        self.textures_used = set()
 
     def count(self, b):
         """update stats (vertices, surfaces, area) with given building's data
@@ -669,6 +669,9 @@ class Stats(object):
 
     def count_LOD(self, lod):
         self.LOD[lod] += 1
+        
+    def count_texture(self, texture):
+        self.textures_used.add(str(texture))
 
     def print_summary(self):
         out = sys.stdout
@@ -697,9 +700,9 @@ class Stats(object):
         out.write(textwrap.dedent(roof_line))
 
         try:
-            texture_x_repeated_percent = (self.texture_x_repeated * 100. / (self.texture_x_repeated + self.texture_x_simple))
+            textures_used_percent = len(self.textures_used) * 100. / self.textures_total
         except:
-            texture_x_repeated_percent = 0.
+            textures_used_percent = 99.9
 
         out.write(textwrap.dedent("""
               complex       %i
@@ -708,14 +711,14 @@ class Stats(object):
               simplified    %i
             vertices        %i
             surfaces        %i
-            repeated tex x  %i out of %i (%2.0f %%)
+            used tex        %i out of %i (%2.0f %%)
                 LOD bare        %i (%2.0f %%)
                 LOD rough       %i (%2.0f %%)
                 LOD detail      %i (%2.0f %%)
             """ % (self.have_complex_roof, self.roof_errors,
                    self.nodes_ground, self.nodes_simplified,
                    self.vertices, self.surfaces,
-                   self.texture_x_repeated, (self.texture_x_repeated + self.texture_x_simple), texture_x_repeated_percent,
+                   len(self.textures_used), self.textures_total, textures_used_percent, 
                    self.LOD[0], lodzero,
                    self.LOD[1], lodone,
                    self.LOD[2], lodtwo)))

@@ -18,6 +18,7 @@ import sys
 import atlas
 from texture import Texture
 import catalog
+import tools
 
 #import textures_src
 
@@ -188,6 +189,8 @@ class TextureManager(object):
                 new_provides.append(self.__cls + ':' + item)
         #t.provides = [self.__cls + ':' + i for i in t.provides]
         t.provides = new_provides
+        
+        tools.stats.textures_total += 1        
         self.__l.append(t)
 
     def keep_only(self, i):
@@ -204,7 +207,9 @@ class TextureManager(object):
             return None
         #print "cands are\n", string.join(["  " + str(c) for c in candidates], '\n')
         #return candidates[3]
-        return candidates[random.randint(0, len(candidates)-1)]
+        the_texture = candidates[random.randint(0, len(candidates)-1)]    
+        tools.stats.count_texture(the_texture)        
+        return the_texture 
 
     def find_candidates(self, requires = []):
         #return [self.__l[0]]
@@ -212,6 +217,8 @@ class TextureManager(object):
         for cand in self.__l:
             if set(requires).issubset(cand.provides):
                 candidates.append(cand)
+            else:
+                logging.debug("  unmet requires %s" % str(cand))
         return candidates
 
     def __str__(self):
@@ -231,7 +238,10 @@ class FacadeManager(TextureManager):
             logging.warn("no matching texture for %1.f m x %1.1f m <%s>" % (height, width, str(requires)))
             return None
         ranked_list = self.rank_candidates(candidates, tags)
-        return ranked_list[random.randint(0, len(ranked_list) - 1)]
+        the_texture = ranked_list[random.randint(0, len(ranked_list) - 1)]
+        tools.stats.count_texture(the_texture)        
+        return the_texture 
+
 
     def rank_candidates(self, candidates, tags):
         ranked_list = []
@@ -255,6 +265,7 @@ class FacadeManager(TextureManager):
 #        print "\ncands", [str(t.filename) for t in candidates]
         # -- check height
 #        print " Candidates:"
+        #logging.info("Got %i cands" % len(candidates))
         new_candidates = []
         for t in candidates:
 #            print "  <<<", t.filename
@@ -269,6 +280,7 @@ class FacadeManager(TextureManager):
 
 #                candidates.remove(t)
 #        print "remaining cands", [str(t.filename) for t in new_candidates]
+        #logging.info("After width/height test %i remaining" % len(new_candidates))
         return new_candidates
 
 def find_matching_texture(cls, textures):
@@ -285,52 +297,54 @@ def init(tex_prefix='', create_atlas=False):
     print "textures: init"
     global facades
     global roofs
-    facades = FacadeManager('facade')
-    roofs = TextureManager('roof')
 
-    catalog.append_facades_de(tex_prefix, facades)
-    #append_facades_test()
-    catalog.append_roofs(tex_prefix, roofs)
-    catalog.append_facades_us(tex_prefix, facades)
-    #facades.keep_only(1)
+    filename = tex_prefix + 'tex/atlas_facades'
+    pkl_fname = filename + '.pkl'
 
-    if False:
-        print roofs[0].provides
-        print "black roofs: ", [str(i) for i in roofs.find_candidates(['roof:color:black'])]
-        print "red   roofs: ", [str(i) for i in roofs.find_candidates(['roof:color:red'])]
-        print "old facades: "
-        for i in facades.find_candidates(['facade:shape:residential','age:old'], 10):
-            print i, i.v_cuts * i.v_size_meters
-    #print facades[0].provides
-
-    if False:
+    if create_atlas:
         facades = FacadeManager('facade')
         roofs = TextureManager('roof')
-        facades.append(Texture(tex_prefix + 'test.png',
-                               10, [142,278,437,590,756,890,1024], True,
-                               10, [130,216,297,387,512], True, True,
-                               provides=['shape:urban','shape:residential','age:modern','age:old','compat:roof-flat','compat:roof-pitched']))
-        roofs.append(Texture(tex_prefix + 'test.png',
-                             10., [], True, 10., [], True, provides=['color:black', 'color:red']))
-
-    # -- make texture atlas (or unpickle)
-    if create_atlas:
-        filename = tex_prefix + 'tex/atlas_facades'
-        pkl_fname = filename + '.pkl'
-        if 1:
-    #        facades.make_texture_atlas(filename + '.png')
-            texture_list = facades.get_list() + roofs.get_list()
-            make_texture_atlas(texture_list, filename, '.png', lightmap=True)
     
-            logging.info("Saving %s", pkl_fname)
-            #fpickle = open(pkl_fname, 'wb')
-            #cPickle.dump(facades, fpickle, -1)
-            #fpickle.close()
-        else:
-            logging.info("Loading %s", pkl_fname)
-            fpickle = open(pkl_fname, 'rb')
-            facades = cPickle.load(fpickle)
-            fpickle.close()
+        catalog.append_facades_de(tex_prefix, facades)
+        #append_facades_test()
+        catalog.append_roofs(tex_prefix, roofs)
+        catalog.append_facades_us(tex_prefix, facades)
+        #facades.keep_only(1)
+    
+        if False:
+            print roofs[0].provides
+            print "black roofs: ", [str(i) for i in roofs.find_candidates(['roof:color:black'])]
+            print "red   roofs: ", [str(i) for i in roofs.find_candidates(['roof:color:red'])]
+            print "old facades: "
+            for i in facades.find_candidates(['facade:shape:residential','age:old'], 10):
+                print i, i.v_cuts * i.v_size_meters
+        #print facades[0].provides
+    
+        if False:
+            facades = FacadeManager('facade')
+            roofs = TextureManager('roof')
+            facades.append(Texture(tex_prefix + 'test.png',
+                                   10, [142,278,437,590,756,890,1024], True,
+                                   10, [130,216,297,387,512], True, True,
+                                   provides=['shape:urban','shape:residential','age:modern','age:old','compat:roof-flat','compat:roof-pitched']))
+            roofs.append(Texture(tex_prefix + 'test.png',
+                                 10., [], True, 10., [], True, provides=['color:black', 'color:red']))
+    
+        # -- make texture atlas
+        texture_list = facades.get_list() + roofs.get_list()
+        make_texture_atlas(texture_list, filename, '.png', lightmap=True)
+
+        logging.info("Saving %s", pkl_fname)
+        fpickle = open(pkl_fname, 'wb')
+        cPickle.dump(facades, fpickle, -1)
+        cPickle.dump(roofs, fpickle, -1)
+        fpickle.close()
+    else:
+        logging.info("Loading %s", pkl_fname)
+        fpickle = open(pkl_fname, 'rb')
+        facades = cPickle.load(fpickle)
+        roofs = cPickle.load(fpickle)
+        fpickle.close()
 
     logging.info(facades)
 

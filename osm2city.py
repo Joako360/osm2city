@@ -597,18 +597,18 @@ if __name__ == "__main__":
     parameters.show()
 
     # -- initialize modules
-    tex.manager.init(create_atlas=args.do_textures or args.do_textures_only)
-    
-    if args.do_textures_only:
-        sys.exit(0)
 
     # -- prepare transformation to local coordinates
     cmin, cmax = parameters.get_extent_global()
     center = parameters.get_center_global()
 
-    #center = (11.38, 47.26)
     tools.init(coordinates.Transformation(center, hdg = 0))
-#    print tools.transform.toGlobal(cmin), tools.transform.toGlobal(cmax)
+
+    tex.manager.init(create_atlas=args.do_textures or args.do_textures_only)
+    
+    if args.do_textures_only:
+        sys.exit(0)
+
 
     logging.info("reading elevation data")
     elev = tools.get_interpolator(fake=parameters.NO_ELEV)
