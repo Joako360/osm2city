@@ -22,6 +22,9 @@ def get_file(name, tilename, lon, lat):
         name = name + tilename
     return open(calc_tile.root_directory_name((lon, lat)) + os.sep + name, "wb")
 
+def write_to_file( command, file_handle):
+    file_handle.write('python %s -f %s/params.ini' % (command, replacement_path) + os.linesep)
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser(description="build-tiles generates a directory structure capable of generating complete tiles of scenery")
@@ -64,14 +67,16 @@ if __name__ == '__main__':
     except OSError, e:
         if e.errno != 17:
             logging.exception("Unable to create path to output")
-
+  
     downloadfile = get_file("download_", args.tilename, lon, lat)
-    osm2city = get_file("osm2city_", args.tilename, lon, lat)
-    osm2pylon = get_file("osm2pylon_", args.tilename, lon, lat)
-    tools = get_file("tools_", args.tilename, lon, lat)
-    platformsfile = get_file("osm2platform_", args.tilename, lon, lat)
-    roads = get_file("roads_", args.tilename, lon, lat)
-    pierfile = get_file("piers_", args.tilename, lon, lat)
+    files = [] 
+    files.append(('osm2city.py',get_file("osm2city_", args.tilename, lon, lat)))
+    files.append(('osm2pylon.py',get_file("osm2pylon_", args.tilename, lon, lat)))
+    files.append(('tools.py',get_file("tools_", args.tilename, lon, lat)))
+    files.append(('platforms.py',get_file("osm2platform_", args.tilename, lon, lat)))
+    files.append(('roads.py',get_file("roads_", args.tilename, lon, lat)))
+    files.append(('piers.py',get_file("piers_", args.tilename, lon, lat)))
+    files.append(('landuse.py',get_file("landuse_", args.tilename, lon, lat)))
     for dy in range(0, num_cols):
         for dx in range(0, num_rows):
             index = calc_tile.tile_index((lon, lat), dx, dy)
@@ -101,18 +106,12 @@ if __name__ == '__main__':
             
             # wget -O FT_WILLIAM/buildings.osm http://overpass-api.de/api/map?bbox=-5.2,56.8,-5.,56.9
             downloadfile.write(download_command % (replacement_path, calc_tile.get_west_lon(lon, lat, dx), calc_tile.get_south_lat(lat, dy), calc_tile.get_east_lon(lon, lat, dx), calc_tile.get_north_lat(lat, dy)))
-            osm2city.write('python osm2city.py -f %s/params.ini' % (replacement_path) + os.linesep)
-            osm2pylon.write('python osm2pylon.py -f %s/params.ini' % (replacement_path) + os.linesep)
-            tools.write('python tools.py -f %s/params.ini' % (replacement_path) + os.linesep)
-            platformsfile.write('python platforms.py -f %s/params.ini' % (replacement_path) + os.linesep)
-            roads.write('python roads.py -f %s/params.ini' % (replacement_path) + os.linesep)
-            pierfile.write('python piers.py -f %s/params.ini' % (replacement_path) + os.linesep)
-    downloadfile.close()
-    osm2city.close()
-    osm2pylon.close()
-    tools.close()
-    platformsfile.close()
-    roads.close()
-    pierfile.close()
+            for command in files:
+                write_to_file(command[0], command[1])
+    for command in files:
+        command[1].close()
 
     sys.exit(0)
+
+        
+        
