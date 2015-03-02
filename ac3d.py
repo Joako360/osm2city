@@ -216,7 +216,6 @@ class Writer(object):
         for o in non_empty:
             o.plot()
     
-    
     def parse(self):
         def convertObject(tokens):
             print "got tokens!", tokens
@@ -237,6 +236,18 @@ class Writer(object):
         def convertLTexture(tokens):
             #print "got LText", tokens
             self._current_object.texture = tokens[1].strip('"\'')
+
+        def convertLTexrep(tokens):
+            self._current_object.texrep = (tokens[0], tokens[1])
+
+        def convertLRot(tokens):
+            self._current_object.rot = tokens
+
+        def convertLLoc(tokens):
+            self._current_object.loc = (tokens[0], tokens[1], tokens[2])
+
+        def convertLUrl(tokens):
+            self._current_object.url = (tokens[0])
 
         def convertLVertex(tokens):
             #print "got LVert", tokens
@@ -265,8 +276,12 @@ class Writer(object):
         lObject = (Literal('OBJECT') + Word(alphas)).setParseAction(convertLObj)
         lKids = (Literal('kids') + integer).setResultsName('kids')
         lName = (Literal('name') + anything + LineEnd()).setParseAction(convertLName)
+#        lData = (Literal('data') + anything + LineEnd()).setParseAction(convertLName)
         lTexture = (Literal('texture') + anything + LineEnd()).setParseAction(convertLTexture)
-        lTexrep = Literal('texrep') + floatNumber + floatNumber
+        lTexrep = (Literal('texrep') + floatNumber + floatNumber).setParseAction(convertLTexrep)
+        lRot = (Literal('rot') + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber).setParseAction(convertLRot)
+        lLoc = (Literal('loc') + floatNumber + floatNumber + floatNumber).setParseAction(convertLLoc)
+        lUrl = (Literal('url') + anything + LineEnd()).setParseAction(convertLUrl)
         lNumvert = Literal('numvert') + Word(nums)
         lVertex = (floatNumber + floatNumber + floatNumber).setParseAction(convertLVertex)
         lMaterial = Literal('MATERIAL') + anything + LineEnd()
@@ -279,13 +294,14 @@ class Writer(object):
         pObjectWorld = Group(lObject + lKids)
         pSurf = (lSurf + Optional(lMat) + lRefs + Group(OneOrMore(lNodes))).setParseAction( convertSurf )
         pObject = Group(lObject + lName + Optional(lTexture) + Optional(lTexrep) \
+          + Optional(lRot) + Optional(lLoc) + Optional(lUrl) \
           + lNumvert + Group(OneOrMore(lVertex)) \
           + Optional(lNumsurf + Group(OneOrMore(pSurf))) + lKids).setParseAction( convertObject ) 
 
         pFile = lHeader + Group(OneOrMore(lMaterial)) + pObjectWorld \
           + Group(OneOrMore(pObject))
         
-        self.p = pFile.parseFile('tower-usaf-40m.ac')
+        self.p = pFile.parseFile('big-hangar.ac')
     
         # todo: texrep rot loc url data
         # groups -- how do they work?
