@@ -192,6 +192,9 @@ class Probe_fgelev(object):
             except IOError, reason:
                 logging.warn("Loading elev cache failed (%s)", reason)
                 self._cache = {}
+            except EOFError, reason:
+                logging.warn("Loading elev cache failed (%s)", reason)
+                self._cache = {}
         else:
             self._cache = None
 
