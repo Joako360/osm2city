@@ -3,9 +3,10 @@ import string
 import matplotlib.pyplot as plt
 import logging
 from pdb import pm
+import numpy as np
 
 from pyparsing import Literal, Word, quotedString, alphas, Optional, OneOrMore, \
-    Group, ParseException, nums, Combine, Regex, alphanums, LineEnd
+    Group, ParseException, nums, Combine, Regex, alphanums, LineEnd, Each
 
 fmt_node = '%1.6f'
 
@@ -39,13 +40,17 @@ class Face(object):
 
 class Object(object):
     """An object (3D) in a AC3D filed with faces and nodes"""
-    def __init__(self, name, stats=None, texture=None, default_type=0x0, default_mat=0, default_swap_uv=False):
+    def __init__(self, name=None, stats=None, texture=None, texrep=None, texoff=None, rot=None, loc=None, url=None, default_type=0x0, default_mat=0, default_swap_uv=False):
         self._nodes = []
         self._faces = []
-        self.name = str(name)
-        assert name != ""
+        self.name = name
         self.stats = stats
         self.texture = texture
+        self.texrep = texrep
+        self.texoff = texoff
+        self.rot = rot
+        self.loc = loc
+        self.url = url
         self.default_type = default_type
         self.default_mat = default_mat
         self.default_swap_uv = default_swap_uv
@@ -81,7 +86,18 @@ class Object(object):
 
     def __str__(self):
         s = 'OBJECT poly\n'
-        s += 'name "%s"\n' % self.name
+        if self.name != None:
+            s += 'name "%s"\n' % self.name
+        if self.texrep != None:
+            s += 'texrep %g %g\n' % (self.texrep[0], self.texrep[1])
+        if self.texoff != None:
+            s += 'texoff %g %g\n' % (self.texoff[0], self.texoff[1])
+        if self.rot != None:
+            s += 'rot %s\n' % string.join(["%g" % item for item in self.rot])
+        if self.loc != None:
+            s += 'loc %g %g %g\n' %  (self.loc[0], self.loc[1], self.loc[2])
+        if self.url != None:
+            s += 'url %s\n' % self.url 
         if self.texture:
             s += 'texture "%s"\n' %self.texture
         s += 'numvert %i\n' % len(self._nodes)
@@ -147,6 +163,7 @@ class Writer(object):
     """
     def __init__(self, stats, show_labels = False):
         self.objects = []
+        self.materials_list = []
         self.show_labels = show_labels
         self.stats = stats
         self._current_object = None
@@ -199,11 +216,14 @@ class Writer(object):
 
     def __str__(self):
         s = 'AC3Db\n'
-        s += 'MATERIAL "" rgb 1 1 1 amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0\n'
+        if self.materials_list:
+            s += string.join(['MATERIAL %s\n' % the_mat for the_mat in self.materials_list], '')
+        else:
+            s += 'MATERIAL "" rgb 1 1 1 amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0\n'
 #        s += 'MATERIAL "" rgb 1 1 1 amb 0.5 0.5 0.5 emis 1 1 1 spec 0.5 0.5 0.5 shi 64 trans 0\n'
         non_empty = [o for o in self.objects if not o.is_empty()]
         s += 'OBJECT world\nkids %i\n' % len(non_empty)
-        s += string.join([str(o) for o in non_empty])
+        s += string.join([str(o) for o in non_empty], '')
         return s
 
     def write_to_file(self, file_name):
@@ -218,13 +238,17 @@ class Writer(object):
     
     def parse(self):
         def convertObject(tokens):
-            print "got tokens!", tokens
-            print "--------"
+            pass
+            #print "got tokens!", tokens
+            #print "--------"
             #bla
             #o = Object(name, self.stats, texture, **kwargs)
             #self.objects.append(o)
             #self._current_object = o
             #return o
+        def convertLMaterial(tokens):
+            self.materials_list.append(tokens[1])
+
         def convertLObj(tokens):
             #print "got LObj", tokens
             self.new_object(None, None)
@@ -237,17 +261,23 @@ class Writer(object):
             #print "got LText", tokens
             self._current_object.texture = tokens[1].strip('"\'')
 
+        def _token2array(tokens, num):
+            return np.array([float(item) for item in tokens[1:num + 1]])
+
         def convertLTexrep(tokens):
-            self._current_object.texrep = (tokens[0], tokens[1])
+            self._current_object.texrep = _token2array(tokens, 2)
+
+        def convertLTexoff(tokens):
+            self._current_object.texoff = _token2array(tokens, 2)
 
         def convertLRot(tokens):
-            self._current_object.rot = tokens
+            self._current_object.rot = _token2array(tokens, 9)
 
         def convertLLoc(tokens):
-            self._current_object.loc = (tokens[0], tokens[1], tokens[2])
+            self._current_object.loc = _token2array(tokens, 3)
 
         def convertLUrl(tokens):
-            self._current_object.url = (tokens[0])
+            self._current_object.url = (tokens[1])
 
         def convertLVertex(tokens):
             #print "got LVert", tokens
@@ -273,18 +303,19 @@ class Writer(object):
         anything = Regex(r'.*')
         
         lHeader = Literal('AC3Db') + LineEnd()
+        lMaterial = (Literal('MATERIAL') + anything + LineEnd()).setParseAction(convertLMaterial)
         lObject = (Literal('OBJECT') + Word(alphas)).setParseAction(convertLObj)
-        lKids = (Literal('kids') + integer).setResultsName('kids')
+        lKids = (Literal('kids') + integer + LineEnd()).setResultsName('kids')
         lName = (Literal('name') + anything + LineEnd()).setParseAction(convertLName)
 #        lData = (Literal('data') + anything + LineEnd()).setParseAction(convertLName)
         lTexture = (Literal('texture') + anything + LineEnd()).setParseAction(convertLTexture)
         lTexrep = (Literal('texrep') + floatNumber + floatNumber).setParseAction(convertLTexrep)
+        lTexoff = (Literal('texoff') + floatNumber + floatNumber).setParseAction(convertLTexoff)
         lRot = (Literal('rot') + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber).setParseAction(convertLRot)
         lLoc = (Literal('loc') + floatNumber + floatNumber + floatNumber).setParseAction(convertLLoc)
         lUrl = (Literal('url') + anything + LineEnd()).setParseAction(convertLUrl)
         lNumvert = Literal('numvert') + Word(nums)
         lVertex = (floatNumber + floatNumber + floatNumber).setParseAction(convertLVertex)
-        lMaterial = Literal('MATERIAL') + anything + LineEnd()
         lNumsurf = Literal('numsurf') + Word(nums)
         lSurf = Literal('SURF') + Word(alphanums)
         lMat = Literal('mat') + integer
@@ -293,8 +324,8 @@ class Writer(object):
         
         pObjectWorld = Group(lObject + lKids)
         pSurf = (lSurf + Optional(lMat) + lRefs + Group(OneOrMore(lNodes))).setParseAction( convertSurf )
-        pObject = Group(lObject + lName + Optional(lTexture) + Optional(lTexrep) \
-          + Optional(lRot) + Optional(lLoc) + Optional(lUrl) \
+        pObject = Group(lObject + Each([Optional(lName), Optional(lTexture), Optional(lTexrep), \
+            Optional(lTexoff), Optional(lRot), Optional(lLoc), Optional(lUrl)]) \
           + lNumvert + Group(OneOrMore(lVertex)) \
           + Optional(lNumsurf + Group(OneOrMore(pSurf))) + lKids).setParseAction( convertObject ) 
 
@@ -311,7 +342,7 @@ if __name__ == "__main__":
     a = Writer(None)
     a.parse()
     
-    print "print\n", a
+    print "%s" % str(a)
 
     if 0:
         a = Writer(None)
