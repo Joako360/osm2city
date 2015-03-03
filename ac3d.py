@@ -8,7 +8,9 @@ import numpy as np
 from pyparsing import Literal, Word, quotedString, alphas, Optional, OneOrMore, \
     Group, ParseException, nums, Combine, Regex, alphanums, LineEnd, Each
 
-fmt_node = '%1.6f'
+#fmt_node = '%1.6f'
+fmt_node = '%g'
+fmt_surf = '%1.4g'
 
 class Node(object):
     def __init__(self, x, y, z):
@@ -34,13 +36,13 @@ class Face(object):
         s = "SURF %s\n" % self.typ
         s += "mat %i\n" % self.mat
         s += "refs %i\n" % len(self.nodes_uv_list)
-        s += string.join(["%i %1.4g %1.4g\n" % (n[0], n[1], n[2]) for n in self.nodes_uv_list], '')
+        s += string.join([("%i " + fmt_surf + " " + fmt_surf + "\n") % (n[0], n[1], n[2]) for n in self.nodes_uv_list], '')
         return s
 
 
 class Object(object):
-    """An object (3D) in a AC3D filed with faces and nodes"""
-    def __init__(self, name=None, stats=None, texture=None, texrep=None, texoff=None, rot=None, loc=None, url=None, default_type=0x0, default_mat=0, default_swap_uv=False):
+    """An object (3D) in an AC3D file with faces and nodes"""
+    def __init__(self, name=None, stats=None, texture=None, texrep=None, texoff=None, rot=None, loc=None, crease=None, url=None, default_type=0x0, default_mat=0, default_swap_uv=False, kids=0):
         self._nodes = []
         self._faces = []
         self.name = name
@@ -51,9 +53,11 @@ class Object(object):
         self.rot = rot
         self.loc = loc
         self.url = url
+        self.crease = crease
         self.default_type = default_type
         self.default_mat = default_mat
         self.default_swap_uv = default_swap_uv
+        self.kids = kids
 
     def close(self):
         pass
@@ -96,6 +100,8 @@ class Object(object):
             s += 'rot %s\n' % string.join(["%g" % item for item in self.rot])
         if self.loc != None:
             s += 'loc %g %g %g\n' %  (self.loc[0], self.loc[1], self.loc[2])
+        if self.crease != None:
+            s += 'crease %g\n' % self.crease
         if self.url != None:
             s += 'url %s\n' % self.url 
         if self.texture:
@@ -104,7 +110,7 @@ class Object(object):
         s += string.join([str(n) for n in self._nodes], '')
         s += 'numsurf %i\n' % len(self._faces)
         s += string.join([str(f) for f in self._faces], '')
-        s += 'kids 0\n'
+        s += 'kids %i\n' % self.kids
         return s
 
     def plot(self):
@@ -222,6 +228,7 @@ class Writer(object):
             s += 'MATERIAL "" rgb 1 1 1 amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0\n'
 #        s += 'MATERIAL "" rgb 1 1 1 amb 0.5 0.5 0.5 emis 1 1 1 spec 0.5 0.5 0.5 shi 64 trans 0\n'
         non_empty = [o for o in self.objects if not o.is_empty()]
+        # FIXME: this doesnt handle nested kids properly
         s += 'OBJECT world\nkids %i\n' % len(non_empty)
         s += string.join([str(o) for o in non_empty], '')
         return s
@@ -250,15 +257,15 @@ class Writer(object):
             self.materials_list.append(tokens[1])
 
         def convertLObj(tokens):
-            #print "got LObj", tokens
             self.new_object(None, None)
 
+        def convertLKids(tokens):
+            self._current_object.kids = int(tokens[1])
+
         def convertLName(tokens):
-            #print "got LName", tokens
             self._current_object.name = tokens[1].strip('"\'')
 
         def convertLTexture(tokens):
-            #print "got LText", tokens
             self._current_object.texture = tokens[1].strip('"\'')
 
         def _token2array(tokens, num):
@@ -273,11 +280,14 @@ class Writer(object):
         def convertLRot(tokens):
             self._current_object.rot = _token2array(tokens, 9)
 
+        def convertLCrease(tokens):
+            self._current_object.crease = tokens[1]
+            
         def convertLLoc(tokens):
             self._current_object.loc = _token2array(tokens, 3)
 
         def convertLUrl(tokens):
-            self._current_object.url = (tokens[1])
+            self._current_object.url = tokens[1]
 
         def convertLVertex(tokens):
             #print "got LVert", tokens
@@ -305,7 +315,7 @@ class Writer(object):
         lHeader = Literal('AC3Db') + LineEnd()
         lMaterial = (Literal('MATERIAL') + anything + LineEnd()).setParseAction(convertLMaterial)
         lObject = (Literal('OBJECT') + Word(alphas)).setParseAction(convertLObj)
-        lKids = (Literal('kids') + integer + LineEnd()).setResultsName('kids')
+        lKids = (Literal('kids') + integer + LineEnd()).setParseAction(convertLKids)
         lName = (Literal('name') + anything + LineEnd()).setParseAction(convertLName)
 #        lData = (Literal('data') + anything + LineEnd()).setParseAction(convertLName)
         lTexture = (Literal('texture') + anything + LineEnd()).setParseAction(convertLTexture)
@@ -313,6 +323,7 @@ class Writer(object):
         lTexoff = (Literal('texoff') + floatNumber + floatNumber).setParseAction(convertLTexoff)
         lRot = (Literal('rot') + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber).setParseAction(convertLRot)
         lLoc = (Literal('loc') + floatNumber + floatNumber + floatNumber).setParseAction(convertLLoc)
+        lCrease = (Literal('crease') + floatNumber).setParseAction(convertLCrease)
         lUrl = (Literal('url') + anything + LineEnd()).setParseAction(convertLUrl)
         lNumvert = Literal('numvert') + Word(nums)
         lVertex = (floatNumber + floatNumber + floatNumber).setParseAction(convertLVertex)
@@ -325,7 +336,7 @@ class Writer(object):
         pObjectWorld = Group(lObject + lKids)
         pSurf = (lSurf + Optional(lMat) + lRefs + Group(OneOrMore(lNodes))).setParseAction( convertSurf )
         pObject = Group(lObject + Each([Optional(lName), Optional(lTexture), Optional(lTexrep), \
-            Optional(lTexoff), Optional(lRot), Optional(lLoc), Optional(lUrl)]) \
+            Optional(lTexoff), Optional(lRot), Optional(lLoc), Optional(lUrl), Optional(lCrease)]) \
           + lNumvert + Group(OneOrMore(lVertex)) \
           + Optional(lNumsurf + Group(OneOrMore(pSurf))) + lKids).setParseAction( convertObject ) 
 
@@ -334,7 +345,7 @@ class Writer(object):
         
         self.p = pFile.parseFile('big-hangar.ac')
     
-        # todo: texrep rot loc url data
+        # todo: 
         # groups -- how do they work?
     
     
