@@ -92,7 +92,7 @@ if __name__ == '__main__':
             with open(args.properties, "r") as sources:
                 lines = sources.readlines()
             with open(path + os.sep + args.out, "w") as sources:
-                replacement = '\\1 ' + replacement_path
+                replacement = '\\1 "' + replacement_path + '"'
                 for line in lines:
                     line = re.sub('^\s*(PREFIX\s*=)([ A-Za-z0-9]*)', replacement, line)
                     line = re.sub('^\s*(BOUNDARY_EAST\s*=)([ A-Za-z0-9.,]*)', '\\1 %f' % (calc_tile.get_east_lon(lon, lat, dx)), line)
