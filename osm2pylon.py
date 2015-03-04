@@ -1261,7 +1261,6 @@ def optimize_catenary(half_distance_pylons, max_value, sag, max_variation):
 
 
 def main():
-    logging.basicConfig(level=logging.DEBUG)
     # Handling arguments and parameters
     parser = argparse.ArgumentParser(
         description="osm2pylon reads OSM data and creates pylons, powerlines and aerialways for use with FlightGear")
@@ -1269,9 +1268,11 @@ def main():
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
     parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
     parser.add_argument("-u", dest="uninstall", action="store_true", help="uninstall ours from .stg")
+    parser.add_argument("-l", "--loglevel", help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL")
     args = parser.parse_args()
     if args.filename is not None:
         parameters.read_from_file(args.filename)
+    parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
     if args.e:
         parameters.NO_ELEV = True
     files_to_remove = None
