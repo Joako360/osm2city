@@ -405,7 +405,7 @@ class LinearObject(object):
         # - walk through all intersections
         #     make intersection compute endpoints of all ways, replace generic ones
         # - how to re-use nodes?
-        #   - ac3d writer could take care of that -- merge double nodes within tolerance
+        #   - ac3d File could take care of that -- merge double nodes within tolerance
         #   - store node number in way! Each way will have 4 corners as nodes,
         #     compute intermediate ones on write
         #     is OK with texturing, since can query node position
@@ -503,7 +503,7 @@ def max_slope_for_road(obj):
 
 
 def main():
-    ac = ac3d.Writer(tools.stats)
+    ac = ac3d.File(tools.stats)
     obj = ac.new_object('roads', 'tex/bridge.png')
     line.write_to(obj)
     f = open('line.ac', 'w')

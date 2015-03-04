@@ -167,7 +167,7 @@ class Label(Object):
                            (o+3,u0,v1)])
                 z += w
 
-class Writer(object):
+class File(object):
     """
     Hold a number of objects. Each object holds nodes and faces.
     Count nodes/surfaces etc internally, thereby eliminating a common source of bugs.
@@ -247,7 +247,7 @@ class Writer(object):
         s += string.join([str(o) for o in non_empty], '')
         return s
 
-    def write_to_file(self, file_name):
+    def write(self, file_name):
         f = open(file_name + '.ac', 'w')
         f.write(str(self))
         f.close()
@@ -257,7 +257,7 @@ class Writer(object):
         for o in non_empty:
             o.plot()
     
-    def parse(self, filename):
+    def read(self, file_name):
         def convertObject(tokens):
             pass
         def convertLMaterial(tokens):
@@ -350,20 +350,20 @@ class Writer(object):
         pFile = lHeader + Group(OneOrMore(lMaterial)) + pObjectWorld \
           + Group(OneOrMore(pObject))
         
-        self.p = pFile.parseFile(filename)
+        self.p = pFile.parseFile(file_name)
     
         # todo: 
         # groups -- how do they work?
     
     
 if __name__ == "__main__":
-    a = Writer(None)
-    a.parse('big-hangar.ac')
+    a = File(None)
+    a.read('big-hangar.ac')
     
     print "%s" % str(a)
 
     if 0:
-        a = Writer(None)
+        a = File(None)
         a.new_object('bla', '')
         a.node(0,0,0)
         a.node(0,1,0)
@@ -371,6 +371,5 @@ if __name__ == "__main__":
         a.node(1,0,0)
         a.face([(0,0,0), (1,0,0), (2,0,0), (3,0,0)])
         print a
-    
-    print a.total_faces(), a.total_nodes()
+        print a.total_faces(), a.total_nodes()
 

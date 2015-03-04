@@ -701,7 +701,7 @@ class Roads(objectlist.ObjectList):
     def debug_label_nodes(self, stg_manager):
         """write OSM_ID for nodes"""
         # -- write OSM_ID label
-        ac = ac3d.Writer(tools.stats, show_labels=True)
+        ac = ac3d.File(tools.stats, show_labels=True)
         file_name = "labels"
 #        ac3d_obj = ac.new_object(file_name, '', default_swap_uv=True)
         
@@ -728,7 +728,7 @@ class Roads(objectlist.ObjectList):
                 e = self.elev(anchor) + the_node.h_add + 3.
                 ac.add_label(' %i h=%1.1f' % (the_node.osm_id, the_node.h_add), -anchor.y, e, -anchor.x, scale=1.)
         path_to_stg = stg_manager.add_object_static(file_name + '.ac', vec2d(self.transform.toGlobal((0,0))), 0, 0)
-        ac.write_to_file(path_to_stg + file_name)
+        ac.write(path_to_stg + file_name)
 #269416158
     def clip_at_cluster_border(self):
         """
@@ -943,7 +943,7 @@ def main():
         # -- Now write cluster to disk.
         #    First create ac object. Write cluster's objects. Register stg object.
         #    Write ac to file.
-        ac = ac3d.Writer(tools.stats, show_labels=True)
+        ac = ac3d.File(tools.stats, show_labels=True)
         ac3d_obj = ac.new_object(file_name, 'tex/roads.png', default_swap_uv=True)
         for rd in cl.objects:
             if rd.osm_id == 98659369:
@@ -951,7 +951,7 @@ def main():
             rd.write_to(ac3d_obj, elev, cluster_elev, ac, offset=offset_local) # fixme: remove .ac, needed only for adding debug labels
 
         path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, cluster_elev, 0)
-        ac.write_to_file(path_to_stg + file_name)
+        ac.write(path_to_stg + file_name)
         write_xml(path_to_stg, file_name, file_name)
         tools.install_files(['roads.eff'], path_to_stg)
 

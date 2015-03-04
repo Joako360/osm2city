@@ -88,7 +88,7 @@ class Platforms(ObjectList):
         self.objects.append(platform)
 
     def write(self, elev):
-        ac = ac3d.Writer(tools.stats)
+        ac = ac3d.File(tools.stats)
         obj = ac.new_object('platforms', "Textures/Terrain/asphalt.png")
         for platform in self.objects[:]:
             if(platform.is_area):
