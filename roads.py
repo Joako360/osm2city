@@ -289,10 +289,10 @@ class Roads(objectlist.ObjectList):
             h_add = np.array([abs(self.nodes_dict[the_ref].h_add) for the_ref in the_way.refs])
             if h_add.sum() == 0:
                 self.roads_list.remove(the_way)
-                logging.info("kick %i", the_way.osm_id)
+                logging.debug("kick %i", the_way.osm_id)
     
     def create_linear_objects(self):
-        self.G=nx.Graph()
+        self.G = nx.Graph()
 
         for the_way in self.ways_list:
             prio = None
