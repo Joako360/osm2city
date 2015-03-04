@@ -351,23 +351,23 @@ def set_loglevel(args_loglevel = None):
     global LOGLEVEL
     if args_loglevel != None:
         LOGLEVEL = args_loglevel
-
-    # -- add another log level VERBOSE. Use this when logging stuff in loops, e.g. per-OSM-object
+    LOGLEVEL = LOGLEVEL.upper()
+    # -- add another log level VERBOSE. Use this when logging stuff in loops, e.g. per-OSM-object,
     #    potentiallially flooding the screen
     logging.VERBOSE = 5
     logging.addLevelName(logging.VERBOSE, "VERBOSE")
     logging.Logger.verbose = lambda inst, msg, *args, **kwargs: inst.log(logging.VERBOSE, msg, *args, **kwargs)
     logging.verbose = lambda msg, *args, **kwargs: logging.log(logging.VERBOSE, msg, *args, **kwargs)
 
-    numeric_level = getattr(logging, LOGLEVEL.upper(), None)
+    numeric_level = getattr(logging, LOGLEVEL, None)
     if not isinstance(numeric_level, int):
         raise ValueError('Invalid log level: %s' % LOGLEVEL)
     logging.basicConfig(level=numeric_level)
+    logging.getLogger().setLevel(LOGLEVEL)
     
     global quiet
     if numeric_level > logging.INFO:
         quiet = True
-        
 
 if __name__ == "__main__":
     # Handling arguments and parameters
