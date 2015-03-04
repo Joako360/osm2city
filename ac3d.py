@@ -252,7 +252,7 @@ class File(object):
         return s
 
     def write(self, file_name):
-        f = open(file_name + '.ac', 'w')
+        f = open(file_name, 'w')
         f.write(str(self))
         f.close()
 
@@ -373,5 +373,5 @@ if __name__ == "__main__":
         a.node(1,0,0)
         a.face([(0,0,0), (1,0,0), (2,0,0), (3,0,0)])
         print a.total_faces(), a.total_nodes()
-        a.write('test')
+        a.write('test.ac')
 

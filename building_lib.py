@@ -789,9 +789,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
                 out_surf.write(roofs.flat(b, X, roof_ac_name_flat))
                 out_surf.write("kids 0\n")
 
-    f = open(ac_file_name, "w")
-    f.write(str(ac))
-    f.close()
+    ac.write(ac_file_name)
     # plot on-screen using matplotlib
     if 0:
         ac.plot()

@@ -506,7 +506,6 @@ def main():
     ac = ac3d.File(tools.stats)
     obj = ac.new_object('roads', 'tex/bridge.png')
     line.write_to(obj)
-    f = open('line.ac', 'w')
 
     if 0:
         ac.center()
@@ -514,8 +513,7 @@ def main():
         ac.plot()
         plt.show()
 
-    f.write(str(ac))
-    f.close()
+    ac.write('line.ac')
 
 if __name__ == "__main__":
     main()
