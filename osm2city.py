@@ -569,12 +569,13 @@ if __name__ == "__main__":
                       help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
     parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
     parser.add_argument("-c", dest="c", action="store_true", help="do not check for overlapping with static objects")
-    parser.add_argument("-T", "--do-textures-only", action="store_true", help="create texture atlas and exit")
-    parser.add_argument("-t", "--do-textures", action="store_true", help="create texture atlas")
+    parser.add_argument("-A", "--create-atlas-only", action="store_true", help="create texture atlas and exit")
+    parser.add_argument("-a", "--create-atlas", action="store_true", help="create texture atlas")
     parser.add_argument("-u", dest="uninstall", action="store_true", help="uninstall ours from .stg")
     parser.add_argument("-d", dest="debug", default=False, action="store_true", help="set loglevel=DEBUG")
     args = parser.parse_args()
 
+    # -- command line args override paramters
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
     else:
@@ -594,7 +595,11 @@ if __name__ == "__main__":
         parameters.NO_ELEV = True
         parameters.OVERLAP_CHECK = False
 
+    if args.create_atlas or args.create_atlas_only:
+        parameters.CREATE_ATLAS = True
+
     parameters.show()
+
 
     # -- initialize modules
 
@@ -604,9 +609,9 @@ if __name__ == "__main__":
 
     tools.init(coordinates.Transformation(center, hdg = 0))
 
-    tex.manager.init(create_atlas=args.do_textures or args.do_textures_only)
+    tex.manager.init(create_atlas=parameters.CREATE_ATLAS)
     
-    if args.do_textures_only:
+    if args.create_atlas_only:
         sys.exit(0)
 
 

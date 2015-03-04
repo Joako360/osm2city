@@ -62,6 +62,8 @@ ELEV_RASTER_Y = 10
 # PARAMETERS RELATED TO BUILDINGS IN osm2city
 #=============================================================================
 
+CREATE_ATLAS = True         # -- create texture atlas on osm2city startup
+
 # -- check for overlap with static models. The scenery folder must contain an "Objects" folder
 OVERLAP_CHECK = True
 OVERLAP_RADIUS = 5
