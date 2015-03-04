@@ -572,15 +572,14 @@ if __name__ == "__main__":
     parser.add_argument("-A", "--create-atlas-only", action="store_true", help="create texture atlas and exit")
     parser.add_argument("-a", "--create-atlas", action="store_true", help="create texture atlas")
     parser.add_argument("-u", dest="uninstall", action="store_true", help="uninstall ours from .stg")
-    parser.add_argument("-l", "--loglevel", help="set loglevel. Valid levels are DEBUG, INFO, WARNING, ERROR, CRITICAL")
+    parser.add_argument("-l", "--loglevel", help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL")
     args = parser.parse_args()
 
     # -- command line args override paramters
 
     if args.filename is not None:
         parameters.read_from_file(args.filename)
-
-    parameters.set_loglevel(args.loglevel)
+    parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
     
     if args.e:
         parameters.NO_ELEV = True
