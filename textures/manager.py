@@ -124,7 +124,7 @@ def make_texture_atlas(texture_list, atlas_filename, ext, size_x = 256, pad_y = 
     if ambient_occlusion:
         for l in texture_list:
             if l.cls == 'facade':
-                print l.provides
+                #print l.provides
                 R, G, B, A = img2np.img2RGBA(l.im)
                 height_px = R.shape[0]
                 # reversed height
