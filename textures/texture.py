@@ -81,8 +81,8 @@ class Texture(object):
             self.h_size_meters = h_size_meters
         else:
             self.h_size_meters = self.v_size_meters / image_aspect
-            print "No hsize, using image aspect %i x %i = %g. h_size = %g v_size = %g" % \
-              (self.width_px, self.height_px, image_aspect, self.h_size_meters, self.v_size_meters)
+            logging.debug("No hsize, using image aspect %i x %i = %g. h_size = %g v_size = %g" % \
+              (self.width_px, self.height_px, image_aspect, self.h_size_meters, self.v_size_meters))
             
         # aspect = v / h
         if v_cuts == []:

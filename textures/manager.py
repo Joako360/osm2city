@@ -215,9 +215,9 @@ class TextureManager(object):
 
     def find_matching(self, requires = []):
         candidates = self.find_candidates(requires)
-        logging.debug("looking for texture" + str(requires))
+        logging.verbose("looking for texture" + str(requires))
         for c in candidates:
-            logging.debug("  candidate " + c.filename + " provides " + str(c.provides))
+            logging.verbose("  candidate " + c.filename + " provides " + str(c.provides))
         if len(candidates) == 0:
             logging.warn("WARNING: no matching texture for <%s>" % str(requires))
             return None
@@ -234,7 +234,7 @@ class TextureManager(object):
             if set(requires).issubset(cand.provides):
                 candidates.append(cand)
             else:
-                logging.debug("  unmet requires %s" % str(cand))
+                logging.verbose("  unmet requires %s" % str(cand))
         return candidates
 
     def __str__(self):
@@ -310,13 +310,13 @@ def find_matching_texture(cls, textures):
 # pitched roof: requires = facade:age:old
 
 def init(tex_prefix='', create_atlas=False):
-    print "textures: init"
+    logging.debug("textures: init")
     global facades
     global roofs
 
     filename = tex_prefix + 'tex/atlas_facades'
     pkl_fname = filename + '.pkl'
-
+    
     if create_atlas:
         facades = FacadeManager('facade')
         roofs = TextureManager('roof')
@@ -362,7 +362,7 @@ def init(tex_prefix='', create_atlas=False):
         roofs = cPickle.load(fpickle)
         fpickle.close()
 
-    logging.info(facades)
+    logging.debug(facades)
 
 
 if __name__ == "__main__":

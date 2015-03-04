@@ -677,6 +677,7 @@ class Stats(object):
         self.textures_used.add(str(texture))
 
     def print_summary(self):
+        if parameters.quiet: return
         out = sys.stdout
         total_written = self.LOD.sum()
         lodzero = 0
@@ -748,7 +749,7 @@ def install_files(file_list, dst):
     """link files in file_list to dst"""
     for the_file in file_list:
         the_dst = dst + os.sep + the_file
-        print "cp %s %s" % (the_file, the_dst)
+        logging.info("cp %s %s" % (the_file, the_dst))
         try:
             shutil.copy2(the_file, the_dst)
         except OSError, reason:
@@ -766,7 +767,7 @@ def get_interpolator(**kwargs):
 
 def progress(i, max_i):
     """progress indicator"""
-    if sys.stdout.isatty():
+    if sys.stdout.isatty() and not parameters.quiet:
         try:
             if i % (max_i / 100) > 0:
                 return

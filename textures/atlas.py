@@ -48,7 +48,7 @@ class Atlas(Region):
             try:
                 atlas.paste(the_image, (the_texture._x, the_texture._y))
             except ValueError:
-                logging.info("%s: Skipping an empty texture" % self.name)
+                logging.debug("%s: Skipping an empty texture" % self.name)
         atlas.save(filename, optimize=True)
 
     def pack(self, the_texture):

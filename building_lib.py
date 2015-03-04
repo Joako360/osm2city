@@ -105,7 +105,7 @@ def check_height(building_height, t):
         if building_height >= t.v_cuts_meters[0] and building_height <= t.v_size_meters:
 #            print "--->"
             if t.v_align_bottom or parameters.BUILDING_FAKE_AMBIENT_OCCLUSION:
-                logging.debug("from bottom")
+                logging.verbose("from bottom")
                 for i in range(len(t.v_cuts_meters)):
                     if t.v_cuts_meters[i] >= building_height:
 #                        print "bot trying %g >= %g ?" % (t.v_cuts_meters[i],  building_height)
@@ -479,7 +479,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             pass
 #
         # -- determine facade and roof textures
-        logging.debug("___find facade")
+        logging.verbose("___find facade")
         if b.parent is None:
             b.facade_texture = facades.find_matching(facade_requires, b.tags, b.height, b.longest_edge_len)
         else:
@@ -490,7 +490,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 b.parent.facade_texture = b.facade_texture
             else:
                 b.facade_texture = b.parent.facade_texture
-        logging.debug("__done" + str(b.facade_texture))
+        logging.verbose("__done" + str(b.facade_texture))
         if not b.facade_texture:
             tools.stats.skipped_texture += 1
             logging.info("Skipping building (no matching texture)")

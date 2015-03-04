@@ -846,7 +846,12 @@ def main():
                       help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
     parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
     parser.add_argument("-b", "--bridges-only", action="store_true", help="create only bridges and embankments")
+    parser.add_argument("-l", "--loglevel", help="set loglevel. Valid levels are DEBUG, INFO, WARNING, ERROR, CRITICAL")
+
     args = parser.parse_args()
+
+    # -- command line args override paramters
+    parameters.set_loglevel(args.loglevel)
 
     if args.filename is not None:
         parameters.read_from_file(args.filename)
