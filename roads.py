@@ -289,10 +289,10 @@ class Roads(objectlist.ObjectList):
             h_add = np.array([abs(self.nodes_dict[the_ref].h_add) for the_ref in the_way.refs])
             if h_add.sum() == 0:
                 self.roads_list.remove(the_way)
-                logging.info("kick %i", the_way.osm_id)
+                logging.debug("kick %i", the_way.osm_id)
     
     def create_linear_objects(self):
-        self.G=nx.Graph()
+        self.G = nx.Graph()
 
         for the_way in self.ways_list:
             prio = None
@@ -838,8 +838,6 @@ def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
     
 
 def main():
-    #logging.basicConfig(level=logging.INFO)
-    logging.basicConfig(level=logging.DEBUG)
     import argparse
     parser = argparse.ArgumentParser(description="bridge.py reads OSM data and creates bridge models for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
@@ -862,7 +860,6 @@ def main():
         parameters.CREATE_BRIDGES_ONLY = True
 
     #parameters.show()
-
     center_global = parameters.get_center_global()
     osm_fname = parameters.get_OSM_file_name()
     transform = coordinates.Transformation(center_global, hdg=0)
