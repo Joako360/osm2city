@@ -261,6 +261,7 @@ DEBUG_PLOT = 0
 CREATE_BRIDGES_ONLY = 0         # create only bridges and embankments
 # default_args_end # DO NOT MODIFY THIS LINE
 
+quiet = False
 
 def get_OSM_file_name():
     """
@@ -283,6 +284,8 @@ def show():
     """
     Prints all parameters as key = value
     """
+    global quiet
+    if quiet: return
     print '--- Using the following parameters: ---'
     my_globals = globals()
     for k in sorted(my_globals.iterkeys()):
@@ -298,9 +301,9 @@ def show():
             continue
         elif isinstance(my_globals[k], types.ListType):
             value = ', '.join(my_globals[k])
-            print k, '=', value
+            print '%s = %s' % (k, str(value))
         else:
-            print k, '=', my_globals[k]
+            print '%s = %s' % (k, my_globals[k])
     print '------'
 
 
@@ -343,16 +346,28 @@ def show_default():
         if do_print:
             print line,
             
-def set_loglevel(args):
+def set_loglevel(args_loglevel = None):
     """set loglevel from paramters or command line"""
-    try:
-        LOGLEVEL = args.loglevel
-    except:
-        pass
+    global LOGLEVEL
+    if args_loglevel != None:
+        LOGLEVEL = args_loglevel
+
+    # -- add another log level VERBOSE. Use this when logging stuff in loops, e.g. per-OSM-object
+    #    potentiallially flooding the screen
+    logging.VERBOSE = 5
+    logging.addLevelName(logging.VERBOSE, "VERBOSE")
+    logging.Logger.verbose = lambda inst, msg, *args, **kwargs: inst.log(logging.VERBOSE, msg, *args, **kwargs)
+    logging.verbose = lambda msg, *args, **kwargs: logging.log(logging.VERBOSE, msg, *args, **kwargs)
+
     numeric_level = getattr(logging, LOGLEVEL.upper(), None)
     if not isinstance(numeric_level, int):
         raise ValueError('Invalid log level: %s' % LOGLEVEL)
     logging.basicConfig(level=numeric_level)
+    
+    global quiet
+    if numeric_level > logging.INFO:
+        quiet = True
+        
 
 if __name__ == "__main__":
     # Handling arguments and parameters
