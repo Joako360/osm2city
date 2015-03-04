@@ -572,14 +572,11 @@ if __name__ == "__main__":
     parser.add_argument("-A", "--create-atlas-only", action="store_true", help="create texture atlas and exit")
     parser.add_argument("-a", "--create-atlas", action="store_true", help="create texture atlas")
     parser.add_argument("-u", dest="uninstall", action="store_true", help="uninstall ours from .stg")
-    parser.add_argument("-d", dest="debug", default=False, action="store_true", help="set loglevel=DEBUG")
+    parser.add_argument("-l", "--loglevel", help="set loglevel. Valid levels are DEBUG, INFO, WARNING, ERROR, CRITICAL")
     args = parser.parse_args()
 
     # -- command line args override paramters
-    if args.debug:
-        logging.basicConfig(level=logging.DEBUG)
-    else:
-        logging.basicConfig(level=logging.INFO)
+    parameters.set_loglevel(args)
 
     if args.filename is not None:
         parameters.read_from_file(args.filename)

@@ -9,6 +9,8 @@ The assigned values are default values. The Config files will overwrite them
 Created on May 27, 2013
 
 @author: vanosten
+
+Ludomotico contributed a cleaner version of read_from_file().
 """
 
 import argparse
@@ -18,11 +20,13 @@ from os.path import os
 from vec2d import vec2d
 from pdb import pm
 import logging
+import traceback
 
 # default_args_start # DO NOT MODIFY THIS LINE
 #=============================================================================
 # PARAMETERS FOR ALL osm2city MODULES
 #=============================================================================
+LOGLEVEL = "INFO"
 
 # -- Scenery folder, typically a geographic name or the ICAO code of the airport
 PREFIX = "LSZR"
@@ -258,30 +262,6 @@ CREATE_BRIDGES_ONLY = 0         # create only bridges and embankments
 # default_args_end # DO NOT MODIFY THIS LINE
 
 
-def set_parameters(param_dict):
-    for k in param_dict:
-        if k in globals():
-            if isinstance(globals()[k], types.BooleanType):
-                globals()[k] = parse_bool(k, param_dict[k])
-            elif isinstance(globals()[k], types.FloatType):
-                float_value = parse_float(k, param_dict[k])
-                if None is not float_value:
-                    globals()[k] = float_value
-            elif isinstance(globals()[k], types.IntType):
-                int_value = parse_int(k, param_dict[k])
-                if None is not int_value:
-                    globals()[k] = int_value
-            elif isinstance(globals()[k], types.StringType):
-                if None is not param_dict[k]:
-                    globals()[k] = param_dict[k].strip().strip('"\'')
-            elif isinstance(globals()[k], types.ListType):
-                globals()[k] = parse_list(param_dict[k])
-            else:
-                print "Parameter", k, "has an unknown type/value:", param_dict[k]
-        else:
-            print "Ignoring unknown parameter", k
-
-
 def get_OSM_file_name():
     """
     Returns the path to the OSM File
@@ -324,86 +304,29 @@ def show():
     print '------'
 
 
-def parse_list(string_value):
-    """
-    Tries to parse a string containing comma separated values and returns a list
-    """
-    my_list = []
-    if None is not string_value:
-        my_list = string_value.split(',')
-        for index in range(len(my_list)):
-            my_list[index] = my_list[index].strip().strip('"\'')
-    return my_list
-
-
-def parse_float(key, string_value):
-    """
-    Tries to parse a string and get a float. If it is not possible, then None is returned.
-    On parse exception the key and the value are printed to console
-    """
-    float_value = None
-    try:
-        float_value = float(string_value)
-    except ValueError:
-        print 'Unable to convert', string_value, 'to decimal number. Relates to key', key
-    return float_value
-
-
-def parse_int(key, string_value):
-    """
-    Tries to parse a string and get an int. If it is not possible, then None is returned.
-    On parse exception the key and the value are printed to console
-    """
-    int_value = None
-    try:
-        int_value = int(string_value)
-    except ValueError:
-        print 'Unable to convert', string_value, 'to number. Relates to key', key
-    return int_value
-
-
-def parse_bool(key, string_value):
-    """
-    Tries to parse a string and get a boolean. If it is not possible, then False is returned.
-    """
-    if string_value.lower() in ("yes", "true", "on", "1"):
-        return True
-    if string_value.lower() in ("no", "false", "off", "0"):
-        return False
-    print "Boolean value %s for %s not understood. Assuming False." % (string_value, key)
-    # FIXME: bail out if not understood!
-    return False
-
-
 def read_from_file(filename):
-    logging.info('Reading parameters from file:%s'%filename)
+    logging.info('Reading parameters from file: %s' % filename)
+    file_globals = dict()
+    default_globals = globals()
     try:
-        f = open(filename, 'r')
-        param_dict = {}
-        full_line = ""
-        for line in f:
-            # -- ignore comments and empty lines
-            line = line.split('#')[0].strip()
-            if line == "":
-                continue
-
-            full_line += line  # -- allow for multi-line lists
-            if line.endswith(","):
-                continue
-
-            pair = full_line.split("=", 1)
-            key = pair[0].strip().upper()
-            value = None
-            if 2 == len(pair):
-                value = pair[1].strip()
-            param_dict[key] = value
-            full_line = ""
-
-        set_parameters(param_dict)
-        f.close()
+        execfile(filename, file_globals)
     except IOError, reason:
-        print "Error processing file with parameters:", reason
+        logging.error("Error processing file with parameters:", reason)
         sys.exit(1)
+    except NameError:
+        print traceback.format_exc()
+        logging.error("Error while reading " + filename + ". Perhaps an unquoted string in your parameters file?")
+        sys.exit(1)
+        
+    for k, v in file_globals.iteritems():
+        if k.startswith('_'): 
+            continue
+        k = k.upper()
+        if k in default_globals:
+            default_globals[k] = v
+        else:
+            logging.warn('Unknown parameter: %s=%s' % (k, v))
+
 
 def show_default():
     """show default parameters by printing all params defined above between
@@ -419,6 +342,17 @@ def show_default():
             return
         if do_print:
             print line,
+            
+def set_loglevel(args):
+    """set loglevel from paramters or command line"""
+    try:
+        LOGLEVEL = args.loglevel
+    except:
+        pass
+    numeric_level = getattr(logging, LOGLEVEL.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError('Invalid log level: %s' % LOGLEVEL)
+    logging.basicConfig(level=numeric_level)
 
 if __name__ == "__main__":
     # Handling arguments and parameters
