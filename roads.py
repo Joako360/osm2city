@@ -838,8 +838,6 @@ def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
     
 
 def main():
-    #logging.basicConfig(level=logging.INFO)
-    logging.basicConfig(level=logging.DEBUG)
     import argparse
     parser = argparse.ArgumentParser(description="bridge.py reads OSM data and creates bridge models for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
