@@ -349,7 +349,7 @@ class File(object):
           + lNumvert + Group(OneOrMore(lVertex)) \
           + Optional(lNumsurf + Group(OneOrMore(pSurf))) + lKids)#.setParseAction( convertObject ) 
 
-        pFile = lHeader + Group(Optional(OneOrMore(lMaterial))) + pObjectWorld \
+        pFile = lHeader + Group(OneOrMore(lMaterial)) + pObjectWorld \
           + Group(OneOrMore(pObject))
         
         self.p = pFile.parseFile(file_name)
@@ -372,6 +372,6 @@ if __name__ == "__main__":
         a.node(1,1,0)
         a.node(1,0,0)
         a.face([(0,0,0), (1,0,0), (2,0,0), (3,0,0)])
-        print a
         print a.total_faces(), a.total_nodes()
+        a.write('test')
 
