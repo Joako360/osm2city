@@ -84,7 +84,7 @@ class Piers(ObjectList):
         self.objects.append(pier)
 
     def write(self, elev):
-        ac = ac3d.Writer(tools.stats)
+        ac = ac3d.File(tools.stats)
         obj = ac.new_object('Piers', "Textures/Terrain/asphalt.png")
         for pier in self.objects[:]:
             length = len(pier.nodes)

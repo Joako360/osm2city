@@ -15,7 +15,7 @@ import math
 import string
 
 from vec2d import vec2d
-from textures import find_matching_texture
+from textures.manager import find_matching_texture
 # nobjects = 0
 nb = 0
 out = ""
@@ -104,7 +104,7 @@ def check_height(building_height, t):
         # - error acceptable?
         if building_height >= t.v_cuts_meters[0] and building_height <= t.v_size_meters:
 #            print "--->"
-            if 0 and t.v_align_bottom:
+            if t.v_align_bottom or parameters.BUILDING_FAKE_AMBIENT_OCCLUSION:
                 logging.debug("from bottom")
                 for i in range(len(t.v_cuts_meters)):
                     if t.v_cuts_meters[i] >= building_height:
@@ -691,7 +691,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
     def local_elev(p):
         return elev(p + offset) - tile_elev
 
-    ac = ac3d.Writer(tools.stats)
+    ac = ac3d.File(tools.stats)
     LOD_objects = []
     LOD_objects.append(ac.new_object('LOD_bare', 'tex/atlas_facades.png'))
     LOD_objects.append(ac.new_object('LOD_rough', 'tex/atlas_facades.png'))
@@ -789,9 +789,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
                 out_surf.write(roofs.flat(b, X, roof_ac_name_flat))
                 out_surf.write("kids 0\n")
 
-    f = open(ac_file_name, "w")
-    f.write(str(ac))
-    f.close()
+    ac.write(ac_file_name)
     # plot on-screen using matplotlib
     if 0:
         ac.plot()

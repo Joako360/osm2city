@@ -3,7 +3,7 @@
 # FIXME: check sign of angle
 
 """
-Ugly, highly experimental code.
+Deprecated, Ugly, highly experimental code.
 
 Created on Sun Sep 29 10:42:12 2013
 

@@ -95,6 +95,10 @@ BUILDING_SKEL_ROOFS_MAX_ANGLE = 50  #    have a random angle between MIN and MAX
 BUILDING_SKEL_MAX_NODES = 10        # -- max number of nodes for which we generate pySkeleton roofs
 BUILDING_SKEL_MAX_HEIGHT_RATIO = 0.7 # -- skip skel roofs if ratio of roof height to base building height is larger than this
 
+BUILDING_FAKE_AMBIENT_OCCLUSION = True
+BUILDING_FAKE_AMBIENT_OCCLUSION_HEIGHT = 6.
+BUILDING_FAKE_AMBIENT_OCCLUSION_VALUE = 0.7
+
 EXPERIMENTAL_INNER = 0              # -- do we still need this?
 
 # -- Parameters which influence the height of buildings if no info from OSM is available.

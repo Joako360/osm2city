@@ -562,8 +562,6 @@ def write_xml(path, fname, buildings):
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    #logging.basicConfig(level=logging.DEBUG)
 
     # -- Parse arguments. Command line overrides config file.
     parser = argparse.ArgumentParser(description="osm2city reads OSM data and creates buildings for use with FlightGear")
@@ -571,8 +569,16 @@ if __name__ == "__main__":
                       help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
     parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
     parser.add_argument("-c", dest="c", action="store_true", help="do not check for overlapping with static objects")
+    parser.add_argument("-T", "--do-textures-only", action="store_true", help="create texture atlas and exit")
+    parser.add_argument("-t", "--do-textures", action="store_true", help="create texture atlas")
     parser.add_argument("-u", dest="uninstall", action="store_true", help="uninstall ours from .stg")
+    parser.add_argument("-d", dest="debug", default=False, action="store_true", help="set loglevel=DEBUG")
     args = parser.parse_args()
+
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
 
     if args.filename is not None:
         parameters.read_from_file(args.filename)
@@ -591,15 +597,18 @@ if __name__ == "__main__":
     parameters.show()
 
     # -- initialize modules
-    tex.init()
 
     # -- prepare transformation to local coordinates
     cmin, cmax = parameters.get_extent_global()
     center = parameters.get_center_global()
 
-    #center = (11.38, 47.26)
     tools.init(coordinates.Transformation(center, hdg = 0))
-#    print tools.transform.toGlobal(cmin), tools.transform.toGlobal(cmax)
+
+    tex.manager.init(create_atlas=args.do_textures or args.do_textures_only)
+    
+    if args.do_textures_only:
+        sys.exit(0)
+
 
     logging.info("reading elevation data")
     elev = tools.get_interpolator(fake=parameters.NO_ELEV)
@@ -697,7 +706,7 @@ if __name__ == "__main__":
     #   - location clash with stg static models? drop building
     #   - TODO: analyze surrounding: similar shaped buildings nearby? will get same texture
     #   - set building type, roof type etc
-    buildings = building_lib.analyse(buildings, static_objects, tools.transform, elev, tex.facades, tex.roofs)
+    buildings = building_lib.analyse(buildings, static_objects, tools.transform, elev, tex.manager.facades, tex.manager.roofs)
 
     # -- initialize STG_Manager
     if parameters.PATH_TO_OUTPUT:

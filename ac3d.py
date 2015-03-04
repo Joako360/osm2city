@@ -3,11 +3,14 @@ import string
 import matplotlib.pyplot as plt
 import logging
 from pdb import pm
+import numpy as np
 
 from pyparsing import Literal, Word, quotedString, alphas, Optional, OneOrMore, \
-    Group, ParseException, nums, Combine, Regex, alphanums, LineEnd
+    Group, ParseException, nums, Combine, Regex, alphanums, LineEnd, Each
 
-fmt_node = '%1.6f'
+#fmt_node = '%1.6f'
+fmt_node = '%g'
+fmt_surf = '%1.4g'
 
 class Node(object):
     def __init__(self, x, y, z):
@@ -33,22 +36,28 @@ class Face(object):
         s = "SURF %s\n" % self.typ
         s += "mat %i\n" % self.mat
         s += "refs %i\n" % len(self.nodes_uv_list)
-        s += string.join(["%i %1.4g %1.4g\n" % (n[0], n[1], n[2]) for n in self.nodes_uv_list], '')
+        s += string.join([("%i " + fmt_surf + " " + fmt_surf + "\n") % (n[0], n[1], n[2]) for n in self.nodes_uv_list], '')
         return s
 
 
 class Object(object):
-    """An object (3D) in a AC3D filed with faces and nodes"""
-    def __init__(self, name, stats=None, texture=None, default_type=0x0, default_mat=0, default_swap_uv=False):
+    """An object (3D) in an AC3D file with faces and nodes"""
+    def __init__(self, name=None, stats=None, texture=None, texrep=None, texoff=None, rot=None, loc=None, crease=None, url=None, default_type=0x0, default_mat=0, default_swap_uv=False, kids=0):
         self._nodes = []
         self._faces = []
-        self.name = str(name)
-        assert name != ""
+        self.name = name
         self.stats = stats
         self.texture = texture
+        self.texrep = texrep
+        self.texoff = texoff
+        self.rot = rot
+        self.loc = loc
+        self.url = url
+        self.crease = crease
         self.default_type = default_type
         self.default_mat = default_mat
         self.default_swap_uv = default_swap_uv
+        self.kids = kids
 
     def close(self):
         pass
@@ -62,6 +71,12 @@ class Object(object):
 
     def next_node_index(self):
         return len(self._nodes)
+        
+    def total_nodes(self):
+        return len(self._nodes)
+
+    def total_faces(self):
+        return len(self._faces)
 
     def face(self, nodes_uv_list, typ=None, mat=None, swap_uv=None):
         """Add new face. Return its index."""
@@ -81,14 +96,27 @@ class Object(object):
 
     def __str__(self):
         s = 'OBJECT poly\n'
-        s += 'name "%s"\n' % self.name
+        if self.name != None:
+            s += 'name "%s"\n' % self.name
+        if self.texrep != None:
+            s += 'texrep %g %g\n' % (self.texrep[0], self.texrep[1])
+        if self.texoff != None:
+            s += 'texoff %g %g\n' % (self.texoff[0], self.texoff[1])
+        if self.rot != None:
+            s += 'rot %s\n' % string.join(["%g" % item for item in self.rot])
+        if self.loc != None:
+            s += 'loc %g %g %g\n' %  (self.loc[0], self.loc[1], self.loc[2])
+        if self.crease != None:
+            s += 'crease %g\n' % self.crease
+        if self.url != None:
+            s += 'url %s\n' % self.url 
         if self.texture:
             s += 'texture "%s"\n' %self.texture
         s += 'numvert %i\n' % len(self._nodes)
         s += string.join([str(n) for n in self._nodes], '')
         s += 'numsurf %i\n' % len(self._faces)
         s += string.join([str(f) for f in self._faces], '')
-        s += 'kids 0\n'
+        s += 'kids %i\n' % self.kids
         return s
 
     def plot(self):
@@ -139,14 +167,19 @@ class Label(Object):
                            (o+3,u0,v1)])
                 z += w
 
-class Writer(object):
+class File(object):
     """
-    Hold a number of objects. Each object holds nodes and faces.
-    Count nodes/surfaces etc internally, thereby eliminating a common source of bugs.
-    Can also add 3d labels (useful for debugging, disabled by default)
+    Hold a number of 3D objects, each object consiting of nodes and faces.
+    Either read objects from ac3d file or add them via new_object().
+    Can write ac3d files.
+    
+    When adding objects, count nodes/surfaces etc internally, thereby eliminating
+    a common source of bugs. Can also add 3d labels (useful for debugging, disabled
+    by default)
     """
     def __init__(self, stats, show_labels = False):
         self.objects = []
+        self.materials_list = []
         self.show_labels = show_labels
         self.stats = stats
         self._current_object = None
@@ -196,18 +229,30 @@ class Writer(object):
                 node.x -= cx
                 node.y -= cy
                 node.z -= cz
+                
+    def total_nodes(self):
+        """return total number of nodes of all objects"""
+        return np.array([o.total_nodes() for o in self.objects]).sum()
+
+    def total_faces(self):
+        """return total number of faces of all objects"""
+        return np.array([o.total_faces() for o in self.objects]).sum()
 
     def __str__(self):
         s = 'AC3Db\n'
-        s += 'MATERIAL "" rgb 1 1 1 amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0\n'
+        if self.materials_list:
+            s += string.join(['MATERIAL %s\n' % the_mat for the_mat in self.materials_list], '')
+        else:
+            s += 'MATERIAL "" rgb 1 1 1 amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0\n'
 #        s += 'MATERIAL "" rgb 1 1 1 amb 0.5 0.5 0.5 emis 1 1 1 spec 0.5 0.5 0.5 shi 64 trans 0\n'
         non_empty = [o for o in self.objects if not o.is_empty()]
+        # FIXME: this doesnt handle nested kids properly
         s += 'OBJECT world\nkids %i\n' % len(non_empty)
-        s += string.join([str(o) for o in non_empty])
+        s += string.join([str(o) for o in non_empty], '')
         return s
 
-    def write_to_file(self, file_name):
-        f = open(file_name + '.ac', 'w')
+    def write(self, file_name):
+        f = open(file_name, 'w')
         f.write(str(self))
         f.close()
 
@@ -216,38 +261,53 @@ class Writer(object):
         for o in non_empty:
             o.plot()
     
-    
-    def parse(self):
-        def convertObject(tokens):
-            print "got tokens!", tokens
-            print "--------"
-            #bla
-            #o = Object(name, self.stats, texture, **kwargs)
-            #self.objects.append(o)
-            #self._current_object = o
-            #return o
+    def read(self, file_name):
+        """read an ac3d file. TODO: groups, nested kids"""
+#        def convertObject(tokens):
+#            pass
+        def convertLMaterial(tokens):
+            self.materials_list.append(tokens[1])
+
         def convertLObj(tokens):
-            #print "got LObj", tokens
             self.new_object(None, None)
 
+        def convertLKids(tokens):
+            self._current_object.kids = int(tokens[1])
+
         def convertLName(tokens):
-            #print "got LName", tokens
             self._current_object.name = tokens[1].strip('"\'')
 
         def convertLTexture(tokens):
-            #print "got LText", tokens
             self._current_object.texture = tokens[1].strip('"\'')
 
+        def _token2array(tokens, num):
+            return np.array([float(item) for item in tokens[1:num + 1]])
+
+        def convertLTexrep(tokens):
+            self._current_object.texrep = _token2array(tokens, 2)
+
+        def convertLTexoff(tokens):
+            self._current_object.texoff = _token2array(tokens, 2)
+
+        def convertLRot(tokens):
+            self._current_object.rot = _token2array(tokens, 9)
+
+        def convertLCrease(tokens):
+            self._current_object.crease = tokens[1]
+            
+        def convertLLoc(tokens):
+            self._current_object.loc = _token2array(tokens, 3)
+
+        def convertLUrl(tokens):
+            self._current_object.url = tokens[1]
+
         def convertLVertex(tokens):
-            #print "got LVert", tokens
             self._current_object.node(tokens[0], tokens[1], tokens[2])
 
         def convertSurf(tokens):
-            #print "got Surf", tokens
             assert(tokens[0] == 'SURF')
             assert(tokens[2] == 'mat')
             assert(tokens[4] == 'refs')
-            
             self._current_object.face(nodes_uv_list = tokens[6], typ = tokens[1], mat = tokens[3])
 
         def convertIntegers(tokens):
@@ -262,14 +322,20 @@ class Writer(object):
         anything = Regex(r'.*')
         
         lHeader = Literal('AC3Db') + LineEnd()
+        lMaterial = (Literal('MATERIAL') + anything + LineEnd()).setParseAction(convertLMaterial)
         lObject = (Literal('OBJECT') + Word(alphas)).setParseAction(convertLObj)
-        lKids = (Literal('kids') + integer).setResultsName('kids')
+        lKids = (Literal('kids') + integer + LineEnd()).setParseAction(convertLKids)
         lName = (Literal('name') + anything + LineEnd()).setParseAction(convertLName)
+#        lData = (Literal('data') + anything + LineEnd()).setParseAction(convertLName)
         lTexture = (Literal('texture') + anything + LineEnd()).setParseAction(convertLTexture)
-        lTexrep = Literal('texrep') + floatNumber + floatNumber
+        lTexrep = (Literal('texrep') + floatNumber + floatNumber).setParseAction(convertLTexrep)
+        lTexoff = (Literal('texoff') + floatNumber + floatNumber).setParseAction(convertLTexoff)
+        lRot = (Literal('rot') + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber).setParseAction(convertLRot)
+        lLoc = (Literal('loc') + floatNumber + floatNumber + floatNumber).setParseAction(convertLLoc)
+        lCrease = (Literal('crease') + floatNumber).setParseAction(convertLCrease)
+        lUrl = (Literal('url') + anything + LineEnd()).setParseAction(convertLUrl)
         lNumvert = Literal('numvert') + Word(nums)
         lVertex = (floatNumber + floatNumber + floatNumber).setParseAction(convertLVertex)
-        lMaterial = Literal('MATERIAL') + anything + LineEnd()
         lNumsurf = Literal('numsurf') + Word(nums)
         lSurf = Literal('SURF') + Word(alphanums)
         lMat = Literal('mat') + integer
@@ -278,32 +344,34 @@ class Writer(object):
         
         pObjectWorld = Group(lObject + lKids)
         pSurf = (lSurf + Optional(lMat) + lRefs + Group(OneOrMore(lNodes))).setParseAction( convertSurf )
-        pObject = Group(lObject + lName + Optional(lTexture) + Optional(lTexrep) \
+        pObject = Group(lObject + Each([Optional(lName), Optional(lTexture), Optional(lTexrep), \
+            Optional(lTexoff), Optional(lRot), Optional(lLoc), Optional(lUrl), Optional(lCrease)]) \
           + lNumvert + Group(OneOrMore(lVertex)) \
-          + Optional(lNumsurf + Group(OneOrMore(pSurf))) + lKids).setParseAction( convertObject ) 
+          + Optional(lNumsurf + Group(OneOrMore(pSurf))) + lKids)#.setParseAction( convertObject ) 
 
         pFile = lHeader + Group(OneOrMore(lMaterial)) + pObjectWorld \
           + Group(OneOrMore(pObject))
         
-        self.p = pFile.parseFile('tower-usaf-40m.ac')
+        self.p = pFile.parseFile(file_name)
     
-        # todo: texrep rot loc url data
+        # todo: 
         # groups -- how do they work?
     
     
 if __name__ == "__main__":
-    a = Writer(None)
-    a.parse()
+    a = File(None)
+    a.read('big-hangar.ac')
     
-    print "print\n", a
+    print "%s" % str(a)
 
     if 0:
-        a = Writer(None)
+        a = File(None)
         a.new_object('bla', '')
         a.node(0,0,0)
         a.node(0,1,0)
         a.node(1,1,0)
         a.node(1,0,0)
         a.face([(0,0,0), (1,0,0), (2,0,0), (3,0,0)])
-        print a
+        print a.total_faces(), a.total_nodes()
+        a.write('test.ac')
 
