@@ -576,11 +576,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # -- command line args override paramters
-    parameters.set_loglevel(args.loglevel)
 
     if args.filename is not None:
         parameters.read_from_file(args.filename)
 
+    parameters.set_loglevel(args.loglevel)
+    
     if args.e:
         parameters.NO_ELEV = True
     if args.c:
