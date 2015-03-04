@@ -1,5 +1,7 @@
 SHARED_FOLDER=$(HOME)/Dropbox/Public/fg/osm2city/
 
+.PHONY: clean tex-release
+
 tex-release:
 	tar czf tex.tar.gz tex/
 	tar czf tex_src.tar.gz tex.src/
