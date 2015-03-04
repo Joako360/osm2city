@@ -211,19 +211,18 @@ class Platforms(ObjectList):
 
 
 def main():
-    logging.basicConfig(level=logging.INFO)
-    # logging.basicConfig(level=logging.DEBUG)
-
     import argparse
     parser = argparse.ArgumentParser(description="platform.py reads OSM data and creates platform models for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                       help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
+    parser.add_argument("-l", "--loglevel", help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL")
 #    parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
 #    parser.add_argument("-c", dest="c", action="store_true", help="do not check for overlapping with static objects")
     args = parser.parse_args()
 
     if args.filename is not None:
         parameters.read_from_file(args.filename)
+    parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
 
 #    if args.e:
 #        parameters.NO_ELEV = True
