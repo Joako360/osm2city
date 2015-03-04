@@ -13,7 +13,7 @@ class Region(object):
         self.y = y        
         self.width_px = width
         self.height_px = height
-        logging.debug("  New Region " + str(self))
+        logging.verbose("  New Region " + str(self))
 
     def __str__(self):
         return "(%i x %i + %i + %i)" % (self.width_px, self.height_px, 
@@ -57,10 +57,10 @@ class Atlas(Region):
         for the_region in self.regions:
             if self._pack(the_texture, the_region):
                 self._textures.append(the_texture)
-                logging.debug("  packed at %i %i" % (the_texture._x, the_texture._y))
-                logging.debug("now have %i regions" % len(self.regions))
+                logging.verbose("  packed at %i %i" % (the_texture._x, the_texture._y))
+                logging.verbose("now have %i regions" % len(self.regions))
                 for the_region in self.regions:
-                    logging.debug("  - " + str(the_region))
+                    logging.verbose("  - " + str(the_region))
                 return True
         return False
 
@@ -101,13 +101,13 @@ class Atlas(Region):
         assert(the_texture.width_px > 0)
         if the_texture.height_px == the_region.height_px:
             if the_texture.width_px == the_region.width_px:
-                logging.debug("H split exact fit")
+                logging.verbose("H split exact fit")
                 the_texture._x = the_region.x
                 the_texture._y = the_region.y
                 self.regions.remove(the_region)
                 return True
             elif the_texture.width_px < the_region.width_px:
-                logging.debug("H split")
+                logging.verbose("H split")
                 # split horiz
                 the_texture._x = the_region.x
                 the_texture._y = the_region.y
@@ -116,16 +116,16 @@ class Atlas(Region):
                 self.check_regions()
                 return True
             else:
-                logging.debug("H too small (%i < %i), trying next" % (the_region.width_px, the_texture.width_px))
+                logging.verbose("H too small (%i < %i), trying next" % (the_region.width_px, the_texture.width_px))
                 return False
         elif the_texture.height_px > the_region.height_px:
-            logging.debug("V too small, trying next")
+            logging.verbose("V too small, trying next")
             return False
         else:
             # check if it fits width
             if the_texture.width_px > the_region.width_px:
                 return False
-            logging.debug("V split")
+            logging.verbose("V split")
             # vertical split
             the_texture._x = the_region.x
             the_texture._y = the_region.y
