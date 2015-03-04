@@ -169,9 +169,13 @@ class Label(Object):
 
 class File(object):
     """
-    Hold a number of objects. Each object holds nodes and faces.
-    Count nodes/surfaces etc internally, thereby eliminating a common source of bugs.
-    Can also add 3d labels (useful for debugging, disabled by default)
+    Hold a number of 3D objects, each object consiting of nodes and faces.
+    Either read objects from ac3d file or add them via new_object().
+    Can write ac3d files.
+    
+    When adding objects, count nodes/surfaces etc internally, thereby eliminating
+    a common source of bugs. Can also add 3d labels (useful for debugging, disabled
+    by default)
     """
     def __init__(self, stats, show_labels = False):
         self.objects = []
@@ -258,8 +262,9 @@ class File(object):
             o.plot()
     
     def read(self, file_name):
-        def convertObject(tokens):
-            pass
+        """read an ac3d file. TODO: groups, nested kids"""
+#        def convertObject(tokens):
+#            pass
         def convertLMaterial(tokens):
             self.materials_list.append(tokens[1])
 
@@ -297,15 +302,12 @@ class File(object):
             self._current_object.url = tokens[1]
 
         def convertLVertex(tokens):
-            #print "got LVert", tokens
             self._current_object.node(tokens[0], tokens[1], tokens[2])
 
         def convertSurf(tokens):
-            #print "got Surf", tokens
             assert(tokens[0] == 'SURF')
             assert(tokens[2] == 'mat')
             assert(tokens[4] == 'refs')
-            
             self._current_object.face(nodes_uv_list = tokens[6], typ = tokens[1], mat = tokens[3])
 
         def convertIntegers(tokens):
@@ -347,7 +349,7 @@ class File(object):
           + lNumvert + Group(OneOrMore(lVertex)) \
           + Optional(lNumsurf + Group(OneOrMore(pSurf))) + lKids)#.setParseAction( convertObject ) 
 
-        pFile = lHeader + Group(OneOrMore(lMaterial)) + pObjectWorld \
+        pFile = lHeader + Group(Optional(OneOrMore(lMaterial))) + pObjectWorld \
           + Group(OneOrMore(pObject))
         
         self.p = pFile.parseFile(file_name)
