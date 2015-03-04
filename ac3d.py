@@ -71,6 +71,12 @@ class Object(object):
 
     def next_node_index(self):
         return len(self._nodes)
+        
+    def total_nodes(self):
+        return len(self._nodes)
+
+    def total_faces(self):
+        return len(self._faces)
 
     def face(self, nodes_uv_list, typ=None, mat=None, swap_uv=None):
         """Add new face. Return its index."""
@@ -219,6 +225,14 @@ class Writer(object):
                 node.x -= cx
                 node.y -= cy
                 node.z -= cz
+                
+    def total_nodes(self):
+        """return total number of nodes of all objects"""
+        return np.array([o.total_nodes() for o in self.objects]).sum()
+
+    def total_faces(self):
+        """return total number of faces of all objects"""
+        return np.array([o.total_faces() for o in self.objects]).sum()
 
     def __str__(self):
         s = 'AC3Db\n'
@@ -243,16 +257,9 @@ class Writer(object):
         for o in non_empty:
             o.plot()
     
-    def parse(self):
+    def parse(self, filename):
         def convertObject(tokens):
             pass
-            #print "got tokens!", tokens
-            #print "--------"
-            #bla
-            #o = Object(name, self.stats, texture, **kwargs)
-            #self.objects.append(o)
-            #self._current_object = o
-            #return o
         def convertLMaterial(tokens):
             self.materials_list.append(tokens[1])
 
@@ -338,12 +345,12 @@ class Writer(object):
         pObject = Group(lObject + Each([Optional(lName), Optional(lTexture), Optional(lTexrep), \
             Optional(lTexoff), Optional(lRot), Optional(lLoc), Optional(lUrl), Optional(lCrease)]) \
           + lNumvert + Group(OneOrMore(lVertex)) \
-          + Optional(lNumsurf + Group(OneOrMore(pSurf))) + lKids).setParseAction( convertObject ) 
+          + Optional(lNumsurf + Group(OneOrMore(pSurf))) + lKids)#.setParseAction( convertObject ) 
 
         pFile = lHeader + Group(OneOrMore(lMaterial)) + pObjectWorld \
           + Group(OneOrMore(pObject))
         
-        self.p = pFile.parseFile('big-hangar.ac')
+        self.p = pFile.parseFile(filename)
     
         # todo: 
         # groups -- how do they work?
@@ -351,7 +358,7 @@ class Writer(object):
     
 if __name__ == "__main__":
     a = Writer(None)
-    a.parse()
+    a.parse('big-hangar.ac')
     
     print "%s" % str(a)
 
@@ -364,4 +371,6 @@ if __name__ == "__main__":
         a.node(1,0,0)
         a.face([(0,0,0), (1,0,0), (2,0,0), (3,0,0)])
         print a
+    
+    print a.total_faces(), a.total_nodes()
 
