@@ -137,7 +137,6 @@ def reset_nb():
 
 def get_nodes_from_acs(objs, own_prefix):
     """load all .ac and .xml, extract nodes, skipping own .ac starting with own_prefix"""
-    # FIXME: use real ac3d reader: https://github.com/majic79/Blender-AC3D/blob/master/io_scene_ac3d/import_ac3d.py
     # FIXME: don't skip .xml
     # skip own .ac city-*.xml
 
@@ -155,39 +154,16 @@ def get_nodes_from_acs(objs, own_prefix):
         # FIXME: also read OBJECT_SHARED.
         if fname.endswith(".ac") and b.stg_typ == "OBJECT_STATIC":
             print "READ_AC", b.name
-            try:
-                ac = open(fname, 'r')
-            except:
-                print "can't open", fname
-                continue
+            ac = ac3d.File(file_name=fname, stats=None)
+
             angle = radians(b.stg_hdg)
-            R = np.array([[cos(angle), -sin(angle)],
-                          [sin(angle), cos(angle)]])
+            Rot_mat = np.array([[cos(angle), -sin(angle)],
+                                [sin(angle), cos(angle)]])
 
-            ac_nodes = np.array([[0, 0]])
-            lines = ac.readlines()
-            i = 0
-            while (i < len(lines)):
-                if lines[i].startswith('numvert'):
-                    line = lines[i]
-                    numvert = int(line.split()[1])
-                    # print "numvert", numvert
-                    for j in range(numvert):
-                        i += 1
-                        splitted = lines[i].split()
-                        node = np.array([-float(splitted[2]),
-                                         - float(splitted[0])])
-
-                        node = np.dot(R, node).reshape(1, 2)
-                        ac_nodes = np.append(ac_nodes, node, 0)
-                        # stg_hdg
-
-                i += 1
-            ac.close()
-
-#            ac_nodes = R.dot(ac_nodes)
-            ac_nodes += b.anchor.as_array()
-            all_nodes = np.append(all_nodes, ac_nodes, 0)
+            ac_nodes = -np.delete(ac.nodes_as_array().transpose(), 1, 0)[::-1]
+            ac_nodes = np.dot(Rot_mat, ac_nodes)
+            ac_nodes += b.anchor.as_array().reshape(2,1)
+            all_nodes = np.append(all_nodes, ac_nodes.transpose(), 0)
             # print "------"
 
     return all_nodes
@@ -691,7 +667,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
     def local_elev(p):
         return elev(p + offset) - tile_elev
 
-    ac = ac3d.File(tools.stats)
+    ac = ac3d.File(stats=tools.stats)
     LOD_objects = []
     LOD_objects.append(ac.new_object('LOD_bare', 'tex/atlas_facades.png'))
     LOD_objects.append(ac.new_object('LOD_rough', 'tex/atlas_facades.png'))
