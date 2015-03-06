@@ -503,7 +503,7 @@ def max_slope_for_road(obj):
 
 
 def main():
-    ac = ac3d.File(tools.stats)
+    ac = ac3d.File(stats=tools.stats)
     obj = ac.new_object('roads', 'tex/bridge.png')
     line.write_to(obj)
 
