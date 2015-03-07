@@ -345,7 +345,8 @@ class File(object):
         
         anything = Regex(r'.*')
         
-        lHeader = Literal('AC3Db') + LineEnd()
+#       Relaxed see Tor_Ness_Lighthouse.xml  
+        lHeader = Regex('AC3Db[S]*') + LineEnd()
         lMaterial = (Literal('MATERIAL') + anything + LineEnd()).setParseAction(convertLMaterial)
         lObject = (Literal('OBJECT') + Word(alphas)).setParseAction(convertLObj)
         lKids = (Literal('kids') + integer + LineEnd()).setParseAction(convertLKids)
@@ -377,7 +378,10 @@ class File(object):
         pFile = lHeader + Group(OneOrMore(lMaterial)) + pObjectWorld \
           + Group(OneOrMore(pObject))
         
-        self.p = pFile.parseFile(file_name)
+        try:
+            self.p = pFile.parseFile(file_name)
+        except IOError, e:
+            logging.warning(e)
     
         # todo: 
         # groups -- how do they work?
