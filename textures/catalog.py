@@ -547,6 +547,9 @@ def append_roofs(tex_prefix, roofs):
     roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_black_1.png',
         100., [], True, 100., [], False, provides=['color:black', 'compat:roof-flat']))
 
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_gray_1.png',
+        100., [], True, 100., [], False, provides=['color:gray', 'compat:roof-flat']))
+
     roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_gray_2.png',
         100., [], True, 100., [], False, provides=['color:gray', 'compat:roof-flat']))
 
