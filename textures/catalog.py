@@ -535,28 +535,27 @@ def append_roofs(tex_prefix, roofs):
 #    roofs.append(Texture(tex_prefix + 'tex.src/roof_tiled_red',
 #                         1., [], True, 1., [], False, provides=['color:red']))
 
-    roofs.append(Texture(tex_prefix + 'tex.src/roof_red_1.png',
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_red1.png',
         31.8, [], True, 16.1, [], False, provides=['color:red', 'compat:roof-pitched']))
 
-    roofs.append(Texture(tex_prefix + 'tex.src/roof_black_1.png',
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_black1.png',
         31.8, [], True, 16.1, [], False, provides=['color:black', 'compat:roof-pitched']))
 
     roofs.append(Texture(tex_prefix + 'tex.src/roof_black4.jpg',
         6., [], True, 3.5, [], False, provides=['color:black', 'compat:roof-pitched']))
 
-    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_black_1.png',
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_black1.png',
         100., [], True, 100., [], False, provides=['color:black', 'compat:roof-flat']))
 
-    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_gray_1.png',
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_gray1.png',
+        100., [], True, 100., [], False, provides=['color:gray', 'compat:roof-flat']))
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_gray2.png',
         100., [], True, 100., [], False, provides=['color:gray', 'compat:roof-flat']))
 
-    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_gray_2.png',
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_gray3.png',
         100., [], True, 100., [], False, provides=['color:gray', 'compat:roof-flat']))
 
-    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_gray_3.png',
-        100., [], True, 100., [], False, provides=['color:gray', 'compat:roof-flat']))
-
-    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_brown_1.png',
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_brown1.png',
         100., [], True, 100., [], False, provides=['color:brown', 'compat:roof-flat']))
 
 #    roofs.append(Texture(tex_prefix + 'tex.src/roof_black2',

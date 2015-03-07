@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import string
 import matplotlib.pyplot as plt
 import logging
@@ -68,6 +69,10 @@ class Object(object):
         if self.stats:
             self.stats.vertices += 1
         return len(self._nodes) - 1
+        
+    def nodes_as_array(self):
+        """return all nodes as a numpy array"""
+        return np.array([(n.x, n.y, n.z) for n in self._nodes])
 
     def next_node_index(self):
         return len(self._nodes)
@@ -177,13 +182,16 @@ class File(object):
     a common source of bugs. Can also add 3d labels (useful for debugging, disabled
     by default)
     """
-    def __init__(self, stats, show_labels = False):
+    def __init__(self, file_name = None, stats=None, show_labels = False):
+        """Read ac3d data from file_name if given. Otherwise create empty ac3d object"""
         self.objects = []
         self.materials_list = []
         self.show_labels = show_labels
         self.stats = stats
         self._current_object = None
         self.label_object = None
+        if file_name != None:
+            self.read(file_name)
 
     def new_object(self, name, texture, **kwargs):
         o = Object(name, self.stats, texture, **kwargs)
@@ -237,7 +245,16 @@ class File(object):
     def total_faces(self):
         """return total number of faces of all objects"""
         return np.array([o.total_faces() for o in self.objects]).sum()
-
+    
+    def nodes_as_array(self):
+        """return all nodes as a numpy array"""
+        the_nodes = np.zeros((0,3))
+        for o in self.objects:
+            if o.is_empty(): continue
+            a = o.nodes_as_array()
+            the_nodes = np.vstack((the_nodes, a))
+        return the_nodes
+    
     def __str__(self):
         s = 'AC3Db\n'
         if self.materials_list:
@@ -270,9 +287,16 @@ class File(object):
 
         def convertLObj(tokens):
             self.new_object(None, None)
+            self._current_object._type = tokens[1]
+            
 
         def convertLKids(tokens):
             self._current_object.kids = int(tokens[1])
+
+        def convertLData(tokens):
+            #print "data", tokens
+            #self._current_object.name = tokens[1].strip('"\'')
+            pass
 
         def convertLName(tokens):
             self._current_object.name = tokens[1].strip('"\'')
@@ -326,7 +350,7 @@ class File(object):
         lObject = (Literal('OBJECT') + Word(alphas)).setParseAction(convertLObj)
         lKids = (Literal('kids') + integer + LineEnd()).setParseAction(convertLKids)
         lName = (Literal('name') + anything + LineEnd()).setParseAction(convertLName)
-#        lData = (Literal('data') + anything + LineEnd()).setParseAction(convertLName)
+        lData = (Literal('data') + anything + LineEnd() + anything + LineEnd()).setParseAction(convertLData)
         lTexture = (Literal('texture') + anything + LineEnd()).setParseAction(convertLTexture)
         lTexrep = (Literal('texrep') + floatNumber + floatNumber).setParseAction(convertLTexrep)
         lTexoff = (Literal('texoff') + floatNumber + floatNumber).setParseAction(convertLTexoff)
@@ -344,10 +368,11 @@ class File(object):
         
         pObjectWorld = Group(lObject + lKids)
         pSurf = (lSurf + Optional(lMat) + lRefs + Group(OneOrMore(lNodes))).setParseAction( convertSurf )
-        pObject = Group(lObject + Each([Optional(lName), Optional(lTexture), Optional(lTexrep), \
+        pObject = Group(lObject + Each([Optional(lName), Optional(lData), Optional(lTexture), Optional(lTexrep), \
             Optional(lTexoff), Optional(lRot), Optional(lLoc), Optional(lUrl), Optional(lCrease)]) \
-          + lNumvert + Group(OneOrMore(lVertex)) \
-          + Optional(lNumsurf + Group(OneOrMore(pSurf))) + lKids)#.setParseAction( convertObject ) 
+          + Optional(lNumvert + Group(OneOrMore(lVertex)) \
+                   + Optional(lNumsurf + Group(OneOrMore(pSurf)))) \
+          + lKids)#.setParseAction( convertObject ) 
 
         pFile = lHeader + Group(OneOrMore(lMaterial)) + pObjectWorld \
           + Group(OneOrMore(pObject))
@@ -359,19 +384,63 @@ class File(object):
     
     
 if __name__ == "__main__":
-    a = File(None)
-    a.read('big-hangar.ac')
-    
-    print "%s" % str(a)
-
+    a = File()
+    #a.read('big-hangar.ac')
+    #nn =  a.nodes_as_array()
+    #print nn.shape
+    #print "%s" % str(a)
+    from math import sin, cos, radians
     if 0:
-        a = File(None)
+        a = File()
         a.new_object('bla', '')
         a.node(0,0,0)
-        a.node(0,1,0)
-        a.node(1,1,0)
+        a.node(0,0,1)
+        a.node(1,0,1)
         a.node(1,0,0)
         a.face([(0,0,0), (1,0,0), (2,0,0), (3,0,0)])
         print a.total_faces(), a.total_nodes()
-        a.write('test.ac')
+        nodes = a.nodes_as_array()
+        
+        
+        ac_nodes = np.array([[0, 0]])
+        for x, y, z in nodes:
+            node = np.dot(Rot_mat, [-z, -x]).reshape(1, 2)
+            ac_nodes = np.append(ac_nodes, node, 0)
+
+    angle = radians(98.9)
+    Rot_mat = np.array([[cos(angle), -sin(angle)],
+                        [sin(angle), cos(angle)]])
+
+    a = File("INNSBRUCK_mpreis_market.ac")
+    #for o in a.objects:
+    #    print "n", o.name, o.kids, o._type
+    nodes = -np.delete(a.nodes_as_array().transpose(), 1, 0)[::-1]
+    r = np.dot(Rot_mat, nodes)
+
+    print a.total_faces()
+    print a.total_nodes()
+        
+
+    if 1:
+        #plt.clf()
+        #a.plot()
+        plt.xlim(-50,50)
+        plt.ylim(-50,50)
+# plt.show()
+
+    plt.plot(nodes[0], nodes[1], 'k-')
+    r = np.dot(Rot_mat, nodes)
+    plt.plot(r[0], r[1], 'r-')
+    plt.show()
+    print ac_nodes
+    print nodes
+    
+    bla        
+    node = np.array([-float(splitted[2]),
+                    - float(splitted[0])])
+
+    node = np.dot(Rot_mat, node).reshape(1, 2)
+    ac_nodes = np.append(ac_nodes, node, 0)
+        
+#        a.write('test.ac')
 

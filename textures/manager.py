@@ -5,6 +5,17 @@ Created on Wed Mar 13 22:22:05 2013
 
 @author: tom
 """
+# The provides/requires mechanism could be improved. 
+# Currently, TextureManager prepends the "provides" tags with the texture class.
+# Find_matching will match only if "requires" is a subset of "provides".
+# That is, there is no OR. All "requires" must be matched 
+#
+# ideally:
+# Texture(rules='building.height > 15 
+#                AND (roof.color = black OR roof.color = gray) 
+#                AND roof.shape = flat ')
+
+
 import numpy as np
 import random
 from pdb import pm

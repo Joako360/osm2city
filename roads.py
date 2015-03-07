@@ -701,7 +701,7 @@ class Roads(objectlist.ObjectList):
     def debug_label_nodes(self, stg_manager):
         """write OSM_ID for nodes"""
         # -- write OSM_ID label
-        ac = ac3d.File(tools.stats, show_labels=True)
+        ac = ac3d.File(stats=tools.stats, show_labels=True)
         file_name = "labels"
 #        ac3d_obj = ac.new_object(file_name, '', default_swap_uv=True)
         
@@ -946,7 +946,7 @@ def main():
         # -- Now write cluster to disk.
         #    First create ac object. Write cluster's objects. Register stg object.
         #    Write ac to file.
-        ac = ac3d.File(tools.stats, show_labels=True)
+        ac = ac3d.File(stats=tools.stats, show_labels=True)
         ac3d_obj = ac.new_object(file_name, 'tex/roads.png', default_swap_uv=True)
         for rd in cl.objects:
             if rd.osm_id == 98659369:
