@@ -763,6 +763,9 @@ if __name__ == "__main__":
 
         path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, tile_elev, 0)
 
+#        if cl.I.x == 0 and cl.I.y == 0:
+        stg_manager.add_object_static('lightmap-switch.xml', center_global, tile_elev, 0)
+
         if args.uninstall:
             files_to_remove.append(path_to_stg + file_name + ".ac")
             files_to_remove.append(path_to_stg + file_name + ".xml")
@@ -770,7 +773,7 @@ if __name__ == "__main__":
             # -- write .ac and .xml
             building_lib.write(path_to_stg + file_name + ".ac", cl.objects, elev, tile_elev, tools.transform, offset)
             write_xml(path_to_stg, file_name, cl.objects)
-            tools.install_files(['cityLM.eff'], path_to_stg)
+            tools.install_files(['cityLM.eff', 'lightmap-switch.xml'], path_to_stg)
 
     if args.uninstall:
         for f in files_to_remove:
