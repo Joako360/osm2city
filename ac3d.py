@@ -367,7 +367,7 @@ class File(object):
         lRefs = Literal('refs') + integer
         lNodes = Group(integer + floatNumber + floatNumber)
         
-        pObjectWorld = Group(lObject + lKids)
+        pObjectWorld = Group(lObject + Optional(lName) + lKids)
         pSurf = (lSurf + Optional(lMat) + lRefs + Group(OneOrMore(lNodes))).setParseAction( convertSurf )
         pObject = Group(lObject + Each([Optional(lName), Optional(lData), Optional(lTexture), Optional(lTexrep), \
             Optional(lTexoff), Optional(lRot), Optional(lLoc), Optional(lUrl), Optional(lCrease)]) \

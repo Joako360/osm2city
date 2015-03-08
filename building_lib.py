@@ -153,7 +153,7 @@ def get_nodes_from_acs(objs, own_prefix):
 
         # FIXME: also read OBJECT_SHARED.
         if fname.endswith(".ac") and b.stg_typ == "OBJECT_STATIC":
-            print "READ_AC", b.name
+            print "READ_AC", fname
             ac = ac3d.File(file_name=fname, stats=None)
 
             angle = radians(b.stg_hdg)
