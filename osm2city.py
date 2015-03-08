@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python2.7 
 # -*- coding: utf-8 -*-
 """
 osm2city.py aims at generating 3D city models for FG, using OSM data.
@@ -284,7 +284,7 @@ class Buildings(object):
         # -- funny things might happen while parsing OSM
         try:
 #        if 1:
-            if str(osm_id) in parameters.SKIP_LIST:
+            if osm_id in parameters.SKIP_LIST:
                 logging.info("SKIPPING OSM_ID %i" % osm_id)
                 return False
             if 'name' in tags:
