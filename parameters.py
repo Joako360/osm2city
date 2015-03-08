@@ -23,6 +23,10 @@ import logging
 import traceback
 
 # default_args_start # DO NOT MODIFY THIS LINE
+# -*- coding: utf-8 -*-
+# The preceeding line sets encoding of this file to utf-8. Needed for non-ascii 
+# object names. It must stay on the first or second line.
+
 #=============================================================================
 # PARAMETERS FOR ALL osm2city MODULES
 #=============================================================================
