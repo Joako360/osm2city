@@ -283,7 +283,6 @@ class Buildings(object):
 
         # -- funny things might happen while parsing OSM
         try:
-#        if 1:
             if osm_id in parameters.SKIP_LIST:
                 logging.info("SKIPPING OSM_ID %i" % osm_id)
                 return False
