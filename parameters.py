@@ -82,10 +82,10 @@ TILE_SIZE = 2000            # -- tile size in meters for clustering of buildings
 MAX_OBJECTS = 50000         # -- maximum number of buildings to read from OSM data
 CONCURRENCY = 1             # -- number of parallel OSM parsing threads. Unused ATM.
 
-# -- skip buildings based on their OSM name tag or OSM ID, in case there's already a static model for these, and the overlap check fails.
-SKIP_LIST = ["Dresden Hauptbahnhof", "Semperoper", "Zwinger", "Hofkirche",
-  "Frauenkirche", "Coselpalais", "Palais im Großen Garten",
-  "Residenzschloss Dresden", "Fernsehturm", "Fernsehturm Dresden", "87807683"]
+# -- skip buildings based on their OSM name tag or OSM ID, in case there's already
+#    a static model for these, and the overlap check fails. 
+#    Use unicode strings as in the first example if there are non-ASCII characters.
+SKIP_LIST = [u"Theologische Fakultät", "Rhombergpassage", 55875208]
 
 # -- Parameters which influence the number of buildings from OSM taken to output
 BUILDING_MIN_HEIGHT = 3.4           # -- minimum height of a building to be included in output (does not include roof)
@@ -303,9 +303,6 @@ def show():
                 isinstance(my_globals[k], types.FunctionType) or \
                 isinstance(my_globals[k], types.ModuleType):
             continue
-        elif isinstance(my_globals[k], types.ListType):
-            value = ', '.join(my_globals[k])
-            print '%s = %s' % (k, str(value))
         else:
             print '%s = %s' % (k, my_globals[k])
     print '------'
