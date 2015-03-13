@@ -7,8 +7,7 @@ from pdb import pm
 import numpy as np
 
 from pyparsing import Literal, Word, quotedString, alphas, Optional, OneOrMore, \
-    Group, ParseException, nums, Combine, Regex, alphanums, LineEnd, Each,\
-    ParserElement, ZeroOrMore
+    Group, ParseException, nums, Combine, Regex, alphanums, LineEnd, Each
 
 #fmt_node = '%1.6f'
 fmt_node = '%g'
@@ -320,17 +319,6 @@ class File(object):
         def convertLCrease(tokens):
             self._current_object.crease = tokens[1]
             
-        def convertLCube(tokens):
-            if( len(tokens) > 1):
-                self._current_object.cube = tokens[1]
-
-        def convertLMesh(tokens):
-            if( len(tokens) > 1):
-                self._current_object.mesh = tokens[1]
-
-        def convertLMesh1(tokens):
-            pass
-
         def convertLLoc(tokens):
             self._current_object.loc = _token2array(tokens, 3)
 
@@ -350,39 +338,27 @@ class File(object):
             return int(tokens[0])
         
         def convertFloats(tokens):
-            try:
-                return float(tokens[0])
-            except ValueError:
-                logging.error(tokens[0])
+            return float(tokens[0])
             
-        integer = Word( nums ).setParseAction( convertIntegers )
-        string = Regex(r'"[^"]*"') 
-        floatNumber = Regex(r'[+-]?(\d+(\.\d*)?|(\.\d*))([eE][+-]\d+)?').setParseAction( convertFloats )
+        integer = Word( nums ).setParseAction( convertIntegers ) 
+        floatNumber = Regex(r'[+-]?\d+(\.\d*)?([eE][+-]\d+)?').setParseAction( convertFloats )
         
         anything = Regex(r'.*')
         
-        debug = False
-        
 #       Relaxed see Tor_Ness_Lighthouse.xml  
         lHeader = Regex('AC3Db[S]*') + LineEnd()
-        lMaterial = (Literal('MATERIAL') + anything + LineEnd()).setParseAction(convertLMaterial).setDebug(debug)
-        lObject = (Literal('OBJECT') + Word(alphas)).setParseAction(convertLObj).setDebug(debug)
-        lKids = (Literal('kids') + integer).setParseAction(convertLKids).setDebug(debug)
-        lName = (Literal('name') + string).setParseAction(convertLName).setDebug(debug)
-        lData = (Literal('data') + integer + LineEnd() + Word(alphanums + ".-_") ).setParseAction(convertLData).setDebug(debug)
-        lTexture = (Literal('texture') + string ).setParseAction(convertLTexture).setDebug(debug)
-        lTexrep = (Literal('texrep') + floatNumber + floatNumber ).setParseAction(convertLTexrep).setDebug(debug)
-        lTexoff = (Literal('texoff') + floatNumber + floatNumber ).setParseAction(convertLTexoff).setDebug(debug)
-        lRot = (Literal('rot') + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber).setParseAction(convertLRot).setDebug(debug)
+        lMaterial = (Literal('MATERIAL') + anything + LineEnd()).setParseAction(convertLMaterial)
+        lObject = (Literal('OBJECT') + Word(alphas)).setParseAction(convertLObj)
+        lKids = (Literal('kids') + integer + LineEnd()).setParseAction(convertLKids)
+        lName = (Literal('name') + anything + LineEnd()).setParseAction(convertLName)
+        lData = (Literal('data') + anything + LineEnd() + anything + LineEnd()).setParseAction(convertLData)
+        lTexture = (Literal('texture') + anything + LineEnd()).setParseAction(convertLTexture)
+        lTexrep = (Literal('texrep') + floatNumber + floatNumber).setParseAction(convertLTexrep)
+        lTexoff = (Literal('texoff') + floatNumber + floatNumber).setParseAction(convertLTexoff)
+        lRot = (Literal('rot') + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber).setParseAction(convertLRot)
         lLoc = (Literal('loc') + floatNumber + floatNumber + floatNumber).setParseAction(convertLLoc)
-        lCrease = (Literal('crease') + floatNumber).setParseAction(convertLCrease).setDebug(debug)
-        lCube = (Literal('Cube') + Optional(floatNumber) ).setParseAction(convertLCube).setDebug(debug)
-        lMesh = (Regex('Mesh[^1]') + Optional(floatNumber)  ).setParseAction(convertLMesh).setDebug(debug)
-        lMesh1 = (Literal('Mesh1') + Word(alphanums + "_-")  + Word(alphanums + "_-") ).setParseAction(convertLMesh1).setDebug(debug)
-        lPlane = (Literal('Plane') + Optional(floatNumber)  ).setDebug(debug)
-        lCircle = (Literal('Circle') + Optional(floatNumber)  ).setDebug(debug)
-        lCylinder = (Literal('Cylinder') + Optional(floatNumber)  ).setDebug(debug)
-        lUrl = (Literal('url') + string).setParseAction(convertLUrl).setDebug(debug)
+        lCrease = (Literal('crease') + floatNumber).setParseAction(convertLCrease)
+        lUrl = (Literal('url') + anything + LineEnd()).setParseAction(convertLUrl)
         lNumvert = Literal('numvert') + Word(nums)
         lVertex = (floatNumber + floatNumber + floatNumber).setParseAction(convertLVertex)
         lNumsurf = Literal('numsurf') + Word(nums)
@@ -393,14 +369,11 @@ class File(object):
         
         pObjectWorld = Group(lObject + Optional(lName) + lKids)
         pSurf = (lSurf + Optional(lMat) + lRefs + Group(OneOrMore(lNodes))).setParseAction( convertSurf )
-        pObjectHeader = Group(lObject + Each([Optional(lName), Optional(lData), Optional(lTexture), Optional(lTexrep), \
-            Optional(lTexoff), Optional(lRot), Optional(lLoc), Optional(lUrl), Optional(lCrease), Optional(lCube), Optional(lMesh), Optional(lMesh1), Optional(lPlane), Optional(lCircle), Optional(lCylinder)]))
-        pObject = Group(pObjectHeader + Optional(lNumvert + Group(ZeroOrMore(lVertex)) \
-                   + Optional(lNumsurf + Group(ZeroOrMore(pSurf)))) \
+        pObject = Group(lObject + Each([Optional(lName), Optional(lData), Optional(lTexture), Optional(lTexrep), \
+            Optional(lTexoff), Optional(lRot), Optional(lLoc), Optional(lUrl), Optional(lCrease)]) \
+          + Optional(lNumvert + Group(OneOrMore(lVertex)) \
+                   + Optional(lNumsurf + Group(OneOrMore(pSurf)))) \
           + lKids)#.setParseAction( convertObject ) 
-#         pObject.setDebug(True)
-#         pObject.debug = True
-#         ParserElement.verbose_stacktrace = True
 
         pFile = lHeader + Group(OneOrMore(lMaterial)) + pObjectWorld \
           + Group(OneOrMore(pObject))
@@ -442,10 +415,7 @@ if __name__ == "__main__":
     Rot_mat = np.array([[cos(angle), -sin(angle)],
                         [sin(angle), cos(angle)]])
 
-#     a = File("C:/Users/keith.paterson/Documents/FlightGear/TerraSync\Objects\e010n50\e012n51\EDDP_DHL_hangar.ac")
-#     a = File("C:/Users/keith.paterson/Documents/FlightGear/TerraSync\Objects\e010n50\e012n51\eddp_antonov_hangar.ac")
-    a = File("C:/Users/keith.paterson/Documents/FlightGear/TerraSync/Objects/e010n50\e013n51/frauenkirche.ac")
-
+    a = File("INNSBRUCK_mpreis_market.ac")
     #for o in a.objects:
     #    print "n", o.name, o.kids, o._type
     nodes = -np.delete(a.nodes_as_array().transpose(), 1, 0)[::-1]
@@ -477,3 +447,4 @@ if __name__ == "__main__":
     ac_nodes = np.append(ac_nodes, node, 0)
         
 #        a.write('test.ac')
+
