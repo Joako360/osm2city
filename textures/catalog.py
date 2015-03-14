@@ -1,7 +1,9 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 
-from texture import Texture
+from textures.texture import Texture
+import os
+import logging
 
 def append_facades_de(tex_prefix, facades):
     """---------------- ADD YOUR FACADE TEXTURES HERE -------------------"""
@@ -525,7 +527,15 @@ def append_facades_us(tex_prefix, facades):
         v_align_bottom=True,
         requires=['roof:color:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
-    
+
+def append_dynamic(tex_prefix, facades): 
+    """--- Dynamically runs py files in tex.src ---"""   
+    for subdir, dirs, files in os.walk('tex.src', topdown=True):
+        for file in files:
+                if file[-2:] != "py":
+                    continue 
+                logging.info("Executing %s "%(subdir + os.sep + file))
+                execfile(subdir + os.sep + file, locals())
 
 def append_roofs(tex_prefix, roofs):
     """------------ ADD YOUR ROOF TEXTURES HERE -------------------"""

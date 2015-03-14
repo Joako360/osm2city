@@ -5,7 +5,7 @@
 # Tested with wxPython 2.3.4.2 and PIL 1.1.3.
 #from wxPython import wx
 import wx
-import Image             # Only if you need and use the PIL library.
+from PIL import Image             # Only if you need and use the PIL library.
 
 def bitmapToPil(bitmap):
     return imageToPil(bitmapToImage(bitmap))
