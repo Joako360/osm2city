@@ -698,15 +698,14 @@ class Roads(objectlist.ObjectList):
         print "138: ", self.nodes_dict[1401732138].h_add
         print "139: ", self.nodes_dict[1401732138].h_add
         
-    def debug_label_nodes(self, stg_manager):
+    def debug_label_nodes(self, stg_manager, file_name="labels"):
         """write OSM_ID for nodes"""
         # -- write OSM_ID label
         ac = ac3d.File(stats=tools.stats, show_labels=True)
-        file_name = "labels"
 #        ac3d_obj = ac.new_object(file_name, '', default_swap_uv=True)
         
 
-        for way in self.bridges_list: # + self.roads_list:
+        for way in self.bridges_list + self.roads_list:
             the_node = self.nodes_dict[way.refs[0]]
             anchor = vec2d(self.transform.toLocal(vec2d(the_node.lon, the_node.lat)))
 #            anchor.x += random.uniform(-1,1)
@@ -849,10 +848,8 @@ def main():
     args = parser.parse_args()
 
     # -- command line args override paramters
-
     if args.filename is not None:
         parameters.read_from_file(args.filename)
-
     parameters.set_loglevel(args.loglevel)
 
     if args.e:
@@ -862,20 +859,18 @@ def main():
 
     #parameters.show()
     center_global = parameters.get_center_global()
-    osm_fname = parameters.get_OSM_file_name()
     transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(transform)
     elev = tools.get_interpolator(fake=parameters.NO_ELEV)
     roads = Roads(transform, elev)
     handler = osmparser.OSMContentHandler(valid_node_keys=[])
-    source = open(osm_fname)
     logging.info("Reading the OSM file might take some time ...")
 
 #    handler.register_way_callback(roads.from_way, **roads.req_and_valid_keys)
 #    roads.register_callbacks_in(handler)
     handler.register_way_callback(roads.store_way, req_keys=roads.req_keys)
     handler.register_uncategorized_way_callback(roads.store_uncategorized)
-    handler.parse(source)
+    handler.parse(parameters.get_OSM_file_name())
     logging.info("ways: %i", len(roads))
         
     if parameters.PATH_TO_OUTPUT:
@@ -931,7 +926,7 @@ def main():
 
     replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)        
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
-#    roads.debug_label_nodes(stg_manager)
+    roads.debug_label_nodes(stg_manager)
 
     # -- write stg
     for cl in roads.clusters:
@@ -950,8 +945,7 @@ def main():
         ac3d_obj = ac.new_object(file_name, 'tex/roads.png', default_swap_uv=True)
         for rd in cl.objects:
             if rd.osm_id == 98659369:
-                print "hhhhh", file_name
-            rd.write_to(ac3d_obj, elev, cluster_elev, ac, offset=offset_local) # fixme: remove .ac, needed only for adding debug labels
+                rd.write_to(ac3d_obj, elev, cluster_elev, ac, offset=offset_local) # fixme: remove .ac, needed only for adding debug labels
 
         path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, cluster_elev, 0)
         ac.write(path_to_stg + file_name + '.ac')
