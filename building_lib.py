@@ -16,6 +16,7 @@ import string
 
 from vec2d import vec2d
 from textures.manager import find_matching_texture
+import os
 # nobjects = 0
 nb = 0
 out = ""
