@@ -148,8 +148,6 @@ class Building(object):
 #            print "\nfirst nodes", closest_i, closest_o, r
             new_inner = shg.polygon.LinearRing(np.roll(np.array(inner.coords)[:-1], -min_i, axis=0))
             new_inner_rings_list.append(new_inner)
-#            print "NEW", new_inner
-#            print "OLD", inner
             self.outer_nodes_closest.append(min_o)
             outer_nodes_avail.remove(min_o)
 #            print self.outer_nodes_closest
