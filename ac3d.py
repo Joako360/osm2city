@@ -295,8 +295,6 @@ class File(object):
             self._current_object.kids = int(tokens[1])
 
         def convertLData(tokens):
-            #print "data", tokens
-            #self._current_object.name = tokens[1].strip('"\'')
             pass
 
         def convertLName(tokens):
@@ -319,17 +317,6 @@ class File(object):
 
         def convertLCrease(tokens):
             self._current_object.crease = tokens[1]
-
-        def convertLCube(tokens):
-            if( len(tokens) > 1):
-                self._current_object.cube = tokens[1]
-
-        def convertLMesh(tokens):
-            if( len(tokens) > 1):
-                self._current_object.mesh = tokens[1]
-
-        def convertLMesh1(tokens):
-            pass
 
         def convertLLoc(tokens):
             self._current_object.loc = _token2array(tokens, 3)
@@ -358,7 +345,6 @@ class File(object):
         integer = Word( nums ).setParseAction( convertIntegers )
         string = Regex(r'"[^"]*"')
         floatNumber = Regex(r'[+-]?(\d+(\.\d*)?|(\.\d*))([eE][+-]\d+)?').setParseAction( convertFloats )
-
         anything = Regex(r'.*')
 
         debug = False
@@ -369,19 +355,13 @@ class File(object):
         lObject = (Literal('OBJECT') + Word(alphas)).setParseAction(convertLObj).setDebug(debug)
         lKids = (Literal('kids') + integer).setParseAction(convertLKids).setDebug(debug)
         lName = (Literal('name') + string).setParseAction(convertLName).setDebug(debug)
-        lData = (Literal('data') + integer + LineEnd() + Word(alphanums + ".-_") ).setParseAction(convertLData).setDebug(debug)
+        lData = (Literal('data') + integer + LineEnd() + anything + LineEnd()).setParseAction(convertLData).setDebug(debug)
         lTexture = (Literal('texture') + string ).setParseAction(convertLTexture).setDebug(debug)
         lTexrep = (Literal('texrep') + floatNumber + floatNumber ).setParseAction(convertLTexrep).setDebug(debug)
         lTexoff = (Literal('texoff') + floatNumber + floatNumber ).setParseAction(convertLTexoff).setDebug(debug)
         lRot = (Literal('rot') + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber).setParseAction(convertLRot).setDebug(debug)
         lLoc = (Literal('loc') + floatNumber + floatNumber + floatNumber).setParseAction(convertLLoc)
         lCrease = (Literal('crease') + floatNumber).setParseAction(convertLCrease).setDebug(debug)
-        lCube = (Literal('Cube') + Optional(floatNumber) ).setParseAction(convertLCube).setDebug(debug)
-        lMesh = (Regex('Mesh[^1]') + Optional(floatNumber)  ).setParseAction(convertLMesh).setDebug(debug)
-        lMesh1 = (Literal('Mesh1') + Word(alphanums + "_-")  + Word(alphanums + "_-") ).setParseAction(convertLMesh1).setDebug(debug)
-        lPlane = (Literal('Plane') + Optional(floatNumber)  ).setDebug(debug)
-        lCircle = (Literal('Circle') + Optional(floatNumber)  ).setDebug(debug)
-        lCylinder = (Literal('Cylinder') + Optional(floatNumber)  ).setDebug(debug)
         lUrl = (Literal('url') + string).setParseAction(convertLUrl).setDebug(debug)
         lNumvert = Literal('numvert') + Word(nums)
         lVertex = (floatNumber + floatNumber + floatNumber).setParseAction(convertLVertex)
@@ -394,7 +374,7 @@ class File(object):
         pObjectWorld = Group(lObject + Optional(lName) + lKids)
         pSurf = (lSurf + Optional(lMat) + lRefs + Group(OneOrMore(lNodes))).setParseAction( convertSurf )
         pObjectHeader = Group(lObject + Each([Optional(lName), Optional(lData), Optional(lTexture), Optional(lTexrep), \
-            Optional(lTexoff), Optional(lRot), Optional(lLoc), Optional(lUrl), Optional(lCrease), Optional(lCube), Optional(lMesh), Optional(lMesh1), Optional(lPlane), Optional(lCircle), Optional(lCylinder)]))
+            Optional(lTexoff), Optional(lRot), Optional(lLoc), Optional(lUrl), Optional(lCrease)]))
         pObject = Group(pObjectHeader + Optional(lNumvert + Group(ZeroOrMore(lVertex)) \
                    + Optional(lNumsurf + Group(ZeroOrMore(pSurf)))) \
           + lKids)#.setParseAction( convertObject )
@@ -444,8 +424,10 @@ if __name__ == "__main__":
 
 #     a = File("C:/Users/keith.paterson/Documents/FlightGear/TerraSync\Objects\e010n50\e012n51\EDDP_DHL_hangar.ac")
 #     a = File("C:/Users/keith.paterson/Documents/FlightGear/TerraSync\Objects\e010n50\e012n51\eddp_antonov_hangar.ac")
-    a = File("C:/Users/keith.paterson/Documents/FlightGear/TerraSync/Objects/e010n50\e013n51/frauenkirche.ac")
-
+    #a = File("C:/Users/keith.paterson/Documents/FlightGear/TerraSync/Objects/e010n50\e013n51/frauenkirche.ac")
+    a = File("/mnt/hgfs/albrecht/daten/fgfs/fg_scenery/Scenery-TerraSync/Objects/e010n50/e012n51/eddp_antonov_hangar.ac")
+    #a = File("/mnt/hgfs/albrecht/daten/fgfs/fg_scenery/Scenery-TerraSync/Objects/e010n50/e013n51/frauenkirche.ac") 
+    #a = File("/mnt/hgfs/albrecht/daten/fgfs/fg_scenery/Scenery-TerraSync/Objects/e010n50/e012n51/EDDP_TerminalC.ac")
     #for o in a.objects:
     #    print "n", o.name, o.kids, o._type
     nodes = -np.delete(a.nodes_as_array().transpose(), 1, 0)[::-1]
@@ -464,7 +446,7 @@ if __name__ == "__main__":
 
     plt.plot(nodes[0], nodes[1], 'k-')
     r = np.dot(Rot_mat, nodes)
-    plt.plot(r[0], r[1], 'r-')
+    #plt.plot(r[0], r[1], 'r-')
     plt.show()
     print ac_nodes
     print nodes
