@@ -139,6 +139,7 @@ class Roads(objectlist.ObjectList):
         #if 'railway' in way.tags and (not 'highway' in way.tags):
         #    return
         if 'railway' in way.tags:
+            #return # switch off railways
             if way.tags['railway'] != 'rail':
                 return
         try:
