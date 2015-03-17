@@ -247,7 +247,7 @@ class LinearObject(object):
 
     def probe_ground(self, elev, line_string):
         """probe ground elevation along given line string, return array"""
-        return np.array([elev(the_node) for the_node in self.edge[0].coords])
+        return np.array([elev(the_node) for the_node in line_string.coords])
 
     def level_out(self, elev, elev_offset):
         """accepts x,y and h_add, compute z, store z in self
@@ -343,6 +343,10 @@ class LinearObject(object):
         if self.osm_id == 24722952:
             pass
 
+        l_z = self.probe_ground(elev, self.edge[0]) + self.AGL
+        r_z = self.probe_ground(elev, self.edge[1]) + self.AGL
+
+
         if 1 or left_z_given is None:
             left_z = self.probe_ground(elev, self.edge[0]) + self.AGL
             
@@ -378,8 +382,16 @@ class LinearObject(object):
         #   right_h_add = diff
         # elif diff / self.width < -max_grad:  #   right > left
         #   left_h_add = -diff
-
+        the_id = 31381437
+        if first_node.osm_id == the_id or last_node.osm_id == the_id:
+            #bla
+            pass
         return left_z, right_z, h_add
+
+    def _write_to(self, obj, elev, elev_offset, edge0, edge1,
+                                          tex_y0, tex_y1, n_nodes=0, left_z_set=0, right_z_set=0, ac=0, offset=0):
+        print "FIXME: linear _write_to()"
+        return 0,0,0
 
     # FIXME: this is really a road type of linearObject, so make it linearRoad
     # FIXME: what is offset?
@@ -392,15 +404,24 @@ class LinearObject(object):
            offset accounts for tile center
         """
         left_z, right_z, h_add = self.level_out(elev, elev_offset)
-        left_z  = self.probe_ground(elev, self.edge[0])
-        right_z = self.probe_ground(elev, self.edge[1])
+        #left_z  = self.probe_ground(elev, self.edge[0])
+        #right_z = self.probe_ground(elev, self.edge[1])
+        if self.osm_id == 204383381: # 1st   (+)
+            print ">> 1st ", h_add
+            print self.nodes_dict[self.refs[0]].h_add
+        if self.osm_id == 138440237: # last (2)
+            print "<< las ", h_add
+            print self.nodes_dict[self.refs[-1]].h_add
+            print self.nodes_dict[self.refs[0]].h_add
+            print self.refs[0]
 
         left_nodes_list =  self.write_nodes(obj, self.edge[0], left_z, elev_offset, offset=offset)
         right_nodes_list = self.write_nodes(obj, self.edge[1], right_z, elev_offset, offset=offset)
-
+        if self.osm_id == 138440237:
+            pass
+            #bla
         self.write_quads(obj, left_nodes_list, right_nodes_list, self.tex_y0, self.tex_y1, debug_ac=debug_ac)
-        
-        if h_add is not None:
+        if 1 and h_add is not None:
             # -- side walls of embankment
             if h_add.max() > 0.1:
                 left_ground_z  = self.probe_ground(elev, self.edge[0])
@@ -410,7 +431,7 @@ class LinearObject(object):
                 right_ground_nodes = self.write_nodes(obj, self.edge[1], right_ground_z, elev_offset, offset=offset)
 
                 self.write_quads(obj, left_ground_nodes, left_nodes_list, 4/8., 5/8., debug_ac=debug_ac)
-                self.write_quads(obj, right_ground_nodes, right_nodes_list, 4/8., 5/8., debug_ac=debug_ac)
+                self.write_quads(obj, right_nodes_list, right_ground_nodes, 4/8., 5/8., debug_ac=debug_ac)
 
         return True
         # options:

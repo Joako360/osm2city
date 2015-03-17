@@ -115,8 +115,11 @@ class Roads(objectlist.ObjectList):
         self.elev = elev
         self.ways_list = []
         self.bridges_list = []
-        self.roads_list = []
+        self.roads_list = self.objects # alias
         self.nodes_dict = {}
+
+    def __str__(self):
+        return "%i ways, %i roads, %i bridges" % (len(self.ways_list), len(self.roads_list), len(self.bridges_list))
 
     def store_uncategorized(self, way, nodes_dict):
         pass
@@ -305,7 +308,7 @@ class Roads(objectlist.ObjectList):
             tex_y0 = 2/8.
             tex_y1 = 3/8.
             AGL_ofs = 1.0 + random.uniform(0.01, 0.1)
-            AGL_ofs = 0.05
+            AGL_ofs = 0.0
             #if way.tags.has_key('layer'):
             #    AGL_ofs = 20.*float(way.tags['layer'])
             #print way.tags
@@ -339,11 +342,11 @@ class Roads(objectlist.ObjectList):
     
             try:
                 if is_bridge(the_way):
-                    obj = LinearBridge(self.transform, self.elev, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
+                    obj = LinearBridge(self.transform, self.elev, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.01+0.005*prio+AGL_ofs)
                     obj.typ = prio
-                    #self.bridges_list.append(obj)
+                    self.bridges_list.append(obj)
                 else:
-                    obj = LinearObject(self.transform, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs)
+                    obj = LinearObject(self.transform, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.01+0.005*prio+AGL_ofs)
                     obj.typ = prio
                     self.roads_list.append(obj)
             except ValueError, reason:
@@ -707,7 +710,7 @@ class Roads(objectlist.ObjectList):
 #        ac3d_obj = ac.new_object(file_name, '', default_swap_uv=True)
         
 
-        for way in self.bridges_list: # + self.roads_list:
+        for way in self.bridges_list + self.roads_list:
             the_node = self.nodes_dict[way.refs[0]]
             anchor = vec2d(self.transform.toLocal(vec2d(the_node.lon, the_node.lat)))
 #            anchor.x += random.uniform(-1,1)
@@ -863,6 +866,8 @@ def main():
 
     #parameters.show()
     center_global = parameters.get_center_global()
+    center_global = vec2d(11.3894958, 47.2533677)
+    center_global = vec2d(y=47.2537319, x=11.3990406)
     osm_fname = parameters.get_OSM_file_name()
     transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(transform)
@@ -908,10 +913,13 @@ def main():
     elev.save_cache()
 #    roads.build_graph(roads.ways_list)
 #    roads.split_long_roads_between_bridges()
+    logging.debug("before linear " + str(roads))
     roads.create_linear_objects()
 #    roads.debug_test()
 #    roads.debug_test()
     roads.propagate_h_add()
+    logging.debug("after linear" + str(roads))
+
 #    roads.debug_test()
 #    roads.debug_plot(show=True, plot_junctions=True)#, label_nodes=[1132288594, 1132288612])
 #    print "before", len(roads.attached_ways_dict)
@@ -932,7 +940,7 @@ def main():
 
     replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)        
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
-#    roads.debug_label_nodes(stg_manager)
+    roads.debug_label_nodes(stg_manager)
 
     # -- write stg
     for cl in roads.clusters:
@@ -952,6 +960,7 @@ def main():
         for rd in cl.objects:
             if rd.osm_id == 98659369:
                 print "hhhhh", file_name
+            #print "offset_local", offset_local
             rd.write_to(ac3d_obj, elev, cluster_elev, ac, offset=offset_local) # fixme: remove .ac, needed only for adding debug labels
 
         path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, cluster_elev, 0)
