@@ -316,7 +316,7 @@ def read_from_file(filename):
     try:
         execfile(filename, file_globals)
     except IOError, reason:
-        logging.error("Error processing file with parameters:", reason)
+        logging.error("Error processing file with parameters: %s", reason)
         sys.exit(1)
     except NameError:
         print traceback.format_exc()
