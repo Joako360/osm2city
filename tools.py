@@ -241,7 +241,7 @@ class Probe_fgelev(object):
                 return -100
 
             try:
-                self.fgelev_pipe.stdin.write("%i %g %g\r\n" % (self.record, position.lon, position.lat))
+                self.fgelev_pipe.stdin.write("%i %1.10f %1.10f\r\n" % (self.record, position.lon, position.lat))
             except IOError, reason:
                 logging.error(reason)
 
