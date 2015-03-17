@@ -153,17 +153,19 @@ def get_nodes_from_acs(objs, own_prefix):
 
         # FIXME: also read OBJECT_SHARED.
         if fname.endswith(".ac") and b.stg_typ == "OBJECT_STATIC":
-            print "READ_AC", b.name
-            ac = ac3d.File(file_name=fname, stats=None)
-
-            angle = radians(b.stg_hdg)
-            Rot_mat = np.array([[cos(angle), -sin(angle)],
-                                [sin(angle), cos(angle)]])
-
-            ac_nodes = -np.delete(ac.nodes_as_array().transpose(), 1, 0)[::-1]
-            ac_nodes = np.dot(Rot_mat, ac_nodes)
-            ac_nodes += b.anchor.as_array().reshape(2,1)
-            all_nodes = np.append(all_nodes, ac_nodes.transpose(), 0)
+            logging.info( "READ_AC %s"%fname)
+            try:            
+                ac = ac3d.File(file_name=fname, stats=None)                
+                angle = radians(b.stg_hdg)
+                Rot_mat = np.array([[cos(angle), -sin(angle)],
+                                    [sin(angle), cos(angle)]])
+    
+                ac_nodes = -np.delete(ac.nodes_as_array().transpose(), 1, 0)[::-1]
+                ac_nodes = np.dot(Rot_mat, ac_nodes)
+                ac_nodes += b.anchor.as_array().reshape(2,1)
+                all_nodes = np.append(all_nodes, ac_nodes.transpose(), 0)
+            except Exception, e:
+                logging.error("Error reading %s %s"%(fname,e))
             # print "------"
 
     return all_nodes

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python2.7 
 # -*- coding: utf-8 -*-
 """
 osm2city.py aims at generating 3D city models for FG, using OSM data.
@@ -148,8 +148,6 @@ class Building(object):
 #            print "\nfirst nodes", closest_i, closest_o, r
             new_inner = shg.polygon.LinearRing(np.roll(np.array(inner.coords)[:-1], -min_i, axis=0))
             new_inner_rings_list.append(new_inner)
-#            print "NEW", new_inner
-#            print "OLD", inner
             self.outer_nodes_closest.append(min_o)
             outer_nodes_avail.remove(min_o)
 #            print self.outer_nodes_closest
@@ -283,8 +281,7 @@ class Buildings(object):
 
         # -- funny things might happen while parsing OSM
         try:
-#        if 1:
-            if str(osm_id) in parameters.SKIP_LIST:
+            if osm_id in parameters.SKIP_LIST:
                 logging.info("SKIPPING OSM_ID %i" % osm_id)
                 return False
             if 'name' in tags:

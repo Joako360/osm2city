@@ -7,7 +7,8 @@ from pdb import pm
 import numpy as np
 
 from pyparsing import Literal, Word, quotedString, alphas, Optional, OneOrMore, \
-    Group, ParseException, nums, Combine, Regex, alphanums, LineEnd, Each
+    Group, ParseException, nums, Combine, Regex, alphanums, LineEnd, Each,\
+    ParserElement, ZeroOrMore
 
 #fmt_node = '%1.6f'
 fmt_node = '%g'
@@ -69,14 +70,14 @@ class Object(object):
         if self.stats:
             self.stats.vertices += 1
         return len(self._nodes) - 1
-        
+
     def nodes_as_array(self):
         """return all nodes as a numpy array"""
         return np.array([(n.x, n.y, n.z) for n in self._nodes])
 
     def next_node_index(self):
         return len(self._nodes)
-        
+
     def total_nodes(self):
         return len(self._nodes)
 
@@ -114,7 +115,7 @@ class Object(object):
         if self.crease != None:
             s += 'crease %g\n' % self.crease
         if self.url != None:
-            s += 'url %s\n' % self.url 
+            s += 'url %s\n' % self.url
         if self.texture:
             s += 'texture "%s"\n' %self.texture
         s += 'numvert %i\n' % len(self._nodes)
@@ -177,7 +178,7 @@ class File(object):
     Hold a number of 3D objects, each object consiting of nodes and faces.
     Either read objects from ac3d file or add them via new_object().
     Can write ac3d files.
-    
+
     When adding objects, count nodes/surfaces etc internally, thereby eliminating
     a common source of bugs. Can also add 3d labels (useful for debugging, disabled
     by default)
@@ -198,7 +199,7 @@ class File(object):
         self.objects.append(o)
         self._current_object = o
         return o
-        
+
     def add_label(self, text, x, y, z, orientation=0, scale=1.):
         if not self.label_object:
             self.label_object = Label()
@@ -237,7 +238,7 @@ class File(object):
                 node.x -= cx
                 node.y -= cy
                 node.z -= cz
-                
+
     def total_nodes(self):
         """return total number of nodes of all objects"""
         return np.array([o.total_nodes() for o in self.objects]).sum()
@@ -245,7 +246,7 @@ class File(object):
     def total_faces(self):
         """return total number of faces of all objects"""
         return np.array([o.total_faces() for o in self.objects]).sum()
-    
+
     def nodes_as_array(self):
         """return all nodes as a numpy array"""
         the_nodes = np.zeros((0,3))
@@ -254,7 +255,7 @@ class File(object):
             a = o.nodes_as_array()
             the_nodes = np.vstack((the_nodes, a))
         return the_nodes
-    
+
     def __str__(self):
         s = 'AC3Db\n'
         if self.materials_list:
@@ -277,7 +278,7 @@ class File(object):
         non_empty = [o for o in self.objects if not o.is_empty()]
         for o in non_empty:
             o.plot()
-    
+
     def read(self, file_name):
         """read an ac3d file. TODO: groups, nested kids"""
 #        def convertObject(tokens):
@@ -288,14 +289,12 @@ class File(object):
         def convertLObj(tokens):
             self.new_object(None, None)
             self._current_object._type = tokens[1]
-            
+
 
         def convertLKids(tokens):
             self._current_object.kids = int(tokens[1])
 
         def convertLData(tokens):
-            #print "data", tokens
-            #self._current_object.name = tokens[1].strip('"\'')
             pass
 
         def convertLName(tokens):
@@ -318,7 +317,7 @@ class File(object):
 
         def convertLCrease(tokens):
             self._current_object.crease = tokens[1]
-            
+
         def convertLLoc(tokens):
             self._current_object.loc = _token2array(tokens, 3)
 
@@ -336,29 +335,34 @@ class File(object):
 
         def convertIntegers(tokens):
             return int(tokens[0])
-        
+
         def convertFloats(tokens):
-            return float(tokens[0])
-            
-        integer = Word( nums ).setParseAction( convertIntegers ) 
-        floatNumber = Regex(r'[+-]?\d+(\.\d*)?([eE][+-]\d+)?').setParseAction( convertFloats )
-        
+            try:
+                return float(tokens[0])
+            except ValueError:
+                logging.error(tokens[0])
+
+        integer = Word( nums ).setParseAction( convertIntegers )
+        string = Regex(r'"[^"]*"')
+        floatNumber = Regex(r'[+-]?(\d+(\.\d*)?|(\.\d*))([eE][+-]\d+)?').setParseAction( convertFloats )
         anything = Regex(r'.*')
-        
-#       Relaxed see Tor_Ness_Lighthouse.xml  
+
+        debug = False
+
+#       Relaxed see Tor_Ness_Lighthouse.xml
         lHeader = Regex('AC3Db[S]*') + LineEnd()
-        lMaterial = (Literal('MATERIAL') + anything + LineEnd()).setParseAction(convertLMaterial)
-        lObject = (Literal('OBJECT') + Word(alphas)).setParseAction(convertLObj)
-        lKids = (Literal('kids') + integer + LineEnd()).setParseAction(convertLKids)
-        lName = (Literal('name') + anything + LineEnd()).setParseAction(convertLName)
-        lData = (Literal('data') + anything + LineEnd() + anything + LineEnd()).setParseAction(convertLData)
-        lTexture = (Literal('texture') + anything + LineEnd()).setParseAction(convertLTexture)
-        lTexrep = (Literal('texrep') + floatNumber + floatNumber).setParseAction(convertLTexrep)
-        lTexoff = (Literal('texoff') + floatNumber + floatNumber).setParseAction(convertLTexoff)
-        lRot = (Literal('rot') + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber).setParseAction(convertLRot)
+        lMaterial = (Literal('MATERIAL') + anything + LineEnd()).setParseAction(convertLMaterial).setDebug(debug)
+        lObject = (Literal('OBJECT') + Word(alphas)).setParseAction(convertLObj).setDebug(debug)
+        lKids = (Literal('kids') + integer).setParseAction(convertLKids).setDebug(debug)
+        lName = (Literal('name') + string).setParseAction(convertLName).setDebug(debug)
+        lData = (Literal('data') + integer + LineEnd() + anything + LineEnd()).setParseAction(convertLData).setDebug(debug)
+        lTexture = (Literal('texture') + string ).setParseAction(convertLTexture).setDebug(debug)
+        lTexrep = (Literal('texrep') + floatNumber + floatNumber ).setParseAction(convertLTexrep).setDebug(debug)
+        lTexoff = (Literal('texoff') + floatNumber + floatNumber ).setParseAction(convertLTexoff).setDebug(debug)
+        lRot = (Literal('rot') + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber + floatNumber).setParseAction(convertLRot).setDebug(debug)
         lLoc = (Literal('loc') + floatNumber + floatNumber + floatNumber).setParseAction(convertLLoc)
-        lCrease = (Literal('crease') + floatNumber).setParseAction(convertLCrease)
-        lUrl = (Literal('url') + anything + LineEnd()).setParseAction(convertLUrl)
+        lCrease = (Literal('crease') + floatNumber).setParseAction(convertLCrease).setDebug(debug)
+        lUrl = (Literal('url') + string).setParseAction(convertLUrl).setDebug(debug)
         lNumvert = Literal('numvert') + Word(nums)
         lVertex = (floatNumber + floatNumber + floatNumber).setParseAction(convertLVertex)
         lNumsurf = Literal('numsurf') + Word(nums)
@@ -366,27 +370,30 @@ class File(object):
         lMat = Literal('mat') + integer
         lRefs = Literal('refs') + integer
         lNodes = Group(integer + floatNumber + floatNumber)
-        
-        pObjectWorld = Group(lObject + lKids)
+
+        pObjectWorld = Group(lObject + Optional(lName) + lKids)
         pSurf = (lSurf + Optional(lMat) + lRefs + Group(OneOrMore(lNodes))).setParseAction( convertSurf )
-        pObject = Group(lObject + Each([Optional(lName), Optional(lData), Optional(lTexture), Optional(lTexrep), \
-            Optional(lTexoff), Optional(lRot), Optional(lLoc), Optional(lUrl), Optional(lCrease)]) \
-          + Optional(lNumvert + Group(OneOrMore(lVertex)) \
-                   + Optional(lNumsurf + Group(OneOrMore(pSurf)))) \
-          + lKids)#.setParseAction( convertObject ) 
+        pObjectHeader = Group(lObject + Each([Optional(lName), Optional(lData), Optional(lTexture), Optional(lTexrep), \
+            Optional(lTexoff), Optional(lRot), Optional(lLoc), Optional(lUrl), Optional(lCrease)]))
+        pObject = Group(pObjectHeader + Optional(lNumvert + Group(ZeroOrMore(lVertex)) \
+                   + Optional(lNumsurf + Group(ZeroOrMore(pSurf)))) \
+          + lKids)#.setParseAction( convertObject )
+#         pObject.setDebug(True)
+#         pObject.debug = True
+#         ParserElement.verbose_stacktrace = True
 
         pFile = lHeader + Group(OneOrMore(lMaterial)) + pObjectWorld \
           + Group(OneOrMore(pObject))
-        
+
         try:
             self.p = pFile.parseFile(file_name)
         except IOError, e:
             logging.warning(e)
-    
-        # todo: 
+
+        # todo:
         # groups -- how do they work?
-    
-    
+
+
 if __name__ == "__main__":
     a = File()
     #a.read('big-hangar.ac')
@@ -404,8 +411,8 @@ if __name__ == "__main__":
         a.face([(0,0,0), (1,0,0), (2,0,0), (3,0,0)])
         print a.total_faces(), a.total_nodes()
         nodes = a.nodes_as_array()
-        
-        
+
+
         ac_nodes = np.array([[0, 0]])
         for x, y, z in nodes:
             node = np.dot(Rot_mat, [-z, -x]).reshape(1, 2)
@@ -415,7 +422,12 @@ if __name__ == "__main__":
     Rot_mat = np.array([[cos(angle), -sin(angle)],
                         [sin(angle), cos(angle)]])
 
-    a = File("INNSBRUCK_mpreis_market.ac")
+#     a = File("C:/Users/keith.paterson/Documents/FlightGear/TerraSync\Objects\e010n50\e012n51\EDDP_DHL_hangar.ac")
+#     a = File("C:/Users/keith.paterson/Documents/FlightGear/TerraSync\Objects\e010n50\e012n51\eddp_antonov_hangar.ac")
+    #a = File("C:/Users/keith.paterson/Documents/FlightGear/TerraSync/Objects/e010n50\e013n51/frauenkirche.ac")
+    a = File("/mnt/hgfs/albrecht/daten/fgfs/fg_scenery/Scenery-TerraSync/Objects/e010n50/e012n51/eddp_antonov_hangar.ac")
+    #a = File("/mnt/hgfs/albrecht/daten/fgfs/fg_scenery/Scenery-TerraSync/Objects/e010n50/e013n51/frauenkirche.ac") 
+    #a = File("/mnt/hgfs/albrecht/daten/fgfs/fg_scenery/Scenery-TerraSync/Objects/e010n50/e012n51/EDDP_TerminalC.ac")
     #for o in a.objects:
     #    print "n", o.name, o.kids, o._type
     nodes = -np.delete(a.nodes_as_array().transpose(), 1, 0)[::-1]
@@ -423,7 +435,7 @@ if __name__ == "__main__":
 
     print a.total_faces()
     print a.total_nodes()
-        
+
 
     if 1:
         #plt.clf()
@@ -434,17 +446,16 @@ if __name__ == "__main__":
 
     plt.plot(nodes[0], nodes[1], 'k-')
     r = np.dot(Rot_mat, nodes)
-    plt.plot(r[0], r[1], 'r-')
+    #plt.plot(r[0], r[1], 'r-')
     plt.show()
     print ac_nodes
     print nodes
-    
-    bla        
+
+    bla
     node = np.array([-float(splitted[2]),
                     - float(splitted[0])])
 
     node = np.dot(Rot_mat, node).reshape(1, 2)
     ac_nodes = np.append(ac_nodes, node, 0)
-        
-#        a.write('test.ac')
 
+#        a.write('test.ac')

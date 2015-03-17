@@ -641,6 +641,7 @@ class Stats(object):
         self.skipped_no_elev = 0
         self.buildings_in_LOD = np.zeros(3)
         self.area_levels = np.array([1, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000])
+        self.corners = np.zeros(10)
         self.area_above = np.zeros_like(self.area_levels)
         self.vertices = 0
         self.surfaces = 0
@@ -649,25 +650,33 @@ class Stats(object):
         self.roof_errors = 0
         self.out = None
         self.LOD = np.zeros(3)
-        self.nodes_ground = 0
         self.nodes_simplified = 0
+        self.nodes_ground = 0
         self.textures_total = 0
         self.textures_used = set()
 
     def count(self, b):
-        """update stats (vertices, surfaces, area) with given building's data
+        """update stats (vertices, surfaces, area, corners) with given building's data
         """
         if b.roof_type in self.roof_types:
             self.roof_types[b.roof_type] += 1
         else:
             self.roof_types[b.roof_type] = 1
-        # FIXME: do we still need this??
-        # self.objects += 1 # skipped because we count buildings while OSM parsing
+
+        # -- stats on number of ground nodes.
+        #    Complex buildings counted in corners[0]
+        if b.X_inner:
+            self.corners[0] += 1
+        else:
+            self.corners[min(b.nnodes_outer, len(self.corners)-1)] += 1
+        
+        # --stats on area
         for i in range(len(self.area_levels))[::-1]:
             if b.area >= self.area_levels[i]:
                 self.area_above[i] += 1
                 return i
         self.area_above[0] += 1
+       
         return 0
 
     def count_LOD(self, lod):
@@ -691,12 +700,13 @@ class Stats(object):
             total buildings %i
             parse errors    %i
             written         %i
+              four-sided    %i
             skipped
               small         %i
               nearby        %i
               no elevation  %i
               no texture    %i
-            """ % (self.objects, self.parse_errors, total_written,
+            """ % (self.objects, self.parse_errors, total_written, self.corners[4],
                    self.skipped_small, self.skipped_nearby, self.skipped_no_elev, self.skipped_texture)))
         roof_line = "        roof-types"
         for roof_type in self.roof_types:
@@ -726,16 +736,20 @@ class Stats(object):
                    self.LOD[0], lodzero,
                    self.LOD[1], lodone,
                    self.LOD[2], lodtwo)))
-        out.write("above\n")
-        max_area_above = self.area_above.max()
-        if max_area_above < 1: max_area_above = 1
-        for i in range(len(self.area_levels)):
+        out.write("\narea >=\n")
+        max_area_above = max(1, self.area_above.max())
+        for i in xrange(len(self.area_levels)):
             out.write(" %5g m^2  %5i |%s\n" % (self.area_levels[i], self.area_above[i], \
                       "#" * int(56. * self.area_above[i] / max_area_above)))
-#        except Exception, reason:
-#            logging.error(reason)
-#            return
 
+        out.write("\nnumber of corners >=\n")
+        max_corners = max(1, self.corners.max())
+        for i in xrange(3, len(self.corners)):
+            out.write("     %2i %6i |%s\n" % (i, self.corners[i], \
+                      "#" * int(56. * self.corners[i] / max_corners)))
+        out.write(" complex %5i |%s\n" % (self.corners[0], \
+                  "#" * int(56. * self.corners[0] / max_corners)))
+                  
 
 def init(new_transform):
     global transform
