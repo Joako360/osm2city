@@ -204,9 +204,9 @@ def is_static_object_nearby(b, X, static_tree):
 #            for n in nearby:
 #                print "-->", s[n]
         try:
-            print "Static objects nearby. Skipping ", b.name, len(nearby)
-        except:
-            print "FIXME: Encoding problem", b.name.encode('ascii', 'ignore')
+            logging.info( "Static objects nearby. Skipping %s is near %d buildings" ( b.name, len(nearby)))
+        except RuntimeError as e:
+            logging.error( "FIXME: %s %s ID %d"% (e, b.name.encode('ascii', 'ignore'), b.osm_id))
         # for n in nearby:
         #    print static_objects.objs[n].name,
         # print
