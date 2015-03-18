@@ -257,6 +257,7 @@ LU_GENB_INDUSTRIAL_BUILDING_SIDE_MAX = 20
 #=============================================================================
 
 TRAFFIC_SHADER_ENABLE = False
+MAX_SLOPE_RAILWAY = 0.04
 MAX_SLOPE_MOTORWAY = 0.03       # max slope for motorways
 MAX_SLOPE_ROAD = 0.08
 MAX_TRANSVERSE_GRADIENT = 0.1   #

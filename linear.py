@@ -28,6 +28,27 @@ class LinearObject(object):
             roads with (one/two-sided) embankment.
             set angle of embankment
     - 3d:   bridges. Surfaces all around.
+    
+    possible cases:
+    1. roads: left/right LS given. No h_add. Small gradient.
+      -> probe z, paint on surface
+    1a. roads, side. left Nodes given, right LS given. Probe right_z.
+    2. embankment: center and left/right given, h_add.
+      -> probe z, add h
+    3. bridge: 
+     
+    API: just write the damn thing!
+    - work out left_z, right_z
+    - write once all z is figured out
+    - 
+    
+    
+    z: - small gradient: paint on surface
+       - large gradient: elevate left or right
+       - left/right elev given?
+       - h_add given
+    write_nodes_to_ac
+    compute_or_set_z
 
     TODO:
       - better draping. Find discontinuity in elev, insert node
@@ -173,90 +194,129 @@ class LinearObject(object):
         self.normals[-1] = self.normals[-2]
         self.angle[-1] = self.angle[-2]
 
-    def _write_to(self, obj, elev, cluster_elev, left, right, tex_y0, tex_y1, n_nodes=None, left_z_set=None,
-                  right_z_set=None, ac=None, offset=None):
+    def write_nodes(self, obj, line_string, z, cluster_elev, offset=None):
+        """given a LineString and z, write nodes to .ac.
+           Return nodes_list         
+        """
+#        if not offset:
+#            offset = vec2d(0,0)            
+        # if joint0 == 1D:
+        #     if neighbour0.already_written:
+        #         left_coords = left.coords[1:]
+        #         right_coords = left.coords[1:]
+        #     else:
+        #         nodes_l = np.arange(n_nodes) + obj.next_node_index()
+        n_nodes = len(line_string.coords)
+        nodes_list = obj.next_node_index() + np.arange(n_nodes)
+        for i, the_node in enumerate(line_string.coords):
+            e = z[i] - cluster_elev
+            obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
+            
+        return nodes_list
+
+    def write_quads(self, obj, left_nodes_list, right_nodes_list, tex_y0, tex_y1, debug_ac=None):
         """
            Write a series of quads bound by left and right. 
-           Left/right can be lists of node indices which will be used to form a series of quads.
-
-           Left/right can also be LineStrings, in which case we first create nodes. Use left_z_set
-           as the node's height coordinate if given, otherwise probe elevation.
-           
-           Elev_offset is subtracted from probed or given elev.
+           Left/right are lists of node indices which will be used to form a series of quads.
         """
 
-        if "tunnel" in self.tags: 
+        if "tunnel" in self.tags:       # FIXME: this should be caught earlier
             return None, None, None
 
         if self.osm_id == 204383381:
             print "h"
+           
+#        if joint:
+#            remove left.coords[0]
+#            remove left_z[0]
 
-        if not offset:
-            offset = vec2d(0,0)            
-            
-        left_nodes = []    # node indices. Eventually build faces from these.
-        right_nodes = []
+        # write textured quads SURF
+                # -- write face as series of quads. Works OK, but produces more
+                #    SURFs in .ac.
+        scale = 30.
+        n_nodes = len(left_nodes_list)
+        assert(len(left_nodes_list) == len(right_nodes_list))
+        for i in range(n_nodes-1):
+            xl = self.dist[i]/scale
+            xr = self.dist[i+1]/scale
+            face = [ (left_nodes_list[i],    xl, tex_y0),
+                     (left_nodes_list[i+1],  xr, tex_y0),
+                     (right_nodes_list[i+1], xr, tex_y1),
+                     (right_nodes_list[i],   xl, tex_y1) ]
+            obj.face(face[::-1])
+        
 
-        try:
-            n_nodes = len(left.coords)
-        except AttributeError:
-            left_nodes = left
-        try:
-            n_nodes = len(right.coords)
-        except AttributeError:
-            right_nodes = right
-        if n_nodes is None:
-            raise ValueError("Neither left nor right are iterable: need n_nodes.")
+    def probe_ground(self, elev, line_string):
+        """probe ground elevation along given line string, return array"""
+        return np.array([elev(the_node) for the_node in line_string.coords])
 
+    def level_out(self, elev, elev_offset):
+        """accepts x,y and h_add, compute z, store z in self
+           Use left_z_given
+           as the node's height coordinate if given, otherwise probe elevation.
+           
+           Elev_offset is subtracted from probed or given elev.
+        """
         first_node = self.nodes_dict[self.refs[0]]
         last_node = self.nodes_dict[self.refs[-1]]
                 
         # -- elevated road. Got h_add data for first and last node. Now lift intermediate
         #    nodes. So far, h_add is for centerline only.
-        # FIXME: when do we need this? if left_z_set is None and right_z_set is None?
+        # FIXME: when do we need this? if left_z_given is None and right_z_given is None?
 
         center_z = np.array([elev(the_node) for the_node in self.center.coords])  + self.AGL
 
         EPS = 0.001
 
+        assert(len(self.edge[0].coords) == len(self.edge[0].coords))
+        n_nodes = len(self.edge[0].coords)
+
         h_add_0 = first_node.h_add
         h_add_1 = last_node.h_add
         dh_dx = max_slope_for_road(self)
+        MSL_0 = center_z[0] + h_add_0
+        MSL_1 = center_z[-1] + h_add_1
 
         if h_add_0 <= EPS and h_add_1 <= EPS:
             h_add = np.zeros(n_nodes)
         elif h_add_0 <= EPS:
-            h_add = np.array([max(0, h_add_1 - (self.dist[-1] - self.dist[i]) * dh_dx) for i in range(n_nodes)])
+            h_add = np.array([max(0, MSL_1 - (self.dist[-1] - self.dist[i]) * dh_dx - center_z[i]) for i in range(n_nodes)])
         elif h_add_1 <= EPS:
-            h_add = np.array([max(0, h_add_0 - self.dist[i] * dh_dx) for i in range(n_nodes)])
+            h_add = np.array([max(0, MSL_0 - self.dist[i] * dh_dx - center_z[i]) for i in range(n_nodes)])
         else:
             #actual_slope = 
 #            h_add = np.array([max(0, h_add_0 + (h_add_1 - h_add_0) * self.dist[i]/self.dist[-1]) for i in range(n_nodes)])
             h_add = np.zeros(n_nodes)
             for i in range(n_nodes):
-                h_add[i] = max(0, h_add_0 - self.dist[i] * dh_dx - (center_z[i] - center_z[0]))
-                if h_add[i] < 0.001:
+                h_add[i] = max(0, MSL_0 - self.dist[i] * dh_dx - center_z[i])
+                if h_add[i] < EPS: # FIXME: different for other h_add?
                     break
+            
+#            for i in range(n_nodes):
+#                h_add[i] = max(0, h_add_0 - self.dist[i] * dh_dx - (center_z[i] - center_z[0]))
+#                if h_add[i] < 0.001:
+#                    break
             for i in range(n_nodes)[::-1]:
                 other_h_add = h_add[i]
-                h_add[i] = max(0, h_add_1 - (self.dist[-1] - self.dist[i]) * dh_dx - (center_z[i] - center_z[-1]))
+                h_add[i] = max(0, MSL_1 - (self.dist[-1] - self.dist[i]) * dh_dx - center_z[i])
+#                h_add[i] = max(0, h_add_1 - (self.dist[-1] - self.dist[i]) * dh_dx - (center_z[i] - center_z[-1]))
                 if other_h_add > h_add[i]:
-                    h_add[i] = other_h_add
+                    h_add[i] = other_h_add # FIXME: this is different than for first h_add?
                     break
 
         # -- get elev
-        if left_z_set is not None:
-            assert(len(left_z_set) == n_nodes)
+        #if left_z_given is not None:
+        #    assert(len(left_z_given) == n_nodes)
 
-        if right_z_set is not None:
-            assert(len(right_z_set) == n_nodes)
+        #if right_z_given is not None:
+        #    assert(len(right_z_given) == n_nodes)
 
         # no elev given:
         #  probe left and right
-        #  if transversal grad too large at a node:
-        #     use higher elev, add to h_add_left or h_add_right
+        #  if transversal gradient too large at a node:
+        #     use the higher of the two elevs, add to h_add_left or h_add_right
        
-        # if left node index given: no use for left_z_set
+        # if left node index given: no use for left_z_given
         # same for right
         left_z = np.zeros(n_nodes)
         right_z = np.zeros(n_nodes)
@@ -292,110 +352,113 @@ class LinearObject(object):
         if self.osm_id == 24722952:
             pass
 
-        if left_z_set is None and not left_nodes:
-            left_z = np.array([elev(the_node) for the_node in left.coords])  + self.AGL
+        l_z = self.probe_ground(elev, self.edge[0]) + self.AGL
+        r_z = self.probe_ground(elev, self.edge[1]) + self.AGL
+
+
+        left_z = self.probe_ground(elev, self.edge[0]) + self.AGL
             
-        if right_z_set is None and not right_nodes:
-            right_z = np.array([elev(the_node) for the_node in right.coords]) + self.AGL
+        right_z = self.probe_ground(elev, self.edge[1]) + self.AGL
 
-        if not left_nodes and not right_nodes:
-            if left_z_set is None and right_z_set is None:
-                diff_elev = left_z - right_z
-                for i, the_diff in enumerate(diff_elev):
-                    # -- h_add larger than terrain gradient:
-                    #    terrain gradient doesnt matter, just create level road at h_add
-                    if h_add[i] > abs(the_diff/2.):
-                         left_z[i]  += (h_add[i] - the_diff/2.)
-                         right_z[i] += (h_add[i] + the_diff/2.)
-                    else:
-                        # h_add smaller than terrain gradient. 
-                        # In case terrain gradient is significant, create level
-                        # road which is then higher than h_add anyway.
-                        # Otherwise, create sloped road and ignore h_add.
-                        # FIXME: is this a bug?
-                        if the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT: #  left > right
-                            right_z[i] += the_diff  # dirty
-                        elif -the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT: # right > left
-                            left_z[i] += - the_diff # dirty
-                        else:
-                            # terrain gradient negligible and h_add small
-                            pass
+        diff_elev = left_z - right_z
+        for i, the_diff in enumerate(diff_elev):
+            # -- h_add larger than terrain gradient:
+            #    terrain gradient doesnt matter, just create level road at h_add
+            if h_add[i] > abs(the_diff/2.):
+                 left_z[i]  += (h_add[i] - the_diff/2.)
+                 right_z[i] += (h_add[i] + the_diff/2.)
+            else:
+                # h_add smaller than terrain gradient. 
+                # In case terrain gradient is significant, create level
+                # road which is then higher than h_add anyway.
+                # Otherwise, create sloped road and ignore h_add.
+                # FIXME: is this a bug?
+                if the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT: #  left > right
+                    right_z[i] += the_diff  # dirty
+                elif -the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT: # right > left
+                    left_z[i] += - the_diff # dirty
+                else:
+                    # terrain gradient negligible and h_add small
+                    pass
 
-        if left_z_set is not None: left_z = left_z_set
-        if right_z_set is not None: right_z = right_z_set
+        #if left_z_given is not None: left_z = left_z_given
+        #if right_z_given is not None: right_z = right_z_given
         # diff = (left_elev[i] - right_elev[i])
         # if diff / self.width > max_grad: #  left > right
         #   right_h_add = diff
         # elif diff / self.width < -max_grad:  #   right > left
         #   left_h_add = -diff
+        the_id = 31381437
+        if first_node.osm_id == the_id or last_node.osm_id == the_id:
+            #bla
+            pass
+        return left_z, right_z, h_add
 
+    def _write_to(self, obj, elev, elev_offset, edge0, edge1,
+                                          tex_y0, tex_y1, n_nodes=0, left_z_set=0, right_z_set=0, ac=0, offset=0):
+        print "FIXME: linear _write_to()"
+        return 0,0,0
 
-        # -- write left nodes
-        # left_coords = left.coords
-        # right_coords = right.coords
-        # if joint0 == 1D:
-        #     if neighbour0.already_written:
-        #         left_coords = left.coords[1:]
-        #         right_coords = left.coords[1:]
-        #     else:
-        #         nodes_l = np.arange(n_nodes) + obj.next_node_index()
-        if not left_nodes:
-            left_nodes = np.arange(n_nodes) + obj.next_node_index()
-            for i, the_node in enumerate(left.coords):
-                e = left_z[i] - cluster_elev
-                obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
-#                if abs(the_node[1]) > 50000. or abs(the_node[0]) > 50000.:
-#                    print "large node %6.0f %6.0f %i" % (the_node[0], the_node[1], self.osm_id)
-#            ac.add_label(''+str(self.osm_id), -the_node[1], e+5, -the_node[0], scale=5)
-#        nodes_l = range(node0_l, node0_l + n_nodes)
+    # FIXME: this is really a road type of linearObject, so make it linearRoad
+    # FIXME: what is offset?
 
-        # -- write right nodes
-        if not right_nodes:
-            right_nodes = np.arange(n_nodes) + obj.next_node_index()
-            for i, the_node in enumerate(right.coords):
-                e = right_z[i] - cluster_elev
-                obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
-#                ac.add_label(''+str(self.osm_id), -the_node[1], e+5, -the_node[0], scale=5)
-#        nodes_r = range(node0_r, node0_r + n_nodes)
+    def debug_print_node_info(self, the_node, h_add=None):
+        if the_node in self.refs:
+            i = self.refs.index(the_node)
+            print ">> OSMID %i %i h_add %5.2g" % (self.osm_id, i, self.nodes_dict[the_node].h_add),
+            if h_add is not None:
+                print h_add #[i]
+            else:
+                print
+            return True
+        return False
 
-
-#        if joint:
-#            remove left.coords[0]
-#            remove left_z[0]
-
-        # make left node index list
-        # write right nodes
-        # make right node index list
-
-        # write textured quads SURF
-                # -- write face as series of quads. Works OK, but produces more
-                #    SURFs in .ac.
-        scale = 30.
-        for i in range(n_nodes-1):
-            xl = self.dist[i]/scale
-            xr = self.dist[i+1]/scale
-            face = [ (left_nodes[i],    xl, tex_y0),
-                     (left_nodes[i+1],  xr, tex_y0),
-                     (right_nodes[i+1], xr, tex_y1),
-                     (right_nodes[i],   xl, tex_y1) ]
-            obj.face(face[::-1])
-        return list(left_nodes), list(right_nodes), h_add
-
-    def write_to(self, obj, elev, elev_offset, ac=None, left=None, right=None, z=None, 
-                 offset=None):
-        """need adjacency info
-           left: node index of left
-           right:
+    def debug_label_nodes(self, line_string, z, ac, elev_offset, offset, h_add):
+        for i, anchor in enumerate(line_string.coords):
+            e = z[i] - elev_offset
+            ac.add_label('<' + str(self.osm_id) + '> add %5.2f' % h_add[i], -(anchor[1] - offset.y), e+0.5, -(anchor[0] - offset.x), scale=1)
+        
+    def write_to(self, obj, elev, elev_offset, debug_ac=None, offset=None):
+        """
+           assume we are a street: flat (or elevated) on terrain, left and right edges
+           #need adjacency info
+           #left: node index of left
+           #right:
            offset accounts for tile center
         """
-        left, right, h_add = self._write_to(obj, elev, elev_offset, self.edge[0], self.edge[1],
-                       self.tex_y0, self.tex_y1, ac=ac, offset=offset)
-        if h_add is not None:
+        left_z, right_z, h_add = self.level_out(elev, elev_offset)
+        #left_z  = self.probe_ground(elev, self.edge[0])
+        #right_z = self.probe_ground(elev, self.edge[1])
+        if self.osm_id == 204383381: # 1st   (+)
+            print ">> 1st ", h_add
+            print self.nodes_dict[self.refs[0]].h_add
+        if self.osm_id == 138440237: # last (2)
+            print "<< las ", h_add
+            print self.nodes_dict[self.refs[-1]].h_add
+            print self.nodes_dict[self.refs[0]].h_add
+            print self.refs[0]
+            
+        if self.debug_print_node_info(21551419, h_add):
+            self.debug_label_nodes(self.center, left_z, debug_ac, elev_offset, offset, h_add)
+
+        left_nodes_list =  self.write_nodes(obj, self.edge[0], left_z, elev_offset, offset=offset)
+        right_nodes_list = self.write_nodes(obj, self.edge[1], right_z, elev_offset, offset=offset)
+        if self.osm_id == 138440237:
+            pass
+            #bla
+        self.write_quads(obj, left_nodes_list, right_nodes_list, self.tex_y0, self.tex_y1, debug_ac=debug_ac)
+        if 1 and h_add is not None:
+            # -- side walls of embankment
             if h_add.max() > 0.1:
-                self._write_to(obj, elev, elev_offset, right, self.edge[1],
-                               4/8., 5/8., ac=ac, offset=offset)
-                self._write_to(obj, elev, elev_offset, self.edge[0], left,
-                               4/8., 5/8., ac=ac, offset=offset)
+                left_ground_z  = self.probe_ground(elev, self.edge[0])
+                right_ground_z = self.probe_ground(elev, self.edge[1])
+
+                left_ground_nodes  = self.write_nodes(obj, self.edge[0], left_ground_z, elev_offset, offset=offset)
+                right_ground_nodes = self.write_nodes(obj, self.edge[1], right_ground_z, elev_offset, offset=offset)
+
+                self.write_quads(obj, left_ground_nodes, left_nodes_list, 4/8., 5/8., debug_ac=debug_ac)
+                self.write_quads(obj, right_nodes_list, right_ground_nodes, 4/8., 5/8., debug_ac=debug_ac)
+
         return True
         # options:
         # - each way has two ends.
@@ -498,6 +561,8 @@ class LinearObject(object):
 def max_slope_for_road(obj): 
     if 'highway' in obj.tags and obj.tags['highway'] in ['motorway']:
         return parameters.MAX_SLOPE_MOTORWAY
+    elif 'railway' in obj.tags and obj.tags['railway'] in ['rail']:
+        return parameters.MAX_SLOPE_RAILWAY
     else:
         return parameters.MAX_SLOPE_ROAD
 
