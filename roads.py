@@ -179,6 +179,7 @@ class Roads(objectlist.ObjectList):
             the_node.h_add = 0.
     
     def propagate_h_add_over_edge(self, ref0, ref1, args):
+        """propagate h_add over edges of graph"""
         obj = self.G[ref0][ref1]['obj']
         dh_dx = max_slope_for_road(obj)
         n0 = self.nodes_dict[ref0]
@@ -941,7 +942,7 @@ def main():
 
     replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)        
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
-    roads.debug_label_nodes(stg_manager)
+    #roads.debug_label_nodes(stg_manager)
 
     # -- write stg
     for cl in roads.clusters:

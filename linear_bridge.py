@@ -173,10 +173,12 @@ class LinearBridge(linear.LinearObject):
             z[i] = self.deck_height(l, normalized=False) + self.AGL
             l += self.segment_len[i]
 
+        self.debug_print_node_info(21551419)
+
         left_top_nodes =  self.write_nodes(obj, self.edge[0], z, elev_offset, offset=offset)
         right_top_nodes = self.write_nodes(obj, self.edge[1], z, elev_offset, offset=offset)
 
-        left_bottom_edge, right_bottom_edge = self.compute_offset(3)
+        left_bottom_edge, right_bottom_edge = self.compute_offset(self.width/2 * 0.5)
         left_bottom_nodes =  self.write_nodes(obj, left_bottom_edge, z-3, elev_offset, offset=offset)
         right_bottom_nodes = self.write_nodes(obj, right_bottom_edge, z-3, elev_offset, offset=offset)
 
@@ -184,10 +186,10 @@ class LinearBridge(linear.LinearObject):
         self.write_quads(obj, left_top_nodes, right_top_nodes, self.tex_y0, self.tex_y1, debug_ac=None)
         
         # -- right
-        self.write_quads(obj, right_top_nodes, right_bottom_nodes, self.tex_y0, self.tex_y1, debug_ac=None)
+        self.write_quads(obj, right_top_nodes, right_bottom_nodes,  4/8., 3/8., debug_ac=None)
         
         # -- left
-        self.write_quads(obj, left_bottom_nodes, left_top_nodes, self.tex_y0, self.tex_y1, debug_ac=None)
+        self.write_quads(obj, left_bottom_nodes, left_top_nodes, 3/8., 4/8., debug_ac=None)
 
         # -- bottom
-        self.write_quads(obj, right_bottom_nodes, left_bottom_nodes, self.tex_y0, self.tex_y1, debug_ac=None)
+        self.write_quads(obj, right_bottom_nodes, left_bottom_nodes,  0.9, 1, debug_ac=None)

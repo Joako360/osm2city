@@ -211,6 +211,7 @@ class LinearObject(object):
         for i, the_node in enumerate(line_string.coords):
             e = z[i] - cluster_elev
             obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
+            
         return nodes_list
 
     def write_quads(self, obj, left_nodes_list, right_nodes_list, tex_y0, tex_y1, debug_ac=None):
@@ -273,26 +274,34 @@ class LinearObject(object):
         h_add_0 = first_node.h_add
         h_add_1 = last_node.h_add
         dh_dx = max_slope_for_road(self)
+        MSL_0 = center_z[0] + h_add_0
+        MSL_1 = center_z[-1] + h_add_1
 
         if h_add_0 <= EPS and h_add_1 <= EPS:
             h_add = np.zeros(n_nodes)
         elif h_add_0 <= EPS:
-            h_add = np.array([max(0, h_add_1 - (self.dist[-1] - self.dist[i]) * dh_dx) for i in range(n_nodes)])
+            h_add = np.array([max(0, MSL_1 - (self.dist[-1] - self.dist[i]) * dh_dx - center_z[i]) for i in range(n_nodes)])
         elif h_add_1 <= EPS:
-            h_add = np.array([max(0, h_add_0 - self.dist[i] * dh_dx) for i in range(n_nodes)])
+            h_add = np.array([max(0, MSL_0 - self.dist[i] * dh_dx - center_z[i]) for i in range(n_nodes)])
         else:
             #actual_slope = 
 #            h_add = np.array([max(0, h_add_0 + (h_add_1 - h_add_0) * self.dist[i]/self.dist[-1]) for i in range(n_nodes)])
             h_add = np.zeros(n_nodes)
             for i in range(n_nodes):
-                h_add[i] = max(0, h_add_0 - self.dist[i] * dh_dx - (center_z[i] - center_z[0]))
-                if h_add[i] < 0.001:
+                h_add[i] = max(0, MSL_0 - self.dist[i] * dh_dx - center_z[i])
+                if h_add[i] < EPS: # FIXME: different for other h_add?
                     break
+            
+#            for i in range(n_nodes):
+#                h_add[i] = max(0, h_add_0 - self.dist[i] * dh_dx - (center_z[i] - center_z[0]))
+#                if h_add[i] < 0.001:
+#                    break
             for i in range(n_nodes)[::-1]:
                 other_h_add = h_add[i]
-                h_add[i] = max(0, h_add_1 - (self.dist[-1] - self.dist[i]) * dh_dx - (center_z[i] - center_z[-1]))
+                h_add[i] = max(0, MSL_1 - (self.dist[-1] - self.dist[i]) * dh_dx - center_z[i])
+#                h_add[i] = max(0, h_add_1 - (self.dist[-1] - self.dist[i]) * dh_dx - (center_z[i] - center_z[-1]))
                 if other_h_add > h_add[i]:
-                    h_add[i] = other_h_add
+                    h_add[i] = other_h_add # FIXME: this is different than for first h_add?
                     break
 
         # -- get elev
@@ -347,33 +356,30 @@ class LinearObject(object):
         r_z = self.probe_ground(elev, self.edge[1]) + self.AGL
 
 
-        if 1 or left_z_given is None:
-            left_z = self.probe_ground(elev, self.edge[0]) + self.AGL
+        left_z = self.probe_ground(elev, self.edge[0]) + self.AGL
             
-        if 1 or right_z_given is None:
-            right_z = self.probe_ground(elev, self.edge[1]) + self.AGL
+        right_z = self.probe_ground(elev, self.edge[1]) + self.AGL
 
-        if 1 or left_z_given is None and right_z_given is None:
-            diff_elev = left_z - right_z
-            for i, the_diff in enumerate(diff_elev):
-                # -- h_add larger than terrain gradient:
-                #    terrain gradient doesnt matter, just create level road at h_add
-                if h_add[i] > abs(the_diff/2.):
-                     left_z[i]  += (h_add[i] - the_diff/2.)
-                     right_z[i] += (h_add[i] + the_diff/2.)
+        diff_elev = left_z - right_z
+        for i, the_diff in enumerate(diff_elev):
+            # -- h_add larger than terrain gradient:
+            #    terrain gradient doesnt matter, just create level road at h_add
+            if h_add[i] > abs(the_diff/2.):
+                 left_z[i]  += (h_add[i] - the_diff/2.)
+                 right_z[i] += (h_add[i] + the_diff/2.)
+            else:
+                # h_add smaller than terrain gradient. 
+                # In case terrain gradient is significant, create level
+                # road which is then higher than h_add anyway.
+                # Otherwise, create sloped road and ignore h_add.
+                # FIXME: is this a bug?
+                if the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT: #  left > right
+                    right_z[i] += the_diff  # dirty
+                elif -the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT: # right > left
+                    left_z[i] += - the_diff # dirty
                 else:
-                    # h_add smaller than terrain gradient. 
-                    # In case terrain gradient is significant, create level
-                    # road which is then higher than h_add anyway.
-                    # Otherwise, create sloped road and ignore h_add.
-                    # FIXME: is this a bug?
-                    if the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT: #  left > right
-                        right_z[i] += the_diff  # dirty
-                    elif -the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT: # right > left
-                        left_z[i] += - the_diff # dirty
-                    else:
-                        # terrain gradient negligible and h_add small
-                        pass
+                    # terrain gradient negligible and h_add small
+                    pass
 
         #if left_z_given is not None: left_z = left_z_given
         #if right_z_given is not None: right_z = right_z_given
@@ -395,6 +401,23 @@ class LinearObject(object):
 
     # FIXME: this is really a road type of linearObject, so make it linearRoad
     # FIXME: what is offset?
+
+    def debug_print_node_info(self, the_node, h_add=None):
+        if the_node in self.refs:
+            i = self.refs.index(the_node)
+            print ">> OSMID %i %i h_add %5.2g" % (self.osm_id, i, self.nodes_dict[the_node].h_add),
+            if h_add is not None:
+                print h_add #[i]
+            else:
+                print
+            return True
+        return False
+
+    def debug_label_nodes(self, line_string, z, ac, elev_offset, offset, h_add):
+        for i, anchor in enumerate(line_string.coords):
+            e = z[i] - elev_offset
+            ac.add_label('<' + str(self.osm_id) + '> add %5.2f' % h_add[i], -(anchor[1] - offset.y), e+0.5, -(anchor[0] - offset.x), scale=1)
+        
     def write_to(self, obj, elev, elev_offset, debug_ac=None, offset=None):
         """
            assume we are a street: flat (or elevated) on terrain, left and right edges
@@ -414,6 +437,9 @@ class LinearObject(object):
             print self.nodes_dict[self.refs[-1]].h_add
             print self.nodes_dict[self.refs[0]].h_add
             print self.refs[0]
+            
+        if self.debug_print_node_info(21551419, h_add):
+            self.debug_label_nodes(self.center, left_z, debug_ac, elev_offset, offset, h_add)
 
         left_nodes_list =  self.write_nodes(obj, self.edge[0], left_z, elev_offset, offset=offset)
         right_nodes_list = self.write_nodes(obj, self.edge[1], right_z, elev_offset, offset=offset)
