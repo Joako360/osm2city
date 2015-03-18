@@ -762,8 +762,10 @@ def init(new_transform):
 def install_files(file_list, dst):
     """link files in file_list to dst"""
     for the_file in file_list:
-        the_dst = dst + os.sep + the_file
+        the_dst = dst # + os.sep + the_file
         logging.info("cp %s %s" % (the_file, the_dst))
+        if os.path.exists(the_dst + the_file):
+            return
         try:
             shutil.copy2(the_file, the_dst)
         except OSError, reason:
