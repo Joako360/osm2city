@@ -208,6 +208,7 @@ class TextureManager(object):
             return
 
         new_provides = []
+        logging.debug("Added %s "%t.filename)
         for item in t.provides:
             if item.split(':')[0] in ('age', 'region', 'compat'):
                 new_provides.append(item)
@@ -299,8 +300,10 @@ class FacadeManager(TextureManager):
 #            print "     building_height", building_height
 #            print "     min/max", t.height_min, t.height_max
             if height < t.height_min or height > t.height_max:
+                logging.verbose("height %.2f (%.2f-%.2f) outside bounds : %s" %(height, t.height_min, t.height_max, str(t.filename)))
                 continue
             if width < t.width_min or width > t.width_max:
+                logging.verbose("width %.2f (%.2f-%.2f) outside bounds : %s"%(width, t.width_min, t.width_max,str(t.filename)))
                 continue
 
             new_candidates.append(t)
@@ -332,6 +335,7 @@ def init(tex_prefix='', create_atlas=False):
         facades = FacadeManager('facade')
         roofs = TextureManager('roof')
     
+        catalog.append_dynamic(tex_prefix, facades)
         catalog.append_facades_de(tex_prefix, facades)
         #append_facades_test()
         catalog.append_roofs(tex_prefix, roofs)
