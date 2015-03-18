@@ -742,6 +742,10 @@ class Stats(object):
             out.write(" %5g m^2  %5i |%s\n" % (self.area_levels[i], self.area_above[i], \
                       "#" * int(56. * self.area_above[i] / max_area_above)))
 
+        if logging.getLogger().level <= logging.VERBOSE:
+            for name in self.textures_used:
+                logging.debug("%s"%name)
+
         out.write("\nnumber of corners >=\n")
         max_corners = max(1, self.corners.max())
         for i in xrange(3, len(self.corners)):
