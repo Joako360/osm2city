@@ -206,6 +206,9 @@ class MyFrame(wx.Frame):
         out_case_name = self.out_case_name()
         in_ext = os.path.splitext(self.in_file_name)[1]
         s = textwrap.dedent("""
+        from textures.texture import Texture
+        """)
+        s += textwrap.dedent("""
         facades.append(Texture('tex.src/%s',
             h_size_meters=%1.1f, h_cuts=%s, h_can_repeat=True,
             v_size_meters=%1.1f, v_cuts=%s, v_can_repeat=False,
@@ -306,7 +309,7 @@ class MyFrame(wx.Frame):
             self.text_ctrl_x.SetFocus()
 
         self.update_label(event)
-        self.OnPaint()
+        self.Refresh()
 
     def OnRightUp(self, event):
         self.right_click = self.screen2img(self.GetMousePos(event))
@@ -321,24 +324,25 @@ class MyFrame(wx.Frame):
             self.y_scale_p1 = self.right_click[1]
             self.text_ctrl_y.SetFocus()
         self.update_label(event)
-        self.OnPaint()
+        self.Refresh()
 
     def fit_to_click(self):
         pass
 
     def OnMiddleDown(self, event):
-        self.OnPaint()
+        self.Refresh()
         event.Skip()
 
     def OnRightDown(self, event):
         self.drag_start = self.screen2img(self.GetMousePos(event))
         #np.array(self.GetMousePos(event))
-        self.OnPaint(event)
+        self.Refresh()
         event.Skip()
 
     def OnLeftDown(self, event):
         self.drag_start = self.screen2img(self.GetMousePos(event))
-        self.OnPaint(event)
+        self.Refresh()
+#         self.OnPaint(event)
         event.Skip()
 
     def GetMousePos(self, event):
@@ -365,10 +369,10 @@ class MyFrame(wx.Frame):
     def OnMouseWheel(self, event):
         if event.ShiftDown():
             if event.GetWheelRotation() < 0: fac = 1/fac
-            self.OnPaint()
+            self.Refresh()
             return
 
-        self.OnPaint()
+        self.Refresh()
         #event.Skip()
 
     def OnKey(self, event):
@@ -376,7 +380,7 @@ class MyFrame(wx.Frame):
         #print "key", event.GetKeyCode()
 #        if event.GetKeyCode() == wx.WXK_BACK or event.GetKeyCode() == wx.WXK_DELETE:
 #            self.update_label(event)
-#            self.OnPaint()
+#            self.Refresh()
 #        else:
 #            event.Skip()
 

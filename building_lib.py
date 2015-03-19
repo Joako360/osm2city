@@ -16,6 +16,7 @@ import string
 
 from vec2d import vec2d
 from textures.manager import find_matching_texture
+import os
 # nobjects = 0
 nb = 0
 out = ""
@@ -203,9 +204,9 @@ def is_static_object_nearby(b, X, static_tree):
 #            for n in nearby:
 #                print "-->", s[n]
         try:
-            print "Static objects nearby. Skipping ", b.name, len(nearby)
-        except:
-            print "FIXME: Encoding problem", b.name.encode('ascii', 'ignore')
+            logging.info( "Static objects nearby. Skipping %s is near %d buildings" ( b.name, len(nearby)))
+        except RuntimeError as e:
+            logging.error( "FIXME: %s %s ID %d"% (e, b.name.encode('ascii', 'ignore'), b.osm_id))
         # for n in nearby:
         #    print static_objects.objs[n].name,
         # print
@@ -314,7 +315,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
     if static_objects:
         s = get_nodes_from_acs(static_objects, parameters.PREFIX + "city")
 
-        np.savetxt("nodes.dat", s)
+        np.savetxt(parameters.PREFIX + os.sep + "nodes.dat", s)
         static_tree = KDTree(s, leafsize=10)  # -- switch to brute force at 10
 
     new_buildings = []
