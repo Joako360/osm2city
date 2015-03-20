@@ -72,7 +72,7 @@ class LinearBridge(linear.LinearObject):
         return self.elev_spline(l)
 
     def prep_height(self, nodes_dict):
-        """Set deck shape depending on elevation."""
+        """Preliminary deck shape depending on elevation. Write required h_add to end nodes"""
         # deck slope more or less continuous!
         # d2z/dx2 limit
         # - put some constraints: min clearance
@@ -97,34 +97,66 @@ class LinearBridge(linear.LinearObject):
         #   if terrain is sloping, keep MSL, such that terrain approaches MSL
         # eventually write MSL
         #
-        h0, hm, h1 = self.elev([0,0.5,1])
-        self.avg_slope = (h1 - h0)/self.center.length
-#        print "# h0, hm, h1:", h0, hm, h1
-        self.D = Deck_shape_linear(h0, h1)
-        try:
-            min_height = 8. * int(self.tags['layer'])
-        except KeyError:
-            min_height = 8.
-        h_add = max(0, min_height - (self.D(0.5) - hm))
-        
-#        h_add = 0. # debug: no h_add at all
-        if h_add > 0.:
-            self.D = Deck_shape_linear(h0 + h_add, h1 + h_add)
-
         node0 = nodes_dict[self.refs[0]]
         node1 = nodes_dict[self.refs[-1]]
+
+        MSL = np.array(3)
+        MSL = self.elev([0, 0.5, 1]) # FIXME: use elev interpolator instead
         
-        if node0.h_add != 0:
-            node0.h_add = 0.5*(node0.h_add + h_add)
+        deck_MSL = MSL.copy()
+        deck_MSL[0] += node0.h_add
+        deck_MSL[-1] += node1.h_add
+        
+        if deck_MSL[-1] > deck_MSL[0]:
+            hi_end = -1
+            lo_end = 0
         else:
-            node0.h_add = h_add
+            hi_end = 0
+            lo_end = -1
+        mid = 1
+        #self.avg_slope = (MSL[hi_end] - MSL[lo_end])/self.center.length
+#        print "# MSL_0, MSL_m, MSL_1:", MSL_0, MSL_m, MSL_1
+        self.D = Deck_shape_linear(deck_MSL[0], deck_MSL[-1])
+        try:
+            required_height = 5. * int(self.tags['layer'])
+        except KeyError:
+            required_height = 5.
             
-        if node1.h_add != 0:
-            node1.h_add = 0.5*(node1.h_add + h_add)
+        if (self.D(0.5) - MSL[mid]) > required_height:
+            return
+        
+        dh_dx = linear.max_slope_for_road(self)
+        
+        # -- need to elevate one or both ends
+        deck_MSL[mid] = MSL[mid] + required_height
+        if deck_MSL[hi_end] > deck_MSL[mid]:
+            # -- elevate lower end
+#            print "elevating lower end"
+            deck_MSL[lo_end] = max(deck_MSL[hi_end] - 2 * (deck_MSL[hi_end] - deck_MSL[mid]), 
+                                   deck_MSL[hi_end] - dh_dx * self.center.length)
         else:
-            node1.h_add = h_add
-#        if self.D(0.5) - hm < min_height:
-#            self.D = Deck_shape_poly(h0, hm+min_height, h1)
+#            print "elevating both"
+            # -- elevate both ends to same MSL
+            deck_MSL[hi_end] = deck_MSL[lo_end] = deck_MSL[mid]
+
+        h_add = np.maximum(deck_MSL - MSL, np.zeros_like(deck_MSL))        
+            
+#        h_add = 0. # debug: no h_add at all
+        self.D = Deck_shape_linear(deck_MSL[0], deck_MSL[-1])
+        
+#        print "midh", self.D(0.5) - MSL[1], required_height
+
+        if node0.h_add > 0:
+            node0.h_add = 0.5*(node0.h_add + h_add[0])
+        else:
+            node0.h_add = h_add[0]
+            
+        if node1.h_add > 0:
+            node1.h_add = 0.5*(node1.h_add + h_add[-1])
+        else:
+            node1.h_add = h_add[-1]
+#        if self.D(0.5) - MSL_m < required_height:
+#            self.D = Deck_shape_poly(MSL_0, MSL_m+required_height, MSL_1)
 
         if self.osm_id == 126452863:
             print "hj", node0.h_add, node1.h_add
@@ -172,15 +204,20 @@ class LinearBridge(linear.LinearObject):
         for i in range(n_nodes):
             z[i] = self.deck_height(l, normalized=False) + self.AGL
             l += self.segment_len[i]
+            
+        #z, right_z, h_add = self.level_out(elev, elev_offset)
+        #print "br", h_add
+
 
         self.debug_print_node_info(21551419)
 
         left_top_nodes =  self.write_nodes(obj, self.edge[0], z, elev_offset, offset=offset)
         right_top_nodes = self.write_nodes(obj, self.edge[1], z, elev_offset, offset=offset)
 
+        bridge_body_height = 1.5
         left_bottom_edge, right_bottom_edge = self.compute_offset(self.width/2 * 0.5)
-        left_bottom_nodes =  self.write_nodes(obj, left_bottom_edge, z-3, elev_offset, offset=offset)
-        right_bottom_nodes = self.write_nodes(obj, right_bottom_edge, z-3, elev_offset, offset=offset)
+        left_bottom_nodes =  self.write_nodes(obj, left_bottom_edge, z-bridge_body_height, elev_offset, offset=offset)
+        right_bottom_nodes = self.write_nodes(obj, right_bottom_edge, z-bridge_body_height, elev_offset, offset=offset)
 
         # -- top
         self.write_quads(obj, left_top_nodes, right_top_nodes, self.tex_y0, self.tex_y1, debug_ac=None)

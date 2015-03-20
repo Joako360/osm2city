@@ -153,13 +153,13 @@ class Roads(objectlist.ObjectList):
 #    self.transform, self.elev, way.osm_id, way.tags, way.refs, nodes_dict, 
 #    width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs
     def prio(self, highway_tag, access):
-        if highway_tag == 'motorway' or highway_tag == 'motorway_link':
+        if highway_tag == 'motorway':
             prio = 5
         elif highway_tag == 'primary' or highway_tag == 'trunk':
             prio = 4
         elif highway_tag == 'secondary':
             prio = 3
-        elif highway_tag == 'tertiary' or highway_tag == 'unclassified':
+        elif highway_tag == 'tertiary' or highway_tag == 'unclassified'  or highway_tag == 'motorway_link':
             prio = 2
         elif highway_tag == 'residential':
             prio = 1
@@ -282,6 +282,7 @@ class Roads(objectlist.ObjectList):
         return shg.LineString(nodes)
 
     def remove_short_bridges(self):
+        """remove bridge tag from short bridges, making them a simple way"""
         for the_way in self.ways_list:
             if is_bridge(the_way):
                 center = self.LineString_from_way(the_way)
@@ -634,6 +635,11 @@ class Roads(objectlist.ObjectList):
             plt.savefig(save)
         if show:
             plt.show()
+    def debug_show_h_add(self, label=""):
+        return
+        print "====", label
+        for the_node in self.nodes_dict.itervalues():
+            print "n %12i h_add %5.2f" % (the_node.osm_id, the_node.h_add)
             
     def cleanup_junctions(self):
         """Remove junctions that
@@ -704,6 +710,22 @@ class Roads(objectlist.ObjectList):
         print "138: ", self.nodes_dict[1401732138].h_add
         print "139: ", self.nodes_dict[1401732138].h_add
         
+    def debug_keep_only(self, osm_id_list):
+        """keep only ways of given osm_id"""
+        new_list = []
+        for the_obj in self.ways_list:
+            if the_obj.osm_id in osm_id_list:
+                new_list.append(the_obj)
+        self.ways_list = new_list
+
+    def debug_drop_unused_nodes(self):
+        new_nodes_dict = {}
+        for the_list in [self.bridges_list, self.roads_list]:
+            for the_obj in the_list:
+                for the_ref in the_obj.refs:
+                    new_nodes_dict[the_ref] = self.nodes_dict[the_ref]
+        self.nodes_dict = new_nodes_dict
+                
     def debug_label_nodes(self, stg_manager, file_name="labels"):
         """write OSM_ID for nodes"""
         # -- write OSM_ID label
@@ -712,6 +734,19 @@ class Roads(objectlist.ObjectList):
         
 
         for way in self.bridges_list + self.roads_list:
+            # -- label center with way ID
+            the_node = self.nodes_dict[way.refs[len(way.refs)/2]]
+            anchor = vec2d(self.transform.toLocal(vec2d(the_node.lon, the_node.lat)))
+#            anchor.x += random.uniform(-1,1)
+            if math.isnan(anchor.lon) or math.isnan(anchor.lat):
+                logging.error("Nan encountered while probing anchor elevation")
+                continue
+
+            e = self.elev(anchor) + the_node.h_add + 1.
+            ac.add_label('way %i' % (way.osm_id), -anchor.y, e, -anchor.x, scale=1.)
+
+
+            # -- label first node
             the_node = self.nodes_dict[way.refs[0]]
             anchor = vec2d(self.transform.toLocal(vec2d(the_node.lon, the_node.lat)))
 #            anchor.x += random.uniform(-1,1)
@@ -722,6 +757,7 @@ class Roads(objectlist.ObjectList):
             e = self.elev(anchor) + the_node.h_add + 3.
             ac.add_label(' %i h=%1.1f' % (the_node.osm_id, the_node.h_add), -anchor.y, e, -anchor.x, scale=1.)
 
+            # -- label last node
             if 1:
                 the_node = self.nodes_dict[way.refs[-1]]
                 anchor = vec2d(self.transform.toLocal(vec2d(the_node.lon, the_node.lat)))
@@ -776,7 +812,6 @@ def write_xml(path_to_stg, file_name, object_name):
         </effect>
         </PropertyList>
     """  % (file_name, shader_str, object_name)))
-
 
 def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
     """debug: plot roads map to .eps"""
@@ -885,6 +920,11 @@ def main():
         path_to_output = parameters.PATH_TO_SCENERY
 
     #roads.clip_at_cluster_border()
+    #roads.debug_keep_only([24768143, 24960785, 24960872, 4531757, 24960872])
+    #roads.debug_keep_only([24768144, 204383347, 204383366, 204383384, 204383376])
+    #roads.debug_keep_only([24768144, 204383376])
+    logging.debug("before linear " + str(roads))
+
     roads.remove_short_bridges()
     if 1:
         logging.debug("len before %i" % len(roads.ways_list))
@@ -910,9 +950,13 @@ def main():
 #    roads.split_long_roads_between_bridges()
     logging.debug("before linear " + str(roads))
     roads.create_linear_objects()
+    roads.debug_drop_unused_nodes()
+    roads.debug_show_h_add("after linear ob")
+
 #    roads.debug_test()
 #    roads.debug_test()
     roads.propagate_h_add()
+    roads.debug_show_h_add("after propagate")
     logging.debug("after linear" + str(roads))
 
 #    roads.debug_test()
@@ -935,7 +979,7 @@ def main():
 
     replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)        
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
-    #roads.debug_label_nodes(stg_manager)
+    roads.debug_label_nodes(stg_manager)
 
     # -- write stg
     for cl in roads.clusters:
@@ -968,7 +1012,7 @@ def main():
     elev.save_cache()
     troubleshoot.troubleshoot(tools.stats)
     logging.info('Done.')
-
+    roads.debug_show_h_add()
 
 if __name__ == "__main__":
     main()

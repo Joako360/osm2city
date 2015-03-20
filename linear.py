@@ -392,6 +392,7 @@ class LinearObject(object):
         if first_node.osm_id == the_id or last_node.osm_id == the_id:
             #bla
             pass
+        #print "h_add0,1", h_add_0, h_add_1
         return left_z, right_z, h_add
 
     def _write_to(self, obj, elev, elev_offset, edge0, edge1,
@@ -438,8 +439,8 @@ class LinearObject(object):
             print self.nodes_dict[self.refs[0]].h_add
             print self.refs[0]
             
-        if self.debug_print_node_info(21551419, h_add):
-            self.debug_label_nodes(self.center, left_z, debug_ac, elev_offset, offset, h_add)
+        #if self.debug_print_node_info(21551419, h_add):
+        #self.debug_label_nodes(self.center, left_z, debug_ac, elev_offset, offset, h_add)
 
         left_nodes_list =  self.write_nodes(obj, self.edge[0], left_z, elev_offset, offset=offset)
         right_nodes_list = self.write_nodes(obj, self.edge[1], right_z, elev_offset, offset=offset)
