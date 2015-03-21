@@ -281,7 +281,13 @@ class Roads(objectlist.ObjectList):
         nodes = np.array([self.transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
         return shg.LineString(nodes)
 
-    def remove_short_bridges(self):
+    def remove_tunnels(self):
+        """remove tunnels"""
+        for the_way in self.ways_list:
+            if "tunnel" in the_way.tags:
+                self.ways_list.remove(the_way)
+
+    def replace_short_bridges_with_ways(self):
         """remove bridge tag from short bridges, making them a simple way"""
         for the_way in self.ways_list:
             if is_bridge(the_way):
@@ -648,10 +654,29 @@ class Roads(objectlist.ObjectList):
         pass
     
     def compatible_ways(self, way1, way2):
+        print "trying join", way1.osm_id, way2.osm_id
         if is_bridge(way1) == is_bridge(way2):
             return True
         else:
             return False
+
+    def attached_ways_dict_remove(self, the_ref, the_way, ignore_missing_ref=False):
+        """remove given way from given node in attached_ways_dict"""
+        if ignore_missing_ref and the_ref not in self.attached_ways_dict:
+            print "not removing way from the ref %i because the ref is not in attached_ways_dict" % the_ref
+            return
+        for way, boolean in self.attached_ways_dict[the_ref]:
+            if way == the_way:
+                print "removing way %s from node %i LIST " % (the_way, the_ref), self.attached_ways_dict[the_ref]
+                self.attached_ways_dict[the_ref].remove((the_way, boolean))
+
+    def attached_ways_dict_append(self, the_ref, the_way, is_first, ignore_missing_ref=False):
+        """append given way to attached_ways_dict. If ignore_non_existing is True, silently
+           do nothing in case the_ref does not exist. Otherwise we may get a KeyError."""
+        if ignore_missing_ref and the_ref not in self.attached_ways_dict:
+            return
+        self.attached_ways_dict[the_ref].append((the_way, is_first))
+
 
     def join_ways(self, way1, way2):
         """join ways that
@@ -660,6 +685,9 @@ class Roads(objectlist.ObjectList):
            must share exactly one node
         """
         logging.debug("Joining %i and %i" % (way1.osm_id, way2.osm_id))
+        if way1.osm_id == way2.osm_id:
+            logging.warn("  Not joining way %i with itself" % way1.osm_id)
+            return
         if way1.refs[0] == way2.refs[0]:
             new_refs = way1.refs[::-1] + way2.refs[1:]
         elif way1.refs[0] == way2.refs[-1]:
@@ -673,6 +701,17 @@ class Roads(objectlist.ObjectList):
             return
             
         new_way = self.init_way_from_existing(way1, new_refs)
+        print "old and new", way1, new_way        
+
+        self.attached_ways_dict_remove(way1.refs[0],  way1, ignore_missing_ref=True)
+        self.attached_ways_dict_remove(way1.refs[-1], way1, ignore_missing_ref=True)
+        self.attached_ways_dict_remove(way2.refs[0],  way2, ignore_missing_ref=True)
+        self.attached_ways_dict_remove(way2.refs[-1], way2, ignore_missing_ref=True)
+
+        self.attached_ways_dict_append(new_way.refs[0], new_way, is_first=True, ignore_missing_ref=True)
+        self.attached_ways_dict_append(new_way.refs[-1], new_way, is_first=False, ignore_missing_ref=True)
+
+            
         try:
             self.ways_list.remove(way1)
             print "1ok ",
@@ -698,7 +737,7 @@ class Roads(objectlist.ObjectList):
         for the_way in self.ways_list:
             if the_way.osm_id == osm_id:
                 return the_way
-        raise ValueError("way %i not found" % the_way.osm_id)
+        raise ValueError("way %i not found" % osm_id)
 
     def debug_is_osm_id_in_ways_list(self, osm_id):
         for the_way in self.ways_list:
@@ -923,16 +962,19 @@ def main():
     #roads.debug_keep_only([24768143, 24960785, 24960872, 4531757, 24960872])
     #roads.debug_keep_only([24768144, 204383347, 204383366, 204383384, 204383376])
     #roads.debug_keep_only([24768144, 204383376])
+#    roads.debug_keep_only([159102469, 204383356, 204383372, 149964565, 149964564])
     logging.debug("before linear " + str(roads))
 
-    roads.remove_short_bridges()
+    roads.remove_tunnels()
+    roads.replace_short_bridges_with_ways()
     if 1:
         logging.debug("len before %i" % len(roads.ways_list))
         roads.find_junctions(roads.ways_list)
         #roads.debug_plot_junctions('ks')
         #roads.count_inner_junctions('bs')
         roads.split_ways_at_inner_junctions()
-        if 0: roads.join_degree2_junctions()
+        if 1: 
+            roads.join_degree2_junctions()
         roads.find_junctions(roads.ways_list, 3)
 #        roads.print_junctions_stats()
         plt.clf()
@@ -1013,6 +1055,7 @@ def main():
     troubleshoot.troubleshoot(tools.stats)
     logging.info('Done.')
     roads.debug_show_h_add()
+    logging.debug("final " + str(roads))
 
 if __name__ == "__main__":
     main()

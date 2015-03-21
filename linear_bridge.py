@@ -63,7 +63,7 @@ class LinearBridge(linear.LinearObject):
 #        print ">>>    ", probe_locations_nondim
 #        print ">>> got", elevs
         self.elev_spline = scipy.interpolate.interp1d(probe_locations_nondim, elevs)
-        self.prep_height(nodes_dict)
+        self.prep_height(nodes_dict, elev)
 
     def elev(self, l, normalized=True):
         """given linear distance [m], interpolate and return terrain elevation"""
@@ -71,7 +71,7 @@ class LinearBridge(linear.LinearObject):
             l /= self.center.length
         return self.elev_spline(l)
 
-    def prep_height(self, nodes_dict):
+    def prep_height(self, nodes_dict, elev):
         """Preliminary deck shape depending on elevation. Write required h_add to end nodes"""
         # deck slope more or less continuous!
         # d2z/dx2 limit
@@ -100,9 +100,12 @@ class LinearBridge(linear.LinearObject):
         node0 = nodes_dict[self.refs[0]]
         node1 = nodes_dict[self.refs[-1]]
 
-        MSL = np.array(3)
-        MSL = self.elev([0, 0.5, 1]) # FIXME: use elev interpolator instead
+        #MSL = np.zeros_like(self.normals)
+        #MSL = self.elev([0, 0.5, 1]) # FIXME: use elev interpolator instead
+        MSL_mid = self.elev([0.5]) # FIXME: use elev interpolator instead?
         
+        MSL = np.array([elev(the_node) for the_node in self.center.coords])
+
         deck_MSL = MSL.copy()
         deck_MSL[0] += node0.h_add
         deck_MSL[-1] += node1.h_add
@@ -113,7 +116,7 @@ class LinearBridge(linear.LinearObject):
         else:
             hi_end = 0
             lo_end = -1
-        mid = 1
+        #mid = 1
         #self.avg_slope = (MSL[hi_end] - MSL[lo_end])/self.center.length
 #        print "# MSL_0, MSL_m, MSL_1:", MSL_0, MSL_m, MSL_1
         self.D = Deck_shape_linear(deck_MSL[0], deck_MSL[-1])
@@ -122,39 +125,35 @@ class LinearBridge(linear.LinearObject):
         except KeyError:
             required_height = 5.
             
-        if (self.D(0.5) - MSL[mid]) > required_height:
+        if (self.D(0.5) - MSL_mid) > required_height:
             return
         
         dh_dx = linear.max_slope_for_road(self)
         
         # -- need to elevate one or both ends
-        deck_MSL[mid] = MSL[mid] + required_height
-        if deck_MSL[hi_end] > deck_MSL[mid]:
+        deck_MSL_mid = MSL_mid + required_height
+        if deck_MSL[hi_end] > deck_MSL_mid:
             # -- elevate lower end
 #            print "elevating lower end"
-            deck_MSL[lo_end] = max(deck_MSL[hi_end] - 2 * (deck_MSL[hi_end] - deck_MSL[mid]), 
+            deck_MSL[lo_end] = max(deck_MSL[hi_end] - 2 * (deck_MSL[hi_end] - deck_MSL_mid), 
                                    deck_MSL[hi_end] - dh_dx * self.center.length)
         else:
 #            print "elevating both"
             # -- elevate both ends to same MSL
-            deck_MSL[hi_end] = deck_MSL[lo_end] = deck_MSL[mid]
+            deck_MSL[hi_end] = deck_MSL[lo_end] = deck_MSL_mid
 
-        h_add = np.maximum(deck_MSL - MSL, np.zeros_like(deck_MSL))        
+        h_add = np.maximum(deck_MSL - MSL, np.zeros_like(deck_MSL))
+        
+        left_z, right_z, h_add = self.level_out(elev, h_add)
+        deck_MSL = MSL + h_add
             
 #        h_add = 0. # debug: no h_add at all
         self.D = Deck_shape_linear(deck_MSL[0], deck_MSL[-1])
         
 #        print "midh", self.D(0.5) - MSL[1], required_height
 
-        if node0.h_add > 0:
-            node0.h_add = 0.5*(node0.h_add + h_add[0])
-        else:
-            node0.h_add = h_add[0]
-            
-        if node1.h_add > 0:
-            node1.h_add = 0.5*(node1.h_add + h_add[-1])
-        else:
-            node1.h_add = h_add[-1]
+        node0.h_add = h_add[0]
+        node1.h_add = h_add[-1]
 #        if self.D(0.5) - MSL_m < required_height:
 #            self.D = Deck_shape_poly(MSL_0, MSL_m+required_height, MSL_1)
 
