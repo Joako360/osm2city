@@ -35,6 +35,9 @@ class Way(OSMElement):
 
     def addRef(self, ref):
         self.refs.append(ref)
+        
+    def __str__(self):
+        return "<Way OSM_ID %i at %s>" % (self.osm_id, hex(id(self)))
 
 
 class Relation(OSMElement):
