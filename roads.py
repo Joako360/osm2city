@@ -29,8 +29,25 @@ junctions:
     #if only 2 nodes, and both end nodes, and road types compatible:
     #put way into joining list
 
-we have
-   attached_ways_dict: for each (true) junction node, store a list of tuples (attached way, is_first)
+Data structures
+---------------
+
+
+nodes_dict: contains all osmparser.Nodes, by OSM_ID
+  nodes_dict[OSM_ID] -> Node
+  KEEP, because we have a lot more nodes than junctions.
+  
+Roads.G: graph
+  its nodes represent junctions. Indexed by OSM_ID of osmparser.Nodes
+  edges represent roads between junctions, and have obj=osmparser.Way
+  self.G[ref_1][ref_2]['obj'] -> osmparser.Way
+
+attached_ways_dict: for each (true) junction node, store a list of tuples (attached way, is_first)
+  basically, this duplicates Roads.G!
+  need self.G[ref]['stubs'][4]
+  self.G[ref][] -> Junction.stubs_list[2]
+    
+
 
 Render junction:
   if 2 ways:
@@ -84,7 +101,6 @@ import tools
 from cluster import Clusters
 import re
 import random
-import networkx as nx
 import graph
 import troubleshoot
 
@@ -103,6 +119,36 @@ def no_transform((x, y)):
 def is_bridge(way):
     return "bridge" in  way.tags
 
+class Stub(object):
+    def __init__(self, attached_way, is_first, joint_nodes=[]):
+        self.attached_way = attached_way
+        self.is_first = is_first
+        self.joint_nodes = joint_nodes
+
+class Junction(object):
+    """store attached ways, joint_node indices
+       current usage of attached_ways_dict:
+          for the_ref, ways_list in attached_ways_dict.items()
+          -> for the_ref, the_junction in attached_ways_dict.items()
+          for ref in self.attached_ways_dict
+          -> unchanged
+          for way, boolean in self.attached_ways_dict[the_ref]:
+          -> junction = self.attached_ways_dict[the_ref].attached_ways
+          OR __items__()
+          for ref, ways_tuple_list in self.attached_ways_dict.iteritems()
+          -> for ref, junction in self.attached_ways_dict.iteritems():
+               junction.attached_ways
+    - 
+    """
+    def __init__(self, attached_ways, is_first, joint_nodes=[]):
+        self.attached_ways = [attached_ways, is_first]
+        self.joint_nodes = joint_nodes # list of tuples
+        
+    def __len__(self):
+        return len(self.attached_ways)
+
+    def append(self, items):
+        self.attached_ways.append(items)
 
 class Roads(objectlist.ObjectList):
     valid_node_keys = []
@@ -304,7 +350,7 @@ class Roads(objectlist.ObjectList):
                 logging.debug("kick %i", the_way.osm_id)
     
     def create_linear_objects(self):
-        self.G = nx.Graph()
+        self.G = graph.Graph()
 
         for the_way in self.ways_list:
             prio = None

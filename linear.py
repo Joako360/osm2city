@@ -53,6 +53,14 @@ class LinearObject(object):
     TODO:
       - better draping. Find discontinuity in elev, insert node
       - 2.5d, 3d, embankment
+      - merge junction nodes:
+        - merge_junction_nodes():
+          for the_junction in those with 2 ways attached:
+          move left and right coords
+        - write_to()
+          - check if our junction already has a written way attached
+          - if not, write our node and store node indices in junction
+          - if yes, use stored node indices
     """
     def __init__(self, transform, osm_id, tags, refs, nodes_dict, width=9, tex_y0=0.5, tex_y1=0.75, AGL=0.5):
         #self.transform = transform

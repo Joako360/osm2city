@@ -38,3 +38,4 @@ def scale_test(transform, elev):
     p0 = vec2d(transform.toGlobal((0, 0)))
     p1 = vec2d(transform.toGlobal((1., 0)))
     print p0, p1
+
