@@ -210,14 +210,17 @@ class LinearBridge(linear.LinearObject):
 
         self.debug_print_node_info(21551419)
 
-        left_top_nodes =  self.write_nodes(obj, self.edge[0], z, elev_offset, offset=offset)
-        right_top_nodes = self.write_nodes(obj, self.edge[1], z, elev_offset, offset=offset)
+        print self.osm_id
+        if self.osm_id == 98659370:
+            pass
+
+        left_top_nodes =  self.write_nodes(obj, self.edge[0], z, elev_offset, offset, join=True, is_left=True)
+        right_top_nodes = self.write_nodes(obj, self.edge[1], z, elev_offset, offset, True, False)
 
         bridge_body_height = 1.5
         left_bottom_edge, right_bottom_edge = self.compute_offset(self.width/2 * 0.5)
-        left_bottom_nodes =  self.write_nodes(obj, left_bottom_edge, z-bridge_body_height, elev_offset, offset=offset)
-        right_bottom_nodes = self.write_nodes(obj, right_bottom_edge, z-bridge_body_height, elev_offset, offset=offset)
-
+        left_bottom_nodes =  self.write_nodes(obj, left_bottom_edge, z-bridge_body_height, elev_offset, offset)
+        right_bottom_nodes = self.write_nodes(obj, right_bottom_edge, z-bridge_body_height, elev_offset, offset)
         # -- top
         self.write_quads(obj, left_top_nodes, right_top_nodes, self.tex_y0, self.tex_y1, debug_ac=None)
         

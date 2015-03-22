@@ -119,36 +119,6 @@ def no_transform((x, y)):
 def is_bridge(way):
     return "bridge" in  way.tags
 
-class Stub(object):
-    def __init__(self, attached_way, is_first, joint_nodes=[]):
-        self.attached_way = attached_way
-        self.is_first = is_first
-        self.joint_nodes = joint_nodes
-
-class Junction(object):
-    """store attached ways, joint_node indices
-       current usage of attached_ways_dict:
-          for the_ref, ways_list in attached_ways_dict.items()
-          -> for the_ref, the_junction in attached_ways_dict.items()
-          for ref in self.attached_ways_dict
-          -> unchanged
-          for way, boolean in self.attached_ways_dict[the_ref]:
-          -> junction = self.attached_ways_dict[the_ref].attached_ways
-          OR __items__()
-          for ref, ways_tuple_list in self.attached_ways_dict.iteritems()
-          -> for ref, junction in self.attached_ways_dict.iteritems():
-               junction.attached_ways
-    - 
-    """
-    def __init__(self, attached_ways, is_first, joint_nodes=[]):
-        self.attached_ways = [attached_ways, is_first]
-        self.joint_nodes = joint_nodes # list of tuples
-        
-    def __len__(self):
-        return len(self.attached_ways)
-
-    def append(self, items):
-        self.attached_ways.append(items)
 
 class Roads(objectlist.ObjectList):
     valid_node_keys = []
@@ -262,7 +232,7 @@ class Roads(objectlist.ObjectList):
             graph.for_edges_in_bfs_call(self.propagate_h_add_over_edge, None, self.G, node0s, visited)
 
     def build_graph(self, source_iterable):
-        self.G=nx.Graph()
+        self.G=Graph()
         for the_way in source_iterable:
             self.G.add_edge(the_way.refs[0], the_way.refs[-1], obj=the_way)
 
@@ -326,6 +296,27 @@ class Roads(objectlist.ObjectList):
         osm_nodes = [self.nodes_dict[r] for r in way.refs]
         nodes = np.array([self.transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
         return shg.LineString(nodes)
+
+    def cleanup_topo(self):
+    
+        logging.debug("len before %i" % len(self.ways_list))
+        self.attached_ways_dict = self.find_junctions(self.ways_list)
+        #self.debug_plot_junctions('ks')
+        #self.count_inner_junctions('bs')
+        self.split_ways_at_inner_junctions()
+        self.join_degree2_junctions()
+        self.find_junctions(self.ways_list, 3)
+        del self.attached_ways_dict
+    #        self.print_junctions_stats()
+        plt.clf()
+    #        self.count_inner_junctions('rs')
+        #bla
+        #self.debug_print_dict()
+        #self.debug_plot_junctions('k.')
+        #sys.exit(0)
+    
+        logging.debug("len after %i" % len(self.ways_list))
+
 
     def remove_tunnels(self):
         """remove tunnels"""
@@ -408,7 +399,7 @@ class Roads(objectlist.ObjectList):
                 logging.warn("skipping OSM_ID %i: %s" % (the_way.osm_id, reason))
                 continue
 
-            self.G.add_edge(the_way.refs[0], the_way.refs[-1], obj=obj)
+            self.G.add_edge(obj)
 
         # debug: plot graph
         if 0:
@@ -443,17 +434,17 @@ class Roads(objectlist.ObjectList):
         - for each node, store attached ways in a dict                O(N)
         - if a node has 2 ways, store that node as a candidate
         - remove entries/nodes that have less than 2 ways attached    O(N)
-        - one way ends, other way starts: also an junction
+        - one way ends, other way starts: also a junction
         FIXME: use quadtree/kdtree
         """
         
         logging.info('Finding junctions...')
-        self.attached_ways_dict = {} # a dict: for each ref (aka node) hold a list of attached ways
+        attached_ways_dict = {} # a dict: for each ref (aka node) hold a list of attached ways
         for j, the_way in enumerate(ways_list):
             tools.progress(j, len(ways_list))
             for i, ref in enumerate(the_way.refs):
                 try:
-                    self.attached_ways_dict[ref].append((the_way, i == 0)) # store tuple (the_way, is_first)
+                    attached_ways_dict[ref].append((the_way, i == 0)) # store tuple (the_way, is_first)
                     # -- check if ways are actually distinct before declaring
                     #    an junction?
                     # not an junction if
@@ -461,17 +452,18 @@ class Roads(objectlist.ObjectList):
                     # easier?: only 2 ways, at least one node is middle node
 #                        self.junctions_set.add(ref)
                 except KeyError:
-                    self.attached_ways_dict[ref] = [(the_way, i == 0)]  # initialize node
+                    attached_ways_dict[ref] = [(the_way, i == 0)]  # initialize node
 
         # kick nodes that belong to one way only
-        for ref, the_ways in self.attached_ways_dict.items():
+        for ref, the_ways in attached_ways_dict.items():
 #            if len(value) >= 2: self.nodes_dict[ref].n_attached_ways = len(value)
             if len(the_ways) < degree: # FIXME: join_ways, then return 2 here
-                self.attached_ways_dict.pop(ref)
+                attached_ways_dict.pop(ref)
 #            else:
 #                pass
 #                check if one is first node and one last node. If so, join_ways
-
+        return attached_ways_dict
+        
     def count_inner_junctions(self, style):
         """count inner nodes which are junctions"""
         count = 0        
@@ -1011,32 +1003,20 @@ def main():
 #    roads.debug_keep_only([159102469, 204383356, 204383372, 149964565, 149964564])
     logging.debug("before linear " + str(roads))
 
+    # -- First, clean up topo. We work on ways_list:
+    #    remove tunnels, short bridges, also remove inner junctions
+    # 
     roads.remove_tunnels()
     roads.replace_short_bridges_with_ways()
-    if 1:
-        logging.debug("len before %i" % len(roads.ways_list))
-        roads.find_junctions(roads.ways_list)
-        #roads.debug_plot_junctions('ks')
-        #roads.count_inner_junctions('bs')
-        roads.split_ways_at_inner_junctions()
-        if 1: 
-            roads.join_degree2_junctions()
-        roads.find_junctions(roads.ways_list, 3)
-#        roads.print_junctions_stats()
-        plt.clf()
-#        roads.count_inner_junctions('rs')
-        #bla
-        #roads.debug_print_dict()
-        #roads.debug_plot_junctions('k.')
-        #sys.exit(0)
-
-        logging.debug("len after %i" % len(roads.ways_list))
+    roads.cleanup_topo()
 
     roads.probe_elev_at_nodes()
     elev.save_cache()
 #    roads.build_graph(roads.ways_list)
 #    roads.split_long_roads_between_bridges()
     logging.debug("before linear " + str(roads))
+    
+    # -- no change in topo beyond create_linear_objects() !
     roads.create_linear_objects()
     roads.debug_drop_unused_nodes()
     roads.debug_show_h_add("after linear ob")

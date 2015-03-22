@@ -64,9 +64,8 @@ class LinearObject(object):
     """
     def __init__(self, transform, osm_id, tags, refs, nodes_dict, width=9, tex_y0=0.5, tex_y1=0.75, AGL=0.5):
         #self.transform = transform
-        self.joints = np.arange(4)  # node indices of joints. 8 if 2.5d.
-        self.start_joint = False
-        self.end_joint = False
+#        self.junction0 = None # these are set on create_linear_objects()
+#        self.junction1 = None
         self.width = width
         self.AGL = AGL  # drape distance above terrain
         self.osm_id = osm_id
@@ -202,7 +201,7 @@ class LinearObject(object):
         self.normals[-1] = self.normals[-2]
         self.angle[-1] = self.angle[-2]
 
-    def write_nodes(self, obj, line_string, z, cluster_elev, offset=None):
+    def write_nodes(self, obj, line_string, z, cluster_elev, offset=None, join=False, is_left=False):
         """given a LineString and z, write nodes to .ac.
            Return nodes_list         
         """
@@ -214,9 +213,43 @@ class LinearObject(object):
         #         right_coords = left.coords[1:]
         #     else:
         #         nodes_l = np.arange(n_nodes) + obj.next_node_index()
-        n_nodes = len(line_string.coords)
-        nodes_list = obj.next_node_index() + np.arange(n_nodes)
-        for i, the_node in enumerate(line_string.coords):
+#        if join:
+#            if left:
+        to_write = copy.copy(line_string.coords)
+        nodes_list = []
+#        print "JUNLEN", len(self.junction0), len(self.junction1)
+
+        if not join:
+            nodes_list += list(obj.next_node_index() + np.arange(len(to_write)))
+        else:
+            if len(self.junction0) == 2:
+                try:
+                    # if other node already exists, do not write a new one
+                    other_node = self.junction0.get_other_node(self, is_left) #other nodes already written:
+                    to_write = to_write[1:]
+                    z = z[1:]
+                    nodes_list.append(other_node)
+                except KeyError:
+                    self.junction0.set_other_node(self, is_left, obj.next_node_index())
+    
+            # -- make list with all but last node -- we might add last node later
+            nodes_list += list(obj.next_node_index() + np.arange(len(to_write)-1))
+            last_node = obj.next_node_index() + len(to_write)-1
+
+            if len(self.junction1) == 2:
+                try:
+                    # if other node already exists, do not write a new one
+                    other_node = self.junction1.get_other_node(self, is_left) #other nodes already written:
+                    to_write = to_write[:-1]
+                    z = z[:-1]
+                    nodes_list.append(other_node)
+                except KeyError:
+                    self.junction1.set_other_node(self, is_left, last_node)
+                    nodes_list.append(last_node)
+            else:
+                nodes_list.append(last_node)
+                
+        for i, the_node in enumerate(to_write):
             e = z[i] - cluster_elev
             obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
             
@@ -485,8 +518,8 @@ class LinearObject(object):
         #if self.debug_print_node_info(21551419, h_add):
         #self.debug_label_nodes(self.center, left_z, debug_ac, elev_offset, offset, h_add)
 
-        left_nodes_list =  self.write_nodes(obj, self.edge[0], left_z, elev_offset, offset=offset)
-        right_nodes_list = self.write_nodes(obj, self.edge[1], right_z, elev_offset, offset=offset)
+        left_nodes_list =  self.write_nodes(obj, self.edge[0], left_z, elev_offset, offset, join=True, is_left=True)
+        right_nodes_list = self.write_nodes(obj, self.edge[1], right_z, elev_offset, offset, True, False)
         if self.osm_id == 138440237:
             pass
             #bla
