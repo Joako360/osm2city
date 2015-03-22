@@ -204,7 +204,10 @@ def is_static_object_nearby(b, X, static_tree):
 #            for n in nearby:
 #                print "-->", s[n]
         try:
-            logging.info( "Static objects nearby. Skipping %s is near %d buildings" ( b.name, len(nearby)))
+            if b.name is None or len(b.name) == 0:
+                logging.info( "Static objects nearby. Skipping %d is near %d buildings"%( b.osm_id, len(nearby)))
+            else:
+                logging.info( "Static objects nearby. Skipping %s is near %d buildings"%( b.name, len(nearby)))
         except RuntimeError as e:
             logging.error( "FIXME: %s %s ID %d"% (e, b.name.encode('ascii', 'ignore'), b.osm_id))
         # for n in nearby:
@@ -757,7 +760,10 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
                     roofs.separate_gable(out, b, b.X)
                 elif b.roof_type == 'hipped':
                     roofs.separate_hipped(out, b, b.X)
+                elif b.roof_type == 'flat':
+                    roofs.flat(out, b, b.X)
                 else:
+                    logging.debug("FIXME simple rooftype %s unsupported "%b.roof_type)
                     roofs.flat(out, b, b.X)
             # out_surf.write("kids 0\n")
 

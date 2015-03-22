@@ -20,6 +20,8 @@ class OSMElement(object):
     def addTag(self, key, value):
         self.tags[key] = value
 
+    def __str__(self):
+        return "<%s OSM_ID %i at %s>" % (type(self).__name__, self.osm_id, hex(id(self)))
 
 class Node(OSMElement):
     def __init__(self, osm_id, lat, lon):

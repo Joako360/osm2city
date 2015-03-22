@@ -250,12 +250,9 @@ class LinearObject(object):
         """probe ground elevation along given line string, return array"""
         return np.array([elev(the_node) for the_node in line_string.coords])
 
-    def level_out(self, elev, elev_offset):
-        """accepts x,y and h_add, compute z, store z in self
-           Use left_z_given
-           as the node's height coordinate if given, otherwise probe elevation.
-           
-           Elev_offset is subtracted from probed or given elev.
+
+    def get_h_add(self, elev, elev_offset):
+        """
         """
         first_node = self.nodes_dict[self.refs[0]]
         last_node = self.nodes_dict[self.refs[-1]]
@@ -304,6 +301,7 @@ class LinearObject(object):
                     h_add[i] = other_h_add # FIXME: this is different than for first h_add?
                     break
 
+        return h_add, center_z
         # -- get elev
         #if left_z_given is not None:
         #    assert(len(left_z_given) == n_nodes)
@@ -318,8 +316,6 @@ class LinearObject(object):
        
         # if left node index given: no use for left_z_given
         # same for right
-        left_z = np.zeros(n_nodes)
-        right_z = np.zeros(n_nodes)
         
         # conditions for left z probing:
         # left coord given, no left z        
@@ -349,15 +345,55 @@ class LinearObject(object):
         # Is there a case with
         # ONE index given, but need to probe elev on other side? Perhaps.
         #left_is_coords == left.coords
-        if self.osm_id == 24722952:
-            pass
 
-        l_z = self.probe_ground(elev, self.edge[0]) + self.AGL
-        r_z = self.probe_ground(elev, self.edge[1]) + self.AGL
+# ALT:
+# get_level_point()
+#   single place that works with MAX_TRANSVERSE_GRAD
+#   give center, left, right coord:
+#   return h_add, left, right z
+# 
+# create bridge:
+#    DECK height: need to probe elev
+#    create h_add that accoutns 
+#    - for max_dh_dx 
+#    - and max_transverse. call level_out()
+
+#  
+# propagate_h_add()
+#   this will propagate
+# 
+# test_h_add_for_max_slope()
+#
+# write
+
+# create roads afterwards? Yes, because bridges are more critical wrt h_add
+# 
+# 
 
 
+#    def level_out2(self, elev, elev_offset, h_add, center_z):
+#        """adjust given h_add such that roads stays below MAX_TRANSVERSE_GRADIENT"""
+#        
+#        left_z = self.probe_ground(elev, self.edge[0]) + self.AGL
+#        right_z = self.probe_ground(elev, self.edge[1]) + self.AGL
+##        diff = np.maximum(left_z, right_z) - center_z
+#        diff_elev = abs(left_z - right_z)
+#        
+#        for i, the_diff in enumerate(diff_elev):
+#            # -- h_add larger than terrain gradient:
+#            #    terrain gradient doesnt matter, just create level road at h_add
+#            #    Note that h_add relates to center, therefore the_diff/2
+#            if h_add[i] > the_diff/2.:
+#                pass
+#            else:
+#                if the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT:
+#                    h_add[i] += the_diff/2.
+#        
+#        return h_add
+        
+    def level_out(self, elev, h_add):
+        """given h_add, adjust left_z and right_z to stay below MAX_TRANSVERSE_GRADIENT"""
         left_z = self.probe_ground(elev, self.edge[0]) + self.AGL
-            
         right_z = self.probe_ground(elev, self.edge[1]) + self.AGL
 
         diff_elev = left_z - right_z
@@ -375,8 +411,10 @@ class LinearObject(object):
                 # FIXME: is this a bug?
                 if the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT: #  left > right
                     right_z[i] += the_diff  # dirty
+                    h_add[i] += the_diff/2.
                 elif -the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT: # right > left
                     left_z[i] += - the_diff # dirty
+                    h_add[i] -= the_diff/2. # the_diff is negative
                 else:
                     # terrain gradient negligible and h_add small
                     pass
@@ -388,10 +426,7 @@ class LinearObject(object):
         #   right_h_add = diff
         # elif diff / self.width < -max_grad:  #   right > left
         #   left_h_add = -diff
-        the_id = 31381437
-        if first_node.osm_id == the_id or last_node.osm_id == the_id:
-            #bla
-            pass
+        #print "h_add0,1", h_add_0, h_add_1
         return left_z, right_z, h_add
 
     def _write_to(self, obj, elev, elev_offset, edge0, edge1,
@@ -426,7 +461,8 @@ class LinearObject(object):
            #right:
            offset accounts for tile center
         """
-        left_z, right_z, h_add = self.level_out(elev, elev_offset)
+        h_add, center_z = self.get_h_add(elev, elev_offset)
+        left_z, right_z, h_add = self.level_out(elev, h_add)
         #left_z  = self.probe_ground(elev, self.edge[0])
         #right_z = self.probe_ground(elev, self.edge[1])
         if self.osm_id == 204383381: # 1st   (+)
@@ -438,8 +474,8 @@ class LinearObject(object):
             print self.nodes_dict[self.refs[0]].h_add
             print self.refs[0]
             
-        if self.debug_print_node_info(21551419, h_add):
-            self.debug_label_nodes(self.center, left_z, debug_ac, elev_offset, offset, h_add)
+        #if self.debug_print_node_info(21551419, h_add):
+        #self.debug_label_nodes(self.center, left_z, debug_ac, elev_offset, offset, h_add)
 
         left_nodes_list =  self.write_nodes(obj, self.edge[0], left_z, elev_offset, offset=offset)
         right_nodes_list = self.write_nodes(obj, self.edge[1], right_z, elev_offset, offset=offset)

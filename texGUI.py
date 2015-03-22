@@ -271,9 +271,8 @@ class MyFrame(wx.Frame):
             dc.DrawLine(x, 0, x, y1)
 
         if self.IsLeftDragging:
-            a = self.GetMousePos(event)
             drag_start_scr = self.img2screen(self.drag_start)
-            dc.DrawLine(drag_start_scr[0], drag_start_scr[1], a[0], drag_start_scr[1])
+            dc.DrawLine(drag_start_scr[0], drag_start_scr[1], self.mouse_pos[0], drag_start_scr[1])
         elif self.x_scale_p0 != None:
             p0 = self.img2screen(self.x_scale_p0)
             p1 = self.img2screen(self.x_scale_p1)
@@ -285,9 +284,8 @@ class MyFrame(wx.Frame):
             dc.DrawLine(0, y, x1, y)
 
         if self.IsRightDragging:
-            a = self.GetMousePos(event)
             drag_start_scr = self.img2screen(self.drag_start)
-            dc.DrawLine(drag_start_scr[0], drag_start_scr[1], drag_start_scr[0], a[1])
+            dc.DrawLine(drag_start_scr[0], drag_start_scr[1], drag_start_scr[0], self.mouse_pos[1])
         elif self.y_scale_p0 != None:
             p0 = self.img2screen(self.y_scale_p0)
             p1 = self.img2screen(self.y_scale_p1)
@@ -355,14 +353,16 @@ class MyFrame(wx.Frame):
 
         if event.LeftIsDown():
             self.IsLeftDragging = True
-            self.OnPaint(event)
+            self.mouse_pos = self.GetMousePos(event)
+            self.Refresh()
         elif event.RightIsDown():
             self.IsRightDragging = True
-            self.OnPaint(event)
+            self.mouse_pos = self.GetMousePos(event)
+            self.Refresh()
         else:
             self.IsLeftDragging = False
             self.IsRightDragging = False
-            #self.OnPaint(event)
+            #self.Refresh()
 
 #            self.PickPoint(event)
 
