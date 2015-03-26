@@ -246,7 +246,7 @@ class TextureManager(object):
             if set(requires).issubset(cand.provides):
                 candidates.append(cand)
             else:
-                logging.verbose("  unmet requires %s" % str(cand))
+                logging.verbose("  unmet requires %s %s %s" % (str(cand.filename), str(requires), str(cand.provides)))
         return candidates
 
     def __str__(self):
