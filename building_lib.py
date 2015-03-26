@@ -17,6 +17,7 @@ import string
 from vec2d import vec2d
 from textures.manager import find_matching_texture
 import os
+from shapely.geometry.point import Point
 # nobjects = 0
 nb = 0
 out = ""
@@ -142,6 +143,8 @@ def get_nodes_from_acs(objs, own_prefix):
     # skip own .ac city-*.xml
 
     all_nodes = np.array([[0, 0]])
+    
+    read_objects = {}
 
     for b in objs:
         fname = b.name
@@ -152,22 +155,26 @@ def get_nodes_from_acs(objs, own_prefix):
             fname = fname.replace(".xml", ".ac")
         # print "now <%s> %s" % (fname, b.stg_typ)
 
-        # FIXME: also read OBJECT_SHARED.
-        if fname.endswith(".ac") and b.stg_typ == "OBJECT_STATIC":
+        # Path to shared objects is built elsewhere
+        if fname.endswith(".ac"):
             logging.info( "READ_AC %s"%fname)
-            try:            
-                ac = ac3d.File(file_name=fname, stats=None)                
+            try:
+                if fname in read_objects:
+                    ac = read_objects[fname]
+                else:
+                    ac = ac3d.File(file_name=fname, stats=None)
+                    read_objects[fname] = ac
+                                
                 angle = radians(b.stg_hdg)
                 Rot_mat = np.array([[cos(angle), -sin(angle)],
                                     [sin(angle), cos(angle)]])
     
-                ac_nodes = -np.delete(ac.nodes_as_array().transpose(), 1, 0)[::-1]
-                ac_nodes = np.dot(Rot_mat, ac_nodes)
-                ac_nodes += b.anchor.as_array().reshape(2,1)
-                all_nodes = np.append(all_nodes, ac_nodes.transpose(), 0)
+                transposed_ac_nodes = -np.delete(ac.nodes_as_array().transpose(), 1, 0)[::-1]
+                transposed_ac_nodes = np.dot(Rot_mat, transposed_ac_nodes)
+                transposed_ac_nodes += b.anchor.as_array().reshape(2,1)
+                all_nodes = np.append(all_nodes, transposed_ac_nodes.transpose(), 0)
             except Exception, e:
                 logging.error("Error reading %s %s"%(fname,e))
-            # print "------"
 
     return all_nodes
 
@@ -196,18 +203,30 @@ def is_static_object_nearby(b, X, static_tree):
     #    filter these
     nearby = static_tree.query_ball_point(X, radius)
     nearby = [x for x in nearby if x]
+    nearby = [item for sublist in nearby for item in sublist]
+    nearby = list(set(nearby))
+    d = static_tree.data
+    
+    
 
     if len(nearby):
+        for i in nearby:
+            inside = b.polygon.contains(Point(d[i]))
+            if inside:
+                break
+        
 #        for i in range(b.nnodes_outer):
 #            tools.stats.debug2.write("%g %g\n" % (X[i,0], X[i,1]))
 #            print "nearby:", nearby
 #            for n in nearby:
 #                print "-->", s[n]
+        if not inside:
+            return False
         try:
             if b.name is None or len(b.name) == 0:
-                logging.info( "Static objects nearby. Skipping %d is near %d buildings"%( b.osm_id, len(nearby)))
+                logging.info( "Static objects nearby. Skipping %d is near %d building nodes"%( b.osm_id, len(nearby)))
             else:
-                logging.info( "Static objects nearby. Skipping %s is near %d buildings"%( b.name, len(nearby)))
+                logging.info( "Static objects nearby. Skipping %s is near %d building nodes"%( b.name, len(nearby)))
         except RuntimeError as e:
             logging.error( "FIXME: %s %s ID %d"% (e, b.name.encode('ascii', 'ignore'), b.osm_id))
         # for n in nearby:
@@ -347,7 +366,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             tools.stats.nodes_simplified += b.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
             b.roll_inner_nodes()
         except Exception, reason:
-            print "simplify or roll_inner_nodes failed (OSM ID %i, %s)" % (b.osm_id, reason)
+            logging.warn( "simplify or roll_inner_nodes failed (OSM ID %i, %s)" % (b.osm_id, reason))
             continue
 
         # -- array of local outer coordinates

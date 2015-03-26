@@ -212,7 +212,11 @@ class STGEntry(object):
         return STGEntry.SHARED_OBJECT
 
     def get_obj_path_and_name(self):
-        return self.stg_path + os.sep + self.obj_filename
+        if self.is_static:
+            return self.stg_path + os.sep + self.obj_filename
+        else:
+            p = os.path.abspath(self.stg_path + os.sep + '..' + os.sep + '..' + os.sep + '..')
+            return os.path.abspath(p + os.sep + self.obj_filename)
 
 
 def read_stg_entries(stg_path_and_name, our_magic):
@@ -248,8 +252,9 @@ def read_stg_entries(stg_path_and_name, our_magic):
                 lat = float(splitted[3])
                 elev = float(splitted[4])
                 hdg = float(splitted[5])
-                entries.append(STGEntry(type_, obj_filename, path, lon, lat, elev, hdg))
-                logging.debug("stg: %s %s", type_, path + os.sep + obj_filename)
+                entry = STGEntry(type_, obj_filename, path, lon, lat, elev, hdg)
+                entries.append(entry)                
+                logging.debug("stg: %s %s", type_, entry.get_obj_path_and_name())
     except IndexError, reason:
         logging.warning("stg_io:read: Ignoring unreadable file %s", reason)
         logging.warning("Offending line: %s", line)
