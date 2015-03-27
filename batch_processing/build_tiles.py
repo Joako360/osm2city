@@ -9,17 +9,25 @@ import sys
 import calc_tile
 import re
 import os
+import platform
+import stat
 from _io import open
 
 
-def get_file(name, tilename, lon, lat):
+def get_file_name(name, tilename, lon, lat):
     """
     Returns a command file (Extension cmd for windows)
     """
+    
     if "nt" in os.name:
-        name = name + tilename + ".cmd"
+        extension =".cmd"
+    elif re.search('linux', platform.system().lower()):
+        extension = ".sh" 
     else:
-        name = name + tilename
+        extension = ""
+    return name + tilename + extension
+
+def open_file(name):
     return open(calc_tile.root_directory_name((lon, lat)) + os.sep + name, "wb")
 
 def write_to_file( command, file_handle):
@@ -34,6 +42,15 @@ if __name__ == '__main__':
                       help="The name of the property file to be copied")
     parser.add_argument("-o", "--out", dest="out",
                       help="The name of the property file to be generated")
+    parser.add_argument(      "--url"  , 
+                       help='Address of the api'        ,
+                       default="http://overpass-api.de/api/xapi?",
+                       choices=["http://jxapi.osm.rambler.ru/xapi/api/0.6/",
+                                "http://open.mapquestapi.com/xapi/api/0.6/",
+                                "http://jxapi.openstreetmap.org/xapi/api/0.6/",
+                                "http://www.overpass-api.de/api/xapi?",] ,
+                       type=str, required=False  )
+
     args = parser.parse_args()
 
     if(args.tilename is None):
@@ -68,27 +85,34 @@ if __name__ == '__main__':
         if e.errno != 17:
             logging.exception("Unable to create path to output")
   
-    downloadfile = get_file("download_", args.tilename, lon, lat)
-    files = [] 
-    files.append(('osm2city.py',get_file("osm2city_", args.tilename, lon, lat)))
-    files.append(('osm2pylon.py',get_file("osm2pylon_", args.tilename, lon, lat)))
-    files.append(('tools.py',get_file("tools_", args.tilename, lon, lat)))
-    files.append(('platforms.py',get_file("osm2platform_", args.tilename, lon, lat)))
-    files.append(('roads.py',get_file("roads_", args.tilename, lon, lat)))
-    files.append(('piers.py',get_file("piers_", args.tilename, lon, lat)))
-    files.append(('landuse.py',get_file("landuse_", args.tilename, lon, lat)))
+    downloadfile = open_file(get_file_name("download_", args.tilename, lon, lat))
+    files = []
+    utils = [ 'osm2city', 'osm2pylon', 'tools', 'platforms', 'roads', 'piers', 'landuse', ]
+    for util in utils :
+        files.append((util+'.py',
+                      open_file(get_file_name( util+"_", args.tilename, lon, lat)),
+                    ))
+
+    #header if necessary 
+    if re.search('linux', platform.system().lower()):
+        downloadfile.write('#!/bin/bash\n')
+        for command in files :
+            command[1].write('#!/bin/bash\n')
+
     for dy in range(0, num_cols):
         for dx in range(0, num_rows):
             index = calc_tile.tile_index((lon, lat), dx, dy)
             path = ("%s%s%s" % (calc_tile.directory_name((lon, lat)), os.sep, index))
             logging.info(path)
+            print(path)
             try:
                 os.makedirs(path)
             except OSError, e:
                 if e.errno != 17:
                     logging.exception("Unable to create path to output")
-            if(path.count('\\')):
-                replacement_path = re.sub('\\\\', '/', path)
+            #if(path.count('\\')):
+            replacement_path = re.sub('\\\\', '/', path) if(path.count('\\')) else path
+            
             with open(args.properties, "r") as sources:
                 lines = sources.readlines()
             with open(path + os.sep + args.out, "w") as sources:
@@ -100,7 +124,7 @@ if __name__ == '__main__':
                     line = re.sub('^\s*(BOUNDARY_NORTH\s*=)([ A-Za-z0-9.,]*)', '\\1 %f' % (calc_tile.get_north_lat(lat, dy)), line)
                     line = re.sub('^\s*(BOUNDARY_SOUTH\s*=)([ A-Za-z0-9.,]*)', '\\1 %f' % (calc_tile.get_south_lat(lat, dy)), line)
                     sources.write(line)
-            download_command = 'wget -O %s/buildings.osm http://overpass-api.de/api/map?bbox=%f,%f,%f,%f   ' + os.linesep
+            download_command = 'wget -O %s/buildings.osm ' + args.url + 'map?bbox=%f,%f,%f,%f   ' + os.linesep
 #            download_command = 'curl --proxy-ntlm -o %s/buildings.osm http://overpass-api.de/api/map?bbox=%f,%f,%f,%f   ' + os.linesep            
 #             download_command = 'wget -O %s/buildings.osm http://overpass-api.de/api/map?bbox=%f,%f,%f,%f   ' + os.linesep
             
@@ -111,7 +135,16 @@ if __name__ == '__main__':
     for command in files:
         command[1].close()
 
+    # chmod u+x on created scripts for linux
+    if re.search('linux', platform.system().lower()):
+        for util in utils + ['download',] :
+            f=calc_tile.root_directory_name((lon, lat)) + os.sep + get_file_name( util+"_", args.tilename, lon, lat)
+            try :
+                st=os.stat(f)
+                os.chmod( f, st.st_mode | stat.S_IEXEC)
+            except :
+                print( '[ WARNING ] could not add exec rights to ' + f )
+            
     sys.exit(0)
 
-        
         
