@@ -157,11 +157,12 @@ def get_nodes_from_acs(objs, own_prefix):
 
         # Path to shared objects is built elsewhere
         if fname.endswith(".ac"):
-            logging.info( "READ_AC %s"%fname)
             try:
                 if fname in read_objects:
+                    logging.debug( "CACHED_AC %s"%fname)
                     ac = read_objects[fname]
                 else:
+                    logging.info( "READ_AC %s"%fname)
                     ac = ac3d.File(file_name=fname, stats=None)
                     read_objects[fname] = ac
                                 
