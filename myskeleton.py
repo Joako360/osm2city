@@ -83,7 +83,10 @@ def myskel(out, b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header 
     try:
 #    if True:
         poly = polygon.Polygon(vertices, edges, speeds)
-        angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE, parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
+        if 'roof:angle' in b.tags:
+            angle = float(b.tags['roof:angle'])
+        else:
+            angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE, parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
         roof_mesh = poly.roof_3D(angle * 3.1415 / 180.)
         #roof.mesh.vertices
         roof_height = max([p[2] for p in roof_mesh.vertices])
