@@ -5,7 +5,6 @@ import random
 from math import sin, cos, atan2, tan
 import copy
 import logging
-from scipy import deg2rad
 import parameters
 
 def _flat_relation(b):
@@ -132,7 +131,7 @@ def separate_gable(out, b, X, inward_meters = 0.):
     else:
         angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE, parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
     # -- tangential vector of long edge
-    roof_height = tan(deg2rad(angle)) * (b.lenX[1]/2)
+    roof_height = tan(np.deg2rad(angle)) * (b.lenX[1]/2)
     
     #We don't want the hipped part to be greater than the height, which is 45 deg
     inward_meters = min(roof_height,inward_meters)
