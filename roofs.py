@@ -2,9 +2,11 @@ import shapely.geometry as shg
 import numpy as np
 import building_lib
 import random
-from math import sin, cos, atan2
+from math import sin, cos, atan2, tan
 import copy
 import logging
+from scipy import deg2rad
+import parameters
 
 def _flat_relation(b):
     """relation flat roof, for one inner way only, included in base model"""
@@ -112,22 +114,31 @@ def _flat(b):
     return out
 
 def separate_hipped(out, b, X):
-    return separate_gable(out, b, X, inward_meters = 4.)
+    return separate_gable(out, b, X, inward_meters = 3.)
 
-def separate_gable(out, b, X, inward_meters = 4.):
+def separate_gable(out, b, X, inward_meters = 0.):
     """gable roof, 4 nodes, separate model. Inward_"""
     #out.new_object(b.roof_ac_name, b.roof_texture.filename + '.png')
 
     # -- pitched roof for 4 ground nodes
     t = b.roof_texture
-
+    
     # -- 4 corners
     o = out.next_node_index()
     for x in X:
         out.node(-x[1], b.ground_elev + b.height, -x[0])
+    if 'roof:angle' in b.tags:
+        angle = float(b.tags['roof:angle'])
+    else:
+        angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE, parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
     # -- tangential vector of long edge
-    roof_height = 3. # 3m
-    tang = (X[1]-X[0])/b.lenX[0] * inward_meters
+    roof_height = tan(deg2rad(angle)) * (b.lenX[1]/2)
+    
+    #We don't want the hipped part to be greater than the height, which is 45 deg
+    inward_meters = min(roof_height,inward_meters)
+
+#     roof_height = 3. # 3m
+    tang = (X[1]-X[0])/b.lenX[1] * inward_meters
 
     len_roof_top = b.lenX[0] - 2.*inward_meters
     len_roof_bottom = 1.*b.lenX[0]

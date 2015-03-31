@@ -83,6 +83,8 @@ from cluster import Clusters
 from numpy.core.numeric import True_
 from shapely.geometry.multipoint import MultiPoint
 from shapely.geos import TopologicalError, PredicateError
+from tools import transform
+
 
 buildings = []  # -- master list, holds all buildings
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
@@ -265,7 +267,7 @@ class Buildings(object):
             return False
 
         for way in self.way_list:
-            if tag_matches(way.tags, self.req_way_keys):
+            if tag_matches(way.tags, self.req_way_keys) and len(way.refs)>3:
                 self._make_building_from_way(way.osm_id, way.tags, way.refs)
 
     def _make_building_from_way(self, osm_id, tags, refs, inner_ways=[]):
@@ -706,6 +708,7 @@ if __name__ == "__main__":
     #   - TODO: analyze surrounding: similar shaped buildings nearby? will get same texture
     #   - set building type, roof type etc
     buildings = building_lib.analyse(buildings, static_objects, tools.transform, elev, tex.manager.facades, tex.manager.roofs)
+        
 
     # -- initialize STG_Manager
     if parameters.PATH_TO_OUTPUT:
@@ -714,6 +717,11 @@ if __name__ == "__main__":
         path_to_output = parameters.PATH_TO_SCENERY
     replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)        
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
+#     for node in ac_nodes:
+#         print node
+#         lon, lat = tools.transform.toGlobal(node)
+#         e = elev((lon,lat), is_global=True)
+#         stg_manager.add_object_shared("Models/Communications/cell-monopole1-75m.xml", vec2d(lon, lat), e, 0)
 
     #tools.write_gp(buildings)
 
