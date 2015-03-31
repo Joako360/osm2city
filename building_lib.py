@@ -159,10 +159,10 @@ def get_nodes_from_acs(objs, own_prefix):
         if fname.endswith(".ac"):
             try:
                 if fname in read_objects:
-                    logging.debug( "CACHED_AC %s"%fname)
+                    logging.debug( "CACHED_AC %s" % fname)
                     ac = read_objects[fname]
                 else:
-                    logging.info( "READ_AC %s"%fname)
+                    logging.info( "READ_AC %s" % fname)
                     ac = ac3d.File(file_name=fname, stats=None)
                     read_objects[fname] = ac
                                 

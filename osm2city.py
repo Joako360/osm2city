@@ -267,7 +267,7 @@ class Buildings(object):
             return False
 
         for way in self.way_list:
-            if tag_matches(way.tags, self.req_way_keys) and len(way.refs)>3:
+            if tag_matches(way.tags, self.req_way_keys) and len(way.refs) > 3:
                 self._make_building_from_way(way.osm_id, way.tags, way.refs)
 
     def _make_building_from_way(self, osm_id, tags, refs, inner_ways=[]):
