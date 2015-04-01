@@ -18,6 +18,7 @@ from vec2d import vec2d
 from textures.manager import find_matching_texture
 import os
 from shapely.geometry.point import Point
+import re
 # nobjects = 0
 nb = 0
 out = ""
@@ -152,7 +153,16 @@ def get_nodes_from_acs(objs, own_prefix):
         if fname.endswith(".xml"):
             if fname.startswith(own_prefix):
                 continue
-            fname = fname.replace(".xml", ".ac")
+            if os.path.exists(fname.replace(".xml", ".ac")):
+                fname = fname.replace(".xml", ".ac")
+            else:
+                with open(fname) as f:
+                    content = f.readlines()
+                    for line in content:
+                        if "<path>" in line:
+                            path = os.path.dirname(fname)
+                            fname = path + os.sep + re.split("</?path>",line)[1]
+                            break
         # print "now <%s> %s" % (fname, b.stg_typ)
 
         # Path to shared objects is built elsewhere
@@ -211,23 +221,24 @@ def is_static_object_nearby(b, X, static_tree):
     
 
     if len(nearby):
-        for i in nearby:
-            inside = b.polygon.contains(Point(d[i]))
-            if inside:
-                break
-        
-#        for i in range(b.nnodes_outer):
-#            tools.stats.debug2.write("%g %g\n" % (X[i,0], X[i,1]))
-#            print "nearby:", nearby
-#            for n in nearby:
-#                print "-->", s[n]
-        if not inside:
-            return False
+        if parameters.OVERLAP_CHECK_INSIDE:
+            for i in nearby:
+                inside = False
+    #            inside = b.polygon.contains(Point(d[i]))
+                if inside:
+                    break        
+    #        for i in range(b.nnodes_outer):
+    #            tools.stats.debug2.write("%g %g\n" % (X[i,0], X[i,1]))
+    #            print "nearby:", nearby
+    #            for n in nearby:
+    #                print "-->", s[n]
+            if not inside:
+                return False
         try:
             if b.name is None or len(b.name) == 0:
                 logging.info( "Static objects nearby. Skipping %d is near %d building nodes"%( b.osm_id, len(nearby)))
             else:
-                logging.info( "Static objects nearby. Skipping %s is near %d building nodes"%( b.name, len(nearby)))
+                logging.info( "Static objects nearby. Skipping %s (%d) is near %d building nodes"%( b.name, b.osm_id, len(nearby)))
         except RuntimeError as e:
             logging.error( "FIXME: %s %s ID %d"% (e, b.name.encode('ascii', 'ignore'), b.osm_id))
         # for n in nearby:

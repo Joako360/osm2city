@@ -74,6 +74,8 @@ CREATE_ATLAS = True         # -- create texture atlas on osm2city startup
 
 # -- check for overlap with static models. The scenery folder must contain an "Objects" folder
 OVERLAP_CHECK = True
+# -- Additionally check if one of the near nodes is actually inside the building
+OVERLAP_CHECK_INSIDE = False
 OVERLAP_RADIUS = 5
 BUILDING_REMOVE_WITH_PARTS = False
 
