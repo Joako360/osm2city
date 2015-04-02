@@ -130,13 +130,12 @@ def separate_gable(out, b, X, inward_meters = 0.):
         angle = float(b.tags['roof:angle'])
     else:
         angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE, parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
-    # -- tangential vector of long edge
     roof_height = tan(np.deg2rad(angle)) * (b.lenX[1]/2)
     
     #We don't want the hipped part to be greater than the height, which is 45 deg
     inward_meters = min(roof_height,inward_meters)
 
-#     roof_height = 3. # 3m
+    # -- tangential vector of long edge
     tang = (X[1]-X[0])/b.lenX[1] * inward_meters
 
     len_roof_top = b.lenX[0] - 2.*inward_meters
