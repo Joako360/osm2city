@@ -156,6 +156,8 @@ def get_nodes_from_acs(objs, own_prefix):
             if os.path.exists(fname.replace(".xml", ".ac")):
                 fname = fname.replace(".xml", ".ac")
             else:
+                if not os.path.exists(fname):
+                    continue
                 with open(fname) as f:
                     content = f.readlines()
                     for line in content:
