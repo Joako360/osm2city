@@ -710,7 +710,7 @@ class Stats(object):
                    self.skipped_small, self.skipped_nearby, self.skipped_no_elev, self.skipped_texture)))
         roof_line = "        roof-types"
         for roof_type in self.roof_types:
-            roof_line += """\r\n          %s\t%i""" % (roof_type, self.roof_types[roof_type])
+            roof_line += """\n          %s\t%i""" % (roof_type, self.roof_types[roof_type])
         out.write(textwrap.dedent(roof_line))
 
         try:
@@ -743,8 +743,8 @@ class Stats(object):
                       "#" * int(56. * self.area_above[i] / max_area_above)))
 
         if logging.getLogger().level <= logging.VERBOSE:
-            for name in self.textures_used:
-                logging.debug("%s"%name)
+            for name in sorted(self.textures_used):
+                out.write("%s\n"%name)
 
         out.write("\nnumber of corners >=\n")
         max_corners = max(1, self.corners.max())
