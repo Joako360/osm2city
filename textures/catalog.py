@@ -535,7 +535,11 @@ def append_dynamic(tex_prefix, facades):
                 if file[-2:] != "py":
                     continue 
                 logging.info("Executing %s "%(subdir + os.sep + file))
-                execfile(subdir + os.sep + file, locals())
+                try:
+                    execfile(subdir + os.sep + file, locals())
+                except:
+                    logging.exception("Error while running %s"%file)
+            
 
 def append_roofs(tex_prefix, roofs):
     """------------ ADD YOUR ROOF TEXTURES HERE -------------------"""
