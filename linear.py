@@ -218,19 +218,19 @@ class LinearObject(object):
         to_write = copy.copy(line_string.coords)
         nodes_list = []
 #        print "JUNLEN", len(self.junction0), len(self.junction1)
-
+        assert(self.cluster_ref != None)
         if not join:
             nodes_list += list(obj.next_node_index() + np.arange(len(to_write)))
         else:
             if len(self.junction0) == 2:
                 try:
                     # if other node already exists, do not write a new one
-                    other_node = self.junction0.get_other_node(self, is_left) #other nodes already written:
+                    other_node = self.junction0.get_other_node(self, is_left, self.cluster_ref) #other nodes already written:
                     to_write = to_write[1:]
                     z = z[1:]
                     nodes_list.append(other_node)
                 except KeyError:
-                    self.junction0.set_other_node(self, is_left, obj.next_node_index())
+                    self.junction0.set_other_node(self, is_left, obj.next_node_index(), self.cluster_ref)
     
             # -- make list with all but last node -- we might add last node later
             nodes_list += list(obj.next_node_index() + np.arange(len(to_write)-1))
@@ -239,12 +239,12 @@ class LinearObject(object):
             if len(self.junction1) == 2:
                 try:
                     # if other node already exists, do not write a new one
-                    other_node = self.junction1.get_other_node(self, is_left) #other nodes already written:
+                    other_node = self.junction1.get_other_node(self, is_left, self.cluster_ref) #other nodes already written:
                     to_write = to_write[:-1]
                     z = z[:-1]
                     nodes_list.append(other_node)
                 except KeyError:
-                    self.junction1.set_other_node(self, is_left, last_node)
+                    self.junction1.set_other_node(self, is_left, last_node, self.cluster_ref)
                     nodes_list.append(last_node)
             else:
                 nodes_list.append(last_node)
@@ -517,9 +517,11 @@ class LinearObject(object):
             
         #if self.debug_print_node_info(21551419, h_add):
         #self.debug_label_nodes(self.center, left_z, debug_ac, elev_offset, offset, h_add)
-
-        left_nodes_list =  self.write_nodes(obj, self.edge[0], left_z, elev_offset, offset, join=True, is_left=True)
-        right_nodes_list = self.write_nodes(obj, self.edge[1], right_z, elev_offset, offset, True, False)
+        join=1
+        left_nodes_list =  self.write_nodes(obj, self.edge[0], left_z, elev_offset, 
+                                            offset, join=join, is_left=True)
+        right_nodes_list = self.write_nodes(obj, self.edge[1], right_z, elev_offset,
+                                            offset, join=join, is_left=False)
         if self.osm_id == 138440237:
             pass
             #bla
@@ -532,7 +534,6 @@ class LinearObject(object):
 
                 left_ground_nodes  = self.write_nodes(obj, self.edge[0], left_ground_z, elev_offset, offset=offset)
                 right_ground_nodes = self.write_nodes(obj, self.edge[1], right_ground_z, elev_offset, offset=offset)
-
                 self.write_quads(obj, left_ground_nodes, left_nodes_list, 4/8., 5/8., debug_ac=debug_ac)
                 self.write_quads(obj, right_nodes_list, right_ground_nodes, 4/8., 5/8., debug_ac=debug_ac)
 

@@ -152,12 +152,18 @@ class Roads(objectlist.ObjectList):
 
         if len(self.ways_list) >= parameters.MAX_OBJECTS: 
             return
+
+        #if not 'railway' in way.tags: # -- keep only railways
+        #    return
+            
         #if 'railway' in way.tags and (not 'highway' in way.tags):
         #    return
         if 'railway' in way.tags:
-            #return # switch off railways
-            if way.tags['railway'] != 'rail':
-                return
+            pass
+            #return # -- don't use railways
+            #if way.tags['railway'] != 'rail':
+            #    return
+            
         try:
             if self.prio(way.tags['highway'], True) == 0:
                 return
@@ -304,11 +310,12 @@ class Roads(objectlist.ObjectList):
         #self.debug_plot_junctions('ks')
         #self.count_inner_junctions('bs')
         self.split_ways_at_inner_junctions()
-        self.join_degree2_junctions()
-        self.find_junctions(self.ways_list, 3)
+        #self.debug_print_refs_of_way(239806431)
+        self.join_degree2_junctions() 
+        #self.debug_print_refs_of_way(239806431)
+        #self.find_junctions(self.ways_list, 3)
         del self.attached_ways_dict
     #        self.print_junctions_stats()
-        plt.clf()
     #        self.count_inner_junctions('rs')
         #bla
         #self.debug_print_dict()
@@ -516,11 +523,11 @@ class Roads(objectlist.ObjectList):
                 new_way.refs.append(the_ref)
                 if the_ref in self.attached_ways_dict:
                     new_list.append(new_way)
-                    self.debug_plot_way(new_way, '-', lw=1, mark_nodes=0)
+                    self.debug_plot_way(new_way, '-', lw=1)
                     new_way = self.init_way_from_existing(the_way, the_ref)
             if the_ref not in self.attached_ways_dict: # FIXME: store previous test?
                 new_list.append(new_way)
-                self.debug_plot_way(new_way, '--', lw=1, mark_nodes=0)
+                self.debug_plot_way(new_way, '--', lw=1)
 #            new_way.refs.append(the_way.refs[-1])
 #            self.ways_list.append(new_way)
 #            self.debug_plot_way(new_way, "--", lw=2, mark_nodes=True)
@@ -623,7 +630,7 @@ class Roads(objectlist.ObjectList):
 #        plt.text(self.nodes_dict[ref].lon, self.nodes_dict[ref].lat, ref.osm_id)
 
 
-    def debug_plot_way(self, way, ls, lw, color=False, mark_nodes=False, show_label=False):
+    def debug_plot_way(self, way, ls, lw, color=False, ends_marker=False, show_label=False, show_ends=False):
 #        return
         if not parameters.DEBUG_PLOT: return
         col = ['b', 'r', 'y', 'g', '0.25', 'k', 'c']
@@ -640,11 +647,11 @@ class Roads(objectlist.ObjectList):
 #        a = np.array([transform.toGlobal(p) for p in a])
         #color = col[r.typ]
         plt.plot(a[:,0], a[:,1], ls, linewidth=lw, color=color)
-        if mark_nodes:
-            plt.plot(a[0,0], a[0,1], 'o', linewidth=lw, color=color)
-            plt.plot(a[-1,0], a[-1,1], 'o', linewidth=lw, color=color)
+        if ends_marker:
+            plt.plot(a[0,0], a[0,1], ends_marker, linewidth=lw, color=color)
+            plt.plot(a[-1,0], a[-1,1], ends_marker, linewidth=lw, color=color)
         if show_label:
-            plt.text(0.5*(a[0,0]+a[-1,0]), 0.5*(a[0,1]+a[-1,1]), way.osm_id)
+            plt.text(0.5*(a[0,0]+a[-1,0]), 0.5*(a[0,1]+a[-1,1]), way.osm_id, color="b")
     
     def debug_plot_junctions(self, style):
         if not parameters.DEBUG_PLOT: return
@@ -659,17 +666,47 @@ class Roads(objectlist.ObjectList):
         plt.plot(node.lon, node.lat, 'rs', mfc='None', ms=10)
         plt.text(node.lon+0.0001, node.lat, str(node.osm_id) + " h" + str(text))
 
-    def debug_plot(self, save=False, plot_junctions=False, show=False, label_nodes=[]):
+    def debug_plot(self, save=False, plot_junctions=False, show=False, label_nodes=[], label_all_ways=False, clusters=None):
         if not parameters.DEBUG_PLOT: return
+        plt.clf()
         if plot_junctions:
             self.debug_plot_junctions('o')            
         for ref in label_nodes:
             self.debug_label_node(ref)
+        col = ['b', 'r', 'y', 'g', '0.75', '0.5', 'k', 'c']
+        col = ['0.5', '0.75', 'y', 'g', 'r', 'b', 'k']
+        lw    = [1, 1, 1, 1.2, 1.5, 2, 1]
+        lw_w  = np.array([1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]) * 0.1
+
+        if clusters:
+            for i, cl in enumerate(clusters):
+                if len(cl.objects): 
+                    cluster_color = col[random.randint(0, len(col)-1)]
+                    c = np.array([[cl.min.x, cl.min.y], 
+                                  [cl.max.x, cl.min.y], 
+                                  [cl.max.x, cl.max.y], 
+                                  [cl.min.x, cl.max.y],
+                                  [cl.min.x, cl.min.y]])
+                    c = np.array([self.transform.toGlobal(p) for p in c])
+                    plt.plot(c[:,0], c[:,1], '-', color=cluster_color)
+                for r in cl.objects:
+                    random_color = col[random.randint(0, len(col)-1)]
+                    osmid_color = col[(r.osm_id + len(r.refs)) % len(col)]                
+                    a = np.array(r.center.coords)
+                    a = np.array([self.transform.toGlobal(p) for p in a])
+                    #color = col[r.typ]
+                    try:
+                        lw = lw_w[r.typ]
+                    except:
+                        lw = lw_w[0]
+                        
+                    plt.plot(a[:,0], a[:,1], color=cluster_color, linewidth=lw+2)
+    
             
         for the_way in self.ways_list:
-            self.debug_plot_way(the_way, '-', lw=0.5)
+            self.debug_plot_way(the_way, '-', lw=0.5, show_label=True, ends_marker='x')
             
-            if 0:
+            if 1:
                 ref = the_way.refs[0]
                 self.debug_label_node(ref)
                 ref = the_way.refs[-1]
@@ -792,12 +829,13 @@ class Roads(objectlist.ObjectList):
         new_list = []
         for the_obj in self.ways_list:
             if the_obj.osm_id in osm_id_list:
+                print "keeping", the_obj.osm_id
                 new_list.append(the_obj)
         self.ways_list = new_list
 
     def debug_drop_unused_nodes(self):
         new_nodes_dict = {}
-        for the_list in [self.bridges_list, self.roads_list]:
+        for the_list in [self.ways_list, self.bridges_list, self.roads_list]:
             for the_obj in the_list:
                 for the_ref in the_obj.refs:
                     new_nodes_dict[the_ref] = self.nodes_dict[the_ref]
@@ -847,7 +885,22 @@ class Roads(objectlist.ObjectList):
                 ac.add_label(' %i h=%1.1f' % (the_node.osm_id, the_node.h_add), -anchor.y, e, -anchor.x, scale=1.)
         path_to_stg = stg_manager.add_object_static(file_name + '.ac', vec2d(self.transform.toGlobal((0,0))), 0, 0)
         ac.write(path_to_stg + file_name + '.ac')
-#269416158
+
+    def debug_print_ways_at_node(self, node_osm_id):
+        """print ways that connect to given node OSM_ID"""
+        print "ID", node_osm_id
+        for the_way in self.ways_list:
+            if node_osm_id in the_way.refs:
+                print "+", the_way.osm_id
+    def debug_print_refs_of_way(self, way_osm_id):
+        """print refs of given way"""
+        for the_way in self.ways_list:
+            if the_way.osm_id == way_osm_id:
+                print "found", the_way
+                for the_ref in the_way.refs:
+                    print "+", the_ref
+                    
+        
     def clip_at_cluster_border(self):
         """
                - loop all objects
@@ -866,7 +919,8 @@ class Roads(objectlist.ObjectList):
         self.clusters = Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
 
         for the_object in self.bridges_list + self.roads_list:
-            self.clusters.append(vec2d(the_object.center.centroid.coords[0]), the_object)
+            cluster_ref = self.clusters.append(vec2d(the_object.center.centroid.coords[0]), the_object)
+            the_object.cluster_ref = cluster_ref
 
 def write_xml(path_to_stg, file_name, object_name):
     xml = open(path_to_stg + file_name + '.xml', "w")
@@ -964,7 +1018,6 @@ def main():
     parser.add_argument("-l", "--loglevel", help="set loglevel. Valid levels are DEBUG, INFO, WARNING, ERROR, CRITICAL")
 
     args = parser.parse_args()
-
     # -- command line args override paramters
     if args.filename is not None:
         parameters.read_from_file(args.filename)
@@ -1001,7 +1054,11 @@ def main():
     #roads.debug_keep_only([24768144, 204383347, 204383366, 204383384, 204383376])
     #roads.debug_keep_only([24768144, 204383376])
 #    roads.debug_keep_only([159102469, 204383356, 204383372, 149964565, 149964564])
+    #roads.debug_keep_only([199894698, 239806431, 239806435, 199894356, 199894361, 199894352])
+    #roads.debug_drop_unused_nodes()
     logging.debug("before linear " + str(roads))
+
+    roads.debug_print_ways_at_node(2098788640)
 
     # -- First, clean up topo. We work on ways_list:
     #    remove tunnels, short bridges, also remove inner junctions
@@ -1009,7 +1066,12 @@ def main():
     roads.remove_tunnels()
     roads.replace_short_bridges_with_ways()
     roads.cleanup_topo()
+    # disabling this moves bridge/embankment nodes together. No h diff then.
 
+
+
+    roads.debug_print_ways_at_node(2098788640)
+    roads.debug_print_refs_of_way(239806431)
     roads.probe_elev_at_nodes()
     elev.save_cache()
 #    roads.build_graph(roads.ways_list)
@@ -1018,7 +1080,6 @@ def main():
     
     # -- no change in topo beyond create_linear_objects() !
     roads.create_linear_objects()
-    roads.debug_drop_unused_nodes()
     roads.debug_show_h_add("after linear ob")
 
 #    roads.debug_test()
@@ -1047,7 +1108,7 @@ def main():
 
     replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)        
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
-    roads.debug_label_nodes(stg_manager)
+    #roads.debug_label_nodes(stg_manager)
 
     # -- write stg
     for cl in roads.clusters:
@@ -1074,7 +1135,15 @@ def main():
         write_xml(path_to_stg, file_name, file_name)
         tools.install_files(['roads.eff'], path_to_stg)
 
-    #debug_create_eps(roads, roads.clusters, elev, plot_cluster_borders=1)
+        for the_way in cl.objects:
+            the_way.junction0.reset()
+            the_way.junction1.reset()
+            
+
+
+    roads.debug_plot(show=True, plot_junctions=False, clusters=roads.clusters) #, label_nodes=self.nodes_dict.keys())#, label_nodes=[1132288594, 1132288612])
+    
+    debug_create_eps(roads, roads.clusters, elev, plot_cluster_borders=1)
     stg_manager.write()
 
     elev.save_cache()

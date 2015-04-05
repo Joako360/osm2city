@@ -208,19 +208,26 @@ class LinearBridge(linear.LinearObject):
         #print "br", h_add
 
 
-        self.debug_print_node_info(21551419)
+        #self.debug_print_node_info(21551419)
 
         print self.osm_id
-        if self.osm_id == 98659370:
+        IDs = [199894356, 239806431]
+        if self.osm_id in IDs:
             pass
-
-        left_top_nodes =  self.write_nodes(obj, self.edge[0], z, elev_offset, offset, join=True, is_left=True)
-        right_top_nodes = self.write_nodes(obj, self.edge[1], z, elev_offset, offset, True, False)
+        if 2098788640 in self.refs:
+            print "OSMID", self.osm_id
+        join=1
+        left_top_nodes =  self.write_nodes(obj, self.edge[0], z, elev_offset, 
+                                           offset, join=join, is_left=True)
+        right_top_nodes = self.write_nodes(obj, self.edge[1], z, elev_offset, 
+                                           offset, join=join, is_left=False)
 
         bridge_body_height = 1.5
         left_bottom_edge, right_bottom_edge = self.compute_offset(self.width/2 * 0.5)
-        left_bottom_nodes =  self.write_nodes(obj, left_bottom_edge, z-bridge_body_height, elev_offset, offset)
-        right_bottom_nodes = self.write_nodes(obj, right_bottom_edge, z-bridge_body_height, elev_offset, offset)
+        left_bottom_nodes =  self.write_nodes(obj, left_bottom_edge, z-bridge_body_height,
+                                              elev_offset, offset)
+        right_bottom_nodes = self.write_nodes(obj, right_bottom_edge, z-bridge_body_height, 
+                                              elev_offset, offset)
         # -- top
         self.write_quads(obj, left_top_nodes, right_top_nodes, self.tex_y0, self.tex_y1, debug_ac=None)
         
@@ -232,3 +239,34 @@ class LinearBridge(linear.LinearObject):
 
         # -- bottom
         self.write_quads(obj, right_bottom_nodes, left_bottom_nodes,  0.9, 1, debug_ac=None)
+
+        # -- end wall 1
+        the_node = self.edge[0].coords[0]
+        e = elev(the_node) - elev_offset
+        left_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
+
+        the_node = self.edge[1].coords[0]
+        e = elev(the_node) - elev_offset
+        right_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
+
+        face = [ (left_top_nodes[0],    0, 1),
+                 (right_top_nodes[0],   0, 1),
+                 (right_bottom_node,    0, 1),
+                 (left_bottom_node,     0, 1) ]
+        obj.face(face)
+
+        # -- end wall 2
+        the_node = self.edge[0].coords[-1]
+        e = elev(the_node) - elev_offset
+        left_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
+
+        the_node = self.edge[1].coords[-1]
+        e = elev(the_node) - elev_offset
+        right_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
+
+        face = [ (left_top_nodes[-1],    0, 1),
+                 (right_top_nodes[-1],   0, 1),
+                 (right_bottom_node,    0, 1),
+                 (left_bottom_node,     0, 1) ]
+        obj.face(face[::-1])
+

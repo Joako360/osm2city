@@ -54,9 +54,13 @@ class Junction(object):
     def __init__(self, way, is_first, joint_nodes=[]):
         self._attached_ways = [way]
         self._is_first = [is_first]
-        self.joint_nodes = joint_nodes # list of tuples
+        self.joint_nodes = joint_nodes # list of tuples -- unused?
+        self.reset()
+        
+    def reset(self):
         self._left_node = None
         self._right_node = None
+        self._cluster_ref = None
         
     def __len__(self):
         return len(self._attached_ways)
@@ -70,7 +74,9 @@ class Junction(object):
         assert(i==0 or i==1)
         return (i + self._is_first[i] + is_left) % 2 == 0
     
-    def get_other_node(self, way, is_left):
+    def get_other_node(self, way, is_left, cluster_ref):
+        if self._cluster_ref != cluster_ref:
+            raise KeyError
         if self._use_left_node(way, is_left):
             if self._left_node == None:
                 raise KeyError
@@ -80,7 +86,9 @@ class Junction(object):
                 raise KeyError
             return self._right_node
 
-    def set_other_node(self, way, is_left, node):
+    def set_other_node(self, way, is_left, node, cluster_ref):
+        """We also store cluster reference to avoid using nodes from other clusters"""
+        self._cluster_ref = cluster_ref
         if self._use_left_node(way, is_left):
             if self._left_node != None:
                 raise ValueError("other node already set")
@@ -99,7 +107,7 @@ class Graph(nx.Graph):
 
     def add_node(self, the_ref, obj):
         super(Graph, self).add_node(the_ref, obj=obj)
-
+        
     def add_edge(self, way):
         ref0 = way.refs[0]
         ref1 = way.refs[-1]
@@ -128,19 +136,19 @@ class Graph(nx.Graph):
 #            self.G.add_edge(the_way.refs[0], the_way.refs[-1], obj=the_way)
 
 if __name__ == "__main__":
-    
+    import osm
     G=Graph()
     
     junction1 = 'j1'
     junction2 = 'j2'
-    G.add_node("a", junction1)
-    G.add_node("a", junction1)
+    #G.add_node("a", junction1)
+    #G.add_node("a", junction1)
     
+    #G.add_node(2, junction2)
+    #G.add_node(3, "hj")
+    G.add_edge(osm.Way(1, [], [1, 2]))
+    G.add_edge(osm.Way(2, [], [4, 3]))
     bla
-    G.add_node(2, junction2)
-    G.add_node(3, "hj")
-    G.add_edge(3, 2)
-    G.add_edge("a", 2)
     print "aa", G.node["a"]['obj']
     print "cur"
     print G["a"]
@@ -150,3 +158,4 @@ if __name__ == "__main__":
     for the_node in G.nodes(data=True):
         print the_node[0], " --",
         print the_node[1]['obj']
+        
