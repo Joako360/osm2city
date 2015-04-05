@@ -360,8 +360,8 @@ class Roads(objectlist.ObjectList):
             width = 9
             tex_y0 = 2/8.
             tex_y1 = 3/8.
-            AGL_ofs = 1.0 + random.uniform(0.01, 0.1)
-            AGL_ofs = 0.0
+            AGL_ofs = random.uniform(0.01, 0.1)
+            #AGL_ofs = 0.0
             #if way.tags.has_key('layer'):
             #    AGL_ofs = 20.*float(way.tags['layer'])
             #print way.tags

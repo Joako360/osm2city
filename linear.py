@@ -504,8 +504,7 @@ class LinearObject(object):
         """
         h_add, center_z = self.get_h_add(elev, elev_offset)
         left_z, right_z, h_add = self.level_out(elev, h_add)
-        #left_z  = self.probe_ground(elev, self.edge[0])
-        #right_z = self.probe_ground(elev, self.edge[1])
+
         if self.osm_id == 204383381: # 1st   (+)
             print ">> 1st ", h_add
             print self.nodes_dict[self.refs[0]].h_add
@@ -517,14 +516,10 @@ class LinearObject(object):
             
         #if self.debug_print_node_info(21551419, h_add):
         #self.debug_label_nodes(self.center, left_z, debug_ac, elev_offset, offset, h_add)
-        join=1
         left_nodes_list =  self.write_nodes(obj, self.edge[0], left_z, elev_offset, 
-                                            offset, join=join, is_left=True)
+                                            offset, join=True, is_left=True)
         right_nodes_list = self.write_nodes(obj, self.edge[1], right_z, elev_offset,
-                                            offset, join=join, is_left=False)
-        if self.osm_id == 138440237:
-            pass
-            #bla
+                                            offset, join=True, is_left=False)
         self.write_quads(obj, left_nodes_list, right_nodes_list, self.tex_y0, self.tex_y1, debug_ac=debug_ac)
         if 1 and h_add is not None:
             # -- side walls of embankment
