@@ -43,8 +43,18 @@ class Face(object):
 
 
 class Object(object):
-    """An object (3D) in an AC3D file with faces and nodes"""
-    def __init__(self, name=None, stats=None, texture=None, texrep=None, texoff=None, rot=None, loc=None, crease=None, url=None, default_type=0x0, default_mat=0, default_swap_uv=False, kids=0):
+    """An object (3D) in an AC3D file with faces and nodes
+       type:  
+         The first 4 bits (flags & 0xF) is the type. 0 = polygon, 1 = closedline, 2 = line  
+         The next four bits (flags >> 4) specify the shading and 
+backface.  bit1 = shaded surface bit2 = twosided.
+         ts0000
+         31 
+         268421
+         0x20: two-sided poly
+         0x00: single-sided poly
+    """
+    def __init__(self, name=None, stats=None, texture=None, texrep=None, texoff=None, rot=None, loc=None, crease=None, url=None, default_type=0x00, default_mat=0, default_swap_uv=False, kids=0):
         self._nodes = []
         self._faces = []
         self.name = name
