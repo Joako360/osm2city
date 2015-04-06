@@ -242,7 +242,7 @@ def is_static_object_nearby(b, X, static_tree):
             else:
                 logging.info( "Static objects nearby. Skipping %s (%d) is near %d building nodes"%( b.name, b.osm_id, len(nearby)))
         except RuntimeError as e:
-            logging.error( "FIXME: %s %s ID %d"% (e, b.name.encode('ascii', 'ignore'), b.osm_id))
+            logging.error( "FIXME: %s %s ID %d" % (e, b.name.encode('ascii', 'ignore'), b.osm_id))
         # for n in nearby:
         #    print static_objects.objs[n].name,
         # print

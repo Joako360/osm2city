@@ -1,4 +1,5 @@
 #!/usr/bin/env python2
+# -*- coding: utf-8 -*-
 """abstract way extractor. To be inherited.
 
 class Road(object):

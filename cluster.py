@@ -99,7 +99,8 @@ class Clusters(object):
         """find cluster of """
         #print "appending at pos", X
         #print "  to ", self(X)
-        self(anchor).objects.append(obj)
+        the_cluster = self(anchor)
+        the_cluster.objects.append(obj)
         try:
             # Local stats
             self(anchor).stats.count(obj)
@@ -108,6 +109,7 @@ class Clusters(object):
         except AttributeError:
             #logging.debug("count broken, fix me")
             pass
+        return the_cluster
         
     def transfer_buildings(self):
         """1|0

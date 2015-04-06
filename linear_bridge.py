@@ -183,6 +183,49 @@ class LinearBridge(linear.LinearObject):
         #return 10.
         return self.D(l)
 
+
+    def pillar(self, obj, x, y, h0, h1, ofs, angle):
+        self.pillar_r0 = 2.
+        self.pillar_r1 = 1.
+        self.pillar_nnodes = 8
+
+        rx = self.pillar_r0
+        ry = self.pillar_r1
+
+        nodes_list = []
+        ofs = obj.next_node_index()
+        vert = ""
+        R = np.array([[np.cos(-angle), -np.sin(-angle)],
+                      [np.sin(-angle),  np.cos(-angle)]])
+        for a in np.linspace(0, 2*np.pi, self.pillar_nnodes, endpoint = False):
+            a += np.pi/self.pillar_nnodes
+            node = np.array([rx*np.cos(a), ry*np.sin(a)])
+            node = np.dot(R, node)
+            obj.node(-(y+node[0]), h1, -(x+node[1]))
+        for a in np.linspace(0, 2*np.pi, self.pillar_nnodes, endpoint = False):
+            a += np.pi/self.pillar_nnodes
+            node = np.array([rx*np.cos(a), ry*np.sin(a)])
+            node = np.dot(R, node)
+            obj.node(-(y+node[0]), h0, -(x+node[1]))
+
+        for i in range(self.pillar_nnodes-1):
+            face = [(ofs+i,                      0, 4/8.-0.05),
+                    (ofs+i+1,                    1, 4/8.-0.05), 
+                    (ofs+i+1+self.pillar_nnodes, 1, 4/8.), 
+                    (ofs+i+self.pillar_nnodes,   0, 4/8.)]
+            obj.face(face)
+            
+        i = self.pillar_nnodes - 1
+        face = [(ofs+i,                    0, 4/8.-0.05),
+                (ofs,                      1, 4/8.-0.05), 
+                (ofs+self.pillar_nnodes,   1, 4/8.), 
+                (ofs+i+self.pillar_nnodes, 0, 4/8.)]
+        obj.face(face)
+
+        nodes_list.append(face)
+
+        return ofs + 2*self.pillar_nnodes, vert, nodes_list
+
     def write_to(self, obj, elev, elev_offset, ac=None, offset=None):
         """
         write
@@ -204,20 +247,17 @@ class LinearBridge(linear.LinearObject):
             z[i] = self.deck_height(l, normalized=False) + self.AGL
             l += self.segment_len[i]
             
-        #z, right_z, h_add = self.level_out(elev, elev_offset)
-        #print "br", h_add
-
-
-        self.debug_print_node_info(21551419)
-
-        left_top_nodes =  self.write_nodes(obj, self.edge[0], z, elev_offset, offset=offset)
-        right_top_nodes = self.write_nodes(obj, self.edge[1], z, elev_offset, offset=offset)
-
+        left_top_nodes =  self.write_nodes(obj, self.edge[0], z, elev_offset,
+                                           offset, join=True, is_left=True)
+        right_top_nodes = self.write_nodes(obj, self.edge[1], z, elev_offset,
+                                           offset, join=True, is_left=False)
+                                           
         bridge_body_height = 1.5
         left_bottom_edge, right_bottom_edge = self.compute_offset(self.width/2 * 0.5)
-        left_bottom_nodes =  self.write_nodes(obj, left_bottom_edge, z-bridge_body_height, elev_offset, offset=offset)
-        right_bottom_nodes = self.write_nodes(obj, right_bottom_edge, z-bridge_body_height, elev_offset, offset=offset)
-
+        left_bottom_nodes =  self.write_nodes(obj, left_bottom_edge, z-bridge_body_height,
+                                              elev_offset, offset)
+        right_bottom_nodes = self.write_nodes(obj, right_bottom_edge, z-bridge_body_height, 
+                                              elev_offset, offset)
         # -- top
         self.write_quads(obj, left_top_nodes, right_top_nodes, self.tex_y0, self.tex_y1, debug_ac=None)
         
@@ -228,4 +268,43 @@ class LinearBridge(linear.LinearObject):
         self.write_quads(obj, left_bottom_nodes, left_top_nodes, 3/8., 4/8., debug_ac=None)
 
         # -- bottom
-        self.write_quads(obj, right_bottom_nodes, left_bottom_nodes,  0.9, 1, debug_ac=None)
+        self.write_quads(obj, right_bottom_nodes, left_bottom_nodes,  4/8.-0.05, 4/8., debug_ac=None)
+
+        # -- end wall 1
+        the_node = self.edge[0].coords[0]
+        e = elev(the_node) - elev_offset
+        left_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
+
+        the_node = self.edge[1].coords[0]
+        e = elev(the_node) - elev_offset
+        right_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
+
+        face = [ (left_top_nodes[0],    0, 4/8.), # FIXME: texture coords
+                 (right_top_nodes[0],   0, 5/8.),
+                 (right_bottom_node,    1, 5/8.),
+                 (left_bottom_node,     1, 4/8.) ]
+        obj.face(face)
+
+        # -- end wall 2
+        the_node = self.edge[0].coords[-1]
+        e = elev(the_node) - elev_offset
+        left_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
+
+        the_node = self.edge[1].coords[-1]
+        e = elev(the_node) - elev_offset
+        right_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
+
+        face = [ (left_top_nodes[-1],    0, 4/8.),
+                 (right_top_nodes[-1],   0, 5/8.),
+                 (right_bottom_node,    1, 5/8.),
+                 (left_bottom_node,     1, 4/8.) ]
+        obj.face(face[::-1])
+        
+        # pillars
+        #if len(self.refs) > 2:
+        z -= elev_offset
+        for i in range(1, n_nodes-1):
+            z0 = elev(self.center.coords[i]) - elev_offset - 1.
+            point = self.center.coords[i]
+            self.pillar(obj, point[0]-offset.x, point[1]-offset.y, z0, z[i], 0, self.angle[i])
+

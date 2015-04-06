@@ -1,5 +1,7 @@
 """test/debug routines
 """
+import numpy as np
+from pdb import pm
 
 def show_nodes(osm_id, nodes, refs, nodes_dict, left, right):
     print "OSM_ID %i" % osm_id
@@ -38,3 +40,14 @@ def scale_test(transform, elev):
     p0 = vec2d(transform.toGlobal((0, 0)))
     p1 = vec2d(transform.toGlobal((1., 0)))
     print p0, p1
+
+if __name__ == "__main__":
+    def t(z):
+        print z
+        z = z[1:-1]
+        print z
+        
+    a = np.arange(4)
+    t(a)
+    print a
+    
