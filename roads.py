@@ -729,7 +729,7 @@ class Roads(objectlist.ObjectList):
         pass
     
     def compatible_ways(self, way1, way2):
-        print "trying join", way1.osm_id, way2.osm_id
+        logging.debug("trying join %i %i" % (way1.osm_id, way2.osm_id))
         if is_bridge(way1) == is_bridge(way2):
             return True
         else:
@@ -738,11 +738,11 @@ class Roads(objectlist.ObjectList):
     def attached_ways_dict_remove(self, the_ref, the_way, ignore_missing_ref=False):
         """remove given way from given node in attached_ways_dict"""
         if ignore_missing_ref and the_ref not in self.attached_ways_dict:
-            print "not removing way from the ref %i because the ref is not in attached_ways_dict" % the_ref
+            logging.debug("not removing way from the ref %i because the ref is not in attached_ways_dict" % the_ref)
             return
         for way, boolean in self.attached_ways_dict[the_ref]:
             if way == the_way:
-                print "removing way %s from node %i LIST " % (the_way, the_ref), self.attached_ways_dict[the_ref]
+                logging.debug("removing way %s from node %i LIST " % (the_way, the_ref), self.attached_ways_dict[the_ref])
                 self.attached_ways_dict[the_ref].remove((the_way, boolean))
 
     def attached_ways_dict_append(self, the_ref, the_way, is_first, ignore_missing_ref=False):
@@ -776,7 +776,7 @@ class Roads(objectlist.ObjectList):
             return
             
         new_way = self.init_way_from_existing(way1, new_refs)
-        print "old and new", way1, new_way        
+        logging.debug("old and new" + str(way1) + str(new_way))
 
         self.attached_ways_dict_remove(way1.refs[0],  way1, ignore_missing_ref=True)
         self.attached_ways_dict_remove(way1.refs[-1], way1, ignore_missing_ref=True)
@@ -789,16 +789,16 @@ class Roads(objectlist.ObjectList):
             
         try:
             self.ways_list.remove(way1)
-            print "1ok ",
+            logging.debug("1ok ")
         except ValueError:
             self.ways_list.remove(self.debug_find_way_by_osm_id(way1.osm_id))
-            print "1not ",
+            logging.debug("1not ")
         try:
             self.ways_list.remove(way2)
-            print "2ok"
+            logging.debug("2ok")
         except ValueError:
             self.ways_list.remove(self.debug_find_way_by_osm_id(way2.osm_id))
-            print "2not"
+            logging.debug("2not")
         self.ways_list.append(new_way)
 
     def join_degree2_junctions(self):
