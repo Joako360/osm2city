@@ -74,7 +74,7 @@ class OSMContentHandler(xml.sax.ContentHandler):
     the input file processed by e.g. Osmosis first.
     """
 
-    def __init__(self, valid_node_keys, border):
+    def __init__(self, valid_node_keys, border=None):
         xml.sax.ContentHandler.__init__(self)
         self.border = border
         self._way_callbacks = []
