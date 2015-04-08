@@ -536,7 +536,7 @@ def append_dynamic(tex_prefix, facades):
                     continue 
                 logging.info("Executing %s "%(subdir + os.sep + file))
                 try:
-                    execfile(subdir + os.sep + file, locals())
+                    execfile(subdir + os.sep + file)
                 except:
                     logging.exception("Error while running %s"%file)
             
