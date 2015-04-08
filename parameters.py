@@ -40,6 +40,9 @@ BOUNDARY_WEST = 9.54
 BOUNDARY_SOUTH = 47.48
 BOUNDARY_EAST = 9.58
 BOUNDARY_NORTH = 47.50
+# Clip all nodes outside the bounding box
+BOUNDARY_CLIPPING = True
+BOUNDARY_CLIPPING_BORDER_SIZE = 0.25
 
 OSM_FILE = "buildings.osm"  # -- file name of the file with OSM data. Must reside in $PREFIX
 USE_PKL = False             # -- instead of parsing the OSM file, read a previously created cache file $PREFIX/buildings.pkl
@@ -286,6 +289,13 @@ def get_extent_global():
     cmin = vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
     cmax = vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
     return cmin, cmax
+
+def get_clipping_extent():
+    rect = [(BOUNDARY_WEST+BOUNDARY_CLIPPING_BORDER_SIZE, BOUNDARY_SOUTH-BOUNDARY_CLIPPING_BORDER_SIZE),
+            (BOUNDARY_EAST-BOUNDARY_CLIPPING_BORDER_SIZE, BOUNDARY_SOUTH-BOUNDARY_CLIPPING_BORDER_SIZE),
+            (BOUNDARY_EAST-BOUNDARY_CLIPPING_BORDER_SIZE, BOUNDARY_NORTH+BOUNDARY_CLIPPING_BORDER_SIZE),
+            (BOUNDARY_WEST+BOUNDARY_CLIPPING_BORDER_SIZE, BOUNDARY_NORTH+BOUNDARY_CLIPPING_BORDER_SIZE)]
+    return rect
 
 def show():
     """

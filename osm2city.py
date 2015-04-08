@@ -636,7 +636,11 @@ if __name__ == "__main__":
             if raw_input().lower() != 'y':
                 sys.exit(-1)
 
-        handler = osmparser.OSMContentHandler(valid_node_keys=[])
+        if parameters.BOUNDARY_CLIPPING:
+            border = shg.Polygon(parameters.get_clipping_extent())
+        else:
+            border = None
+        handler = osmparser.OSMContentHandler(valid_node_keys=[], border=border)
         buildings = Buildings()
         buildings.register_callbacks_with(handler)
         source = open(osm_fname)

@@ -17,7 +17,6 @@ import string
 from vec2d import vec2d
 from textures.manager import find_matching_texture
 import os
-from shapely.geometry.point import Point
 import re
 import ac3d_fast
 # nobjects = 0
@@ -227,7 +226,7 @@ def is_static_object_nearby(b, X, static_tree):
         if parameters.OVERLAP_CHECK_INSIDE:
             for i in nearby:
                 inside = False
-    #            inside = b.polygon.contains(Point(d[i]))
+                inside = b.polygon.contains(shg.Point(d[i]))
                 if inside:
                     break        
     #        for i in range(b.nnodes_outer):

@@ -49,6 +49,7 @@ class Clusters(object):
         self.prefix = prefix
 
         #self.list = []
+        logging.info("Generating clusters %s %s"%(min,max))
         self._clusters = [[self.init_cluster(vec2d(i,j)) 
           for j in range(self.n.y)] for i in range(self.n.x)]
 #        for i in range(self.nx * self.ny):

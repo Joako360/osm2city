@@ -10,6 +10,7 @@ Use a tool like Osmosis to pre-process data.
 import xml.sax
 import logging
 import unittest
+import shapely.geometry as shg
 
 
 class OSMElement(object):
@@ -73,8 +74,9 @@ class OSMContentHandler(xml.sax.ContentHandler):
     the input file processed by e.g. Osmosis first.
     """
 
-    def __init__(self, valid_node_keys):
+    def __init__(self, valid_node_keys, border):
         xml.sax.ContentHandler.__init__(self)
+        self.border = border
         self._way_callbacks = []
         self._relation_callbacks = []
         self._uncategorized_way_callback = None
@@ -135,7 +137,10 @@ class OSMContentHandler(xml.sax.ContentHandler):
 
     def endElement(self, name):
         if name == "node":
-            self.nodes_dict[self._current_node.osm_id] = self._current_node
+            if self.border is None or self.border.contains(shg.Point(self._current_node.lon, self._current_node.lat)):        
+                self.nodes_dict[self._current_node.osm_id] = self._current_node
+            else:
+                logging.debug("Ignored Osmid %d outside clipping"%(self._current_node.osm_id))
         elif name == "way":
             cb = self.find_callback_for(self._current_way.tags, self._way_callbacks)
             # no longer filter valid_way_keys here. That's up to the callback.
