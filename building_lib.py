@@ -17,8 +17,8 @@ import string
 from vec2d import vec2d
 from textures.manager import find_matching_texture
 import os
-from shapely.geometry.point import Point
 import re
+import ac3d_fast
 # nobjects = 0
 nb = 0
 out = ""
@@ -171,11 +171,11 @@ def get_nodes_from_acs(objs, own_prefix):
         if fname.endswith(".ac"):
             try:
                 if fname in read_objects:
-                    logging.debug( "CACHED_AC %s" % fname)
+                    logging.verbose( "CACHED_AC %s" % fname)
                     ac = read_objects[fname]
                 else:
                     logging.info( "READ_AC %s" % fname)
-                    ac = ac3d.File(file_name=fname, stats=None)
+                    ac = ac3d_fast.File(file_name=fname, stats=None)
                     read_objects[fname] = ac
                                 
                 angle = radians(b.stg_hdg)
@@ -226,7 +226,7 @@ def is_static_object_nearby(b, X, static_tree):
         if parameters.OVERLAP_CHECK_INSIDE:
             for i in nearby:
                 inside = False
-    #            inside = b.polygon.contains(Point(d[i]))
+                inside = b.polygon.contains(shg.Point(d[i]))
                 if inside:
                     break        
     #        for i in range(b.nnodes_outer):
