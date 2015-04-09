@@ -14,6 +14,7 @@ import scipy.interpolate
 from pdb import pm
 from vec2d import vec2d
 import matplotlib.pyplot as plt
+import parameters
 #from turtle import Vec2D
 
 class Deck_shape_linear(object):
@@ -121,9 +122,9 @@ class LinearBridge(linear.LinearObject):
 #        print "# MSL_0, MSL_m, MSL_1:", MSL_0, MSL_m, MSL_1
         self.D = Deck_shape_linear(deck_MSL[0], deck_MSL[-1])
         try:
-            required_height = 5. * int(self.tags['layer'])
+            required_height = parameters.BRIDGE_LAYER_HEIGHT * int(self.tags['layer'])
         except KeyError:
-            required_height = 5.
+            required_height = parameters.BRIDGE_LAYER_HEIGHT
             
         if (self.D(0.5) - MSL_mid) > required_height:
             return
@@ -185,8 +186,8 @@ class LinearBridge(linear.LinearObject):
 
 
     def pillar(self, obj, x, y, h0, h1, ofs, angle):
-        self.pillar_r0 = 2.
-        self.pillar_r1 = 1.
+        self.pillar_r0 = 1.
+        self.pillar_r1 = 0.5
         self.pillar_nnodes = 8
 
         rx = self.pillar_r0
@@ -252,11 +253,10 @@ class LinearBridge(linear.LinearObject):
         right_top_nodes = self.write_nodes(obj, self.edge[1], z, elev_offset,
                                            offset, join=True, is_left=False)
                                            
-        bridge_body_height = 1.5
-        left_bottom_edge, right_bottom_edge = self.compute_offset(self.width/2 * 0.5)
-        left_bottom_nodes =  self.write_nodes(obj, left_bottom_edge, z-bridge_body_height,
+        left_bottom_edge, right_bottom_edge = self.compute_offset(self.width/2 * 0.85)
+        left_bottom_nodes =  self.write_nodes(obj, left_bottom_edge, z-parameters.BRIDGE_BODY_HEIGHT,
                                               elev_offset, offset)
-        right_bottom_nodes = self.write_nodes(obj, right_bottom_edge, z-bridge_body_height, 
+        right_bottom_nodes = self.write_nodes(obj, right_bottom_edge, z-parameters.BRIDGE_BODY_HEIGHT, 
                                               elev_offset, offset)
         # -- top
         self.write_quads(obj, left_top_nodes, right_top_nodes, self.tex_y0, self.tex_y1, debug_ac=None)

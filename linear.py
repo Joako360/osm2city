@@ -274,7 +274,7 @@ class LinearObject(object):
         # write textured quads SURF
                 # -- write face as series of quads. Works OK, but produces more
                 #    SURFs in .ac.
-        scale = 30.
+        scale = 50. # length of texture in meters
         n_nodes = len(left_nodes_list)
         assert(len(left_nodes_list) == len(right_nodes_list))
         for i in range(n_nodes-1):
