@@ -303,7 +303,7 @@ class Buildings(object):
             if 'roof:shape' in tags:
                 _roof_type = tags['roof:shape']
             else:
-                _roof_type = 'unknown'
+                _roof_type = parameters.BUILDING_UNKNOWN_ROOF_TYPE
             _building_type = building_lib.mapType(tags)
 
             # -- simple (silly?) heuristics to 'respect' layers
@@ -320,9 +320,12 @@ class Buildings(object):
             inner_rings_list = []
             for _way in inner_ways:
                 inner_rings_list.append(self._refs_to_ring(_way.refs, inner=True))
+        except KeyError, reason:
+            logging.error("Failed to parse building referenced node missing clipped?(%s) WayID %d %s Refs %s" % (reason, osm_id, tags, refs))
+            tools.stats.parse_errors += 1
+            return False
         except Exception, reason:
-#        else:
-            print "\nFailed to parse building (%s)" % reason, osm_id, tags, refs
+            logging.error("Failed to parse building (%s)  WayID %d %s Refs %s" % (reason, osm_id, tags, refs))
             tools.stats.parse_errors += 1
             return False
 

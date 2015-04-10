@@ -101,6 +101,7 @@ BUILDING_REDUCE_CHECK_TOUCH = False # -- before removing a building due to area,
 BUILDING_SIMPLIFY_TOLERANCE = 1.0   # -- all points in the simplified building will be within the tolerance distance of the original geometry.
 BUILDING_NEVER_SKIP_LEVELS = 6      # -- buildings that tall will never be skipped
 
+BUILDING_UNKNOWN_ROOF_TYPE = "flat" # -- If the roof type isn't given use this type
 BUILDING_COMPLEX_ROOFS = 1          # -- generate complex roofs on buildings?
 BUILDING_COMPLEX_ROOFS_MAX_LEVELS = 5 # -- don't put complex roofs on buildings taller than this
 BUILDING_COMPLEX_ROOFS_MAX_AREA   = 2000 # -- don't put complex roofs on buildings larger than this
