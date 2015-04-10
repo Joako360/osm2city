@@ -28,7 +28,8 @@ class File(object):
                 continue
             if num_vertices>0:
                 num_vertices-=1
-                vertice = map(float,split(" ",line))
+                s = split("[ \t]",line)
+                vertice = map(float,split("[ \t]",line))
                 self.vertices.append(vertice)
                         
     def nodes_as_array(self):
