@@ -508,7 +508,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         logging.verbose("__done" + str(b.facade_texture))
         if not b.facade_texture:
             tools.stats.skipped_texture += 1
-            logging.info("Skipping building (no matching texture)")
+            logging.info("Skipping building OsmID %d (no matching texture)" % b.osm_id)
             continue
         if(b.longest_edge_len > b.facade_texture.width_max):
             logging.error("OsmID : %d b.longest_edge_len <= b.facade_texture.width_max"%b.osm_id)
@@ -524,10 +524,18 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         # make roof equal across parts
         if b.parent is None:
             b.roof_texture = roofs.find_matching(roof_requires)
+            if not b.roof_texture:
+                tools.stats.skipped_texture += 1
+                logging.warn("WARNING: no matching texture for OsmID %d <%s>" % (b.osm_id,str(roof_requires)))
+                continue
         else:
             if b.parent.roof_texture is None:
                 b.roof_texture = roofs.find_matching(roof_requires)
                 b.parent.roof_texture = b.roof_texture
+                if not b.roof_texture:
+                    tools.stats.skipped_texture += 1
+                    logging.warn("WARNING: no matching texture for OsmID %d <%s>" % (b.osm_id,str(roof_requires)))
+                    continue
             else:
                 b.roof_texture = b.parent.roof_texture
 
