@@ -21,6 +21,7 @@ from vec2d import vec2d
 from pdb import pm
 import logging
 import traceback
+from linear import EMBANKMENT_1
 
 # default_args_start # DO NOT MODIFY THIS LINE
 # -*- coding: utf-8 -*-
@@ -273,6 +274,7 @@ CREATE_BRIDGES_ONLY = 0         # create only bridges and embankments
 # default_args_end # DO NOT MODIFY THIS LINE
 BRIDGE_LAYER_HEIGHT = 4.         # bridge height per layer
 BRIDGE_BODY_HEIGHT = 0.9         # height of bridge body
+EMBANKMENT_TEXTURE = EMBANKMENT_1 # Texture for the embankement 
 quiet = False
 
 def get_OSM_file_name():
