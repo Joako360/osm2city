@@ -118,11 +118,11 @@ if __name__ == '__main__':
             with open(path + os.sep + args.out, "w") as sources:
                 replacement = '\\1 "' + replacement_path + '"'
                 for line in lines:
-                    line = re.sub('^\s*(PREFIX\s*=)([ A-Za-z0-9]*)', replacement, line)
-                    line = re.sub('^\s*(BOUNDARY_EAST\s*=)([ A-Za-z0-9.,]*)', '\\1 %f' % (calc_tile.get_east_lon(lon, lat, dx)), line)
-                    line = re.sub('^\s*(BOUNDARY_WEST\s*=)([ A-Za-z0-9.,]*)', '\\1 %f' % (calc_tile.get_west_lon(lon, lat, dx)), line)
-                    line = re.sub('^\s*(BOUNDARY_NORTH\s*=)([ A-Za-z0-9.,]*)', '\\1 %f' % (calc_tile.get_north_lat(lat, dy)), line)
-                    line = re.sub('^\s*(BOUNDARY_SOUTH\s*=)([ A-Za-z0-9.,]*)', '\\1 %f' % (calc_tile.get_south_lat(lat, dy)), line)
+                    line = re.sub('^\s*(PREFIX\s*=)(.*)', replacement, line)
+                    line = re.sub('^\s*(BOUNDARY_EAST\s*=)(.*)', '\\1 %f' % (calc_tile.get_east_lon(lon, lat, dx)), line)
+                    line = re.sub('^\s*(BOUNDARY_WEST\s*=)(.*)', '\\1 %f' % (calc_tile.get_west_lon(lon, lat, dx)), line)
+                    line = re.sub('^\s*(BOUNDARY_NORTH\s*=)(.*)', '\\1 %f' % (calc_tile.get_north_lat(lat, dy)), line)
+                    line = re.sub('^\s*(BOUNDARY_SOUTH\s*=)(.*)', '\\1 %f' % (calc_tile.get_south_lat(lat, dy)), line)
                     sources.write(line)
             download_command = 'wget -O %s/buildings.osm ' + args.url + 'map?bbox=%f,%f,%f,%f   ' + os.linesep
 #            download_command = 'curl --proxy-ntlm -o %s/buildings.osm http://overpass-api.de/api/map?bbox=%f,%f,%f,%f   ' + os.linesep            
@@ -146,5 +146,3 @@ if __name__ == '__main__':
                 print( '[ WARNING ] could not add exec rights to ' + f )
             
     sys.exit(0)
-
-        
