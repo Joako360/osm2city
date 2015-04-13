@@ -376,6 +376,10 @@ class Roads(objectlist.ObjectList):
                     prio = 6
                     width = 2.87
                     tex = TRACK
+                elif the_way.tags['railway'] in ['tram']:
+                    prio = 6
+                    width = 2.87
+                    tex = TRAMWAY
 #            TA: disabled parking for now. While certainly good to have,
 #                parking in OSM is not a linear feature in general.
 #                We'd need to add areas.    
