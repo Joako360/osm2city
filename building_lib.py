@@ -797,10 +797,11 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
                     # FIXME: move to analyse. If we fall back, don't require separate LOD
             # -- pitched roof for exactly 4 ground nodes
             else:
+                max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO
                 if b.roof_type == 'gabled':
-                    roofs.separate_gable(out, b, b.X)
+                    roofs.separate_gable(out, b, b.X, max_height=max_height)
                 elif b.roof_type == 'hipped':
-                    roofs.separate_hipped(out, b, b.X)
+                    roofs.separate_hipped(out, b, b.X, max_height=max_height)
                 elif b.roof_type == 'flat':
                     roofs.flat(out, b, b.X)
                 else:

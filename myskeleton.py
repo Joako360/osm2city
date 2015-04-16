@@ -96,7 +96,7 @@ def myskel(out, b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header 
             #We'll just flatten the roof then instead of loosing it 
             angle = angle - 5
         if roof_height > max_height:
-            logging.debug("roof too high %g > %g" % (roof_height, max_height))
+            logging.warn("roof too high %g > %g" % (roof_height, max_height))
             return False
 
         result = roof_mesh.to_out(out, b, offset_xy, offset_z, header)
