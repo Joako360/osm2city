@@ -87,12 +87,18 @@ def myskel(out, b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header 
             angle = float(b.tags['roof:angle'])
         else:
             angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE, parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
-        roof_mesh = poly.roof_3D(angle * 3.1415 / 180.)
-        #roof.mesh.vertices
-        roof_height = max([p[2] for p in roof_mesh.vertices])
+        while angle > 0:    
+            roof_mesh = poly.roof_3D(angle * 3.1415 / 180.)
+            #roof.mesh.vertices
+            roof_height = max([p[2] for p in roof_mesh.vertices])
+            if roof_height < max_height:
+                break
+            #We'll just flatten the roof then instead of loosing it 
+            angle = angle - 5
         if roof_height > max_height:
             logging.debug("roof too high %g > %g" % (roof_height, max_height))
             return False
+
         result = roof_mesh.to_out(out, b, offset_xy, offset_z, header)
     except Exception, reason:
 #    if False:
