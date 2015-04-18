@@ -2,6 +2,8 @@ import numpy as np
 from PIL import Image
 import logging
 
+
+
 class Texture(object):
     """
     possible texture types:

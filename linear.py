@@ -9,22 +9,11 @@ import math
 import copy
 import parameters
 import logging
-
+import textures.road
 # debug
 import test
 #import warnings
 #warnings.filterwarnings('error')
-
-TRACK = (0/8.,1/8.)
-ROAD_1 = (1/8.,2/8.)
-ROAD_2  = (2/8.,3/8.)
-ROAD_3 = (3/8.,4/8.)
-EMBANKMENT_1 = (4/8.,5/8.)
-EMBANKMENT_2 = (5/8.,6/8.)
-TRAMWAY = (6/8.,7/8.)
-UNUSED_2 = (7/8.,8/8.)
-
-BOTTOM = (4/8.-0.05,4/8.)
 
 
 
@@ -75,7 +64,7 @@ class LinearObject(object):
           - if not, write our node and store node indices in junction
           - if yes, use stored node indices
     """
-    def __init__(self, transform, osm_id, tags, refs, nodes_dict, width=9, tex=EMBANKMENT_1, AGL=0.5):
+    def __init__(self, transform, osm_id, tags, refs, nodes_dict, width=9, tex=textures.road.EMBANKMENT_1, AGL=0.5):
         #self.transform = transform
 #        self.junction0 = None # these are set on create_linear_objects()
 #        self.junction1 = None

@@ -15,6 +15,7 @@ from pdb import pm
 from vec2d import vec2d
 import matplotlib.pyplot as plt
 import parameters
+import textures.road
 #from turtle import Vec2D
 
 class Deck_shape_linear(object):
@@ -48,7 +49,7 @@ class Deck_shape_poly(object):
         return self.a0 + self.a1*s + self.a2*s*s
 
 class LinearBridge(linear.LinearObject):
-    def __init__(self, transform, elev, osm_id, tags, refs, nodes_dict, width=9, tex=linear.EMBANKMENT_2, AGL=0.5):
+    def __init__(self, transform, elev, osm_id, tags, refs, nodes_dict, width=9, tex=textures.road.EMBANKMENT_2, AGL=0.5):
         super(LinearBridge, self).__init__(transform, osm_id, tags, refs, nodes_dict, width, tex, AGL)
         # -- prepare elevation spline
         #    probe elev at n_probes locations
@@ -210,17 +211,17 @@ class LinearBridge(linear.LinearObject):
             obj.node(-(y+node[0]), h0, -(x+node[1]))
 
         for i in range(self.pillar_nnodes-1):
-            face = [(ofs+i,                      0, linear.BOTTOM[0]),
-                    (ofs+i+1,                    1, linear.BOTTOM[0]), 
-                    (ofs+i+1+self.pillar_nnodes, 1, linear.BOTTOM[1]), 
-                    (ofs+i+self.pillar_nnodes,   0, linear.BOTTOM[1])]
+            face = [(ofs+i,                      0, textures.road.BOTTOM[0]),
+                    (ofs+i+1,                    1, textures.road.BOTTOM[0]), 
+                    (ofs+i+1+self.pillar_nnodes, 1, textures.road.BOTTOM[1]), 
+                    (ofs+i+self.pillar_nnodes,   0, textures.road.BOTTOM[1])]
             obj.face(face)
             
         i = self.pillar_nnodes - 1
-        face = [(ofs+i,                    0, linear.BOTTOM[0]),
-                (ofs,                      1, linear.BOTTOM[0]), 
-                (ofs+self.pillar_nnodes,   1, linear.BOTTOM[1]), 
-                (ofs+i+self.pillar_nnodes, 0, linear.BOTTOM[1])]
+        face = [(ofs+i,                    0, textures.road.BOTTOM[0]),
+                (ofs,                      1, textures.road.BOTTOM[0]), 
+                (ofs+self.pillar_nnodes,   1, textures.road.BOTTOM[1]), 
+                (ofs+i+self.pillar_nnodes, 0, textures.road.BOTTOM[1])]
         obj.face(face)
 
         nodes_list.append(face)
@@ -268,7 +269,7 @@ class LinearBridge(linear.LinearObject):
         self.write_quads(obj, left_bottom_nodes, left_top_nodes, parameters.EMBANKMENT_TEXTURE[0], parameters.EMBANKMENT_TEXTURE[1], debug_ac=None)
 
         # -- bottom
-        self.write_quads(obj, right_bottom_nodes, left_bottom_nodes, linear.BOTTOM[0], linear.BOTTOM[1], debug_ac=None)
+        self.write_quads(obj, right_bottom_nodes, left_bottom_nodes, textures.road.BOTTOM[0], textures.road.BOTTOM[1], debug_ac=None)
 
         # -- end wall 1
         the_node = self.edge[0].coords[0]
