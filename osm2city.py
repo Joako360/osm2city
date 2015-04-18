@@ -466,8 +466,6 @@ def write_xml(path, fname, buildings):
     xml.write("<path>%s.ac</path>" % fname)
 
     # -- lightmap
-    #    not all textures have lightmaps yet
-    #LMs_avail = ['tex/DSCF9495_pow2', 'tex/DSCF9503_noroofsec_pow2', 'tex/LZ_old_bright_bc2', 'tex/DSCF9678_pow2', 'tex/DSCF9710', 'tex/wohnheime_petersburger']
 
     # FIXME: use Effect/Building? What's the difference?
     #                <lightmap-factor type="float" n="0"><use>/scenery/LOWI/garage[0]/door[0]/position-norm</use></lightmap-factor>
