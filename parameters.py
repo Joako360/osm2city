@@ -271,11 +271,13 @@ MAX_TRANSVERSE_GRADIENT = 0.1   #
 BRIDGE_MIN_LENGTH = 20.         # discard short bridges, draw road instead
 DEBUG_PLOT = 0
 CREATE_BRIDGES_ONLY = 0         # create only bridges and embankments
-# default_args_end # DO NOT MODIFY THIS LINE
 BRIDGE_LAYER_HEIGHT = 4.         # bridge height per layer
 BRIDGE_BODY_HEIGHT = 0.9         # height of bridge body
 EMBANKMENT_TEXTURE = textures.road.EMBANKMENT_1 # Texture for the embankement 
 quiet = False
+
+# default_args_end # DO NOT MODIFY THIS LINE
+
 
 def get_OSM_file_name():
     """
