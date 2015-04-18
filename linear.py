@@ -15,6 +15,19 @@ import test
 #import warnings
 #warnings.filterwarnings('error')
 
+TRACK = (0/8.,1/8.)
+ROAD_1 = (1/8.,2/8.)
+ROAD_2  = (2/8.,3/8.)
+ROAD_3 = (3/8.,4/8.)
+EMBANKMENT_1 = (4/8.,5/8.)
+EMBANKMENT_2 = (5/8.,6/8.)
+TRAMWAY = (6/8.,7/8.)
+UNUSED_2 = (7/8.,8/8.)
+
+BOTTOM = (4/8.-0.05,4/8.)
+
+
+
 class LinearObject(object):
     """
     generic linear feature, base class for road, railroad, bridge etc.
@@ -62,7 +75,7 @@ class LinearObject(object):
           - if not, write our node and store node indices in junction
           - if yes, use stored node indices
     """
-    def __init__(self, transform, osm_id, tags, refs, nodes_dict, width=9, tex_y0=0.5, tex_y1=0.75, AGL=0.5):
+    def __init__(self, transform, osm_id, tags, refs, nodes_dict, width=9, tex=EMBANKMENT_1, AGL=0.5):
         #self.transform = transform
 #        self.junction0 = None # these are set on create_linear_objects()
 #        self.junction1 = None
@@ -83,8 +96,7 @@ class LinearObject(object):
         except Warning, reason:
             print "Warning in OSM_ID %i: %s" % (self.osm_id, reason)
 
-        self.tex_y0 = tex_y0  # determines which part of texture we use
-        self.tex_y1 = tex_y1
+        self.tex = tex  # determines which part of texture we use
 
 #        if self.osm_id == 235008364:
 #            test.show_nodes(osm_id, nodes, refs, nodes_dict, self.edge[0], self.edge[1])
@@ -520,7 +532,7 @@ class LinearObject(object):
                                             offset, join=True, is_left=True)
         right_nodes_list = self.write_nodes(obj, self.edge[1], right_z, elev_offset,
                                             offset, join=True, is_left=False)
-        self.write_quads(obj, left_nodes_list, right_nodes_list, self.tex_y0, self.tex_y1, debug_ac=debug_ac)
+        self.write_quads(obj, left_nodes_list, right_nodes_list, self.tex[0], self.tex[1], debug_ac=debug_ac)
         if 1 and h_add is not None:
             # -- side walls of embankment
             if h_add.max() > 0.1:
@@ -529,8 +541,8 @@ class LinearObject(object):
 
                 left_ground_nodes  = self.write_nodes(obj, self.edge[0], left_ground_z, elev_offset, offset=offset)
                 right_ground_nodes = self.write_nodes(obj, self.edge[1], right_ground_z, elev_offset, offset=offset)
-                self.write_quads(obj, left_ground_nodes, left_nodes_list, 4/8., 5/8., debug_ac=debug_ac)
-                self.write_quads(obj, right_nodes_list, right_ground_nodes, 4/8., 5/8., debug_ac=debug_ac)
+                self.write_quads(obj, left_ground_nodes, left_nodes_list, parameters.EMBANKMENT_TEXTURE[0], parameters.EMBANKMENT_TEXTURE[1], debug_ac=debug_ac)
+                self.write_quads(obj, right_nodes_list, right_ground_nodes, parameters.EMBANKMENT_TEXTURE[0], parameters.EMBANKMENT_TEXTURE[1], debug_ac=debug_ac)
 
         return True
         # options:

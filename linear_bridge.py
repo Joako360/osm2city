@@ -48,8 +48,8 @@ class Deck_shape_poly(object):
         return self.a0 + self.a1*s + self.a2*s*s
 
 class LinearBridge(linear.LinearObject):
-    def __init__(self, transform, elev, osm_id, tags, refs, nodes_dict, width=9, tex_y0=0.5, tex_y1=0.75, AGL=0.5):
-        super(LinearBridge, self).__init__(transform, osm_id, tags, refs, nodes_dict, width, tex_y0, tex_y1, AGL)
+    def __init__(self, transform, elev, osm_id, tags, refs, nodes_dict, width=9, tex=linear.EMBANKMENT_2, AGL=0.5):
+        super(LinearBridge, self).__init__(transform, osm_id, tags, refs, nodes_dict, width, tex, AGL)
         # -- prepare elevation spline
         #    probe elev at n_probes locations
         n_probes = max(int(self.center.length / 5.), 3)
@@ -210,17 +210,17 @@ class LinearBridge(linear.LinearObject):
             obj.node(-(y+node[0]), h0, -(x+node[1]))
 
         for i in range(self.pillar_nnodes-1):
-            face = [(ofs+i,                      0, 4/8.-0.05),
-                    (ofs+i+1,                    1, 4/8.-0.05), 
-                    (ofs+i+1+self.pillar_nnodes, 1, 4/8.), 
-                    (ofs+i+self.pillar_nnodes,   0, 4/8.)]
+            face = [(ofs+i,                      0, linear.BOTTOM[0]),
+                    (ofs+i+1,                    1, linear.BOTTOM[0]), 
+                    (ofs+i+1+self.pillar_nnodes, 1, linear.BOTTOM[1]), 
+                    (ofs+i+self.pillar_nnodes,   0, linear.BOTTOM[1])]
             obj.face(face)
             
         i = self.pillar_nnodes - 1
-        face = [(ofs+i,                    0, 4/8.-0.05),
-                (ofs,                      1, 4/8.-0.05), 
-                (ofs+self.pillar_nnodes,   1, 4/8.), 
-                (ofs+i+self.pillar_nnodes, 0, 4/8.)]
+        face = [(ofs+i,                    0, linear.BOTTOM[0]),
+                (ofs,                      1, linear.BOTTOM[0]), 
+                (ofs+self.pillar_nnodes,   1, linear.BOTTOM[1]), 
+                (ofs+i+self.pillar_nnodes, 0, linear.BOTTOM[1])]
         obj.face(face)
 
         nodes_list.append(face)
@@ -259,16 +259,16 @@ class LinearBridge(linear.LinearObject):
         right_bottom_nodes = self.write_nodes(obj, right_bottom_edge, z-parameters.BRIDGE_BODY_HEIGHT, 
                                               elev_offset, offset)
         # -- top
-        self.write_quads(obj, left_top_nodes, right_top_nodes, self.tex_y0, self.tex_y1, debug_ac=None)
+        self.write_quads(obj, left_top_nodes, right_top_nodes, self.tex[0], self.tex[1], debug_ac=None)
         
         # -- right
-        self.write_quads(obj, right_top_nodes, right_bottom_nodes,  4/8., 3/8., debug_ac=None)
+        self.write_quads(obj, right_top_nodes, right_bottom_nodes, parameters.EMBANKMENT_TEXTURE[1], parameters.EMBANKMENT_TEXTURE[0], debug_ac=None)
         
         # -- left
-        self.write_quads(obj, left_bottom_nodes, left_top_nodes, 3/8., 4/8., debug_ac=None)
+        self.write_quads(obj, left_bottom_nodes, left_top_nodes, parameters.EMBANKMENT_TEXTURE[0], parameters.EMBANKMENT_TEXTURE[1], debug_ac=None)
 
         # -- bottom
-        self.write_quads(obj, right_bottom_nodes, left_bottom_nodes,  4/8.-0.05, 4/8., debug_ac=None)
+        self.write_quads(obj, right_bottom_nodes, left_bottom_nodes, linear.BOTTOM[0], linear.BOTTOM[1], debug_ac=None)
 
         # -- end wall 1
         the_node = self.edge[0].coords[0]
@@ -279,10 +279,10 @@ class LinearBridge(linear.LinearObject):
         e = elev(the_node) - elev_offset
         right_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 
-        face = [ (left_top_nodes[0],    0, 4/8.), # FIXME: texture coords
-                 (right_top_nodes[0],   0, 5/8.),
-                 (right_bottom_node,    1, 5/8.),
-                 (left_bottom_node,     1, 4/8.) ]
+        face = [ (left_top_nodes[0],    0, parameters.EMBANKMENT_TEXTURE[0]), # FIXME: texture coords
+                 (right_top_nodes[0],   0, parameters.EMBANKMENT_TEXTURE[1]),
+                 (right_bottom_node,    1, parameters.EMBANKMENT_TEXTURE[1]),
+                 (left_bottom_node,     1, parameters.EMBANKMENT_TEXTURE[0]) ]
         obj.face(face)
 
         # -- end wall 2
@@ -294,10 +294,10 @@ class LinearBridge(linear.LinearObject):
         e = elev(the_node) - elev_offset
         right_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 
-        face = [ (left_top_nodes[-1],    0, 4/8.),
-                 (right_top_nodes[-1],   0, 5/8.),
-                 (right_bottom_node,    1, 5/8.),
-                 (left_bottom_node,     1, 4/8.) ]
+        face = [ (left_top_nodes[-1],    0, parameters.EMBANKMENT_TEXTURE[0]),
+                 (right_top_nodes[-1],   0, parameters.EMBANKMENT_TEXTURE[1]),
+                 (right_bottom_node,    1, parameters.EMBANKMENT_TEXTURE[1]),
+                 (left_bottom_node,     1, parameters.EMBANKMENT_TEXTURE[0]) ]
         obj.face(face[::-1])
         
         # pillars

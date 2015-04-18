@@ -21,6 +21,7 @@ from vec2d import vec2d
 from pdb import pm
 import logging
 import traceback
+from linear import EMBANKMENT_1
 
 # default_args_start # DO NOT MODIFY THIS LINE
 # -*- coding: utf-8 -*-
@@ -101,6 +102,7 @@ BUILDING_REDUCE_CHECK_TOUCH = False # -- before removing a building due to area,
 BUILDING_SIMPLIFY_TOLERANCE = 1.0   # -- all points in the simplified building will be within the tolerance distance of the original geometry.
 BUILDING_NEVER_SKIP_LEVELS = 6      # -- buildings that tall will never be skipped
 
+BUILDING_UNKNOWN_ROOF_TYPE = "flat" # -- If the roof type isn't given use this type
 BUILDING_COMPLEX_ROOFS = 1          # -- generate complex roofs on buildings?
 BUILDING_COMPLEX_ROOFS_MAX_LEVELS = 5 # -- don't put complex roofs on buildings taller than this
 BUILDING_COMPLEX_ROOFS_MAX_AREA   = 2000 # -- don't put complex roofs on buildings larger than this
@@ -272,6 +274,7 @@ CREATE_BRIDGES_ONLY = 0         # create only bridges and embankments
 # default_args_end # DO NOT MODIFY THIS LINE
 BRIDGE_LAYER_HEIGHT = 4.         # bridge height per layer
 BRIDGE_BODY_HEIGHT = 0.9         # height of bridge body
+EMBANKMENT_TEXTURE = EMBANKMENT_1 # Texture for the embankement 
 quiet = False
 
 def get_OSM_file_name():
@@ -292,10 +295,10 @@ def get_extent_global():
     return cmin, cmax
 
 def get_clipping_extent():
-    rect = [(BOUNDARY_WEST+BOUNDARY_CLIPPING_BORDER_SIZE, BOUNDARY_SOUTH-BOUNDARY_CLIPPING_BORDER_SIZE),
-            (BOUNDARY_EAST-BOUNDARY_CLIPPING_BORDER_SIZE, BOUNDARY_SOUTH-BOUNDARY_CLIPPING_BORDER_SIZE),
-            (BOUNDARY_EAST-BOUNDARY_CLIPPING_BORDER_SIZE, BOUNDARY_NORTH+BOUNDARY_CLIPPING_BORDER_SIZE),
-            (BOUNDARY_WEST+BOUNDARY_CLIPPING_BORDER_SIZE, BOUNDARY_NORTH+BOUNDARY_CLIPPING_BORDER_SIZE)]
+    rect = [(BOUNDARY_WEST-BOUNDARY_CLIPPING_BORDER_SIZE, BOUNDARY_SOUTH-BOUNDARY_CLIPPING_BORDER_SIZE),
+            (BOUNDARY_EAST+BOUNDARY_CLIPPING_BORDER_SIZE, BOUNDARY_SOUTH-BOUNDARY_CLIPPING_BORDER_SIZE),
+            (BOUNDARY_EAST+BOUNDARY_CLIPPING_BORDER_SIZE, BOUNDARY_NORTH+BOUNDARY_CLIPPING_BORDER_SIZE),
+            (BOUNDARY_WEST-BOUNDARY_CLIPPING_BORDER_SIZE, BOUNDARY_NORTH+BOUNDARY_CLIPPING_BORDER_SIZE)]
     return rect
 
 def show():

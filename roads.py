@@ -89,8 +89,7 @@ import coordinates
 import tools
 import parameters
 import ac3d
-from linear import LinearObject, max_slope_for_road
-from linear_bridge import LinearBridge
+from linear import LinearObject, max_slope_for_road, ROAD_1, ROAD_2, ROAD_3, TRACK
 import shapely.geometry as shg
 
 import logging
@@ -108,6 +107,7 @@ import troubleshoot
 import test
 from pdb import pm
 import math
+from linear_bridge import LinearBridge
 #from memory_profiler import profile
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
@@ -362,8 +362,7 @@ class Roads(objectlist.ObjectList):
                 access = 'yes'
     
             width = 9
-            tex_y0 = 2/8.
-            tex_y1 = 3/8.
+            tex = ROAD_2
             AGL_ofs = random.uniform(0.01, 0.1)
             #AGL_ofs = 0.0
             #if way.tags.has_key('layer'):
@@ -376,8 +375,11 @@ class Roads(objectlist.ObjectList):
                 if the_way.tags['railway'] in ['rail']:
                     prio = 6
                     width = 2.87
-                    tex_y0 = 0
-                    tex_y1 = 1/8.
+                    tex = TRACK
+                elif the_way.tags['railway'] in ['tram']:
+                    prio = 6
+                    width = 2.87
+                    tex = TRAMWAY
 #            TA: disabled parking for now. While certainly good to have,
 #                parking in OSM is not a linear feature in general.
 #                We'd need to add areas.    
@@ -386,8 +388,7 @@ class Roads(objectlist.ObjectList):
 #                    prio = 7
     
             if prio in [1, 2]:
-                tex_y0 = 1/8.
-                tex_y1 = 2/8.
+                tex = ROAD_1
                 width=6
     
             if prio == 0 or prio == None:
@@ -399,11 +400,11 @@ class Roads(objectlist.ObjectList):
     
             try:
                 if is_bridge(the_way):
-                    obj = LinearBridge(self.transform, self.elev, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.01+0.005*prio+AGL_ofs)
+                    obj = LinearBridge(self.transform, self.elev, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex=tex, AGL=0.01+0.005*prio+AGL_ofs)
                     obj.typ = prio
                     self.bridges_list.append(obj)
                 else:
-                    obj = LinearObject(self.transform, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.01+0.005*prio+AGL_ofs)
+                    obj = LinearObject(self.transform, the_way.osm_id, the_way.tags, the_way.refs, self.nodes_dict, width=width, tex=tex, AGL=0.01+0.005*prio+AGL_ofs)
                     obj.typ = prio
                     self.roads_list.append(obj)
             except ValueError, reason:

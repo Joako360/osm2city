@@ -231,7 +231,6 @@ class TextureManager(object):
         for c in candidates:
             logging.verbose("  candidate " + c.filename + " provides " + str(c.provides))
         if len(candidates) == 0:
-            logging.warn("WARNING: no matching texture for <%s>" % str(requires))
             return None
         #print "cands are\n", string.join(["  " + str(c) for c in candidates], '\n')
         #return candidates[3]
@@ -246,7 +245,7 @@ class TextureManager(object):
             if set(requires).issubset(cand.provides):
                 candidates.append(cand)
             else:
-                logging.verbose("  unmet requires %s %s %s" % (str(cand.filename), str(requires), str(cand.provides)))
+                logging.verbose("  unmet requires %s req %s prov %s" % (str(cand.filename), str(requires), str(cand.provides)))
         return candidates
 
     def __str__(self):

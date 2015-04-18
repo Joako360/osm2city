@@ -390,6 +390,7 @@ class SharedModel(object):
     def _read_from_file(self):
         """Reads the model's data from file and sets the variables"""
         models_path = parameters.LU_GENB_PATH_TO_MODELS
+        models_path = os.path.abspath(models_path)
         if not models_path.endswith(os.sep):
             models_path = models_path + os.sep
         try:
@@ -397,9 +398,8 @@ class SharedModel(object):
             if self.path.endswith(".xml"):
                 with open(models_path + ac_filename, 'r') as f:
                     xml_data = f.read()
-                    sep_index = ac_filename.rfind(os.sep)
-                    model_dir = ac_filename[0:sep_index+1]
-                    ac_filename = model_dir + parse_ac_file_name(xml_data)
+                    model_dir = os.path.dirname(ac_filename)                    
+                    ac_filename = model_dir + os.sep + parse_ac_file_name(xml_data)
             boundary_tuple = extract_boundary(models_path + ac_filename)
             self.width = boundary_tuple[2] - boundary_tuple[0]
             self.depth = boundary_tuple[3] - boundary_tuple[1]

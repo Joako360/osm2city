@@ -112,10 +112,10 @@ def _flat(b):
         out += "%i %g %g\n" % (i+b.nnodes_outer, 0, 0)
     return out
 
-def separate_hipped(out, b, X):
-    return separate_gable(out, b, X, inward_meters = 3.)
+def separate_hipped(out, b, X, max_height):
+    return separate_gable(out, b, X, inward_meters = 3., max_height=max_height)
 
-def separate_gable(out, b, X, inward_meters = 0.):
+def separate_gable(out, b, X, inward_meters = 0., max_height = 1e99):
     """gable roof, 4 nodes, separate model. Inward_"""
     #out.new_object(b.roof_ac_name, b.roof_texture.filename + '.png')
 
@@ -130,8 +130,15 @@ def separate_gable(out, b, X, inward_meters = 0.):
         angle = float(b.tags['roof:angle'])
     else:
         angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE, parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
-    roof_height = tan(np.deg2rad(angle)) * (b.lenX[1]/2)
-    
+    while angle > 0:
+        roof_height = tan(np.deg2rad(angle)) * (b.lenX[1]/2)
+        if roof_height < max_height:
+            break
+        angle = angle - 5
+    if roof_height > max_height:
+        logging.warn("roof too high %g > %g" % (roof_height, max_height))
+        return False
+
     #We don't want the hipped part to be greater than the height, which is 45 deg
     inward_meters = min(roof_height,inward_meters)
 

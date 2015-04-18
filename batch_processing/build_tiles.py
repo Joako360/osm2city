@@ -21,7 +21,7 @@ def get_file_name(name, tilename, lon, lat):
     
     if "nt" in os.name:
         extension =".cmd"
-    elif re.search('linux', platform.system().lower()):
+    elif re.search('linux|mac', platform.system().lower()):
         extension = ".sh" 
     else:
         extension = ""
@@ -31,17 +31,21 @@ def open_file(name):
     return open(calc_tile.root_directory_name((lon, lat)) + os.sep + name, "wb")
 
 def write_to_file( command, file_handle):
-    file_handle.write('python %s -f %s/params.ini' % (command, replacement_path) + os.linesep)
+    file_handle.write('python ' + command + ' -f ' + replacement_path + '/params.ini ')
+    if BASH_PARALLEL_PROCESS :
+        file_handle.write('&' +  os.linesep + 'parallel_wait $max_parallel_processus' + os.linesep)
+    else :
+        file_handle.write(os.linesep)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser(description="build-tiles generates a directory structure capable of generating complete tiles of scenery")
     parser.add_argument("-t", "--tile", dest="tilename",
-                      help="The name of the tile")
+                        help="The name of the tile",required=True)
     parser.add_argument("-f", "--properties", dest="properties",
-                      help="The name of the property file to be copied")
+                        help="The name of the property file to be copied",required=True)
     parser.add_argument("-o", "--out", dest="out",
-                      help="The name of the property file to be generated")
+                        help="The name of the property file to be generated",required=True)
     parser.add_argument(      "--url"  , 
                        help='Address of the api'        ,
                        default="http://overpass-api.de/api/xapi?",
@@ -50,21 +54,26 @@ if __name__ == '__main__':
                                 "http://jxapi.openstreetmap.org/xapi/api/0.6/",
                                 "http://www.overpass-api.de/api/xapi?",] ,
                        type=str, required=False  )
+    parser.add_argument("-p",  "--parallel", dest="parallel",
+                        help="Force generated script to include parallel processing handling",
+                        action='store_true',
+                        default=False,
+                        required=False )
 
     args = parser.parse_args()
 
-    if(args.tilename is None):
-        logging.error("Tilename is required")
-        parser.print_usage()
-        exit(1)
-    if(args.properties is None):
-        logging.error("Input properties are required")
-        parser.print_usage()
-        exit(1)
-    if(args.out is None):
-        logging.error("Output properties are required")
-        parser.print_usage()
-        exit(1)
+#    if(args.tilename is None):
+#        logging.error("Tilename is required")
+#        parser.print_usage()
+#        exit(1)
+#    if(args.properties is None):
+#        logging.error("Input properties are required")
+#        parser.print_usage()
+#        exit(1)
+#    if(args.out is None):
+#        logging.error("Output properties are required")
+#        parser.print_usage()
+#        exit(1)
     logging.info('Generating directory structure for %s ', args.tilename)
     matched = re.match("([ew])([0-9]{3})([ns])([0-9]{2})", args.tilename)
     lon = int(matched.group(2))
@@ -93,11 +102,36 @@ if __name__ == '__main__':
                       open_file(get_file_name( util+"_", args.tilename, lon, lat)),
                     ))
 
-    #header if necessary 
-    if re.search('linux', platform.system().lower()):
-        downloadfile.write('#!/bin/bash\n')
+    #check if necessary to add parallel processing code
+    BASH_PARALLEL_PROCESS=False
+    if args.parallel :
+        if re.search('linux|mac', platform.system().lower()) :
+            BASH_PARALLEL_PROCESS=True
+        
+    #header for bash if necessary 
+    if re.search('linux|mac', platform.system().lower()) :
+        header_bash= '''#!/bin/bash''' + os.linesep
+        if BASH_PARALLEL_PROCESS :
+            header_bash +='''#
+max_parallel_process=1
+if [ $# -gt 0 ] 
+then
+    if echo $1 | grep -q "^[1-9][0-9]*$"
+    then
+        max_parallel_process=$1 
+    fi
+fi
+#
+function parallel_wait(){
+while [ $( LC_ALL=C jobs | grep -v -e Done | wc -l) -ge $max_parallel_process ]
+do
+    sleep 1
+done	
+}
+'''
+        downloadfile.write(header_bash)
         for command in files :
-            command[1].write('#!/bin/bash\n')
+            command[1].write(header_bash)
 
     for dy in range(0, num_cols):
         for dx in range(0, num_rows):
@@ -118,13 +152,17 @@ if __name__ == '__main__':
             with open(path + os.sep + args.out, "w") as sources:
                 replacement = '\\1 "' + replacement_path + '"'
                 for line in lines:
-                    line = re.sub('^\s*(PREFIX\s*=)([ A-Za-z0-9]*)', replacement, line)
-                    line = re.sub('^\s*(BOUNDARY_EAST\s*=)([ A-Za-z0-9.,]*)', '\\1 %f' % (calc_tile.get_east_lon(lon, lat, dx)), line)
-                    line = re.sub('^\s*(BOUNDARY_WEST\s*=)([ A-Za-z0-9.,]*)', '\\1 %f' % (calc_tile.get_west_lon(lon, lat, dx)), line)
-                    line = re.sub('^\s*(BOUNDARY_NORTH\s*=)([ A-Za-z0-9.,]*)', '\\1 %f' % (calc_tile.get_north_lat(lat, dy)), line)
-                    line = re.sub('^\s*(BOUNDARY_SOUTH\s*=)([ A-Za-z0-9.,]*)', '\\1 %f' % (calc_tile.get_south_lat(lat, dy)), line)
+                    line = re.sub('^\s*(PREFIX\s*=)(.*)', replacement, line)
+                    line = re.sub('^\s*(BOUNDARY_EAST\s*=)(.*)', '\\1 %f' % (calc_tile.get_east_lon(lon, lat, dx)), line)
+                    line = re.sub('^\s*(BOUNDARY_WEST\s*=)(.*)', '\\1 %f' % (calc_tile.get_west_lon(lon, lat, dx)), line)
+                    line = re.sub('^\s*(BOUNDARY_NORTH\s*=)(.*)', '\\1 %f' % (calc_tile.get_north_lat(lat, dy)), line)
+                    line = re.sub('^\s*(BOUNDARY_SOUTH\s*=)(.*)', '\\1 %f' % (calc_tile.get_south_lat(lat, dy)), line)
                     sources.write(line)
-            download_command = 'wget -O %s/buildings.osm ' + args.url + 'map?bbox=%f,%f,%f,%f   ' + os.linesep
+            download_command = 'wget -O %s/buildings.osm ' + args.url + 'map?bbox=%f,%f,%f,%f   ' 
+            if BASH_PARALLEL_PROCESS :
+                download_command += '&' + os.linesep + 'parallel_wait $max_parallel_process' + os.linesep
+            else :
+                download_command += os.linesep
 #            download_command = 'curl --proxy-ntlm -o %s/buildings.osm http://overpass-api.de/api/map?bbox=%f,%f,%f,%f   ' + os.linesep            
 #             download_command = 'wget -O %s/buildings.osm http://overpass-api.de/api/map?bbox=%f,%f,%f,%f   ' + os.linesep
             
@@ -136,7 +174,7 @@ if __name__ == '__main__':
         command[1].close()
 
     # chmod u+x on created scripts for linux
-    if re.search('linux', platform.system().lower()):
+    if re.search('linux|mac', platform.system().lower()):
         for util in utils + ['download',] :
             f=calc_tile.root_directory_name((lon, lat)) + os.sep + get_file_name( util+"_", args.tilename, lon, lat)
             try :
@@ -146,5 +184,3 @@ if __name__ == '__main__':
                 print( '[ WARNING ] could not add exec rights to ' + f )
             
     sys.exit(0)
-
-        
