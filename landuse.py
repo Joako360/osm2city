@@ -610,6 +610,8 @@ def process_osm_place_refs(nodes_dict, ways_dict, my_coord_transformator):
                     my_places[my_place.osm_id] = my_place
     logging.debug("OSM places of type polygon found: %s", len(my_places))
 
+    if nodes_dict is None:
+        return my_places
     # Get the Places from OSM nodes
     for node in nodes_dict.values():
         my_type, my_population = _parse_place_tags(node.tags)
