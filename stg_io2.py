@@ -36,6 +36,7 @@ class STG_File(object):
         self.file_name = self.path_to_stg + "%07i.stg" % tile_index
         self.other_list = []
         self.our_list = []
+        self.our_ac_file_name_list = []
         self.magic = magic
         self.prefix = prefix
         #deprecated usage
@@ -98,23 +99,27 @@ class STG_File(object):
     def drop_ours(self):
         """Clear our list. Call write() afterwards to finish uninstall"""
         self.our_list = []
+        self.our_ac_file_name_list = []
 
-    def add_object_static(self, ac_file_name, lon_lat, elev, hdg):
-        """add OBJECT_STATIC line to our_list. Returns path to stg."""
-        line = "OBJECT_STATIC %s %1.5f %1.5f %1.2f %g\n" % (ac_file_name, lon_lat.lon, lon_lat.lat, elev, hdg)
-        self.our_list.append(line)
-        logging.debug(self.file_name + ':' + line)
+    def _add_object(self, obj_prefix, ac_file_name, lon_lat, elev, hdg, once=False):
+        """add OBJECT_XXXXX line to our_list. Returns path to stg."""
+        line = "OBJECT_%s %s %1.5f %1.5f %1.2f %g\n" % (obj_prefix.upper(), ac_file_name, lon_lat.lon, lon_lat.lat, elev, hdg)
+        if once == False or (ac_file_name not in self.our_ac_file_name_list):
+            self.our_list.append(line)
+            self.our_ac_file_name_list.append(ac_file_name)
+            logging.debug(self.file_name + ':' + line)
+        else:
+            logging.debug(self.file_name + ': not writing (once=True) ' + line)
         self.make_path_to_stg()
         return self.path_to_stg
 
-    def add_object_shared(self, ac_file_name, lon_lat, elev, hdg):
+    def add_object_static(self, ac_file_name, lon_lat, elev, hdg, once=False):
         """add OBJECT_STATIC line to our_list. Returns path to stg."""
-#         OBJECT_SHARED Models/Maritime/Civilian/Pilot_Boat.ac -0.188 54.07603 -0.24 0 
-        line = "OBJECT_SHARED %s %1.5f %1.5f %1.2f %g\n" % (ac_file_name, lon_lat.lon, lon_lat.lat, elev, hdg)
-        self.our_list.append(line)
-        logging.debug(self.file_name + ':' + line)
-        self.make_path_to_stg()
-        return self.path_to_stg
+        return self._add_object('STATIC', ac_file_name, lon_lat, elev, hdg, once)
+
+    def add_object_shared(self, ac_file_name, lon_lat, elev, hdg, once=False):
+        """add OBJECT_SHARED line to our_list. Returns path to stg."""
+        return self._add_object('SHARED', ac_file_name, lon_lat, elev, hdg, once)
 
     def make_path_to_stg(self):
         try:
@@ -172,10 +177,10 @@ class STG_Manager(object):
                 the_stg.drop_ours()
         return the_stg
 
-    def add_object_static(self, ac_file_name, lon_lat, elev, hdg):
+    def add_object_static(self, ac_file_name, lon_lat, elev, hdg, once=False):
         """Adds OBJECT_STATIC line. Returns path to stg."""
         the_stg = self(lon_lat)
-        return the_stg.add_object_static(ac_file_name, lon_lat, elev, hdg)
+        return the_stg.add_object_static(ac_file_name, lon_lat, elev, hdg, once)
 
     def add_object_shared(self, ac_file_name, lon_lat, elev, hdg):
         """Adds OBJECT_SHARED line. Returns path to stg it was added to."""

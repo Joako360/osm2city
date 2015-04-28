@@ -774,7 +774,7 @@ if __name__ == "__main__":
         path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, tile_elev, 0)
 
 #        if cl.I.x == 0 and cl.I.y == 0:
-        stg_manager.add_object_static('lightmap-switch.xml', center_global, tile_elev, 0)
+        stg_manager.add_object_static('lightmap-switch.xml', center_global, tile_elev, 0, once=True)
 
         if args.uninstall:
             files_to_remove.append(path_to_stg + file_name + ".ac")
