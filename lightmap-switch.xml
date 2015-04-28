@@ -3,7 +3,7 @@
     <!-- Nasal helper: listen on sun-angle-rad and set lightmap-factor  -->
     <nasal>
         <load>
-            if (!getprop("/scenery/osm2city/lightmap-factor")) {
+            if (getprop("/scenery/osm2city/lightmap-factor") == nil) {
                 print ("installing osm2city nasal.");
                 setprop("/scenery/osm2city/lightmap-factor", 0);
                 setlistener("sim/time/sun-angle-rad", func(the_node) {
