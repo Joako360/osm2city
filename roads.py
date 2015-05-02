@@ -725,6 +725,10 @@ class Roads(objectlist.ObjectList):
     def debug_show_h_add(self, label=""):
         return
         print "====", label
+        IDs=[473886072]
+        for the_id in IDs:
+            print "> ID %i h_add %g" % (the_id, self.nodes_dict[the_id].h_add)
+        return
         for the_node in self.nodes_dict.itervalues():
             print "n %12i h_add %5.2f" % (the_node.osm_id, the_node.h_add)
             
@@ -894,7 +898,7 @@ class Roads(objectlist.ObjectList):
 
     def debug_print_ways_at_node(self, node_osm_id):
         """print ways that connect to given node OSM_ID"""
-        print "ID", node_osm_id
+        #print "ID", node_osm_id
         for the_way in self.ways_list:
             if node_osm_id in the_way.refs:
                 print "+", the_way.osm_id
@@ -1064,7 +1068,7 @@ def main():
     #roads.debug_drop_unused_nodes()
     logging.debug("before linear " + str(roads))
 
-    roads.debug_print_ways_at_node(2098788640)
+#    roads.debug_print_ways_at_node(2098788640)
 
     # -- First, clean up topo. We work on ways_list:
     #    remove tunnels, short bridges, also remove inner junctions
@@ -1074,8 +1078,6 @@ def main():
     roads.cleanup_topo()
     # disabling this moves bridge/embankment nodes together. No h diff then.
 
-
-
     roads.debug_print_ways_at_node(2098788640)
     roads.debug_print_refs_of_way(239806431)
     roads.probe_elev_at_nodes()
@@ -1083,6 +1085,7 @@ def main():
 #    roads.build_graph(roads.ways_list)
 #    roads.split_long_roads_between_bridges()
     logging.debug("before linear " + str(roads))
+    roads.debug_show_h_add("before linear ob")
     
     # -- no change in topo beyond create_linear_objects() !
     roads.create_linear_objects()
@@ -1114,7 +1117,7 @@ def main():
 
     replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)        
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
-    #roads.debug_label_nodes(stg_manager)
+#    roads.debug_label_nodes(stg_manager)
 
     # -- write stg
     for cl in roads.clusters:
