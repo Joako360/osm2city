@@ -39,12 +39,13 @@ class Interpolator(object):
     def __init__(self, filename, fake=False, clamp=False):
         """If clamp = False, out-of-bounds elev probing returns -9999.
            Otherwise, return elev at closest boundary.
+           If fake_elev != False, don't probe elev. Instead, always return given value.
         """
         # FIXME: use values from header in filename
         # FIXME: could save lots of mem by not storing regular grid XY
         if fake:
+            self.h = fake
             self.fake = True
-            self.h = 0.
             return
         else:
             self.fake = False
@@ -175,7 +176,13 @@ class Probe_fgelev(object):
            it from disk. Automatically save the cache to disk every auto_save_every misses.
            If fake=True, never do any probing and return 0 on all queries.
         """
-        self.fake = fake
+        if fake:
+            self.h = fake
+            self.fake = True
+            return
+        else:
+            self.fake = False
+
         self.auto_save_every = auto_save_every
         self.h_offset = 0
         self.fgelev_pipe = None
@@ -212,7 +219,8 @@ class Probe_fgelev(object):
 #            raise RuntimeError("Spawning fgelev failed.")
 
     def save_cache(self):
-        "save cache to disk"
+        """save cache to disk"""
+        if self.fake: return
         fpickle = open(self.pkl_fname, 'wb')
         cPickle.dump(self._cache, fpickle, -1)
         fpickle.close()
@@ -263,7 +271,7 @@ class Probe_fgelev(object):
             return elev
 
         if self.fake:
-            return 0.
+            return self.h
 
         global transform
         if not is_global:

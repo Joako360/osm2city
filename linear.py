@@ -15,8 +15,6 @@ import test
 #import warnings
 #warnings.filterwarnings('error')
 
-
-
 class LinearObject(object):
     """
     generic linear feature, base class for road, railroad, bridge etc.
@@ -275,7 +273,12 @@ class LinearObject(object):
         # write textured quads SURF
                 # -- write face as series of quads. Works OK, but produces more
                 #    SURFs in .ac.
-        scale = 50. # length of texture in meters
+        scale = 32. # length of texture in meters 
+                    # 2 lanes * 4m per lane = 128 px wide. 512px long = 32 m
+#         	Autobahnen 	Andere Straßen
+#          Schmalstrich 	0,15 m 	0,12 m
+#          Breitstrich 	0,30 m 	0,25 m
+#       Leitlinie Schmalstrich, 3m innerorts, 6m BAB. Verhältnis Strich:Lücke = 1:2
         n_nodes = len(left_nodes_list)
         assert(len(left_nodes_list) == len(right_nodes_list))
         for i in range(n_nodes-1):

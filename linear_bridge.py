@@ -102,6 +102,9 @@ class LinearBridge(linear.LinearObject):
         node0 = nodes_dict[self.refs[0]]
         node1 = nodes_dict[self.refs[-1]]
 
+        if 473886072 == node1.osm_id:
+            pass
+
         #MSL = np.zeros_like(self.normals)
         #MSL = self.elev([0, 0.5, 1]) # FIXME: use elev interpolator instead
         MSL_mid = self.elev([0.5]) # FIXME: use elev interpolator instead?
@@ -154,6 +157,7 @@ class LinearBridge(linear.LinearObject):
         
 #        print "midh", self.D(0.5) - MSL[1], required_height
 
+
         node0.h_add = h_add[0]
         node1.h_add = h_add[-1]
 #        if self.D(0.5) - MSL_m < required_height:
@@ -174,7 +178,10 @@ class LinearBridge(linear.LinearObject):
             plt.plot(X, self.elev(X), 'g-o')
             plt.show()
 
-#        bla
+        if 473886072 == node0.osm_id:
+            print ">>>0", node0.h_add
+        if 473886072 == node1.osm_id:
+            print ">>>1", node1.h_add
 
     def deck_height(self, l, normalized=True):
         """given linear distance [m], interpolate and return deck height"""
