@@ -84,6 +84,7 @@ from numpy.core.numeric import True_
 from shapely.geometry.multipoint import MultiPoint
 from shapely.geos import TopologicalError, PredicateError
 from tools import transform
+import random
 
 
 buildings = []  # -- master list, holds all buildings
@@ -477,15 +478,6 @@ def write_xml(path, fname, buildings):
         <effect>
           <inherits-from>cityLM</inherits-from>
           """))
-#                    <parameters>
-#            <lightmap-enabled type="int">1</lightmap-enabled>
-#            <texture n="3">
-#              <image>%s_LM.png</image>
-#              <wrap-s>repeat</wrap-s>
-#              <wrap-t>repeat</wrap-t>
-#            </texture>
-#          </parameters>
-#              """ % 'tex/atlas_facades
         xml.write("  <object-name>LOD_detail</object-name>\n")
         xml.write("  <object-name>LOD_rough</object-name>\n")
         xml.write("</effect>\n")
@@ -562,7 +554,7 @@ def write_xml(path, fname, buildings):
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-
+    random.seed(42)
     # -- Parse arguments. Command line overrides config file.
     parser = argparse.ArgumentParser(description="osm2city reads OSM data and creates buildings for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",

@@ -15,7 +15,7 @@ import math
 import string
 
 from vec2d import vec2d
-from textures.manager import find_matching_texture
+import textures.manager as tm
 import os
 import re
 import ac3d_fast
@@ -716,9 +716,9 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
     ac = ac3d.File(stats=tools.stats)
     LOD_objects = []
-    LOD_objects.append(ac.new_object('LOD_bare', 'tex/atlas_facades.png'))
-    LOD_objects.append(ac.new_object('LOD_rough', 'tex/atlas_facades.png'))
-    LOD_objects.append(ac.new_object('LOD_detail', 'tex/atlas_facades.png'))
+    LOD_objects.append(ac.new_object('LOD_bare', tm.atlas_file_name + '.png'))
+    LOD_objects.append(ac.new_object('LOD_rough', tm.atlas_file_name + '.png'))
+    LOD_objects.append(ac.new_object('LOD_detail', tm.atlas_file_name + '.png'))
 
     global nb  # FIXME: still need this?
 

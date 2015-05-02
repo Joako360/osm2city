@@ -30,10 +30,11 @@ import atlas
 from texture import Texture
 import catalog
 import tools
-
-#import textures_src
+import datetime
 import img2np
 import parameters
+
+atlas_file_name = None
 
 def next_pow2(value):
     return 2**(int(math.log(value) / math.log(2)) + 1)
@@ -321,14 +322,18 @@ def find_matching_texture(cls, textures):
 
 
 # pitched roof: requires = facade:age:old
-
 def init(tex_prefix='', create_atlas=False):
     logging.debug("textures: init")
     global facades
     global roofs
+    global atlas_file_name
+    
+    atlas_file_name = tex_prefix + 'tex/atlas_facades'
+    if parameters.ATLAS_SUFFIX_DATE:
+        now = datetime.datetime.now()
+        atlas_file_name += "_%04i%02i%02i" % (now.year, now.month, now.day)
 
-    filename = tex_prefix + 'tex/atlas_facades'
-    pkl_fname = filename + '.pkl'
+    pkl_fname = atlas_file_name + '.pkl'
     
     if create_atlas:
         facades = FacadeManager('facade')
@@ -362,7 +367,7 @@ def init(tex_prefix='', create_atlas=False):
     
         # -- make texture atlas
         texture_list = facades.get_list() + roofs.get_list()
-        make_texture_atlas(texture_list, filename, '.png', lightmap=True, ambient_occlusion=parameters.BUILDING_FAKE_AMBIENT_OCCLUSION)
+        make_texture_atlas(texture_list, atlas_file_name, '.png', lightmap=True, ambient_occlusion=parameters.BUILDING_FAKE_AMBIENT_OCCLUSION)
 
         logging.info("Saving %s", pkl_fname)
         fpickle = open(pkl_fname, 'wb')

@@ -102,6 +102,7 @@ import re
 import random
 import graph
 import troubleshoot
+import argparse
 
 # debug stuff
 import test
@@ -1026,7 +1027,7 @@ def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
     
 
 def main():
-    import argparse
+    random.seed(42)
     parser = argparse.ArgumentParser(description="bridge.py reads OSM data and creates bridge models for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                       help="read parameters from FILE (e.g. params.ini)", metavar="FILE")

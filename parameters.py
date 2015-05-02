@@ -75,6 +75,7 @@ ELEV_RASTER_Y = 10
 #=============================================================================
 
 CREATE_ATLAS = True         # -- create texture atlas on osm2city startup
+ATLAS_SUFFIX_DATE = False   # -- add timestamp to file name
 
 # -- check for overlap with static models. The scenery folder must contain an "Objects" folder
 OVERLAP_CHECK = True
