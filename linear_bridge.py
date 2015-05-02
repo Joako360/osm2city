@@ -270,10 +270,10 @@ class LinearBridge(linear.LinearObject):
         self.write_quads(obj, left_top_nodes, right_top_nodes, self.tex[0], self.tex[1], debug_ac=None)
         
         # -- right
-        self.write_quads(obj, right_top_nodes, right_bottom_nodes, parameters.EMBANKMENT_TEXTURE[1], parameters.EMBANKMENT_TEXTURE[0], debug_ac=None)
+        self.write_quads(obj, right_top_nodes, right_bottom_nodes, textures.road.BRIDGE_1[1], textures.road.BRIDGE_1[0], debug_ac=None)
         
         # -- left
-        self.write_quads(obj, left_bottom_nodes, left_top_nodes, parameters.EMBANKMENT_TEXTURE[0], parameters.EMBANKMENT_TEXTURE[1], debug_ac=None)
+        self.write_quads(obj, left_bottom_nodes, left_top_nodes, textures.road.BRIDGE_1[0], textures.road.BRIDGE_1[1], debug_ac=None)
 
         # -- bottom
         self.write_quads(obj, right_bottom_nodes, left_bottom_nodes, textures.road.BOTTOM[0], textures.road.BOTTOM[1], debug_ac=None)
