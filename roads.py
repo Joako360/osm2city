@@ -179,22 +179,6 @@ class Roads(objectlist.ObjectList):
     
 #    self.transform, self.elev, way.osm_id, way.tags, way.refs, nodes_dict, 
 #    width=width, tex_y0=tex_y0, tex_y1=tex_y1, AGL=0.1+0.005*prio+AGL_ofs
-    def prio(self, highway_tag, access):
-        if highway_tag == 'motorway':
-            prio = 5
-        elif highway_tag == 'primary' or highway_tag == 'trunk':
-            prio = 4
-        elif highway_tag == 'secondary':
-            prio = 3
-        elif highway_tag == 'tertiary' or highway_tag == 'unclassified'  or highway_tag == 'motorway_link':
-            prio = 2
-        elif highway_tag == 'residential':
-            prio = 1
-        elif highway_tag == 'service' and access:
-            prio = 0 # None
-        else:
-            prio = 0
-        return prio
         
     def probe_elev_at_nodes(self):
         """add elevation info to all nodes"""
@@ -351,6 +335,23 @@ class Roads(objectlist.ObjectList):
             if h_add.sum() == 0:
                 self.roads_list.remove(the_way)
                 logging.debug("kick %i", the_way.osm_id)
+
+    def prio(self, highway_tag, access):
+        if highway_tag == 'motorway':
+            prio = 5
+        elif highway_tag == 'primary' or highway_tag == 'trunk':
+            prio = 4
+        elif highway_tag == 'secondary':
+            prio = 3
+        elif highway_tag == 'tertiary' or highway_tag == 'unclassified'  or highway_tag == 'motorway_link':
+            prio = 2
+        elif highway_tag == 'residential':
+            prio = 1
+        elif highway_tag == 'service' and access:
+            prio = 0 # None
+        else:
+            prio = 0
+        return prio
     
     def create_linear_objects(self):
         self.G = graph.Graph()
@@ -363,7 +364,7 @@ class Roads(objectlist.ObjectList):
                 access = 'yes'
     
             width = 9
-            tex = textures.road.ROAD_2
+            tex = textures.road.ROAD_3
             AGL_ofs = random.uniform(0.01, 0.1)
             #AGL_ofs = 0.0
             #if way.tags.has_key('layer'):
@@ -388,7 +389,13 @@ class Roads(objectlist.ObjectList):
 #                if the_way.tags['amenity'] in ['parking']:
 #                    prio = 7
     
-            if prio in [1, 2]:
+            if prio in [5]:
+                tex = textures.road.ROAD_3
+                width=6
+            elif prio in [3, 4]:
+                tex = textures.road.ROAD_2
+                width=6
+            elif prio in [0, 1, 2]:
                 tex = textures.road.ROAD_1
                 width=6
     
