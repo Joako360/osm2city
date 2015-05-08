@@ -329,9 +329,6 @@ def init(tex_prefix='', create_atlas=False):
     global atlas_file_name
     
     atlas_file_name = tex_prefix + 'tex/atlas_facades'
-    if parameters.ATLAS_SUFFIX_DATE:
-        now = datetime.datetime.now()
-        atlas_file_name += "_%04i%02i%02i" % (now.year, now.month, now.day)
 
     pkl_fname = atlas_file_name + '.pkl'
     
@@ -367,18 +364,28 @@ def init(tex_prefix='', create_atlas=False):
     
         # -- make texture atlas
         texture_list = facades.get_list() + roofs.get_list()
+        if parameters.ATLAS_SUFFIX_DATE:
+            now = datetime.datetime.now()
+            atlas_file_name += "_%04i%02i%02i" % (now.year, now.month, now.day)
+
         make_texture_atlas(texture_list, atlas_file_name, '.png', lightmap=True, ambient_occlusion=parameters.BUILDING_FAKE_AMBIENT_OCCLUSION)
+        
+        params = {}
+        params['atlas_file_name'] =  atlas_file_name
 
         logging.info("Saving %s", pkl_fname)
         fpickle = open(pkl_fname, 'wb')
         cPickle.dump(facades, fpickle, -1)
         cPickle.dump(roofs, fpickle, -1)
+        cPickle.dump(params, fpickle, -1)
         fpickle.close()
     else:
         logging.info("Loading %s", pkl_fname)
         fpickle = open(pkl_fname, 'rb')
         facades = cPickle.load(fpickle)
         roofs = cPickle.load(fpickle)
+        params = cPickle.load(fpickle)
+        atlas_file_name = params['atlas_file_name']
         fpickle.close()
 
     logging.debug(facades)
