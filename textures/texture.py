@@ -1,7 +1,7 @@
 import numpy as np
 from PIL import Image
 import logging
-
+import os
 
 
 class Texture(object):
@@ -54,12 +54,19 @@ class Texture(object):
         # roof type, color
 #        self.v_min = v_min
 #        self.v_max = v_max
-
+        self.h_size_meters = h_size_meters  # -- set here, might override later
+        self.v_size_meters = v_size_meters
+        
+        # -- load image. Try full path first, failing that try current dir.
         try:
             self.im = Image.open(self.filename)
         except:
-             logging.warning("Skipping non-existing texture %s" % self.filename)
-             return
+            try:
+                self.filename = filename.split(os.sep)[-1]
+                self.im = Image.open(self.filename)
+            except:
+                logging.warning("Skipping non-existing texture %s" % self.filename)
+                return
         self.width_px, self.height_px = self.im.size
         image_aspect = self.height_px / float(self.width_px)
 
