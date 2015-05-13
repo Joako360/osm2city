@@ -8,7 +8,7 @@
                 <lightmap-multi type="int">0</lightmap-multi>
                 <lightmap-color type="vec3d" n="0"> 0.941 0.682 0.086 </lightmap-color>
                 <texture n="3">
-                    <image>tex/roads_LM.png</image>
+                    <image>tex/roads_LM.dds</image>
                     <wrap-s>repeat</wrap-s>
                     <wrap-t>repeat</wrap-t>
                 </texture>
