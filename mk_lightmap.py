@@ -44,9 +44,9 @@ def img2RGBA(img):
         n_channels = 1
     else:
         n_channels = n.shape[2]
-    
+
     zero = np.zeros((height_px, width_px))
-    
+
     if n_channels == 1:
         R = copy(n)
         G = copy(zero)
@@ -89,7 +89,7 @@ def empty_RGBA_like(img):
     return R, G, B, A
 
 def mk_lit_values_from_float(num, mean_min, mean_max, R_var, G_var, G_minus, B_var, B_minus):
-    """auto-gen a list of num window colors. Each color uses given range for 
+    """auto-gen a list of num window colors. Each color uses given range for
        a mean value; RGB values are offset from mean by given _var"""
     lit_values = []
     for i in range(num):
@@ -99,7 +99,7 @@ def mk_lit_values_from_float(num, mean_min, mean_max, R_var, G_var, G_minus, B_v
         B = mean + random.uniform(-B_var, B_var) - B_minus
         lit_values.append([min(int(value * 255.), 255) for value in [R, G, B]])
     return lit_values
-        
+
 
 def lit_windows(R, img):
     """Accept R channel. Identify floors and windows. Light them up randomly.
@@ -129,7 +129,7 @@ def lit_windows(R, img):
                 floor_border_down = i
                 floor_borders.append((floor_border_up, floor_border_down))
         i += 1
-    
+
     # -- Now, at each floor, find windows in a similar fashion.
     for floor_border_up, floor_border_down in floor_borders:
         y_sum = R[floor_border_up:floor_border_down].sum(axis=0) / (floor_border_down-floor_border_up)
@@ -147,10 +147,10 @@ def lit_windows(R, img):
                     on_lo = True
                     border_down = i
                     window_borders.append((border_up, border_down))
-    
+
             i += 1
 
-        # -- list of window centers for our floor    
+        # -- list of window centers for our floor
         this_floor_centers = []
         for border_up, border_down in window_borders:
             center_x = (border_up + border_down)/2
@@ -159,15 +159,15 @@ def lit_windows(R, img):
             #Y = [floor_border_up, floor_border_up, floor_border_down, floor_border_down, floor_border_up]
             #plt.plot(X, Y, 'r-')
         all_centers.append(this_floor_centers)
-        if 0:    
+        if 0:
             y = [threshold_hi for tmp in window_borders]
             plt.plot(y_sum)
-            plt.plot(window_borders, y, 'o') 
+            plt.plot(window_borders, y, 'o')
             plt.show()
             plt.clf()
-        
+
     # -- light rows of windows per floor with a tuple RGB picked randomly from this list:
-#    lit_values = mk_lit_values_from_float(200, mean_min=0.7, mean_max=1.0, 
+#    lit_values = mk_lit_values_from_float(200, mean_min=0.7, mean_max=1.0,
 #                                          R_var=0.05, G_var=0.02, G_minus=0.05, B_var=0.1, B_minus=0.15)
     lit_values = np.array([(226, 229, 198), (255, 254, 231), (243, 224, 191),
                            (255, 238, 206), (229, 226, 191), (243, 255, 255),
@@ -183,12 +183,12 @@ def lit_windows(R, img):
                 lit_value = lit_values[random.randint(0,len(lit_values)-1)].copy()
                 lit_value *= random.uniform(0.8, 1.) # randomly dim
                 alpha = 255
-                if random.uniform(0, 1.) < 0.1: 
+                if random.uniform(0, 1.) < 0.1:
                     lit_value *= 0. # switch off some
                     alpha = 0
-    
+
             lit_len -= 1
-            # -- test if seed pixel is actually red to avoid accidentally 
+            # -- test if seed pixel is actually red to avoid accidentally
             #    filling background
             if R[y,x] > 0.5:
                 print "."
@@ -202,7 +202,7 @@ def lit_windows(R, img):
 def create_red_windows(T):
     """read .py, auto-create raw LM with windows in red on"""
     img = Image.new("RGBA", (T.im.size), (0,0,0,255))
-    
+
     # -- horizontal borders of windows. Assume some window/gap width
     h_margin_m = 0.5
     window_width_m = 1.1
@@ -211,7 +211,7 @@ def create_red_windows(T):
     window_u = [[u0, u0 + window_width_m / T.h_size_meters] for u0 in np.arange(h_margin_m, T.h_size_meters - h_margin_m, window_offset_m) / T.h_size_meters]
 #    for i, the_split_width_m in enumerate(np.diff(T.h_cuts_m)):
 #        if the_split_width_m > 2.5 and the_split_width_m < 5.:
-        
+
     # -- vertical borders. Use T.v_cuts, assume ...
     lo = 0.4 # ...  a percentage of level height
     hi = 0.9
@@ -224,7 +224,7 @@ def create_red_windows(T):
             v1 = T.v_cuts[j+1]
             dv = v1 - v0
             window_v.append([v0 + lo * dv, v0 + hi * dv])
-        
+
     width_px, height_px = img.size
     window_u = np.array(window_u) * width_px
     # -- image origin is upper left, hence 1 - v
@@ -234,10 +234,10 @@ def create_red_windows(T):
     rgba = (255, 0, 0, 255)
     for u in window_u:
         for v in window_v:
-                                    
+
             dr = ImageDraw.Draw(img)
             dr.rectangle((u[0], v[0], u[1], v[1]), fill=rgba, outline = rgba)
-    
+
     #img.save('test.png')
     return img
 
@@ -271,7 +271,7 @@ def main():
     args = parser.parse_args()
 
     for arg_name in args.FILE:
-                
+
         name, ext = os.path.splitext(arg_name)
         if name.endswith('_LM'):
             logging.warn('Ignoring lightmap %s.' % arg_name)
@@ -279,8 +279,8 @@ def main():
 
         T = load_py(arg_name)
         roof = 'roof' in arg_name
-        
-        
+
+
         # -- if we have a .py, use image from Texture object
         #    otherwise assume we have a manual LM == _MA
         if ext == '.py':
@@ -310,7 +310,7 @@ def main():
         if T:
             width_m = T.h_size_meters
             height_m = T.v_size_meters
-        else:            
+        else:
             try:
                 regex = re.compile("_[0-9]+x[0-9]+m")
                 width_m, height_m = [float(v) for v in regex.findall(img_name)[0][1:-1].split('x')]
@@ -326,10 +326,10 @@ def main():
             X, Y = np.meshgrid(x, y)
             X_m = X * width_m
             Y_m = Y * height_m
-            
+
             # yellow window light in R
             R = R * A
-            
+
             if roof:
                 A = np.zeros_like(R)
                 A += 0.3 - 0.1*Y
@@ -338,7 +338,7 @@ def main():
                 # vertical gradient, plus horizonal gaussian for
                 v = scipy.stats.norm(loc = 0.5, scale = 0.7).pdf(x)
                 gauss_x = v / v.max()
-            
+
                 A = np.zeros_like(R)
                 A += 0.3 + 0.7 * np.exp(-Y_m/5.)
                 A *= gauss_x
@@ -346,17 +346,17 @@ def main():
                 G = A * 0.409
                 B = A * 0.172
                 A = 1.
-                
-            img = RGBA2img(R, G, B, A)     
+
+            img = RGBA2img(R, G, B, A)
 #            img.save("wbs_lit.png")
-            
+
             #plt.show()
         #bl
         if args.lit_windows and 1:
             img.putpixel((5,4), (255,210,20,255))
             imR = RGBA2img(R_win, 0., 0., 0.)
             # -- If I don't do this, Image is readonly. WTF?!?
-            imR.putpixel((5,4), (255,210,20,255)) 
+            imR.putpixel((5,4), (255,210,20,255))
             R, G, B, A = lit_windows(R_win, imR)
 #            imR.save("wbs_imR.png")
             img.paste(imR, None, imR)
@@ -364,25 +364,25 @@ def main():
 
 #            imm = RGBA2img(R_win, 0., 0., 1.)
 #            imm.save('imtt.png')
-            
-        if 0:    
+
+        if 0:
             plt.plot(x_sum)
             y = [threshold_hi for tmp in floor_borders]
             print y
-            plt.plot(floor_borders, y, 'o') 
+            plt.plot(floor_borders, y, 'o')
             plt.show()
 
-            
+
 
         # -- Assemble image from RGBA and save LM
         # A unused. Set A = 1 to ease vis
 #        A = np.zeros_like(R) + 1.
-        
+
         if 0:
             channel_name = 'RGBA'
             for i, channel in enumerate([R, G, B, A]):
                 print "%s: %1.2f %1.2f" % (channel_name[i], channel.min(), channel.max())
-        
+
 #        im_out = RGBA2img(R, G, B, A)
         #file_name="a123.png"
         file_name_LM = name + '_LM' + ext
@@ -399,8 +399,8 @@ def main():
         import matplotlib.pyplot as plt
         plt.plot(x, v)
         plt.show()
-    
-    
+
+
 
 if __name__ == "__main__":
     main()
@@ -427,4 +427,4 @@ if __name__ == "__main__":
 
     img.putpixel((5,4), (255,210,20,255))
     img.save('out.png')
-    
+
