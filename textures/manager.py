@@ -342,7 +342,7 @@ def init(tex_prefix='', create_atlas=False):
         catalog.append_dynamic(tex_prefix, facades)
         #append_facades_test()
         catalog.append_roofs(tex_prefix, roofs)
-        catalog.append_facades_us(tex_prefix, facades)
+        #catalog.append_facades_us(tex_prefix, facades)
         #facades.keep_only(1)
     
         if False:

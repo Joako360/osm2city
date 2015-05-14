@@ -49,13 +49,15 @@ class Texture(object):
         self.width_min = 0
         self.width_max = 9999
         self.v_align_bottom = v_align_bottom
-        h_cuts.sort()
-        v_cuts.sort()
         # roof type, color
 #        self.v_min = v_min
 #        self.v_max = v_max
         self.h_size_meters = h_size_meters  # -- set here, might override later
         self.v_size_meters = v_size_meters
+
+        h_cuts.sort()
+        v_cuts.sort()
+
         
         # -- load image. Try full path first, failing that try current dir.
         try:
@@ -95,7 +97,9 @@ class Texture(object):
             
         # aspect = v / h
         if v_cuts == []:
-            v_cuts = [1,2,3,4,5,6,7,8,9,10]
+            logging.warn("No v_cuts in %s" % filename)
+            nsteps = int(self.v_size_meters / 3.3) + 1 # assume level height = 3.3m
+            v_cuts = list(np.linspace(0, 1., nsteps, endpoint=True))
             
         if v_cuts != None:
             v_cuts.insert(0,0)
@@ -118,7 +122,9 @@ class Texture(object):
             self.height_max = self.v_size_meters
 
         if h_cuts == []:
-            h_cuts = [1,2,3,4,5,6,7,8,9,10]
+            logging.warn("No h_cuts in %s" % filename)
+            nsteps = int(self.h_size_meters / 6.) + 1 # cut every 6m
+            h_cuts = list(np.linspace(0, 1., nsteps, endpoint=True))
 
         self.h_cuts = np.array(h_cuts, dtype=np.float)
         #print "h1", self.h_cuts

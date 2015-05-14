@@ -173,7 +173,7 @@ def append_dynamic(tex_prefix, facades):
     """--- Dynamically runs py files in tex.src ---"""   
     for subdir, dirs, files in os.walk('tex.src', topdown=True):
         for file in files:
-                if file[-2:] != "py":
+                if not file.endswith("py"):
                     continue 
                 logging.info("Executing %s "%(subdir + os.sep + file))
                 try:
