@@ -88,6 +88,9 @@ def empty_RGBA_like(img):
     A *= 0
     return R, G, B, A
 
+def chance(fraction):
+    return random.uniform(0, 1.) < fraction
+
 def mk_lit_values_from_float(num, mean_min, mean_max, R_var, G_var, G_minus, B_var, B_minus):
     """auto-gen a list of num window colors. Each color uses given range for
        a mean value; RGB values are offset from mean by given _var"""
@@ -101,7 +104,7 @@ def mk_lit_values_from_float(num, mean_min, mean_max, R_var, G_var, G_minus, B_v
     return lit_values
 
 
-def lit_windows(R, img):
+def lit_windows(R, img, commercial=False):
     """Accept R channel. Identify floors and windows. Light them up randomly.
        Return R, img
     """
@@ -173,25 +176,41 @@ def lit_windows(R, img):
                            (255, 238, 206), (229, 226, 191), (243, 255, 255),
                            (255, 252, 245)])
 
-    for this_floor_centers in all_centers:
-        lit_len = 0
-        for x, y in this_floor_centers:
-            if lit_len == 0:
-                lit_len = int(random.gauss(len(this_floor_centers)/2., len(this_floor_centers)/5))
-                lit_len = min(lit_len, 7) # limit row length
-                #lit_len = 1
-                lit_value = lit_values[random.randint(0,len(lit_values)-1)].copy()
-                lit_value *= random.uniform(0.8, 1.) # randomly dim
-                alpha = 255
-                if random.uniform(0, 1.) < 0.1:
-                    lit_value *= 0. # switch off some
-                    alpha = 0
+    if commercial:
+        chance_off = 0.5
+        chance_floor_on = 0.3
+        max_len = 200
+    else:
+        chance_off = 0.6
+        chance_floor_on = 0.05
+        max_len = 2
 
-            lit_len -= 1
+
+    for this_floor_centers in all_centers:
+        next_len = 0
+        off = False
+        n_windows_this_floor = len(this_floor_centers)
+        if chance(chance_floor_on):
+            next_len = n_windows_this_floor # lit whole floor
+        for x, y in this_floor_centers:
+            if next_len == 0:
+                next_len = random.randint(1, n_windows_this_floor/3)
+                next_len = min(next_len, max_len)
+                off = False
+                if chance(chance_off):
+                    off = True
+
+            alpha = 255
+            lit_value = lit_values[random.randint(0,len(lit_values)-1)].copy()
+            lit_value *= random.uniform(0.8, 1.) # randomly dim
+            if off:
+                alpha = 0
+                lit_value *= 0
+
+            next_len -= 1
             # -- test if seed pixel is actually red to avoid accidentally
             #    filling background
             if R[y,x] > 0.5:
-                print "."
         #            plt.plot(x, y, 'gs')
                 ImageDraw.floodfill(img, (x,y), (int(lit_value[0]), int(lit_value[1]), int(lit_value[2]), alpha))
 
@@ -247,6 +266,7 @@ def load_py(image_file_name):
     name, ext = os.path.splitext(image_file_name)
     py_name = name + '.py'
     try:
+        tex_prefix = ""
         execfile(py_name)
     except:
         logging.warn("Error while loading %s" % py_name)
@@ -267,164 +287,167 @@ def main():
     parser.add_argument("-w", "--lit-windows", action="store_true", help="add streetlight to facade")
     parser.add_argument("-f", "--force", action="store_true", help="overwrite _LM")
     parser.add_argument("-l", "--loglevel", help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL")
+    parser.add_argument("-c", "--commercial", action="store_true", help="assume commercial facade for window lighting algorithm")
     parser.add_argument("FILE", nargs="+")
     args = parser.parse_args()
 
     for arg_name in args.FILE:
-
-        name, ext = os.path.splitext(arg_name)
-        if name.endswith('_LM'):
-            logging.warn('Ignoring lightmap %s.' % arg_name)
-            continue
-
-        T = load_py(arg_name)
-        roof = 'roof' in arg_name
-
-
-        # -- if we have a .py, use image from Texture object
-        #    otherwise assume we have a manual LM == _MA
-        if ext == '.py':
-            img = None
-            img_name = T.filename
-            name, ext = os.path.splitext(img_name)
-            R, G, B, A = empty_RGBA_like(T.im)
-            img = RGBA2img(R, G, B, A)
-        else:
-            img_name = arg_name
-            img = Image.open(img_name)
-            R, G, B, A = img2RGBA(img)
-
-        if args.auto_windows:
-            if not T:
-                logging.warn("Can't auto-create windows for %s because .py is missing" % img_name)
+        try:
+            name, ext = os.path.splitext(arg_name)
+            if name.endswith('_LM'):
+                logging.warn('Ignoring lightmap %s.' % arg_name)
+                continue
+    
+            T = load_py(arg_name)
+            roof = 'roof' in arg_name
+    
+    
+            # -- if we have a .py, use image from Texture object
+            #    otherwise assume we have a manual LM == _MA
+            if ext == '.py':
+                img = None
+                img_name = T.filename
+                name, ext = os.path.splitext(img_name)
+                R, G, B, A = empty_RGBA_like(T.im)
+                img = RGBA2img(R, G, B, A)
             else:
-                img = create_red_windows(T)
-                R_win, G, B, A = img2RGBA(img)
-        else:
-            R_win = R.copy()
-
-
-        height_px, width_px = R.shape
-        aspect = float(height_px) / width_px
-        # -- get size in meters, either from .py, from file name or assume something
-        if T:
-            width_m = T.h_size_meters
-            height_m = T.v_size_meters
-        else:
-            try:
-                regex = re.compile("_[0-9]+x[0-9]+m")
-                width_m, height_m = [float(v) for v in regex.findall(img_name)[0][1:-1].split('x')]
-            except:
-                height_m = 10.
-                width_m = 10. / aspect
-
-        #R_org = R.copy() # -- save R to identify windows later
-
-        if args.add_streetlight and 1:
-            y = np.linspace(1, 0, height_px)
-            x = np.linspace(0, 1, width_px)
-            X, Y = np.meshgrid(x, y)
-            X_m = X * width_m
-            Y_m = Y * height_m
-
-            # yellow window light in R
-            R = R * A
-
-            if roof:
-                A = np.zeros_like(R)
-                A += 0.3 - 0.1*Y
+                img_name = arg_name
+                img = Image.open(img_name)
+                R, G, B, A = img2RGBA(img)
+    
+            if args.auto_windows:
+                if not T:
+                    logging.warn("Can't auto-create windows for %s because .py is missing" % img_name)
+                else:
+                    img = create_red_windows(T)
+                    R_win, G, B, A = img2RGBA(img)
             else:
-                # street light in G
-                # vertical gradient, plus horizonal gaussian for
-                v = scipy.stats.norm(loc = 0.5, scale = 0.7).pdf(x)
-                gauss_x = v / v.max()
-
-                A = np.zeros_like(R)
-                A += 0.3 + 0.7 * np.exp(-Y_m/5.)
-                A *= gauss_x
-                R = A * 0.564
-                G = A * 0.409
-                B = A * 0.172
-                A = 1.
-
-            img = RGBA2img(R, G, B, A)
-#            img.save("wbs_lit.png")
-
-            #plt.show()
-        #bl
-        if args.lit_windows and 1:
-            img.putpixel((5,4), (255,210,20,255))
-            imR = RGBA2img(R_win, 0., 0., 0.)
-            # -- If I don't do this, Image is readonly. WTF?!?
-            imR.putpixel((5,4), (255,210,20,255))
-            R, G, B, A = lit_windows(R_win, imR)
-#            imR.save("wbs_imR.png")
-            img.paste(imR, None, imR)
-#            img.save("img.png")
-
-#            imm = RGBA2img(R_win, 0., 0., 1.)
-#            imm.save('imtt.png')
-
-        if 0:
-            plt.plot(x_sum)
-            y = [threshold_hi for tmp in floor_borders]
-            print y
-            plt.plot(floor_borders, y, 'o')
-            plt.show()
-
-
-
-        # -- Assemble image from RGBA and save LM
-        # A unused. Set A = 1 to ease vis
-#        A = np.zeros_like(R) + 1.
-
-        if 0:
-            channel_name = 'RGBA'
-            for i, channel in enumerate([R, G, B, A]):
-                print "%s: %1.2f %1.2f" % (channel_name[i], channel.min(), channel.max())
-
-#        im_out = RGBA2img(R, G, B, A)
-        #file_name="a123.png"
-        file_name_LM = name + '_LM' + ext
-        if os.path.exists(file_name_LM) and not args.force:
-            logging.warn("Not overwriting %s" % file_name_LM)
-        else:
-            img.save(file_name_LM)
-        del R, G, B, A, img
-
-    if 0:
-        x = np.linspace(0, 1, 11)
-        v = scipy.stats.norm(loc = 0.5, scale = 0.2).pdf(x)
-        v /= v.max()
-        import matplotlib.pyplot as plt
-        plt.plot(x, v)
-        plt.show()
-
+                R_win = R.copy()
+    
+    
+            height_px, width_px = R.shape
+            aspect = float(height_px) / width_px
+            # -- get size in meters, either from .py, from file name or assume something
+            if T:
+                width_m = T.h_size_meters
+                height_m = T.v_size_meters
+            else:
+                try:
+                    regex = re.compile("_[0-9]+x[0-9]+m")
+                    width_m, height_m = [float(v) for v in regex.findall(img_name)[0][1:-1].split('x')]
+                except:
+                    height_m = 10.
+                    width_m = 10. / aspect
+    
+            #R_org = R.copy() # -- save R to identify windows later
+    
+            if args.add_streetlight and 1:
+                y = np.linspace(1, 0, height_px)
+                x = np.linspace(0, 1, width_px)
+                X, Y = np.meshgrid(x, y)
+                X_m = X * width_m
+                Y_m = Y * height_m
+    
+                # yellow window light in R
+                R = R * A
+    
+                if roof:
+                    A = np.zeros_like(R)
+                    A += 0.3 - 0.1*Y
+                else:
+                    # street light in G
+                    # vertical gradient, plus horizonal gaussian for
+                    v = scipy.stats.norm(loc = 0.5, scale = 0.7).pdf(x)
+                    gauss_x = v / v.max()
+    
+                    A = np.zeros_like(R)
+                    A += 0.3 + 0.7 * np.exp(-Y_m/5.)
+                    A *= gauss_x * 1. # FIME: better scaling!
+                    R = A * 0.564
+                    G = A * 0.409
+                    B = A * 0.172
+                    A = 1.
+    
+                img = RGBA2img(R, G, B, A)
+    #            img.save("wbs_lit.png")
+    
+                #plt.show()
+            #bl
+            if args.lit_windows and 1:
+                img.putpixel((5,4), (255,210,20,255))
+                imR = RGBA2img(R_win, 0., 0., 0.)
+                # -- If I don't do this, Image is readonly. WTF?!?
+                imR.putpixel((5,4), (255,210,20,255))
+                R, G, B, A = lit_windows(R_win, imR, args.commercial)
+    #            imR.save("wbs_imR.png")
+                img.paste(imR, None, imR)
+    #            img.save("img.png")
+    
+    #            imm = RGBA2img(R_win, 0., 0., 1.)
+    #            imm.save('imtt.png')
+    
+            if 0:
+                plt.plot(x_sum)
+                y = [threshold_hi for tmp in floor_borders]
+                print y
+                plt.plot(floor_borders, y, 'o')
+                plt.show()
+    
+    
+    
+            # -- Assemble image from RGBA and save LM
+            # A unused. Set A = 1 to ease vis
+    #        A = np.zeros_like(R) + 1.
+    
+            if 0:
+                channel_name = 'RGBA'
+                for i, channel in enumerate([R, G, B, A]):
+                    print "%s: %1.2f %1.2f" % (channel_name[i], channel.min(), channel.max())
+    
+    #        im_out = RGBA2img(R, G, B, A)
+            #file_name="a123.png"
+            file_name_LM = name + '_LM' + ext
+            if os.path.exists(file_name_LM) and not args.force:
+                logging.warn("Not overwriting %s" % file_name_LM)
+            else:
+                img.save(file_name_LM)
+            del R, G, B, A, img
+    
+            if 0:
+                x = np.linspace(0, 1, 11)
+                v = scipy.stats.norm(loc = 0.5, scale = 0.2).pdf(x)
+                v /= v.max()
+                import matplotlib.pyplot as plt
+                plt.plot(x, v)
+                plt.show()
+        except Exception as e:
+            print e
+        
 
 
 if __name__ == "__main__":
     main()
-    bla
+    if 0:
 #    img = Image.open("wbs70_36x36m.png")
-
-    height_px, width_px = (10,20)
-    n = np.zeros((height_px, width_px, 4))
-    R = np.zeros((height_px, width_px)) + 0.
-    G = np.zeros((height_px, width_px)) + 1
-    B = np.zeros((height_px, width_px)) + 1
-    A = np.zeros((height_px, width_px)) + 1.
-#    return Image.fromarray(n, 'RGBA')
-    if 1:
-        n[:,:,0] = R #* random.uniform(0.5, 1.0)
-        n[:,:,1] = G
-        n[:,:,2] = B
-        n[:,:,3] = A
-    out = (n*255).astype('uint8')
-#    out = (n*255).uint8()  astype('uint8').copy()
-    import copy
-#    out = copy.copy(np.uint8(n*255))
-    img = Image.fromarray(out, 'RGBA')
-
-    img.putpixel((5,4), (255,210,20,255))
-    img.save('out.png')
-
+    
+        height_px, width_px = (10,20)
+        n = np.zeros((height_px, width_px, 4))
+        R = np.zeros((height_px, width_px)) + 0.
+        G = np.zeros((height_px, width_px)) + 1
+        B = np.zeros((height_px, width_px)) + 1
+        A = np.zeros((height_px, width_px)) + 1.
+    #    return Image.fromarray(n, 'RGBA')
+        if 1:
+            n[:,:,0] = R #* random.uniform(0.5, 1.0)
+            n[:,:,1] = G
+            n[:,:,2] = B
+            n[:,:,3] = A
+        out = (n*255).astype('uint8')
+    #    out = (n*255).uint8()  astype('uint8').copy()
+        import copy
+    #    out = copy.copy(np.uint8(n*255))
+        img = Image.fromarray(out, 'RGBA')
+    
+        img.putpixel((5,4), (255,210,20,255))
+        img.save('out.png')
+    
