@@ -26,28 +26,33 @@ detach ()
     wine $NV/detach.exe $*
 }
 
+genmips ()
+{
+    # nvDXT -nmips 10 -flip -file atlas_facades.png
+    bd=$PWD
+    case=$1
+    mkdir -p tmp/
+    cd tmp
+    cp $bd/tex/$case.png .
+    #nvDXT -nmips 10 -flip -file $case.png
+    #exit
+    #nvDXT -nomipmap -file ${case}_01.png 
+    nvDXT -nmips 10 -flip -file $case.png
+    detach $case
+    for i in `seq -w 0 8`; do
+        is=`printf "%02i" $i`
+        #(( bc = $i * 7 ))
+        bc=`awk -v num=$i 'BEGIN{print 4*num^(1.3)}'`
+        mip=${case}_$is
+        convert $mip.dds -brightness-contrast ${bc}x${bc} $mip.png
+        rm $mip.dds
+        nvDXT -nomipmap -file $mip.png
+        ls -l $mip.dds
+    done
+    stitch $case
+    mv $case.dds $bd/tex/
+    cd ..
+}
 
-# nvDXT -nmips 10 -flip -file atlas_facades.png
-#case=atlas_facades_LM
-bd=$PWD
-case=roads_LM
-mkdir -p tmp/
-cd tmp
-cp $bd/tex/$case.png .
-#nvDXT -nmips 10 -flip -file $case.png
-#exit
-#nvDXT -nomipmap -file ${case}_01.png 
-nvDXT -nmips 10 -flip -file $case.png
-detach $case
-for i in `seq -w 0 8`; do
-    is=`printf "%02i" $i`
-    #(( bc = $i * 7 ))
-    bc=`awk -v num=$i 'BEGIN{print 4*num^(1.3)}'`
-    mip=${case}_$is
-    convert $mip.dds -brightness-contrast ${bc}x${bc} $mip.png
-    rm $mip.dds
-    nvDXT -nomipmap -file $mip.png
-    ls -l $mip.dds
-done
-stitch $case
-mv $case.dds $bd/tex/
+genmips roads_LM
+genmips atlas_facades_LM
