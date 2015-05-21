@@ -41,8 +41,7 @@ BOUNDARY_WEST = 9.54
 BOUNDARY_SOUTH = 47.48
 BOUNDARY_EAST = 9.58
 BOUNDARY_NORTH = 47.50
-# Clip all nodes outside the bounding box
-BOUNDARY_CLIPPING = True
+BOUNDARY_CLIPPING = True    # -- Clip all nodes outside the bounding box
 BOUNDARY_CLIPPING_BORDER_SIZE = 0.25
 
 OSM_FILE = "buildings.osm"  # -- file name of the file with OSM data. Must reside in $PREFIX
