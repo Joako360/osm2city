@@ -390,13 +390,13 @@ class Roads(objectlist.ObjectList):
 #                if the_way.tags['amenity'] in ['parking']:
 #                    prio = 7
     
-            if prio in [5]:
+            if prio in [5]: # motorway
                 tex = textures.road.ROAD_3
-                width=6
-            elif prio in [3, 4]:
+                width=9
+            elif prio in [3, 4]: # pri,sec
                 tex = textures.road.ROAD_2
-                width=6
-            elif prio in [0, 1, 2]:
+                width=7.5
+            elif prio in [0, 1, 2]: # ter, resi, service
                 tex = textures.road.ROAD_1
                 width=6
     
@@ -1141,7 +1141,7 @@ def main():
         #    First create ac object. Write cluster's objects. Register stg object.
         #    Write ac to file.
         ac = ac3d.File(stats=tools.stats, show_labels=True)
-        ac3d_obj = ac.new_object(file_name, 'tex/roads.png', default_swap_uv=True)
+        ac3d_obj = ac.new_object(file_name, 'tex/roads.png', default_swap_uv=True, default_type=0x10)
         for rd in cl.objects:
             if rd.osm_id == 98659369:
                 pass
