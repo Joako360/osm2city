@@ -170,12 +170,17 @@ def append_facades_us(tex_prefix, facades):
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 def append_dynamic(tex_prefix, facades): 
-    """--- Dynamically runs py files in tex.src ---"""   
-    for subdir, dirs, files in os.walk('tex.src', topdown=True):
+    """--- Dynamically runs py files in tex.src ---
+    In texture .py files, we load a texture like so:
+      Texture(tex_prefix + 'filename.jpg' ...
+    tex_prefix is the path to the texture file, and should end in os.sep
+    """   
+    for subdir, dirs, files in os.walk(tex_prefix, topdown=True):
         for file in files:
                 if not file.endswith("py"):
                     continue 
-                logging.info("Executing %s "%(subdir + os.sep + file))
+                logging.debug("Executing %s "% (subdir + os.sep + file))
+                tex_prefix = subdir + os.sep
                 try:
                     execfile(subdir + os.sep + file)
                 except:
@@ -190,33 +195,33 @@ def append_roofs(tex_prefix, roofs):
 #    roofs.append(Texture(tex_prefix + 'tex.src/roof_tiled_red',
 #                         1., [], True, 1., [], False, provides=['color:red']))
 
-    roofs.append(Texture(tex_prefix + 'tex.src/roof_red1.png',
+    roofs.append(Texture(tex_prefix + 'roof_red1.png',
         31.8, [], True, 16.1, [], False, provides=['color:red', 'compat:roof-pitched']))
 
-    roofs.append(Texture(tex_prefix + 'tex.src/roof_black1.png',
+    roofs.append(Texture(tex_prefix + 'roof_black1.png',
         31.8, [], True, 16.1, [], False, provides=['color:black', 'compat:roof-pitched']))
 
-    roofs.append(Texture(tex_prefix + 'tex.src/roof_black4.jpg',
+    roofs.append(Texture(tex_prefix + 'roof_black4.jpg',
         6., [], True, 3.5, [], False, provides=['color:black', 'compat:roof-pitched']))
 
-    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_black1.png',
+    roofs.append(Texture(tex_prefix + 'roof_gen_black1.png',
         100., [], True, 100., [], False, provides=['color:black', 'compat:roof-flat']))
 
-    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_gray1.png',
+    roofs.append(Texture(tex_prefix + 'roof_gen_gray1.png',
         100., [], True, 100., [], False, provides=['color:gray', 'compat:roof-flat']))
-    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_gray2.png',
-        100., [], True, 100., [], False, provides=['color:gray', 'compat:roof-flat']))
-
-    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_gray3.png',
+    roofs.append(Texture(tex_prefix + 'roof_gen_gray2.png',
         100., [], True, 100., [], False, provides=['color:gray', 'compat:roof-flat']))
 
-    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_brown1.png',
+    roofs.append(Texture(tex_prefix + 'roof_gen_gray3.png',
+        100., [], True, 100., [], False, provides=['color:gray', 'compat:roof-flat']))
+
+    roofs.append(Texture(tex_prefix + 'roof_gen_brown1.png',
         100., [], True, 100., [], False, provides=['color:brown', 'compat:roof-flat']))
 
-#    roofs.append(Texture(tex_prefix + 'tex.src/roof_black2',
+#    roofs.append(Texture(tex_prefix + 'roof_black2',
 #                             1.39, [], True, 0.89, [], True, provides=['color:black']))
-#    roofs.append(Texture(tex_prefix + 'tex.src/roof_black3',
+#    roofs.append(Texture(tex_prefix + 'roof_black3',
 #                             0.6, [], True, 0.41, [], True, provides=['color:black']))
 
-#    roofs.append(Texture(tex_prefix + 'tex.src/roof_black3_small_256x128',
+#    roofs.append(Texture(tex_prefix + 'roof_black3_small_256x128',
 #                             0.25, [], True, 0.12, [], True, provides=['color:black']))

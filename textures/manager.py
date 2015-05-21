@@ -135,6 +135,7 @@ def make_texture_atlas(texture_list, atlas_filename, ext, size_x = 256, pad_y = 
     #    where z is height above ground. 
     if ambient_occlusion:
         for l in texture_list:
+            if l.v_can_repeat: continue
             if l.cls == 'facade':
                 #print l.provides
                 R, G, B, A = img2np.img2RGBA(l.im)
@@ -322,13 +323,13 @@ def find_matching_texture(cls, textures):
 
 
 # pitched roof: requires = facade:age:old
-def init(tex_prefix='', create_atlas=False):
+def init(tex_prefix='tex.src/', create_atlas=False):
     logging.debug("textures: init")
     global facades
     global roofs
     global atlas_file_name
     
-    atlas_file_name = tex_prefix + 'tex/atlas_facades'
+    atlas_file_name = 'tex/atlas_facades'
     if parameters.ATLAS_SUFFIX_DATE:
         now = datetime.datetime.now()
         atlas_file_name += "_%04i%02i%02i" % (now.year, now.month, now.day)
@@ -339,7 +340,9 @@ def init(tex_prefix='', create_atlas=False):
         facades = FacadeManager('facade')
         roofs = TextureManager('roof')
     
-        catalog.append_dynamic(tex_prefix, facades)
+        catalog.append_dynamic(tex_prefix + 'hk', facades)
+        catalog.append_dynamic(tex_prefix + 'de', facades)
+        catalog.append_dynamic(tex_prefix + 'us', facades)
         #append_facades_test()
         catalog.append_roofs(tex_prefix, roofs)
         #catalog.append_facades_us(tex_prefix, facades)
