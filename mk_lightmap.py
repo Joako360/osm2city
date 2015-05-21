@@ -91,15 +91,40 @@ def empty_RGBA_like(img):
 def chance(fraction):
     return random.uniform(0, 1.) < fraction
 
-def mk_lit_values_from_float(num, mean_min, mean_max, R_var, G_var, G_minus, B_var, B_minus):
+def pick_one(the_list):
+    return the_list[random.randint(0, len(the_list)-1)]
+
+def mk_lit_values_from_float(num, mean_min, mean_max, R_var, G_var, G_minus, B_var, B_minus, min_val):
     """auto-gen a list of num window colors. Each color uses given range for
        a mean value; RGB values are offset from mean by given _var"""
     lit_values = []
-    for i in range(num):
+    i = num
+    while i:
         mean = random.uniform(mean_min, mean_max)
         R = mean + random.uniform(-R_var, R_var)
         G = mean + random.uniform(-G_var, G_var) - G_minus
         B = mean + random.uniform(-B_var, B_var) - B_minus
+        
+        if max(R, G, B) < min_val: # or (G - R > 0.1 or G - B > 0.15):
+            continue
+        
+        i -= 1
+        lit_values.append([min(int(value * 255.), 255) for value in [R, G, B]])
+    return lit_values
+
+def _mk_lit_values_from_float(num, mean_min, mean_max, R_var, G_var, G_minus, B_var, B_minus, min_val):
+    """auto-gen a list of num window colors. Each color uses given range for
+       a mean value; RGB values are offset from mean by given _var"""
+    lit_values = []
+    i = num
+    while i:
+        mean = random.uniform(mean_min, mean_max)
+        R = random.gauss(0.9, 0.001)
+        G = random.gauss(0.8, 0.081)
+        B = random.gauss(0.6, 0.081)
+
+        if max(R, G, B < min_val): continue
+        i -= 1
         lit_values.append([min(int(value * 255.), 255) for value in [R, G, B]])
     return lit_values
 
@@ -119,6 +144,7 @@ def lit_windows(R, img, commercial=False):
     threshold_hi = 0.4
     on_lo = x_sum[0] < threshold_lo
     floor_borders = []
+    floor_border_up = 0
     all_centers = [] # 2-D list of window centers
     i = 1
     while i < len(x_sum):
@@ -138,6 +164,7 @@ def lit_windows(R, img, commercial=False):
         y_sum = R[floor_border_up:floor_border_down].sum(axis=0) / (floor_border_down-floor_border_up)
         on_lo = y_sum[0] < threshold_lo
         window_borders = []
+        border_up = 0
         center_y = (floor_border_up + floor_border_down)/2
         i = 1
         while i < len(y_sum):
@@ -170,20 +197,50 @@ def lit_windows(R, img, commercial=False):
             plt.clf()
 
     # -- light rows of windows per floor with a tuple RGB picked randomly from this list:
-#    lit_values = mk_lit_values_from_float(200, mean_min=0.7, mean_max=1.0,
-#                                          R_var=0.05, G_var=0.02, G_minus=0.05, B_var=0.1, B_minus=0.15)
-    lit_values = np.array([(226, 229, 198), (255, 254, 231), (243, 224, 191),
-                           (255, 238, 206), (229, 226, 191), (243, 255, 255),
-                           (255, 252, 245)])
+    lit_values_col = mk_lit_values_from_float(20, mean_min=0.8, mean_max=1.0,
+                                          R_var=0.15,
+                                          G_var=0.2, G_minus=0.1, 
+                                          B_var=0.4, B_minus=0.1,
+                                          min_val=0.9)
+
+    lit_values_yellow = mk_lit_values_from_float(40, mean_min=0.95, mean_max=1.0,
+                                          R_var=0.1,
+                                          G_var=0.05, G_minus=0.15, 
+                                          B_var=0.2, B_minus=0.4,
+                                          min_val=0.9)
+
+    lit_values_white = mk_lit_values_from_float(30, mean_min=0.95, mean_max=1.0,
+                                          R_var=0.05,
+                                          G_var=0.05, G_minus=0., 
+                                          B_var=0.05, B_minus=0.,
+                                          min_val=0.9)
+
+#    lit_values_white = mk_lit_values_from_float(30, mean_min=0.95, mean_max=1.0,
+#                                          R_var=0.0,
+#                                          G_var=0.0, G_minus=0., 
+#                                          B_var=0.0, B_minus=0.,
+#                                          min_val=0.9)
+
+
+    lit_values_manual = [(226, 229, 198), (255, 254, 231), (243, 224, 191),
+                         (255, 238, 206), (229, 226, 191), (243, 255, 255),
+                         (255, 252, 245)]
+                                          
 
     if commercial:
-        chance_off = 0.5
-        chance_floor_on = 0.3
-        max_len = 200
-    else:
         chance_off = 0.6
-        chance_floor_on = 0.05
+        chance_floor_on = 0.2
+        max_len = 200
+        lit_values = np.array(lit_values_manual)
+    else:
+        chance_off = 0.9
+        chance_floor_on = 0.0
         max_len = 2
+        lit_values = lit_values_yellow
+        lit_values += lit_values_col
+        lit_values += lit_values_white 
+        lit_values += lit_values_manual
+        lit_values = np.array(lit_values)
 
 
     for this_floor_centers in all_centers:
@@ -192,9 +249,10 @@ def lit_windows(R, img, commercial=False):
         n_windows_this_floor = len(this_floor_centers)
         if chance(chance_floor_on):
             next_len = n_windows_this_floor # lit whole floor
+            n_windows_this_floor
         for x, y in this_floor_centers:
             if next_len == 0:
-                next_len = random.randint(1, n_windows_this_floor/3)
+                next_len = random.randint(1, max(1, n_windows_this_floor/3))
                 next_len = min(next_len, max_len)
                 off = False
                 if chance(chance_off):
@@ -221,13 +279,29 @@ def lit_windows(R, img, commercial=False):
 def create_red_windows(T):
     """read .py, auto-create raw LM with windows in red on"""
     img = Image.new("RGBA", (T.im.size), (0,0,0,255))
+    width_px, height_px = img.size
 
     # -- horizontal borders of windows. Assume some window/gap width
+    px_per_m = width_px / T.h_size_meters
     h_margin_m = 0.5
+    h_margin_px = max(1, round(h_margin_m * px_per_m))
     window_width_m = 1.1
     window_gap_m = 0.7
-    window_offset_m = window_width_m + window_gap_m
-    window_u = [[u0, u0 + window_width_m / T.h_size_meters] for u0 in np.arange(h_margin_m, T.h_size_meters - h_margin_m, window_offset_m) / T.h_size_meters]
+    window_width_px = max(1, round(window_width_m * px_per_m))
+    window_gap_px = max(2, round(window_gap_m * px_per_m))
+    window_offset_m = window_gap_m + window_width_m
+    
+#    window_u = [[u0, u0 + window_width_m / T.h_size_meters] for u0 in np.arange(h_margin_m, T.h_size_meters - h_margin_m, window_offset_m) / T.h_size_meters]
+#    print window_u, "\n"
+    window_u = [] 
+    u0 = h_margin_px
+    while u0 < (width_px - h_margin_px - window_width_px):
+        window_u.append([u0, u0 + window_width_px])
+        u0 += window_width_px + window_gap_px
+
+    #bla
+#    for u0 in np.arange(h_margin_m, T.h_size_meters - h_margin_m, window_offset_m) / T.h_size_meters]
+    
 #    for i, the_split_width_m in enumerate(np.diff(T.h_cuts_m)):
 #        if the_split_width_m > 2.5 and the_split_width_m < 5.:
 
@@ -244,11 +318,9 @@ def create_red_windows(T):
             dv = v1 - v0
             window_v.append([v0 + lo * dv, v0 + hi * dv])
 
-    width_px, height_px = img.size
-    window_u = np.array(window_u) * width_px
+    window_u = np.array(window_u) #* width_px
     # -- image origin is upper left, hence 1 - v
     window_v = (1. - np.array(window_v)) * height_px
-
     # -- make windows red
     rgba = (255, 0, 0, 255)
     for u in window_u:
@@ -279,7 +351,7 @@ def load_py(image_file_name):
 # ------------------------------------------------------------------------
 
 def main():
-    random.seed(42)
+    #random.seed(42)
     # -- Parse arguments. Command line overrides config file.
     parser = argparse.ArgumentParser(description="mk_lightmap.py creates lightmaps for use with osm2city")
     parser.add_argument("-a", "--auto-windows", action="store_true", help="auto-create lit windows")
@@ -292,7 +364,8 @@ def main():
     args = parser.parse_args()
 
     for arg_name in args.FILE:
-        try:
+#        try:
+        if 1:
             name, ext = os.path.splitext(arg_name)
             if name.endswith('_LM'):
                 logging.warn('Ignoring lightmap %s.' % arg_name)
@@ -320,6 +393,7 @@ def main():
                     logging.warn("Can't auto-create windows for %s because .py is missing" % img_name)
                 else:
                     img = create_red_windows(T)
+#                    img.save("wbs_lit.png")
                     R_win, G, B, A = img2RGBA(img)
             else:
                 R_win = R.copy()
@@ -341,7 +415,7 @@ def main():
     
             #R_org = R.copy() # -- save R to identify windows later
     
-            if args.add_streetlight and 1:
+            if args.add_streetlight and not T.v_can_repeat:
                 y = np.linspace(1, 0, height_px)
                 x = np.linspace(0, 1, width_px)
                 X, Y = np.meshgrid(x, y)
@@ -362,18 +436,24 @@ def main():
     
                     A = np.zeros_like(R)
                     A += 0.3 + 0.7 * np.exp(-Y_m/5.)
-                    A *= gauss_x * 1. # FIME: better scaling!
-                    R = A * 0.564
-                    G = A * 0.409
-                    B = A * 0.172
+                    A *= gauss_x * 1.7 # FIME: better scaling!
+
+                    street_values = [(0.464, 0.409, 0.372), (0.5, 0.5, 0.5)]
+                    street_value = pick_one(street_values)
+                    R = A * street_value[0]
+                    G = A * street_value[1]
+                    B = A * street_value[2]
+                    
+                    
+#                    G[0:20,:] = 1. # identify top
+                    #B = A * 0.372
                     A = 1.
     
                 img = RGBA2img(R, G, B, A)
-    #            img.save("wbs_lit.png")
     
                 #plt.show()
             #bl
-            if args.lit_windows and 1:
+            if args.lit_windows:
                 img.putpixel((5,4), (255,210,20,255))
                 imR = RGBA2img(R_win, 0., 0., 0.)
                 # -- If I don't do this, Image is readonly. WTF?!?
@@ -420,8 +500,9 @@ def main():
                 import matplotlib.pyplot as plt
                 plt.plot(x, v)
                 plt.show()
-        except Exception as e:
-            print e
+        
+#        except Exception as e:
+#            print e
         
 
 
