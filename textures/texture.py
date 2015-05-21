@@ -64,8 +64,9 @@ class Texture(object):
             self.im = Image.open(self.filename)
         except:
             try:
-                self.filename = filename.split(os.sep)[-1]
-                self.im = Image.open(self.filename)
+                filename_no_path = filename.split(os.sep)[-1]
+                self.im = Image.open(filename_no_path)
+                self.filename = filename_no_path
             except:
                 logging.warning("Skipping non-existing texture %s" % self.filename)
                 return
