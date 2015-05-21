@@ -219,7 +219,7 @@ class Building(object):
 
 
 class Buildings(object):
-    """holds buildings list. Interfaces with OSM hanlder"""
+    """holds buildings list. Interfaces with OSM handler"""
     valid_node_keys = []
 #    valid_way_keys = ["building", "building:part", "building:height", "height", "building:levels", "layer"]
     req_way_keys = ["building", "building:part"]
@@ -478,6 +478,7 @@ def write_xml(path, fname, buildings):
         <effect>
           <inherits-from>cityLM</inherits-from>
           """))
+        xml.write("  <object-name>LOD_bare</object-name>\n")
         xml.write("  <object-name>LOD_detail</object-name>\n")
         xml.write("  <object-name>LOD_rough</object-name>\n")
         xml.write("</effect>\n")
