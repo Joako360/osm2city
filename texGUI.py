@@ -92,6 +92,8 @@ class MyFrame(wx.Frame):
         self.last_split_was_left = []
         self.width_m = 1.
         self.height_m = 1.
+        self.px_per_m = 1.
+        self.py_per_m = 1.
         self.x_scale_p0 = None
         self.x_scale_p1 = 0
         self.y_scale_p0 = None
@@ -162,12 +164,12 @@ class MyFrame(wx.Frame):
 
     def compute_width_height(self):
         try:
-            px_per_m = (self.x_scale_p1 - self.x_scale_p0[0]) / float(self.text_ctrl_x.GetValue())
+            px_per_m = abs(self.x_scale_p1 - self.x_scale_p0[0]) / abs(float(self.text_ctrl_x.GetValue()))
         except:
             px_per_m = 0.
 
         try:
-            py_per_m = (self.y_scale_p1 - self.y_scale_p0[1]) / float(self.text_ctrl_y.GetValue())
+            py_per_m = abs(self.y_scale_p1 - self.y_scale_p0[1]) / abs(float(self.text_ctrl_y.GetValue()))
             #print self.y_scale_p1, self.y_scale_p0[0], (self.y_scale_p1 - self.y_scale_p0[0]), py_per_m
         except:
             py_per_m = 0.
@@ -178,23 +180,27 @@ class MyFrame(wx.Frame):
 #            pass
 
         try:
-            if 0 < px_per_m:
+            if px_per_m > 0:
                 self.width_m = self.pilImageOrg.size[0] / px_per_m
             else:
                 self.width_m = self.pilImageOrg.size[0] / py_per_m
 
-            if 0 < py_per_m:
+            if py_per_m > 0:
                 self.height_m = self.pilImageOrg.size[1] / py_per_m
             else:
                 self.height_m = self.pilImageOrg.size[1] / px_per_m
         except ZeroDivisionError:
             pass
+        
+        self.px_per_m = self.pilImageOrg.size[0] / self.width_m
+        self.py_per_m = self.pilImageOrg.size[1] / self.height_m
 
     def update_label(self, event):
         m = self.mousepos_img
         self.compute_width_height()
 
-        label_text = "(%i, %i) %g" % (m[0], m[1], self.scale)
+        label_text = "(%i, %i) %g (%1.2f %1.2f) m" % (m[0], m[1], self.scale, 
+                      m[0]/self.px_per_m, m[1]/self.py_per_m,)
         label_text += "  size (%i %i) px" % self.pilImageOrg.size
         label_text += "  (%6.3f %6.3f) m" % (self.width_m, self.height_m)
 
@@ -205,11 +211,10 @@ class MyFrame(wx.Frame):
         self.y_cuts.sort()
         out_case_name = self.out_case_name()
         in_ext = os.path.splitext(self.in_file_name)[1]
-        s = textwrap.dedent("""
-        from textures.texture import Texture
+        s = textwrap.dedent("""from textures.texture import Texture
         """)
         s += textwrap.dedent("""
-        facades.append(Texture('%s',
+        facades.append(Texture(tex_prefix + '%s',
             %1.1f, %s, True,
             %1.1f, %s, False,
             v_align_bottom=True, height_min=0,
