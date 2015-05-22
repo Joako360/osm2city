@@ -590,6 +590,10 @@ def write_map(filename, transform, elev, gmin, gmax):
     out.write("kids 0\n")
     out.close()
     # print "OBJECT_STATIC surface.ac"
+    center_global = transform.toGlobal((0,0))
+    stg_fname = calc_tile.construct_stg_file_name(center_global)
+    print stg_fname, center_global
+    bla
 
 def write_gp(buildings):
     gp = open("buildings.dat", "w")

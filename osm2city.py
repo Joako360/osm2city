@@ -612,7 +612,7 @@ if __name__ == "__main__":
     logging.debug("height at origin" + str(elev(vec2d(0,0))))
     logging.debug("origin at " + str(tools.transform.toGlobal((0,0))))
 
-    #tools.write_map('dresden.png', transform, elev, vec2d(minlon, minlat), vec2d(maxlon, maxlat))
+    tools.write_map('dresden.png', tools.transform, elev, cmin, cmax)
 
     # -- now read OSM data. Either parse OSM xml, or read a previously cached .pkl file
     #    End result is 'buildings', a list of building objects
