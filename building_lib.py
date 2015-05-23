@@ -274,11 +274,6 @@ def is_large_enough(b, buildings):
 def compute_height_and_levels(b):
     """Determines total height (and number of levels) of a building based on
        OSM values and other logic"""
-    if 0:
-        b.levels = 13
-        b.height = b.levels * 3.
-        return
-
     try:
         if isinstance(b.height, (int, long)):
             b.height = float(b.height)
@@ -288,6 +283,9 @@ def compute_height_and_levels(b):
         b.height = 0
     # -- try OSM height and levels first
     if b.height > 0 and b.levels > 0:
+        if b.levels > parameters.BUILDING_CITY_LEVELS_LIMIT:
+            b.levels = parameters.BUILDING_CITY_LEVELS_LIMIT
+            b.height = b.levels * random_level_height()
         return
 
     level_height = random_level_height()

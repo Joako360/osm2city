@@ -128,6 +128,8 @@ BUILDING_CITY_LEVEL_HEIGHT_MODE = 3.3
 BUILDING_CITY_LEVEL_HEIGHT_HEIGH = 3.6
 # FIXME: same parameters for place = town, village, suburb
 
+BUILDING_CITY_LEVELS_LIMIT = 999   # max number of levels, even overrides OSM value
+
 # -- The more buildings end up in LOD rough or bare, the more work for your GPU.
 #    Increasing any of the following parameters will decrease GPU load.
 LOD_ALWAYS_DETAIL_BELOW_AREA = 150  # -- below this area, buildings will always be LOD detail
