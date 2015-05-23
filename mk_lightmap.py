@@ -469,6 +469,10 @@ def main():
                         R += add + r_var
                         G += add + g_var
                         B += add + b_var
+
+                        R[R < 0] = 0.
+                        G[G < 0] = 0.
+                        B[B < 0] = 0.
                     
                     
 #                    G[0:20,:] = 1. # identify top
