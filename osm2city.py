@@ -563,6 +563,7 @@ if __name__ == "__main__":
     parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
     parser.add_argument("-c", dest="c", action="store_true", help="do not check for overlapping with static objects")
     parser.add_argument("-A", "--create-atlas-only", action="store_true", help="create texture atlas and exit")
+    parser.add_argument("-M", "--create-map-only", action="store_true", help="create map and exit")
     parser.add_argument("-a", "--create-atlas", action="store_true", help="create texture atlas")
     parser.add_argument("-u", dest="uninstall", action="store_true", help="uninstall ours from .stg")
     parser.add_argument("-l", "--loglevel", help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL")
@@ -612,7 +613,9 @@ if __name__ == "__main__":
     logging.debug("height at origin" + str(elev(vec2d(0,0))))
     logging.debug("origin at " + str(tools.transform.toGlobal((0,0))))
 
-    tools.write_map('dresden.png', tools.transform, elev, cmin, cmax)
+    if args.create_map_only:
+        tools.write_map('surface.png', tools.transform, elev, cmin, cmax)
+        sys.exit(0)
 
     # -- now read OSM data. Either parse OSM xml, or read a previously cached .pkl file
     #    End result is 'buildings', a list of building objects
