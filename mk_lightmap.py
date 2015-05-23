@@ -19,7 +19,7 @@ This script
 TODO:
 - automatically add windows to R, from .py, if arg endswith .py
 - try new RGB LM scheme
-
+- clean up a lot -- this is really messy
 
 """
 
@@ -73,6 +73,8 @@ def RGBA2img(R, G, B, A):
         n[:,:,1] = G
         n[:,:,2] = B
         n[:,:,3] = A
+        
+    n[n > 1.] = 1.
     out = (n*255).astype('uint8').copy()
     #out = (n*255).uint8()  #astype('uint8').copy()
     #import copy
@@ -363,6 +365,15 @@ def main():
     parser.add_argument("FILE", nargs="+")
     args = parser.parse_args()
 
+    # -- debug presets    
+    if 0:
+        args.auto_windows = 1
+        args.add_streetlight = 1
+        args.lit_windows = 1
+        args.commercial = True
+        args.force = True
+        args.FILE = ["facade_modern_commercial_red_gray_20x14m.py"]
+    
     for arg_name in args.FILE:
 #        try:
         if 1:
@@ -393,7 +404,7 @@ def main():
                     logging.warn("Can't auto-create windows for %s because .py is missing" % img_name)
                 else:
                     img = create_red_windows(T)
-#                    img.save("wbs_lit.png")
+                    #img.save("wbs_lit.png")
                     R_win, G, B, A = img2RGBA(img)
             else:
                 R_win = R.copy()
@@ -423,7 +434,7 @@ def main():
                 Y_m = Y * height_m
     
                 # yellow window light in R
-                R = R * A
+#                R = R * A
     
                 if roof:
                     A = np.zeros_like(R)
@@ -435,8 +446,9 @@ def main():
                     gauss_x = v / v.max()
     
                     A = np.zeros_like(R)
-                    A += 0.3 + 0.7 * np.exp(-Y_m/5.)
+                    A += 0. + 0.7 * np.exp(-Y_m/5.)
                     A *= gauss_x * 1.7 # FIME: better scaling!
+                    #A *= 0 # off!
 
                     street_values = [(0.464, 0.409, 0.372), (0.5, 0.5, 0.5)]
                     street_value = pick_one(street_values)
@@ -444,12 +456,28 @@ def main():
                     G = A * street_value[1]
                     B = A * street_value[2]
                     
+                    # lighten up whole facade
+                    if chance(0.5):
+                        add = random.uniform(0, 0.1)
+                        r_var = random.uniform(-0.05, 0.03)
+                        g_var = random.uniform(-0.05, 0.01)
+                        b_var = random.uniform(-0.05, 0.05)
+#                        add = 0.1
+#                        r_var = +0.03
+#                        g_var = -0.05
+#                        b_var = -0.05
+                        R += add + r_var
+                        G += add + g_var
+                        B += add + b_var
+                    
                     
 #                    G[0:20,:] = 1. # identify top
                     #B = A * 0.372
                     A = 1.
     
                 img = RGBA2img(R, G, B, A)
+            else:
+                img = RGBA2img(R*0, G*0, B*0, A*0)
     
                 #plt.show()
             #bl
@@ -459,7 +487,7 @@ def main():
                 # -- If I don't do this, Image is readonly. WTF?!?
                 imR.putpixel((5,4), (255,210,20,255))
                 R, G, B, A = lit_windows(R_win, imR, args.commercial)
-    #            imR.save("wbs_imR.png")
+                #img.save("wbs_imR.png")
                 img.paste(imR, None, imR)
     #            img.save("img.png")
     
