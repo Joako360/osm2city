@@ -301,7 +301,7 @@ class Roads(objectlist.ObjectList):
         #self.count_inner_junctions('bs')
         self.split_ways_at_inner_junctions()
         #self.debug_print_refs_of_way(239806431)
-        self.join_degree2_junctions() 
+#        self.join_degree2_junctions()  # -- FIXME: this leads to very elevated roads.
         #self.debug_print_refs_of_way(239806431)
         #self.find_junctions(self.ways_list, 3)
         del self.attached_ways_dict
