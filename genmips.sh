@@ -31,17 +31,19 @@ genmips ()
     # nvDXT -nmips 10 -flip -file atlas_facades.png
     bd=$PWD
     case=$1
-    bf=$2
-    be=$3
-    cf=$4
-    ce=$5
+    sharpen=$2 
+    bf=$3
+    be=$4
+    cf=$5
+    ce=$6
     mkdir -p tmp/
     cd tmp
     cp $bd/tex/$case.png .
     #nvDXT -nmips 10 -flip -file $case.png
     #exit
     #nvDXT -nomipmap -file ${case}_01.png 
-    nvDXT -nmips 10 -flip -sharpenMethod SharpenMedium -file $case.png
+    [ "$sharpen" == "yes" ] && sharpen="-sharpenMethod SharpenMedium" || sharpen=""
+    nvDXT -nmips 10 -flip $sharpen -file $case.png
     detach $case
     for i in `seq -w 0 8`; do
         is=`printf "%02i" $i`
@@ -53,7 +55,7 @@ genmips ()
         convert $mip.dds -brightness-contrast ${br}x${co} $mip.png
         rm $mip.dds
         nvDXT -nomipmap -file $mip.png
-        ls -l $mip.dds
+        #ls -l $mip.dds
     done
     stitch $case
     mv $case.dds $bd/tex/
@@ -68,10 +70,13 @@ gendds ()
     done
 }
 
-genmips atlas_facades_LM 2. 1.7 7. 1.
+# genmips atlas_facades_LM yes 2. 1.7 7. 1. # eigentlich OK, nur bunt on high mip levels
+#genmips atlas_facades_LM yes 1.5 1.7 5. 1. 
 
-#genmips roads_LM 2 1.5 1 1.5
-genmips roads_LM 1 1. 1 1.
+#genmips roads_LM no 2 1.5 1 1.5
+# genmips roads_LM no 1 1 1 1. # OK, bissel bright in med mip levels
+#genmips roads_LM no 0.7 0.7 0.4 0.7
+genmips roads_LM no 0.7 1.0 0.4 1.0
 exit
 bd=$PWD
 cd tmp
