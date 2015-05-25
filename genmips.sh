@@ -71,7 +71,7 @@ gendds ()
 }
 
 # genmips atlas_facades_LM yes 2. 1.7 7. 1. # eigentlich OK, nur bunt on high mip levels
-#genmips atlas_facades_LM yes 1.5 1.7 5. 1. 
+genmips atlas_facades_LM yes 1.5 1.7 5. 1. 
 
 #genmips roads_LM no 2 1.5 1 1.5
 # genmips roads_LM no 1 1 1 1. # OK, bissel bright in med mip levels
