@@ -659,24 +659,23 @@ def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner=False):
     tex_y0 = texture.y(tex_y0)  # -- to atlas coordinates
     tex_y1 = texture.y(tex_y1)
 
-    nnodes_ring = len(ring.coords) - 1
-    v1 = v0 + nnodes_ring
+    v1 = v0 + len(ring.coords) - 1
     # print "v0 %i v1 %i lenX %i" % (v0, v1, len(b.lenX))
+    u0 = 0    
     for i in range(v0, v1 - 1):
         if False:
             tex_x1 = texture.x(b.lenX[i] / texture.h_size_meters)  # -- simply repeat texture to fit length
         else:
-            # FIXME: respect facade texture split_h
             # FIXME: there is a nan in textures.h_splits of tex/facade_modern36x36_12
-            a = b.lenX[i] / texture.h_size_meters
-            ia = int(a)
-            frac = a - ia
-            tex_x1 = texture.x(texture.closest_h_match(frac) + ia)
+            u1_best = u0 + b.lenX[i] / texture.h_size_meters
+            u1 = texture.closest_h_match(u1_best)
+            tex_x1 = texture.x(u1)
             if texture.v_can_repeat:
                 # assert(tex_x1 <= 1.)
                 if not (tex_x1 <= 1.):
                     logging.debug('FIXME: v_can_repeat: need to check in analyse')
-        tex_x0 = texture.x(0)
+        tex_x0 = texture.x(u0)
+        u0 = u1
         # print "texx", tex_x0, tex_x1
         j = i + b.first_node
         out.face([ (j, tex_x0, tex_y0),

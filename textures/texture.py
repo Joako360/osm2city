@@ -175,7 +175,10 @@ class Texture(object):
         # - old
         # - modern
         # european, north_american, south_american, mediterreanian, african, asian
-    def closest_h_match(self, frac):
-        return self.h_cuts[np.abs(self.h_cuts - frac).argmin()]
+    def closest_h_match(self, h):
+        """move given h coord to closest h_cut"""
+        trunc = int(h)
+        frac = h - trunc
+        return self.h_cuts[np.abs(self.h_cuts - frac).argmin()] + trunc
         #self.h_cuts[np.abs(self.h_cuts - frac).argmin()]
         #bla
