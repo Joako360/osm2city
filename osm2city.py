@@ -614,9 +614,10 @@ if __name__ == "__main__":
     logging.debug("origin at " + str(tools.transform.toGlobal((0,0))))
 
     if args.create_map_only:
-        tools.write_map('surface.png', tools.transform, elev, cmin, cmax)
-        sys.exit(0)
-
+        TM = tools.texmap(tools.transform, elev, cmin, cmax, (512, 512))
+        #tools.write_map('surface.png', tools.transform, elev, cmin, cmax)
+#        sys.exit(0)
+  
     # -- now read OSM data. Either parse OSM xml, or read a previously cached .pkl file
     #    End result is 'buildings', a list of building objects
     pkl_fname = parameters.PREFIX + os.sep + parameters.OSM_FILE + '.pkl'
@@ -726,11 +727,19 @@ if __name__ == "__main__":
 
     #tools.write_gp(buildings)
 
+        
+
+
     # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
     for b in buildings:
+        for p in b.X_outer:
+            TM.point(vec2d(tools.transform.toGlobal(p)), 0, (255, 255, 0, 255))
         clusters.append(b.anchor, b)
     building_lib.decide_LOD(buildings)
     clusters.transfer_buildings()
+    TM.write_ac('surface')
+    blaaa
+
 
     # -- write clusters
     clusters.write_stats()
