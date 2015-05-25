@@ -1120,6 +1120,16 @@ def main():
 #    roads.objects = [roads.objects[0]]
     if parameters.CREATE_BRIDGES_ONLY:
         roads.keep_only_bridges_and_embankments()
+        
+    # -- experimental fake street lamps
+    cmin, cmax = parameters.get_extent_global()
+    TM = tools.texmap(tools.transform, elev, cmin, cmax, (512, 512))
+    for the_road in roads.roads_list:
+        osm_nodes = [the_road.nodes_dict[r] for r in the_road.refs]
+        [TM.point(vec2d(n.lon, n.lat), 0, (255, 255, 255, 255)) for n in osm_nodes]
+    
+    TM.write_ac('surface')
+        
     roads.clusterize()
 #    scale_test(transform, elev)
 
