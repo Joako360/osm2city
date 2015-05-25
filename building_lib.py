@@ -659,15 +659,21 @@ def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner=False):
     tex_y0 = texture.y(tex_y0)  # -- to atlas coordinates
     tex_y1 = texture.y(tex_y1)
 
+    # FIXME: need to test upfront whether texture is at least as long as longest edge
+
     v1 = v0 + len(ring.coords) - 1
     # print "v0 %i v1 %i lenX %i" % (v0, v1, len(b.lenX))
     u0 = 0    
-    for i in range(v0, v1 - 1):
+    for i in range(v0, v1):
         if False:
             tex_x1 = texture.x(b.lenX[i] / texture.h_size_meters)  # -- simply repeat texture to fit length
         else:
             # FIXME: there is a nan in textures.h_splits of tex/facade_modern36x36_12
             u1_best = u0 + b.lenX[i] / texture.h_size_meters
+            # -- reset u0 if texture is not wrap-around and we're out of bounds
+            if not texture.h_can_repeat and u1_best > 1.:
+                u0 = 0.
+                u1_best = u0 + b.lenX[i] / texture.h_size_meters
             u1 = texture.closest_h_match(u1_best)
             tex_x1 = texture.x(u1)
             if texture.v_can_repeat:
@@ -675,26 +681,25 @@ def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner=False):
                 if not (tex_x1 <= 1.):
                     logging.debug('FIXME: v_can_repeat: need to check in analyse')
         tex_x0 = texture.x(u0)
+#        print "texx", tex_x0, tex_x1
+        if i == v1-1: 
+            # -- closing wall
+            j0 = v0 + b.first_node
+            j1 = v1 + b.first_node
+            out.face([(j1 - 1, tex_x0, tex_y0),
+                       (j0, tex_x1, tex_y0),
+                       (j0 + b._nnodes_ground, tex_x1, tex_y1),
+                       (j1 - 1 + b._nnodes_ground, tex_x0, tex_y1)],
+                       swap_uv=texture.v_can_repeat)
+        else:
+            j = i + b.first_node
+            out.face([ (j, tex_x0, tex_y0),
+                       (j + 1, tex_x1, tex_y0),
+                       (j + 1 + b._nnodes_ground, tex_x1, tex_y1),
+                       (j + b._nnodes_ground, tex_x0, tex_y1) ],
+                       swap_uv=texture.v_can_repeat)
         u0 = u1
-        # print "texx", tex_x0, tex_x1
-        j = i + b.first_node
-        out.face([ (j, tex_x0, tex_y0),
-                   (j + 1, tex_x1, tex_y0),
-                   (j + 1 + b._nnodes_ground, tex_x1, tex_y1),
-                   (j + b._nnodes_ground, tex_x0, tex_y1) ],
-                   swap_uv=texture.v_can_repeat)
 
-    # -- closing wall
-    tex_x1 = texture.x(b.lenX[v1 - 1] / texture.h_size_meters)
-
-    j0 = v0 + b.first_node
-    j1 = v1 + b.first_node
-
-    out.face([(j1 - 1, tex_x0, tex_y0),
-               (j0, tex_x1, tex_y0),
-               (j0 + b._nnodes_ground, tex_x1, tex_y1),
-               (j1 - 1 + b._nnodes_ground, tex_x0, tex_y1)],
-               swap_uv=texture.v_can_repeat)
     return v1
     # ---
     # need numvert
