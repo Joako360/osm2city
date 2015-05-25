@@ -29,6 +29,7 @@ import time
 import re
 import csv
 import subprocess
+from PIL import Image, ImageDraw
 # import Queue
 
 import matplotlib.pyplot as plt
@@ -539,60 +540,86 @@ def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=
         f.write("\n")
     f.close()
 
-def write_map(filename, transform, elev, gmin, gmax):
-    lmin = vec2d(transform.toLocal((gmin.x, gmin.y)))
-    lmax = vec2d(transform.toLocal((gmax.x, gmax.y)))
-    map_z0 = 0.
-    elev_offset = elev(vec2d(0,0))
-    print "offset", elev_offset
+class texmap(object):
+    """A drawable texture draped over terrain"""
+    def __init__(self, transform, elev, lonlat0, lonlat1, size_px):
+        # create texture of given size
+        self.img = Image.new("RGBA", (size_px), (0,0,0,0))
+        self.size_px = vec2d(size_px)
+        self.lonlat0 = lonlat0
+        self.lonlat1 = lonlat1
+        self.dlonlat = (lonlat1 - lonlat0)
+        self.elev = elev
+        self.transform = transform
 
-    nx, ny = ((lmax - lmin) / 100.).int().list()  # 100m raster
+    def _px(self, lonlat):
+        px = ((lonlat - self.lonlat0) / self.dlonlat * self.size_px)
+        return int(px.x), self.size_px[1] - int(px.y)
 
-    x = np.linspace(lmin.x, lmax.x, nx)
-    y = np.linspace(lmin.y, lmax.y, ny)
-
-    u = np.linspace(0., 1., nx)
-    v = np.linspace(0., 1., ny)
-
-
-    out = open("surface.ac", "w")
-    out.write(textwrap.dedent("""\
-    AC3Db
-    MATERIAL "" rgb 1   1    1 amb 1 1 1  emis 0 0 0  spec 0.5 0.5 0.5  shi 64  trans 0
-    OBJECT world
-    kids 1
-    OBJECT poly
-    name "surface"
-    texture "%s"
-    numvert %i
-    """ % (filename, nx * ny)))
-
-    for j in range(ny):
-        for i in range(nx):
-            out.write("%g %g %g\n" % (y[j], (elev(vec2d(x[i],y[j])) - elev_offset), x[i]))
-
-    out.write("numsurf %i\n" % ((nx - 1) * (ny - 1)))
-    for j in range(ny - 1):
-        for i in range(nx - 1):
-            out.write(textwrap.dedent("""\
-            SURF 0x0
-            mat 0
-            refs 4
-            """))
-            out.write("%i %g %g\n" % (i + j * (nx), u[i], v[j]))
-            out.write("%i %g %g\n" % (i + 1 + j * (nx), u[i + 1], v[j]))
-            out.write("%i %g %g\n" % (i + 1 + (j + 1) * (nx), u[i + 1], v[j + 1]))
-            out.write("%i %g %g\n" % (i + (j + 1) * (nx), u[i], v[j + 1]))
-#            0 0 0
-#            1 1 0
-#            2 1 1
-#            3 0 1
-    out.write("kids 0\n")
-    out.close()
-    # print "OBJECT_STATIC surface.ac"
-    center_global = transform.toGlobal((0,0))
-    stg_fname = calc_tile.construct_stg_file_name(center_global)
-    print stg_fname, center_global
+    def line(self, lonlat0, lonlat1, color):
+        pass
+    
+    def point(self, lonlat, radius, color):
+        x, y = self._px(lonlat)
+        if x < 0 or y < 0 or x >= self.size_px.x or y >= self.size_px.y:
+            return
+        self.img.putpixel((x, y), color)
+        
+    def write_ac(self, filename):
+        lmin = vec2d(self.transform.toLocal((self.lonlat0.x, self.lonlat0.y)))
+        lmax = vec2d(self.transform.toLocal((self.lonlat1.x, self.lonlat1.y)))
+        map_z0 = 0.
+        elev_offset = self.elev(vec2d(0,0))
+        print "offset", elev_offset
+        self.img.save("%s.png" % filename)
+    
+        nx, ny = ((lmax - lmin) / 100.).int().list()  # 100m raster
+    
+        x = np.linspace(lmin.x, lmax.x, nx)
+        y = np.linspace(lmin.y, lmax.y, ny)
+    
+        u = np.linspace(0., 1., nx)
+        v = np.linspace(0., 1., ny)
+    
+    
+        out = open("%s.ac" % filename, "w")
+        out.write(textwrap.dedent("""\
+        AC3Db
+        MATERIAL "" rgb 1   1    1 amb 1 1 1  emis 1 1 1  spec 0.5 0.5 0.5  shi 64  trans 0
+        OBJECT world
+        kids 1
+        OBJECT poly
+        name "surface"
+        texture "%s.png"
+        numvert %i
+        """ % (filename, nx * ny)))
+    
+        for j in range(ny):
+            for i in range(nx):
+                out.write("%g %g %g\n" % (y[j], (self.elev(vec2d(x[i],y[j])) - elev_offset), x[i]))
+    
+        out.write("numsurf %i\n" % ((nx - 1) * (ny - 1)))
+        for j in range(ny - 1):
+            for i in range(nx - 1):
+                out.write(textwrap.dedent("""\
+                SURF 0x10
+                mat 0
+                refs 4
+                """))
+                out.write("%i %g %g\n" % (i + j * (nx), u[i], v[j]))
+                out.write("%i %g %g\n" % (i + 1 + j * (nx), u[i + 1], v[j]))
+                out.write("%i %g %g\n" % (i + 1 + (j + 1) * (nx), u[i + 1], v[j + 1]))
+                out.write("%i %g %g\n" % (i + (j + 1) * (nx), u[i], v[j + 1]))
+    #            0 0 0
+    #            1 1 0
+    #            2 1 1
+    #            3 0 1
+        out.write("kids 0\n")
+        out.close()
+        # print "OBJECT_STATIC surface.ac"
+        center_global = self.transform.toGlobal((0,0))
+        stg_fname = calc_tile.construct_stg_file_name(center_global)
+        print stg_fname, center_global
 
 def write_gp(buildings):
     gp = open("buildings.dat", "w")
