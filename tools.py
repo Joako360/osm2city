@@ -542,38 +542,45 @@ def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=
 
 class texmap(object):
     """A drawable texture draped over terrain"""
-    def __init__(self, transform, elev, lonlat0, lonlat1, size_px):
+    # FIXME: a base class for a rectangular region! Could be used for Clusters and this.
+    def __init__(self, transform, elev, lmin, lmax, size_px):
         # create texture of given size
         self.img = Image.new("RGBA", (size_px), (0,0,0,0))
         self.size_px = vec2d(size_px)
-        self.lonlat0 = lonlat0
-        self.lonlat1 = lonlat1
-        self.dlonlat = (lonlat1 - lonlat0)
+        self.lmin = lmin # local coords, in meters
+        self.lmax = lmax
+        self.lsize = (lmax - lmin)
         self.elev = elev
         self.transform = transform
+        self.lcenter = self.lmin + 0.5 * self.lsize
+        self.gcenter = vec2d(transform.toGlobal(self.lcenter))
 
-    def _px(self, lonlat):
-        px = ((lonlat - self.lonlat0) / self.dlonlat * self.size_px)
+    def _px(self, xy):
+        px = ((xy - self.lmin) / self.lsize * self.size_px)
         return int(px.x), self.size_px[1] - int(px.y)
 
-    def line(self, lonlat0, lonlat1, color):
+    def line(self, lmin, lmax, color):
         pass
     
-    def point(self, lonlat, radius, color):
+    def gpoint(self, lonlat, radius, color):
         x, y = self._px(lonlat)
+        if x < 0 or y < 0 or x >= self.size_px.x or y >= self.size_px.y:
+            return
+        self.img.putpixel((x, y), color)
+
+    def lpoint(self, xy, radius, color):
+        x, y = self._px(self.transform.toxy)
         if x < 0 or y < 0 or x >= self.size_px.x or y >= self.size_px.y:
             return
         self.img.putpixel((x, y), color)
         
     def write_ac(self, filename):
-        lmin = vec2d(self.transform.toLocal((self.lonlat0.x, self.lonlat0.y)))
-        lmax = vec2d(self.transform.toLocal((self.lonlat1.x, self.lonlat1.y)))
         map_z0 = 0.
         elev_offset = self.elev(vec2d(0,0))
         print "offset", elev_offset
         self.img.save("%s.png" % filename)
     
-        nx, ny = ((lmax - lmin) / 100.).int().list()  # 100m raster
+        nx, ny = (self.lsize / 100.).int().list()  # 100m raster
     
         x = np.linspace(lmin.x, lmax.x, nx)
         y = np.linspace(lmin.y, lmax.y, ny)
@@ -619,7 +626,8 @@ class texmap(object):
         # print "OBJECT_STATIC surface.ac"
         center_global = self.transform.toGlobal((0,0))
         stg_fname = calc_tile.construct_stg_file_name(center_global)
-        print stg_fname, center_global
+        print "%s:OBJECT_STATIC %s.ac %1.9f %1.9f %g 180" % 
+          (stg_fname, filename, center_global[0], center_global[1], elev_offset)
 
 def write_gp(buildings):
     gp = open("buildings.dat", "w")

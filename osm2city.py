@@ -732,13 +732,9 @@ if __name__ == "__main__":
 
     # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
     for b in buildings:
-        for p in b.X_outer:
-            TM.point(vec2d(tools.transform.toGlobal(p)), 0, (255, 255, 0, 255))
         clusters.append(b.anchor, b)
     building_lib.decide_LOD(buildings)
     clusters.transfer_buildings()
-    TM.write_ac('surface')
-    blaaa
 
 
     # -- write clusters
@@ -759,6 +755,16 @@ if __name__ == "__main__":
             if b.roof_complex: nroofs += 2  # we have 2 different LOD models for each roof
 
         tile_elev = elev(cl.center)
+
+        
+        TM = tools.texmap(tools.transform, elev, vec2d(tools.transform.toGlobal(cl.min)), 
+                          vec2d(tools.transform.toGlobal(cl.max)), (512, 512))
+        for b in cl.objects:
+            for p in b.X_outer:
+                TM.point(vec2d(tools.transform.toGlobal(p)), 0, (255, 255, 0, 255))
+        TM.write_ac('surface_%i' % ic)
+
+        cl.min
         center_global = vec2d(tools.transform.toGlobal(cl.center))
         if tile_elev == -9999:
             logging.warning("Skipping tile elev = -9999 at lat %.3f and lon %.3f", center_global.lat, center_global.lon)
