@@ -552,44 +552,44 @@ class texmap(object):
         self.lsize = (lmax - lmin)
         self.elev = elev
         self.transform = transform
-        self.lcenter = self.lmin + 0.5 * self.lsize
-        self.gcenter = vec2d(transform.toGlobal(self.lcenter))
+        self.lcenter = self.lmin + self.lsize * 0.5
+        self.gcenter = vec2d(self.transform.toGlobal(self.lcenter))
+        self.elev_at_center = self.elev(self.gcenter)
 
     def _px(self, xy):
+        """transform local XY coord to pixel coord"""
         px = ((xy - self.lmin) / self.lsize * self.size_px)
         return int(px.x), self.size_px[1] - int(px.y)
 
     def line(self, lmin, lmax, color):
         pass
     
-    def gpoint(self, lonlat, radius, color):
-        x, y = self._px(lonlat)
+    def gpoint(self, lonlat, radius, rgba):
+        x, y = self._px(self.transform.toLocal(lonlat))
         if x < 0 or y < 0 or x >= self.size_px.x or y >= self.size_px.y:
             return
-        self.img.putpixel((x, y), color)
+        self.img.putpixel((x, y), rgba)
 
-    def lpoint(self, xy, radius, color):
-        x, y = self._px(self.transform.toxy)
+    def lpoint(self, xy, radius, rgba):
+        x, y = self._px(xy)
         if x < 0 or y < 0 or x >= self.size_px.x or y >= self.size_px.y:
             return
-        self.img.putpixel((x, y), color)
+        self.img.putpixel((x, y), rgba)
         
-    def write_ac(self, filename):
-        map_z0 = 0.
-        elev_offset = self.elev(vec2d(0,0))
+    def write(self, path_to_stg, file_name, stg_manager):
+        elev_offset = self.elev_at_center
         print "offset", elev_offset
-        self.img.save("%s.png" % filename)
+        self.img.save("%s.png" % (path_to_stg + file_name))
     
         nx, ny = (self.lsize / 100.).int().list()  # 100m raster
     
-        x = np.linspace(lmin.x, lmax.x, nx)
-        y = np.linspace(lmin.y, lmax.y, ny)
+        x = np.linspace(self.lmin.x, self.lmax.x, nx)
+        y = np.linspace(self.lmin.y, self.lmax.y, ny)
     
         u = np.linspace(0., 1., nx)
         v = np.linspace(0., 1., ny)
-    
-    
-        out = open("%s.ac" % filename, "w")
+        
+        out = open("%s.ac" % (path_to_stg + file_name), "w")
         out.write(textwrap.dedent("""\
         AC3Db
         MATERIAL "" rgb 1   1    1 amb 1 1 1  emis 1 1 1  spec 0.5 0.5 0.5  shi 64  trans 0
@@ -599,11 +599,13 @@ class texmap(object):
         name "surface"
         texture "%s.png"
         numvert %i
-        """ % (filename, nx * ny)))
+        """ % (file_name, nx * ny)))
     
         for j in range(ny):
             for i in range(nx):
-                out.write("%g %g %g\n" % (y[j], (self.elev(vec2d(x[i],y[j])) - elev_offset), x[i]))
+                out.write("%g %g %g\n" % (y[j] - self.lcenter[1], 
+                                          (self.elev(vec2d(x[i],y[j])) - elev_offset),
+                                          x[i] - self.lcenter[0]))
     
         out.write("numsurf %i\n" % ((nx - 1) * (ny - 1)))
         for j in range(ny - 1):
@@ -623,11 +625,9 @@ class texmap(object):
     #            3 0 1
         out.write("kids 0\n")
         out.close()
-        # print "OBJECT_STATIC surface.ac"
-        center_global = self.transform.toGlobal((0,0))
-        stg_fname = calc_tile.construct_stg_file_name(center_global)
-        print "%s:OBJECT_STATIC %s.ac %1.9f %1.9f %g 180" % 
-          (stg_fname, filename, center_global[0], center_global[1], elev_offset)
+
+        # FIXME: orientation 180 deg!  
+        stg_manager.add_object_static(file_name + '.ac', self.gcenter, elev_offset, 180)
 
 def write_gp(buildings):
     gp = open("buildings.dat", "w")

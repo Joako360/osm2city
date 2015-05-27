@@ -43,8 +43,18 @@ You should disable random buildings.
 # cmd line
 # x skip nearby check
 # x fake elev
-# - log level
-
+# x log level
+#
+# Coordinate systems
+# - global: lon, lat
+# - local: a Cartesian coordinate system, in meters, local flat earth approximation,
+#          origin is center point of boundaries given in parameters file          
+# - cluster: a Cartesian coordinate system, in meters,
+#          origin is cluster center
+#
+#
+#
+#
 # development hints:
 # variables
 # b: a building instance
@@ -317,6 +327,7 @@ class Buildings(object):
             # -- all checks OK: accept building
 
             # -- make outer and inner rings from refs
+            #    ring coords are local
             outer_ring = self._refs_to_ring(refs)
             inner_rings_list = []
             for _way in inner_ways:
@@ -727,8 +738,6 @@ if __name__ == "__main__":
 
     #tools.write_gp(buildings)
 
-        
-
 
     # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
     for b in buildings:
@@ -757,14 +766,7 @@ if __name__ == "__main__":
         tile_elev = elev(cl.center)
 
         
-        TM = tools.texmap(tools.transform, elev, vec2d(tools.transform.toGlobal(cl.min)), 
-                          vec2d(tools.transform.toGlobal(cl.max)), (512, 512))
-        for b in cl.objects:
-            for p in b.X_outer:
-                TM.point(vec2d(tools.transform.toGlobal(p)), 0, (255, 255, 0, 255))
-        TM.write_ac('surface_%i' % ic)
-
-        cl.min
+        # -- cluster anchor must be its center to allow a sane LOD range test
         center_global = vec2d(tools.transform.toGlobal(cl.center))
         if tile_elev == -9999:
             logging.warning("Skipping tile elev = -9999 at lat %.3f and lon %.3f", center_global.lat, center_global.lon)
@@ -784,7 +786,6 @@ if __name__ == "__main__":
 
         path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, tile_elev, 0)
 
-#        if cl.I.x == 0 and cl.I.y == 0:
         stg_manager.add_object_static('lightmap-switch.xml', center_global, tile_elev, 0, once=True)
 
         if args.uninstall:
@@ -792,9 +793,18 @@ if __name__ == "__main__":
             files_to_remove.append(path_to_stg + file_name + ".xml")
         else:
             # -- write .ac and .xml
+            #    Building coords are still local, they're transformed to cluster coords only in write()
             building_lib.write(path_to_stg + file_name + ".ac", cl.objects, elev, tile_elev, tools.transform, offset)
             write_xml(path_to_stg, file_name, cl.objects)
             tools.install_files(['cityLM.eff', 'lightmap-switch.xml'], path_to_stg)
+
+        # -- map
+        TM = tools.texmap(tools.transform, elev, cl.min, cl.max, (512, 512))
+        for b in cl.objects:
+            for p in b.X_outer:
+                TM.lpoint(vec2d(p), 0, (255, 255, 0, 255))
+        map_file_name = replacement_prefix + "map%02i%02i" % (cl.I.x, cl.I.y)
+        TM.write(path_to_stg, map_file_name, stg_manager)
 
     if args.uninstall:
         for f in files_to_remove:

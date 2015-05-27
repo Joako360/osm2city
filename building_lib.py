@@ -710,7 +710,8 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
     """now actually write buildings of one LOD for given tile.
        While writing, accumulate some statistics
        (totals stored in global stats object, individually also in building)
-       offset accounts for cluster center
+       Offset accounts for cluster center. Buildings we get are in local coords,
+       transform to cluster coords.
        - all LOD in one file. Plus roofs. One Object per LOD
     """
     def local_elev(p):
