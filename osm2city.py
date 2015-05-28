@@ -624,8 +624,8 @@ if __name__ == "__main__":
     logging.debug("height at origin" + str(elev(vec2d(0,0))))
     logging.debug("origin at " + str(tools.transform.toGlobal((0,0))))
 
-    if args.create_map_only:
-        TM = tools.texmap(tools.transform, elev, cmin, cmax, (512, 512))
+#    if args.create_map_only:
+#        TM = tools.texmap(tools.transform, elev, cmin, cmax, (512, 512))
         #tools.write_map('surface.png', tools.transform, elev, cmin, cmax)
 #        sys.exit(0)
   
@@ -799,10 +799,10 @@ if __name__ == "__main__":
             tools.install_files(['cityLM.eff', 'lightmap-switch.xml'], path_to_stg)
 
         # -- map
-        TM = tools.texmap(tools.transform, elev, cl.min, cl.max, (512, 512))
+        TM = tools.texmap(tools.transform, elev, cl.min, cl.max, (1024, 1024))
         for b in cl.objects:
             for p in b.X_outer:
-                TM.lpoint(vec2d(p), 0, (255, 255, 0, 255))
+                TM.lpoint(vec2d(p), (255, 255, 0, 128), 10)
         map_file_name = replacement_prefix + "map%02i%02i" % (cl.I.x, cl.I.y)
         TM.write(path_to_stg, map_file_name, stg_manager)
 

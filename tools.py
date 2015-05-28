@@ -559,7 +559,11 @@ class texmap(object):
     def _px(self, xy):
         """transform local XY coord to pixel coord"""
         px = ((xy - self.lmin) / self.lsize * self.size_px)
-        return int(px.x), self.size_px[1] - int(px.y)
+        return int(round(px.x)), self.size_px[1] - int(round(px.y))
+    
+    def _m2px(self, m):
+        """for given length in meters, return length in px"""
+        return int(round(m) / self.lsize.x * self.size_px.x)
 
     def line(self, lmin, lmax, color):
         pass
@@ -570,11 +574,44 @@ class texmap(object):
             return
         self.img.putpixel((x, y), rgba)
 
-    def lpoint(self, xy, radius, rgba):
+    def lpoint(self, xy, rgba, radius=0):
         x, y = self._px(xy)
         if x < 0 or y < 0 or x >= self.size_px.x or y >= self.size_px.y:
             return
-        self.img.putpixel((x, y), rgba)
+
+        if radius > 0:
+            r = rgba[0]
+            g = rgba[1]
+            b = rgba[2]
+            r = int(0.464 * 255 * 1.3)
+            g = int(0.409 * 255 * 1.3)
+            b = int(0.372 * 255 * 1.3)
+            G = self.lgauss(xy, radius, rgba) * 200.
+            gs = np.array(G.shape)
+            ofs = gs / 2
+            for i in xrange(gs[0]):
+                for j in xrange(gs[1]):
+                    try:
+                        self.img.putpixel((x+i-ofs[0], y+j-ofs[1]), (r, g, b, int(G[i,j])))
+                    except IndexError:
+                        pass
+        else:
+            self.img.putpixel((x, y), rgba)
+        
+    def makeGaussian(self, size, fwhm = 3, center=None):
+        """ Make a square gaussian kernel.
+        size is the length of a side of the square
+        fwhm is full-width-half-maximum, which
+        can be thought of as an effective radius.
+        """
+        x = np.arange(-size, size+1, 1, float)
+        y = x[:,np.newaxis]
+        return np.exp(-4*np.log(2) * (x**2 + y**2) / fwhm**2)
+
+    def lgauss(self, xy, radius_m, rgba):
+        x0, y0 = self._px(xy)
+        radius_px = self._m2px(radius_m)
+        return self.makeGaussian(radius_px)
         
     def write(self, path_to_stg, file_name, stg_manager):
         elev_offset = self.elev_at_center

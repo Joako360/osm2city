@@ -447,7 +447,7 @@ def main():
     
                     A = np.zeros_like(R)
                     A += 0. + 0.7 * np.exp(-Y_m/5.)
-                    A *= gauss_x * 1.7 # FIME: better scaling!
+                    A *= gauss_x * 2.7 # FIME: better scaling!
                     #A *= 0 # off!
 
                     street_values = [(0.464, 0.409, 0.372), (0.5, 0.5, 0.5)]
@@ -458,14 +458,10 @@ def main():
                     
                     # lighten up whole facade
                     if chance(0.5):
-                        add = random.uniform(0, 0.1)
+                        add = random.uniform(0.05, 0.2) + 0.1
                         r_var = random.uniform(-0.05, 0.03)
                         g_var = random.uniform(-0.05, 0.01)
                         b_var = random.uniform(-0.05, 0.05)
-#                        add = 0.1
-#                        r_var = +0.03
-#                        g_var = -0.05
-#                        b_var = -0.05
                         R += add + r_var
                         G += add + g_var
                         B += add + b_var

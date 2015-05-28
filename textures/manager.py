@@ -144,7 +144,6 @@ def make_texture_atlas(texture_list, atlas_filename, ext, size_x = 256, pad_y = 
                 Z = np.linspace(l.v_size_meters, 0, height_px).reshape(height_px, 1)
                 fac = 1. - parameters.BUILDING_FAKE_AMBIENT_OCCLUSION_VALUE * np.exp(-Z / parameters.BUILDING_FAKE_AMBIENT_OCCLUSION_HEIGHT)
                 l.im = img2np.RGBA2img(R * fac, G * fac, B * fac)
-
     
     # -- paste, compute atlas coords
     #    lower left corner of texture is x0, y0
