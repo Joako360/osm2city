@@ -35,6 +35,7 @@ import re
 import os
 import logging
 import argparse
+import noise
 
 def img2RGBA(img):
     """convert PIL image to individual np arrays for R,G,B,A"""
@@ -456,6 +457,35 @@ def main():
                     G = A * street_value[1]
                     B = A * street_value[2]
                     
+                    # -- noise close to ground
+                    N = np.zeros(width_px)
+                    base=random.randint(0, width_px)
+                    for x in xrange(width_px):
+                        N[x] = noise.pnoise1(x*3./width_px, octaves=2, persistence=1.5, 
+                                lacunarity=2, repeat=width_px, base=base)
+                    N -= N.min()
+                    N /= N.max()
+                    decay_meters = random.uniform(0.5, 2)
+                    ny = decay_meters * height_px / height_m
+                    if 0:
+                        D = np.zeros(ny)
+                        for x in xrange(ny):
+                            D[x] = noise.pnoise1(x*3./width_px, octaves=2, persistence=1.5, 
+                                    lacunarity=2, repeat=width_px, base=base)
+                        D -= D.min()
+                        D /= D.max()
+                        D *= 50
+
+                    DY = np.arange(ny)
+                    decay = np.cos(DY/float(ny)*np.pi/2.)
+                    decay = 1.-DY/float(ny)
+                    for y in DY:
+                        R[-y,:] -= N * decay[y]
+    #                    R[-10:-1,:] = 1.
+                        G[-y,:] -= N * decay[y]
+                        B[-y,:] -= N * decay[y]
+                    
+                    
                     # lighten up whole facade
                     if chance(0.5):
                         add = random.uniform(0.05, 0.2) + 0.1
@@ -466,10 +496,9 @@ def main():
                         G += add + g_var
                         B += add + b_var
 
-                        R[R < 0] = 0.
-                        G[G < 0] = 0.
-                        B[B < 0] = 0.
-                    
+                    R[R < 0] = 0.
+                    G[G < 0] = 0.
+                    B[B < 0] = 0.
                     
 #                    G[0:20,:] = 1. # identify top
                     #B = A * 0.372
