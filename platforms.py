@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # FIXME: check sign of angle
 import re
+from locale import atoi
 
 """
 Ugly, highly experimental code.
@@ -42,6 +43,10 @@ class Platform(object):
         self.typ = 0
         self.nodes = []
         self.is_area = 'area' in tags
+        self.logger = logging.getLogger("platforms")
+        
+        if 'layer' in tags:
+            self.logger.warn("layer %s %d"%(tags['layer'],osm_id))
 
 #    def transform(self, nodes_dict, transform):
         osm_nodes = [nodes_dict[r] for r in refs]
@@ -53,10 +58,11 @@ class Platform(object):
 class Platforms(ObjectList):
     valid_node_keys = []
     req_keys = ['railway']
-    valid_keys = ['area']
+    valid_keys = ['area', 'layer']
 
     def __init__(self, transform):
         ObjectList.__init__(self, transform)
+        self.logger = logging.getLogger("platforms")
 
     def create_from_way(self, way, nodes_dict):
 # Processes one way into a platform
@@ -65,7 +71,7 @@ class Platforms(ObjectList):
             self.min_max_scanned = True
             cmin = vec2d(self.minlon, self.minlat)
             cmax = vec2d(self.maxlon, self.maxlat)
-            logging.info("min/max " + str(cmin) + " " + str(cmax))
+            self.logger.info("min/max " + str(cmin) + " " + str(cmax))
 #            center_global = (cmin + cmax)*0.5
             # center_global = vec2d(1.135e1+0.03, 0.02+4.724e1)
             # self.transform = coordinates.Transformation(center_global, hdg = 0)
@@ -81,6 +87,8 @@ class Platforms(ObjectList):
 #            for t in way.tags.keys():
 #                print (t), "=", (way.tags[t])+" ",
 #            print "(rejected)"
+            return
+        if 'layer' in way.tags and atoi(way.tags['layer']) < 0:
             return
 
         # print "(accepted)"
@@ -104,9 +112,9 @@ class Platforms(ObjectList):
 
         o = obj.next_node_index()
         if linear_ring.is_ccw:
-            logging.info('Anti-Clockwise')
+            self.logger.info('Anti-Clockwise')
         else:
-            logging.info("Clockwise")
+            self.logger.info("Clockwise")
             platform.nodes = platform.nodes[::-1]
         for p in platform.nodes:
             e = elev(vec2d(p[0], p[1])) + 1
