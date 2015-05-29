@@ -29,6 +29,7 @@ class STG_File(object):
     """represents an .stg file.
        takes care of writing/reading/uninstalling OBJECT_* lines
     """
+    
     def __init__(self, lon_lat, tile_index, path_to_scenery, magic, prefix):
         """Read all lines from stg to memory.
            Store our/other lines in two separate lists."""
@@ -224,11 +225,13 @@ class STGEntry(object):
             return os.path.abspath(p + os.sep + self.obj_filename)
 
 
-def read_stg_entries(stg_path_and_name, our_magic):
+def read_stg_entries(stg_path_and_name, our_magic, ignore_bad_lines=False):
     """Reads an stg-file and extracts STGEntry objects outside of marked areas for our_magic.
     TODO: In the future, take care of multiple scenery paths here.
     TODO: should be able to take a list of our_magic"""
     entries = []  # list of STGEntry objects
+    
+    logger = logging.getLogger("stgio2")
 
     if None is not our_magic:
         our_magic_start = delimiter_string(our_magic, None, True)
@@ -250,22 +253,33 @@ def read_stg_entries(stg_path_and_name, our_magic):
 
                 if line.startswith('#') or line.lstrip() == "":
                     continue
-                splitted = line.split()
-                type_ = splitted[0]
-                obj_filename = splitted[1]
-                lon = float(splitted[2])
-                lat = float(splitted[3])
-                elev = float(splitted[4])
-                hdg = float(splitted[5])
-                entry = STGEntry(type_, obj_filename, path, lon, lat, elev, hdg)
-                entries.append(entry)                
-                logging.debug("stg: %s %s", type_, entry.get_obj_path_and_name())
-    except IndexError, reason:
-        logging.warning("stg_io:read: Ignoring unreadable file %s", reason)
-        logging.warning("Offending line: %s", line)
-        return []
+                try:
+                    splitted = line.split()
+                    type_ = splitted[0]
+                    obj_filename = splitted[1]
+                    lon = float(splitted[2])
+                    lat = float(splitted[3])
+                    elev = float(splitted[4])
+                    hdg = float(splitted[5])
+                    entry = STGEntry(type_, obj_filename, path, lon, lat, elev, hdg)
+                    entries.append(entry)                
+                    logger.debug("stg: %s %s", type_, entry.get_obj_path_and_name())
+                except ValueError, reason:
+                    if not ignore_bad_lines:
+                        logger.warning("stg_io:read: Damaged file %s", reason)
+                        logger.warning("Damaged line: %s", line.strip())
+                        return []
+                    else:
+                        logger.warning("Damaged line: %s", line.strip())
+                except IndexError, reason:
+                    if not ignore_bad_lines:
+                        logger.warning("stg_io:read: Ignoring unreadable file %s", reason)
+                        logger.warning("Offending line: %s", line.strip())
+                        return []
+                    else:
+                        logger.warning("Damaged line: %s", line.strip())
     except IOError, reason:
-        logging.warning("stg_io:read: Ignoring unreadable file %s", reason)
+        logger.warning("stg_io:read: Ignoring unreadable file %s", reason)
         return []
     return entries
 
