@@ -606,7 +606,6 @@ if __name__ == "__main__":
     # -- initialize modules
 
     # -- prepare transformation to local coordinates
-    cmin, cmax = parameters.get_extent_global()
     center = parameters.get_center_global()
 
     tools.init(coordinates.Transformation(center, hdg = 0))
@@ -659,9 +658,9 @@ if __name__ == "__main__":
         #tools.stats.print_summary()
         buildings.make_way_buildings()
         buildings._get_min_max_coords()
-        cmin = vec2d(buildings.minlon, buildings.minlat)
-        cmax = vec2d(buildings.maxlon, buildings.maxlat)
-        logging.info("min/max " + str(cmin) + " " + str(cmax))
+        bmin = vec2d(buildings.minlon, buildings.minlat)
+        bmax = vec2d(buildings.maxlon, buildings.maxlat)
+        logging.info("min/max " + str(bmin) + " " + str(bmax))
         buildings = buildings.buildings
         logging.info("parsed %i buildings." % len(buildings))
 
@@ -690,8 +689,7 @@ if __name__ == "__main__":
 #    buildings = new_buildings
 
     # -- create (empty) clusters
-    lmin = vec2d(tools.transform.toLocal(cmin))
-    lmax = vec2d(tools.transform.toLocal(cmax))
+    lmin, lmax = [vec2d(tools.transform.toLocal(c)) for c in parameters.get_extent_global()]
     clusters = Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
 
     if parameters.OVERLAP_CHECK:
@@ -799,13 +797,21 @@ if __name__ == "__main__":
             tools.install_files(['cityLM.eff', 'lightmap-switch.xml'], path_to_stg)
 
         # -- map
-        TM = tools.texmap(tools.transform, elev, cl.min, cl.max, (1024, 1024))
-        for b in cl.objects:
-            for p in b.X_outer:
-                TM.lpoint(vec2d(p), (255, 255, 0, 128), 10)
         map_file_name = replacement_prefix + "map%02i%02i" % (cl.I.x, cl.I.y)
-        TM.write(path_to_stg, map_file_name, stg_manager)
-
+        TM = tools.texmap(path_to_stg, map_file_name, tools.transform, elev, 
+                          cl.min, cl.max)
+#        print "1px == ", TM._px2m(1)
+#        TM.lpoint(cl.min, (255, 255, 255, 255))
+        TM.lpoint(cl.min, (0, 0, 255, 255))
+        TM.lpoint(cl.max - 5, (255, 255, 255, 255))
+        
+        if 1:
+            for b in cl.objects:
+                for p in b.X_outer:
+#                    print "---", vec2d(p), 
+                    TM.lpoint(vec2d(p), (255, 255, 255, 123), 0)
+        TM.write(stg_manager)
+        
     if args.uninstall:
         for f in files_to_remove:
             try:

@@ -1121,15 +1121,7 @@ def main():
     if parameters.CREATE_BRIDGES_ONLY:
         roads.keep_only_bridges_and_embankments()
         
-    # -- experimental fake street lamps
-    cmin, cmax = parameters.get_extent_global()
-    TM = tools.texmap(tools.transform, elev, cmin, cmax, (512, 512))
-    for the_road in roads.roads_list:
-        osm_nodes = [the_road.nodes_dict[r] for r in the_road.refs]
-        [TM.point(vec2d(n.lon, n.lat), 0, (255, 255, 255, 255)) for n in osm_nodes]
-    
-    TM.write_ac('surface')
-        
+
     roads.clusterize()
 #    scale_test(transform, elev)
 
@@ -1161,6 +1153,35 @@ def main():
         ac.write(path_to_stg + file_name + '.ac')
         write_xml(path_to_stg, file_name, file_name)
         tools.install_files(['roads.eff'], path_to_stg)
+
+
+        # -- experimental fake street lamps
+        map_file_name = replacement_prefix + "map%02i%02i" % (cl.I.x, cl.I.y)
+        TM = tools.texmap(path_to_stg, map_file_name, tools.transform, elev, 
+                          cl.min, cl.max, (2048, 2048), init=True)
+#        print "1px == ", TM._px2m(1)
+#        TM.lpoint(cl.min, (255, 255, 255, 255))
+#        TM.lpoint(cl.min, (0, 0, 255, 255))
+#        TM.lpoint(cl.max - 5, (255, 255, 255, 255))
+        for the_road in cl.objects:
+            s = 0
+            s1 = the_road.center.length
+            delta = 2.5
+            while s < s1:
+                s += random.gauss(30, 5)
+                p = the_road.center.interpolate(s)
+                p = vec2d(p.coords[0]) + vec2d(random.uniform(-delta, delta), random.uniform(-delta, delta))
+                if the_road.typ in [0, 1, 2]:
+                    col = (255, 255, 255, 64)
+                else:
+                    col = (255, 150, 0, 64)
+                TM.lpoint(p, col, 30.)
+                TM.lpoint(p, (255, 255, 255, 255))
+                
+#            osm_nodes = [the_road.nodes_dict[r] for r in the_road.refs]
+#            [TM.gpoint(vec2d(n.lon, n.lat), (255, 150, 0, 128), 30.) for n in osm_nodes]
+        TM.write(stg_manager)
+#        shg.LineString.interpolate()
 
         for the_way in cl.objects:
             the_way.junction0.reset()

@@ -30,6 +30,7 @@ import re
 import csv
 import subprocess
 from PIL import Image, ImageDraw
+import img2np
 # import Queue
 
 import matplotlib.pyplot as plt
@@ -543,9 +544,19 @@ def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=
 class texmap(object):
     """A drawable texture draped over terrain"""
     # FIXME: a base class for a rectangular region! Could be used for Clusters and this.
-    def __init__(self, transform, elev, lmin, lmax, size_px):
+    def __init__(self, path_to_stg, file_name, transform, elev, lmin, lmax, size_px=(512, 512), init=False):
         # create texture of given size
+        self.path_to_stg = path_to_stg
+        self.file_name = file_name
         self.img = Image.new("RGBA", (size_px), (0,0,0,0))
+        if not init:
+            # -- try load
+            try:
+                self.img = Image.open(path_to_stg + file_name + '.png')
+                size_px = self.img.size
+            except IOError:
+                logging.warn("Couldn't load %s, using blank image" % (path_to_stg + file_name + '.png'))
+        self.img_rgba = img2np.img2RGBA(self.img)
         self.size_px = vec2d(size_px)
         self.lmin = lmin # local coords, in meters
         self.lmax = lmax
@@ -555,50 +566,105 @@ class texmap(object):
         self.lcenter = self.lmin + self.lsize * 0.5
         self.gcenter = vec2d(self.transform.toGlobal(self.lcenter))
         self.elev_at_center = self.elev(self.gcenter)
-
+        
+        if 0:
+            #print transform.toGlobal(
+            x1 = self.lmin.x + 0.333 * self.lsize.x
+            x2 = self.lmin.x + 0.666 * self.lsize.x
+            y1 = self.lmin.y + 0.333 * self.lsize.y
+            y2 = self.lmin.y + 0.666 * self.lsize.y
+            
+            print self.lmin
+            print x1
+            print x2
+            print self.lmax
+    
+            def writenode(f, i, x, y):
+                p = vec2d(self.transform.toGlobal((x, y)))
+                f.write('<node id="%i" visible="true" version="2" changeset="274214" timestamp="2008-03-06T11:50:18Z" user="daveemtb" uid="19799" lat="%1.10f" lon="%1.10f"/>\n' % (i, p.lat, p.lon))
+            f = open("my.osm", "w")
+    #        f = open("/dev/stdout", "wa")
+            writenode(f, 0, x1, y1)
+            writenode(f, 1, x2, y1)
+            writenode(f, 2, x2, y2)
+            writenode(f, 3, x1, y2)
+            f.close()
+            bla
+    
     def _px(self, xy):
         """transform local XY coord to pixel coord"""
-        px = ((xy - self.lmin) / self.lsize * self.size_px)
-        return int(round(px.x)), self.size_px[1] - int(round(px.y))
+        px = ((-self.lmin + xy) / self.lsize * self.size_px)
+        return int(round(px.x)), self.size_px[1] - int(round(px.y)) - 1
     
     def _m2px(self, m):
         """for given length in meters, return length in px"""
-        return int(round(m) / self.lsize.x * self.size_px.x)
+        return int(round(m / self.lsize.x * self.size_px.x))
+
+    def _px2m(self, px):
+        """for given length in px, return length in meters"""
+        return float(px) / self.size_px.x * self.lsize.x
 
     def line(self, lmin, lmax, color):
         pass
+
+    def putpixel(self, (x, y), col, blend=True):
+        
+        fg_a = col[3] / 255.
+        fg = [c / 255. * fg_a for c in col[0:3]]
+        fg.append(fg_a)
+        
+        for i in xrange(3):
+            self.img_rgba[i][y, x] = fg[i] + self.img_rgba[i][y, x] * (1. - fg_a)
+        self.img_rgba[3][y, x] = fg_a + self.img_rgba[3][y, x] * (1. - fg_a)
+                
+        #self.img.putpixel(xy, col)
     
-    def gpoint(self, lonlat, radius, rgba):
-        x, y = self._px(self.transform.toLocal(lonlat))
-        if x < 0 or y < 0 or x >= self.size_px.x or y >= self.size_px.y:
-            return
-        self.img.putpixel((x, y), rgba)
+    def gpoint(self, lonlat, rgba, radius=0):
+        self.lpoint(vec2d(self.transform.toLocal(lonlat)), rgba, radius)
 
     def lpoint(self, xy, rgba, radius=0):
         x, y = self._px(xy)
+        #print "--xy", x, y
         if x < 0 or y < 0 or x >= self.size_px.x or y >= self.size_px.y:
             return
-
         if radius > 0:
             r = rgba[0]
             g = rgba[1]
             b = rgba[2]
-            r = int(0.464 * 255 * 1.3)
-            g = int(0.409 * 255 * 1.3)
-            b = int(0.372 * 255 * 1.3)
-            G = self.lgauss(xy, radius, rgba) * 200.
+#            r = int(0.464 * 255 * 1.3)
+#            g = int(0.409 * 255 * 1.3)
+#            b = int(0.372 * 255 * 1.3)
+            G = self.lgauss(xy, radius, rgba)
             gs = np.array(G.shape)
             ofs = gs / 2
             for i in xrange(gs[0]):
                 for j in xrange(gs[1]):
                     try:
-                        self.img.putpixel((x+i-ofs[0], y+j-ofs[1]), (r, g, b, int(G[i,j])))
+                        self.putpixel((x+i-ofs[0], y+j-ofs[1]), (r, g, b, rgba[3]*G[i,j]))
                     except IndexError:
                         pass
         else:
-            self.img.putpixel((x, y), rgba)
+            self.putpixel((x, y), rgba)
+            if 0:
+                try:
+    #                self.putpixel((x+1, y-1), (255,0,0,255))
+    #                self.putpixel((x-1, y-1), (255,0,0,255))
+    #                self.putpixel((x+1, y+1), (255,0,0,255))
+    #                self.putpixel((x-1, y+1), (255,0,0,255))
+                    col = (0,0,255,255)
+                    self.putpixel((x+1, y), col)
+                    self.putpixel((x-1, y), col)
+                    self.putpixel((x, y+1), col)
+                    self.putpixel((x, y-1), col)
+                    self.putpixel((x+2, y), col)
+                    self.putpixel((x-2, y), col)
+                    self.putpixel((x, y+2), col)
+                    self.putpixel((x, y-2), col)
+    
+                except IndexError:
+                    pass
         
-    def makeGaussian(self, size, fwhm = 3, center=None):
+    def makeGaussian(self, size, fwhm, center=None):
         """ Make a square gaussian kernel.
         size is the length of a side of the square
         fwhm is full-width-half-maximum, which
@@ -611,12 +677,14 @@ class texmap(object):
     def lgauss(self, xy, radius_m, rgba):
         x0, y0 = self._px(xy)
         radius_px = self._m2px(radius_m)
-        return self.makeGaussian(radius_px)
+#        print "rad", radius_m, radius_px
+        return self.makeGaussian(radius_px, radius_px)
         
-    def write(self, path_to_stg, file_name, stg_manager):
+    def write(self, stg_manager):
         elev_offset = self.elev_at_center
         print "offset", elev_offset
-        self.img.save("%s.png" % (path_to_stg + file_name))
+        self.img = img2np.RGBA2img(*self.img_rgba)
+        self.img.save("%s.png" % (self.path_to_stg + self.file_name))
     
         nx, ny = (self.lsize / 100.).int().list()  # 100m raster
     
@@ -626,17 +694,17 @@ class texmap(object):
         u = np.linspace(0., 1., nx)
         v = np.linspace(0., 1., ny)
         
-        out = open("%s.ac" % (path_to_stg + file_name), "w")
+        out = open("%s.ac" % (self.path_to_stg + self.file_name), "w")
         out.write(textwrap.dedent("""\
         AC3Db
-        MATERIAL "" rgb 1   1    1 amb 1 1 1  emis 1 1 1  spec 0.5 0.5 0.5  shi 64  trans 0
+        MATERIAL "" rgb 1 1 1 amb 1 1 1  emis 1 1 1  spec 0.5 0.5 0.5  shi 64  trans 0
         OBJECT world
         kids 1
         OBJECT poly
         name "surface"
         texture "%s.png"
         numvert %i
-        """ % (file_name, nx * ny)))
+        """ % (self.file_name, nx * ny)))
     
         for j in range(ny):
             for i in range(nx):
@@ -664,7 +732,7 @@ class texmap(object):
         out.close()
 
         # FIXME: orientation 180 deg!  
-        stg_manager.add_object_static(file_name + '.ac', self.gcenter, elev_offset, 180)
+        stg_manager.add_object_static(self.file_name + '.ac', self.gcenter, elev_offset + 1, 180)
 
 def write_gp(buildings):
     gp = open("buildings.dat", "w")

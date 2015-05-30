@@ -465,7 +465,7 @@ def main():
                                 lacunarity=2, repeat=width_px, base=base)
                     N -= N.min()
                     N /= N.max()
-                    decay_meters = random.uniform(0.5, 2)
+                    decay_meters = random.uniform(1.5, 3)
                     ny = decay_meters * height_px / height_m
                     if 0:
                         D = np.zeros(ny)
