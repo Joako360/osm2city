@@ -607,8 +607,10 @@ class texmap(object):
     def line(self, lmin, lmax, color):
         pass
 
+    def gpoint(self, lonlat, rgba, Gauss=None):
+        self.lpoint(vec2d(self.transform.toLocal(lonlat)), rgba, Gauss)
+
     def putpixel(self, (x, y), col, blend=True):
-        
         fg_a = col[3] / 255.
         fg = [c / 255. * fg_a for c in col[0:3]]
         fg.append(fg_a)
@@ -616,33 +618,70 @@ class texmap(object):
         for i in xrange(3):
             self.img_rgba[i][y, x] = fg[i] + self.img_rgba[i][y, x] * (1. - fg_a)
         self.img_rgba[3][y, x] = fg_a + self.img_rgba[3][y, x] * (1. - fg_a)
-                
-        #self.img.putpixel(xy, col)
     
-    def gpoint(self, lonlat, rgba, radius=0):
-        self.lpoint(vec2d(self.transform.toLocal(lonlat)), rgba, radius)
+    def put_mat(self, x, y, rgba, alpha_mat):
+#        self.size_px = vec2d(8,8)
+#        alpha_mat = np.zeros((5,5))
+        mat_size = vec2d(alpha_mat.shape)
+        anchor = vec2d(x, y) - mat_size / 2
+#        anchor = vec2d(5, 3)
+        dist_to_border = anchor + mat_size - self.size_px
+#        print "di", dist_to_border
+#        print "ac", anchor
+#        print "si", mat_size
+#        bla
+        if dist_to_border[0] > 0:
+            alpha_mat = alpha_mat[:,:-dist_to_border[0]]
+        if dist_to_border[1] > 0:
+            alpha_mat = alpha_mat[:-dist_to_border[1],:]
+            
+        x, y = anchor
+        if anchor[0] < 0:
+            alpha_mat = alpha_mat[:,-anchor[0]:]
+            x = 0
+        if anchor[1] < 0:
+            alpha_mat = alpha_mat[-anchor[1]:,:]
+            y = 0
+#        print "iffn", alpha_mat.shape
+        mat_size = vec2d(alpha_mat.shape)
+#        return 
+#        if y > self.size_px[1] - alpha_mat.shape[1]/2
+        
+        fg_a = alpha_mat * rgba[3] / 255.
+        
+        for i in xrange(3):
+            bg_col = self.img_rgba[i][y:y+mat_size[0], x:x+mat_size[1]] 
+            #print bg_col.shape, ofs, x, y
+            fg = fg_a * (rgba[i] / 255.)
+            bg_col = fg + bg_col * (1. - fg_a)
+            self.img_rgba[i][y:y+mat_size[0], x:x+mat_size[1]] = bg_col
+            
+        bg_alpha = self.img_rgba[3][y:y+mat_size[0], x:x+mat_size[1]] 
+        bg_alpha = fg_a + bg_alpha * (1. - fg_a)
+        self.img_rgba[3][y:y+mat_size[0], x:x+mat_size[1]] = bg_alpha
 
-    def lpoint(self, xy, rgba, radius=0):
+    def lpoint(self, xy, rgba, Gauss=None):
         x, y = self._px(xy)
-        #print "--xy", x, y
+#        print "--xy", x, y
         if x < 0 or y < 0 or x >= self.size_px.x or y >= self.size_px.y:
             return
-        if radius > 0:
+        if Gauss is not None:    
+#        if radius > 0:
             r = rgba[0]
             g = rgba[1]
             b = rgba[2]
 #            r = int(0.464 * 255 * 1.3)
 #            g = int(0.409 * 255 * 1.3)
 #            b = int(0.372 * 255 * 1.3)
-            G = self.lgauss(xy, radius, rgba)
-            gs = np.array(G.shape)
-            ofs = gs / 2
-            for i in xrange(gs[0]):
-                for j in xrange(gs[1]):
-                    try:
-                        self.putpixel((x+i-ofs[0], y+j-ofs[1]), (r, g, b, rgba[3]*G[i,j]))
-                    except IndexError:
-                        pass
+#            gs = np.array(Gauss.shape)
+#            ofs = gs / 2
+            self.put_mat(x, y, rgba, Gauss)
+#            for i in xrange(gs[0]):
+#                for j in xrange(gs[1]):
+#                    try:
+#                        self.putpixel((x+i-ofs[0], y+j-ofs[1]), (r, g, b, rgba[3]*Gauss[i,j]))
+#                    except IndexError:
+#                        pass
         else:
             self.putpixel((x, y), rgba)
             if 0:
@@ -674,8 +713,7 @@ class texmap(object):
         y = x[:,np.newaxis]
         return np.exp(-4*np.log(2) * (x**2 + y**2) / fwhm**2)
 
-    def lgauss(self, xy, radius_m, rgba):
-        x0, y0 = self._px(xy)
+    def lgauss(self, radius_m):
         radius_px = self._m2px(radius_m)
 #        print "rad", radius_m, radius_px
         return self.makeGaussian(radius_px, radius_px)

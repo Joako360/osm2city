@@ -809,7 +809,18 @@ if __name__ == "__main__":
             for b in cl.objects:
                 for p in b.X_outer:
 #                    print "---", vec2d(p), 
-                    TM.lpoint(vec2d(p), (255, 255, 255, 123), 0)
+                    TM.lpoint(vec2d(p), (255, 255, 255, 123))
+                    
+        # -- VHXX apron lights
+        if cl.I.x == 1 and cl.I.y == 1:
+            positions = np.loadtxt("light_poles.txt")
+            Gauss = TM.lgauss(radius_m=60)
+            for the_pos in positions:
+                col = (255, 255, 255, 128)
+                TM.gpoint(the_pos, col, Gauss)
+                #TM.gpoint(the_pos, (255, 255, 255, 255))
+                
+            
         TM.write(stg_manager)
         
     if args.uninstall:
@@ -828,6 +839,7 @@ if __name__ == "__main__":
     tools.stats.print_summary()
     troubleshoot.troubleshoot(tools.stats)
     logging.info("done.")
+    
     sys.exit(0)
 
 

@@ -34,14 +34,14 @@ def img2RGBA(img):
 
 def RGBA2img(R, G, B, A=None):
     channels = "RGB"
-    if A != None: channels = "RGBA"
+    if A is not None: channels = "RGBA"
         
     height_px, width_px = R.shape
     n = np.zeros((height_px, width_px, len(channels)))
     n[:,:,0] = R #* random.uniform(0.5, 1.0)
     n[:,:,1] = G
     n[:,:,2] = B
-    if A != None: n[:,:,3] = A
+    if A is not None: n[:,:,3] = A
     #channel_name = 'RGBA'
     #for i, channel in enumerate([R, G, B, A]):
     #    print "%s: %1.2f %1.2f" % (channel_name[i], channel.min(), channel.max())

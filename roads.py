@@ -730,6 +730,7 @@ class Roads(objectlist.ObjectList):
             plt.savefig(save)
         if show:
             plt.show()
+            
     def debug_show_h_add(self, label=""):
         return
         print "====", label
@@ -1163,6 +1164,9 @@ def main():
 #        TM.lpoint(cl.min, (255, 255, 255, 255))
 #        TM.lpoint(cl.min, (0, 0, 255, 255))
 #        TM.lpoint(cl.max - 5, (255, 255, 255, 255))
+                          
+        Gauss = TM.lgauss(radius_m=30)
+                          
         for the_road in cl.objects:
             s = 0
             s1 = the_road.center.length
@@ -1175,7 +1179,7 @@ def main():
                     col = (255, 255, 255, 64)
                 else:
                     col = (255, 150, 0, 64)
-                TM.lpoint(p, col, 30.)
+                TM.lpoint(p, col, Gauss)
                 TM.lpoint(p, (255, 255, 255, 255))
                 
 #            osm_nodes = [the_road.nodes_dict[r] for r in the_road.refs]
@@ -1189,7 +1193,7 @@ def main():
             
 
 
-    roads.debug_plot(show=True, plot_junctions=False, clusters=roads.clusters) #, label_nodes=self.nodes_dict.keys())#, label_nodes=[1132288594, 1132288612])
+    roads.debug_plot(show=False, plot_junctions=False, clusters=roads.clusters, save='roads.png') #, label_nodes=self.nodes_dict.keys())#, label_nodes=[1132288594, 1132288612])
     
     debug_create_eps(roads, roads.clusters, elev, plot_cluster_borders=1)
     stg_manager.write()
