@@ -59,6 +59,11 @@ if __name__ == '__main__':
                         action='store_true',
                         default=False,
                         required=False )
+    parser.add_argument("-n", dest="new_download",
+                        help="New download",
+                        action='store_true',
+                        default=False,
+                        required=False )
 
     args = parser.parse_args()
 
@@ -103,6 +108,7 @@ if __name__ == '__main__':
                     ))
 
     #check if necessary to add parallel processing code
+        
     BASH_PARALLEL_PROCESS=False
     if args.parallel :
         if re.search('linux|mac', platform.system().lower()) :
@@ -137,8 +143,7 @@ done
         for dx in range(0, num_rows):
             index = calc_tile.tile_index((lon, lat), dx, dy)
             path = ("%s%s%s" % (calc_tile.directory_name((lon, lat)), os.sep, index))
-            logging.info(path)
-            print(path)
+            logging.info("Writing to : %s"%path)
             try:
                 os.makedirs(path)
             except OSError, e:
@@ -147,6 +152,7 @@ done
             #if(path.count('\\')):
             replacement_path = re.sub('\\\\', '/', path) if(path.count('\\')) else path
             
+            #Manipulate the properties file and write to new destination
             with open(args.properties, "r") as sources:
                 lines = sources.readlines()
             with open(path + os.sep + args.out, "w") as sources:
@@ -158,16 +164,21 @@ done
                     line = re.sub('^\s*(BOUNDARY_NORTH\s*=)(.*)', '\\1 %f' % (calc_tile.get_north_lat(lat, dy)), line)
                     line = re.sub('^\s*(BOUNDARY_SOUTH\s*=)(.*)', '\\1 %f' % (calc_tile.get_south_lat(lat, dy)), line)
                     sources.write(line)
-            download_command = 'wget -O %s/buildings.osm ' + args.url + 'map?bbox=%f,%f,%f,%f   ' 
-            if BASH_PARALLEL_PROCESS :
-                download_command += '&' + os.linesep + 'parallel_wait $max_parallel_process' + os.linesep
-            else :
-                download_command += os.linesep
-#            download_command = 'curl --proxy-ntlm -o %s/buildings.osm http://overpass-api.de/api/map?bbox=%f,%f,%f,%f   ' + os.linesep            
-#             download_command = 'wget -O %s/buildings.osm http://overpass-api.de/api/map?bbox=%f,%f,%f,%f   ' + os.linesep
-            
-            # wget -O FT_WILLIAM/buildings.osm http://overpass-api.de/api/map?bbox=-5.2,56.8,-5.,56.9
-            downloadfile.write(download_command % (replacement_path, calc_tile.get_west_lon(lon, lat, dx), calc_tile.get_south_lat(lat, dy), calc_tile.get_east_lon(lon, lat, dx), calc_tile.get_north_lat(lat, dy)))
+#            download_command = 'wget -O %s/buildings.osm ' + args.url + 'map?bbox=%f,%f,%f,%f   '
+            if args.new_download:
+                download_command = 'python download_tile.py -f %s/params.ini'%path 
+                downloadfile.write(download_command+ os.linesep)
+            else:
+                download_command = 'curl -f --retry 6 --proxy-ntlm -o %s/buildings.osm http://overpass-api.de/api/map?bbox=%f,%f,%f,%f   ' + os.linesep                        
+                if BASH_PARALLEL_PROCESS :
+                    download_command += '&' + os.linesep + 'parallel_wait $max_parallel_process' + os.linesep
+                else :
+                    download_command += os.linesep
+    #            download_command = 'curl --proxy-ntlm -o %s/buildings.osm http://overpass-api.de/api/map?bbox=%f,%f,%f,%f   ' + os.linesep            
+    #             download_command = 'wget -O %s/buildings.osm http://overpass-api.de/api/map?bbox=%f,%f,%f,%f   ' + os.linesep
+                
+                # wget -O FT_WILLIAM/buildings.osm http://overpass-api.de/api/map?bbox=-5.2,56.8,-5.,56.9
+                downloadfile.write(download_command % (replacement_path, calc_tile.get_west_lon(lon, lat, dx), calc_tile.get_south_lat(lat, dy), calc_tile.get_east_lon(lon, lat, dx), calc_tile.get_north_lat(lat, dy)))
             for command in files:
                 write_to_file(command[0], command[1])
     for command in files:
