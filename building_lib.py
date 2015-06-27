@@ -283,9 +283,6 @@ def compute_height_and_levels(b):
         b.height = 0
     # -- try OSM height and levels first
     if b.height > 0 and b.levels > 0:
-        if b.levels > parameters.BUILDING_CITY_LEVELS_LIMIT:
-            b.levels = parameters.BUILDING_CITY_LEVELS_LIMIT
-            b.height = b.levels * random_level_height()
         return
 
     level_height = random_level_height()
@@ -442,6 +439,10 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 continue
 
         compute_height_and_levels(b)
+        if b.levels > parameters.BUILDING_CITY_LEVELS_LIMIT:
+            b.levels = parameters.BUILDING_CITY_LEVELS_LIMIT
+            b.height = b.levels * random_level_height()
+
 
         # -- check area
         if not is_large_enough(b, buildings):
