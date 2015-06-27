@@ -254,7 +254,7 @@ class LinearObject(object):
             
         return nodes_list
 
-    def write_quads(self, obj, left_nodes_list, right_nodes_list, tex_y0, tex_y1, debug_ac=None):
+    def write_quads(self, obj, left_nodes_list, right_nodes_list, tex_y0, tex_y1, debug_ac=None, mat=0):
         """
            Write a series of quads bound by left and right. 
            Left/right are lists of node indices which will be used to form a series of quads.
@@ -288,7 +288,7 @@ class LinearObject(object):
                      (left_nodes_list[i+1],  xr, tex_y0),
                      (right_nodes_list[i+1], xr, tex_y1),
                      (right_nodes_list[i],   xl, tex_y1) ]
-            obj.face(face[::-1])
+            obj.face(face[::-1], mat=mat)
         
 
     def probe_ground(self, elev, line_string):
