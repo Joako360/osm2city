@@ -541,6 +541,37 @@ def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=
         f.write("\n")
     f.close()
 
+class texmap_mip(object):
+    def __init__(self, levels, path_to_stg, file_name, transform, elev, lmin, lmax, size_px=(512, 512), init=False):
+        self.mips = []    
+        for the_level in range(levels):
+            if the_level > 0:
+                the_file_name = file_name + '_%02i' % the_level
+            else:
+                the_file_name = file_name
+            the_size_px = np.array(size_px) / 2**(the_level)
+            the_mip = texmap(path_to_stg, the_file_name, transform, elev, lmin, lmax, the_size_px, init)
+            self.mips.append(the_mip)
+
+    def lpoint(self, xy, rgba, Gauss=None):
+        for level, the_mip in enumerate(self.mips):
+            if Gauss == None:
+                the_mip.lpoint(xy, rgba)
+            else:
+                the_mip.lpoint(xy, rgba, Gauss[level])
+
+    def lgauss(self, radius_m):
+        Gauss = []
+        for the_mip in self.mips:
+            Gauss.append(the_mip.lgauss(radius_m))
+        return Gauss
+        
+    def write(self, stg_manager, img_only=False):
+        for level, the_mip in enumerate(self.mips):
+            if level > 0:
+                img_only = True
+            the_mip.write(stg_manager, img_only)
+
 class texmap(object):
     """A drawable texture draped over terrain"""
     # FIXME: a base class for a rectangular region! Could be used for Clusters and this.
@@ -549,6 +580,7 @@ class texmap(object):
         self.path_to_stg = path_to_stg
         self.file_name = file_name
         self.img = Image.new("RGBA", (size_px), (0,0,0,0))
+        self.is_empty = True
         if not init:
             # -- try load
             try:
@@ -620,6 +652,7 @@ class texmap(object):
         self.img_rgba[3][y, x] = fg_a + self.img_rgba[3][y, x] * (1. - fg_a)
     
     def put_mat(self, x, y, rgba, alpha_mat):
+        self.is_empty = False
 #        self.size_px = vec2d(8,8)
 #        alpha_mat = np.zeros((5,5))
         mat_size = vec2d(alpha_mat.shape)
@@ -665,6 +698,7 @@ class texmap(object):
 #        print "--xy", x, y
         if x < 0 or y < 0 or x >= self.size_px.x or y >= self.size_px.y:
             return
+        self.is_empty = False
         if Gauss is not None:    
 #        if radius > 0:
             r = rgba[0]
@@ -718,12 +752,16 @@ class texmap(object):
 #        print "rad", radius_m, radius_px
         return self.makeGaussian(radius_px, radius_px)
         
-    def write(self, stg_manager):
+    def write(self, stg_manager, img_only=False):
+        if self.is_empty: 
+            return
         elev_offset = self.elev_at_center
-        print "offset", elev_offset
+        #print "offset", elev_offset
         self.img = img2np.RGBA2img(*self.img_rgba)
         self.img.save("%s.png" % (self.path_to_stg + self.file_name))
-    
+        if img_only:
+            return
+            
         nx, ny = (self.lsize / 100.).int().list()  # 100m raster
     
         x = np.linspace(self.lmin.x, self.lmax.x, nx)
@@ -731,8 +769,8 @@ class texmap(object):
     
         u = np.linspace(0., 1., nx)
         v = np.linspace(0., 1., ny)
-        
-        out = open("%s.ac" % (self.path_to_stg + self.file_name), "w")
+
+        out = open(self.path_to_stg + self.file_name + ".ac", "w")
         out.write(textwrap.dedent("""\
         AC3Db
         MATERIAL "" rgb 1 1 1 amb 1 1 1  emis 1 1 1  spec 0.5 0.5 0.5  shi 64  trans 0
@@ -740,7 +778,7 @@ class texmap(object):
         kids 1
         OBJECT poly
         name "surface"
-        texture "%s.png"
+        texture "%s.dds"
         numvert %i
         """ % (self.file_name, nx * ny)))
     
@@ -768,9 +806,43 @@ class texmap(object):
     #            3 0 1
         out.write("kids 0\n")
         out.close()
+        
+        self.write_xml()
 
         # FIXME: orientation 180 deg!  
-        stg_manager.add_object_static(self.file_name + '.ac', self.gcenter, elev_offset + 1, 180)
+        stg_manager.add_object_static(self.file_name + '.xml', self.gcenter, elev_offset + 1, 180)
+
+    def write_xml(self):
+        #  -- LOD animation
+        xml = open(self.path_to_stg + self.file_name + ".xml", "w")
+        xml.write("""<?xml version="1.0"?>\n<PropertyList>\n""")
+        xml.write("<path>%s.ac</path>" % self.file_name)
+    
+        xml.write(textwrap.dedent("""
+        <animation>
+          <object-name>surface</object-name>
+          
+          <enable-hot type="bool">false</enable-hot>
+          <type>select</type>
+          <condition>
+            <greater-than>		
+              <property>/scenery/osm2city/lightmap-factor</property>
+              <value>0.01</value>
+            </greater-than>
+          </condition>      
+        </animation>
+
+        <animation>
+          <type>range</type>
+          <min-m>0</min-m>
+          <max-m>25000</max-m>
+          <!--max-property>/sim/rendering/static-lod/rough</max-property-->
+          <object-name>surface</object-name>
+        </animation>
+
+        </PropertyList>
+        """))
+        xml.close()
 
 def write_gp(buildings):
     gp = open("buildings.dat", "w")
