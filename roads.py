@@ -960,8 +960,31 @@ def write_xml(path_to_stg, file_name, object_name):
                 %s
                 <object-name>%s</object-name>
         </effect>
+
+        <!--
+        <animation>
+          <type>material</type> 
+          <object-name>%s</object-name>
+          <emission>	
+            <red>0.5</red>
+            <green>0.3</green>
+            <blue>0</blue>
+          </emission>
+        </animation>
+        -->
+        
+        <animation>
+          <type>range</type>
+          <min-m>0</min-m>
+            <max-property>/sim/rendering/static-lod/detailed</max-property>
+          <object-name>%s</object-name>
+        </animation>
+
         </PropertyList>
-    """  % (file_name, shader_str, object_name)))
+    """  % (file_name, shader_str, object_name, object_name, object_name)))
+    
+    
+    
 
 def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
     """debug: plot roads map to .eps"""
@@ -1143,8 +1166,14 @@ def main():
         # -- Now write cluster to disk.
         #    First create ac object. Write cluster's objects. Register stg object.
         #    Write ac to file.
+        ac3d.fmt_node = '%1.2f'
         ac = ac3d.File(stats=tools.stats, show_labels=True)
-        ac3d_obj = ac.new_object(file_name, 'tex/roads.png', default_swap_uv=True, default_type=0x10)
+        ac.init_default_material()
+#        ac.materials_list.append('"lit" rgb 1 1 1 amb 1 1 1 emis 0.5 0.29 0 spec 0.5 0.5 0.5 shi 64 trans 0')
+        ac.materials_list.append('"lit" rgb 1 1 1 amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0')
+        ac3d_obj = ac.new_object(file_name, 'Textures/osm2city/VHXX/roads.png', 
+                                 default_swap_uv=True, default_type=0x10)
+                
         for rd in cl.objects:
             if rd.osm_id == 98659369:
                 pass
@@ -1158,8 +1187,8 @@ def main():
 
         # -- experimental fake street lamps
         map_file_name = replacement_prefix + "map%02i%02i" % (cl.I.x, cl.I.y)
-        TM = tools.texmap(path_to_stg, map_file_name, tools.transform, elev, 
-                          cl.min, cl.max, (2048, 2048), init=True)
+        TM = tools.texmap_mip(4, path_to_stg, map_file_name, tools.transform, elev, 
+                          cl.min, cl.max, (1024, 1024), init=True)
 #        print "1px == ", TM._px2m(1)
 #        TM.lpoint(cl.min, (255, 255, 255, 255))
 #        TM.lpoint(cl.min, (0, 0, 255, 255))
@@ -1168,6 +1197,7 @@ def main():
         Gauss = TM.lgauss(radius_m=30)
                           
         for the_road in cl.objects:
+            if the_road.typ == 6: continue # skip railways
             s = 0
             s1 = the_road.center.length
             delta = 2.5
@@ -1184,7 +1214,7 @@ def main():
                 
 #            osm_nodes = [the_road.nodes_dict[r] for r in the_road.refs]
 #            [TM.gpoint(vec2d(n.lon, n.lat), (255, 150, 0, 128), 30.) for n in osm_nodes]
-        TM.write(stg_manager)
+        TM.write(stg_manager, img_only=True)
 #        shg.LineString.interpolate()
 
         for the_way in cl.objects:
