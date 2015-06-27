@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""
+ac3d.py is part of osm2city.
+"""
+
 import string
 import matplotlib.pyplot as plt
 import logging
@@ -265,6 +269,12 @@ class File(object):
             a = o.nodes_as_array()
             the_nodes = np.vstack((the_nodes, a))
         return the_nodes
+
+    def init_default_material(self):
+        self.materials_list.append('"default" rgb 1 1 1 amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0')
+
+    def add_material(self, the_mat):
+        self.materials_list.append(the_mat)
 
     def __str__(self):
         s = 'AC3Db\n'
