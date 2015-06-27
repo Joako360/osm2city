@@ -328,7 +328,7 @@ def init(tex_prefix='tex.src/', create_atlas=False):
     global roofs
     global atlas_file_name
     
-    atlas_file_name = 'tex/atlas_facades'
+    atlas_file_name = 'Textures/osm2city/VHXX/atlas_facades'
     if parameters.ATLAS_SUFFIX_DATE:
         now = datetime.datetime.now()
         atlas_file_name += "_%04i%02i%02i" % (now.year, now.month, now.day)
