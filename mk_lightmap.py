@@ -97,6 +97,18 @@ def chance(fraction):
 def pick_one(the_list):
     return the_list[random.randint(0, len(the_list)-1)]
 
+class Colors(object):
+    def __init__(self):
+        self.colors = []
+        self.probs = []
+
+    def add(self, R, G, B, scale=1., prob=1.):
+        self.colors.append([R*scale/255., G*scale/255., B*scale/255.])
+        self.probs.append(prob)
+
+    def pick_one(self):
+        return np.array(self.colors[random.randint(0, len(self.colors)-1)])
+
 def mk_lit_values_from_float(num, mean_min, mean_max, R_var, G_var, G_minus, B_var, B_minus, min_val):
     """auto-gen a list of num window colors. Each color uses given range for
        a mean value; RGB values are offset from mean by given _var"""
@@ -351,10 +363,12 @@ def load_py(image_file_name):
     T = facades[0]
     return T
 
+
 # ------------------------------------------------------------------------
 
-def main():
-    #random.seed(42)
+def main(debug=0):
+    random.seed(42)
+    logging.basicConfig(level=logging.INFO)
     # -- Parse arguments. Command line overrides config file.
     parser = argparse.ArgumentParser(description="mk_lightmap.py creates lightmaps for use with osm2city")
     parser.add_argument("-a", "--auto-windows", action="store_true", help="auto-create lit windows")
@@ -367,15 +381,17 @@ def main():
     args = parser.parse_args()
 
     # -- debug presets    
-    if 0:
+    if debug:
         args.auto_windows = 1
         args.add_streetlight = 1
         args.lit_windows = 1
-        args.commercial = True
-        args.force = True
-        args.FILE = ["facade_modern_commercial_red_gray_20x14m.py"]
+        if debug==2:
+            args.commercial = True
+            args.force = True
+            args.FILE = ["facade_modern_commercial_red_gray_20x14m.py"]
     
     for arg_name in args.FILE:
+        logging.info("trying %s" % arg_name)
 #        try:
         if 1:
             name, ext = os.path.splitext(arg_name)
@@ -426,8 +442,22 @@ def main():
                     width_m = 10. / aspect
     
             #R_org = R.copy() # -- save R to identify windows later
+            # Mercury Vapor 216, 247, 255
+            # Sodium Vapor 255, 209, 178
+            # Metal Halide 242, 252, 255
+            # High Pressure Sodium 255, 183, 76
+
+            facade_colors = Colors()
+            facade_colors.add(107, 170, 201, 0.6)  # blueish
+            facade_colors.add(64,  155, 129, 0.45)   # greenish
+            facade_colors.add(188, 147, 153, 0.7)  # red
+            facade_colors.add(149, 129, 81, 0.8)   # brown
+            facade_colors.add(224, 224, 209, 0.6)  # pale yellow
+            facade_colors.add(0.464*255, 0.409*255, 0.372*255) # brownish
+            facade_colors.add(80.,  80.,  80.)
+            facade_colors.add(216, 247, 255, 0.5)  # mercury vapor light greenish
     
-            if args.add_streetlight and not T.v_can_repeat:
+            if chance(0.5) and args.add_streetlight and not T.v_can_repeat:
                 y = np.linspace(1, 0, height_px)
                 x = np.linspace(0, 1, width_px)
                 X, Y = np.meshgrid(x, y)
@@ -447,15 +477,16 @@ def main():
                     gauss_x = v / v.max()
     
                     A = np.zeros_like(R)
-                    A += 0. + 0.7 * np.exp(-Y_m/5.)
+                    A += 0.1 + 0.4 * np.exp(-Y_m/15.)
                     A *= gauss_x * 2.7 # FIME: better scaling!
                     #A *= 0 # off!
 
-                    street_values = [(0.464, 0.409, 0.372), (0.5, 0.5, 0.5)]
-                    street_value = pick_one(street_values)
-                    R = A * street_value[0]
-                    G = A * street_value[1]
-                    B = A * street_value[2]
+#                    street_values = [(0.464, 0.409, 0.372), (0.5, 0.5, 0.5)]
+                    street_value = facade_colors.pick_one()
+                    #logging.info("col:" + (str(street_value*255)))
+                    R = A * street_value[0] # * random.uniform(0.9, 1.1)
+                    G = A * street_value[1] # * random.uniform(0.95, 1.05)
+                    B = A * street_value[2] # * random.uniform(0.95, 1.05)
                     
                     # -- noise close to ground
                     N = np.zeros(width_px)
@@ -486,8 +517,15 @@ def main():
                         B[-y,:] -= N * decay[y]
                     
                     
-                    # lighten up whole facade
-                    if chance(0.5):
+                    # -- lighten up whole facade
+                    if height_m > 20. and chance(0.33):
+                        #val = pick_one(facade_values) * 0.2
+                        val = street_value * 0.05
+                        R += val[0]
+                        G += val[1]
+                        B += val[2]
+                        
+                    if 0 and chance(0.75):
                         add = random.uniform(0.05, 0.2) + 0.1
                         r_var = random.uniform(-0.05, 0.03)
                         g_var = random.uniform(-0.05, 0.01)
@@ -496,13 +534,14 @@ def main():
                         G += add + g_var
                         B += add + b_var
 
-                    R[R < 0] = 0.
-                    G[G < 0] = 0.
-                    B[B < 0] = 0.
+                A = 1.
+                    
+                R[R < 0] = 0.
+                G[G < 0] = 0.
+                B[B < 0] = 0.
                     
 #                    G[0:20,:] = 1. # identify top
                     #B = A * 0.372
-                    A = 1.
     
                 img = RGBA2img(R, G, B, A)
             else:
@@ -564,7 +603,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(debug=0)
     if 0:
 #    img = Image.open("wbs70_36x36m.png")
     
