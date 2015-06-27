@@ -797,31 +797,32 @@ if __name__ == "__main__":
             tools.install_files(['cityLM.eff', 'lightmap-switch.xml'], path_to_stg)
 
         # -- map
-        map_file_name = replacement_prefix + "map%02i%02i" % (cl.I.x, cl.I.y)
-        TM = tools.texmap(path_to_stg, map_file_name, tools.transform, elev, 
-                          cl.min, cl.max)
-#        print "1px == ", TM._px2m(1)
-#        TM.lpoint(cl.min, (255, 255, 255, 255))
-        TM.lpoint(cl.min, (0, 0, 255, 255))
-        TM.lpoint(cl.max - 5, (255, 255, 255, 255))
-        
-        if 1:
-            for b in cl.objects:
-                for p in b.X_outer:
-#                    print "---", vec2d(p), 
-                    TM.lpoint(vec2d(p), (255, 255, 255, 123))
-                    
-        # -- VHXX apron lights
-        if cl.I.x == 1 and cl.I.y == 1:
-            positions = np.loadtxt("light_poles.txt")
-            Gauss = TM.lgauss(radius_m=60)
-            for the_pos in positions:
-                col = (255, 255, 255, 128)
-                TM.gpoint(the_pos, col, Gauss)
-                #TM.gpoint(the_pos, (255, 255, 255, 255))
-                
+        if 0:
+            map_file_name = replacement_prefix + "map%02i%02i" % (cl.I.x, cl.I.y)
+            TM = tools.texmap_mip(4, path_to_stg, map_file_name, tools.transform, elev, 
+                              cl.min, cl.max)
+    #        print "1px == ", TM._px2m(1)
+    #        TM.lpoint(cl.min, (255, 255, 255, 255))
+            TM.lpoint(cl.min, (0, 0, 255, 255))
+            TM.lpoint(cl.max - 5, (255, 255, 255, 255))
             
-        TM.write(stg_manager)
+            if 1:
+                for b in cl.objects:
+                    for p in b.X_outer:
+    #                    print "---", vec2d(p), 
+                        TM.lpoint(vec2d(p), (255, 255, 255, 123))
+                        
+            # -- VHXX apron lights
+            if 0 and cl.I.x == 1 and cl.I.y == 1:
+                positions = np.loadtxt("light_poles.txt")
+                Gauss = TM.lgauss(radius_m=90)
+                for the_pos in positions:
+                    col = (255, 183, 76, 128)
+                    TM.gpoint(the_pos, col, Gauss)
+                    #TM.gpoint(the_pos, (255, 255, 255, 255))
+                    
+                
+            TM.write(stg_manager)
         
     if args.uninstall:
         for f in files_to_remove:
