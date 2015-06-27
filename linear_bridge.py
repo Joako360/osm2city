@@ -267,13 +267,13 @@ class LinearBridge(linear.LinearObject):
         right_bottom_nodes = self.write_nodes(obj, right_bottom_edge, z-parameters.BRIDGE_BODY_HEIGHT, 
                                               elev_offset, offset)
         # -- top
-        self.write_quads(obj, left_top_nodes, right_top_nodes, self.tex[0], self.tex[1], debug_ac=None)
+        self.write_quads(obj, left_top_nodes, right_top_nodes, self.tex[0], self.tex[1], debug_ac=None, mat=1)
         
         # -- right
-        self.write_quads(obj, right_top_nodes, right_bottom_nodes, textures.road.BRIDGE_1[1], textures.road.BRIDGE_1[0], debug_ac=None)
+        self.write_quads(obj, right_top_nodes, right_bottom_nodes, textures.road.BRIDGE_1[1], textures.road.BRIDGE_1[0], debug_ac=None, mat=1)
         
         # -- left
-        self.write_quads(obj, left_bottom_nodes, left_top_nodes, textures.road.BRIDGE_1[0], textures.road.BRIDGE_1[1], debug_ac=None)
+        self.write_quads(obj, left_bottom_nodes, left_top_nodes, textures.road.BRIDGE_1[0], textures.road.BRIDGE_1[1], debug_ac=None, mat=1)
 
         # -- bottom
         self.write_quads(obj, right_bottom_nodes, left_bottom_nodes, textures.road.BOTTOM[0], textures.road.BOTTOM[1], debug_ac=None)
@@ -291,7 +291,7 @@ class LinearBridge(linear.LinearObject):
                  (right_top_nodes[0],   0, parameters.EMBANKMENT_TEXTURE[1]),
                  (right_bottom_node,    1, parameters.EMBANKMENT_TEXTURE[1]),
                  (left_bottom_node,     1, parameters.EMBANKMENT_TEXTURE[0]) ]
-        obj.face(face)
+        obj.face(face, mat=1)
 
         # -- end wall 2
         the_node = self.edge[0].coords[-1]
@@ -306,7 +306,7 @@ class LinearBridge(linear.LinearObject):
                  (right_top_nodes[-1],   0, parameters.EMBANKMENT_TEXTURE[1]),
                  (right_bottom_node,    1, parameters.EMBANKMENT_TEXTURE[1]),
                  (left_bottom_node,     1, parameters.EMBANKMENT_TEXTURE[0]) ]
-        obj.face(face[::-1])
+        obj.face(face[::-1], mat=1)
         
         # pillars
         #if len(self.refs) > 2:
