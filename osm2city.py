@@ -398,9 +398,10 @@ class Buildings(object):
         if tools.stats.objects >= parameters.MAX_OBJECTS:
             return
 
-        if 'building' in relation.tags:
+        if 'building' in relation.tags or 'building:part' in relation.tags :
             outer_ways = []
             inner_ways = []
+            outer_multipolygons = []
 #            print "rel: ", relation.osm_id, relation.tags #, members
             for m in relation.members:
 #                print "  member", m, m.type_, m.role
@@ -408,14 +409,49 @@ class Buildings(object):
                 if m.type_ == 'way':
                     if m.role == 'outer':
                         for way in self.way_list:
-                            if way.osm_id == m.ref: outer_ways.append(way)
+                            if way.osm_id == m.ref:
+                                if way.refs[0] == way.refs[-1] :
+                                    outer_multipolygons.append(way)
+                                    print("add way outer multipolygon ", way.osm_id)                                    
+                                else :
+                                    outer_ways.append(way)
+                                    print("add way outer ", way.osm_id)
+
                     elif m.role == 'inner':
                         for way in self.way_list:
                             if way.osm_id == m.ref: inner_ways.append(way)
 
+                #elif m.type_ == 'multipolygon':
+                #    if m.role == 'outer' :
+                #        for way in self.way_list:
+                #            if way.osm_id == m.ref:
+                #                outer_multipolygons.append(way)
+
             if outer_ways:
                 #print "len outer ways", len(outer_ways)
-                all_outer_refs = [ref for way in outer_ways for ref in way.refs]
+                #all_outer_refs = [ref for way in outer_ways for ref in way.refs]
+                # build all_outer_refs
+                list_outer_refs = [ way.refs for way in outer_ways[1:] ]
+                # get some order :
+                all_outer_refs = []
+                all_outer_refs.extend( outer_ways[0].refs )
+
+                for i in range(1, len(outer_ways)):
+                    for way_refs in list_outer_refs :
+                        if   way_refs[0]  == all_outer_refs[-1] : 
+                            #first node of way is last of previous
+                            all_outer_refs.extend(way_refs[0:])
+                            continue
+                        elif way_refs[-1] == all_outer_refs[-1] :
+                            #last node of way is last of previous 
+                            all_outer_refs.extend(way_refs[::-1])
+                            continue
+                    list_outer_refs.remove(way_refs)
+                    
+                               
+                               
+                    
+                
                 all_tags = relation.tags
                 for way in outer_ways:
                     #print "TAG", way.tags
@@ -437,13 +473,33 @@ class Buildings(object):
 #                if bla:
 #                    print relation.tags['name']
                 # -- way could have a 'building' tag, too. Prevent processing this twice.
-                for _way in outer_ways:
+                
+            
+            if outer_multipolygons :
+                all_tags = relation.tags
+                for way in outer_multipolygons:
+                    logging.info("Multipolygon" + str(way.osm_id))
+                    all_tags = dict(way.tags.items() + all_tags.items())
+                    if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
+                        res = self._make_building_from_way(way.osm_id,
+                                                           all_tags,
+                                                           way.refs, [inner_ways[0]])
+                    else:
+                        res = self._make_building_from_way(way.osm_id, 
+                                                           all_tags,
+                                                           way.refs, inner_ways)
+                
+            if not outer_multipolygons and not outer_ways :
+                logging.info("Skipping relation %i: no outer way." % relation.osm_id)
+                
+            for _way in outer_ways:
                     if _way in self.way_list:
-                        self.way_list.remove(_way)
+                        logging.info("removing ways" + str(_way.osm_id))
+                        # keep way if not closed, might be used elsewhere
+                        if _way.refs[0] == _way.refs[-1] :
+                            self.way_list.remove(_way)
                     else:
                         logging.error("Outer way (%d) not in list of ways. Building type missing?"%_way.osm_id)
-            else:
-                logging.info("Skipping relation %i: no outer way." % relation.osm_id)
 
     def _get_min_max_coords(self):
         for node in self.nodes_dict.values():
