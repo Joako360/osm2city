@@ -6,6 +6,7 @@ from math import sin, cos, atan2, tan
 import copy
 import logging
 import parameters
+import re
 
 def _flat_relation(b):
     """relation flat roof, for one inner way only, included in base model"""
@@ -180,6 +181,59 @@ def separate_gable(out, b, X, inward_meters = 0., max_height = 1e99):
                (o + 0, t.x(repeatx), t.y(0)),
                (o + 4, t.x(0.5*repeatx), t.y(repeaty)) ])
 
+def separate_pyramidal(out, b, X, inward_meters = 0.5, max_height = 1.e99):
+    """pyramidal roof, ? nodes, separate model. Inward_"""
+    #out.new_object(b.roof_ac_name, b.roof_texture.filename + '.png')
+
+    # -- pitched roof for ? ground nodes
+    t = b.roof_texture
+    
+    # -- ? corners
+    o = out.next_node_index()
+    for x in X:
+        out.node(-x[1], b.ground_elev + b.height, -x[0])
+        
+    if 'roof:height' in b.tags:
+        # force clean of tag if the unit is given 
+        roof_height = float(re.sub(' .*', ' ',b.tags['roof:height'].strip()))
+    else :
+        if 'roof:angle' in b.tags:
+            angle = float(b.tags['roof:angle'])
+        else:
+            angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE, parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
+            
+        while angle > 0:
+            roof_height = tan(np.deg2rad(angle)) * (b.lenX[1]/2)
+            if roof_height < max_height:
+                break
+            angle = angle - 5
+        if roof_height > max_height:
+            logging.warn("roof too high %g > %g" % (roof_height, max_height))
+            return False
+
+    #We don't want the hipped part to be greater than the height, which is 45 deg
+    inward_meters = min(roof_height,inward_meters)
+
+    len_roof_top = b.lenX[0] - 2.*inward_meters
+    len_roof_bottom = 1.*b.lenX[0]
+
+    # get middle node of the "tower"
+    out_1 = -sum([ xi[1] for xi in X ])/len(X)
+    out_2 = -sum([ xi[0] for xi in X ])/len(X)
+    out.node( out_1, b.ground_elev + b.height + roof_height, out_2)
+
+    # texture it
+    roof_texture_size_x = t.h_size_meters # size of roof texture in meters
+    roof_texture_size_y = t.v_size_meters
+
+    # loop on sides of the building
+    for i in range(0,len(X)) :
+        repeatx = b.lenX[1]/roof_texture_size_x
+        len_roof_hypo = (inward_meters**2 + roof_height**2)**0.5
+        repeaty = len_roof_hypo/roof_texture_size_x
+        out.face([ (o + i            , t.x(0)          , t.y(0)),
+                   (o + (i+1)%len(X) , t.x(repeatx)    , t.y(0)),
+                   (o + len(X)       , t.x(0.5*repeatx), t.y(repeaty)) ])
 
 def _separate_flat(b, X, ac_name = ""):
 
