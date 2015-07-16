@@ -492,6 +492,26 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 facade_requires.append('facade:shape:terminal')
         except KeyError:
             pass
+        try :
+            if 'stone' in string.lower(b.tags['building:material']):
+                facade_requires.append('building:material:stone')       
+        except KeyError:
+            pass
+        try :
+            if 'timber_framing' in string.lower(b.tags['building:material']):
+                facade_requires.append('facade:building:material:timber_framing')
+        except KeyError:
+            pass
+        try :
+            # cleanup building:colour and use it
+            if   'building:color' in b.tags and 'building:colour' not in b.tags :
+                b.tags['building:colour'] = b.tags['building:color']
+                del(b.tags['building:color'])
+            elif 'building:color' in b.tags and 'building:colour'     in b.tags :
+                del(b.tags['building:color'])
+            facade_requires.append('facade:building:colour:'+string.lower(b.tags['building:colour']))
+        except KeyError:
+            pass    
 #
         # -- determine facade and roof textures
         logging.verbose("___find facade")
