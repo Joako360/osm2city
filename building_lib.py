@@ -788,12 +788,13 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
         # -- outer and inner walls (if any)
         # print "--1"
+        if b.facade_texture != 'wall_no' :
         write_ring(out, b, b.polygon.exterior, 0, b.facade_texture, tex_y0, tex_y1)
-        if True:
-            v0 = b.nnodes_outer
-            for inner in b.polygon.interiors:
-                # print "--2"
-                v0 = write_ring(out, b, inner, v0, b.facade_texture, tex_y0, tex_y1, True)
+            if True:
+                v0 = b.nnodes_outer
+                for inner in b.polygon.interiors:
+                    # print "--2"
+                    v0 = write_ring(out, b, inner, v0, b.facade_texture, tex_y0, tex_y1, True)
 # def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner = False):
 
         # -- roof
