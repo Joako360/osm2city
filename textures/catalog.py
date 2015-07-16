@@ -115,8 +115,8 @@ def append_facades_de(tex_prefix, facades):
 
     # FIXME:
     facades.append(Texture(tex_prefix + 'tex.src/de/commercial/facade_modern_commercial_90x340m.jpg',
-        h_size_meters=90.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=True,
-        v_size_meters=340.2, v_cuts=[309, 443, 577, 712, 846, 1204, 1383, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
+        h_size_meters=90, h_cuts=[32, 64, 96, 129, 160, 192, 224, 256], h_can_repeat=True, #[107, 214, 322, 429, 532, 640, 747, 850]
+        v_size_meters=315, v_cuts=[88, 126, 164, 203, 241, 344, 395, 447, 472, 501, 527, 554, 578, 603, 633, 659, 684, 896], v_can_repeat=False, #[309, 443, 577, 712, 846, 1204, 1383, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135]
         v_align_bottom=True, height_min=40,
         requires=['roof:color:black'], #, 'roof:color:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
@@ -550,27 +550,36 @@ def append_roofs(tex_prefix, roofs):
 #                         1., [], True, 1., [], False, provides=['color:red']))
 
     roofs.append(Texture(tex_prefix + 'tex.src/roof_red1.png',
-        31.8, [], True, 16.1, [], False, provides=['color:red', 'compat:roof-pitched']))
+    32, [0,1024], True, 16, [0,512], False, provides=['default', 'color:red', 'compat:roof-pitched']))
 
     roofs.append(Texture(tex_prefix + 'tex.src/roof_black1.png',
-        31.8, [], True, 16.1, [], False, provides=['color:black', 'compat:roof-pitched']))
+    32, [0,2048], True, 16, [0,1024], False, provides=['default', 'color:black', 'compat:roof-pitched']))
 
-    roofs.append(Texture(tex_prefix + 'tex.src/roof_black4.jpg',
-        6., [], True, 3.5, [], False, provides=['color:black', 'compat:roof-pitched']))
+    #roofs.append(Texture(tex_prefix + 'tex.src/roof_black4.jpg',
+    #    6., [], True, 3.5, [], False, provides=['color:black', 'compat:roof-pitched']))
 
     roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_black1.png',
-        100., [], True, 100., [], False, provides=['color:black', 'compat:roof-flat']))
+        100., [], True, 100., [], False, provides=['default', 'color:black', 'compat:roof-flat']))
 
     roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_gray1.png',
-        100., [], True, 100., [], False, provides=['color:gray', 'compat:roof-flat']))
+        100., [], True, 100., [], False, provides=['default', 'color:gray', 'compat:roof-flat']))
     roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_gray2.png',
-        100., [], True, 100., [], False, provides=['color:gray', 'compat:roof-flat']))
+        100., [], True, 100., [], False, provides=['default', 'color:gray', 'compat:roof-flat']))
 
     roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_gray3.png',
-        100., [], True, 100., [], False, provides=['color:gray', 'compat:roof-flat']))
+        100., [], True, 100., [], False, provides=['default', 'color:gray', 'compat:roof-flat']))
 
     roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_brown1.png',
-        100., [], True, 100., [], False, provides=['color:brown', 'compat:roof-flat']))
+        100., [], True, 100., [], False, provides=['default', 'color:brown', 'compat:roof-flat']))
+
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_grass.png',
+        100., [], True, 100., [], False, requires=['roof:material:grass'], provides=['material:grass', 'color:green', 'compat:roof-pitched', 'compat:roof-flat']))
+
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_copper.png',
+        100., [], True, 100., [], False, requires=['roof:material:copper'], provides=['material:copper', 'color:green', 'compat:roof-pitched', 'compat:roof-flat']))
+
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_glass.png',
+        100., [], True, 100., [], False, requires=['roof:material:glass'], provides=['material:glass', 'compat:roof-pitched', 'compat:roof-flat']))
 
 #    roofs.append(Texture(tex_prefix + 'tex.src/roof_black2',
 #                             1.39, [], True, 0.89, [], True, provides=['color:black']))
