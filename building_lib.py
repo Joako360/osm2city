@@ -844,7 +844,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
                 elif b.roof_type == 'hipped':
                     roofs.separate_hipped(out, b, b.X, max_height=max_height)
                 elif b.roof_type == 'pyramidal' :
-                    roofs.separate_pyramidal(out, b, b.X, max_height=max_height)
+                    roofs.separate_pyramidal(out, b, b.X)
                 elif b.roof_type == 'skillion':
                     roofs.separate_skillion2(out, b, b.X, max_height=max_height)
                 elif b.roof_type == 'flat':
