@@ -503,6 +503,8 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                         b.roof_type = 'flat'
             except KeyError:
                 pass
+        except KeyError:
+            pass
         try :
             # cleanup building:colour and use it
             if   'building:color' in b.tags and 'building:colour' not in b.tags :
