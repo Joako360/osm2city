@@ -542,6 +542,14 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         else:
             roof_requires.append('compat:roof-flat')
 
+        try :
+            if   'roof:material' in b.tags :
+                if str(b.tags['roof:material']) in ['copper', 'glass', 'grass'] :
+                    roof_requires.append(str('roof:material:') + str(b.tags['roof:material']))
+        except KeyError :
+            pass
+
+
         # make roof equal across parts
         if b.parent is None:
             b.roof_texture = roofs.find_matching(roof_requires)
