@@ -93,6 +93,9 @@ CONCURRENCY = 1             # -- number of parallel OSM parsing threads. Unused 
 #    a static model for these, and the overlap check fails. 
 #    Use unicode strings as in the first example if there are non-ASCII characters.
 SKIP_LIST = [u"Theologische Fakultät", "Rhombergpassage", 55875208]
+# -- keep buildings based on their OSM name tag or OSM ID.
+#    keeps also, building:part of buildings
+KEEP_LIST = []
 
 # -- Parameters which influence the number of buildings from OSM taken to output
 BUILDING_MIN_HEIGHT = 3.4           # -- minimum height of a building to be included in output (does not include roof)
@@ -403,4 +406,3 @@ if __name__ == "__main__":
         show()
     if args.show_default:
         show_default()
-
