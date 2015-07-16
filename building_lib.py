@@ -798,7 +798,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
             # -- pitched roof for exactly 4 ground nodes
             else:
                 max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO
-                if b.roof_type == 'gabled':
+                if b.roof_type == 'gabled' or b.roof_type == 'half_hipped' :
                     roofs.separate_gable(out, b, b.X, max_height=max_height)
                 elif b.roof_type == 'hipped':
                     roofs.separate_hipped(out, b, b.X, max_height=max_height)
