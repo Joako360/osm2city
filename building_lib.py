@@ -593,8 +593,17 @@ def write_and_count_vert(out, b, elev, offset, tile_elev):
 
     b.first_node = out.next_node_index()
 
+    z = b.ground_elev - 1
+    try :
+        if 'min_height' in b.tags :
+            min_height = float(b.tags['min_height'])
+            z = b.ground_elev + min_height
+    except :
+        logging.warning("Error reading min_height for building" + b.osm_id)
+        pass
+        
     for x in b.X:
-        z = b.ground_elev - 1
+        #z = b.ground_elev - 1
         out.node(-x[1], z, -x[0])
     for x in b.X:
         out.node(-x[1], b.ground_elev + b.height, -x[0])
