@@ -287,86 +287,72 @@ def separate_skillion2(out, b, X, inward_meters = 0., max_height = 1e99, ac_name
         #
         # here we works with trigo angles 
         angle00 = ( pi/2. - (((float(b.tags['roof:slope:direction']) )%360.)*pi/180.)  )
-        angle90 = angle00 + pi/2.
-        ibottom = 0
-        # assume that first point is on the bottom side of the roof
-        # and is a reference point (0,0)
-        # compute line slope*x
-        
-        slope=sin(angle90)
-        
-        dir1 = (cos(angle90),slope)
-        ndir1 = 1 #sqrt(1 + slope**2)
-        dir1n =  (cos(angle90),slope)#(1/ndir1, slope/ndir1)
-        
-        print("dir1n", dir1n)
-        # keep in mind direction
-        #if angle90 < 270 and angle90 >= 90 :
-        #    #dir1, dir1n = -dir1, -dir1n
-        #    dir1=(-dir1[0],-dir1[1])
-        #    dir1n=(-dir1n[0],-dir1n[1])
-
-        # compute distance from points to line slope*x
-        X2=list()
-        XN=list()
-        nXN=list()
-        vprods=list()
-        
-        p0=(X[0][0], X[0][1])
-        for i in range(0,len(X)):
-            # compute coord in new referentiel
-            vecA =  (X[i][0]-p0[0], X[i][1]-p0[1] )
-            X2.append( vecA )             
-            # 
-            norm = vecA[0]*dir1n[0] + vecA[1]*dir1n[1]
-            vecN = ( vecA[0] - norm*dir1n[0], vecA[1] - norm*dir1n[1] )
-            nvecN = sqrt( vecN[0]**2 + vecN[1]**2 )
-            # store vec and norms
-            XN.append(vecN)
-            nXN.append(nvecN)
-            # compute ^ product
-            vprod = dir1n[0]*vecN[1]-dir1n[1]*vecN[0]
-            vprods.append(vprod)
-    
-        # if first point was not on bottom side, one must find the right point
-        # and correct distances
-        if min(vprods) < 0 :
-            ibottom=vprods.index(min(vprods))
-            offset=nXN[ibottom]
-            norms_o=[ nXN[i] + offset if vprods[i] >=0 else -nXN[i] + offset for i in range(0,len(X)) ] #oriented norm
-        else :
-            norms_o=nXN
-
-        # compute height for each point with thales
-        L = float(max(norms_o)) 
-        print('--- ID',b.osm_id)
-        print("norms_o", norms_o)
-        print("roof_height",roof_height)
-        print("roof_height tag", str(b.tags['roof:height']))
-        print("b.height", str(b.height))
-
-        try :
-            roof_height_X=[ roof_height*l/L for l in norms_o  ]
-            # try to simplify
-            if len(roof_height_X) in [3,4] :
-                for i in range(0,len(roof_height_X)) :
-                    if roof_height_X[i]             < 0.5 : roof_height_X[i] = 0
-                    if roof_height-roof_height_X[i] < 0.5 : roof_height_X[i] = roof_height
-        except :
-            logging.warn("skillion roof with estimated width of 0")
     else :
-        return
+        angre00 = 0.
 
-    # loop on sides of the building
-    #for i in range(0,len(X)) :
-    #    repeatx = b.lenX[1]/roof_texture_size_x
-    #    len_roof_hypo = (inward_meters**2 + roof_height**2)**0.5
-    #    repeaty = len_roof_hypo/roof_texture_size_x
-    #    out.face([ (o + i            , t.x(0)          , t.y(0)),
-    #               (o + (i+1)%len(X) , t.x(repeatx)    , t.y(0)),
-    #               (o + len(X)       , t.x(0.5*repeatx), t.y(repeaty)) ])
+    angle90 = angle00 + pi/2.
+    ibottom = 0
+    # assume that first point is on the bottom side of the roof
+    # and is a reference point (0,0)
+    # compute line slope*x
+    
+    slope=sin(angle90)
+    
+    dir1 = (cos(angle90),slope)
+    ndir1 = 1 #sqrt(1 + slope**2)
+    dir1n =  (cos(angle90),slope)#(1/ndir1, slope/ndir1)
+    
+    print("dir1n", dir1n)
+    # keep in mind direction
+    #if angle90 < 270 and angle90 >= 90 :
+    #    #dir1, dir1n = -dir1, -dir1n
+    #    dir1=(-dir1[0],-dir1[1])
+    #    dir1n=(-dir1n[0],-dir1n[1])
 
-    print('there')
+    # compute distance from points to line slope*x
+    X2=list()
+    XN=list()
+    nXN=list()
+    vprods=list()
+    
+    p0=(X[0][0], X[0][1])
+    for i in range(0,len(X)):
+        # compute coord in new referentiel
+        vecA =  (X[i][0]-p0[0], X[i][1]-p0[1] )
+        X2.append( vecA )             
+        # 
+        norm = vecA[0]*dir1n[0] + vecA[1]*dir1n[1]
+        vecN = ( vecA[0] - norm*dir1n[0], vecA[1] - norm*dir1n[1] )
+        nvecN = sqrt( vecN[0]**2 + vecN[1]**2 )
+        # store vec and norms
+        XN.append(vecN)
+        nXN.append(nvecN)
+        # compute ^ product
+        vprod = dir1n[0]*vecN[1]-dir1n[1]*vecN[0]
+        vprods.append(vprod)
+
+    # if first point was not on bottom side, one must find the right point
+    # and correct distances
+    if min(vprods) < 0 :
+        ibottom=vprods.index(min(vprods))
+        offset=nXN[ibottom]
+        norms_o=[ nXN[i] + offset if vprods[i] >=0 else -nXN[i] + offset for i in range(0,len(X)) ] #oriented norm
+    else :
+        norms_o=nXN
+
+    # compute height for each point with thales
+    L = float(max(norms_o)) 
+
+    try :
+        roof_height_X=[ roof_height*l/L for l in norms_o  ]
+        # try to simplify
+        if len(roof_height_X) in [3,4] :
+            for i in range(0,len(roof_height_X)) :
+                if roof_height_X[i]             < 0.5 : roof_height_X[i] = 0
+                if roof_height-roof_height_X[i] < 0.5 : roof_height_X[i] = roof_height
+    except :
+        logging.warn("skillion roof with estimated width of 0")
+
     #We don't want the hipped part to be greater than the height, which is 45 deg
     inward_meters = min(roof_height,inward_meters)
 
@@ -413,7 +399,6 @@ def separate_skillion2(out, b, X, inward_meters = 0., max_height = 1e99, ac_name
                     outer_closest.pop(0)
                     nodes.append(o) # -- go back to outer ring
         else:
-            print("else len(b.polygon.interiors)")
             nodes = range(b.nnodes_outer)
 
         #assert(len(X) >= len(nodes))
@@ -426,17 +411,8 @@ def separate_skillion2(out, b, X, inward_meters = 0., max_height = 1e99, ac_name
 
         assert(len(nodes) == b._nnodes_ground + 2 * len(b.polygon.interiors))
 
-
-        #if not ac_name: uv *= 0 # -- texture only separate roofs
-        #print "uv, ", uv
-
         l = []
         o=out.next_node_index()
-
-        #for i in range(0,len(nodes)):
-        #    out.node(-X[i][1], b.ground_elev + b.height + roof_height_X[i], -X[i][0])
-        #for i, node in enumerate(nodes):
-        #    #out.node(-X[node][1], b.ground_elev + b.height + roof_height_X[node], -X[node][0])
 
         # create nodes for/ and roof
         for i, node in enumerate(nodes):
@@ -465,7 +441,6 @@ def separate_skillion2(out, b, X, inward_meters = 0., max_height = 1e99, ac_name
                           (o0 + nodes[ipp], tf.x(repeatx), tf.y(max(1-repeaty_ipp - delta[1],0))), 
                           (o  + nodes[ipp], tf.x(repeatx), tf.y(1-delta[1])), 
                           (o  + nodes[i]  , tf.x(0),       tf.y(1-delta[0]))]    )
-
         #exit(1)
 
     return
