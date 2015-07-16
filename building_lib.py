@@ -831,6 +831,8 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
                                       max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
                 if s:
                     tools.stats.have_complex_roof += 1
+                elif b.roof_type == 'skillion':
+                    roofs.separate_skillion2(out, b, b.X, max_height=max_height)
                 else:  # -- fall back to flat roof
                     roofs.flat(out, b, b.X)
                     # FIXME: move to analyse. If we fall back, don't require separate LOD
@@ -843,6 +845,8 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
                     roofs.separate_hipped(out, b, b.X, max_height=max_height)
                 elif b.roof_type == 'pyramidal' :
                     roofs.separate_pyramidal(out, b, b.X, max_height=max_height)
+                elif b.roof_type == 'skillion':
+                    roofs.separate_skillion2(out, b, b.X, max_height=max_height)
                 elif b.roof_type == 'flat':
                     roofs.flat(out, b, b.X)
                 else:
