@@ -802,6 +802,8 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
                     roofs.separate_gable(out, b, b.X, max_height=max_height)
                 elif b.roof_type == 'hipped':
                     roofs.separate_hipped(out, b, b.X, max_height=max_height)
+                elif b.roof_type == 'pyramidal' :
+                    roofs.separate_pyramidal(out, b, b.X, max_height=max_height)
                 elif b.roof_type == 'flat':
                     roofs.flat(out, b, b.X)
                 else:
