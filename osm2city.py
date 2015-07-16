@@ -348,6 +348,11 @@ class Buildings(object):
                             if 'building:part' in building.tags and cand_building.polygon.intersection(building.polygon).equals(building.polygon):
                                 # Our building:part belongs to the building
                                 if(cand_building in self.buildings):
+                                    try :
+                                        if cand_building.tags['building:part'] != 'no' :
+                                            continue
+                                    except :
+                                        pass
                                     # We don't need it since it'll be replaced by its parts
                                     self.buildings.remove(cand_building)
                                 logging.info('Found Building for removing %d' % cand_building.osm_id)
