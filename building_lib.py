@@ -809,7 +809,10 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
         if not b.roof_complex:
         # if True:
-            roofs.flat(out, b, b.X)
+            if b.roof_type == 'skillion':
+                roofs.separate_skillion2(out, b, b.X, max_height=max_height)
+            else :
+                roofs.flat(out, b, b.X)
             continue
 
         # -- roof
