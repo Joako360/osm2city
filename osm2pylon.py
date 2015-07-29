@@ -1268,7 +1268,7 @@ def main():
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
     parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
     parser.add_argument("-u", dest="uninstall", action="store_true", help="uninstall ours from .stg")
-    parser.add_argument("-l", "--loglevel", help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL")
+    parser.add_argument("-l", "--loglevel", help="Set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL")
     args = parser.parse_args()
     if args.filename is not None:
         parameters.read_from_file(args.filename)

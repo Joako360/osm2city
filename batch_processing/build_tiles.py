@@ -101,7 +101,7 @@ if __name__ == '__main__':
   
     downloadfile = open_file(get_file_name("download_", args.tilename, lon, lat))
     files = []
-    utils = [ 'osm2city', 'osm2pylon', 'tools', 'platforms', 'roads', 'piers', 'landuse', ]
+    utils = [ 'osm2city', 'osm2pylon', 'tools', 'platforms', 'roads', 'piers', ]
     for util in utils :
         files.append((util+'.py',
                       open_file(get_file_name( util+"_", args.tilename, lon, lat)),

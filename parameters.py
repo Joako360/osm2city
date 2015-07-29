@@ -219,47 +219,6 @@ LU_LANDUSE_BUILDING_BUFFER_DISTANCE = 25
 LU_LANDUSE_BUILDING_BUFFER_DISTANCE_MAX = 50
 LU_LANDUSE_MIN_AREA = 5000
 
-LU_GENB_PATH_TO_MODELS = "/home/vanosten/bin/fgfs_scenery/terrasync/Models/"
-LU_GENB_STEP_DISTANCE = 2
-LU_GENB_MIN_STREET_LENGTH = 10
-
-LU_GENB_RESIDENTIAL_MIN_GEN_SHARE = 0.3
-LU_GENB_INDUSTRIAL_MIN_GEN_SHARE = 0.3
-
-LU_GENB_RESIDENTIAL_HOUSES = ["Residential/MontserratHse3Green.xml"
-                              , "Residential/French_House.ac"
-                              , "Residential/French_House.ac"
-                              , "Residential/germanvillagehouse1.xml"]
-LU_GENB_RESIDENTIAL_HOUSE_FRONT_MIN = 4
-LU_GENB_RESIDENTIAL_HOUSE_FRONT_MAX = 8
-LU_GENB_RESIDENTIAL_HOUSE_BACK_MIN = 5
-LU_GENB_RESIDENTIAL_HOUSE_BACK_MAX = 15
-LU_GENB_RESIDENTIAL_HOUSE_SIDE_MIN = 5
-LU_GENB_RESIDENTIAL_HOUSE_SIDE_MAX = 15
-
-LU_GENB_RESIDENTIAL_ROWHOUSE_SHARE = 0.4
-LU_GENB_RESIDENTIAL_ROWHOUSES = ["Residential/French_House.ac"]
-LU_GENB_RESIDENTIAL_ROWHOUSE_FRONT_MIN = 3
-LU_GENB_RESIDENTIAL_ROWHOUSE_FRONT_MAX = 6
-LU_GENB_RESIDENTIAL_ROWHOUSE_BACK_MIN = 6
-LU_GENB_RESIDENTIAL_ROWHOUSE_BACK_MAX = 10
-LU_GENB_RESIDENTIAL_ROWHOUSE_SIDE_MIN = 1
-LU_GENB_RESIDENTIAL_ROWHOUSE_SIDE_MAX = 2
-LU_GENB_RESIDENTIAL_ROWHOUSE_MIN_NUMBER = 4
-
-LU_GENB_INDUSTRIAL_LARGE_SHARE = 0.4
-LU_GENB_INDUSTRIAL_BUILDINGS_LARGE = ["Industrial/Industrial10x20.xml"
-                                      , "Industrial/Schenker_storehouse35x30.xml"
-                                      , "Industrial/scotch-distillery.ac"]
-LU_GENB_INDUSTRIAL_BUILDINGS_SMALL = ["Industrial/WaterTower_DDmoritzweg.xml"
-                                      , "Communications/communication-building1-without-antenna.ac"]
-LU_GENB_INDUSTRIAL_BUILDING_FRONT_MIN = 10
-LU_GENB_INDUSTRIAL_BUILDING_FRONT_MAX = 20
-LU_GENB_INDUSTRIAL_BUILDING_BACK_MIN = 10
-LU_GENB_INDUSTRIAL_BUILDING_BACK_MAX = 20
-LU_GENB_INDUSTRIAL_BUILDING_SIDE_MIN = 10
-LU_GENB_INDUSTRIAL_BUILDING_SIDE_MAX = 20
-
 #=============================================================================
 # PARAMETERS RELATED TO roads.py
 #=============================================================================
