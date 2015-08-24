@@ -123,10 +123,6 @@ def separate_gable(out, b, X, inward_meters = 0., max_height = 1e99):
     # -- pitched roof for 4 ground nodes
     t = b.roof_texture
     
-    # -- 4 corners
-    o = out.next_node_index()
-    for x in X:
-        out.node(-x[1], b.ground_elev + b.height, -x[0])
     if 'roof:angle' in b.tags:
         angle = float(b.tags['roof:angle'])
     else:
@@ -140,6 +136,10 @@ def separate_gable(out, b, X, inward_meters = 0., max_height = 1e99):
         logging.warn("roof too high %g > %g" % (roof_height, max_height))
         return False
 
+    # -- 4 corners
+    o = out.next_node_index()
+    for x in X:
+        out.node(-x[1], b.ground_elev + b.height - roof_height, -x[0])
     #We don't want the hipped part to be greater than the height, which is 45 deg
     inward_meters = min(roof_height,inward_meters)
 
@@ -149,8 +149,8 @@ def separate_gable(out, b, X, inward_meters = 0., max_height = 1e99):
     len_roof_top = b.lenX[0] - 2.*inward_meters
     len_roof_bottom = 1.*b.lenX[0]
 
-    out.node(-(0.5*(X[3][1]+X[0][1]) + tang[1]), b.ground_elev + b.height + roof_height, -(0.5*(X[3][0]+X[0][0]) + tang[0]))
-    out.node(-(0.5*(X[1][1]+X[2][1]) - tang[1]), b.ground_elev + b.height + roof_height, -(0.5*(X[1][0]+X[2][0]) - tang[0]))
+    out.node(-(0.5*(X[3][1]+X[0][1]) + tang[1]), b.ground_elev + b.height, -(0.5*(X[3][0]+X[0][0]) + tang[0]))
+    out.node(-(0.5*(X[1][1]+X[2][1]) - tang[1]), b.ground_elev + b.height, -(0.5*(X[1][0]+X[2][0]) - tang[0]))
 
     roof_texture_size_x = t.h_size_meters # size of roof texture in meters
     roof_texture_size_y = t.v_size_meters
