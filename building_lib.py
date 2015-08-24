@@ -895,19 +895,15 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
     global nb  # FIXME: still need this?
 
+    for ib, b in enumerate(buildings) :
+        b.set_X()
+        b.set_ground_elev( elev, tile_elev )
+        
     for ib, b in enumerate(buildings):
         tools.progress(ib, len(buildings))
         out = LOD_objects[b.LOD]
-        b.X = np.array(b.X_outer + b.X_inner)
-    #    Xo = np.array(b.X_outer)
-        for i in range(b._nnodes_ground):
-            b.X[i, 0] -= offset.x  # -- cluster coordinates. NB: this changes building coordinates!
-            b.X[i, 1] -= offset.y
-
-
-        b.ground_elev = local_elev(vec2d(b.X[0]))  # -- interpolate ground elevation at building location
-        # b.ground_elev = elev(vec2d(b.X[0]) + offset) - tile_elev # -- interpolate ground elevation at building location
-        # write_ground(out, b, local_elev)
+        
+        compute_roof_height(b)
         write_and_count_vert(out, b, elev, offset, tile_elev)
 
         nb += 1
