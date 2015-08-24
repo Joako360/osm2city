@@ -97,15 +97,18 @@ class Building(object):
        Read-only access to node coordinates via self.X[node][0|1]
     """
     def __init__(self, osm_id, tags, outer_ring, name, height, levels,
-                 stg_typ = None, stg_hdg = None, inner_rings_list = [], building_type = 'unknown', roof_type = 'flat'):
+                 stg_typ = None, stg_hdg = None, inner_rings_list = [], building_type = 'unknown', roof_type = 'flat', roof_height = 0, refs=[]):
         self.osm_id = osm_id
         self.tags = tags
+        self.refs = refs
         #self.outer_ring = outer_ring # (outer) local linear ring
         self.inner_rings_list = inner_rings_list
         self.name = name.encode('ascii', 'ignore')     # stg: name
         self.stg_typ = stg_typ  # stg: OBJECT_SHARED or _STATIC
         self.stg_hdg = stg_hdg
         self.height = height
+        self.roof_height = roof_height
+        self.roof_height_X = []
         self.longest_edge_len = 0.
         self.levels = levels
         self.first_node = 0  # index of first node in final OBJECT node list
@@ -127,7 +130,10 @@ class Building(object):
         self.building_type = building_type
         self.roof_type = roof_type
         self.parent = None
-
+        self.parent_part = []
+        self.parents_parts = []
+        self.cand_buildings = []
+        self.children = []
 
     def roll_inner_nodes(self):
         """Roll inner rings such that the node closest to an outer node goes first.
@@ -187,6 +193,49 @@ class Building(object):
         #if inner_rings:
         #    print "inner!", inner_rings
         self.polygon = shg.Polygon(outer, inner)
+        
+    def set_X(self):
+        self.X = np.array(self.X_outer + self.X_inner)
+        for i in range(self._nnodes_ground):
+            self.X[i, 0] -= offset.x  # -- cluster coordinates. NB: this changes building coordinates!
+            self.X[i, 1] -= offset.y
+
+    def set_ground_elev(self, elev, tile_elev, min_elev=None, flag=False):
+
+        def local_elev(p):
+            return elev(p + offset) - tile_elev
+
+        self.set_X()
+
+        # get elevation with building points
+        self.ground_elev = min( [ local_elev(vec2d(self.X[i])) for i in range(self._nnodes_ground)  ] )
+
+        print("set_ground_elev first guess", self.osm_id, self.ground_elev, flag)
+
+        try :
+            if min_elev :
+                self.ground_elev = min(min_elev, self.ground_elev)
+
+            # gather children ground info
+            if self.children and flag != "nodown" :
+                for child in self.children :
+                    child.set_ground_elev(elev, tile_elev, min_elev=self.ground_elev, flag="noup")
+                    self.ground_elev = min(self.ground_elev, child.ground_elev)
+                    
+                for child in self.children :
+                    child.ground_elev=self.ground_elev
+
+            # pass information to parent
+            if self.parent and flag != "noup" :
+                self.parent.set_ground_elev(elev, tile_elev, min_elev=self.ground_elev, flag="nodown")
+                self.ground_elev = min(self.ground_elev, self.parent.ground_elev)
+
+        except :
+            logging.error("in set_ground_elev building %i" % self.osm_id)
+            pass
+        
+        if self.parent :
+            print( "   set_ground_elev", self.osm_id, self.ground_elev, self.parent.osm_id, self.parent.ground_elev )
 
     @property
     def X_outer(self):
