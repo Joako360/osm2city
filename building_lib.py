@@ -650,8 +650,11 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             logging.error("OsmID : %d b.longest_edge_len <= b.facade_texture.width_max"%b.osm_id)
             continue
         # print "long", b.longest_edge_len, b.facade_texture.width_max, str(b.facade_texture)
-
-        roof_requires = copy.copy(b.facade_texture.requires)
+        #
+        # roof search
+        #
+        roof_requires.extend(copy.copy(b.facade_texture.requires))
+        
         if b.roof_complex:
             roof_requires.append('compat:roof-pitched')
         else:
