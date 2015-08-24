@@ -607,15 +607,37 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             pass
         try :
             material_type = string.lower(b.tags['building:material'])
-            if str(material_type) in ['stone', 'brick', 'timber_framing' ] :
+            if str(material_type) in ['stone', 'brick', 'timber_framing', 'concrete', 'glass' ] :
                 facade_requires.append(str('facade:building:material:'+ str(material_type)))
             try :
-                # stone use for 
-                if str(material_type) == 'stone' :
-                    if 'roof:shape' not in b.tags :
+                # stone use for
+                if str(material_type) in ['stone', 'concrete', ] :
+                    try :
+                        _roof_material = string.lower(str(b.tags['roof:material']))
+                    except :
+                        _roof_material = None
+
+                    try :
+                        _roof_colour = string.lower(str(b.tags['roof:colour']))
+                    except :
+                        _roof_colour = None
+
+                    if not (_roof_colour or _roof_material ):
+                        b.tags['roof:material'] = str(material_type)
+                        roof_requires.append('roof:material:' + str(material_type))
+
+                    try :
+                        _roof_shape = string.lower(b.tags['roof:shape'])
+                    except :
+                        _roof_shape = None
+
+                    if not _roof_shape :
+                        b.tags['roof:shape'] = 'flat' 
                         b.roof_type = 'flat'
-            except KeyError:
-                pass
+                        b.roof_complex = False
+            except :
+                logging.warning('checking roof material')
+                pass                
         except KeyError:
             pass
         try :
