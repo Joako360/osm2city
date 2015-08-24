@@ -306,6 +306,107 @@ def compute_height_and_levels(b):
     b.height = float(b.levels) * level_height
 
 
+def compute_roof_height(b):
+    "Compute roof_height for each node"
+
+    if b.roof_type == 'skillion' :
+            if 'roof:height' in b.tags:
+                # force clean of tag if the unit is given 
+                roof_height = float(re.sub(' .*', ' ',b.tags['roof:height'].strip()))
+            else :
+                if 'roof:angle' in b.tags:
+                    angle = float(b.tags['roof:angle'])
+                else:
+                    angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE, parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
+            
+                while angle > 0:
+                    roof_height = tan(np.deg2rad(angle)) * (b.lenX[1]/2)
+                    if roof_height < max_height:
+                        break
+                    angle = angle - 1
+
+            if 'roof:slope:direction' in b.tags :
+                # Input angle
+                # angle are given clock wise with reference 0 as north
+                # 
+                # angle 0 north
+                # angle 90 east
+                # angle 180 south
+                # angle 270 west
+                # angle 360 north
+                #
+                # here we works with trigo angles 
+                angle00 = ( pi/2. - (((float(b.tags['roof:slope:direction']) )%360.)*pi/180.)  )
+            else :
+                angle00 = 0
+                
+            angle90 = angle00 + pi/2.
+            ibottom = 0
+            # assume that first point is on the bottom side of the roof
+            # and is a reference point (0,0)
+            # compute line slope*x
+            
+            slope=sin(angle90)
+            
+            dir1 = (cos(angle90),slope)
+            ndir1 = 1 #sqrt(1 + slope**2)
+            dir1n =  (cos(angle90),slope)#(1/ndir1, slope/ndir1)
+            
+            # keep in mind direction
+            #if angle90 < 270 and angle90 >= 90 :
+            #    #dir1, dir1n = -dir1, -dir1n
+            #    dir1=(-dir1[0],-dir1[1])
+            #    dir1n=(-dir1n[0],-dir1n[1])
+
+            # compute distance from points to line slope*x
+            X2=list()
+            XN=list()
+            nXN=list()
+            vprods=list()
+            
+            X = b.X
+            
+            p0=(X[0][0], X[0][1])
+            for i in range(0,len(X)):
+                # compute coord in new referentiel
+                vecA =  (X[i][0]-p0[0], X[i][1]-p0[1] )
+                X2.append( vecA )             
+                # 
+                norm = vecA[0]*dir1n[0] + vecA[1]*dir1n[1]
+                vecN = ( vecA[0] - norm*dir1n[0], vecA[1] - norm*dir1n[1] )
+                nvecN = sqrt( vecN[0]**2 + vecN[1]**2 )
+                # store vec and norms
+                XN.append(vecN)
+                nXN.append(nvecN)
+                # compute ^ product
+                vprod = dir1n[0]*vecN[1]-dir1n[1]*vecN[0]
+                vprods.append(vprod)
+
+            # if first point was not on bottom side, one must find the right point
+            # and correct distances
+            if min(vprods) < 0 :
+                ibottom=vprods.index(min(vprods))
+                offset=nXN[ibottom]
+                norms_o=[ nXN[i] + offset if vprods[i] >=0 else -nXN[i] + offset for i in range(0,len(X)) ] #oriented norm
+            else :
+                norms_o=nXN
+
+            # compute height for each point with thales
+            L = float(max(norms_o)) 
+
+            #try :
+            b.roof_height_X=[ roof_height*l/L for l in norms_o  ]
+            b.roof_height=roof_height
+
+    #except :
+    #    if 'roof:shape' in b.tags :
+    #        logging.error('in compute_height_and_levels', b.tags)
+    #    pass
+    
+
+    return
+
+
 def make_lightmap_dict(buildings):
     """make a dictionary: map texture to objects"""
     lightmap_dict = {}
