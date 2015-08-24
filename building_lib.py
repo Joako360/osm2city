@@ -815,7 +815,7 @@ def write_and_count_vert(out, b, elev, offset, tile_elev):
         #  +-----+------+
         #
         for x in b.X:
-            out.node(-x[1], b.ground_elev + b.height , -x[0])
+            out.node(-x[1], b.ground_elev + b.height - b.roof_height , -x[0])
     b.ceiling = b.ground_elev + b.height
 # ----
 
