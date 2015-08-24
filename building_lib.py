@@ -820,15 +820,19 @@ def write_ground(out, b, elev):
 
 def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner=False):
     tex_y0 = texture.y(tex_y0)  # -- to atlas coordinates
+    tex_y1_input = tex_y1
     tex_y1 = texture.y(tex_y1)
 
     nnodes_ring = len(ring.coords) - 1
     v1 = v0 + nnodes_ring
+    
     # print "v0 %i v1 %i lenX %i" % (v0, v1, len(b.lenX))
-    for i in range(v0, v1 - 1):
+    for ioff in range(0, v1-v0):#range(0, v1-v0-1):
+        i = v0 + ioff
         if False:
             tex_x1 = texture.x(b.lenX[i] / texture.h_size_meters)  # -- simply repeat texture to fit length
         else:
+            ipp = i+1 if ioff < v1-v0-1 else v0
             # FIXME: respect facade texture split_h
             # FIXME: there is a nan in textures.h_splits of tex/facade_modern36x36_12
             a = b.lenX[i] / texture.h_size_meters
@@ -839,26 +843,24 @@ def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner=False):
                 # assert(tex_x1 <= 1.)
                 if not (tex_x1 <= 1.):
                     logging.debug('FIXME: v_can_repeat: need to check in analyse')
+
+            if b.roof_type == 'skillion' :     
+                tex_y12 = texture.y( ( b.height - b.roof_height + b.roof_height_X[i  ])/b.height * tex_y1_input )
+                tex_y11 = texture.y( ( b.height - b.roof_height + b.roof_height_X[ipp])/b.height * tex_y1_input )
+            else :
+                tex_y12 = tex_y1
+                tex_y11 = tex_y1
+
         tex_x0 = texture.x(0)
-        # print "texx", tex_x0, tex_x1
-        j = i + b.first_node
-        out.face([ (j, tex_x0, tex_y0),
-                   (j + 1, tex_x1, tex_y0),
-                   (j + 1 + b._nnodes_ground, tex_x1, tex_y1),
-                   (j + b._nnodes_ground, tex_x0, tex_y1) ],
-                   swap_uv=texture.v_can_repeat)
+        # compute indices to handle closing wall
+        j   = i   + b.first_node
+        jpp = ipp + b.first_node  
 
-    # -- closing wall
-    tex_x1 = texture.x(b.lenX[v1 - 1] / texture.h_size_meters)
-
-    j0 = v0 + b.first_node
-    j1 = v1 + b.first_node
-
-    out.face([(j1 - 1, tex_x0, tex_y0),
-               (j0, tex_x1, tex_y0),
-               (j0 + b._nnodes_ground, tex_x1, tex_y1),
-               (j1 - 1 + b._nnodes_ground, tex_x0, tex_y1)],
-               swap_uv=texture.v_can_repeat)
+        out.face([ (j                       , tex_x0, tex_y0),
+                   (jpp                     , tex_x1, tex_y0),
+                   (jpp   + b._nnodes_ground, tex_x1, tex_y11),
+                   (j +     b._nnodes_ground, tex_x0, tex_y12) ],
+                 swap_uv=texture.v_can_repeat)     
     return v1
     # ---
     # need numvert
