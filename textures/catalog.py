@@ -557,13 +557,16 @@ def append_roofs(tex_prefix, roofs):
 #                         1., [], True, 1., [], False, provides=['color:red']))
 
     roofs.append(Texture(tex_prefix + 'tex.src/roof_red1.png',
-    32, [0,1024], True, 16, [0,512], False, provides=['default', 'color:red', 'compat:roof-pitched']))
+        32, [0,1024], True, 16, [0,512], False, provides=['default', 'color:red', 'compat:roof-pitched', 'material:roof_tiles']))
 
     roofs.append(Texture(tex_prefix + 'tex.src/roof_black1.png',
-    32, [0,2048], True, 16, [0,1024], False, provides=['default', 'color:black', 'compat:roof-pitched']))
+        32, [0,2048], True, 16, [0,1024], False, provides=['default', 'color:black', 'compat:roof-pitched', 'material:roof_tiles']))
 
     #roofs.append(Texture(tex_prefix + 'tex.src/roof_black4.jpg',
     #    6., [], True, 3.5, [], False, provides=['color:black', 'compat:roof-pitched']))
+
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_stone.png',
+        100., [], True, 100., [], False, requires=['roof:material:stone'], provides=[ 'specific', 'material:stone', 'compat:roof-flat', 'compat:roof-pitched']))
 
     roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_black1.png',
         100., [], True, 100., [], False, provides=['default', 'color:black', 'compat:roof-flat']))
@@ -574,7 +577,7 @@ def append_roofs(tex_prefix, roofs):
         100., [], True, 100., [], False, provides=['default', 'color:gray', 'compat:roof-flat']))
 
     roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_gray3.png',
-        100., [], True, 100., [], False, provides=['default', 'color:gray', 'compat:roof-flat']))
+        100., [], True, 100., [], False, provides=['default', 'color:gray', 'compat:roof-flat', 'material:concrete', 'material:metal' ]))
 
     roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_brown1.png',
         100., [], True, 100., [], False, provides=['default', 'color:brown', 'compat:roof-flat']))
