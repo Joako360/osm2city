@@ -631,16 +631,49 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 #
         # -- determine facade and roof textures
         logging.verbose("___find facade")
-        if b.parent is None:
+        #
+        # -- find local texture if infos different from parent
+        #
+        if b.parent is None :
             b.facade_texture = facades.find_matching(facade_requires, b.tags, b.height, b.longest_edge_len)
-        else:
-            if b.parent.facade_texture is None:
-#                 if b.parent.osm_id == 3825399:
-#                     print b.parent
-                b.facade_texture = facades.find_matching(facade_requires, b.parent.tags, b.height, b.longest_edge_len)
-                b.parent.facade_texture = b.facade_texture
-            else:
-                b.facade_texture = b.parent.facade_texture
+        else :
+            # 1 - Check if building and building parent infos are the same
+            
+            # 1.1 Infos about colour
+            try :
+                b_color = b.tags['building:colour']
+            except :
+                b_color = None
+                
+            try :
+                b_parent_color = b.parent.tags['building:colour']
+            except :
+                b_parent_color = None
+            
+            # 1.2 Infos about material
+            try :
+                b_material = b.tags['building:material']
+            except :
+                b_material = None
+                
+            try :
+                b_parent_material = b.parent.tags['building:material']
+            except :
+                b_parent_material = None
+               
+            # could extend to building:facade:material ?
+        
+            # 2 - If same infos use building parent facade else find new texture
+            if b_color    == b_parent_color    and \
+               b_material == b_parent_material :
+                    if b.parent.facade_texture is None :
+                        b.facade_texture = facades.find_matching(facade_requires, b.parent.tags, b.height, b.longest_edge_len)
+                        b.parent.facade_texture = b.facade_texture
+                    else:
+                        b.facade_texture = b.parent.facade_texture
+            else :
+                b.facade_texture = facades.find_matching(facade_requires, b.tags, b.height, b.longest_edge_len)
+
         logging.verbose("__done" + str(b.facade_texture))
         if not b.facade_texture:
             tools.stats.skipped_texture += 1
