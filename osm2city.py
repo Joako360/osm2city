@@ -1231,7 +1231,7 @@ if __name__ == "__main__":
                                 remove_buildings.append(b)
                         except :
                             pass
-                            logging.info("[ ERROR ] should not get there")
+                            logging.info("[ ERROR ] Check Keep list search")
                             #remove_buildings.append(b)
                 except :
                     print("something wrong in test remove" + str(b.osm_id))
