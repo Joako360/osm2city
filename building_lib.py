@@ -29,7 +29,7 @@ import shapely.geometry as shg
 import sys
 import textwrap
 # import plot
-from math import sin, cos, radians
+from math import sin, cos, radians, tan, atan2, sqrt, pi
 import tools
 import parameters
 import myskeleton
