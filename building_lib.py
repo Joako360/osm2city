@@ -704,12 +704,32 @@ def write_and_count_vert(out, b, elev, offset, tile_elev):
     except :
         logging.warning("Error reading min_height for building" + b.osm_id)
         pass
-        
+
+    # ground nodes        
     for x in b.X:
         #z = b.ground_elev - 1
         out.node(-x[1], z, -x[0])
-    for x in b.X:
-        out.node(-x[1], b.ground_elev + b.height, -x[0])
+    # under the roof nodes
+    if b.roof_type == 'skillion':
+        # skillion       
+        #           __ -+ 
+        #     __-+--    |
+        #  +--          |
+        #  |            |
+        #  +-----+------+
+        #
+        if b.roof_height_X :
+            for i in range(len(b.X)) :
+                out.node( -b.X[i][1], b.ground_elev + b.height - b.roof_height + b.roof_height_X[i], -b.X[i][0] )
+    else:
+        # others roofs
+        #  
+        #  +-----+------+
+        #  |            |
+        #  +-----+------+
+        #
+        for x in b.X:
+            out.node(-x[1], b.ground_elev + b.height , -x[0])
     b.ceiling = b.ground_elev + b.height
 # ----
 
