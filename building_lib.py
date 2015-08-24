@@ -398,6 +398,15 @@ def compute_roof_height(b):
             b.roof_height_X=[ roof_height*l/L for l in norms_o  ]
             b.roof_height=roof_height
 
+    else :
+        try :
+            b.roof_height = float(re.sub(' .*', ' ',b.tags['roof:height'].strip()))
+        except :
+            if b.roof_type == 'flat' :
+                b.roof_height = 0
+            else :
+            # should compute roof height for others roof type
+                b.roof_height = 3
     #except :
     #    if 'roof:shape' in b.tags :
     #        logging.error('in compute_height_and_levels', b.tags)
