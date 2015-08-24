@@ -277,6 +277,9 @@ class Buildings(object):
 
     def __init__(self):
         self.buildings = []
+        self.buildings_with_parts = []
+        self.remove_buildings = []
+        self.remove_buildings_parts = []
         self.nodes_dict = {}
         self.node_way_dict = {}
         self.way_list = []
@@ -352,6 +355,12 @@ class Buildings(object):
                 layer = int(tags['layer'])
             if 'roof:shape' in tags:
                 _roof_type = tags['roof:shape']
+            _roof_height=0
+            if 'roof:height' in tags:
+                try :
+                    _roof_height = float(tags['roof:height'])
+                except :
+                    _roof_height = 0
             else:
                 _roof_type = parameters.BUILDING_UNKNOWN_ROOF_TYPE
             _building_type = building_lib.mapType(tags)
@@ -379,7 +388,7 @@ class Buildings(object):
             tools.stats.parse_errors += 1
             return False
 
-        building = Building(osm_id, tags, outer_ring, name, height, levels, inner_rings_list=inner_rings_list, building_type=_building_type, roof_type=_roof_type)
+        building = Building(osm_id, tags, outer_ring, name, height, levels, inner_rings_list=inner_rings_list, building_type=_building_type, roof_type=_roof_type, roof_height=_roof_height, refs=refs)
 #        if building.osm_id == 3825399:
 #            print building
 #
