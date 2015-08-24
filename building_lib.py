@@ -611,6 +611,12 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         except KeyError:
             pass
         try :
+            if 'building:material' not in b.tags :
+                if b.tags['building:part'] == "column" :
+                    facade_requires.append(str('facade:building:material:stone'))
+        except KeyError:
+            pass
+        try :
             material_type = string.lower(b.tags['building:material'])
             if str(material_type) in ['stone', 'brick', 'timber_framing', 'concrete', 'glass' ] :
                 facade_requires.append(str('facade:building:material:'+ str(material_type)))
