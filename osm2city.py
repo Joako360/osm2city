@@ -455,6 +455,27 @@ class Buildings(object):
                 #            if way.osm_id == m.ref:
                 #                outer_multipolygons.append(way)
 
+            
+            if outer_multipolygons :
+                all_tags = relation.tags
+                for way in outer_multipolygons:
+                    logging.info("Multipolygon " + str(way.osm_id))
+                    all_tags = dict(way.tags.items() + all_tags.items())
+                    res=False
+                    try :
+                        if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
+                            res = self._make_building_from_way(way.osm_id,
+                                                               all_tags,
+                                                               way.refs, [inner_ways[0]])
+                        else:
+                            res = self._make_building_from_way(way.osm_id, 
+                                                               all_tags,
+                                                               way.refs, inner_ways)
+                    except :
+                        res = self._make_building_from_way(way.osm_id, 
+                                                                   all_tags,
+                                                                   way.refs)
+
             if outer_ways:
                 #print "len outer ways", len(outer_ways)
                 #all_outer_refs = [ref for way in outer_ways for ref in way.refs]
@@ -502,20 +523,6 @@ class Buildings(object):
 #                    print relation.tags['name']
                 # -- way could have a 'building' tag, too. Prevent processing this twice.
                 
-            
-            if outer_multipolygons :
-                all_tags = relation.tags
-                for way in outer_multipolygons:
-                    logging.info("Multipolygon" + str(way.osm_id))
-                    all_tags = dict(way.tags.items() + all_tags.items())
-                    if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
-                        res = self._make_building_from_way(way.osm_id,
-                                                           all_tags,
-                                                           way.refs, [inner_ways[0]])
-                    else:
-                        res = self._make_building_from_way(way.osm_id, 
-                                                           all_tags,
-                                                           way.refs, inner_ways)
                 
             if not outer_multipolygons and not outer_ways :
                 logging.info("Skipping relation %i: no outer way." % relation.osm_id)
