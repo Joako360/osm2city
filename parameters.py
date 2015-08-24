@@ -108,6 +108,7 @@ BUILDING_NEVER_SKIP_LEVELS = 6      # -- buildings that tall will never be skipp
 
 BUILDING_UNKNOWN_ROOF_TYPE = "flat" # -- If the roof type isn't given use this type
 BUILDING_COMPLEX_ROOFS = 1          # -- generate complex roofs on buildings?
+BUILDING_COMPLEX_MIN_HEIGHT = 2     # -- don't put complex roof on buildings smallers than value without roof:shape flag
 BUILDING_COMPLEX_ROOFS_MAX_LEVELS = 5 # -- don't put complex roofs on buildings taller than this
 BUILDING_COMPLEX_ROOFS_MAX_AREA   = 2000 # -- don't put complex roofs on buildings larger than this
 BUILDING_SKEL_ROOFS = 1             # -- generate complex roofs with pySkeleton? Used to be EXPERIMENTAL_USE_SKEL
