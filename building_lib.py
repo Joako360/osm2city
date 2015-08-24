@@ -592,6 +592,8 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 b.roof_complex = False
 
         facade_requires = []
+        roof_requires = []
+        
         if b.roof_complex:
             facade_requires.append('age:old')
             facade_requires.append('compat:roof-pitched')
