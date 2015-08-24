@@ -33,6 +33,7 @@ import tools
 import datetime
 import img2np
 import parameters
+import re
 
 atlas_file_name = None
 
@@ -244,7 +245,38 @@ class TextureManager(object):
         candidates = []
         for cand in self.__l:
             if set(requires).issubset(cand.provides):
-                candidates.append(cand)
+                can_use = True
+                # Check for "specific" texture in order they do not pollute everything
+                if 'facade:specific' in cand.provides :
+                    req_material = None
+                    req_colour   = None
+                    for req in requires :
+                        if re.match('^.*material:.*', req) :
+                            req_material = re.match('^.*material:(.*)', req).group(1)
+                        elif re.match('^.*:colour:.*', req) :
+                            req_colour = re.match('^.*:colour:(.*)', req).group(1)
+                            
+                    prov_material = None
+                    prov_colour   = None
+                    for prov in cand.provides :
+                        if re.match('^.*:material:.*', prov) :
+                            prov_material = re.match('^.*:material:(.*)', prov).group(1)
+                        elif re.match('^.*:colour:.*', prov) :
+                            prov_colour = re.match('^.*:colour:(.*)', prov).group(1)                    
+                    
+                    for prov, req in [ ( prov_material, req_material ), ] : #( prov_colour, req_colour ), ] :
+                        if prov :
+                            if prov != req :
+                                can_use = False
+                                #break
+
+                    print("can_use", can_use )
+                    print("can.provides", cand.provides )
+                    print("requires", requires)
+                    print( str([ ( prov_material, req_material ), ( prov_colour, req_colour ), ]) )
+        
+                if can_use :
+                    candidates.append(cand)
             else:
                 logging.verbose("  unmet requires %s req %s prov %s" % (str(cand.filename), str(requires), str(cand.provides)))
         return candidates
