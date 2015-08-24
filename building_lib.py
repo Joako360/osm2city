@@ -667,6 +667,11 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         except KeyError :
             pass
 
+        # force use of default roof texture, don't want too weird things
+        if    'roof:material' not in b.tags \
+        and   'roof:color'    not in b.tags \
+        and   'roof:colour'   not in b.tags :
+            roof_requires.append(str('roof:default'))
 
         # make roof equal across parts
         if b.parent is None:
