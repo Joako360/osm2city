@@ -575,6 +575,11 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 if (parameters.BUILDING_SKEL_ROOFS and \
                     b._nnodes_ground in range(4, parameters.BUILDING_SKEL_MAX_NODES)):
                     b.roof_complex = True
+                try :
+                    if str(b.tags['roof:shape']) == 'skillion' :
+                        b.roof_complex = True
+                except :
+                    pass
 
             # -- no pitched roof on tall buildings
             if b.levels > parameters.BUILDING_COMPLEX_ROOFS_MAX_LEVELS:
