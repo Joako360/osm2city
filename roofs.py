@@ -187,11 +187,6 @@ def separate_pyramidal(out, b, X, inward_meters = 0.0, max_height = 1.e99):
 
     # -- pitched roof for ? ground nodes
     t = b.roof_texture
-    
-    # -- ? corners
-    o = out.next_node_index()
-    for x in X:
-        out.node(-x[1], b.ground_elev + b.height, -x[0])
         
     if 'roof:height' in b.tags:
         # force clean of tag if the unit is given 
@@ -210,6 +205,11 @@ def separate_pyramidal(out, b, X, inward_meters = 0.0, max_height = 1.e99):
         if roof_height > max_height:
             logging.warn("roof too high %g > %g" % (roof_height, max_height))
             return False
+            
+    # -- ? corners
+    o = out.next_node_index()
+    for x in X:
+        out.node(-x[1], b.ground_elev + b.height - roof_height, -x[0])
 
     #We don't want the hipped part to be greater than the height, which is 45 deg
     inward_meters = min(roof_height,inward_meters)
@@ -220,7 +220,7 @@ def separate_pyramidal(out, b, X, inward_meters = 0.0, max_height = 1.e99):
     # get middle node of the "tower"
     out_1 = -sum([ xi[1] for xi in X ])/len(X)
     out_2 = -sum([ xi[0] for xi in X ])/len(X)
-    out.node( out_1, b.ground_elev + b.height + roof_height, out_2)
+    out.node( out_1, b.ground_elev + b.height, out_2)
 
     # texture it
     roof_texture_size_x = t.h_size_meters # size of roof texture in meters
