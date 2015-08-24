@@ -392,41 +392,6 @@ class Buildings(object):
 #        if building.osm_id == 3825399:
 #            print building
 #
-        if parameters.BUILDING_REMOVE_WITH_PARTS:
-            for ref in refs:
-                # Build a lookup table
-                if ref not in self.node_way_dict:
-                    way_list_by_ref = []
-                else:
-                    way_list_by_ref = self.node_way_dict[ref]
-                    for cand_building in way_list_by_ref:
-                        try:
-                            if building.osm_id == cand_building.osm_id:
-                                continue
-                            if 'building:part' in building.tags and cand_building.polygon.intersection(building.polygon).equals(building.polygon):
-                                # Our building:part belongs to the building
-                                if(cand_building in self.buildings):
-                                    try :
-                                        if cand_building.tags['building:part'] != 'no' :
-                                            continue
-                                    except :
-                                        pass
-                                    # We don't need it since it'll be replaced by its parts
-                                    self.buildings.remove(cand_building)
-                                logging.info('Found Building for removing %d' % cand_building.osm_id)
-                                building.parent = cand_building
-        #                         print cand_building.name
-                                break
-                        except TopologicalError, reason:
-                            logging.warn("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d "%(reason, building.osm_id, cand_building.osm_id))
-                        except PredicateError, reason:
-                            logging.warn("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d "%(reason, building.osm_id, cand_building.osm_id))
-            
-                        
-    #                     if 'building' in building.tags and building.polygon.intersection(cand_building.polygon).equals(cand_building.polygon):
-    #                         print 'Found Building:part'
-                way_list_by_ref.append(building)
-                self.node_way_dict[ref] = way_list_by_ref
         self.buildings.append(building)
 
         tools.stats.objects += 1
