@@ -581,6 +581,16 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 b.roof_complex = False
                 # FIXME: roof_ACs = True
 
+            # -- no complex roof on tiny buildings
+            min_height=0
+            if "min_height" in b.tags :
+                try :
+                    min_height=float(b.tags['min_height'])
+                except :
+                    min_height=0
+            if b.height - min_height < parameters.BUILDING_COMPLEX_MIN_HEIGHT and 'roof:shape' not in b.tags :
+                b.roof_complex = False
+
         facade_requires = []
         if b.roof_complex:
             facade_requires.append('age:old')
