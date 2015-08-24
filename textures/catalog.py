@@ -528,6 +528,13 @@ def append_facades_us(tex_prefix, facades):
         requires=['roof:color:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
+    facades.append(Texture(tex_prefix + 'tex.src/roof_gen_glass.png',
+        100., [], True, 100., [], False,  provides=['specific', 'building:material:glass', 'compat:roof-pitched', 'compat:roof-flat','age:modern', 'age:old', 'shape:urban', 'shape:commercial']))
+        
+    facades.append(Texture(tex_prefix + 'tex.src/simple_concrete.png',
+        100., [], True, 100., [], False, provides=['specific', 'color:gray', 'building:material:concrete', 'age:old', 'age:modern', 'shape:urban', 'shape:commercial', 'compat:roof-flat', 'compat:roof-pitched']))
+
+
 def append_dynamic(tex_prefix, facades): 
     """--- Dynamically runs py files in tex.src ---"""   
     for subdir, dirs, files in os.walk('tex.src', topdown=True):
