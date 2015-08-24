@@ -1211,7 +1211,7 @@ if __name__ == "__main__":
                                     else :
                                         break
                             except :
-                                loggin.inf("[ ERROR ] while getting parents")
+                                logging.info("[ ERROR ] while getting parents")
                                 parent=False
                             
                             # exit if intermediary parent is in list
