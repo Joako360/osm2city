@@ -657,7 +657,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
         try :
             if   'roof:material' in b.tags :
-                if str(b.tags['roof:material']) in ['copper', 'glass', 'grass'] :
+                if str(b.tags['roof:material']) in ['roof_tiles', 'copper', 'glass', 'grass', 'metal', 'concrete' ] :
                     roof_requires.append(str('roof:material:') + str(b.tags['roof:material']))
         except KeyError :
             pass
