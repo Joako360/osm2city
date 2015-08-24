@@ -272,8 +272,8 @@ class Buildings(object):
     valid_node_keys = []
 #    valid_way_keys = ["building", "building:part", "building:height", "height", "building:levels", "layer"]
     req_way_keys = ["building", "building:part"]
-    valid_relation_keys = ["building"]
-    req_relation_keys = ["building"]
+    valid_relation_keys = ["building", "building:part"]
+    req_relation_keys = ["building", "building:part"]
 
     def __init__(self):
         self.buildings = []
