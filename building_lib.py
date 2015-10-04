@@ -1018,15 +1018,104 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
     global nb  # FIXME: still need this?
 
+    #
+    # get local medium ground elevation for each building
+    #
     for ib, b in enumerate(buildings) :
-        b.set_X()
         b.set_ground_elev( elev, tile_elev )
+    
+    #
+    # Exchange informations
+    #
+    for ib, b in enumerate(buildings) :
+        if b.parent :
+            
+            if not b.parent.ground_elev : b.parent.set_ground_elev( elev, tile_elev )
+
+            b.ground_elev_min = min(b.parent.ground_elev, b.ground_elev)
+            b.ground_elev_max = max(b.parent.ground_elev, b.ground_elev)
+            
+            b.ground_elev = b.ground_elev_min
+            
+            if b.parent.children :
+                for child in b.parent.children :
+                    if not child.ground_elev : child.set_ground_elev( elev, tile_elev )
+                            
+                for child in b.parent.children :
+                    b.ground_elev_min = min(child.ground_elev_min, b.ground_elev)
+                    b.ground_elev_max = max(child.ground_elev_max, b.ground_elev)
+                    
+                b.ground_elev = b.ground_elev_min
+                    
+                for child in b.parent.children :
+                    child.ground_elev = b.ground_elev
+        
+        if b.children :
+            for child in b.parent.children :
+                if not child.ground_elev : child.set_ground_elev( elev, tile_elev )           
+            
+            for child in b.children :
+                b.ground_elev_min = min(child.ground_elev_min, b.ground_elev)
+                b.ground_elev_max = max(child.ground_elev_max, b.ground_elev)
+                
+            b.ground_evel = b.ground_elev_min
+                
+            for child in b.children :
+                child.ground_elev = b.ground_elev
+                
+        try :
+            b.ground_elev=float(b.ground_elev)
+        except :
+            logging.fatal("non float elevation for building %"%b.osm_id)
+            exit(1)
+    
+    #
+    # Correct height
+    #
+    for ib, b in enumerate(buildings) :
+        autocorrect =True
+        try :
+            b.ground_elev += b.correct_ground
+            autocorrect = False
+        except :
+            try :
+                b.ground_elev += b.parent.correct_ground
+                autocorrect = False
+            except :
+                pass
+                
+        # auto-correct
+        if autocorrect :
+            if b.children :
+                ground_elev_max = b.ground_elev_max #max( [ child.ground_elev_max for child in b.children ] )
+                min_roof = min( [ child.height - child.roof_height for child in b.children ] )
+            
+                if ground_elev_max > ( min_roof - 2 ) :
+                    b.correct_ground = ground_elev_max - min_roof
+                    b.ground_elev    = ground_elev_max
+                    
+                    for child in b.children :
+                        child.correct_ground = b.correct_ground
+                        child.ground_elev = b.ground_elev
+                
+            elif  b.ground_elev_max > ( b.height - b.roof_height - 2 ) :
+                b.correct_ground = b.ground_elev_max - b.ground_elev_min
+                b.ground_elev = b.ground_elev_max
+            
+            
+        if b.osm_id == 39652753 :
+            print( "building 39652753")
+            print("ground_elev", b.ground_elev)
+            print("min, max", b.ground_elev_min, b.ground_elev_max)
+            print("b.correct_ground = ", b.correct_ground)
+    #exit(1)
         
     for ib, b in enumerate(buildings):
         tools.progress(ib, len(buildings))
         out = LOD_objects[b.LOD]
+
+        compute_roof_height(b, max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
         
-        compute_roof_height(b)
         write_and_count_vert(out, b, elev, offset, tile_elev)
 
         nb += 1
