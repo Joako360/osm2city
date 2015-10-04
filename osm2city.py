@@ -316,9 +316,13 @@ class Buildings(object):
 
         # -- funny things might happen while parsing OSM
         try:
-            if osm_id in parameters.SKIP_LIST:
-                logging.info("SKIPPING OSM_ID %i" % osm_id)
-                return False
+            #if osm_id in parameters.SKIP_LIST :
+            #    try : 
+            #        if tags['building'] != 'no' :
+            #            logging.info("SKIPPING OSM_ID %i" % osm_id)
+            #            return False
+            #    except :
+            #        pass
             if 'name' in tags:
                 name = tags['name']
                 #print "%s" % _name
