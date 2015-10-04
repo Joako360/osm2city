@@ -247,34 +247,55 @@ class TextureManager(object):
             if set(requires).issubset(cand.provides):
                 can_use = True
                 # Check for "specific" texture in order they do not pollute everything
-                if 'facade:specific' in cand.provides :
+                if ( 'facade:specific' in cand.provides ) or  ( 'roof:specific' in cand.provides ) :
+                    can_use = False
                     req_material = None
                     req_colour   = None
                     for req in requires :
                         if re.match('^.*material:.*', req) :
-                            req_material = re.match('^.*material:(.*)', req).group(1)
+                            req_material = re.match('^.*material:(.*)', req).group(0)
                         elif re.match('^.*:colour:.*', req) :
-                            req_colour = re.match('^.*:colour:(.*)', req).group(1)
+                            req_colour = re.match('^.*:colour:(.*)', req).group(0)
                             
+                    prov_materials = []
+                    prov_colours = []
                     prov_material = None
                     prov_colour   = None
                     for prov in cand.provides :
                         if re.match('^.*:material:.*', prov) :
-                            prov_material = re.match('^.*:material:(.*)', prov).group(1)
+                            prov_material = re.match('^.*:material:(.*)', prov).group(0)
+                            prov_materials.append(prov_material)
                         elif re.match('^.*:colour:.*', prov) :
-                            prov_colour = re.match('^.*:colour:(.*)', prov).group(1)                    
+                            prov_colour = re.match('^.*:colour:(.*)', prov).group(0)                    
+                            prov_colours.append(prov_colour)
+                    # one of the provided materials is required
+                    #for prov, req in [ ( prov_material, req_material ), ] : #( prov_colour, req_colour ), ] :
+                    #    if prov :
+                    #        if prov != req :
+                    #            can_use = True
+                    #            break
                     
-                    for prov, req in [ ( prov_material, req_material ), ] : #( prov_colour, req_colour ), ] :
-                        if prov :
-                            if prov != req :
-                                can_use = False
-                                #break
+                    # req_material and colour
+                    can_material = False
+                    if req_material != None :
+                        for prov_material in prov_materials :
+                            print( prov_material, requires )
+                            if prov_material in requires :
+                                can_material = True
+                                break 
+                    
+                    can_colour = False
+                    if req_colour != None : #and can_use:
+                        for prov_colour in prov_colours :
+                            if prov_colour in requires :
+                                can_colour = True
+                                break
+                    else :
+                        can_colour = True
+                                
+                    if can_material and can_colour  :
+                        can_use = True
 
-                    print("can_use", can_use )
-                    print("can.provides", cand.provides )
-                    print("requires", requires)
-                    print( str([ ( prov_material, req_material ), ( prov_colour, req_colour ), ]) )
-        
                 if can_use :
                     candidates.append(cand)
             else:
@@ -377,8 +398,8 @@ def init(tex_prefix='', create_atlas=False):
     
         if False:
             print roofs[0].provides
-            print "black roofs: ", [str(i) for i in roofs.find_candidates(['roof:color:black'])]
-            print "red   roofs: ", [str(i) for i in roofs.find_candidates(['roof:color:red'])]
+            print "black roofs: ", [str(i) for i in roofs.find_candidates(['roof:colour:black'])]
+            print "red   roofs: ", [str(i) for i in roofs.find_candidates(['roof:colour:red'])]
             print "old facades: "
             for i in facades.find_candidates(['facade:shape:residential','age:old'], 10):
                 print i, i.v_cuts * i.v_size_meters
@@ -392,7 +413,7 @@ def init(tex_prefix='', create_atlas=False):
                                    10, [130,216,297,387,512], True, True,
                                    provides=['shape:urban','shape:residential','age:modern','age:old','compat:roof-flat','compat:roof-pitched']))
             roofs.append(Texture(tex_prefix + 'test.png',
-                                 10., [], True, 10., [], True, provides=['color:black', 'color:red']))
+                                 10., [], True, 10., [], True, provides=['colour:black', 'colour:red']))
     
         # -- make texture atlas
         texture_list = facades.get_list() + roofs.get_list()
