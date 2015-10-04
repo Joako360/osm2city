@@ -1079,7 +1079,31 @@ if __name__ == "__main__":
                     tools.stats.objects -= 1
                 except :
                     pass
-                
+            
+            
+            
+            # Custom inject tmp
+                if building.osm_id == 263644296 :
+                    for child in building.children :
+                            child.correct_ground = 3.5
+
+                            child.tags['building:colour'] = 'red'
+                            try :
+                                if 'roof:colour' not in child.tags :
+                                    if 'roof:material' in child.tags :
+                                        if child.tags['roof:material'] != 'stone' :
+                                            continue
+                                        else :
+                                            child.tags['roof:colour'] = 'red'
+
+                                    if  child.tags['building:material'] == 'stone'  :
+                                        child.tags['roof:material'] = 'stone'
+                                        child.tags['roof:colour'] = 'red'
+                            except :
+                                pass
+
+
+
             #
             # remove tagged buildings:part
             #
