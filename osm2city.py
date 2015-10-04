@@ -215,7 +215,6 @@ class Building(object):
         self.ground_elev_max = max(elevs)
         self.ground_elev = self.ground_elev_min
         
-"   set_ground_elev", self.osm_id, self.ground_elev, self.parent.osm_id, self.parent.ground_elev )
 
     @property
     def X_outer(self):
