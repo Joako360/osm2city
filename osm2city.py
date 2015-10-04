@@ -134,7 +134,9 @@ class Building(object):
         self.parents_parts = []
         self.cand_buildings = []
         self.children = []
-
+        self.ground_elev = None
+        self.ground_elev_min = None
+        self.ground_elev_max = None
     def roll_inner_nodes(self):
         """Roll inner rings such that the node closest to an outer node goes first.
 
@@ -200,42 +202,20 @@ class Building(object):
             self.X[i, 0] -= offset.x  # -- cluster coordinates. NB: this changes building coordinates!
             self.X[i, 1] -= offset.y
 
-    def set_ground_elev(self, elev, tile_elev, min_elev=None, flag=False):
+    def set_ground_elev(self, elev, tile_elev, min_elev=None, flag='local'):
 
         def local_elev(p):
             return elev(p + offset) - tile_elev
 
         self.set_X()
-
-        # get elevation with building points
-        self.ground_elev = min( [ local_elev(vec2d(self.X[i])) for i in range(self._nnodes_ground)  ] )
-
-        print("set_ground_elev first guess", self.osm_id, self.ground_elev, flag)
-
-        try :
-            if min_elev :
-                self.ground_elev = min(min_elev, self.ground_elev)
-
-            # gather children ground info
-            if self.children and flag != "nodown" :
-                for child in self.children :
-                    child.set_ground_elev(elev, tile_elev, min_elev=self.ground_elev, flag="noup")
-                    self.ground_elev = min(self.ground_elev, child.ground_elev)
-                    
-                for child in self.children :
-                    child.ground_elev=self.ground_elev
-
-            # pass information to parent
-            if self.parent and flag != "noup" :
-                self.parent.set_ground_elev(elev, tile_elev, min_elev=self.ground_elev, flag="nodown")
-                self.ground_elev = min(self.ground_elev, self.parent.ground_elev)
-
-        except :
-            logging.error("in set_ground_elev building %i" % self.osm_id)
-            pass
         
-        if self.parent :
-            print( "   set_ground_elev", self.osm_id, self.ground_elev, self.parent.osm_id, self.parent.ground_elev )
+        elevs = [ local_elev(vec2d(self.X[i])) for i in range(self._nnodes_ground)  ]
+        
+        self.ground_elev_min = min(elevs)
+        self.ground_elev_max = max(elevs)
+        self.ground_elev = self.ground_elev_min
+        
+"   set_ground_elev", self.osm_id, self.ground_elev, self.parent.osm_id, self.parent.ground_elev )
 
     @property
     def X_outer(self):
