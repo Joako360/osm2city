@@ -1183,12 +1183,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
                 b.correct_ground = b.ground_elev_max - b.ground_elev_min
                 b.ground_elev = b.ground_elev_max
             
-            
-        if b.osm_id == 39652753 :
-            print( "building 39652753")
-            print("ground_elev", b.ground_elev)
-            print("min, max", b.ground_elev_min, b.ground_elev_max)
-            print("b.correct_ground = ", b.correct_ground)
+
     #exit(1)
         
     for ib, b in enumerate(buildings):
