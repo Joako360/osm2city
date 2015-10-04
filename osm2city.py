@@ -335,14 +335,16 @@ class Buildings(object):
                 layer = int(tags['layer'])
             if 'roof:shape' in tags:
                 _roof_type = tags['roof:shape']
+            else:
+                _roof_type = parameters.BUILDING_UNKNOWN_ROOF_TYPE
+
             _roof_height=0
             if 'roof:height' in tags:
                 try :
                     _roof_height = float(tags['roof:height'])
                 except :
                     _roof_height = 0
-            else:
-                _roof_type = parameters.BUILDING_UNKNOWN_ROOF_TYPE
+
             _building_type = building_lib.mapType(tags)
 
             # -- simple (silly?) heuristics to 'respect' layers
