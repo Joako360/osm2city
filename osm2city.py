@@ -440,10 +440,10 @@ class Buildings(object):
                             if way.osm_id == m.ref:
                                 if way.refs[0] == way.refs[-1] :
                                     outer_multipolygons.append(way)
-                                    print("add way outer multipolygon ", way.osm_id)                                    
+                                    logging.verbose("add way outer multipolygon " + str(way.osm_id))                                    
                                 else :
                                     outer_ways.append(way)
-                                    print("add way outer ", way.osm_id)
+                                    logging.verbose("add way outer " + str(way.osm_id))
 
                     elif m.role == 'inner':
                         for way in self.way_list:
@@ -751,7 +751,6 @@ if __name__ == "__main__":
                 if recurs > 20 :
                     return False
                 
-                print("call add_candidates") 
                 #if recurs > 10 :
                 #    return False
                 
@@ -866,7 +865,8 @@ if __name__ == "__main__":
                                     #buildings.buildings.remove(cand_building)
                                     if cand_building not in buildings.remove_buildings :
                                         buildings.remove_buildings.append(cand_building)
-                                    
+                                        logging.info('Found Building for removing %d' % cand_building.osm_id)
+
                                     if cand_building not in buildings.buildings_with_parts :
                                         buildings.buildings_with_parts.append(cand_building)   
                                         #buildings.buildings_with_parts=list(set(self.buildings_with_parts))
@@ -875,8 +875,6 @@ if __name__ == "__main__":
                                     building.parent = cand_building
                                     return
                             except KeyError :
-                                #print(error)                                        
-
                                 pass
                             #except :
                             #    print("Unknown error processing cand_building building", cand_building.osm_id, "for ", building.osm_id)
