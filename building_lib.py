@@ -651,28 +651,47 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         except KeyError:
             pass
         try :
+            # cleanup building:colour and use it
+            if   'building:color' in b.tags and 'building:colour' not in b.tags :
+                b.tags['building:colour'] = b.tags['building:color']
+                del(b.tags['building:color'])
+            elif 'building:color' in b.tags and 'building:colour'     in b.tags :
+                del(b.tags['building:color'])
+            facade_requires.append('facade:building:colour:'+string.lower(b.tags['building:colour']))
+        except KeyError:
+            pass    
+        try :
             material_type = string.lower(b.tags['building:material'])
             if str(material_type) in ['stone', 'brick', 'timber_framing', 'concrete', 'glass' ] :
                 facade_requires.append(str('facade:building:material:'+ str(material_type)))
+                
+            # stone white default
+            if str(material_type)  == 'stone' and 'building:colour' not in b.tags :
+                    b.tags['building:colour'] = 'white'
+                    facade_requires.append(str('facade:building:colour:white'))
             try :
                 # stone use for
                 if str(material_type) in ['stone', 'concrete', ] :
                     try :
-                        _roof_material = string.lower(str(b.tags['roof:material']))
+                        _roof_material = str(b.tags['roof:material']).lower()
                     except :
                         _roof_material = None
 
                     try :
-                        _roof_colour = string.lower(str(b.tags['roof:colour']))
+                        _roof_colour = str(b.tags['roof:colour']).lower()
                     except :
                         _roof_colour = None
 
                     if not (_roof_colour or _roof_material ):
                         b.tags['roof:material'] = str(material_type)
                         roof_requires.append('roof:material:' + str(material_type))
+                        try :
+                            roof_requires.append('roof:colour:' + str(b.tags['roof:colour']))
+                        except :
+                            pass
 
                     try :
-                        _roof_shape = string.lower(b.tags['roof:shape'])
+                        _roof_shape =  str(b.tags['roof:shape']).lower()
                     except :
                         _roof_shape = None
 
@@ -685,16 +704,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 pass                
         except KeyError:
             pass
-        try :
-            # cleanup building:colour and use it
-            if   'building:color' in b.tags and 'building:colour' not in b.tags :
-                b.tags['building:colour'] = b.tags['building:color']
-                del(b.tags['building:color'])
-            elif 'building:color' in b.tags and 'building:colour'     in b.tags :
-                del(b.tags['building:color'])
-            facade_requires.append('facade:building:colour:'+string.lower(b.tags['building:colour']))
-        except KeyError:
-            pass    
+
 #
         # -- determine facade and roof textures
         logging.verbose("___find facade for building %i"%b.osm_id)
@@ -766,8 +776,14 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
         try :
             if   'roof:material' in b.tags :
-                if str(b.tags['roof:material']) in ['roof_tiles', 'copper', 'glass', 'grass', 'metal', 'concrete' ] :
+                if str(b.tags['roof:material']) in ['roof_tiles', 'copper', 'glass', 'grass', 'metal', 'concrete', 'stone', 'slate', ] :
                     roof_requires.append(str('roof:material:') + str(b.tags['roof:material']))
+            
+        except KeyError :
+            pass
+            
+        try :
+            roof_requires.append('roof:colour:' + str(b.tags['roof:colour']))
         except KeyError :
             pass
 
@@ -776,6 +792,8 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         and   'roof:color'    not in b.tags \
         and   'roof:colour'   not in b.tags :
             roof_requires.append(str('roof:default'))
+
+        roof_requires=list(set(roof_requires))
 
         #
         # -- find local texture for roof if infos different from parent
@@ -788,12 +806,70 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 logging.warn("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id,str(roof_requires)))
                 continue
         else:
-            if b.parent.roof_texture is None:
+            # 1 - Check if building and building parent infos are the same
+            
+            # 1.1 Infos about colour
+            try :
+                r_color = b.tags['roof:colour']
+            except :
+                r_color = None
+                
+            try :
+                r_parent_color = b.parent.tags['roof:colour']
+            except :
+                r_parent_color = None
+            
+            # 1.2 Infos about material
+            try :
+                r_material = b.tags['roof:material']
+            except :
+                r_material = None
+                
+            try :
+                r_parent_material = b.parent.tags['roof:material']
+            except :
+                r_parent_material = None
+
+
+            #
+            # Special for stone
+            #
+            if ( r_material == 'stone') and ( r_color is None ) :
+                # take colour of building 
+                try :
+                    if b.tags['building:material'] == 'stone' :
+                        r_color = b.tags['building:colour']
+                except :
+                    pass
+                    
+                # try parent
+                if not r_color :
+                    try :
+                        if b.parent.tags['building:material'] == 'stone' :
+                            r_color = b.parent.tags['building:colour']
+                    except :
+                        r_color = 'white'
+                        
+                b.tags['roof:colour'] = r_color
+
+
+            # 2 - If same infos use building parent facade else find new texture
+            if r_color    == r_parent_color    and \
+               r_material == r_parent_material :
+                if b.parent.roof_texture is None :
+                    b.roof_texture = roofs.find_matching(roof_requires)
+                    if not b.roof_texture:
+                        tools.stats.skipped_texture += 1
+                        logging.warn("WARNING: no matching texture for OsmID %d <%s>" % (b.osm_id,str(roof_requires)))
+                        continue
+                    b.parent.roof_texture = b.roof_texture
+                else:
+                    b.roof_texture = b.parent.roof_texture
+            else :
                 b.roof_texture = roofs.find_matching(roof_requires)
-                b.parent.roof_texture = b.roof_texture
                 if not b.roof_texture:
                     tools.stats.skipped_texture += 1
-                    logging.warn("WARNING: no matching texture for OsmID %d <%s>" % (b.osm_id,str(roof_requires)))
+                    logging.warn("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id,str(roof_requires)))
                     continue
         
         if b.roof_texture :
