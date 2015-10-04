@@ -1156,10 +1156,12 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
         if not b.roof_complex:
         # if True:
             if b.roof_type == 'skillion':
-                roofs.separate_skillion2(out, b, b.X, max_height=max_height)
+                roofs.separate_skillion2(out, b, b.X, max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
+            elif b.roof_type in ['pyramidal','dome',] :
+                roofs.separate_pyramidal(out, b, b.X)
             else :
                 roofs.flat(out, b, b.X)
-            continue
+            #continue
 
         # -- roof
         #    We can have complex and non-complex roofs:
@@ -1177,24 +1179,28 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
             # -- pitched roof for > 4 ground nodes
 
             if b._nnodes_ground > 4 and parameters.BUILDING_SKEL_ROOFS:
-                s = myskeleton.myskel(out, b, offset_xy=offset,
-                                      offset_z=b.ground_elev + b.height,
-                                      max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
-                if s:
-                    tools.stats.have_complex_roof += 1
-                elif b.roof_type == 'skillion':
-                    roofs.separate_skillion2(out, b, b.X, max_height=max_height)
-                else:  # -- fall back to flat roof
-                    roofs.flat(out, b, b.X)
+                if b.roof_type == 'skillion':
+                    roofs.separate_skillion2(out, b, b.X, max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
+                elif b.roof_type in ['pyramidal','dome'] :
+                    roofs.separate_pyramidal(out, b, b.X)
+                else :
+                    s = myskeleton.myskel(out, b, offset_xy=offset,
+                                    offset_z=b.ground_elev + b.height - b.roof_height,
+                                    max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
+                    if s:
+                        tools.stats.have_complex_roof += 1
+
+                    else:  # -- fall back to flat roof
+                        roofs.flat(out, b, b.X)
                     # FIXME: move to analyse. If we fall back, don't require separate LOD
             # -- pitched roof for exactly 4 ground nodes
             else:
                 max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO
-                if b.roof_type == 'gabled' or b.roof_type == 'half_hipped' :
+                if b.roof_type == 'gabled' or b.roof_type == 'half-hipped' :
                     roofs.separate_gable(out, b, b.X, max_height=max_height)
                 elif b.roof_type == 'hipped':
                     roofs.separate_hipped(out, b, b.X, max_height=max_height)
-                elif b.roof_type == 'pyramidal' :
+                elif b.roof_type in ['pyramidal','dome'] :
                     roofs.separate_pyramidal(out, b, b.X)
                 elif b.roof_type == 'skillion':
                     roofs.separate_skillion2(out, b, b.X, max_height=max_height)
