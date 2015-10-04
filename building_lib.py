@@ -829,7 +829,12 @@ def write_and_count_vert(out, b, elev, offset, tile_elev):
 
     b.first_node = out.next_node_index()
 
-    z = b.ground_elev - 1
+    z = b.ground_elev - 0.1
+    try :
+        z -= b.correct_ground
+    except :
+        pass
+    
     try :
         if 'min_height' in b.tags :
             min_height = float(b.tags['min_height'])
