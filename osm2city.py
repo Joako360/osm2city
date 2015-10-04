@@ -1090,7 +1090,75 @@ if __name__ == "__main__":
             #        tools.stats.objects -= 1
             #    except :
             #        pass       
+            keep_buildings=[]
+            keeped=0
+            if parameters.KEEP_LIST :
+                logging.verbose(" KEEP only buildings ")
+                logging.verbose("len buildings.buildings %i"%len(buildings.buildings))
+                # keep explicitely given buildings by keep_list
+                for building in buildings.buildings :
+                    logging.verbose("TEST %i "%building.osm_id)
+                    if building.osm_id in parameters.KEEP_LIST :
+                        if building not in keep_buildings :
+                            keep_buildings.append(building)
+                            logging.verbose("    keep %i"%building.osm_id)
+                            keeped+=1
                         
+                    if keeped == len(parameters.KEEP_LIST) :
+                        break
+                
+                # keep only parts of buildings with parts
+                for building in buildings.remove_buildings :
+                    logging.verbose("keeping childs of building %i"%building.osm_id)
+
+                    if building.osm_id  in parameters.KEEP_LIST :
+                        for child in building.children :
+                            if (child not in keep_buildings) and (child.osm_id not in parameters.SKIP_LIST) :
+                                logging.verbose("    keep child %i"%child.osm_id)
+                                keep_buildings.append(child)
+                        keeped+=1
+                            
+                    if keeped == len(parameters.KEEP_LIST) :
+                        break
+
+                keep_buildings = list(set(keep_buildings))
+                buildings.buildings=keep_buildings
+            
+            #
+            # REMOVE BUILDINGS + children in SKIP_LIST
+            #
+            if parameters.SKIP_LIST :
+                # Add children of buildings to remove
+                for building in buildings.remove_buildings :
+                    for child in building.children :
+                        parameters.SKIP_LIST.append(child.osm_id)
+                        try :
+                            buildings.buildings.remove(child)
+                        except :
+                            pass                       
+
+                parameters.SKIP_LIST=list(set(parameters.SKIP_LIST))
+
+                for building in buildings.buildings :
+                    if building.osm_id in parameters.SKIP_LIST :
+                        for child in building.children :
+                            try :
+                                buildings.buildings.remove(child)
+                                parameters.SKIP_LIST.append(child.osm_id)
+                            except :
+                                pass  
+                        try :
+                            buildings.buildings.remove(building)
+                        except :
+                            pass
+                            
+            #
+            # Clean parent
+            #
+            for building in buildings.buildings :
+                if building.parent == building :
+                    building.parent = None
+            
         #self.buildings.append(building)
 
         #tools.stats.objects += 1
@@ -1154,100 +1222,6 @@ if __name__ == "__main__":
     else:
         static_objects = None
 
-    #   
-    # keep selected buildings and children building:parts
-    #
-    remove_buildings=[]
-    if parameters.KEEP_LIST :
-        for b in buildings :
-            if parameters.BUILDING_REMOVE_WITH_PARTS:
-                try :
-                    #if ('building:part' not in building.tags) and (building.osm_id not in parameters.KEEP_LIST) :
-                    #    logging.info("SKIPPING OSM_ID %i. Building not in KEEP_LIST (try)" %(building.osm_id,building.parent.osm_id))
-                    #    return False
-                    # get upper parent
-                    #building.parent_start=building.parent
-                    #while building.parent_start :
-                    #    try :
-                    #        if 'building' in building_start.parent.tags :
-                    #            building.parent_start = building.parent.parent
-                    #            break
-                    #        else :
-                    #            building.parent_start = building.parent.parent
-                    #    except :
-                    #        break
-                    if (b.osm_id not in parameters.KEEP_LIST):
-                        try :
-                            # eliminate tag building:yes first
-                            if 'building' in b.tags :
-                                if b.tags['building'] != 'no':
-                                    logging.info("SKIPPING OSM_ID %i. Building not in KEEP_LIST ( building:yes )" %(b.osm_id))
-                                    remove_buildings.append(b)
-                                    continue
-                                    
-
-                            try :
-                                max_parent_search=100
-                                i_max_parent_search=0
-                                parent=b.parent
-                                kepp_inter=False
-                            
-                                while True :
-                                    i_max_parent_search+=1
-                                    if i_max_parent_search > max_parent_search :  break
-                                        
-                                    if parent :
-                                        if parent.osm_id in parameters.KEEP_LIST :
-                                            keep_inter=True
-                                            break
-                                            
-                                    if parent.parent :
-                                        parent = parent.parent
-                                    else :
-                                        break
-                            except :
-                                logging.info("[ ERROR ] while getting parents")
-                                parent=False
-                            
-                            # exit if intermediary parent is in list
-                            if keep_inter :
-                                continue
-                            
-                            if parent :
-                                # skip "building:part"
-                                if 'building:part' in parent.tags :
-                                    if parent.tags['building:part'] != 'no' :
-                                        continue
-                                if (parent.osm_id not in parameters.KEEP_LIST) :
-                                    logging.info("SKIPPING OSM_ID %i. Building and parent building parent %i not in KEEP_LIST" %(b.osm_id,b.osm_id))
-                                    remove_buildings.append(b)
-                            else :
-                                logging.info("SKIPPING OSM_ID %i. Building and parent building parent" %(b.osm_id))
-                                remove_buildings.append(b)
-                        except :
-                            pass
-                            logging.info("[ ERROR ] Check Keep list search")
-                            #remove_buildings.append(b)
-                except :
-                    print("something wrong in test remove" + str(b.osm_id))
-                    pass
-                    
-                    #if building.osm_id not in parameters.KEEP_LIST :
-                    #    logging.info("SKIPPING OSM_ID %i. Building and parent building parent" %(building.osm_id))
-                    #    return False
-                    #logging.info("SKIPPING OSM_ID %i. Building not in KEEP_LIST"%(building.osm_id))
-                    #return False 
-            else :
-                if b.osm_id not in parameters.KEEP_LIST :
-                    logging.info("SKIPPING OSM_ID %i. Building and parent building parent" %(b.osm_id))
-                    remove_buildings.append(b)
-    
-    for b in remove_buildings :
-        try :
-            buildings.remove(b)
-            logging.info("REMOVING building" + str(b.osm_id))
-        except :
-            pass
 
     # - analyze buildings
     #   - calculate area
