@@ -781,7 +781,7 @@ if __name__ == "__main__":
 
                 return False
         
-            def check_and_set_parent(building, cand_building) :
+            def check_and_set_parent(building, cand_building, flag_search='equal') :
                 try:
                     if building.osm_id == cand_building.osm_id:
                         try :
@@ -789,7 +789,22 @@ if __name__ == "__main__":
                                 building.parent = building
                         except :
                             return False
-                    if  cand_building.polygon.intersection(building.polygon).equals(building.polygon):
+                            
+                    cand_valid=False
+                    
+                    if flag_search == 'equal' :
+                        if  cand_building.polygon.intersection(building.polygon).equals(building.polygon):
+                            cand_valid=True
+                    if flag_search == 'intersects' :
+                        #
+                        # Set parent if intersection assuming that building is 0.8 % in candidate
+                        #
+                        if  cand_building.polygon.intersection(building.polygon).intersects(building.polygon):
+                            ratio_area = cand_building.polygon.intersection(building.polygon).area / building.area
+                            if ratio_area > 0.8 :
+                                cand_valid=True
+
+                    if cand_valid :
                         #
                         # Our building:part belongs to the building
                         #
@@ -814,20 +829,17 @@ if __name__ == "__main__":
                                     except :
                                         min_height = 0.
                                 
-                                    #if cand_building.height >= building.height and min_height > cand_min_height :
-                                    #    buildings.remove_buildings_parts.append(building)
-                                    #    #buildings.buildings.remove(building)
-                                    #    print(" removed 'invisible' building:part ", building.osm_id )
-                                    #    print("     building:part ", cand_building.osm_id, cand_min_height, min_height,  )
-                                    #    # continue searching for siblings
-                                    #    return
+                                    if (cand_building.height - cand_building.roof_height) >= building.height and min_height > cand_min_height :
+                                        buildings.remove_buildings_parts.append(building)
+                                        logging.info(" removed 'invisible' building:part " + str(building.osm_id) )
+                                        return
                                     #    #break
-                                    #else :
-                                    ## store parent that is itset a building:part
-                                    #    print("    found possible ", cand_building.osm_id)
-                                    #    building.parents_parts.append(cand_building)
-                                    #    #building.parent_part.cand_building 
-                                    #    return
+                                    else :
+                                    # store parent that is itset a building:part
+                                        logging.verbose("    found possible " + str(cand_building.osm_id))
+                                        building.parents_parts.append(cand_building)
+                                        #building.parent_part.cand_building 
+                                        return
                             except KeyError :
                                 pass
                             #except :
@@ -863,10 +875,10 @@ if __name__ == "__main__":
                             #    pass
                                 
                         else :
-                            print(" cand", cand_building.osm_id, "not in cand_buildings nor buildings_with_parts")
+                            logging.verbose(" cand %i not in cand_buildings nor buildings_with_parts"%cand_building.osm_id )
                             
                     else :
-                        print("   cand ", cand_building.osm_id, "doesn't contains", building.osm_id) 
+                        logging.verbose("   cand %i doesn't contains  %i"%(cand_building.osm_id,  building.osm_id)) 
                                 
                 except TopologicalError, reason:
                     logging.warn("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d "%(reason, building.osm_id, cand_building.osm_id))
@@ -874,6 +886,7 @@ if __name__ == "__main__":
                     logging.warn("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d "%(reason, building.osm_id, cand_building.osm_id))
     
                 return False
+               
             #
             # Build index of buildings by ref
             #
@@ -894,9 +907,21 @@ if __name__ == "__main__":
             #
             # First Pass search parent with buildings sharing points
             #               add possible parents parts
-            logging.verbose("\nFirst pass of parent search\n")   
+            logging.verbose("\nFirst pass of parent search\n")  
+            buildings.remove_buildings=[]
+            buildings.remove_buildings_parts=[]
             for building in buildings.buildings :
                 logging.verbose("   search parent for %i"%building.osm_id )
+                
+                # Set actual building parent to itself
+                try :
+                    if building.tag['building'] != 'no' :
+                        building.parent = building
+                        continue
+                except :
+                    pass
+                    
+                # Search and set parent for building:part
                 cand_buildings = list(set([ b_cand for ref in building.refs for b_cand in buildings.node_way_dict[ref]  if ((b_cand.osm_id != building.osm_id )) ]))
                 for b_cand in cand_buildings :
                     logging.verbose("      trying %i"%b_cand.osm_id )
@@ -910,12 +935,9 @@ if __name__ == "__main__":
                     cand_buildings=building.cand_buildings
                     add_candidates(building, cand_buildings)
 
-                
             #
             # Search parents for still orphans buildings - on buildings sharing points
             #
-            building.remove_buildings=[]
-            buildings.remove_buildings_parts=[]
             for building in buildings.buildings :
                 if building.parent :
                     continue
@@ -926,12 +948,13 @@ if __name__ == "__main__":
                 #
                 if 'building:part' in building.tags :
                     if building.tags['building:part'] == 'no' :
-                        print( " skip building:part = no for ", building.osm_id)
+                        logging.verbose( " skip building:part = no for %i"%building.osm_id)
                         continue
                         
                 if 'building' in building.tags :
                     if building.tags['building'] != 'no' :
-                        print( " skip building != no for ", building.osm_id)                        
+                        logging.verbose( " skip building != no for %i"%building.osm_id)
+                        building.parent = building
                         continue
                 
                 #cand_buildings=[]
@@ -944,28 +967,13 @@ if __name__ == "__main__":
                     # Loop on neighbours buildings sharing a point with target building
                     #
                     for cand_building in cand_buildings:
-                        print( " trying candidate :", cand_building.osm_id )
+                        logging.verbose( " trying candidate : %i "%cand_building.osm_id )
                         check_and_set_parent(building, cand_building)
-
-                ##if building.parent :
-                ##    building.parent.children.append(building)
-                ##    print("FOUND PARENT building first pass", str(building.osm_id), " found parent", str(building.parent.osm_id))
-                #elif building.parent_part :
-                #    building.parent = building.parent_part
-                #    print("FOUND PARENT:PART building ", str(building.osm_id), " found parent", str(building.parent.osm_id))
-                ##else :
-                ##    print("NOT FOUND PARENT for building first pass", str(building.osm_id), str([ bb.osm_id for bb in cand_buildings ]))
-
-
-            #
-            # Here we should make a grid to optimize search 
-            #
 
             #
             # Search parents for buildings that are still orphan and do not "share" points
             #
             orphans=0
-            
             for building in buildings.buildings :
                 if not building.parent :
                     process = False 
@@ -987,78 +995,87 @@ if __name__ == "__main__":
                         
                         if building.parent : 
                             break
-                            
+
             #
             # build children
             #
             for building in buildings.buildings :
-                if building.parent :
+                if building.parent and ( building.parent != building ):
                     if building not in building.parent.children :
                         building.parent.children.append(building)
                 
-                if building.parent_part :
+                if building.parent_part and ( building.parent_part != building ):
                     if building not in building.parent_part.children :
                         building.parent_part.children.append(building)
 
-            ##
-            ## Test 
-            ##
-            #for building in buildings.buildings :
-                ##
-                ## Skip building:part=no and building!=no
-                ##
-                #if 'building:part' in building.tags :
-                    #if building.tags['building:part'] == 'no' :
-                        #print( " skip building:part = no for ", building.osm_id)
-                        #continue
-                        
-                #if 'building' in building.tags :
-                    #if building.tags['building'] != 'no' :
-                        #print( " skip building != no for ", building.osm_id)                        
-                        #continue
-                        
-                #if building.parent :
-                    #continue
-                    
-                ##
-                ## collect parents 
-                ##
-                #possible_parents = [ c.parent for c in building.cand_buildings ]
-                #while True :
-                    #try :
-                        #possible_parents.remove(None)
-                    #except :
-                        #break
-                
-                #possible_parents=list(set(possible_parents))
-                #if len(possible_parents) == 1 : #or len(set(possible_parents)) == 1:
-                    #building.parent=possible_parents[0]
-                    #break
-                #elif len(possible_parents) > 1 :
-                    #most_probable_parent=possible_parents[0]
-                    #area=most_probable_parent.area
-                    #print("area", area)
-                    ##
-                    ## search biggest building
-                    ##
-                    #for possible_parent in set(possible_parents) :
-                        #area_tmp=possible_parent.area
-                        #if area_tmp > area :
-                            #most_probable_parent=possible_parent
-                            #area=area_tmp
-                            
-                #elif building.parent_part :
-                    #building.parent=building.parent_part
-                #else :
-                    #print("building ", building.osm_id, " no parent found")
+            #
+            # Search parents in children parents 
+            #
+            tools.stats.objects = 0 
+            tools.stats.orphans = 0
             
+            for building in buildings.buildings :
+                if not building.parent :
+                    #
+                    # Search in parent of childrens
+                    #
+                    possible_parents = [ child.parent for child in building.children if child.parent ]
+                    possible_parents = list(set(possible_parents))
+                    try :
+                        possible_parents.remove(None)
+                    except :
+                        pass
+                    if len(possible_parents) == 1 :
+                        building.parent = possible_parents[0]
+                    elif len(possible_parents) > 1 :
+                        most_probable_parent=possible_parents[0]
+                        area=most_probable_parent.area
+                        #print("area", area)
+                        #
+                        # search biggest building
+                        #
+                        for possible_parent in set(possible_parents) :
+                            #area_tmp=possible_parent.area
+                            #building.parent=possible_parent
+                            #if area_tmp > area :
+                            #    building.parent=possible_parent
+                            #    area=area_tmp
+                            check_and_set_parent(building, cand_building, flag_search='intersects')
+                            
+                            if building.parent and ( building.parent != building ):
+                                if building not in building.parent.children :
+                                    building.parent.children.append(building)
+                                break
+                    else :
+                        for cand_building in buildings.remove_buildings :
+                            
+                            check_and_set_parent(building, cand_building, flag_search='intersects')
+                            
+                            if building.parent and ( building.parent != building ): 
+                                if building not in building.parent.children :                               
+                                    building.parent.children.append(building)                                
+                                break
+                                
+                if not building.parent :
+                    tools.stats.orphans +=1
+ 
+
+            if parameters.LOGLEVEL == 'VERBOSE' :
+                for building in buildings.buildings:
+                    if building.parent :
+                        logging.verbose('building %i found parent %i'%(building.osm_id, building.parent.osm_id))
+                    else :
+                        logging.verbose('building %i without parent'%building.osm_id)
+                        
+
             #
             # remove tagged buildings
             #
             for building in buildings.remove_buildings :
+                logging.verbose(" Removing buildings")
                 try :
                     buildings.buildings.remove(building)
-                    print("Removing building", building.osm_id)                   
+                    logging.verbose("Removing building %i"%building.osm_id)
                     tools.stats.objects -= 1
                 except :
                     pass
