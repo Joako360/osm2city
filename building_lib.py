@@ -306,10 +306,13 @@ def compute_height_and_levels(b):
     b.height = float(b.levels) * level_height
 
 
-def compute_roof_height(b):
+def compute_roof_height(b, max_height=1e99   ):
     "Compute roof_height for each node"
 
+    b.roof_height=0
+    
     if b.roof_type == 'skillion' :
+        # get global roof_height and height for each vertex
             if 'roof:height' in b.tags:
                 # force clean of tag if the unit is given 
                 roof_height = float(re.sub(' .*', ' ',b.tags['roof:height'].strip()))
@@ -399,14 +402,36 @@ def compute_roof_height(b):
             b.roof_height=roof_height
 
     else :
+        #
+        # others roofs type
+        #
         try :
+            # get roof:height given by osm
             b.roof_height = float(re.sub(' .*', ' ',b.tags['roof:height'].strip()))
+            
         except :
+            # random roof:height
             if b.roof_type == 'flat' :
                 b.roof_height = 0
+            #if b.roof_type in ['gabled', 'pyramidal','half] :
             else :
+                if 'roof:angle' in b.tags:
+                    angle = float(b.tags['roof:angle'])
+                else:
+                    angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE, parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
+                while angle > 0:
+                    roof_height = tan(np.deg2rad(angle)) * (b.lenX[1]/2)
+                    if roof_height < max_height:
+                        break
+                    angle = angle - 5
+                if roof_height > max_height:
+                    logging.warn("roof too high %g > %g" % (roof_height, max_height))
+                    return False
+                    
+                b.roof_height=roof_height
+            #else :
             # should compute roof height for others roof type
-                b.roof_height = 3
+            #    b.roof_height = 0
     #except :
     #    if 'roof:shape' in b.tags :
     #        logging.error('in compute_height_and_levels', b.tags)
