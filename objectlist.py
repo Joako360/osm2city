@@ -12,12 +12,13 @@ class ObjectList(object):
     Class for storing a List OSM Objects
     '''
 
-    def __init__(self, transform=None):
+    def __init__(self, transform=None, clusters=None):
         '''
         Constructor
         '''
         self.objects = []
         self.transform = transform
+        self.clusters = clusters
         self.minlon = 181.
         self.maxlon = -181.
         self.minlat = 91.

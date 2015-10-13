@@ -1,7 +1,5 @@
 #!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
-# FIXME: check sign of angle
-import re
 from locale import atoi
 
 """
@@ -21,11 +19,16 @@ import parameters
 import calc_tile
 import os
 import ac3d
-from objectlist import ObjectList
 import stg_io2
+from objectlist import ObjectList
 
 import logging
 import osmparser
+
+import re
+from cluster import Clusters
+from shapely.geos import lgeos
+
 
 OUR_MAGIC = "osm2platforms"  # Used in e.g. stg files to mark edits by osm2platforms
 # -----------------------------------------------------------------------------
@@ -49,10 +52,11 @@ class Platform(object):
             self.logger.warn("layer %s %d"%(tags['layer'],osm_id))
 
 #    def transform(self, nodes_dict, transform):
-        osm_nodes = [nodes_dict[r] for r in refs]
-        self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
+        self.osm_nodes = [nodes_dict[r] for r in refs]
+        self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in self.osm_nodes])
         # self.nodes = np.array([(n.lon, n.lat) for n in osm_nodes])
         self.line_string = shg.LineString(self.nodes)
+        self.anchor = vec2d(self.nodes[0])        
 
 
 class Platforms(ObjectList):
@@ -60,8 +64,8 @@ class Platforms(ObjectList):
     req_keys = ['railway']
     valid_keys = ['area', 'layer']
 
-    def __init__(self, transform):
-        ObjectList.__init__(self, transform)
+    def __init__(self, transform, clusters):
+        ObjectList.__init__(self, transform, clusters)
         self.logger = logging.getLogger("platforms")
 
     def create_from_way(self, way, nodes_dict):
@@ -94,19 +98,29 @@ class Platforms(ObjectList):
         # print "(accepted)"
         platform = Platform(self.transform, way.osm_id, way.tags, way.refs, nodes_dict)
         self.objects.append(platform)
+        self.clusters.append(platform.anchor, platform)        
 
-    def write(self, elev):
-        ac = ac3d.File(stats=tools.stats)
-        obj = ac.new_object('platforms', "Textures/Terrain/asphalt.png")
-        for platform in self.objects[:]:
-            if(platform.is_area):
-                self.writeArea(platform, elev, ac, obj)
-                None
-            else:
-                self.writeLine(platform, elev, ac, obj)
-        return ac
+    def write(self, elev, stg_manager, path, center_global):
+        for cl in self.clusters:
+            tile_elev = elev(cl.center)
+            if( len(cl.objects) > 0 ):            
+                center_tile = vec2d(tools.transform.toGlobal(cl.center))       
+                ac_fname = "platforms%02i%02i.ac" % (cl.I.x, cl.I.y)     
+                ac = ac3d.File(stats=tools.stats)
+                obj = ac.new_object('platforms', "Textures/Terrain/asphalt.png")
+                for platform in cl.objects[:]:
+                    if(platform.is_area):
+                        self.write_area(platform, elev, ac, obj, cl.center)                        
+                    else:
+                        self.write_line(platform, elev, ac, obj, cl.center)
+                path = stg_manager.add_object_static(ac_fname, center_tile, 0, 0)
+                fname = path + os.sep + ac_fname
+                f = open(fname, 'w')
+                f.write(str(ac))
+                f.close()                
+                        
 
-    def writeArea(self, platform, elev, ac, obj):
+    def write_area(self, platform, elev, ac, obj, offset):
     # Writes a platform mapped as an area
         linear_ring = shg.LinearRing(platform.nodes)
 
@@ -118,7 +132,7 @@ class Platforms(ObjectList):
             platform.nodes = platform.nodes[::-1]
         for p in platform.nodes:
             e = elev(vec2d(p[0], p[1])) + 1
-            obj.node(-p[1], e, -p[0])
+            obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
         top_nodes = np.arange(len(platform.nodes))
         platform.segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(platform.line_string.coords[i])) for i, coord in enumerate(platform.line_string.coords[1:])])
         rd_len = len(platform.line_string.coords)
@@ -135,7 +149,7 @@ class Platforms(ObjectList):
 # Build bottom ring
         for p in platform.nodes:
             e = elev(vec2d(p[0], p[1])) - 1
-            obj.node(-p[1], e, -p[0])
+            obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
 # Build Sides
         for i, n in enumerate(top_nodes[1:]):
             sideface = []
@@ -145,7 +159,7 @@ class Platforms(ObjectList):
             sideface.append((n + o - 1, x, 0.5))
             obj.face(sideface, mat=0)
 
-    def writeLine(self, platform, elev, ac, obj):
+    def write_line(self, platform, elev, ac, obj, offset):
     # Writes a platform as a area which only is mapped as a line
         o = obj.next_node_index()
         left = platform.line_string.parallel_offset(2, 'left', resolution=8, join_style=1, mitre_limit=10.0)
@@ -154,11 +168,11 @@ class Platforms(ObjectList):
         idx_left = obj.next_node_index()
         for p in left.coords:
             e = elev(vec2d(p[0], p[1])) + 1
-            obj.node(-p[1], e, -p[0])
+            obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
         idx_right = obj.next_node_index()
         for p in right.coords:
             e = elev(vec2d(p[0], p[1])) + 1
-            obj.node(-p[1], e, -p[0])
+            obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
         nodes_l = np.arange(len(left.coords))
         nodes_r = np.arange(len(right.coords))
         platform.segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(platform.line_string.coords[i])) for i, coord in enumerate(platform.line_string.coords[1:])])
@@ -179,12 +193,12 @@ class Platforms(ObjectList):
         idx_bottom_left = obj.next_node_index()
         for p in left.coords:
             e = elev(vec2d(p[0], p[1])) - 1
-            obj.node(-p[1], e, -p[0])
+            obj.node(-p[1]+ offset.y, e, -p[0]+ offset.x)
 # Build bottom right line
         idx_bottom_right = obj.next_node_index()
         for p in right.coords:
             e = elev(vec2d(p[0], p[1])) - 1
-            obj.node(-p[1], e, -p[0])
+            obj.node(-p[1]+ offset.y, e, -p[0]+ offset.x)
         idx_end = obj.next_node_index() - 1
 # Build Sides
         for i, n in enumerate(nodes_l[1:]):
@@ -239,11 +253,19 @@ def main():
 
     parameters.show()
 
-    center_global = parameters.get_center_global()
     osm_fname = parameters.get_OSM_file_name()
+    # -- prepare transformation to local coordinates
+    cmin, cmax = parameters.get_extent_global()
+    center_global = parameters.get_center_global()
     transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(transform)
-    platforms = Platforms(transform)
+    
+     # -- create (empty) clusters
+    lmin = vec2d(tools.transform.toLocal(cmin))
+    lmax = vec2d(tools.transform.toLocal(cmax))
+    clusters = Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
+
+    platforms = Platforms(transform, clusters)
 
     handler = osmparser.OSMContentHandler(valid_node_keys=[])
     source = open(osm_fname)
@@ -269,7 +291,7 @@ def main():
     lw = [2, 1.5, 1.2, 1, 1, 1, 1]
     lw_w = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 1]
 
-    if 1:
+    if 0:
         for p in platforms.objects:
             a = p.nodes
             # np.array([transform.toLocal((n.lon, n.lat)) for n in r.nodes])
@@ -281,13 +303,6 @@ def main():
         plt.savefig('platforms.eps')
 
     elev = tools.get_interpolator()
-    ac = platforms.write(elev)
-    ac_fname = 'platforms%07i.ac' % calc_tile.tile_index(center_global)
-    logging.info("done.")
-    fname = path + os.sep + ac_fname
-    f = open(fname, 'w')
-    f.write(str(ac))
-    f.close()
 
     # -- initialize STG_Manager
     if parameters.PATH_TO_OUTPUT:
@@ -297,8 +312,10 @@ def main():
     replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)        
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
 
+    ac = platforms.write(elev, stg_manager, path, center_global)
+    logging.info("done.")
+
     # -- write stg
-    path_to_stg = stg_manager.add_object_static(ac_fname, center_global, 0, 0)
     stg_manager.write()
     elev.save_cache()
 

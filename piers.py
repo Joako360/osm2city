@@ -32,6 +32,8 @@ import math
 from shapely.geometry.linestring import LineString
 from random import random
 import re
+from cluster import Clusters
+from shapely.geos import lgeos
 
 OUR_MAGIC = "osm2piers"  # Used in e.g. stg files to mark edits by osm2Piers
 
@@ -47,7 +49,9 @@ class Pier(object):
 
 #    def transform(self, nodes_dict, transform):
         self.osm_nodes = [nodes_dict[r] for r in refs]
-        self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in self.osm_nodes])
+        self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in self.osm_nodes])        
+        self.anchor = vec2d(self.nodes[0])
+
 
 
 class Piers(ObjectList):
@@ -82,17 +86,31 @@ class Piers(ObjectList):
         # print "(accepted)"
         pier = Pier(self.transform, way.osm_id, way.tags, way.refs, nodes_dict)
         self.objects.append(pier)
+        self.clusters.append(pier.anchor, pier)
 
-    def write(self, elev):
-        ac = ac3d.File(stats=tools.stats)
-        obj = ac.new_object('Piers', "Textures/Terrain/asphalt.png")
-        for pier in self.objects[:]:
-            length = len(pier.nodes)
-            if(length > 3 and pier.nodes[0][0] == pier.nodes[(length - 1)][0] and pier.nodes[0][1] == pier.nodes[(length - 1)][1]):
-                self.write_area(pier, elev, ac, obj)
-            else:
-                self.write_line(pier, elev, ac, obj)
-        return ac
+
+    def write(self, elev, stg_manager, path, center_global):
+        
+        for cl in self.clusters:
+            tile_elev = elev(cl.center)
+            if( len(cl.objects) > 0 ):            
+                center_tile = vec2d(tools.transform.toGlobal(cl.center))       
+                ac_fname = "piers%02i%02i.ac" % (cl.I.x, cl.I.y)     
+                ac = ac3d.File(stats=tools.stats)
+                obj = ac.new_object('piers', "Textures/Terrain/asphalt.png")
+                for pier in cl.objects[:]:
+                    length = len(pier.nodes)
+                    if(length > 3 and pier.nodes[0][0] == pier.nodes[(length - 1)][0] and pier.nodes[0][1] == pier.nodes[(length - 1)][1]):
+                        self.write_area(pier, tile_elev, ac, obj, cl.center)
+                    else:
+                        self.write_line(pier, tile_elev, ac, obj, cl.center)
+                path = stg_manager.add_object_static(ac_fname, center_tile, 0, 0)
+                fname = path + os.sep + ac_fname
+                f = open(fname, 'w')
+                f.write(str(ac))
+                f.close()                
+            
+#             return ac
 
     def write_boats(self, elev, stg_manager):
         for pier in self.objects[:]:
@@ -163,32 +181,39 @@ class Piers(ObjectList):
             choice = randint(0, len(models) - 1)
             model = models[choice]
         elif length < 70:
-            models = [('Models/Maritime/Civilian/small-red-yacht.ac', 110),
-                      ('Models/Maritime/Civilian/small-black-yacht.ac', 110),
-                      ('Models/Maritime/Civilian/small-clear-yacht.ac', 110),
-                      ('Models/Maritime/Civilian/blue-sailing-boat-20m.ac', 120),
-                      ('Models/Maritime/Civilian/red-sailing-boat-11m.ac', 120),
-                      ('Models/Maritime/Civilian/red-sailing-boat-20m.ac', 120)]
+            models = [('Models/Maritime/Civilian/small-red-yacht.ac', 180),
+                      ('Models/Maritime/Civilian/small-black-yacht.ac', 180),
+                      ('Models/Maritime/Civilian/small-clear-yacht.ac', 180),
+                      ('Models/Maritime/Civilian/wide-black-yacht.ac', 180),
+                      ('Models/Maritime/Civilian/wide-red-yacht.ac', 180),
+                      ('Models/Maritime/Civilian/wide-clear-yacht.ac', 180),
+                      ('Models/Maritime/Civilian/blue-sailing-boat-20m.ac', 180),
+                      ('Models/Maritime/Civilian/red-sailing-boat.ac', 180),
+                      ('Models/Maritime/Civilian/red-sailing-boat-11m.ac', 180),
+                      ('Models/Maritime/Civilian/red-sailing-boat-20m.ac', 180)]
             choice = randint(0, len(models) - 1)
             model = models[choice]
-        elif length < 300:
+        elif length < 250:
             #('Models/Maritime/Civilian/Trawler.xml', 300),
-            models = [('Models/Maritime/Civilian/MediumFerry.xml', 100)]
+            models = [('Models/Maritime/Civilian/MediumFerry.xml', 10)]
             choice = randint(0, len(models) - 1)
             model = models[choice]
         elif length < 400:
-            models = [('Models/Maritime/Civilian/LargeTrawler.xml', 10), ('Models/Maritime/Civilian/LargeFerry.xml', 100), ('Models/Maritime/Civilian/barge.xml', 60)]
+            models = [('Models/Maritime/Civilian/LargeTrawler.xml', 10), 
+                      ('Models/Maritime/Civilian/LargeFerry.xml', 100),
+                      ('Models/Maritime/Civilian/barge.xml', 80)]
             choice = randint(0, len(models) - 1)
             model = models[choice]
         else:
-            models = [('Models/Maritime/Civilian/SimpleFreighter.ac', 20), ('Models/Maritime/Civilian/FerryBoat1.ac', 70)]
+            models = [('Models/Maritime/Civilian/SimpleFreighter.ac', 20), 
+                      ('Models/Maritime/Civilian/FerryBoat1.ac', 70)]
             choice = randint(0, len(models) - 1)
             model = models[choice]
         stg_path = stg_manager.add_object_shared(model[0], vec2d(pos_global), 0, direction + model[1])
 #         print stg_path
 
-    def write_area(self, pier, elev, ac, obj):
-    # Writes a Pier mapped as an area
+    def write_area(self, pier, elev, ac, obj, offset):
+        """Writes a Pier mapped as an area"""
         linear_ring = shg.LinearRing(pier.nodes)
 #         print ring_lat_lon
         # TODO shg.LinearRing().is_ccw
@@ -201,8 +226,9 @@ class Piers(ObjectList):
             pier.nodes = pier.nodes[::-1]
         # top ring
         for p in pier.nodes:
-            e = elev(vec2d(p[0], p[1])) + 1
-            obj.node(-p[1], e, -p[0])
+#             e = elev(vec2d(p[0], p[1])) + 1
+            e = elev + 1
+            obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
         top_nodes = np.arange(len(pier.nodes))
         pier.segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(linear_ring.coords[i])) for i, coord in enumerate(linear_ring.coords[1:])])
         rd_len = len(linear_ring.coords)
@@ -218,8 +244,8 @@ class Piers(ObjectList):
         obj.face(face, mat=0)
 # Build bottom ring
         for p in pier.nodes:
-            e = elev(vec2d(p[0], p[1])) - 5
-            obj.node(-p[1], e, -p[0])
+            e = elev - 5
+            obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
 # Build Sides
         height = 1
         for i, n in enumerate(top_nodes[1:]):
@@ -230,7 +256,7 @@ class Piers(ObjectList):
             sideface.append((n + o - 1, x, 0.5))
             obj.face(sideface, mat=0)
 
-    def write_line(self, pier, elev, ac, obj):
+    def write_line(self, pier, elev, ac, obj, offset):
     # Writes a Pier as a area which only is mapped as a line
         line_string = shg.LineString(pier.nodes)
         o = obj.next_node_index()
@@ -239,12 +265,14 @@ class Piers(ObjectList):
         e = 10000
         idx_left = obj.next_node_index()
         for p in left.coords:
-            e = elev(vec2d(p[0], p[1])) + 1
-            obj.node(-p[1], e, -p[0])
+#             e = elev(vec2d(p[0], p[1])) + 1
+            e = elev + 1
+            obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
         idx_right = obj.next_node_index()
         for p in right.coords:
-            e = elev(vec2d(p[0], p[1])) + 1
-            obj.node(-p[1], e, -p[0])
+#             e = elev(vec2d(p[0], p[1])) + 1
+            e = elev + 1
+            obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
         nodes_l = np.arange(len(left.coords))
         nodes_r = np.arange(len(right.coords))
         pier.segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(line_string.coords[i])) for i, coord in enumerate(line_string.coords[1:])])
@@ -264,13 +292,15 @@ class Piers(ObjectList):
 # Build bottom left line
         idx_bottom_left = obj.next_node_index()
         for p in left.coords:
-            e = elev(vec2d(p[0], p[1])) - 1
-            obj.node(-p[1], e, -p[0])
+#             e = elev(vec2d(p[0], p[1])) - 1
+            e = elev - 1
+            obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
 # Build bottom right line
         idx_bottom_right = obj.next_node_index()
         for p in right.coords:
-            e = elev(vec2d(p[0], p[1])) - 1
-            obj.node(-p[1], e, -p[0])
+#             e = elev(vec2d(p[0], p[1])) - 1
+            e = elev - 1
+            obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
         idx_end = obj.next_node_index() - 1
 # Build Sides
         for i, n in enumerate(nodes_l[1:]):
@@ -329,10 +359,18 @@ def main():
     parameters.show()
 
     osm_fname = parameters.get_OSM_file_name()
+    # -- prepare transformation to local coordinates
+    cmin, cmax = parameters.get_extent_global()
     center_global = parameters.get_center_global()
     transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(transform)
-    piers = Piers(transform)
+    
+     # -- create (empty) clusters
+    lmin = vec2d(tools.transform.toLocal(cmin))
+    lmax = vec2d(tools.transform.toLocal(cmax))
+    clusters = Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
+   
+    piers = Piers(transform, clusters)
 
     handler = osmparser.OSMContentHandler(valid_node_keys=[])
     source = open(osm_fname)
@@ -370,15 +408,6 @@ def main():
 
     elev = tools.get_interpolator()
 
-    ac = piers.write(elev)
-    ac_fname = 'Piers%07i.ac' % calc_tile.tile_index(center_global)
-    logging.info("done.")
-
-    fname = path + os.sep + ac_fname
-    f = open(fname, 'w')
-    f.write(str(ac))
-    f.close()
-
     # -- initialize STG_Manager
     if parameters.PATH_TO_OUTPUT:
         path_to_output = parameters.PATH_TO_OUTPUT
@@ -387,9 +416,11 @@ def main():
     replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)        
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
 
+    ac = piers.write(elev, stg_manager, path, center_global)
+    logging.info("done.")
+
     piers.write_boats(elev, stg_manager)
     # -- write stg
-    stg_manager.add_object_static(ac_fname, center_global, 0, 0)
     stg_manager.write()
     elev.save_cache()
 
