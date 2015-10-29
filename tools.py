@@ -19,6 +19,7 @@ import cPickle
 import parameters
 import math
 import string
+from _collections import defaultdict
 
 stats = None
 
@@ -661,7 +662,7 @@ class Stats(object):
         self.nodes_simplified = 0
         self.nodes_ground = 0
         self.textures_total = 0
-        self.textures_used = set()
+        self.textures_used = defaultdict(int)
 
     def count(self, b):
         """update stats (vertices, surfaces, area, corners) with given building's data
@@ -691,7 +692,7 @@ class Stats(object):
         self.LOD[lod] += 1
         
     def count_texture(self, texture):
-        self.textures_used.add(str(texture))
+        self.textures_used[str(texture.filename)] += 1 
 
     def print_summary(self):
         if parameters.quiet: return
@@ -727,20 +728,25 @@ class Stats(object):
             textures_used_percent = 99.9
 
         out.write(textwrap.dedent("""
+            used tex        %i out of %i (%2.0f %%)
+            """ % (len(self.textures_used), self.textures_total, textures_used_percent)))
+        for item in sorted(self.textures_used.items(), key=lambda item: item[1], reverse=True):            
+            out.write(textwrap.dedent("""
+                 %i %s""" % (item[1], item[0])))
+        out.write(textwrap.dedent("""
               complex       %i
               roof_errors   %i
             ground nodes    %i
               simplified    %i
             vertices        %i
             surfaces        %i
-            used tex        %i out of %i (%2.0f %%)
+            LOD
                 LOD bare        %i (%2.0f %%)
                 LOD rough       %i (%2.0f %%)
                 LOD detail      %i (%2.0f %%)
             """ % (self.have_complex_roof, self.roof_errors,
                    self.nodes_ground, self.nodes_simplified,
-                   self.vertices, self.surfaces,
-                   len(self.textures_used), self.textures_total, textures_used_percent, 
+                   self.vertices, self.surfaces, 
                    self.LOD[0], lodzero,
                    self.LOD[1], lodone,
                    self.LOD[2], lodtwo)))
@@ -750,7 +756,7 @@ class Stats(object):
             out.write(" %5g m^2  %5i |%s\n" % (self.area_levels[i], self.area_above[i], \
                       "#" * int(56. * self.area_above[i] / max_area_above)))
 
-        if logging.getLogger().level <= logging.VERBOSE:
+        if logging.getLogger().level <= logging.VERBOSE:  # @UndefinedVariable
             for name in sorted(self.textures_used):
                 out.write("%s\n"%name)
 
