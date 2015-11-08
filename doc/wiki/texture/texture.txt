@@ -62,7 +62,7 @@ The third line gives the same information for the vertical direction:
 The fourth and fifth line state compatibility with other textures. TexGUI.py just creates an empty template here. A useful example could look like this:
 
 <syntaxhighlight lang="python">
-    requires=['roof:color:black'],
+    requires=['roof:colour:black'],
     provides=['shape:industrial','age:old','compat:roof-flat','compat:roof-gable']))
 </syntaxhighlight>
 

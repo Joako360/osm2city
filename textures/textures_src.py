@@ -7,7 +7,7 @@ def import_us(facades):
       h_size_meters=27, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=108, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -15,7 +15,7 @@ def import_us(facades):
       h_size_meters=40, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=80, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -23,7 +23,7 @@ def import_us(facades):
       h_size_meters=39, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=156, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -31,7 +31,7 @@ def import_us(facades):
       h_size_meters=20, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=80, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -39,7 +39,7 @@ def import_us(facades):
       h_size_meters=40, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=160, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -47,7 +47,7 @@ def import_us(facades):
       h_size_meters=32, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=128, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -55,7 +55,7 @@ def import_us(facades):
       h_size_meters=25, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=100, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -63,7 +63,7 @@ def import_us(facades):
       h_size_meters=29, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=58, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -71,7 +71,7 @@ def import_us(facades):
       h_size_meters=29, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=58, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -79,7 +79,7 @@ def import_us(facades):
       h_size_meters=17, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=68, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -87,7 +87,7 @@ def import_us(facades):
       h_size_meters=60, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=60, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -95,7 +95,7 @@ def import_us(facades):
       h_size_meters=29, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=58, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -103,7 +103,7 @@ def import_us(facades):
       h_size_meters=27, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=54, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -111,7 +111,7 @@ def import_us(facades):
       h_size_meters=30, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=120, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -119,7 +119,7 @@ def import_us(facades):
       h_size_meters=28, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=56, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -127,7 +127,7 @@ def import_us(facades):
       h_size_meters=14, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=28, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -135,7 +135,7 @@ def import_us(facades):
       h_size_meters=38, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=76, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -143,7 +143,7 @@ def import_us(facades):
       h_size_meters=29, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=58, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -151,7 +151,7 @@ def import_us(facades):
       h_size_meters=21, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=21, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -159,7 +159,7 @@ def import_us(facades):
       h_size_meters=27, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=54, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -167,7 +167,7 @@ def import_us(facades):
       h_size_meters=24, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=24, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -175,7 +175,7 @@ def import_us(facades):
       h_size_meters=15, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=30, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -183,7 +183,7 @@ def import_us(facades):
       h_size_meters=34, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=17, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -191,7 +191,7 @@ def import_us(facades):
       h_size_meters=19, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=19, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -199,7 +199,7 @@ def import_us(facades):
       h_size_meters=7, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=14, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -207,7 +207,7 @@ def import_us(facades):
       h_size_meters=12, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=12, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -215,7 +215,7 @@ def import_us(facades):
       h_size_meters=18, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=9, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -223,7 +223,7 @@ def import_us(facades):
       h_size_meters=9, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=9, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -231,7 +231,7 @@ def import_us(facades):
       h_size_meters=8, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=8, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -239,7 +239,7 @@ def import_us(facades):
       h_size_meters=14, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=7, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -247,7 +247,7 @@ def import_us(facades):
       h_size_meters=16, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=8, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -255,7 +255,7 @@ def import_us(facades):
       h_size_meters=21, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=5.25, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -263,7 +263,7 @@ def import_us(facades):
       h_size_meters=20, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=10, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -271,7 +271,7 @@ def import_us(facades):
       h_size_meters=15, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=3.75, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -279,7 +279,7 @@ def import_us(facades):
       h_size_meters=15, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=3.75, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -287,7 +287,7 @@ def import_us(facades):
       h_size_meters=15, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=3.75, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -295,7 +295,7 @@ def import_us(facades):
       h_size_meters=10, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=5, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -303,7 +303,7 @@ def import_us(facades):
       h_size_meters=15, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=30, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -311,7 +311,7 @@ def import_us(facades):
       h_size_meters=21, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=21, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -319,7 +319,7 @@ def import_us(facades):
       h_size_meters=14, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=28, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -327,7 +327,7 @@ def import_us(facades):
       h_size_meters=16, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=16, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -335,7 +335,7 @@ def import_us(facades):
       h_size_meters=11, h_cuts=[0, 500, 1000], h_can_repeat=False,
       v_size_meters=11, v_cuts=[0, 500, 1000], v_can_repeat=False,
       v_align_bottom=True, height_min=10,
-      requires=['roof:color:brown'],
+      requires=['roof:colour:brown'],
       provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 

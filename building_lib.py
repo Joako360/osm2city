@@ -29,7 +29,7 @@ import shapely.geometry as shg
 import sys
 import textwrap
 # import plot
-from math import sin, cos, radians
+from math import sin, cos, radians, tan, atan2, sqrt, pi
 import tools
 import parameters
 import myskeleton
@@ -306,6 +306,141 @@ def compute_height_and_levels(b):
     b.height = float(b.levels) * level_height
 
 
+def compute_roof_height(b, max_height=1e99   ):
+    "Compute roof_height for each node"
+
+    b.roof_height=0
+    
+    if b.roof_type == 'skillion' :
+        # get global roof_height and height for each vertex
+            if 'roof:height' in b.tags:
+                # force clean of tag if the unit is given 
+                roof_height = float(re.sub(' .*', ' ',b.tags['roof:height'].strip()))
+            else :
+                if 'roof:angle' in b.tags:
+                    angle = float(b.tags['roof:angle'])
+                else:
+                    angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE, parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
+            
+                while angle > 0:
+                    roof_height = tan(np.deg2rad(angle)) * (b.lenX[1]/2)
+                    if roof_height < max_height:
+                        break
+                    angle = angle - 1
+
+            if 'roof:slope:direction' in b.tags :
+                # Input angle
+                # angle are given clock wise with reference 0 as north
+                # 
+                # angle 0 north
+                # angle 90 east
+                # angle 180 south
+                # angle 270 west
+                # angle 360 north
+                #
+                # here we works with trigo angles 
+                angle00 = ( pi/2. - (((float(b.tags['roof:slope:direction']) )%360.)*pi/180.)  )
+            else :
+                angle00 = 0
+                
+            angle90 = angle00 + pi/2.
+            ibottom = 0
+            # assume that first point is on the bottom side of the roof
+            # and is a reference point (0,0)
+            # compute line slope*x
+            
+            slope=sin(angle90)
+            
+            dir1 = (cos(angle90),slope)
+            ndir1 = 1 #sqrt(1 + slope**2)
+            dir1n =  (cos(angle90),slope)#(1/ndir1, slope/ndir1)
+            
+            # keep in mind direction
+            #if angle90 < 270 and angle90 >= 90 :
+            #    #dir1, dir1n = -dir1, -dir1n
+            #    dir1=(-dir1[0],-dir1[1])
+            #    dir1n=(-dir1n[0],-dir1n[1])
+
+            # compute distance from points to line slope*x
+            X2=list()
+            XN=list()
+            nXN=list()
+            vprods=list()
+            
+            X = b.X
+            
+            p0=(X[0][0], X[0][1])
+            for i in range(0,len(X)):
+                # compute coord in new referentiel
+                vecA =  (X[i][0]-p0[0], X[i][1]-p0[1] )
+                X2.append( vecA )             
+                # 
+                norm = vecA[0]*dir1n[0] + vecA[1]*dir1n[1]
+                vecN = ( vecA[0] - norm*dir1n[0], vecA[1] - norm*dir1n[1] )
+                nvecN = sqrt( vecN[0]**2 + vecN[1]**2 )
+                # store vec and norms
+                XN.append(vecN)
+                nXN.append(nvecN)
+                # compute ^ product
+                vprod = dir1n[0]*vecN[1]-dir1n[1]*vecN[0]
+                vprods.append(vprod)
+
+            # if first point was not on bottom side, one must find the right point
+            # and correct distances
+            if min(vprods) < 0 :
+                ibottom=vprods.index(min(vprods))
+                offset=nXN[ibottom]
+                norms_o=[ nXN[i] + offset if vprods[i] >=0 else -nXN[i] + offset for i in range(0,len(X)) ] #oriented norm
+            else :
+                norms_o=nXN
+
+            # compute height for each point with thales
+            L = float(max(norms_o)) 
+
+            #try :
+            b.roof_height_X=[ roof_height*l/L for l in norms_o  ]
+            b.roof_height=roof_height
+
+    else :
+        #
+        # others roofs type
+        #
+        try :
+            # get roof:height given by osm
+            b.roof_height = float(re.sub(' .*', ' ',b.tags['roof:height'].strip()))
+            
+        except :
+            # random roof:height
+            if b.roof_type == 'flat' :
+                b.roof_height = 0
+            #if b.roof_type in ['gabled', 'pyramidal','half] :
+            else :
+                if 'roof:angle' in b.tags:
+                    angle = float(b.tags['roof:angle'])
+                else:
+                    angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE, parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
+                while angle > 0:
+                    roof_height = tan(np.deg2rad(angle)) * (b.lenX[1]/2)
+                    if roof_height < max_height:
+                        break
+                    angle = angle - 5
+                if roof_height > max_height:
+                    logging.warn("roof too high %g > %g" % (roof_height, max_height))
+                    return False
+                    
+                b.roof_height=roof_height
+            #else :
+            # should compute roof height for others roof type
+            #    b.roof_height = 0
+    #except :
+    #    if 'roof:shape' in b.tags :
+    #        logging.error('in compute_height_and_levels', b.tags)
+    #    pass
+    
+
+    return
+
+
 def make_lightmap_dict(buildings):
     """make a dictionary: map texture to objects"""
     lightmap_dict = {}
@@ -451,7 +586,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             continue
 
         if b.height < parameters.BUILDING_MIN_HEIGHT:
-            print "Skipping small building with height < building_min_height parameter"
+            logging.verbose("Skipping small building with height < building_min_height parameter")
             tools.stats.skipped_small += 1
             continue
 
@@ -474,13 +609,30 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 if (parameters.BUILDING_SKEL_ROOFS and \
                     b._nnodes_ground in range(4, parameters.BUILDING_SKEL_MAX_NODES)):
                     b.roof_complex = True
+                try :
+                    if str(b.tags['roof:shape']) == 'skillion' :
+                        b.roof_complex = True
+                except :
+                    pass
 
             # -- no pitched roof on tall buildings
             if b.levels > parameters.BUILDING_COMPLEX_ROOFS_MAX_LEVELS:
                 b.roof_complex = False
                 # FIXME: roof_ACs = True
 
+            # -- no complex roof on tiny buildings
+            min_height=0
+            if "min_height" in b.tags :
+                try :
+                    min_height=float(b.tags['min_height'])
+                except :
+                    min_height=0
+            if b.height - min_height < parameters.BUILDING_COMPLEX_MIN_HEIGHT and 'roof:shape' not in b.tags :
+                b.roof_complex = False
+
         facade_requires = []
+        roof_requires = []
+        
         if b.roof_complex:
             facade_requires.append('age:old')
             facade_requires.append('compat:roof-pitched')
@@ -492,52 +644,241 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 facade_requires.append('facade:shape:terminal')
         except KeyError:
             pass
+        try :
+            if 'building:material' not in b.tags :
+                if b.tags['building:part'] == "column" :
+                    facade_requires.append(str('facade:building:material:stone'))
+        except KeyError:
+            pass
+        try :
+            # cleanup building:colour and use it
+            if   'building:color' in b.tags and 'building:colour' not in b.tags :
+                b.tags['building:colour'] = b.tags['building:color']
+                del(b.tags['building:color'])
+            elif 'building:color' in b.tags and 'building:colour'     in b.tags :
+                del(b.tags['building:color'])
+            facade_requires.append('facade:building:colour:'+string.lower(b.tags['building:colour']))
+        except KeyError:
+            pass    
+        try :
+            material_type = string.lower(b.tags['building:material'])
+            if str(material_type) in ['stone', 'brick', 'timber_framing', 'concrete', 'glass' ] :
+                facade_requires.append(str('facade:building:material:'+ str(material_type)))
+                
+            # stone white default
+            if str(material_type)  == 'stone' and 'building:colour' not in b.tags :
+                    b.tags['building:colour'] = 'white'
+                    facade_requires.append(str('facade:building:colour:white'))
+            try :
+                # stone use for
+                if str(material_type) in ['stone', 'concrete', ] :
+                    try :
+                        _roof_material = str(b.tags['roof:material']).lower()
+                    except :
+                        _roof_material = None
+
+                    try :
+                        _roof_colour = str(b.tags['roof:colour']).lower()
+                    except :
+                        _roof_colour = None
+
+                    if not (_roof_colour or _roof_material ):
+                        b.tags['roof:material'] = str(material_type)
+                        roof_requires.append('roof:material:' + str(material_type))
+                        try :
+                            roof_requires.append('roof:colour:' + str(b.tags['roof:colour']))
+                        except :
+                            pass
+
+                    try :
+                        _roof_shape =  str(b.tags['roof:shape']).lower()
+                    except :
+                        _roof_shape = None
+
+                    if not _roof_shape :
+                        b.tags['roof:shape'] = 'flat' 
+                        b.roof_type = 'flat'
+                        b.roof_complex = False
+            except :
+                logging.warning('checking roof material')
+                pass                
+        except KeyError:
+            pass
+
 #
         # -- determine facade and roof textures
-        logging.verbose("___find facade")
-        if b.parent is None:
+        logging.verbose("___find facade for building %i"%b.osm_id)
+        #
+        # -- find local texture if infos different from parent
+        #
+        if b.parent is None :
             b.facade_texture = facades.find_matching(facade_requires, b.tags, b.height, b.longest_edge_len)
-        else:
-            if b.parent.facade_texture is None:
-#                 if b.parent.osm_id == 3825399:
-#                     print b.parent
-                b.facade_texture = facades.find_matching(facade_requires, b.parent.tags, b.height, b.longest_edge_len)
-                b.parent.facade_texture = b.facade_texture
-            else:
-                b.facade_texture = b.parent.facade_texture
-        logging.verbose("__done" + str(b.facade_texture))
+        else :
+            # 1 - Check if building and building parent infos are the same
+            
+            # 1.1 Infos about colour
+            try :
+                b_color = b.tags['building:colour']
+            except :
+                b_color = None
+                
+            try :
+                b_parent_color = b.parent.tags['building:colour']
+            except :
+                b_parent_color = None
+            
+            # 1.2 Infos about material
+            try :
+                b_material = b.tags['building:material']
+            except :
+                b_material = None
+                
+            try :
+                b_parent_material = b.parent.tags['building:material']
+            except :
+                b_parent_material = None
+               
+            # could extend to building:facade:material ?
+        
+            # 2 - If same infos use building parent facade else find new texture
+            if b_color    == b_parent_color    and \
+               b_material == b_parent_material :
+                    if b.parent.facade_texture is None :
+                        b.facade_texture = facades.find_matching(facade_requires, b.parent.tags, b.height, b.longest_edge_len)
+                        b.parent.facade_texture = b.facade_texture
+                    else:
+                        b.facade_texture = b.parent.facade_texture
+            else :
+                b.facade_texture = facades.find_matching(facade_requires, b.tags, b.height, b.longest_edge_len)
+
+        if b.facade_texture :
+            logging.verbose("__done" + str(b.facade_texture) + str(b.facade_texture.provides))
+        else :
+            logging.verbose("__done None")
+        
         if not b.facade_texture:
             tools.stats.skipped_texture += 1
-            logging.info("Skipping building OsmID %d (no matching texture)" % b.osm_id)
+            logging.info("Skipping building OsmID %d (no matching facade texture)" % b.osm_id)
             continue
         if(b.longest_edge_len > b.facade_texture.width_max):
             logging.error("OsmID : %d b.longest_edge_len <= b.facade_texture.width_max"%b.osm_id)
             continue
         # print "long", b.longest_edge_len, b.facade_texture.width_max, str(b.facade_texture)
-
-        roof_requires = copy.copy(b.facade_texture.requires)
+        #
+        # roof search
+        #
+        roof_requires.extend(copy.copy(b.facade_texture.requires))
+        
         if b.roof_complex:
             roof_requires.append('compat:roof-pitched')
         else:
             roof_requires.append('compat:roof-flat')
 
-        # make roof equal across parts
+        try :
+            if   'roof:material' in b.tags :
+                if str(b.tags['roof:material']) in ['roof_tiles', 'copper', 'glass', 'grass', 'metal', 'concrete', 'stone', 'slate', ] :
+                    roof_requires.append(str('roof:material:') + str(b.tags['roof:material']))
+            
+        except KeyError :
+            pass
+            
+        try :
+            roof_requires.append('roof:colour:' + str(b.tags['roof:colour']))
+        except KeyError :
+            pass
+
+        # force use of default roof texture, don't want too weird things
+        if    'roof:material' not in b.tags \
+        and   'roof:color'    not in b.tags \
+        and   'roof:colour'   not in b.tags :
+            roof_requires.append(str('roof:default'))
+
+        roof_requires=list(set(roof_requires))
+
+        #
+        # -- find local texture for roof if infos different from parent
+        #
+        logging.verbose("___find roof for building %i"%b.osm_id)
         if b.parent is None:
             b.roof_texture = roofs.find_matching(roof_requires)
             if not b.roof_texture:
                 tools.stats.skipped_texture += 1
-                logging.warn("WARNING: no matching texture for OsmID %d <%s>" % (b.osm_id,str(roof_requires)))
+                logging.warn("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id,str(roof_requires)))
                 continue
         else:
-            if b.parent.roof_texture is None:
+            # 1 - Check if building and building parent infos are the same
+            
+            # 1.1 Infos about colour
+            try :
+                r_color = b.tags['roof:colour']
+            except :
+                r_color = None
+                
+            try :
+                r_parent_color = b.parent.tags['roof:colour']
+            except :
+                r_parent_color = None
+            
+            # 1.2 Infos about material
+            try :
+                r_material = b.tags['roof:material']
+            except :
+                r_material = None
+                
+            try :
+                r_parent_material = b.parent.tags['roof:material']
+            except :
+                r_parent_material = None
+
+
+            #
+            # Special for stone
+            #
+            if ( r_material == 'stone') and ( r_color is None ) :
+                # take colour of building 
+                try :
+                    if b.tags['building:material'] == 'stone' :
+                        r_color = b.tags['building:colour']
+                except :
+                    pass
+                    
+                # try parent
+                if not r_color :
+                    try :
+                        if b.parent.tags['building:material'] == 'stone' :
+                            r_color = b.parent.tags['building:colour']
+                    except :
+                        r_color = 'white'
+                        
+                b.tags['roof:colour'] = r_color
+
+
+            # 2 - If same infos use building parent facade else find new texture
+            if r_color    == r_parent_color    and \
+               r_material == r_parent_material :
+                if b.parent.roof_texture is None :
+                    b.roof_texture = roofs.find_matching(roof_requires)
+                    if not b.roof_texture:
+                        tools.stats.skipped_texture += 1
+                        logging.warn("WARNING: no matching texture for OsmID %d <%s>" % (b.osm_id,str(roof_requires)))
+                        continue
+                    b.parent.roof_texture = b.roof_texture
+                else:
+                    b.roof_texture = b.parent.roof_texture
+            else :
                 b.roof_texture = roofs.find_matching(roof_requires)
-                b.parent.roof_texture = b.roof_texture
                 if not b.roof_texture:
                     tools.stats.skipped_texture += 1
-                    logging.warn("WARNING: no matching texture for OsmID %d <%s>" % (b.osm_id,str(roof_requires)))
+                    logging.warn("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id,str(roof_requires)))
                     continue
-            else:
-                b.roof_texture = b.parent.roof_texture
+        
+        if b.roof_texture :
+            logging.verbose("__done" + str(b.roof_texture) + str(b.roof_texture.provides))
+
+        else :
+            tools.stats.skipped_texture += 1
+            logging.warn("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id,str(roof_requires)))
+            continue
 
         # -- finally: append building to new list
         new_buildings.append(b)
@@ -564,11 +905,45 @@ def write_and_count_vert(out, b, elev, offset, tile_elev):
 
     b.first_node = out.next_node_index()
 
+    z = b.ground_elev - 0.1
+    try :
+        z -= b.correct_ground
+    except :
+        pass
+    
+    try :
+        if 'min_height' in b.tags :
+            min_height = float(b.tags['min_height'])
+            z = b.ground_elev + min_height
+    except :
+        logging.warning("Error reading min_height for building" + b.osm_id)
+        pass
+
+    # ground nodes        
     for x in b.X:
-        z = b.ground_elev - 1
+        #z = b.ground_elev - 1
         out.node(-x[1], z, -x[0])
-    for x in b.X:
-        out.node(-x[1], b.ground_elev + b.height, -x[0])
+    # under the roof nodes
+    if b.roof_type == 'skillion':
+        # skillion       
+        #           __ -+ 
+        #     __-+--    |
+        #  +--          |
+        #  |            |
+        #  +-----+------+
+        #
+        if b.roof_height_X :
+            for i in range(len(b.X)) :
+                out.node( -b.X[i][1], b.ground_elev + b.height - b.roof_height + b.roof_height_X[i], -b.X[i][0] )
+    else:
+        # others roofs
+        #  
+        #  +-----+------+
+        #  |            |
+        #  +-----+------+
+        #
+        for x in b.X:
+            out.node(-x[1], b.ground_elev + b.height - b.roof_height , -x[0])
     b.ceiling = b.ground_elev + b.height
 # ----
 
@@ -659,15 +1034,19 @@ def write_ground(out, b, elev):
 
 def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner=False):
     tex_y0 = texture.y(tex_y0)  # -- to atlas coordinates
+    tex_y1_input = tex_y1
     tex_y1 = texture.y(tex_y1)
 
     nnodes_ring = len(ring.coords) - 1
     v1 = v0 + nnodes_ring
+    
     # print "v0 %i v1 %i lenX %i" % (v0, v1, len(b.lenX))
-    for i in range(v0, v1 - 1):
+    for ioff in range(0, v1-v0):#range(0, v1-v0-1):
+        i = v0 + ioff
         if False:
             tex_x1 = texture.x(b.lenX[i] / texture.h_size_meters)  # -- simply repeat texture to fit length
         else:
+            ipp = i+1 if ioff < v1-v0-1 else v0
             # FIXME: respect facade texture split_h
             # FIXME: there is a nan in textures.h_splits of tex/facade_modern36x36_12
             a = b.lenX[i] / texture.h_size_meters
@@ -678,26 +1057,24 @@ def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner=False):
                 # assert(tex_x1 <= 1.)
                 if not (tex_x1 <= 1.):
                     logging.debug('FIXME: v_can_repeat: need to check in analyse')
+
+            if b.roof_type == 'skillion' :     
+                tex_y12 = texture.y( ( b.height - b.roof_height + b.roof_height_X[i  ])/b.height * tex_y1_input )
+                tex_y11 = texture.y( ( b.height - b.roof_height + b.roof_height_X[ipp])/b.height * tex_y1_input )
+            else :
+                tex_y12 = tex_y1
+                tex_y11 = tex_y1
+
         tex_x0 = texture.x(0)
-        # print "texx", tex_x0, tex_x1
-        j = i + b.first_node
-        out.face([ (j, tex_x0, tex_y0),
-                   (j + 1, tex_x1, tex_y0),
-                   (j + 1 + b._nnodes_ground, tex_x1, tex_y1),
-                   (j + b._nnodes_ground, tex_x0, tex_y1) ],
-                   swap_uv=texture.v_can_repeat)
+        # compute indices to handle closing wall
+        j   = i   + b.first_node
+        jpp = ipp + b.first_node  
 
-    # -- closing wall
-    tex_x1 = texture.x(b.lenX[v1 - 1] / texture.h_size_meters)
-
-    j0 = v0 + b.first_node
-    j1 = v1 + b.first_node
-
-    out.face([(j1 - 1, tex_x0, tex_y0),
-               (j0, tex_x1, tex_y0),
-               (j0 + b._nnodes_ground, tex_x1, tex_y1),
-               (j1 - 1 + b._nnodes_ground, tex_x0, tex_y1)],
-               swap_uv=texture.v_can_repeat)
+        out.face([ (j                       , tex_x0, tex_y0),
+                   (jpp                     , tex_x1, tex_y0),
+                   (jpp   + b._nnodes_ground, tex_x1, tex_y11),
+                   (j +     b._nnodes_ground, tex_x0, tex_y12) ],
+                 swap_uv=texture.v_can_repeat)     
     return v1
     # ---
     # need numvert
@@ -722,19 +1099,99 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
     global nb  # FIXME: still need this?
 
+    #
+    # get local medium ground elevation for each building
+    #
+    for ib, b in enumerate(buildings) :
+        b.set_ground_elev( elev, tile_elev )
+    
+    #
+    # Exchange informations
+    #
+    for ib, b in enumerate(buildings) :
+        if b.parent :
+            
+            if not b.parent.ground_elev : b.parent.set_ground_elev( elev, tile_elev )
+
+            b.ground_elev_min = min(b.parent.ground_elev, b.ground_elev)
+            b.ground_elev_max = max(b.parent.ground_elev, b.ground_elev)
+            
+            b.ground_elev = b.ground_elev_min
+            
+            if b.parent.children :
+                for child in b.parent.children :
+                    if not child.ground_elev : child.set_ground_elev( elev, tile_elev )
+                            
+                for child in b.parent.children :
+                    b.ground_elev_min = min(child.ground_elev_min, b.ground_elev)
+                    b.ground_elev_max = max(child.ground_elev_max, b.ground_elev)
+                    
+                b.ground_elev = b.ground_elev_min
+                    
+                for child in b.parent.children :
+                    child.ground_elev = b.ground_elev
+        
+        if b.children :
+            for child in b.parent.children :
+                if not child.ground_elev : child.set_ground_elev( elev, tile_elev )           
+            
+            for child in b.children :
+                b.ground_elev_min = min(child.ground_elev_min, b.ground_elev)
+                b.ground_elev_max = max(child.ground_elev_max, b.ground_elev)
+                
+            b.ground_evel = b.ground_elev_min
+                
+            for child in b.children :
+                child.ground_elev = b.ground_elev
+                
+        try :
+            b.ground_elev=float(b.ground_elev)
+        except :
+            logging.fatal("non float elevation for building %"%b.osm_id)
+            exit(1)
+    
+    #
+    # Correct height
+    #
+    for ib, b in enumerate(buildings) :
+        autocorrect =True
+        try :
+            b.ground_elev += b.correct_ground
+            autocorrect = False
+        except :
+            try :
+                b.ground_elev += b.parent.correct_ground
+                autocorrect = False
+            except :
+                pass
+                
+        # auto-correct
+        if autocorrect :
+            if b.children :
+                ground_elev_max = b.ground_elev_max #max( [ child.ground_elev_max for child in b.children ] )
+                min_roof = min( [ child.height - child.roof_height for child in b.children ] )
+            
+                if ground_elev_max > ( min_roof - 2 ) :
+                    b.correct_ground = ground_elev_max - min_roof
+                    b.ground_elev    = ground_elev_max
+                    
+                    for child in b.children :
+                        child.correct_ground = b.correct_ground
+                        child.ground_elev = b.ground_elev
+                
+            elif  b.ground_elev_max > ( b.height - b.roof_height - 2 ) :
+                b.correct_ground = b.ground_elev_max - b.ground_elev_min
+                b.ground_elev = b.ground_elev_max
+            
+
+    #exit(1)
+        
     for ib, b in enumerate(buildings):
         tools.progress(ib, len(buildings))
         out = LOD_objects[b.LOD]
-        b.X = np.array(b.X_outer + b.X_inner)
-    #    Xo = np.array(b.X_outer)
-        for i in range(b._nnodes_ground):
-            b.X[i, 0] -= offset.x  # -- cluster coordinates. NB: this changes building coordinates!
-            b.X[i, 1] -= offset.y
 
-
-        b.ground_elev = local_elev(vec2d(b.X[0]))  # -- interpolate ground elevation at building location
-        # b.ground_elev = elev(vec2d(b.X[0]) + offset) - tile_elev # -- interpolate ground elevation at building location
-        # write_ground(out, b, local_elev)
+        compute_roof_height(b, max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
+        
         write_and_count_vert(out, b, elev, offset, tile_elev)
 
         nb += 1
@@ -750,12 +1207,13 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
         # -- outer and inner walls (if any)
         # print "--1"
-        write_ring(out, b, b.polygon.exterior, 0, b.facade_texture, tex_y0, tex_y1)
-        if True:
-            v0 = b.nnodes_outer
-            for inner in b.polygon.interiors:
-                # print "--2"
-                v0 = write_ring(out, b, inner, v0, b.facade_texture, tex_y0, tex_y1, True)
+        if b.facade_texture != 'wall_no' :
+            write_ring(out, b, b.polygon.exterior, 0, b.facade_texture, tex_y0, tex_y1)
+            if True:
+                v0 = b.nnodes_outer
+                for inner in b.polygon.interiors:
+                    # print "--2"
+                    v0 = write_ring(out, b, inner, v0, b.facade_texture, tex_y0, tex_y1, True)
 # def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner = False):
 
         # -- roof
@@ -768,8 +1226,13 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
         if not b.roof_complex:
         # if True:
-            roofs.flat(out, b, b.X)
-            continue
+            if b.roof_type == 'skillion':
+                roofs.separate_skillion2(out, b, b.X, max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
+            elif b.roof_type in ['pyramidal','dome',] :
+                roofs.separate_pyramidal(out, b, b.X)
+            else :
+                roofs.flat(out, b, b.X)
+            #continue
 
         # -- roof
         #    We can have complex and non-complex roofs:
@@ -787,21 +1250,31 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
             # -- pitched roof for > 4 ground nodes
 
             if b._nnodes_ground > 4 and parameters.BUILDING_SKEL_ROOFS:
-                s = myskeleton.myskel(out, b, offset_xy=offset,
-                                      offset_z=b.ground_elev + b.height,
-                                      max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
-                if s:
-                    tools.stats.have_complex_roof += 1
-                else:  # -- fall back to flat roof
-                    roofs.flat(out, b, b.X)
+                if b.roof_type == 'skillion':
+                    roofs.separate_skillion2(out, b, b.X, max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
+                elif b.roof_type in ['pyramidal','dome'] :
+                    roofs.separate_pyramidal(out, b, b.X)
+                else :
+                    s = myskeleton.myskel(out, b, offset_xy=offset,
+                                    offset_z=b.ground_elev + b.height - b.roof_height,
+                                    max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
+                    if s:
+                        tools.stats.have_complex_roof += 1
+
+                    else:  # -- fall back to flat roof
+                        roofs.flat(out, b, b.X)
                     # FIXME: move to analyse. If we fall back, don't require separate LOD
             # -- pitched roof for exactly 4 ground nodes
             else:
                 max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO
-                if b.roof_type == 'gabled':
+                if b.roof_type == 'gabled' or b.roof_type == 'half-hipped' :
                     roofs.separate_gable(out, b, b.X, max_height=max_height)
                 elif b.roof_type == 'hipped':
                     roofs.separate_hipped(out, b, b.X, max_height=max_height)
+                elif b.roof_type in ['pyramidal','dome'] :
+                    roofs.separate_pyramidal(out, b, b.X)
+                elif b.roof_type == 'skillion':
+                    roofs.separate_skillion2(out, b, b.X, max_height=max_height)
                 elif b.roof_type == 'flat':
                     roofs.flat(out, b, b.X)
                 else:

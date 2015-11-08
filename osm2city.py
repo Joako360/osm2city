@@ -97,15 +97,18 @@ class Building(object):
        Read-only access to node coordinates via self.X[node][0|1]
     """
     def __init__(self, osm_id, tags, outer_ring, name, height, levels,
-                 stg_typ = None, stg_hdg = None, inner_rings_list = [], building_type = 'unknown', roof_type = 'flat'):
+                 stg_typ = None, stg_hdg = None, inner_rings_list = [], building_type = 'unknown', roof_type = 'flat', roof_height = 0, refs=[]):
         self.osm_id = osm_id
         self.tags = tags
+        self.refs = refs
         #self.outer_ring = outer_ring # (outer) local linear ring
         self.inner_rings_list = inner_rings_list
         self.name = name.encode('ascii', 'ignore')     # stg: name
         self.stg_typ = stg_typ  # stg: OBJECT_SHARED or _STATIC
         self.stg_hdg = stg_hdg
         self.height = height
+        self.roof_height = roof_height
+        self.roof_height_X = []
         self.longest_edge_len = 0.
         self.levels = levels
         self.first_node = 0  # index of first node in final OBJECT node list
@@ -127,8 +130,13 @@ class Building(object):
         self.building_type = building_type
         self.roof_type = roof_type
         self.parent = None
-
-
+        self.parent_part = []
+        self.parents_parts = []
+        self.cand_buildings = []
+        self.children = []
+        self.ground_elev = None
+        self.ground_elev_min = None
+        self.ground_elev_max = None
     def roll_inner_nodes(self):
         """Roll inner rings such that the node closest to an outer node goes first.
 
@@ -187,6 +195,26 @@ class Building(object):
         #if inner_rings:
         #    print "inner!", inner_rings
         self.polygon = shg.Polygon(outer, inner)
+        
+    def set_X(self):
+        self.X = np.array(self.X_outer + self.X_inner)
+        for i in range(self._nnodes_ground):
+            self.X[i, 0] -= offset.x  # -- cluster coordinates. NB: this changes building coordinates!
+            self.X[i, 1] -= offset.y
+
+    def set_ground_elev(self, elev, tile_elev, min_elev=None, flag='local'):
+
+        def local_elev(p):
+            return elev(p + offset) - tile_elev
+
+        self.set_X()
+        
+        elevs = [ local_elev(vec2d(self.X[i])) for i in range(self._nnodes_ground)  ]
+        
+        self.ground_elev_min = min(elevs)
+        self.ground_elev_max = max(elevs)
+        self.ground_elev = self.ground_elev_min
+        
 
     @property
     def X_outer(self):
@@ -223,11 +251,14 @@ class Buildings(object):
     valid_node_keys = []
 #    valid_way_keys = ["building", "building:part", "building:height", "height", "building:levels", "layer"]
     req_way_keys = ["building", "building:part"]
-    valid_relation_keys = ["building"]
-    req_relation_keys = ["building"]
+    valid_relation_keys = ["building", "building:part"]
+    req_relation_keys = ["building", "building:part"]
 
     def __init__(self):
         self.buildings = []
+        self.buildings_with_parts = []
+        self.remove_buildings = []
+        self.remove_buildings_parts = []
         self.nodes_dict = {}
         self.node_way_dict = {}
         self.way_list = []
@@ -284,9 +315,13 @@ class Buildings(object):
 
         # -- funny things might happen while parsing OSM
         try:
-            if osm_id in parameters.SKIP_LIST:
-                logging.info("SKIPPING OSM_ID %i" % osm_id)
-                return False
+            #if osm_id in parameters.SKIP_LIST :
+            #    try : 
+            #        if tags['building'] != 'no' :
+            #            logging.info("SKIPPING OSM_ID %i" % osm_id)
+            #            return False
+            #    except :
+            #        pass
             if 'name' in tags:
                 name = tags['name']
                 #print "%s" % _name
@@ -305,6 +340,14 @@ class Buildings(object):
                 _roof_type = tags['roof:shape']
             else:
                 _roof_type = parameters.BUILDING_UNKNOWN_ROOF_TYPE
+
+            _roof_height=0
+            if 'roof:height' in tags:
+                try :
+                    _roof_height = float(tags['roof:height'])
+                except :
+                    _roof_height = 0
+
             _building_type = building_lib.mapType(tags)
 
             # -- simple (silly?) heuristics to 'respect' layers
@@ -330,40 +373,10 @@ class Buildings(object):
             tools.stats.parse_errors += 1
             return False
 
-        building = Building(osm_id, tags, outer_ring, name, height, levels, inner_rings_list=inner_rings_list, building_type=_building_type, roof_type=_roof_type)
+        building = Building(osm_id, tags, outer_ring, name, height, levels, inner_rings_list=inner_rings_list, building_type=_building_type, roof_type=_roof_type, roof_height=_roof_height, refs=refs)
 #        if building.osm_id == 3825399:
 #            print building
 #
-        if parameters.BUILDING_REMOVE_WITH_PARTS:
-            for ref in refs:
-                # Build a lookup table
-                if ref not in self.node_way_dict:
-                    way_list_by_ref = []
-                else:
-                    way_list_by_ref = self.node_way_dict[ref]
-                    for cand_building in way_list_by_ref:
-                        try:
-                            if building.osm_id == cand_building.osm_id:
-                                continue
-                            if 'building:part' in building.tags and cand_building.polygon.intersection(building.polygon).equals(building.polygon):
-                                # Our building:part belongs to the building
-                                if(cand_building in self.buildings):
-                                    # We don't need it since it'll be replaced by its parts
-                                    self.buildings.remove(cand_building)
-                                logging.info('Found Building for removing %d' % cand_building.osm_id)
-                                building.parent = cand_building
-        #                         print cand_building.name
-                                break
-                        except TopologicalError, reason:
-                            logging.warn("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d "%(reason, building.osm_id, cand_building.osm_id))
-                        except PredicateError, reason:
-                            logging.warn("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d "%(reason, building.osm_id, cand_building.osm_id))
-            
-                        
-    #                     if 'building' in building.tags and building.polygon.intersection(cand_building.polygon).equals(cand_building.polygon):
-    #                         print 'Found Building:part'
-                way_list_by_ref.append(building)
-                self.node_way_dict[ref] = way_list_by_ref
         self.buildings.append(building)
 
         tools.stats.objects += 1
@@ -398,9 +411,10 @@ class Buildings(object):
         if tools.stats.objects >= parameters.MAX_OBJECTS:
             return
 
-        if 'building' in relation.tags:
+        if 'building' in relation.tags or 'building:part' in relation.tags :
             outer_ways = []
             inner_ways = []
+            outer_multipolygons = []
 #            print "rel: ", relation.osm_id, relation.tags #, members
             for m in relation.members:
 #                print "  member", m, m.type_, m.role
@@ -408,14 +422,70 @@ class Buildings(object):
                 if m.type_ == 'way':
                     if m.role == 'outer':
                         for way in self.way_list:
-                            if way.osm_id == m.ref: outer_ways.append(way)
+                            if way.osm_id == m.ref:
+                                if way.refs[0] == way.refs[-1] :
+                                    outer_multipolygons.append(way)
+                                    logging.verbose("add way outer multipolygon " + str(way.osm_id))                                    
+                                else :
+                                    outer_ways.append(way)
+                                    logging.verbose("add way outer " + str(way.osm_id))
+
                     elif m.role == 'inner':
                         for way in self.way_list:
                             if way.osm_id == m.ref: inner_ways.append(way)
 
+                #elif m.type_ == 'multipolygon':
+                #    if m.role == 'outer' :
+                #        for way in self.way_list:
+                #            if way.osm_id == m.ref:
+                #                outer_multipolygons.append(way)
+
+            
+            if outer_multipolygons :
+                all_tags = relation.tags
+                for way in outer_multipolygons:
+                    logging.info("Multipolygon " + str(way.osm_id))
+                    all_tags = dict(way.tags.items() + all_tags.items())
+                    res=False
+                    try :
+                        if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
+                            res = self._make_building_from_way(way.osm_id,
+                                                               all_tags,
+                                                               way.refs, [inner_ways[0]])
+                        else:
+                            res = self._make_building_from_way(way.osm_id, 
+                                                               all_tags,
+                                                               way.refs, inner_ways)
+                    except :
+                        res = self._make_building_from_way(way.osm_id, 
+                                                                   all_tags,
+                                                                   way.refs)
+
             if outer_ways:
                 #print "len outer ways", len(outer_ways)
-                all_outer_refs = [ref for way in outer_ways for ref in way.refs]
+                #all_outer_refs = [ref for way in outer_ways for ref in way.refs]
+                # build all_outer_refs
+                list_outer_refs = [ way.refs for way in outer_ways[1:] ]
+                # get some order :
+                all_outer_refs = []
+                all_outer_refs.extend( outer_ways[0].refs )
+
+                for i in range(1, len(outer_ways)):
+                    for way_refs in list_outer_refs :
+                        if   way_refs[0]  == all_outer_refs[-1] : 
+                            #first node of way is last of previous
+                            all_outer_refs.extend(way_refs[0:])
+                            continue
+                        elif way_refs[-1] == all_outer_refs[-1] :
+                            #last node of way is last of previous 
+                            all_outer_refs.extend(way_refs[::-1])
+                            continue
+                    list_outer_refs.remove(way_refs)
+                    
+                               
+                               
+                    
+                
                 all_tags = relation.tags
                 for way in outer_ways:
                     #print "TAG", way.tags
@@ -437,13 +507,19 @@ class Buildings(object):
 #                if bla:
 #                    print relation.tags['name']
                 # -- way could have a 'building' tag, too. Prevent processing this twice.
-                for _way in outer_ways:
+                
+                
+            if not outer_multipolygons and not outer_ways :
+                logging.info("Skipping relation %i: no outer way." % relation.osm_id)
+                
+            for _way in outer_ways:
                     if _way in self.way_list:
-                        self.way_list.remove(_way)
+                        logging.info("removing ways" + str(_way.osm_id))
+                        # keep way if not closed, might be used elsewhere
+                        if _way.refs[0] == _way.refs[-1] :
+                            self.way_list.remove(_way)
                     else:
                         logging.error("Outer way (%d) not in list of ways. Building type missing?"%_way.osm_id)
-            else:
-                logging.info("Skipping relation %i: no outer way." % relation.osm_id)
 
     def _get_min_max_coords(self):
         for node in self.nodes_dict.values():
@@ -646,6 +722,483 @@ if __name__ == "__main__":
         cmin = vec2d(buildings.minlon, buildings.minlat)
         cmax = vec2d(buildings.maxlon, buildings.maxlat)
         logging.info("min/max " + str(cmin) + " " + str(cmax))
+        
+        #
+        # Search parents
+        #
+        if parameters.BUILDING_REMOVE_WITH_PARTS : #and 'building' not in building.tags :     
+            #
+            # Build neightbourgs
+            #
+            def add_candidates(building, b_cands=[], used_refs=[], flag_init=True, recurs=0) :
+                ''' Build list of parent candidates for building, return parent if one of the candidates already parsed'''
+                
+                if recurs > 20 :
+                    return False
+                
+                #if recurs > 10 :
+                #    return False
+                
+                if flag_init == True :
+                    used_refs=[]
+                    b_cands=[]
+                
+                if building not in b_cands :
+                    b_cands.append(building)
+                    
+                process_refs = []
+                process_refs.extend(building.refs)
+                for ref in used_refs :
+                    try :
+                        process_refs.remove(ref)
+                    except :
+                        pass
+                
+                for ref in process_refs :
+                    # Store used references
+                    #if ref in used_refs :
+                    #    continue
+                    # 
+                    #if ref in self.node_way_dict :
+                    #print(" ref", ref)
+                    
+                    #if ref not in buildings.node_way_dict :
+                    #     buildings.node_way_dict=[]
+                        
+                    tmp_b_cands = list(set([ b_cand for b_cand in buildings.node_way_dict[ref] if (( b_cand not in b_cands ) and (b_cand.osm_id != building.osm_id )) ]))
+                    b_cands.extend(tmp_b_cands)
+                    
+                    if ref not in used_refs :
+                        used_refs.append(ref) ; used_refs=list(set(used_refs))
+                        for cand_building in tmp_b_cands :
+                            #if cand_building.cand_buildings and flag_init==False:
+                            #    building.cand_buildings =  cand_building.cand_buildings
+                            #    return True
+                            #else :                                
+                            add_candidates(cand_building, b_cands, used_refs, flag_init=False, recurs=recurs+1) 
+                            #        return True
+                    
+                #for b_cand in b_cands :
+                #    if b_cand not in building.cand_buildings :
+                #        building.cand_buildings.append(b_cand)
+                
+                building.cand_buildings = b_cands
+
+                return False
+        
+            def check_and_set_parent(building, cand_building, flag_search='equal') :
+                try:
+                    if building.osm_id == cand_building.osm_id:
+                        try :
+                            if cand_building.tags['building'] != no :
+                                building.parent = building
+                        except :
+                            return False
+                            
+                    cand_valid=False
+                    
+                    if flag_search == 'equal' :
+                        if  cand_building.polygon.intersection(building.polygon).equals(building.polygon):
+                            cand_valid=True
+                    if flag_search == 'intersects' :
+                        #
+                        # Set parent if intersection assuming that building is 0.8 % in candidate
+                        #
+                        if  cand_building.polygon.intersection(building.polygon).intersects(building.polygon):
+                            ratio_area = cand_building.polygon.intersection(building.polygon).area / building.area
+                            if ratio_area > 0.8 :
+                                cand_valid=True
+
+                    if cand_valid :
+                        #
+                        # Our building:part belongs to the building
+                        #
+                        if((cand_building in buildings.buildings) or (cand_building in buildings.buildings_with_parts)):
+                            #
+                            # set temporary building:part as parent
+                            #
+                            try :
+                                if cand_building.tags['building:part'] != 'no' :
+                                    #
+                                    #  area of cand_building is greater than building
+                                    #  if building:height <= cand_building and building:height 
+                                    #  building will not be visible
+                                    #
+                                    try :
+                                        cand_min_height = float(cand_building.tags['building:min_height'])
+                                    except :
+                                        cand_min_height = 0.
+                                        
+                                    try :
+                                        min_height = float(building.tags['building:min_height'])
+                                    except :
+                                        min_height = 0.
+                                
+                                    if (cand_building.height - cand_building.roof_height) >= building.height and min_height > cand_min_height :
+                                        buildings.remove_buildings_parts.append(building)
+                                        logging.info(" removed 'invisible' building:part " + str(building.osm_id) )
+                                        return
+                                    #    #break
+                                    else :
+                                    # store parent that is itset a building:part
+                                        logging.verbose("    found possible " + str(cand_building.osm_id))
+                                        building.parents_parts.append(cand_building)
+                                        #building.parent_part.cand_building 
+                                        return
+                            except KeyError :
+                                pass
+                            #except :
+                            #    print("Unknown error processing cand_building building:part", cand_building.osm_id, "for ", building.osm_id)
+                            #    e = sys.exc_info()[0]
+                            #    print( "Error: %s" % e )
+                            #    pass
+                                
+                            try :
+                                if cand_building.tags['building'] != 'no' :
+                                    #
+                                    # found building parent
+                                    #
+                                    #print("    found", cand_building.osm_id)
+                                    #buildings.buildings.remove(cand_building)
+                                    if cand_building not in buildings.remove_buildings :
+                                        buildings.remove_buildings.append(cand_building)
+                                        logging.info('Found Building for removing %d' % cand_building.osm_id)
+
+                                    if cand_building not in buildings.buildings_with_parts :
+                                        buildings.buildings_with_parts.append(cand_building)   
+                                        #buildings.buildings_with_parts=list(set(self.buildings_with_parts))
+                                        logging.info('Found Building for removing %d' % cand_building.osm_id)
+
+                                    building.parent = cand_building
+                                    return
+                            except KeyError :
+                                pass
+                            #except :
+                            #    print("Unknown error processing cand_building building", cand_building.osm_id, "for ", building.osm_id)
+                            #    e = sys.exc_info()[0]
+                            #    print( "Error: %s" % e )
+                            #    pass
+                                
+                        else :
+                            logging.verbose(" cand %i not in cand_buildings nor buildings_with_parts"%cand_building.osm_id )
+                            
+                    else :
+                        logging.verbose("   cand %i doesn't contains  %i"%(cand_building.osm_id,  building.osm_id)) 
+                                
+                except TopologicalError, reason:
+                    logging.warn("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d "%(reason, building.osm_id, cand_building.osm_id))
+                except PredicateError, reason:
+                    logging.warn("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d "%(reason, building.osm_id, cand_building.osm_id))
+    
+                return False
+               
+            #
+            # Build index of buildings by ref
+            #
+            logging.verbose("\nBuilding index of way by ref\n")
+            for building in buildings.buildings :
+
+                for ref in building.refs :
+                    if ref not in buildings.node_way_dict :
+                        way_list_by_ref=[]
+                    else :
+                        way_list_by_ref=buildings.node_way_dict[ref]
+                        
+                    way_list_by_ref.append(building)
+                    way_list_by_ref=list(set(way_list_by_ref))
+                    
+                    buildings.node_way_dict[ref]=way_list_by_ref
+
+            #
+            # First Pass search parent with buildings sharing points
+            #               add possible parents parts
+            logging.verbose("\nFirst pass of parent search\n")  
+            buildings.remove_buildings=[]
+            buildings.remove_buildings_parts=[]
+            for building in buildings.buildings :
+                logging.verbose("   search parent for %i"%building.osm_id )
+                
+                # Set actual building parent to itself
+                try :
+                    if building.tag['building'] != 'no' :
+                        building.parent = building
+                        continue
+                except :
+                    pass
+                    
+                # Search and set parent for building:part
+                cand_buildings = list(set([ b_cand for ref in building.refs for b_cand in buildings.node_way_dict[ref]  if ((b_cand.osm_id != building.osm_id )) ]))
+                for b_cand in cand_buildings :
+                    logging.verbose("      trying %i"%b_cand.osm_id )
+                    check_and_set_parent(building, b_cand)
+
+            #
+            # Search for candidates buildings recursively
+            #
+            for building in buildings.buildings :
+                if not building.parent :
+                    cand_buildings=building.cand_buildings
+                    add_candidates(building, cand_buildings)
+
+            #
+            # Search parents for still orphans buildings - on buildings sharing points
+            #
+            for building in buildings.buildings :
+                if building.parent :
+                    continue
+                
+                logging.verbose("search parent for %i"%building.osm_id)
+                #
+                # Skip building:part=no and building!=no
+                #
+                if 'building:part' in building.tags :
+                    if building.tags['building:part'] == 'no' :
+                        logging.verbose( " skip building:part = no for %i"%building.osm_id)
+                        continue
+                        
+                if 'building' in building.tags :
+                    if building.tags['building'] != 'no' :
+                        logging.verbose( " skip building != no for %i"%building.osm_id)
+                        building.parent = building
+                        continue
+                
+                #cand_buildings=[]
+                #ans = add_candidates(building, cand_buildings)
+                cand_buildings=building.cand_buildings
+                if False : #ans :
+                    building.parent = ans
+                else :
+                    #
+                    # Loop on neighbours buildings sharing a point with target building
+                    #
+                    for cand_building in cand_buildings:
+                        logging.verbose( " trying candidate : %i "%cand_building.osm_id )
+                        check_and_set_parent(building, cand_building)
+
+            #
+            # Search parents for buildings that are still orphan and do not "share" points
+            #
+            orphans=0
+            for building in buildings.buildings :
+                if not building.parent :
+                    process = False 
+                    #
+                    # Check if isolated 
+                    #
+                    
+                    # obvious 
+                    #if len(building.cand_buildings) < 2 : 
+                    #    process = True
+                    #else 
+                    # less obvious superposition
+                    #    bc_ids = [ bc.osm_id for bc in building.cand_buildings ]
+                    #    bc_ids.sort()
+                    
+                    orphans+=1
+                    for cand_building in buildings.remove_buildings :
+                        check_and_set_parent(building, cand_building)
+                        
+                        if building.parent : 
+                            break
+
+            #
+            # build children
+            #
+            for building in buildings.buildings :
+                if building.parent and ( building.parent != building ):
+                    if building not in building.parent.children :
+                        building.parent.children.append(building)
+                
+                if building.parent_part and ( building.parent_part != building ):
+                    if building not in building.parent_part.children :
+                        building.parent_part.children.append(building)
+
+            #
+            # Search parents in children parents 
+            #
+            tools.stats.objects = 0 
+            tools.stats.orphans = 0
+            
+            for building in buildings.buildings :
+                if not building.parent :
+                    #
+                    # Search in parent of childrens
+                    #
+                    possible_parents = [ child.parent for child in building.children if child.parent ]
+                    possible_parents = list(set(possible_parents))
+                    try :
+                        possible_parents.remove(None)
+                    except :
+                        pass
+                    if len(possible_parents) == 1 :
+                        building.parent = possible_parents[0]
+                    elif len(possible_parents) > 1 :
+                        most_probable_parent=possible_parents[0]
+                        area=most_probable_parent.area
+                        #print("area", area)
+                        #
+                        # search biggest building
+                        #
+                        for possible_parent in set(possible_parents) :
+                            #area_tmp=possible_parent.area
+                            #building.parent=possible_parent
+                            #if area_tmp > area :
+                            #    building.parent=possible_parent
+                            #    area=area_tmp
+                            check_and_set_parent(building, cand_building, flag_search='intersects')
+                            
+                            if building.parent and ( building.parent != building ):
+                                if building not in building.parent.children :
+                                    building.parent.children.append(building)
+                                break
+                    else :
+                        for cand_building in buildings.remove_buildings :
+                            
+                            check_and_set_parent(building, cand_building, flag_search='intersects')
+                            
+                            if building.parent and ( building.parent != building ): 
+                                if building not in building.parent.children :                               
+                                    building.parent.children.append(building)                                
+                                break
+                                
+                if not building.parent :
+                    tools.stats.orphans +=1
+ 
+
+            if parameters.LOGLEVEL == 'VERBOSE' :
+                for building in buildings.buildings:
+                    if building.parent :
+                        logging.verbose('building %i found parent %i'%(building.osm_id, building.parent.osm_id))
+                    else :
+                        logging.verbose('building %i without parent'%building.osm_id)
+                        
+
+            #
+            # remove tagged buildings
+            #
+            for building in buildings.remove_buildings :
+                logging.verbose(" Removing buildings")
+                try :
+                    buildings.buildings.remove(building)
+                    logging.verbose("Removing building %i"%building.osm_id)
+                    tools.stats.objects -= 1
+                except :
+                    pass
+            
+            
+            
+            # Custom inject tmp
+                if building.osm_id == 263644296 :
+                    for child in building.children :
+                            child.correct_ground = 3.5
+
+                            child.tags['building:colour'] = 'red'
+                            try :
+                                if 'roof:colour' not in child.tags :
+                                    if 'roof:material' in child.tags :
+                                        if child.tags['roof:material'] != 'stone' :
+                                            continue
+                                        else :
+                                            child.tags['roof:colour'] = 'red'
+
+                                    if  child.tags['building:material'] == 'stone'  :
+                                        child.tags['roof:material'] = 'stone'
+                                        child.tags['roof:colour'] = 'red'
+                            except :
+                                pass
+
+
+
+            #
+            # remove tagged buildings:part
+            #
+            #for building in buildings.remove_buildings_parts :
+            #    try :
+            #        buildings.buildings.remove(building)
+            ##        print("Removing building part", building.osm_id)
+            #        tools.stats.objects -= 1
+            #    except :
+            #        pass       
+            keep_buildings=[]
+            keeped=0
+            if parameters.KEEP_LIST :
+                logging.verbose(" KEEP only buildings ")
+                logging.verbose("len buildings.buildings %i"%len(buildings.buildings))
+                # keep explicitely given buildings by keep_list
+                for building in buildings.buildings :
+                    logging.verbose("TEST %i "%building.osm_id)
+                    if building.osm_id in parameters.KEEP_LIST :
+                        if building not in keep_buildings :
+                            keep_buildings.append(building)
+                            logging.verbose("    keep %i"%building.osm_id)
+                            keeped+=1
+                        
+                    if keeped == len(parameters.KEEP_LIST) :
+                        break
+                
+                # keep only parts of buildings with parts
+                for building in buildings.remove_buildings :
+                    logging.verbose("keeping childs of building %i"%building.osm_id)
+
+                    if building.osm_id  in parameters.KEEP_LIST :
+                        for child in building.children :
+                            if (child not in keep_buildings) and (child.osm_id not in parameters.SKIP_LIST) :
+                                logging.verbose("    keep child %i"%child.osm_id)
+                                keep_buildings.append(child)
+                        keeped+=1
+                            
+                    if keeped == len(parameters.KEEP_LIST) :
+                        break
+
+                keep_buildings = list(set(keep_buildings))
+                buildings.buildings=keep_buildings
+            
+            #
+            # REMOVE BUILDINGS + children in SKIP_LIST
+            #
+            if parameters.SKIP_LIST :
+                # Add children of buildings to remove
+                for building in buildings.remove_buildings :
+                    for child in building.children :
+                        parameters.SKIP_LIST.append(child.osm_id)
+                        try :
+                            buildings.buildings.remove(child)
+                        except :
+                            pass                       
+
+                parameters.SKIP_LIST=list(set(parameters.SKIP_LIST))
+
+                for building in buildings.buildings :
+                    if building.osm_id in parameters.SKIP_LIST :
+                        for child in building.children :
+                            try :
+                                buildings.buildings.remove(child)
+                                parameters.SKIP_LIST.append(child.osm_id)
+                            except :
+                                pass  
+                        try :
+                            buildings.buildings.remove(building)
+                        except :
+                            pass
+                            
+            #
+            # Clean parent
+            #
+            for building in buildings.buildings :
+                if building.parent == building :
+                    building.parent = None
+            
+        #self.buildings.append(building)
+
+        #tools.stats.objects += 1
+        # show progress here?
+        # if tools.stats.objects % 50 == 0:
+        #    logging.info(tools.stats.objects)
+        
+        #    #if building.parent : 
+        #            print("building ", str(building.osm_id), " found parent", str(building.parent.osm_id))
+
+        buildings_with_parts = buildings.buildings_with_parts
         buildings = buildings.buildings
         logging.info("parsed %i buildings." % len(buildings))
 

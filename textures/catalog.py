@@ -21,7 +21,7 @@ def append_facades_de(tex_prefix, facades):
         19.4, [274, 676, 1114, 1542, 2048], False,
         height_max = 13.,
         v_align_bottom = True,
-        requires=['roof:color:black'],
+        requires=['roof:colour:black'],
         provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
 
     facades.append(Texture(tex_prefix + 'tex.src/de/residential/LZ_old_bright_bc2.png',
@@ -33,7 +33,7 @@ def append_facades_de(tex_prefix, facades):
         43., [40, 79, 115, 156, 196, 235, 273, 312, 351, 389, 428, 468, 507, 545, 584, 624, 662], True,
         88., [667, 597, 530, 460, 391, 322, 254, 185, 117, 48, 736, 804, 873, 943, 1012, 1080, 1151, 1218, 1288, 1350], False,
         v_align_bottom = True, height_min=20.,
-        requires=['roof:color:black'], #, 'roof:color:gray'],
+        requires=['roof:colour:black'], #, 'roof:colour:gray'],
         provides=['age:modern', 'compat:roof-flat', 'shape:terminal']))
 
     facades.append(Texture(tex_prefix + 'tex.src/de/industrial/facade_industrial_white_26x14m.jpg',
@@ -47,7 +47,7 @@ def append_facades_de(tex_prefix, facades):
         34.6, [105, 210, 312, 417, 519, 622, 726, 829, 933, 1039, 1144, 1245, 1350], True,
         20.4, [177, 331, 489, 651, 796], False,
         v_align_bottom = True,
-        requires=['roof:color:black'], #, 'roof:color:gray'],
+        requires=['roof:colour:black'], #, 'roof:colour:gray'],
         provides=['shape:commercial','age:modern', 'compat:roof-flat']))
 
     facades.append(Texture(tex_prefix + 'tex.src/de/residential/facade_modern36x36_12.png',
@@ -67,13 +67,13 @@ def append_facades_de(tex_prefix, facades):
 #    facades.append(Texture(tex_prefix + 'tex.src/de/residential/DSCF9503_pow2',
 #                            12.85, None, True,
 #                            17.66, (1168, 1560, 2048), False, True,
-#                            requires=['roof:color:black'],
+#                            requires=['roof:colour:black'],
 #                            provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
 
     facades.append(Texture(tex_prefix + 'tex.src/de/residential/DSCF9503_noroofsec_pow2.png',
         12.85, [360, 708, 1044, 1392, 2048], True,
         17.66, [556,1015,1474,2048], False,
-        requires=['roof:color:black'],
+        requires=['roof:colour:black'],
         provides=['shape:residential','age:old','compat:roof-flat','compat:roof-pitched']))
 
 #    facades.append(Texture(tex_prefix + 'tex.src/de/residential/DSCF9710_pow2',
@@ -96,29 +96,29 @@ def append_facades_de(tex_prefix, facades):
         25.0, [436, 1194, 2121, 2809, 3536], True,
         14.8, [718, 2096], False,
         v_align_bottom = True,
-        requires=['roof:color:black'],
+        requires=['roof:colour:black'],
         provides=['shape:residential','age:modern','compat:roof-flat']))
 
     facades.append(Texture(tex_prefix + 'tex.src/de/commercial/facade_modern_commercial_red_gray_20x14m.jpg',
         20.0, [588, 1169, 1750, 2327, 2911, 3485], True,
         14.1, [755, 1289, 1823, 2453], False,
         v_align_bottom = True,
-        requires=['roof:color:black'], #, 'roof:color:gray'],
+        requires=['roof:colour:black'], #, 'roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
     facades.append(Texture(tex_prefix + 'tex.src/de/commercial/facade_modern_commercial_green_red_27x39m.jpg',
         27.3, [486, 944, 1398, 1765, 2344], True,
         38.9, [338, 582, 839, 1087, 1340, 1593, 1856, 2094, 3340], False,
         v_align_bottom = True,
-        requires=['roof:color:black'], #, 'roof:color:gray'],
+        requires=['roof:colour:black'], #, 'roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
     # FIXME:
     facades.append(Texture(tex_prefix + 'tex.src/de/commercial/facade_modern_commercial_90x340m.jpg',
-        h_size_meters=90.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=True,
-        v_size_meters=340.2, v_cuts=[309, 443, 577, 712, 846, 1204, 1383, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
+        h_size_meters=90, h_cuts=[32, 64, 96, 129, 160, 192, 224, 256], h_can_repeat=True, #[107, 214, 322, 429, 532, 640, 747, 850]
+        v_size_meters=315, v_cuts=[88, 126, 164, 203, 241, 344, 395, 447, 472, 501, 527, 554, 578, 603, 633, 659, 684, 896], v_can_repeat=False, #[309, 443, 577, 712, 846, 1204, 1383, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135]
         v_align_bottom=True, height_min=40,
-        requires=['roof:color:black'], #, 'roof:color:gray'],
+        requires=['roof:colour:black'], #, 'roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -151,7 +151,7 @@ def append_facades_de(tex_prefix, facades):
         45.9, [167, 345, 521, 700, 873, 944], True,
         60.5, [144, 229, 311, 393, 480, 562, 645, 732, 818, 901, 983, 1067, 1154, 1245], False,
         v_align_bottom = True, height_min=20.,
-        requires=['roof:color:black'], #, 'roof:color:gray'],
+        requires=['roof:colour:black'], #, 'roof:colour:gray'],
         provides=['shape:urban','age:modern', 'compat:roof-flat']))
 
     # debug fallback texture for very large facades.
@@ -170,35 +170,35 @@ def append_facades_test(tex_prefix, facades):
         h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
         v_size_meters=169.2, v_cuts=[309, 443, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
         v_align_bottom=True, height_min=40,
-        requires=['roof:color:brown'],
+        requires=['roof:colour:brown'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
     facades.append(Texture(tex_prefix + 'tex.src/11storymodernsq.jpg',
         h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
         v_size_meters=169.2, v_cuts=[309, 443, 1383, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
         v_align_bottom=True, height_min=40,
-        requires=['roof:color:brown'],
+        requires=['roof:colour:brown'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     facades.append(Texture(tex_prefix + 'tex.src/12storyconcrglassblkwhtmodern.jpg',
         h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
         v_size_meters=169.2, v_cuts=[309, 443,  1204, 3135], v_can_repeat=False,
         v_align_bottom=True, height_min=40,
-        requires=['roof:color:brown'],
+        requires=['roof:colour:brown'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
     facades.append(Texture(tex_prefix + 'tex.src/12storygovtmodern.jpg',
         h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
         v_size_meters=169.2, v_cuts=[309, 443, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
         v_align_bottom=True, height_min=40,
-        requires=['roof:color:brown'],
+        requires=['roof:colour:brown'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
     facades.append(Texture(tex_prefix + 'tex.src/14storyconcrwhite.jpg',
         h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
         v_size_meters=169.2, v_cuts=[309, 443, 577, 712, 846, 1204, 1383, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
         v_align_bottom=True, height_min=40,
-        requires=['roof:color:brown'],
+        requires=['roof:colour:brown'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -208,14 +208,14 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=True,
         v_size_meters=169.2, v_cuts=[309, 443, 577, 712, 846, 1204, 1383, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
         v_align_bottom=True, height_min=40,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
     facades.append(Texture(tex_prefix + 'tex.src/us/commercial/50storySteelGlassmodern1.jpg',
         h_size_meters=41, h_cuts=[], h_can_repeat=False,
         v_size_meters=165, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -223,7 +223,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=40, h_cuts=[], h_can_repeat=False,
         v_size_meters=80, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
 
@@ -232,7 +232,7 @@ def append_facades_us(tex_prefix, facades):
         v_cuts=[], v_can_repeat=False,
         levels=42,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -241,7 +241,7 @@ def append_facades_us(tex_prefix, facades):
         v_cuts=[], v_can_repeat=False,
         levels=56,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -250,7 +250,7 @@ def append_facades_us(tex_prefix, facades):
         v_cuts=[], v_can_repeat=False,
         levels=45,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -259,7 +259,7 @@ def append_facades_us(tex_prefix, facades):
         v_cuts=[], v_can_repeat=False,
         levels=36,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -267,7 +267,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=25, h_cuts=[], h_can_repeat=False,
         v_size_meters=100, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -275,7 +275,7 @@ def append_facades_us(tex_prefix, facades):
         h_cuts=[], h_can_repeat=False,
         v_size_meters=96, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -283,7 +283,7 @@ def append_facades_us(tex_prefix, facades):
         h_cuts=[], h_can_repeat=False,
         levels=28, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -292,7 +292,7 @@ def append_facades_us(tex_prefix, facades):
         v_cuts=[], v_can_repeat=False,
         levels=27,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -301,7 +301,7 @@ def append_facades_us(tex_prefix, facades):
         v_cuts=[], v_can_repeat=False,
         levels=20,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -310,7 +310,7 @@ def append_facades_us(tex_prefix, facades):
         v_cuts=[], v_can_repeat=False,
         levels=22,
         v_align_bottom=False, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -318,7 +318,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=27, h_cuts=[], h_can_repeat=False,
         v_size_meters=54, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -326,21 +326,21 @@ def append_facades_us(tex_prefix, facades):
         h_cuts=[], h_can_repeat=False,
         v_size_meters=100, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     facades.append(Texture(tex_prefix + 'tex.src/us/commercial/18storyoffice.jpg',
         h_size_meters=28, h_cuts=[], h_can_repeat=False,
         v_size_meters=56, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     facades.append(Texture(tex_prefix + 'tex.src/us/commercial/15storyltbrownconcroffice3.jpg',
         h_size_meters=29, h_cuts=[], h_can_repeat=False,
         v_size_meters=58, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -348,7 +348,7 @@ def append_facades_us(tex_prefix, facades):
         h_cuts=[], h_can_repeat=False,
         v_size_meters=40, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -356,7 +356,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=24, h_cuts=[], h_can_repeat=False,
         v_size_meters=24, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -364,7 +364,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=15, h_cuts=[], h_can_repeat=False,
         v_size_meters=30, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -372,7 +372,7 @@ def append_facades_us(tex_prefix, facades):
         h_cuts=[], h_can_repeat=False,
         levels=7, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -380,7 +380,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=21, h_cuts=[], h_can_repeat=False,
         v_size_meters=21, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -388,7 +388,7 @@ def append_facades_us(tex_prefix, facades):
         h_cuts=[], h_can_repeat=False,
         v_size_meters=15, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True, height_min=5,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -396,7 +396,7 @@ def append_facades_us(tex_prefix, facades):
         h_cuts=[], h_can_repeat=False,
         v_size_meters=15, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True, height_min=5,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -404,7 +404,7 @@ def append_facades_us(tex_prefix, facades):
         h_cuts=[], h_can_repeat=False,
         levels=5, v_cuts=[], v_can_repeat=False,
         v_align_bottom=False, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
 # here    
@@ -413,7 +413,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=9, h_cuts=[], h_can_repeat=False,
         v_size_meters=9, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -421,7 +421,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=8, h_cuts=[], h_can_repeat=False,
         v_size_meters=8, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -429,7 +429,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=14, h_cuts=[], h_can_repeat=False,
         v_size_meters=7, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -437,7 +437,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=16, h_cuts=[], h_can_repeat=False,
         v_size_meters=8, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -445,7 +445,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=21, h_cuts=[], h_can_repeat=False,
         v_size_meters=5.25, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -453,7 +453,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=20, h_cuts=[], h_can_repeat=False,
         v_size_meters=10, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -461,7 +461,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=15, h_cuts=[], h_can_repeat=False,
         v_size_meters=3.75, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -469,7 +469,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=15, h_cuts=[], h_can_repeat=False,
         v_size_meters=3.75, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -477,7 +477,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=15, h_cuts=[], h_can_repeat=False,
         v_size_meters=3.75, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -485,7 +485,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=10, h_cuts=[], h_can_repeat=False,
         v_size_meters=5, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -493,7 +493,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=15, h_cuts=[], h_can_repeat=False,
         v_size_meters=30, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True, height_min=10,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -501,7 +501,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=21, h_cuts=[], h_can_repeat=False,
         v_size_meters=21, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -509,7 +509,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=14, h_cuts=[], h_can_repeat=False,
         v_size_meters=28, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -517,7 +517,7 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=16, h_cuts=[], h_can_repeat=False,
         v_size_meters=16, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
     
     
@@ -525,8 +525,15 @@ def append_facades_us(tex_prefix, facades):
         h_size_meters=11, h_cuts=[], h_can_repeat=False,
         v_size_meters=11, v_cuts=[], v_can_repeat=False,
         v_align_bottom=True,
-        requires=['roof:color:gray'],
+        requires=['roof:colour:gray'],
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
+
+    facades.append(Texture(tex_prefix + 'tex.src/roof_gen_glass.png',
+        100., [], True, 100., [], False,  provides=['specific', 'building:material:glass', 'compat:roof-pitched', 'compat:roof-flat','age:modern', 'age:old', 'shape:urban', 'shape:commercial']))
+        
+    facades.append(Texture(tex_prefix + 'tex.src/simple_concrete.png',
+        100., [], True, 100., [], False, provides=['specific', 'colour:gray', 'building:material:concrete', 'age:old', 'age:modern', 'shape:urban', 'shape:commercial', 'compat:roof-flat', 'compat:roof-pitched']))
+
 
 def append_dynamic(tex_prefix, facades): 
     """--- Dynamically runs py files in tex.src ---"""   
@@ -545,37 +552,67 @@ def append_roofs(tex_prefix, roofs):
     """------------ ADD YOUR ROOF TEXTURES HERE -------------------"""
 
 #    roofs.append(Texture(tex_prefix + 'tex.src/roof_tiled_black',
-#                         1., [], True, 1., [], False, provides=['color:black']))
+#                         1., [], True, 1., [], False, provides=['colour:black']))
 #    roofs.append(Texture(tex_prefix + 'tex.src/roof_tiled_red',
-#                         1., [], True, 1., [], False, provides=['color:red']))
+#                         1., [], True, 1., [], False, provides=['colour:red']))
 
     roofs.append(Texture(tex_prefix + 'tex.src/roof_red1.png',
-        31.8, [], True, 16.1, [], False, provides=['color:red', 'compat:roof-pitched']))
+        32, [0,1024], True, 16, [0,512], False, provides=['default', 'colour:red', 'compat:roof-pitched', 'compat:roof-flat', 'material:roof_tiles']))
+        
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_red2.png',
+        32, [0,1024], True, 16, [0,512], False, provides=['default', 'colour:red', 'compat:roof-pitched', 'material:roof_tiles']))
 
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_red3.png',
+        32, [0,1024], True, 16, [0,512], False, provides=['default', 'colour:red', 'compat:roof-pitched', 'material:roof_tiles']))
+        
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_orange.png',
+        32, [0,1024], True, 16, [0,512], False, provides=['specific', 'colour:orange', 'compat:roof-pitched', 'material:roof_tiles']))
+        
     roofs.append(Texture(tex_prefix + 'tex.src/roof_black1.png',
-        31.8, [], True, 16.1, [], False, provides=['color:black', 'compat:roof-pitched']))
+        32, [0,2048], True, 16, [0,1024], False, provides=['default', 'colour:black', 'compat:roof-pitched', 'material:roof_tiles']))
 
-    roofs.append(Texture(tex_prefix + 'tex.src/roof_black4.jpg',
-        6., [], True, 3.5, [], False, provides=['color:black', 'compat:roof-pitched']))
+    #roof_black4.jpg
+    #6., [], True, 3.5, []
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_black_slate.png',
+        32, [0,2048], True, 16, [0,1024], False, provides=['colour:black', 'compat:roof-pitched', 'material:slate']))
 
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_stone.png',
+        100., [], True, 100., [], False, requires=['roof:material:stone'], provides=[ 'specific', 'material:stone', 'colour:white', 'colour:yellow', 'compat:roof-flat', 'compat:roof-pitched']))
+        
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_stone_red.png',
+        100., [], True, 100., [], False, requires=['roof:material:stone'], provides=[ 'specific', 'material:stone', 'colour:red', 'compat:roof-flat', 'compat:roof-pitched']))
+        
     roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_black1.png',
-        100., [], True, 100., [], False, provides=['color:black', 'compat:roof-flat']))
+        100., [], True, 100., [], False, provides=['default', 'colour:black', 'compat:roof-flat']))
 
     roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_gray1.png',
-        100., [], True, 100., [], False, provides=['color:gray', 'compat:roof-flat']))
+        100., [], True, 100., [], False, provides=['default', 'colour:gray', 'compat:roof-flat']))
+        
     roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_gray2.png',
-        100., [], True, 100., [], False, provides=['color:gray', 'compat:roof-flat']))
+        100., [], True, 100., [], False, provides=['default', 'colour:gray', 'compat:roof-flat']))
 
     roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_gray3.png',
-        100., [], True, 100., [], False, provides=['color:gray', 'compat:roof-flat']))
-
+        100., [], True, 100., [], False, provides=['default', 'colour:gray', 'compat:roof-flat', 'material:concrete', 'material:metal' ]))
+        
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_gray3.png',
+        100., [], True, 100., [], False, provides=['specific', 'colour:gray', 'compat:roof-pitched', 'material:concrete', 'material:metal' ]))        
+        
     roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_brown1.png',
-        100., [], True, 100., [], False, provides=['color:brown', 'compat:roof-flat']))
+        100., [], True, 100., [], False, provides=['default', 'colour:brown', 'compat:roof-flat']))
+
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_grass.png',
+        100., [], True, 100., [], False, requires=['roof:material:grass'], provides=['specific', 'material:grass', 'colour:green', 'compat:roof-pitched', 'compat:roof-flat']))
+
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_copper.png',
+        100., [], True, 100., [], False, requires=['roof:material:copper'], provides=['specific', 'material:copper', 'colour:green', 'compat:roof-pitched', 'compat:roof-flat']))
+
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_gen_glass.png',
+        100., [], True, 100., [], False, requires=['roof:material:glass'], provides=['specific', 'material:glass', 'compat:roof-pitched', 'compat:roof-flat']))
 
 #    roofs.append(Texture(tex_prefix + 'tex.src/roof_black2',
-#                             1.39, [], True, 0.89, [], True, provides=['color:black']))
+#                             1.39, [], True, 0.89, [], True, provides=['colour:black']))
 #    roofs.append(Texture(tex_prefix + 'tex.src/roof_black3',
-#                             0.6, [], True, 0.41, [], True, provides=['color:black']))
+#                             0.6, [], True, 0.41, [], True, provides=['colour:black']))
 
 #    roofs.append(Texture(tex_prefix + 'tex.src/roof_black3_small_256x128',
-#                             0.25, [], True, 0.12, [], True, provides=['color:black']))
+#                             0.25, [], True, 0.12, [], True, provides=['colour:black']))

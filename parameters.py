@@ -93,6 +93,9 @@ CONCURRENCY = 1             # -- number of parallel OSM parsing threads. Unused 
 #    a static model for these, and the overlap check fails. 
 #    Use unicode strings as in the first example if there are non-ASCII characters.
 SKIP_LIST = [u"Theologische Fakultät", "Rhombergpassage", 55875208]
+# -- keep buildings based on their OSM name tag or OSM ID.
+#    keeps also, building:part of buildings
+KEEP_LIST = []
 
 # -- Parameters which influence the number of buildings from OSM taken to output
 BUILDING_MIN_HEIGHT = 3.4           # -- minimum height of a building to be included in output (does not include roof)
@@ -105,6 +108,7 @@ BUILDING_NEVER_SKIP_LEVELS = 6      # -- buildings that tall will never be skipp
 
 BUILDING_UNKNOWN_ROOF_TYPE = "flat" # -- If the roof type isn't given use this type
 BUILDING_COMPLEX_ROOFS = 1          # -- generate complex roofs on buildings?
+BUILDING_COMPLEX_MIN_HEIGHT = 2     # -- don't put complex roof on buildings smallers than value without roof:shape flag
 BUILDING_COMPLEX_ROOFS_MAX_LEVELS = 5 # -- don't put complex roofs on buildings taller than this
 BUILDING_COMPLEX_ROOFS_MAX_AREA   = 2000 # -- don't put complex roofs on buildings larger than this
 BUILDING_SKEL_ROOFS = 1             # -- generate complex roofs with pySkeleton? Used to be EXPERIMENTAL_USE_SKEL
@@ -362,4 +366,3 @@ if __name__ == "__main__":
         show()
     if args.show_default:
         show_default()
-

@@ -2,10 +2,11 @@ import shapely.geometry as shg
 import numpy as np
 import building_lib
 import random
-from math import sin, cos, atan2, tan
+from math import sin, cos, atan2, tan, sqrt, pi
 import copy
 import logging
 import parameters
+import re
 
 def _flat_relation(b):
     """relation flat roof, for one inner way only, included in base model"""
@@ -122,22 +123,258 @@ def separate_gable(out, b, X, inward_meters = 0., max_height = 1e99):
     # -- pitched roof for 4 ground nodes
     t = b.roof_texture
     
+    roof_height = b.roof_height
+    if b.roof_height :
+        roof_height = b.roof_height
+    else :
+        logging.error("no roof_height in seperate_gable for building %i"%b.osm_id)
+        return False
+    
+    # get orientation if exits :
+    try :
+        roof_orientation = str(b.tags['roof:orientation'])
+        if not (roof_orientation in ['along', 'accross']) :
+            roof_orientation = 'along'
+    except :
+        roof_orientation = 'along'
+
+
+    # search smallest and longest sides
+    i_small = 3
+    i_long  = 3
+    l_side2 = ( X[0][0] - X[3][0] )**2 + ( X[0][1] - X[3][1] )**2
+    l_small = l_side2
+    l_long  = l_side2
+    
+    for i in range(0,3) :
+        l_side2 = ( X[i+1][0] - X[i][0] )**2 + ( X[i+1][1] - X[i][1] )**2
+        if l_side2 > l_long :
+            i_long = i
+            l_long = l_side2
+        elif l_side2 < l_small :
+            i_small = i
+            l_small = l_side2
+            
+    if roof_orientation == 'accross' :
+        i_side = i_small
+    else :
+        i_side = i_long
+
+    ind_X=[]
+    for i in range(0,4):
+        ind_X.append((i_side + i)%4)
+    
     # -- 4 corners
     o = out.next_node_index()
+    #for x in X:
+    for i in range(0,4) :
+        out.node(-X[ind_X[i]][1], b.ground_elev + b.height - roof_height, -X[ind_X[i]][0])
+    #We don't want the hipped part to be greater than the height, which is 45 deg
+    inward_meters = min(roof_height,inward_meters)
+
+    # -- tangential vector of long edge
+    tang = (X[ind_X[1]]-X[ind_X[0]])/b.lenX[ind_X[1]] * inward_meters
+    
+    len_roof_top = b.lenX[ind_X[0]] - 2.*inward_meters
+    len_roof_bottom = 1.*b.lenX[ind_X[0]]
+
+    out.node(-(0.5*(X[ind_X[3]][1]+X[ind_X[0]][1]) + tang[1]), b.ground_elev + b.height, -(0.5*(X[ind_X[3]][0]+X[ind_X[0]][0]) + tang[0]))
+    out.node(-(0.5*(X[ind_X[1]][1]+X[ind_X[2]][1]) - tang[1]), b.ground_elev + b.height, -(0.5*(X[ind_X[1]][0]+X[ind_X[2]][0]) - tang[0]))
+
+    roof_texture_size_x = t.h_size_meters # size of roof texture in meters
+    roof_texture_size_y = t.v_size_meters
+    repeatx = len_roof_bottom / roof_texture_size_x
+    len_roof_hypo = ((0.5*b.lenX[ind_X[1]])**2 + roof_height**2)**0.5
+    repeaty = len_roof_hypo / roof_texture_size_y
+
+
+    out.face([ (o + 0, t.x(0), t.y(0)),
+               (o + 1, t.x(repeatx), t.y(0)),
+               (o + 5, t.x(repeatx*(1-inward_meters/len_roof_bottom)), t.y(repeaty)),
+               (o + 4, t.x(repeatx*(inward_meters/len_roof_bottom)), t.y(repeaty)) ])
+
+    out.face([ (o + 2, t.x(0), t.y(0)),
+               (o + 3, t.x(repeatx), t.y(0)),
+               (o + 4, t.x(repeatx*(1-inward_meters/len_roof_bottom)), t.y(repeaty)),
+               (o + 5, t.x(repeatx*(inward_meters/len_roof_bottom)), t.y(repeaty)) ])
+
+    repeatx = b.lenX[ind_X[1]]/roof_texture_size_x
+    len_roof_hypo = (inward_meters**2 + roof_height**2)**0.5
+    repeaty = len_roof_hypo/roof_texture_size_y
+    out.face([ (o + 1, t.x(0), t.y(0)),
+               (o + 2, t.x(repeatx), t.y(0)),
+               (o + 5, t.x(0.5*repeatx), t.y(repeaty)) ])
+
+    repeatx = b.lenX[ind_X[3]]/roof_texture_size_x
+    out.face([ (o + 3, t.x(0), t.y(0)),
+               (o + 0, t.x(repeatx), t.y(0)),
+               (o + 4, t.x(0.5*repeatx), t.y(repeaty)) ])
+
+def separate_pyramidal(out, b, X, inward_meters = 0.0, max_height = 1.e99):
+    """pyramidal roof, ? nodes, separate model. Inward_"""
+    #out.new_object(b.roof_ac_name, b.roof_texture.filename + '.png')
+
+    # -- pitched roof for ? ground nodes
+    t = b.roof_texture
+        
+    # -- get roof height 
+    if b.roof_height :
+        roof_height = b.roof_height 
+    else :
+        return False
+            
+    # -- ? corners
+    o = out.next_node_index()
+    for x in X:
+        out.node(-x[1], b.ground_elev + b.height - roof_height, -x[0])
+
+    #We don't want the hipped part to be greater than the height, which is 45 deg
+    inward_meters = min(roof_height,inward_meters)
+
+    len_roof_top = b.lenX[0] - 2.*inward_meters
+    len_roof_bottom = 1.*b.lenX[0]
+
+    # get middle node of the "tower"
+    out_1 = -sum([ xi[1] for xi in X ])/len(X)
+    out_2 = -sum([ xi[0] for xi in X ])/len(X)
+    out.node( out_1, b.ground_elev + b.height, out_2)
+
+    # texture it
+    roof_texture_size_x = t.h_size_meters # size of roof texture in meters
+    roof_texture_size_y = t.v_size_meters
+
+    # loop on sides of the building
+    for i in range(0,len(X)) :
+        repeatx = b.lenX[1]/roof_texture_size_x
+        len_roof_hypo = (inward_meters**2 + roof_height**2)**0.5
+        repeaty = len_roof_hypo/roof_texture_size_x
+        out.face([ (o + i            , t.x(0)          , t.y(0)),
+                   (o + (i+1)%len(X) , t.x(repeatx)    , t.y(0)),
+                   (o + len(X)       , t.x(0.5*repeatx), t.y(repeaty)) ])
+
+
+
+def separate_skillion2(out, b, X, inward_meters = 0., max_height = 1e99, ac_name=""):
+    """skillion roof, n nodes, separate model. Inward_"""
+    # - handle square skillion roof
+    #   it's assumed that the first 2 nodes are at building:height-roof:height
+    #                     the last  2 nodes are at building:height
+    # 
+    t  = b.roof_texture
+    tf = b.facade_texture
+    
+    # -- 4 corners
+    o = out.next_node_index()
+    o0 = o
+    for x in X:
+        out.node(-x[1], b.ground_elev + b.height - b.roof_height , -x[0])
+
+    print('SKILLION ', b.osm_id, ' ', b.tags)
+
+
+
+    #We don't want the hipped part to be greater than the height, which is 45 deg
+    inward_meters = min(b.roof_height,inward_meters)
+
+    # -- tangential vector of long edge
+    tang = (X[1]-X[0])/b.lenX[1] * inward_meters
+
+    len_roof_top = b.lenX[0] - 2.*inward_meters
+    len_roof_bottom = 1.*b.lenX[0]
+
+    #imax=roof_height_X.index(max(roof_height_X))
+    #imax2=roof_height_X.index(max([roof_height_X((imax-1)%4),roof_height_X((imax+1)%4)]))
+    
+    if True :
+        #
+        # FLAT PART
+        #
+        if True : #ac_name:
+            #out.new_object(ac_name, b.roof_texture.filename + '.png')
+            i=0
+            for x in X:
+                z = b.ground_elev - 1
+    #            out += "%1.2f %1.2f %1.2f\n" % (-x[1], b.ground_elev + b.height, -x[0])
+                out.node(-x[1], b.ground_elev + b.height - b.roof_height + b.roof_height_X[i], -x[0])
+                i+=1
+
+        #out += "refs %i\n" % (b._nnodes_ground + 2 * len(b.polygon.interiors))
+
+        if len(b.polygon.interiors):
+            print(" len(b.polygon.interiors)")
+            outer_closest = copy.copy(b.outer_nodes_closest)
+            print("outer_closest = copy.copy(b.outer_nodes_closest)", outer_closest)
+            i = b.nnodes_outer
+            inner_ring = 0
+            nodes = []
+            for o in range(b.nnodes_outer):
+                nodes.append(o)
+                if outer_closest and o == outer_closest[0]:
+                    len_ring = len(b.polygon.interiors[inner_ring].coords) - 1
+                    a = np.arange(len_ring) + i
+                    for x in a: nodes.append(x)
+                    nodes.append(a[0]) # -- close inner ring
+                    i += len_ring
+                    inner_ring += 1
+                    outer_closest.pop(0)
+                    nodes.append(o) # -- go back to outer ring
+        else:
+            nodes = range(b.nnodes_outer)
+
+        #assert(len(X) >= len(nodes))
+        if False : #ac_name == "":
+            uv = face_uv(nodes, X, b.roof_texture, angle=angle00)
+            nodes = np.array(nodes) + b._nnodes_ground
+
+        else:
+            uv = face_uv(nodes, X, b.roof_texture, angle=None)
+
+        assert(len(nodes) == b._nnodes_ground + 2 * len(b.polygon.interiors))
+
+        l = []
+        o=out.next_node_index()
+
+        # create nodes for/ and roof
+        for i, node in enumerate(nodes):
+            #New nodes
+            out.node(-X[node][1], b.ground_elev + b.height - b.roof_height + b.roof_height_X[node], -X[node][0])
+            l.append((o + node, uv[i][0], uv[i][1]))
+            #l.append((o + node + b.first_node, uv[i][0], uv[i][1]))
+        out.face(l)
+
+    return
+
+def separate_skillion(out, b, X, inward_meters = 0., max_height = 1e99):
+    """skillion roof, 4 nodes, separate model. Inward_"""
+    # - handle square skillion roof
+    #   it's assumed that the first 2 nodes are at building:height-roof:height
+    #                     the last  2 nodes are at building:height
+    # 
+    t = b.roof_texture
+    
+    # -- 4 corners
+    o = out.next_node_index()
+
     for x in X:
         out.node(-x[1], b.ground_elev + b.height, -x[0])
-    if 'roof:angle' in b.tags:
-        angle = float(b.tags['roof:angle'])
-    else:
-        angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE, parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
-    while angle > 0:
-        roof_height = tan(np.deg2rad(angle)) * (b.lenX[1]/2)
-        if roof_height < max_height:
-            break
-        angle = angle - 5
-    if roof_height > max_height:
-        logging.warn("roof too high %g > %g" % (roof_height, max_height))
-        return False
+
+    if 'roof:height' in b.tags:
+        # force clean of tag if the unit is given 
+        roof_height = float(re.sub(' .*', ' ',b.tags['roof:height'].strip()))
+    else :
+        if 'roof:angle' in b.tags:
+            angle = float(b.tags['roof:angle'])
+        else:
+            angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE, parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
+            
+        while angle > 0:
+            roof_height = tan(np.deg2rad(angle)) * (b.lenX[1]/2)
+            if roof_height < max_height:
+                break
+            angle = angle - 5
+        if roof_height > max_height:
+            logging.warn("roof too high %g > %g" % (roof_height, max_height))
+            return False
 
     #We don't want the hipped part to be greater than the height, which is 45 deg
     inward_meters = min(roof_height,inward_meters)
@@ -148,8 +385,8 @@ def separate_gable(out, b, X, inward_meters = 0., max_height = 1e99):
     len_roof_top = b.lenX[0] - 2.*inward_meters
     len_roof_bottom = 1.*b.lenX[0]
 
-    out.node(-(0.5*(X[3][1]+X[0][1]) + tang[1]), b.ground_elev + b.height + roof_height, -(0.5*(X[3][0]+X[0][0]) + tang[0]))
-    out.node(-(0.5*(X[1][1]+X[2][1]) - tang[1]), b.ground_elev + b.height + roof_height, -(0.5*(X[1][0]+X[2][0]) - tang[0]))
+    out.node(-X[3][1], b.ground_elev + b.height + roof_height, -X[3][0])
+    out.node(-X[2][1], b.ground_elev + b.height + roof_height, -X[2][0])
 
     roof_texture_size_x = t.h_size_meters # size of roof texture in meters
     roof_texture_size_y = t.v_size_meters

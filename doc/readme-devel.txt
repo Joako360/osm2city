@@ -58,7 +58,7 @@ You can create own facade textures. They're registered in textures.py:
         facades.append(Texture('tex/DSCF9495_pow2',
                                 14, [585, 873, 1179, 1480, 2048], True,
                                 19.4, [274, 676, 1114, 1542, 2048], False, True,
-                                requires=['roof:color:black'],
+                                requires=['roof:colour:black'],
                                 provides=['shape:residential','age:old','compat:roof-flat','compat:roof-gable']))
 
 This registeres a file tex/DSCF9495_pow2. The extention .png is added automatically when writing the .ac file, so make sure you use only .png textures.
