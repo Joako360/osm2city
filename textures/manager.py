@@ -228,9 +228,9 @@ class TextureManager(object):
 
     def find_matching(self, requires = []):
         candidates = self.find_candidates(requires)
-        logging.verbose("looking for texture" + str(requires))
+        logging.verbose("looking for texture" + str(requires))  # @UndefinedVariable
         for c in candidates:
-            logging.verbose("  candidate " + c.filename + " provides " + str(c.provides))
+            logging.verbose("  candidate " + c.filename + " provides " + str(c.provides))  # @UndefinedVariable
         if len(candidates) == 0:
             return None
         #print "cands are\n", string.join(["  " + str(c) for c in candidates], '\n')
@@ -246,7 +246,7 @@ class TextureManager(object):
             if set(requires).issubset(cand.provides):
                 candidates.append(cand)
             else:
-                logging.verbose("  unmet requires %s req %s prov %s" % (str(cand.filename), str(requires), str(cand.provides)))
+                logging.verbose("  unmet requires %s req %s prov %s" % (str(cand.filename), str(requires), str(cand.provides)))  # @UndefinedVariable
         return candidates
 
     def __str__(self):
@@ -300,10 +300,10 @@ class FacadeManager(TextureManager):
 #            print "     building_height", building_height
 #            print "     min/max", t.height_min, t.height_max
             if height < t.height_min or height > t.height_max:
-                logging.verbose("height %.2f (%.2f-%.2f) outside bounds : %s" %(height, t.height_min, t.height_max, str(t.filename)))
+                logging.verbose("height %.2f (%.2f-%.2f) outside bounds : %s" %(height, t.height_min, t.height_max, str(t.filename)))  # @UndefinedVariable
                 continue
             if width < t.width_min or width > t.width_max:
-                logging.verbose("width %.2f (%.2f-%.2f) outside bounds : %s"%(width, t.width_min, t.width_max,str(t.filename)))
+                logging.verbose("width %.2f (%.2f-%.2f) outside bounds : %s"%(width, t.width_min, t.width_max,str(t.filename)))  # @UndefinedVariable
                 continue
 
             new_candidates.append(t)
@@ -389,6 +389,7 @@ def init(tex_prefix='', create_atlas=False):
         fpickle.close()
 
     logging.debug(facades)
+    tools.stats.textures_total = len(facades.get_list() + roofs.get_list())
 
 
 if __name__ == "__main__":
