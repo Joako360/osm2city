@@ -58,8 +58,8 @@ class Texture(object):
         try:
             self.im = Image.open(self.filename)
         except:
-             logging.warning("Skipping non-existing texture %s" % self.filename)
-             return
+            logging.warning("Skipping non-existing texture %s" % self.filename)
+            return
         self.width_px, self.height_px = self.im.size
         image_aspect = self.height_px / float(self.width_px)
 
