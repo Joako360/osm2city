@@ -114,13 +114,6 @@ def append_facades_de(tex_prefix, facades):
         provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
 
     # FIXME:
-    facades.append(Texture(tex_prefix + 'tex.src/de/commercial/facade_modern_commercial_90x340m.jpg',
-        h_size_meters=90, h_cuts=[32, 64, 96, 129, 160, 192, 224, 256], h_can_repeat=True, #[107, 214, 322, 429, 532, 640, 747, 850]
-        v_size_meters=315, v_cuts=[88, 126, 164, 203, 241, 344, 395, 447, 472, 501, 527, 554, 578, 603, 633, 659, 684, 896], v_can_repeat=False, #[309, 443, 577, 712, 846, 1204, 1383, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135]
-        v_align_bottom=True, height_min=40,
-        requires=['roof:colour:black'], #, 'roof:colour:gray'],
-        provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
-
 
     facades.append(Texture(tex_prefix + 'tex.src/de/residential/DSCF9726_noroofsec_pow2.png',
        15.1, [321,703,1024], True,
