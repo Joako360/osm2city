@@ -121,6 +121,8 @@ def no_transform((x, y)):
 def is_bridge(way):
     return "bridge" in  way.tags
 
+def is_railway(way):
+    return "railway" in way.tags
 
 class Roads(objectlist.ObjectList):
     valid_node_keys = []
@@ -748,10 +750,13 @@ class Roads(objectlist.ObjectList):
     
     def compatible_ways(self, way1, way2):
         logging.debug("trying join %i %i" % (way1.osm_id, way2.osm_id))
-        if is_bridge(way1) == is_bridge(way2):
-            return True
-        else:
+        if is_railway(way1) != is_railway(way2):
+            logging.debug("Nope, either both or none must be railway")
             return False
+        if is_bridge(way1) != is_bridge(way2):
+            logging.debug("Nope, either both or none must be a bridge")
+            return False
+        return True
 
     def attached_ways_dict_remove(self, the_ref, the_way, ignore_missing_ref=False):
         """remove given way from given node in attached_ways_dict"""
