@@ -243,6 +243,9 @@ class TextureManager(object):
     def find_candidates(self, requires = []):
         #return [self.__l[0]]
         candidates = []
+#         requires = map_hex_colours(requires)
+        #replace known hex colour codes
+        requires = list(self.map_hex_colour(value) for value in requires)
         for cand in self.__l:
             if set(requires).issubset(cand.provides):
                 can_use = True
@@ -301,6 +304,46 @@ class TextureManager(object):
             else:
                 logging.verbose("  unmet requires %s req %s prov %s" % (str(cand.filename), str(requires), str(cand.provides)))  # @UndefinedVariable
         return candidates
+    
+    def map_hex_colour(self, value):
+    #000000 (or #000)    black         #FFFFFF (or #FFF)    white
+    #808080    gray (or grey)         #C0C0C0    silver
+    #800000    maroon         #FF0000 (or #F00)    red
+    #808000    olive         #FFFF00 (or #FF0)    yellow
+    #008000    green         #00FF00 (or #0F0)    lime
+    #008080    teal         #00FFFF (or #0FF)    aqua
+    #000080    navy         #0000FF (or #00F)    blue
+    #800080    purple         #FF00FF (or #F0F)    fuchsia
+        colour_map = {
+                      "#000000":"black",
+                      "#FFFFFF":"white",
+                      "#fff":"white",
+                      "#808080":"grey",
+                      "#C0C0C0":"silver",
+                      "#800000":"maroon",         
+                      "#FF0000":"red",
+                      "# 808000":"olive",         
+                      "#FFFF00":"yellow",
+                      "#008000":"green" ,        
+                      "#00FF00":"lime",
+                      "#008080":"teal" ,        
+                      "#00FFFF":"aqua",
+                      "#000080":"navy" ,        
+                      "#0000FF":"blue",
+                      "#800080":"purple" ,        
+                      "#FF00FF":"fuchsia"
+        }
+        hash_pos = value.find("#")
+        if (value.startswith( "roof:colour" ) or value.startswith( "facade:building:colour" )) and  hash_pos > 0 :
+            try:
+                tag_string = value[:hash_pos]
+                colour_hex_string = value[hash_pos:].upper()
+                
+                return tag_string + colour_map[colour_hex_string] 
+            except KeyError:
+                return value
+        return value
+        
 
     def __str__(self):
         return string.join([str(t) + '\n' for t in self.__l])
