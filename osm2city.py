@@ -249,7 +249,6 @@ class Building(object):
 class Buildings(object):
     """holds buildings list. Interfaces with OSM hanlder"""
     valid_node_keys = []
-#    valid_way_keys = ["building", "building:part", "building:height", "height", "building:levels", "layer"]
     req_way_keys = ["building", "building:part"]
     valid_relation_keys = ["building", "building:part"]
     req_relation_keys = ["building", "building:part"]
@@ -334,6 +333,8 @@ class Buildings(object):
                 height = osmparser.parse_length(tags['building:height'])
             if 'building:levels' in tags:
                 levels = float(tags['building:levels'])
+            if 'levels' in tags:
+                levels = float(tags['levels'])
             if 'layer' in tags:
                 layer = int(tags['layer'])
             if 'roof:shape' in tags:
