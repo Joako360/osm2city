@@ -7,6 +7,7 @@ import os
 import re
 from subprocess import STDOUT, PIPE
 import subprocess
+import sys
 from time import sleep
 
 import parameters
@@ -43,6 +44,7 @@ if __name__ == '__main__':
             with proc.stderr:
                 for line in iter(proc.stderr.readline, b''):
                     print line.strip()
+                    sys.stdout.flush()
                     outlines += line
 # Already read stderr setting to None lets us get stdout
             proc.stderr = None
