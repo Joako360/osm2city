@@ -37,10 +37,19 @@ if __name__ == '__main__':
         tries = 0
         download_command = download_command % ("CODE:%{http_code}:", parameters.PREFIX, parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH, parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)    
         while tries < 10:    
-            proc = subprocess.Popen(download_command, stdout=PIPE)
+            proc = subprocess.Popen(download_command, stderr=PIPE, stdout=PIPE,bufsize=1, universal_newlines=True)
         #     exitcode = proc.wait()
-            (outs, errs) = proc.communicate()
-            http_code = re.search("CODE:([0-9]*):", outs).group(1)
+            outlines = ""
+            with proc.stderr:
+                for line in iter(proc.stderr.readline, b''):
+                    print line.strip()
+                    outlines += line
+# Already read stderr setting to None lets us get stdout
+            proc.stderr = None
+            output = proc.communicate()[0]
+            exitcode = proc.wait() # wait for the subprocess to exit            http_code = re.search("CODE:([0-9]*):", outs).group(1)
+            http_code = re.search("CODE:([0-9]*):", output).group(1)
+
             logging.info("Received %s" % (http_code))
             if http_code != "429":
                 if http_code == "200":
