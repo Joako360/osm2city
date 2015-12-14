@@ -704,7 +704,7 @@ class Stats(object):
         if total_written > 0:
             lodzero = 100.*self.LOD[0] / total_written
             lodone = 100.*self.LOD[1] / total_written
-            lodtwo = 100.*self.LOD[0] / total_written
+            lodtwo = 100.*self.LOD[2] / total_written
         out.write(textwrap.dedent("""
             total buildings %i
             parse errors    %i
