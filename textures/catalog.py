@@ -531,14 +531,14 @@ def append_facades_us(tex_prefix, facades):
 def append_dynamic(tex_prefix, facades): 
     """--- Dynamically runs py files in tex.src ---"""   
     for subdir, dirs, files in os.walk('tex.src', topdown=True):
-        for file in files:
-                if file[-2:] != "py":
+        for filename in files:
+                if filename[-2:] != "py":
                     continue 
-                logging.info("Executing %s "%(subdir + os.sep + file))
+                logging.info("Executing %s "%(subdir + os.sep + filename))
                 try:
-                    execfile(subdir + os.sep + file)
+                    execfile(subdir + os.sep + filename)
                 except:
-                    logging.exception("Error while running %s"%file)
+                    logging.exception("Error while running %s"%filename)
             
 
 def append_roofs(tex_prefix, roofs):
@@ -568,6 +568,9 @@ def append_roofs(tex_prefix, roofs):
     #6., [], True, 3.5, []
     roofs.append(Texture(tex_prefix + 'tex.src/roof_black_slate.png',
         32, [0,2048], True, 16, [0,1024], False, provides=['colour:black', 'compat:roof-pitched', 'material:slate']))
+
+    roofs.append(Texture(tex_prefix + 'tex.src/roof_gray_slate.png',
+        32, [0,2048], True, 16, [0,1024], False, provides=['colour:gray', 'colour:grey', 'compat:roof-pitched', 'material:slate']))
 
     roofs.append(Texture(tex_prefix + 'tex.src/roof_stone.png',
         100., [], True, 100., [], False, requires=['roof:material:stone'], provides=[ 'specific', 'material:stone', 'colour:white', 'colour:yellow', 'compat:roof-flat', 'compat:roof-pitched']))
