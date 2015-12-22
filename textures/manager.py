@@ -282,7 +282,7 @@ class TextureManager(object):
                     can_material = False
                     if req_material != None :
                         for prov_material in prov_materials :
-                            print( prov_material, requires )
+                            logging.verbose( "Provides ", prov_material, " Requires ", requires )# @UndefinedVariable
                             if prov_material in requires :
                                 can_material = True
                                 break 

@@ -13,7 +13,7 @@ class Region(object):
         self.y = y        
         self.width_px = width
         self.height_px = height
-        logging.verbose("  New Region " + str(self))
+        logging.verbose("  New Region " + str(self))# @UndefinedVariable
 
     def __str__(self):
         return "(%i x %i + %i + %i)" % (self.width_px, self.height_px, 
@@ -48,7 +48,7 @@ class Atlas(Region):
             try:
                 atlas.paste(the_image, (the_texture._x, the_texture._y))
             except ValueError:
-                logging.debug("%s: Skipping an empty texture" % self.name)
+                logging.debug("%s : %s: Skipping an empty texture" % (self.name, the_texture.filename))
         atlas.save(filename, optimize=True)
 
     def pack(self, the_texture):
@@ -57,10 +57,10 @@ class Atlas(Region):
         for the_region in self.regions:
             if self._pack(the_texture, the_region):
                 self._textures.append(the_texture)
-                logging.verbose("  packed at %i %i" % (the_texture._x, the_texture._y))
-                logging.verbose("now have %i regions" % len(self.regions))
+                logging.verbose("  packed at %i %i" % (the_texture._x, the_texture._y))# @UndefinedVariable
+                logging.verbose("now have %i regions" % len(self.regions))# @UndefinedVariable
                 for the_region in self.regions:
-                    logging.verbose("  - " + str(the_region))
+                    logging.verbose("  - " + str(the_region))# @UndefinedVariable
                 return True
         return False
 
@@ -92,8 +92,8 @@ class Atlas(Region):
                 # -- check if we can join two regions
                 if region1.x == region2.x and region1.width_px == region2.width_px \
                    and region1.y + region1.height_px == region2.y:
-                       region1.height_px += region2.height_px
-                       self.regions.remove(region2)
+                    region1.height_px += region2.height_px
+                    self.regions.remove(region2)
             
 
     def _pack(self, the_texture, the_region):
@@ -101,13 +101,13 @@ class Atlas(Region):
         assert(the_texture.width_px > 0)
         if the_texture.height_px == the_region.height_px:
             if the_texture.width_px == the_region.width_px:
-                logging.verbose("H split exact fit")
+                logging.verbose("H split exact fit")# @UndefinedVariable
                 the_texture._x = the_region.x
                 the_texture._y = the_region.y
                 self.regions.remove(the_region)
                 return True
             elif the_texture.width_px < the_region.width_px:
-                logging.verbose("H split")
+                logging.verbose("H split")# @UndefinedVariable
                 # split horiz
                 the_texture._x = the_region.x
                 the_texture._y = the_region.y
@@ -116,16 +116,16 @@ class Atlas(Region):
                 self.check_regions()
                 return True
             else:
-                logging.verbose("H too small (%i < %i), trying next" % (the_region.width_px, the_texture.width_px))
+                logging.verbose("H too small (%i < %i), trying next" % (the_region.width_px, the_texture.width_px))# @UndefinedVariable
                 return False
         elif the_texture.height_px > the_region.height_px:
-            logging.verbose("V too small, trying next")
+            logging.verbose("V too small, trying next")# @UndefinedVariable
             return False
         else:
             # check if it fits width
             if the_texture.width_px > the_region.width_px:
                 return False
-            logging.verbose("V split")
+            logging.verbose("V split")# @UndefinedVariable
             # vertical split
             the_texture._x = the_region.x
             the_texture._y = the_region.y
