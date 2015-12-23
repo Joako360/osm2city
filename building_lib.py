@@ -653,6 +653,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         try :
             # cleanup building:colour and use it
             if   'building:color' in b.tags and 'building:colour' not in b.tags :
+                logging.warning('osm_id %i uses color instead of colour'%b.osm_id)
                 b.tags['building:colour'] = b.tags['building:color']
                 del(b.tags['building:color'])
             elif 'building:color' in b.tags and 'building:colour'     in b.tags :

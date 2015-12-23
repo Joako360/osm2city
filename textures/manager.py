@@ -240,15 +240,34 @@ class TextureManager(object):
         tools.stats.count_texture(the_texture)        
         return the_texture 
 
-    def find_candidates(self, requires = []):
+    def find_candidates(self, requires = [], excludes = []):
         #return [self.__l[0]]
         candidates = []
 #         requires = map_hex_colours(requires)
         #replace known hex colour codes
         requires = list(self.map_hex_colour(value) for value in requires)
+        can_use = True
         for cand in self.__l:
+            for ex in excludes :
+                #check if we maybe have a tag that doesn't match a requires
+                ex_material_key = 'XXX'
+                ex_colour_key = 'XXX'
+                ex_material = ''
+                ex_colour = ''
+                if re.match('^.*material:.*', ex) :
+                    ex_material_key = re.match('(^.*:material:)[^:]*', ex).group(1)
+                    ex_material = re.match('^.*material:([^:]*)', ex).group(1)
+                elif re.match('^.*:colour:.*', ex) :
+                    ex_colour_key = re.match('(^.*:colour:)[^:]*', ex).group(1)
+                    ex_colour = re.match('^.*:colour:([^:]*)', ex).group(1)
+                for req in cand.requires:
+                    if req.startswith( ex_colour_key ) and ex_colour is not re.match('^.*:colour:(.*)', req).group(1):
+                        can_use = False                        
+                    if req.startswith( ex_material_key ) and ex_material is not re.match('^.*:material:(.*)', req).group(1):
+                        can_use = False                        
+                    
+
             if set(requires).issubset(cand.provides):
-                can_use = True
                 # Check for "specific" texture in order they do not pollute everything
                 if ( 'facade:specific' in cand.provides ) or  ( 'roof:specific' in cand.provides ) :
                     can_use = False
@@ -285,7 +304,10 @@ class TextureManager(object):
                             logging.verbose( "Provides ", prov_material, " Requires ", requires )# @UndefinedVariable
                             if prov_material in requires :
                                 can_material = True
-                                break 
+                                break
+                    else :
+                        can_material = True
+                     
                     
                     can_colour = False
                     if req_colour != None : #and can_use:
@@ -357,9 +379,12 @@ class TextureManager(object):
 
 class FacadeManager(TextureManager):
     def find_matching(self, requires, tags, height, width):
-        candidates = self.find_candidates(requires, height, width)
+        exclusions = []
+        if 'roof:colour' in tags:
+            exclusions.append( "%s:%s"%('roof:colour', tags['roof:colour']))
+        candidates = self.find_candidates(requires, exclusions, height, width)
         if len(candidates) == 0:
-            logging.warn("no matching texture for %1.f m x %1.1f m <%s>" % (height, width, str(requires)))
+            logging.warn("no matching facade texture for %1.f m x %1.1f m <%s>" % (height, width, str(requires)))
             return None
         ranked_list = self.rank_candidates(candidates, tags)
         the_texture = ranked_list[random.randint(0, len(ranked_list) - 1)]
@@ -384,8 +409,8 @@ class FacadeManager(TextureManager):
             logging.info("Max Rank %d" % max_val)
         return [t[1] for t in ranked_list if t[0] >= max_val]
 
-    def find_candidates(self, requires, height, width):
-        candidates = TextureManager.find_candidates(self, requires)
+    def find_candidates(self, requires, excludes, height, width):
+        candidates = TextureManager.find_candidates(self, requires, excludes)
 #        print "\ncands", [str(t.filename) for t in candidates]
         # -- check height
 #        print " Candidates:"
