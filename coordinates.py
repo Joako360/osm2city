@@ -51,10 +51,12 @@ Created on Sat Jun  7 22:38:59 2014
 # distances. The fractional errors are of order (distance/R)^2.
 
 
-#import utm
-from math import atan2, sin, cos, sqrt, radians, degrees
+from math import acos, asin, atan2, sin, cos, sqrt, radians, degrees, pi
 import logging
 import unittest
+
+
+NAUTICAL_MILES_METERS = 1852
 
 
 class Transformation(object):
@@ -123,55 +125,34 @@ def calc_distance_local(x1, y1, x2, y2):
     return sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2))
 
 
-class Transformation_UTM(object):
-    """global <-> local coordinate system transformation, using UTM.
-       Likely to fail if local origin is near UTM zone boundary. A point provided
-       to toGlobal() could then well be in another UTM zone. Use at your own risk!
-    """
-    def __init__(self, (lon, lat) = (0,0), hdg=0):
-    #def __init__(self, transform, observers, lon, lat, alt=0, hdg=0, pit=0, rol=0):
-        if hdg != 0.:
-            logging.error("heading != 0 not yet implemented.")
-            raise NotImplemented
-        self._lon = lon
-        self._lat = lat
-        self._update()
+def calc_distance_global(lon1, lat1, lon2, lat2):
+    lon1_r = radians(lon1)
+    lat1_r = radians(lat1)
+    lon2_r = radians(lon2)
+    lat2_r = radians(lat2)
+    distance_radians = calc_distance_global_radians(lon1_r, lat1_r, lon2_r, lat2_r)
+    return distance_radians*((180*60)/pi) * NAUTICAL_MILES_METERS
 
-    def _update(self):
-        """get origin in meters"""
-        self._easting, self._northing, self._zone_number, self._zone_letter \
-            = utm.from_latlon(self._lat, self._lon)
 
-    def toLocal(self, (lon, lat)):
-        """transform global -> local coordinates"""
-        e, n, zone_number, zone_letter = utm.from_latlon(lat, lon)
-        if zone_number != self._zone_number:
-            logging.error("Transformation failed: your point is in a different UTM zone! Use another transformation.")
+def calc_distance_global_radians(lon1_r, lat1_r, lon2_r, lat2_r):
+    return 2*asin(sqrt(pow(sin((lat1_r-lat2_r)/2), 2) + cos(lat1_r)*cos(lat2_r)*pow(sin((lon1_r-lon2_r)/2), 2)))
 
-        return e - self._easting, n - self._northing
 
-    def toGlobal(self, (x, y)):
-        """transform local -> global coordinates"""
-        lat, lon = utm.to_latlon(x + self._easting, y + self._northing, self._zone_number, self._zone_letter)
-        return lon, lat
-
-    def __str__(self):
-        return "(%f %f)" % (self._lon, self._lat)
+def calc_angle_of_line_global(lon1, lat1, lon2, lat2):
+    lon1_r = radians(lon1)
+    lat1_r = radians(lat1)
+    lon2_r = radians(lon2)
+    lat2_r = radians(lat2)
+    d = calc_distance_global_radians(lon1_r, lat1_r, lon2_r, lat2_r)
+    if sin(lon2_r-lon1_r) > 0:
+        angle = acos((sin(lat2_r)-sin(lat1_r)*cos(d))/(sin(d)*cos(lat1_r)))
+    else:
+        angle = 2*pi-acos((sin(lat2_r)-sin(lat1_r)*cos(d))/(sin(d)*cos(lat1_r)))
+    angle = degrees(angle)
+    return angle
 
 
 if __name__ == "__main__":
-    #print utm.from_latlon(51.2, 7.5)
-    #>>> (395201.3103811303, 5673135.241182375, 32, 'U')
-
-    #The syntax is utm.from_latlon(LATITUDE, LONGITUDE).
-
-    #The return has the form (EASTING, NORTHING, ZONE NUMBER, ZONE LETTER).
-
-    #Convert an UTM coordinate into a (latitude, longitude) tuple:
-
-    #print utm.to_latlon(340000, 5710000, 32, 'U')
-    #>>> (51.51852098408468, 6.693872395145327)
-
     t = Transformation((0, 0))
     print t.toLocal((0., 0))
     print t.toLocal((1., 0))
@@ -185,8 +166,8 @@ if __name__ == "__main__":
 # ================ UNITTESTS =======================
 
 
-class TestOSMPylons(unittest.TestCase):
-    def test_angle_of_line(self):
+class TestCoordinates(unittest.TestCase):
+    def test_calc_angle_of_line_local(self):
         self.assertEqual(0, calc_angle_of_line_local(0, 0, 0, 1), "North")
         self.assertEqual(90, calc_angle_of_line_local(0, 0, 1, 0), "East")
         self.assertEqual(180, calc_angle_of_line_local(0, 1, 0, 0), "South")
@@ -195,6 +176,20 @@ class TestOSMPylons(unittest.TestCase):
         self.assertEqual(315, calc_angle_of_line_local(1, 0, 0, 1), "North West")
         self.assertEqual(225, calc_angle_of_line_local(1, 1, 0, 0), "South West")
 
-    def test_distance(self):
+    def test_calc_angle_of_line_global(self):
+        self.assertAlmostEqual(360, calc_angle_of_line_global(1, 46, 1, 47), delta=0.5)  # "North"
+        self.assertAlmostEqual(90, calc_angle_of_line_global(1, -46, 2, -46), delta=0.5)  # "East"
+        self.assertAlmostEqual(180, calc_angle_of_line_global(-1, -33, -1, -34), delta=0.5)  # "South"
+        self.assertAlmostEqual(270, calc_angle_of_line_global(-29, 20, -30, 20), delta=0.5)  # "West"
+        self.assertAlmostEqual(45, calc_angle_of_line_global(0, 0, 1, 1), delta=0.5)  # "North East"
+        self.assertAlmostEqual(315, calc_angle_of_line_global(1, 0, 0, 1), delta=0.5)  # "North West"
+        self.assertAlmostEqual(225, calc_angle_of_line_global(1, 1, 0, 0), delta=0.5)  # "South West"
+
+    def test_calc_distance_local(self):
         self.assertEqual(5, calc_distance_local(0, -1, -4, 2))
 
+    def test_calc_distance_global(self):
+        self.assertAlmostEqual(NAUTICAL_MILES_METERS * 60, calc_distance_global(1, 46, 1, 47), delta=10)
+        self.assertAlmostEqual(NAUTICAL_MILES_METERS * 60, calc_distance_global(1, -33, 1, -34), delta=10)
+        self.assertAlmostEqual(NAUTICAL_MILES_METERS * 60, calc_distance_global(1, 0, 2, 0), delta=10)
+        self.assertAlmostEqual(NAUTICAL_MILES_METERS * 60 * sqrt(2), calc_distance_global(1, 0, 2, 1), delta=10)

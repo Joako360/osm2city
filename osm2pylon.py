@@ -501,12 +501,19 @@ class Line(LineWithoutCables):
             cluster_segments.append(way_segment)
             cluster_length += way_segment.length
             if (cluster_length >= cluster_max_length) or (len(self.way_segments) - 1 == i):
+                # calculate the angle between local and global
+                end_pylon = way_segment.end_pylon
+                angle_local = coordinates.calc_angle_of_line_local(start_pylon.x, start_pylon.y
+                                                                   , end_pylon.x, end_pylon.y)
+                angle_global = coordinates.calc_angle_of_line_global(start_pylon.lon, start_pylon.lat
+                                                                     , end_pylon.lon, end_pylon.lat)
+                angle_difference = angle_local - angle_global
                 # write stuff to files
                 replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)
                 cluster_filename = replacement_prefix + wayname + "%05d_%05d" % (line_index, cluster_index)
                 path_to_stg = my_stg_mgr.add_object_static(cluster_filename + '.xml'
                                                            , vec2d.vec2d(start_pylon.lon, start_pylon.lat)
-                                                           , start_pylon.elevation, 90)
+                                                           , start_pylon.elevation, 90 + angle_difference)
                 if None is not my_files_to_remove:
                     my_files_to_remove.append(path_to_stg + cluster_filename + ".ac")
                     my_files_to_remove.append(path_to_stg + cluster_filename + ".xml")
