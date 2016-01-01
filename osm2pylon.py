@@ -56,8 +56,8 @@ class Cable(object):
         self.end_cable_vertex = end_cable_vertex
         self.vertices = [self.start_cable_vertex, self.end_cable_vertex]
         self.radius = radius
-        self.heading = calc_angle_of_line(start_cable_vertex.x, start_cable_vertex.y
-                                          , end_cable_vertex.x, end_cable_vertex.y)
+        self.heading = coordinates.calc_angle_of_line_local(start_cable_vertex.x, start_cable_vertex.y
+                                                            , end_cable_vertex.x, end_cable_vertex.y)
 
         if (number_extra_vertices > 0) and (catenary_a > 0) and (distance >= parameters.C2P_CATENARY_MIN_DISTANCE):
             self._make_catenary_cable(number_extra_vertices, catenary_a)
@@ -69,8 +69,8 @@ class Cable(object):
         be taken into account https://en.wikipedia.org/wiki/File:Catenary-tension.png.
         However the elevation correction actually already helps quite a bit, because the x/y are kept constant.
         """
-        cable_distance = calc_distance(self.start_cable_vertex.x, self.start_cable_vertex.y
-                                       , self.end_cable_vertex.x, self.end_cable_vertex.y)
+        cable_distance = coordinates.calc_distance_local(self.start_cable_vertex.x, self.start_cable_vertex.y
+                                                         , self.end_cable_vertex.x, self.end_cable_vertex.y)
         part_distance = cable_distance / (1 + number_extra_vertices)
         pylon_y = catenary_a * math.cosh((cable_distance / 2) / catenary_a)
         part_elevation = ((self.start_cable_vertex.elevation - self.end_cable_vertex.elevation) /
@@ -116,7 +116,7 @@ class Cable(object):
         """
         Returns an ac entry for this cable.
         """
-        lines = []
+        lines = list()
         lines.append("OBJECT group")
         lines.append("kids " + str(len(self.vertices) - 1))
         for i in xrange(0, len(self.vertices) - 1):
@@ -270,9 +270,9 @@ class WaySegment(object):
         self.start_pylon = start_pylon
         self.end_pylon = end_pylon
         self.cables = []
-        self.length = calc_distance(start_pylon.x, start_pylon.y, end_pylon.x, end_pylon.y)
-        self.heading = calc_angle_of_line(start_pylon.x, start_pylon.y
-                                          , end_pylon.x, end_pylon.y)
+        self.length = coordinates.calc_distance_local(start_pylon.x, start_pylon.y, end_pylon.x, end_pylon.y)
+        self.heading = coordinates.calc_angle_of_line_local(start_pylon.x, start_pylon.y
+                                                            , end_pylon.x, end_pylon.y)
 
 
 class SharedPylon(object):
@@ -490,8 +490,7 @@ class Line(LineWithoutCables):
 
         In order to reduce rounding errors clusters of WaySegments are used instead of a whole WayLine per file.
         """
-        stg_entries = []
-        cluster_segments = []
+        cluster_segments = list()
         cluster_length = 0.0
         cluster_index = 1
         start_pylon = None
@@ -512,7 +511,7 @@ class Line(LineWithoutCables):
                     my_files_to_remove.append(path_to_stg + cluster_filename + ".ac")
                     my_files_to_remove.append(path_to_stg + cluster_filename + ".xml")
                 else:
-                    ac_file_lines = []
+                    ac_file_lines = list()
                     ac_file_lines.append("AC3Db")
                     ac_file_lines.append('MATERIAL "cable" rgb 0.3 0.3 0.3 amb 0.3 0.3 0.3 emis 0.0 0.0 0.0 spec 0.3 0.3 0.3 shi 1 trans 0')
                     ac_file_lines.append("OBJECT world")
@@ -527,7 +526,7 @@ class Line(LineWithoutCables):
                             cable.translate_vertices_relative(start_pylon.x, start_pylon.y, start_pylon.elevation)
                             ac_file_lines.append(cable.make_ac_entry(0))  # material is 0-indexed
 
-                    xml_file_lines = []
+                    xml_file_lines = list()
                     xml_file_lines.append('<?xml version="1.0"?>')
                     xml_file_lines.append('<PropertyList>')
                     xml_file_lines.append('<path>' + cluster_filename + '.ac</path>')  # the ac-file is in the same directory
@@ -553,7 +552,7 @@ class Line(LineWithoutCables):
                         f.write("\n".join(xml_file_lines))
 
                 cluster_length = 0.0
-                cluster_segments = []
+                cluster_segments = list()
                 cluster_index += 1
                 start_pylon = None
 
@@ -757,7 +756,7 @@ class RailLine(Line):
                 direction_type = SharedPylon.DIRECTION_TYPE_NORMAL
                 mast_point = my_left_parallel.interpolate(current_distance * (my_left_parallel_length / my_length))
             self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point, direction_type))
-            prev_angle = calc_angle_of_line(prev_point.x, prev_point.y, point_on_line.x, point_on_line.y)
+            prev_angle = coordinates.calc_angle_of_line_local(prev_point.x, prev_point.y, point_on_line.x, point_on_line.y)
             prev_point = point_on_line
             # find new masts along the line with a simple approximation for less distance between masts
             # if the radius gets tighter
@@ -770,7 +769,8 @@ class RailLine(Line):
                 else:
                     test_distance = current_distance + RailLine.DEFAULT_MAST_DISTANCE
                     point_on_line = self.linear.interpolate(test_distance)
-                    new_angle = calc_angle_of_line(prev_point.x, prev_point.y, point_on_line.x, point_on_line.y)
+                    new_angle = coordinates.calc_angle_of_line_local(prev_point.x, prev_point.y
+                                                                     , point_on_line.x, point_on_line.y)
                     difference = abs(new_angle - prev_angle)
                     if difference >= 25:
                         current_distance += 10
@@ -793,7 +793,8 @@ class RailLine(Line):
                     direction_type = SharedPylon.DIRECTION_TYPE_NORMAL
                     mast_point = my_left_parallel.interpolate(current_distance * (my_left_parallel_length / my_length))
                 self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point, direction_type))
-                prev_angle = calc_angle_of_line(prev_point.x, prev_point.y, point_on_line.x, point_on_line.y)
+                prev_angle = coordinates.calc_angle_of_line_local(prev_point.x, prev_point.y
+                                                                  , point_on_line.x, point_on_line.y)
                 prev_point = point_on_line
 
         # virtual end point
@@ -904,9 +905,9 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_co
                 except Exception as e:
                     logging.error(e)
 
-    #get LineStrings and remove those lines, which are less than the minimal requirement
+    # get LineStrings and remove those lines, which are less than the minimal requirement
     for the_railway in my_railways.values():
-        my_coordinates = []
+        my_coordinates = list()
         for node in the_railway.nodes:
             my_coordinates.append((node.x, node.y))
         my_linear = LineString(my_coordinates)
@@ -1065,7 +1066,7 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, my_elev_interpolator, my_
                         my_line.shared_pylons.append(my_pylon)
                     else:
                         logging.debug('Node outside of boundaries and therefore ignored: osm_id = %s', my_node.osm_id)
-                    if None != prev_pylon:
+                    if prev_pylon is not None:
                         prev_pylon.next_pylon = my_pylon
                         my_pylon.prev_pylon = prev_pylon
                     prev_pylon = my_pylon
@@ -1112,9 +1113,11 @@ def find_connecting_line(key, lines, max_allowed_angle=360):
     # Get the angle of each line
     for line in lines:
         if line.nodes[0].osm_id == key:
-            angle = calc_angle_of_line(line.nodes[0].x, line.nodes[0].y, line.nodes[1].x, line.nodes[1].y)
+            angle = coordinates.calc_angle_of_line_local(line.nodes[0].x, line.nodes[0].y
+                                                         , line.nodes[1].x, line.nodes[1].y)
         elif line.nodes[-1].osm_id == key:
-            angle = calc_angle_of_line(line.nodes[-1].x, line.nodes[-1].y, line.nodes[-2].x, line.nodes[-2].y)
+            angle = coordinates.calc_angle_of_line_local(line.nodes[-1].x, line.nodes[-1].y
+                                                         , line.nodes[-2].x, line.nodes[-2].y)
         else:
             raise Exception("The referenced node is not at the beginning or end of line0")
         angles.append(angle)
@@ -1155,13 +1158,13 @@ def merge_lines(osm_id, line0, line1, shared_nodes):
         raise Exception("The referenced node is not at the beginning or end of line1")
 
     # combine line1 into line0 in correct sequence (e.g. line0(A,B) + line1(C,B) -> line0(A,B,C)
-    if (False == line0_first) and (True == line1_first):
+    if (line0_first is False) and (line1_first is True):
         for x in range(1, len(line1.nodes)):
             line0.nodes.append(line1.nodes[x])
-    elif (False == line0_first) and (False == line1_first):
+    elif (line0_first is False) and (line1_first is False):
         for x in range(0, len(line1.nodes) - 1):
             line0.nodes.append(line1.nodes[len(line1.nodes) - x - 2])
-    elif (True == line0_first) and (True == line1_first):
+    elif (line0_first is True) and (line1_first is True):
         for x in range(1, len(line1.nodes)):
             line0.nodes.insert(0, line1.nodes[x])
     else:
@@ -1196,24 +1199,16 @@ def calc_heading_nodes(nodes_array):
     """Calculates the headings of nodes in a line based on medium angle. nodes must have a heading, x and y attribute"""
     current_pylon = nodes_array[0]
     next_pylon = nodes_array[1]
-    current_angle = calc_angle_of_line(current_pylon.x, current_pylon.y, next_pylon.x, next_pylon.y)
+    current_angle = coordinates.calc_angle_of_line_local(current_pylon.x, current_pylon.y, next_pylon.x, next_pylon.y)
     current_pylon.heading = current_angle
     for x in range(1, len(nodes_array) - 1):
         prev_angle = current_angle
         current_pylon = nodes_array[x]
         next_pylon = nodes_array[x + 1]
-        current_angle = calc_angle_of_line(current_pylon.x, current_pylon.y, next_pylon.x, next_pylon.y)
+        current_angle = coordinates.calc_angle_of_line_local(current_pylon.x, current_pylon.y
+                                                             , next_pylon.x, next_pylon.y)
         current_pylon.heading = calc_middle_angle(prev_angle, current_angle)
     nodes_array[-1].heading = current_angle
-
-
-def calc_angle_of_line(x1, y1, x2, y2):
-    """Returns the angle in degrees of a line relative to North"""
-    angle = math.atan2(x2 - x1, y2 - y1)
-    degree = math.degrees(angle)
-    if degree < 0:
-        degree += 360
-    return degree
 
 
 def calc_middle_angle(angle_line1, angle_line2):
@@ -1242,10 +1237,6 @@ def stg_angle(angle_normal):
         return 0
     else:
         return 360 - angle_normal
-
-
-def calc_distance(x1, y1, x2, y2):
-    return math.sqrt(math.pow(x1 - x2, 2) + math.pow(y1 - y2, 2))
 
 
 def optimize_catenary(half_distance_pylons, max_value, sag, max_variation):
@@ -1405,15 +1396,6 @@ if __name__ == "__main__":
 
 
 class TestOSMPylons(unittest.TestCase):
-    def test_angle_of_line(self):
-        self.assertEqual(0, calc_angle_of_line(0, 0, 0, 1), "North")
-        self.assertEqual(90, calc_angle_of_line(0, 0, 1, 0), "East")
-        self.assertEqual(180, calc_angle_of_line(0, 1, 0, 0), "South")
-        self.assertEqual(270, calc_angle_of_line(1, 0, 0, 0), "West")
-        self.assertEqual(45, calc_angle_of_line(0, 0, 1, 1), "North East")
-        self.assertEqual(315, calc_angle_of_line(1, 0, 0, 1), "North West")
-        self.assertEqual(225, calc_angle_of_line(1, 1, 0, 0), "South West")
-
     def test_middle_angle(self):
         self.assertEqual(0, calc_middle_angle(0, 0), "North North")
         self.assertEqual(45, calc_middle_angle(0, 90), "North East")
@@ -1421,9 +1403,6 @@ class TestOSMPylons(unittest.TestCase):
         self.assertEqual(90, calc_middle_angle(135, 45), "South_East North_East")
         self.assertEqual(0, calc_middle_angle(45, 315), "South_East North_East")
         self.assertEqual(260, calc_middle_angle(170, 350), "Almost_South Almost_North")
-
-    def test_distance(self):
-        self.assertEqual(5, calc_distance(0, -1, -4, 2))
 
     def test_wayline_calculate_and_map(self):
         # first test headings

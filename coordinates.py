@@ -52,14 +52,16 @@ Created on Sat Jun  7 22:38:59 2014
 
 
 #import utm
-from math import sin, cos, sqrt, radians, degrees
+from math import atan2, sin, cos, sqrt, radians, degrees
 import logging
+import unittest
+
 
 class Transformation(object):
     """global <-> local coordinate system transformation, using flat earth approximation
        http://williams.best.vwh.net/avform.htm#flat
     """
-    def __init__(self, (lon, lat) = (0, 0), hdg = 0):
+    def __init__(self, (lon, lat)=(0, 0), hdg=0):
         if hdg != 0.:
             logging.error("heading != 0 not yet implemented.")
             raise NotImplemented
@@ -76,7 +78,7 @@ class Transformation(object):
         self._coslat = cos(radians(self._lat))
         sinlat = sin(radians(self._lat))
         self._R1 = a*(1.-e2)/(1.-e2*(sinlat**2))**(3./2.)
-        self._R2 = a/sqrt(1-e2*(sinlat)**2)
+        self._R2 = a/sqrt(1-e2*sinlat**2)
 
     def setOrigin(self, (lon, lat)):
         """set origin to given global coordinates (lon, lat)"""
@@ -103,6 +105,22 @@ class Transformation(object):
 
     def __str__(self):
         return "(%f %f)" % (self._lon, self._lat)
+
+
+def calc_angle_of_line_local(x1, y1, x2, y2):
+    """Returns the angle in degrees of a line relative to North.
+    Based on local coordinates (x,y) of two points.
+    """
+    angle = atan2(x2 - x1, y2 - y1)
+    degree = degrees(angle)
+    if degree < 0:
+        degree += 360
+    return degree
+
+
+def calc_distance_local(x1, y1, x2, y2):
+    """Returns the distance between two points based on local coordindates (x,y)."""
+    return sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2))
 
 
 class Transformation_UTM(object):
@@ -155,11 +173,28 @@ if __name__ == "__main__":
     #>>> (51.51852098408468, 6.693872395145327)
 
     t = Transformation((0, 0))
-    print t.toLocal((0.,0))
-    print t.toLocal((1.,0))
-    print t.toLocal((0,1.))
+    print t.toLocal((0., 0))
+    print t.toLocal((1., 0))
+    print t.toLocal((0, 1.))
     print
-    print t.toGlobal((100.,0))
-    print t.toGlobal((1000.,0))
-    print t.toGlobal((10000.,0))
-    print t.toGlobal((100000.,0))
+    print t.toGlobal((100., 0))
+    print t.toGlobal((1000., 0))
+    print t.toGlobal((10000., 0))
+    print t.toGlobal((100000., 0))
+
+# ================ UNITTESTS =======================
+
+
+class TestOSMPylons(unittest.TestCase):
+    def test_angle_of_line(self):
+        self.assertEqual(0, calc_angle_of_line_local(0, 0, 0, 1), "North")
+        self.assertEqual(90, calc_angle_of_line_local(0, 0, 1, 0), "East")
+        self.assertEqual(180, calc_angle_of_line_local(0, 1, 0, 0), "South")
+        self.assertEqual(270, calc_angle_of_line_local(1, 0, 0, 0), "West")
+        self.assertEqual(45, calc_angle_of_line_local(0, 0, 1, 1), "North East")
+        self.assertEqual(315, calc_angle_of_line_local(1, 0, 0, 1), "North West")
+        self.assertEqual(225, calc_angle_of_line_local(1, 1, 0, 0), "South West")
+
+    def test_distance(self):
+        self.assertEqual(5, calc_distance_local(0, -1, -4, 2))
+
