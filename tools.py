@@ -661,8 +661,7 @@ class Stats(object):
         self.LOD = np.zeros(3)
         self.nodes_simplified = 0
         self.nodes_ground = 0
-        self.textures_total = 0
-        self.textures_used = defaultdict(int)
+        self.textures_total = defaultdict(int)
 
     def count(self, b):
         """update stats (vertices, surfaces, area, corners) with given building's data
@@ -692,7 +691,7 @@ class Stats(object):
         self.LOD[lod] += 1
         
     def count_texture(self, texture):
-        self.textures_used[str(texture.filename)] += 1 
+        self.textures_total[str(texture.filename)] += 1 
 
     def print_summary(self):
         if parameters.quiet: return
@@ -722,15 +721,23 @@ class Stats(object):
             roof_line += """\n          %s\t%i""" % (roof_type, self.roof_types[roof_type])
         out.write(textwrap.dedent(roof_line))
 
+        textures_used = {k: v for k, v in self.textures_total.iteritems() if v>0}
+        textures_notused = {k: v for k, v in self.textures_total.iteritems() if v==0}
         try:
-            textures_used_percent = len(self.textures_used) * 100. / self.textures_total
+            textures_used_percent = len(textures_used) * 100. / len(self.textures_total)
         except:
             textures_used_percent = 99.9
 
         out.write(textwrap.dedent("""
-            used tex        %i out of %i (%2.0f %%)
-            """ % (len(self.textures_used), self.textures_total, textures_used_percent)))
-        for item in sorted(self.textures_used.items(), key=lambda item: item[1], reverse=True):            
+            used tex        %i out of %i (%2.0f %%)""" % (len(textures_used), len(self.textures_total), textures_used_percent)))
+        out.write(textwrap.dedent("""
+            Used Textures : """))    
+        for item in sorted(textures_used.items(), key=lambda item: item[1], reverse=True):            
+            out.write(textwrap.dedent("""
+                 %i %s""" % (item[1], item[0])))
+        out.write(textwrap.dedent("""
+            Unused Textures : """))    
+        for item in sorted(textures_notused.items(), key=lambda item: item[1], reverse=True):            
             out.write(textwrap.dedent("""
                  %i %s""" % (item[1], item[0])))
         out.write(textwrap.dedent("""

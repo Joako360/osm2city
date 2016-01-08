@@ -220,7 +220,7 @@ class TextureManager(object):
         t.provides = new_provides
         t.cls = self.__cls
         
-        tools.stats.textures_total += 1        
+        tools.stats.textures_total.append(t.filename)        
         self.__l.append(t)
 
     def keep_only(self, i):
@@ -510,7 +510,8 @@ def init(tex_prefix='', create_atlas=False):
         fpickle.close()
 
     logging.debug(facades)
-    tools.stats.textures_total = len(facades.get_list() + roofs.get_list())
+    tools.stats.textures_total = dict((filename,0) for filename in map((lambda x: x.filename),facades.get_list()))
+    tools.stats.textures_total.update(dict((filename,0) for filename in map((lambda x: x.filename),roofs.get_list())))
 
 
 if __name__ == "__main__":
