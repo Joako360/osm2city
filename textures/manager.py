@@ -220,7 +220,7 @@ class TextureManager(object):
         t.provides = new_provides
         t.cls = self.__cls
         
-        tools.stats.textures_total.append(t.filename)        
+        tools.stats.textures_total[t.filename] = None
         self.__l.append(t)
 
     def keep_only(self, i):
