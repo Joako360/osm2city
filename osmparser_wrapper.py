@@ -5,7 +5,7 @@ A wrapper for OSMContentHandler, enabling backwards compatibility.
 
 import xml.sax
 import logging
-import unittest
+
 import osmparser as op
 
 
@@ -48,7 +48,7 @@ class OSMContentHandler(xml.sax.ContentHandler):
         current_way.tags = {}
         for key, value in all_tags.items():
             if key in self.valid_way_keys:
-                current_way.addTag(key, value)
+                current_way.add_tag(key, value)
         self.ways_dict[current_way.osm_id] = current_way
 
     def process_relation(self, current_relation):
@@ -56,7 +56,7 @@ class OSMContentHandler(xml.sax.ContentHandler):
         current_relation.tags = {}
         for key, value in all_tags.items():
             if key in self.valid_way_keys:
-                current_relation.addTag(key, value)
+                current_relation.add_tag(key, value)
         self.relations_dict[current_relation.osm_id] = current_relation
 
 
@@ -77,24 +77,4 @@ def main(source_file_name):
 
 if __name__ == "__main__":
     main("C:\\FlightGear\\customscenery2\\LSZS\\ch.osm")
-
-# ================ UNITTESTS =======================
-
-
-class TestOSMParser(unittest.TestCase):
-    def test_parse_length(self):
-        self.assertAlmostEqual(1.2, op.parse_length(' 1.2 '), 2, "Correct number with trailing spaces")
-        self.assertAlmostEqual(1.2, op.parse_length(' 1.2 m'), 2, "Correct number with meter unit incl. space")
-        self.assertAlmostEqual(1.2, op.parse_length(' 1.2m'), 2, "Correct number with meter unit without space")
-        self.assertAlmostEqual(1200, op.parse_length(' 1.2 km'), 2, "Correct number with km unit incl. space")
-        self.assertAlmostEqual(2092.1472, op.parse_length(' 1.3mi'), 2, "Correct number with mile unit without space")
-        self.assertAlmostEqual(3.048, op.parse_length("10'"), 2, "Correct number with feet unit without space")
-        self.assertAlmostEqual(3.073, op.parse_length('10\'1"'), 2, "Correct number with feet unit without space")
-        self.assertEquals(0, op.parse_length('m'), "Only valid unit")
-        self.assertEquals(0, op.parse_length('"'), "Only inches, no feet")
-
-    def test_is_parsable_float(self):
-        self.assertFalse(op.is_parsable_float('1,2'))
-        self.assertFalse(op.is_parsable_float('x'))
-        self.assertTrue(op.is_parsable_float('1.2'))
 

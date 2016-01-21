@@ -7,9 +7,10 @@ Use a tool like Osmosis to pre-process data.
 @author: vanosten
 """
 
-import xml.sax
 import logging
 import unittest
+import xml.sax
+
 import shapely.geometry as shg
 
 
@@ -18,11 +19,12 @@ class OSMElement(object):
         self.osm_id = osm_id
         self.tags = {}
 
-    def addTag(self, key, value):
+    def add_tag(self, key, value):
         self.tags[key] = value
 
     def __str__(self):
         return "<%s OSM_ID %i at %s>" % (type(self).__name__, self.osm_id, hex(id(self)))
+
 
 class Node(OSMElement):
     def __init__(self, osm_id, lat, lon):
@@ -121,11 +123,11 @@ class OSMContentHandler(xml.sax.ContentHandler):
             value = attrs.getValue("v")
             if "node" == self._within_element:
                 if key in self._valid_node_keys:
-                    self._current_node.addTag(key, value)
+                    self._current_node.add_tag(key, value)
             elif "way" == self._within_element:
-                self._current_way.addTag(key, value)
+                self._current_way.add_tag(key, value)
             elif "relation" == self._within_element:
-                self._current_relation.addTag(key, value)
+                self._current_relation.add_tag(key, value)
         elif name == "nd":
             ref = int(attrs.getValue("ref"))
             self._current_way.addRef(ref)

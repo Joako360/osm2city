@@ -14,18 +14,19 @@ Ludomotico contributed a cleaner version of read_from_file().
 """
 
 import argparse
+import logging
+import os
 import sys
 import types
-from os.path import os
-from vec2d import vec2d
-from pdb import pm
-import logging
 import traceback
+
 import textures.road
+import vec2d as v
+
 
 # default_args_start # DO NOT MODIFY THIS LINE
 # -*- coding: utf-8 -*-
-# The preceeding line sets encoding of this file to utf-8. Needed for non-ascii 
+# The preceding line sets encoding of this file to utf-8. Needed for non-ascii
 # object names. It must stay on the first or second line.
 
 #=============================================================================
@@ -90,7 +91,7 @@ MAX_OBJECTS = 50000         # -- maximum number of buildings to read from OSM da
 CONCURRENCY = 1             # -- number of parallel OSM parsing threads. Unused ATM.
 
 # -- skip buildings based on their OSM name tag or OSM ID, in case there's already
-#    a static model for these, and the overlap check fails. 
+#    a static model for these, and the overlap check fails.
 #    Use unicode strings as in the first example if there are non-ASCII characters.
 SKIP_LIST = [u"Theologische Fakultät", "Rhombergpassage", 55875208]
 # -- keep buildings based on their OSM name tag or OSM ID.
@@ -216,7 +217,7 @@ C2P_STREETLAMPS_OTHER_DISTANCE = 70
 C2P_STREETLAMPS_MIN_STREET_LENGTH = 20
 
 #=============================================================================
-# PARAMETERS RELATED TO landuse.py
+# PARAMETERS RELATED TO landuse.py - might be replaced by another library
 #=============================================================================
 LU_LANDUSE_GENERATE_LANDUSE = True
 LU_LANDUSE_BUILDING_BUFFER_DISTANCE = 25
@@ -237,7 +238,7 @@ DEBUG_PLOT = 0
 CREATE_BRIDGES_ONLY = 0         # create only bridges and embankments
 BRIDGE_LAYER_HEIGHT = 4.         # bridge height per layer
 BRIDGE_BODY_HEIGHT = 0.9         # height of bridge body
-EMBANKMENT_TEXTURE = textures.road.EMBANKMENT_1 # Texture for the embankement 
+EMBANKMENT_TEXTURE = textures.road.EMBANKMENT_1  # Texture for the embankment
 quiet = False
 
 # default_args_end # DO NOT MODIFY THIS LINE
@@ -251,14 +252,16 @@ def get_OSM_file_name():
 
 
 def get_center_global():
-    cmin = vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
-    cmax = vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
+    cmin = v.vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
+    cmax = v.vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
     return (cmin + cmax) * 0.5
 
+
 def get_extent_global():
-    cmin = vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
-    cmax = vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
+    cmin = v.vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
+    cmax = v.vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
     return cmin, cmax
+
 
 def get_clipping_extent():
     rect = [(BOUNDARY_WEST-BOUNDARY_CLIPPING_BORDER_SIZE, BOUNDARY_SOUTH-BOUNDARY_CLIPPING_BORDER_SIZE),
@@ -267,12 +270,14 @@ def get_clipping_extent():
             (BOUNDARY_WEST-BOUNDARY_CLIPPING_BORDER_SIZE, BOUNDARY_NORTH+BOUNDARY_CLIPPING_BORDER_SIZE)]
     return rect
 
+
 def show():
     """
     Prints all parameters as key = value
     """
     global quiet
-    if quiet: return
+    if quiet:
+        return
     print '--- Using the following parameters: ---'
     my_globals = globals()
     for k in sorted(my_globals.iterkeys()):
@@ -294,7 +299,7 @@ def show():
 def read_from_file(filename):
     logging.info('Reading parameters from file: %s' % filename)
     default_globals = globals()
-    file_globals = {'textures' : default_globals['textures']}
+    file_globals = {'textures': default_globals['textures']}
     try:
         execfile(filename, file_globals)
     except IOError, reason:
@@ -304,9 +309,9 @@ def read_from_file(filename):
         print traceback.format_exc()
         logging.error("Error while reading " + filename + ". Perhaps an unquoted string in your parameters file?")
         sys.exit(1)
-        
+
     for k, v in file_globals.iteritems():
-        if k.startswith('_'): 
+        if k.startswith('_'):
             continue
         k = k.upper()
         if k in default_globals:
@@ -329,15 +334,16 @@ def show_default():
             return
         if do_print:
             print line,
-            
-def set_loglevel(args_loglevel = None):
-    """set loglevel from paramters or command line"""
+
+
+def set_loglevel(args_loglevel=None):
+    """Set loglevel from parameters or command line."""
     global LOGLEVEL
-    if args_loglevel != None:
+    if args_loglevel is not None:
         LOGLEVEL = args_loglevel
     LOGLEVEL = LOGLEVEL.upper()
     # -- add another log level VERBOSE. Use this when logging stuff in loops, e.g. per-OSM-object,
-    #    potentiallially flooding the screen
+    #    potentially flooding the screen
     logging.VERBOSE = 5
     logging.addLevelName(logging.VERBOSE, "VERBOSE")
     logging.Logger.verbose = lambda inst, msg, *args, **kwargs: inst.log(logging.VERBOSE, msg, *args, **kwargs)
@@ -348,10 +354,11 @@ def set_loglevel(args_loglevel = None):
         raise ValueError('Invalid log level: %s' % LOGLEVEL)
     logging.basicConfig(level=numeric_level)
     logging.getLogger().setLevel(LOGLEVEL)
-    
+
     global quiet
     if numeric_level > logging.INFO:
         quiet = True
+
 
 if __name__ == "__main__":
     # Handling arguments and parameters
