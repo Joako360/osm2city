@@ -22,18 +22,17 @@ import argparse
 import logging
 import math
 import os
+import re
 import sys
 import unittest
 import xml.sax
 
 import coordinates
 import osmparser
-import osmparser_wrapper
 import parameters
 import stg_io2
 import tools
 import vec2d
-import re
 
 import shapely.geometry as shg
 
@@ -1511,8 +1510,8 @@ def main():
     valid_relation_keys = []
     req_relation_keys = []
     req_way_keys = ["building", "power", "aerialway", "railway", "landuse", "highway"]
-    handler = osmparser_wrapper.OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
-                                                  req_relation_keys)
+    handler = osmparser.OSMContentHandlerOld(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
+                                             req_relation_keys)
     source = open(osm_fname)
     xml.sax.parse(source, handler)
     # References for buildings

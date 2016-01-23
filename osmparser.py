@@ -142,11 +142,11 @@ class OSMContentHandler(xml.sax.ContentHandler):
             if self.border is None or self.border.contains(shg.Point(self._current_node.lon, self._current_node.lat)):        
                 self.nodes_dict[self._current_node.osm_id] = self._current_node
             else:
-                logging.debug("Ignored Osmid %d outside clipping"%(self._current_node.osm_id))
+                logging.debug("Ignored Osmid %d outside clipping" % (self._current_node.osm_id))
         elif name == "way":
-            cb = self.find_callback_for(self._current_way.tags, self._way_callbacks)
+            cb = find_callback_for(self._current_way.tags, self._way_callbacks)
             # no longer filter valid_way_keys here. That's up to the callback.
-            if cb:
+            if cb is not None:
                 cb(self._current_way, self.nodes_dict)
             else:
                 try:
@@ -154,19 +154,70 @@ class OSMContentHandler(xml.sax.ContentHandler):
                 except TypeError:
                     pass
         elif name == "relation":
-            cb = self.find_callback_for(self._current_relation.tags, self._relation_callbacks)
-            if cb:
+            cb = find_callback_for(self._current_relation.tags, self._relation_callbacks)
+            if cb is not None:
                 cb(self._current_relation)
-
-    def find_callback_for(self, tags, callbacks):
-        for (callback, req_keys) in callbacks:
-            for key in tags.keys():
-                if key in req_keys:
-                    return callback
-        return False
 
     def characters(self, content):
         pass
+
+
+def find_callback_for(tags, callbacks):
+    for (callback, req_keys) in callbacks:
+        for key in tags.keys():
+            if key in req_keys:
+                return callback
+    return None
+
+
+class OSMContentHandlerOld(xml.sax.ContentHandler):
+    """
+    This is a wrapper for OSMContentHandler, enabling backwards compatibility.
+    It registers way and relation callbacks with the actual handler. During parsing,
+    these callbacks fill dictionaries of ways and relations.
+
+    The valid_??_keys are those tag keys, which will be accepted and added to an element's tags.
+    The req_??_keys are those tag keys, of which at least one must be present to add an element to the saved elements.
+
+    The valid_??_keys and req_??_keys are a primitive way to save memory and reduce the number of further processed
+    elements. A better way is to have the input file processed by e.g. Osmosis first.
+    """
+    def __init__(self, valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys):
+        self.valid_way_keys = valid_way_keys
+        self.valid_relation_keys = valid_relation_keys
+        self._handler = OSMContentHandler(valid_node_keys)
+        self._handler.register_way_callback(self.process_way, req_way_keys)
+        self._handler.register_relation_callback(self.process_relation, req_relation_keys)
+        self.nodes_dict = None
+        self.ways_dict = {}
+        self.relations_dict = {}
+
+    def parse(self, source):
+        xml.sax.parse(source, self)
+
+    def startElement(self, name, attrs):
+        self._handler.startElement(name, attrs)
+
+    def endElement(self, name):
+        self._handler.endElement(name)
+
+    def process_way(self, current_way, nodes_dict):
+        if not self.nodes_dict:
+            self.nodes_dict = nodes_dict
+        all_tags = current_way.tags
+        current_way.tags = {}
+        for key, value in all_tags.items():
+            if key in self.valid_way_keys:
+                current_way.add_tag(key, value)
+        self.ways_dict[current_way.osm_id] = current_way
+
+    def process_relation(self, current_relation):
+        all_tags = current_relation.tags
+        current_relation.tags = {}
+        for key, value in all_tags.items():
+            if key in self.valid_way_keys:
+                current_relation.add_tag(key, value)
+        self.relations_dict[current_relation.osm_id] = current_relation
 
 
 def has_required_tag_keys(my_tags, my_required_keys):
@@ -216,7 +267,7 @@ def parse_length(str_length):
 
 def is_parsable_float(str_float):
     try:
-        x = float(str_float)
+        float(str_float)
         return True
     except ValueError:
         return False
@@ -224,29 +275,10 @@ def is_parsable_float(str_float):
 
 def is_parsable_int(str_int):
     try:
-        x = int(str_int)
+        int(str_int)
         return True
     except ValueError:
         return False
-
-
-def main(source_file_name):
-    """Only for test of parser. Normally Parser should be instantiated from other module and then run"""
-    logging.basicConfig(level=logging.INFO)
-    source = open(source_file_name)
-    valid_node_keys = []
-    valid_way_keys = ["building", "height", "building:levels"]
-    req_way_keys = ["building"]
-    valid_relation_keys = ["building"]
-    req_relation_keys = ["building"]
-    handler = OSMContentHandler(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys)
-    xml.sax.parse(source, handler)
-    logging.info('Number of nodes: %s', len(handler.nodes_dict))
-    logging.info('Number of ways: %s', len(handler.ways_dict))
-    logging.info('Number of relations: %s', len(handler.relations_dict))
-
-if __name__ == "__main__":
-    main("C:\\FlightGear\\customscenery2\\LSZS\\ch.osm")
 
 
 # ================ UNITTESTS =======================
