@@ -25,7 +25,7 @@ class Troubleshoot:
             - you have FG's scenery tiles for your area installed
             - PATH_TO_SCENERY is correct\n            
             """)
-        elif parameters.ELEV_MODE == "Manual":
+        else:
             msg += textwrap.dedent("""
             Consider using ELEV_MODE = FgelevCaching if
             you run FG >= 3.2 and have >= 4GB RAM. If that is not feasible, make sure
@@ -35,8 +35,6 @@ class Troubleshoot:
               on the clipping options used when you obtained the OSM file, it may contain
               data well outside your bounding box.\n
             """)
-        else:
-            msg += "Unfortunately not all elevation data is available. consider using ELEV_MODE = FgelevCaching."
         return msg
 
     def skipped_no_texture(self):

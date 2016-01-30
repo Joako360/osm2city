@@ -1,11 +1,13 @@
-'''
+"""
 Created on 27.04.2014
 
 @author: keith.paterson
-'''
-import telnetlib
+"""
+
 import re
-from time import sleep
+import telnetlib
+import time
+
 
 class FG_Telnet(object):
 
@@ -14,45 +16,39 @@ class FG_Telnet(object):
         self.sock = telnetlib.Telnet(host, port)
         self.sock.write("data")
 
-    def get_prop(self, propertyname):
-        self.sock.write("get " + propertyname + "\r\n")
+    def get_prop(self, property_name):
+        self.sock.write("get " + property_name + "\r\n")
         result = self.sock.read_until("/>", 60)
-#        print result
-        return result 
+        return result
         
-    def set_prop(self, propertyname, value):
-        sendbuffer = "set %s %s\r\n"%(propertyname, value)
-        self.sock.write(sendbuffer)
+    def set_prop(self, property_name, value):
+        send_buffer = "set %s %s\r\n" % (property_name, value)
+        self.sock.write(send_buffer)
         result = self.sock.read_until("/>", 60)
-#       print result
         return result
     
     def run_command(self, command):
         try:
-            sendbuffer = "run %s\r\n"%(command)
-            self.sock.write(sendbuffer)
+            send_buffer = "run %s\r\n" % command
+            self.sock.write(send_buffer)
             result = self.sock.read_until("/>", 12000)
             print result
-            if result.find("<completed>") >= 0 :
+            if result.find("<completed>") >= 0:
                 return True
             return False
-        except Exception,e:
+        except Exception, e:
             print e
-            return False 
-        
-        
+            return False
 
     def get_elevation(self, lon, lat):
-        self.set_prop( "/position/latitude-deg", lat );
-        self.set_prop( "/position/longitude-deg", lon );
-        self.set_prop( "/position/altitude-ft", 5000)
-#         while self.get_prop("/position/longitude-deg") != lon and self.get_prop("/position/latitude-deg") != lat:
-        sleep(0.05)
+        self.set_prop("/position/latitude-deg", lat)
+        self.set_prop("/position/longitude-deg", lon)
+        self.set_prop("/position/altitude-ft", 5000)
+        time.sleep(0.05)
         prop = self.get_prop("/position/ground-elev-m")
-        if( prop == None):
+        if prop is None:
             return 0
-        #/position/ground-elev-m = '122.3989172' (double)
-        elev = re.search('[^\']*\'([-e0-9.]*)\'[.]*',prop).group(1)
+        elev = re.search('[^\']*\'([-e0-9.]*)\'[.]*', prop).group(1)
         return float(elev)
 
     def close(self):
@@ -61,56 +57,18 @@ class FG_Telnet(object):
 if __name__ == '__main__':
     fg = FG_Telnet("localhost", 5501)
     
-    fg.set_prop( "/position/longitude-deg", -5 );
-    fg.set_prop( "/position/altitude-ft", 5000 );
+    fg.set_prop("/position/longitude-deg", -5)
+    fg.set_prop("/position/altitude-ft", 5000)
     fg.get_prop("/position/longitude-deg")
-    sleep(1)
+    time.sleep(1)
     fg.get_prop("/position/longitude-deg")
-    sleep(1)
-    fg.set_prop( "/position/latitude-deg", 56.4 );
+    time.sleep(1)
+    fg.set_prop("/position/latitude-deg", 56.4)
     fg.get_prop("/position/ground-elev-m")
-    fg.set_prop( "/position/longitude-deg", -6 );
+    fg.set_prop("/position/longitude-deg", -6)
     fg.get_prop("/position/longitude-deg")
-    sleep(1)
+    time.sleep(1)
     fg.get_prop("/position/longitude-deg")
-    sleep(1)
-    fg.set_prop( "/position/latitude-deg", 56 );
+    time.sleep(1)
+    fg.set_prop("/position/latitude-deg", 56)
     fg.get_prop("/position/ground-elev-m")
-
-# sub set_prop() {    
-#     my( $handle ) = shift;
-#     my( $prop ) = shift;
-#     my( $value ) = shift;
-# 
-#     &send( $handle, "set $prop $value");
-# 
-#     # eof $handle and die "\nconnection closed by host";
-# }
-# 
-# 
-# sub send() {
-#     my( $handle ) = shift;
-# 
-#     print $handle shift, "\015\012";
-# }
-# 
-# 
-# sub connect() {
-#     my( $host ) = shift;
-#     my( $port ) = shift;
-#     my( $timeout ) = (shift || 120);
-#     my( $socket );
-#     STDOUT->autoflush(1);
-#     while ($timeout--) {
-#         if ($socket = IO::Socket::INET->new( Proto => 'tcp',
-#                                              PeerAddr => $host,
-#                                              PeerPort => $port) )
-#         {
-#             $socket->autoflush(1);
-#             return $socket;
-#         }    
-#         print "Attempting to connect to $host ... " . $timeout . "\n";
-#         sleep(1);
-#     }
-#     return 0;
-# }

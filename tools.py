@@ -4,36 +4,40 @@
 tools.py
 misc stuff
 
-Created on Sat Mar 23 18:42:23 2013
+Created on Sat Mar 23 18:42:23 2013½
 
 @author: tom
 """
-import numpy as np
+import argparse
+import cPickle
+import csv
+import logging
+import math
+import os
+import Queue
+import re
+import shutil
+import subprocess
 import sys
 import textwrap
-import os
-import logging
-import batch_processing.fg_telnet as telnet
-import shutil
-import cPickle
-import parameters
-import math
-import string
-from _collections import defaultdict
-
-stats = None
-
-from vec2d import vec2d
-import coordinates
-import calc_tile
 import time
-import re
-import csv
-import subprocess
-# import Queue
 
 import matplotlib.pyplot as plt
+import numpy as np
+
+import batch_processing.fg_telnet as telnet
+import calc_tile
+import coordinates
+import parameters
+import setup
+import vec2d as ve
+
+from _collections import defaultdict
+
+
+stats = None
 transform = None
+
 
 class Interpolator(object):
     """load elevation data from file, interpolate"""
@@ -78,8 +82,8 @@ class Interpolator(object):
         if nx * ny != len(self.x):
             raise ValueError("expected %i, but read %i lines." % (nx * ny, len(self.x)))
 
-        self.min = vec2d(min(self.x), min(self.y))
-        self.max = vec2d(max(self.x), max(self.y))
+        self.min = ve.vec2d(min(self.x), min(self.y))
+        self.max = ve.vec2d(max(self.x), max(self.y))
         self.h = self.h.reshape(ny, nx)
         self.x = self.x.reshape(ny, nx)
         self.y = self.y.reshape(ny, nx)
@@ -127,8 +131,8 @@ class Interpolator(object):
         #plt.plot(x, y, 'k.')
         i = int((x - self.min.x)/self.dx)
         j = int((y - self.min.y)/self.dy)
-        fx = (x - self.x[j,i])/self.dx
-        fy = (y - self.y[j,i])/self.dy
+        fx = (x - self.x[j, i])/self.dx
+        fy = (y - self.y[j, i])/self.dy
         # rounding errors at boundary.
         if j + 1 >= self.h.shape[0]:
             j -= 1
@@ -209,9 +213,8 @@ class Probe_fgelev(object):
     def open_fgelev(self):
         logging.info("Spawning fgelev")
         path_to_fgelev = parameters.FG_ELEV
-        #fg_root = "$FG_ROOT"
-#        fgelev_cmd = path_to_fgelev + ' --expire 1000000 --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY
-        fgelev_cmd = path_to_fgelev + ' --expire 1000000 --fg-scenery '+ parameters.PATH_TO_SCENERY
+
+        fgelev_cmd = path_to_fgelev + ' --expire 1000000 --fg-scenery ' + parameters.PATH_TO_SCENERY
         logging.info("cmd line: " + fgelev_cmd)
         self.fgelev_pipe = subprocess.Popen(fgelev_cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         # -- This should catch spawn errors, but it doesn't. We
@@ -221,7 +224,8 @@ class Probe_fgelev(object):
 
     def save_cache(self):
         """save cache to disk"""
-        if self.fake: return
+        if self.fake:
+            return
         fpickle = open(self.pkl_fname, 'wb')
         cPickle.dump(self._cache, fpickle, -1)
         fpickle.close()
@@ -258,15 +262,16 @@ class Probe_fgelev(object):
             try:
                 line = ""
                 while line == "" and (empty_lines) < 20:
-                    empty_lines+=1
+                    empty_lines += 1
                     line = self.fgelev_pipe.stdout.readline().strip()
                 elev = float(line.split()[1]) + self.h_offset
             except IndexError, reason:
                 self.save_cache()
                 if empty_lines > 1:
-                    logging.fatal("Skipped %i lines" % (empty_lines))
+                    logging.fatal("Skipped %i lines" % empty_lines)
                 logging.fatal("%i %g %g" % (self.record, position.lon, position.lat))
-                logging.fatal("fgelev returned <%s>, resulting in %s. Did fgelev start OK (Record : %i)?", line, reason, self.record)
+                logging.fatal("fgelev returned <%s>, resulting in %s. Did fgelev start OK (Record : %i)?"
+                              , line, reason, self.record)
                 raise RuntimeError("fgelev errors are fatal.")
 
             return elev
@@ -276,12 +281,12 @@ class Probe_fgelev(object):
 
         global transform
         if not is_global:
-            position = vec2d(transform.toGlobal(position))
+            position = ve.vec2d(transform.toGlobal(position))
         else:
-            position = vec2d(position[0], position[1])
+            position = ve.vec2d(position[0], position[1])
 
-        self.record = self.record + 1
-        if self._cache == None:
+        self.record += 1
+        if self._cache is None:
             return really_probe(position)
 
         key = (position.lon, position.lat)
@@ -305,7 +310,7 @@ def test_fgelev(cache, N):
     elev = Probe_fgelev(cache=cache)
     delta = 0.3
     check_btg = True
-    p = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
+    p = ve.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
     elev(p, True, check_btg)  # -- ensure fgelev is up and running
     #p = vec2d(parameters.BOUNDARY_WEST+delta, parameters.BOUNDARY_SOUTH+delta)
     # elev(p, True, check_btg) # -- ensure fgelev is up and running
@@ -334,7 +339,7 @@ def test_fgelev(cache, N):
     i = 0
     for y in Y:
         for x in X:
-            p = vec2d(x, y)
+            p = ve.vec2d(x, y)
             print i / 2,
             e = elev(p, True, check_btg)
             i += 1
@@ -349,90 +354,82 @@ def test_fgelev(cache, N):
     print cache, N, "%d records/s" % (i / (end - start))
     elev.save_cache()
 
-def raster_glob():
-    cmin = vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
-    cmax = vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
+
+def raster_glob(prevent_overwrite=False):
+    cmin = ve.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
+    cmax = ve.vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
     center = (cmin + cmax) * 0.5
     transform = coordinates.Transformation((center.x, center.y), hdg=0)
-    lmin = vec2d(transform.toLocal(cmin.__iter__()))
-    lmax = vec2d(transform.toLocal(cmax.__iter__()))
+    lmin = ve.vec2d(transform.toLocal(cmin.__iter__()))
+    lmax = ve.vec2d(transform.toLocal(cmax.__iter__()))
     delta = (lmax - lmin) * 0.5
-    print "Distance from center to boundary in meters (x, y):", delta
-    err_msg = "Unknown Elevation Query mode : %s Use Manual, Telnet or Fgelev for parameter ELEV_MODE " % (parameters.ELEV_MODE)
-    if parameters.ELEV_MODE == '':
-        logging.error(err_msg)
-        sys.exit(err_msg)
-    elif parameters.ELEV_MODE == 'Manual':
-        print "Creating elev.in ..."
+    logging.info("Distance from center to boundary in meters: x=%d, y=%d", delta.x, delta.y)
+
+    err_msg = "Unknown elevation probing mode : '%s'. Use Manual, Telnet or Fgelev for parameter ELEV_MODE " \
+              % parameters.ELEV_MODE
+    if parameters.ELEV_MODE == 'Manual':
+        logging.info("Creating elev.in ...")
         fname = parameters.PREFIX + os.sep + "elev.in"
-        raster(transform, fname, -delta.x, -delta.y, 2 * delta.x, 2 * delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
+        _raster(transform, fname, -delta.x, -delta.y, 2 * delta.x, 2 * delta.y
+                , parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
 
         path = calc_tile.directory_name(center)
         msg = textwrap.dedent("""
         Done. You should now
-        - copy elev.in to $FGDATA/Nasal/
-        - hide the scenery folder Objects/%s to prevent probing on top of existing objects
-        - start FG, open Nasal console, enter 'elev.get()', press execute. This will create /tmp/elev.xml
-        - once that's done, copy /tmp/elev.xml to your $PREFIX folder
-        - unhide the scenery folder
+        - Copy elev.in to FGData/Nasal/
+        - Hide the scenery folder Objects/%s to prevent probing on top of existing objects
+        - Start FG, open Nasal console, enter 'elev.get_elevation()', press execute. This will create /Export/elev.out
+        - Once that's done, copy /Export/elev.out to your $PREFIX folder
+        - Unhide the scenery folder
         """ % path)
-        print msg
-    elif parameters.ELEV_MODE == 'Telnet':
-        fname = parameters.PREFIX + os.sep + 'elev.in'
-        if not os.path.exists(parameters.PREFIX + os.sep + 'elev.out'):
-            print "Creating ", fname
-            raster_telnet(transform, fname, -delta.x, -delta.y, 2 * delta.x, 2 * delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
+        logging.info(msg)
+    elif (parameters.ELEV_MODE == 'Telnet') or (parameters.ELEV_MODE == 'Fgelev'):
+        fname = parameters.PREFIX + os.sep + 'elev.out'
+        if prevent_overwrite and os.path.exists(fname):
+            logging.info("Skipping %s as it already exists", fname)
+            sys.exit(1)
+
+        logging.info("Creating %s", fname)
+        if parameters.ELEV_MODE == 'Telnet':
+            _raster_telnet(transform, fname, -delta.x, -delta.y, 2 * delta.x, 2 * delta.y
+                           , parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
         else:
-            print "Skipping ", parameters.PREFIX + os.sep + 'elev.out', " exists"
-    elif parameters.ELEV_MODE == 'Fgelev':
-        if not os.path.exists(parameters.PREFIX + os.sep + 'elev.out'):
-            fname = parameters.PREFIX + os.sep + 'elev.out'
-            print "Creating ", fname
-            raster_fgelev(transform, fname, -delta.x, -delta.y, 2 * delta.x, 2 * delta.y, parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
-        else:
-            print "Skipping ", parameters.PREFIX + os.sep + 'elev.out', " exists"
+            _raster_fgelev(transform, fname, -delta.x, -delta.y, 2 * delta.x, 2 * delta.y
+                           , parameters.ELEV_RASTER_X, parameters.ELEV_RASTER_Y)
     else:
         logging.error(err_msg)
-        sys.exit(err_msg)
+        sys.exit(1)
+
 
 def wait_for_fg(fg):
-# Waits for Flightgear to signal, that the elevation processing has finished
+    """Waits for FlightGear to signal, that the elevation processing has finished."""
     for count in range(0, 1000):
         semaphore = fg.get_prop("/osm2city/tiles")
         semaphore = semaphore.split('=')[1]
         m = re.search("([0-9.]+)", semaphore)
-# We don't care if we get 0.0000 (String) or 0 (Int)
+        # We don't care if we get 0.0000 (String) or 0 (Int)
         record = fg.get_prop("/osm2city/record")
         record = record.split('=')[1]
         m2 = re.search("([0-9.]+)", record)
-        if not m is None and float(m.groups()[0]) > 0:
+        if m is not None and float(m.groups()[0]) > 0:
             try:
                 return True
             except:
                 # perform an action#
                 pass
         time.sleep(1)
-        if not m2 is None:
+        if m2 is not None:
             logging.debug("Waiting for Semaphore " + m2.groups()[0])
     return False
 
 
-def raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
-    # --- need $FGDATA/Nasal/elev.nas and elev.in
-    #     hide scenery/Objects/e.... folder
-    #     in Nasal console: elev.get()
-    #     data gets written to /tmp/elev.xml
-
-    # check $FGDATA/Nasal/IOrules
-    fg = telnet.FG_Telnet("localhost", 5501)
-    center_lat = abs(parameters.BOUNDARY_NORTH - parameters.BOUNDARY_SOUTH) / 2 + parameters.BOUNDARY_SOUTH
-    center_lon = abs(parameters.BOUNDARY_WEST - parameters.BOUNDARY_EAST) / 2 + parameters.BOUNDARY_WEST
-    fg.set_prop("/position/latitude-deg", center_lat);
-    fg.set_prop("/position/longitude-deg", center_lon);
-    fg.set_prop("/position/altitude-ft", 3000);
-    f = open("C:/Users/keith.paterson/AppData/Roaming/flightgear.org/elev.in", "w");
-#       f = open(fname, 'w')
-#    f.write("# Tile %s\n" % (parameters.PREFIX))
+def _raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
+    """Writes elev.in and elev.out using Telnet to a running FlightGear instance."""
+    fg_home_path = setup.getFGHome()
+    if fg_home_path is None:
+        logging.error("Operating system unknown and therefore FGHome unknown.")
+        sys.exit(1)
+    f = open(setup.get_elev_in_path(fg_home_path), "w")
     f.write("# %g %g %g %g %g %g\n" % (x0, y0, size_x, size_y, step_x, step_y))
     for y in np.arange(y0, y0 + size_y, step_y):
         for x in np.arange(x0, x0 + size_x, step_x):
@@ -440,53 +437,49 @@ def raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
             f.write("%1.8f %1.8f %g %g\n" % (lon, lat, x, y))
         f.write("\n")
     f.close()
-    fg.set_prop("/position/latitude-deg", center_lat);
-    fg.set_prop("/position/longitude-deg", center_lon);
-    fg.set_prop("/position/altitude-ft", 3000);
+
+    fg = telnet.FG_Telnet("localhost", parameters.TELNET_PORT)
+    center_lat = abs(parameters.BOUNDARY_NORTH - parameters.BOUNDARY_SOUTH) / 2 + parameters.BOUNDARY_SOUTH
+    center_lon = abs(parameters.BOUNDARY_WEST - parameters.BOUNDARY_EAST) / 2 + parameters.BOUNDARY_WEST
+    fg.set_prop("/position/latitude-deg", center_lat)
+    fg.set_prop("/position/longitude-deg", center_lon)
+    fg.set_prop("/position/altitude-ft", 10000)
 
     logging.info("Running FG Command")
     fg.set_prop("/osm2city/tiles", 0)
-    if(fg.run_command("get-elevation")):
+    if fg.run_command("get-elevation"):
         if not wait_for_fg(fg):
             logging.error("Process in FG timed out")
         else:
             logging.info("Success")
-            shutil.copy2("C:/Users/keith.paterson/AppData/Roaming/flightgear.org/Export/elev.out", parameters.PREFIX + os.sep + 'elev.out')
+            shutil.copy2(setup.get_elev_out_path(fg_home_path), fname)
     fg.close()
 
 
-
-
-def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
+def _raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
     """fgelev seems to freeze every now and then, so this can be really slow.
        Same happens when run from bash: fgelev < fgelev.in
     """
-    import subprocess
-    import Queue
-    #fg_root = "$FG_ROOT"
-
-    center_global = vec2d(transform.toGlobal((x0,y0)))
+    center_global = ve.vec2d(transform.toGlobal((x0, y0)))
     btg_file = parameters.PATH_TO_SCENERY + os.sep + "Terrain"
     btg_file = btg_file + os.sep + calc_tile.directory_name(center_global) + os.sep + calc_tile.construct_btg_file_name(center_global)
     if not os.path.exists(btg_file):
         logging.error("Terrain File " + btg_file + " does not exist. Set scenery path correctly or fly there with TerraSync enabled")
         sys.exit(2)
 
-    fg_elev = parameters.FG_ELEV
+    fg_elev_path = parameters.FG_ELEV
 
-#    fgelev = subprocess.Popen( fg_elev + ' --expire 1000000 --fg-root ' + fg_root + ' --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-    fgelev = subprocess.Popen( fg_elev + ' --expire 1000000 --fg-scenery '+ parameters.PATH_TO_SCENERY,  shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-    # fgelev = subprocess.Popen(["/home/tom/daten/fgfs/cvs-build/git-2013-09-22-osg-3.2/bin/fgelev", "--fg-root", "$FG_ROOT",  "--fg-scenery", "$FG_SCENERY"],  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-    # time.sleep(5)
+    fgelev = subprocess.Popen(fg_elev_path + ' --expire 1000000 --fg-scenery ' + parameters.PATH_TO_SCENERY
+                              , shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+
     buf_in = Queue.Queue(maxsize=0)
     f = open(fname, 'w')
-    # f = sys.stdout
     f.write("# %g %g %g %g %g %g\n" % (x0, y0, size_x, size_y, step_x, step_y))
     i = 0
     y_array = np.arange(y0, y0 + size_y, step_y)
     x_array = np.arange(x0, x0 + size_x, step_x)
     n_total = len(x_array) * len(y_array)
-    print "building buffer %i (%i x %i)" % (n_total, len(x_array), len(y_array))
+    logging.info("building buffer %i (%i x %i)", n_total, len(x_array), len(y_array))
 
     for y in y_array:
         for x in x_array:
@@ -501,15 +494,15 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
             fgelev.stdin.write(buf_in.get())
     start = time.time()
 
-    print "reading"
+    logging.info("reading")
     i = 0
     for y in y_array:
         for x in x_array:
-            print "done %i %3.1f %%\r" % (i, i*100/n_total),
+            logging.info("done %i %3.1f %%\r", i, i*100/n_total)
             i += 1
             if not buf_in.empty():
                 line = buf_in.get()
-                print line
+                logging.debug(line)
                 fgelev.stdin.write(line)
             tmp, elev = fgelev.stdout.readline().split()
             lon, lat = transform.toGlobal((x, y))
@@ -517,20 +510,15 @@ def raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, 
             f.write("%1.8f %1.8f %g %g %g\n" % (lon, lat, x, y, float(elev)))
             # if i > 10000: return
         f.write("\n")
-        print "done %i %3.1f %%\r" % (i, i*100/n_total),
+        logging.info("done %i %3.1f %%\r", i, i*100/n_total)
 
     f.close()
     end = time.time()
-    print "done %d records/s" % ((i / (end - start)))
+    logging.info("done %d records per second", i / (end - start))
 
 
-def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
-    # --- need $FGDATA/Nasal/elev.nas and elev.in
-    #     hide scenery/Objects/e.... folder
-    #     in Nasal console: elev.get()
-    #     data gets written to /tmp/elev.xml
-
-    # check $FGDATA/Nasal/IOrules
+def _raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
+    """Writes an elev.in file that ca be used with ELEV_MODE = 'Manual'."""
     f = open(fname, 'w')
     f.write("# %g %g %g %g %g %g\n" % (x0, y0, size_x, size_y, step_x, step_y))
     for y in np.arange(y0, y0 + size_y, step_y):
@@ -540,11 +528,12 @@ def raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=
         f.write("\n")
     f.close()
 
+
 def write_map(filename, transform, elev, gmin, gmax):
-    lmin = vec2d(transform.toLocal((gmin.x, gmin.y)))
-    lmax = vec2d(transform.toLocal((gmax.x, gmax.y)))
+    lmin = ve.vec2d(transform.toLocal((gmin.x, gmin.y)))
+    lmax = ve.vec2d(transform.toLocal((gmax.x, gmax.y)))
     map_z0 = 0.
-    elev_offset = elev(vec2d(0,0))
+    elev_offset = elev(ve.vec2d(0, 0))
     print "offset", elev_offset
 
     nx, ny = ((lmax - lmin) / 100.).int().list()  # 100m raster
@@ -554,7 +543,6 @@ def write_map(filename, transform, elev, gmin, gmax):
 
     u = np.linspace(0., 1., nx)
     v = np.linspace(0., 1., ny)
-
 
     out = open("surface.ac", "w")
     out.write(textwrap.dedent("""\
@@ -570,7 +558,7 @@ def write_map(filename, transform, elev, gmin, gmax):
 
     for j in range(ny):
         for i in range(nx):
-            out.write("%g %g %g\n" % (y[j], (elev(vec2d(x[i],y[j])) - elev_offset), x[i]))
+            out.write("%g %g %g\n" % (y[j], (elev(ve.vec2d(x[i], y[j])) - elev_offset), x[i]))
 
     out.write("numsurf %i\n" % ((nx - 1) * (ny - 1)))
     for j in range(ny - 1):
@@ -580,10 +568,10 @@ def write_map(filename, transform, elev, gmin, gmax):
             mat 0
             refs 4
             """))
-            out.write("%i %g %g\n" % (i + j * (nx), u[i], v[j]))
-            out.write("%i %g %g\n" % (i + 1 + j * (nx), u[i + 1], v[j]))
-            out.write("%i %g %g\n" % (i + 1 + (j + 1) * (nx), u[i + 1], v[j + 1]))
-            out.write("%i %g %g\n" % (i + (j + 1) * (nx), u[i], v[j + 1]))
+            out.write("%i %g %g\n" % (i + j * nx, u[i], v[j]))
+            out.write("%i %g %g\n" % (i + 1 + j * nx, u[i + 1], v[j]))
+            out.write("%i %g %g\n" % (i + 1 + (j + 1) * nx, u[i + 1], v[j + 1]))
+            out.write("%i %g %g\n" % (i + (j + 1) * nx, u[i], v[j + 1]))
 #            0 0 0
 #            1 1 0
 #            2 1 1
@@ -591,6 +579,7 @@ def write_map(filename, transform, elev, gmin, gmax):
     out.write("kids 0\n")
     out.close()
     # print "OBJECT_STATIC surface.ac"
+
 
 def write_gp(buildings):
     gp = open("buildings.dat", "w")
@@ -601,6 +590,7 @@ def write_gp(buildings):
         gp.write("\n")
 
     gp.close()
+
 
 def write_one_gp(b, filename):
     npv = np.array(b.X_outer)
@@ -632,7 +622,6 @@ def write_one_gp(b, filename):
     for v in b.X_outer:
         i += 1
         gp.write('set label "%i" at %g, %g\n' % (i, v[0], v[1]))
-
 
     gp.write("plot '-' w lp\n")
     for v in b.X_outer:
@@ -694,7 +683,8 @@ class Stats(object):
         self.textures_total[str(texture.filename)] += 1 
 
     def print_summary(self):
-        if parameters.quiet: return
+        if parameters.quiet:
+            return
         out = sys.stdout
         total_written = self.LOD.sum()
         lodzero = 0
@@ -721,8 +711,8 @@ class Stats(object):
             roof_line += """\n          %s\t%i""" % (roof_type, self.roof_types[roof_type])
         out.write(textwrap.dedent(roof_line))
 
-        textures_used = {k: v for k, v in self.textures_total.iteritems() if v>0}
-        textures_notused = {k: v for k, v in self.textures_total.iteritems() if v==0}
+        textures_used = {k: v for k, v in self.textures_total.iteritems() if v > 0}
+        textures_notused = {k: v for k, v in self.textures_total.iteritems() if v == 0}
         try:
             textures_used_percent = len(textures_used) * 100. / len(self.textures_total)
         except:
@@ -760,21 +750,21 @@ class Stats(object):
         out.write("\narea >=\n")
         max_area_above = max(1, self.area_above.max())
         for i in xrange(len(self.area_levels)):
-            out.write(" %5g m^2  %5i |%s\n" % (self.area_levels[i], self.area_above[i], \
+            out.write(" %5g m^2  %5i |%s\n" % (self.area_levels[i], self.area_above[i],
                       "#" * int(56. * self.area_above[i] / max_area_above)))
 
         if logging.getLogger().level <= logging.VERBOSE:  # @UndefinedVariable
             for name in sorted(self.textures_used):
-                out.write("%s\n"%name)
+                out.write("%s\n" % name)
 
         out.write("\nnumber of corners >=\n")
         max_corners = max(1, self.corners.max())
         for i in xrange(3, len(self.corners)):
-            out.write("     %2i %6i |%s\n" % (i, self.corners[i], \
+            out.write("     %2i %6i |%s\n" % (i, self.corners[i],
                       "#" * int(56. * self.corners[i] / max_corners)))
-        out.write(" complex %5i |%s\n" % (self.corners[0], \
+        out.write(" complex %5i |%s\n" % (self.corners[0],
                   "#" * int(56. * self.corners[0] / max_corners)))
-                  
+
 
 def init(new_transform):
     global transform
@@ -782,12 +772,13 @@ def init(new_transform):
 
     global stats
     stats = Stats()
-    logging.debug("tools: init %s"%stats)
+    logging.debug("tools: init %s" % stats)
+
 
 def install_files(file_list, dst):
     """link files in file_list to dst"""
     for the_file in file_list:
-        the_dst = dst # + os.sep + the_file
+        the_dst = dst  # + os.sep + the_file
         logging.info("cp %s %s" % (the_file, the_dst))
         if os.path.exists(the_dst + the_file):
             return
@@ -799,12 +790,14 @@ def install_files(file_list, dst):
         except (AttributeError, shutil.Error) as e:
             logging.warn("Error while installing %s: %s" % (the_file, repr(e)))
 
+
 def get_interpolator(**kwargs):
     if parameters.ELEV_MODE == 'FgelevCaching':
         return Probe_fgelev(**kwargs)
     else:
         filename = parameters.PREFIX + os.sep + 'elev.out'
         return Interpolator(filename, **kwargs)
+
 
 def progress(i, max_i):
     """progress indicator"""
@@ -821,21 +814,17 @@ def progress(i, max_i):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    # Parse arguments and eventually override Parameters
-    import argparse
+
     parser = argparse.ArgumentParser(description="tools prepares an elevation grid for Nasal script and then osm2city")
     parser.add_argument("-f", "--file", dest="filename",
-                      help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
+                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
+    parser.add_argument("-o", dest="o", action="store_true", help="do not overwrite existing elevation data")
     args = parser.parse_args()
     if args.filename is not None:
         parameters.read_from_file(args.filename)
     parameters.show()
 
-    if 0:
-        for N in [1000, 100]:
-            test_fgelev(True, N)
-            # test_fgelev(False, N)
-        sys.exit(0)
-
-    raster_glob()
-
+    if args.o:
+        raster_glob(True)
+    else:
+        raster_glob(False)

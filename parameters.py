@@ -63,13 +63,15 @@ PATH_TO_SCENERY = "/home/user/fgfs/scenery/TerraSync"
 PATH_TO_OUTPUT = "/home/user/fgfs/scenery/osm2city"
 
 NO_ELEV = False             # -- skip elevation probing
-ELEV_MODE = "FgelevCaching" # -- elev probing mode. Possible values are FgelevCaching (recommended), Manual, or Telnet
+ELEV_MODE = "Fgelev"  # -- elev probing mode. Possible values are FgelevCaching (recommended), Fgelev, Manual, or Telnet
 FG_ELEV = '"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'
 
 # -- Distance between raster points for elevation map. Xx is horizontal, y is
 #    vertical. Relevant only for ELEV_MODE = Manual or Telnet.
 ELEV_RASTER_X = 10
 ELEV_RASTER_Y = 10
+
+TELNET_PORT = 5501  # The port FlightGear listens to. Needed for ELEV_MODE = "Telnet"
 
 #=============================================================================
 # PARAMETERS RELATED TO BUILDINGS IN osm2city
