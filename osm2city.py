@@ -90,6 +90,10 @@ class Building(object):
        Holds all data relevant for a building. Coordinates, type, area, ...
        Read-only access to node coordinates via self.X[node][0|1]
     """
+    LOD_BARE = 0
+    LOD_ROUGH = 1
+    LOD_DETAIL = 2
+
     def __init__(self, osm_id, tags, outer_ring, name, height, levels,
                  stg_typ=None, stg_hdg=None, inner_rings_list=[], building_type='unknown', roof_type='flat', roof_height=0, refs=[]):
         self.osm_id = osm_id
@@ -114,7 +118,7 @@ class Building(object):
         self.roof_separate_LOD = False # May or may not be faster
         self.ac_name = None
         self.ceiling = 0.
-        self.LOD = None
+        self.LOD = None  # see Building.LOD_* for values
         self.outer_nodes_closest = []
         if len(outer_ring.coords) > 2:
             self.set_polygon(outer_ring, self.inner_rings_list)
@@ -531,8 +535,11 @@ def write_xml(path, fname, buildings):
     xml.write("""<?xml version="1.0"?>\n<PropertyList>\n""")
     xml.write("<path>%s.ac</path>" % fname)
 
-    # -- lightmap
+    has_lod_bare = False
+    has_lod_rough = False
+    has_lod_detail = False
 
+    # -- lightmap
     # FIXME: use Effect/Building? What's the difference?
     #                <lightmap-factor type="float" n="0"><use>/scenery/LOWI/garage[0]/door[0]/position-norm</use></lightmap-factor>
     if parameters.LIGHTMAP_ENABLE:
@@ -565,50 +572,51 @@ def write_xml(path, fname, buildings):
                   </offsets>
                 </model>""" % (-yo, xo, zo) ))  # -- I just don't get those coordinate systems.
 
+        if b.LOD is not None:
+            if b.LOD == Building.LOD_BARE:
+                has_lod_bare = True
+            elif b.LOD == Building.LOD_ROUGH:
+                has_lod_rough = True
+            elif b.LOD == Building.LOD_DETAIL:
+                has_lod_detail = True
+            else:
+                logging.warning("Building %s with unknown LOD level %i", b.osm_id, b.LOD)
+
     # -- LOD animation
     #    no longer use bare (reserved for terrain)
     #    instead use rough, detail, roof
+    if has_lod_bare:
+        xml.write(textwrap.dedent("""
+        <animation>
+          <type>range</type>
+          <min-m>0</min-m>
+          <max-property>/sim/rendering/static-lod/bare</max-property>
+          <object-name>LOD_bare</object-name>
+        </animation>
+        """))
+    if has_lod_rough:
+        xml.write(textwrap.dedent("""
+        <animation>
+          <type>range</type>
+          <min-m>0</min-m>
+          <max-property>/sim/rendering/static-lod/rough</max-property>
+          <object-name>LOD_rough</object-name>
+        </animation>
+        """))
+    if has_lod_detail:
+        xml.write(textwrap.dedent("""
+        <animation>
+          <type>range</type>
+          <min-m>0</min-m>
+          <max-property>/sim/rendering/static-lod/detailed</max-property>
+          <object-name>LOD_detail</object-name>
+        </animation>
+        """))
     xml.write(textwrap.dedent("""
-    <animation>
-      <type>range</type>
-      <min-m>0</min-m>
-      <max-property>/sim/rendering/static-lod/bare</max-property>
-      <object-name>LOD_bare</object-name>
-    </animation>
-
-    <animation>
-      <type>range</type>
-      <min-m>0</min-m>
-      <max-property>/sim/rendering/static-lod/rough</max-property>
-      <object-name>LOD_rough</object-name>
-    </animation>
-
-    <animation>
-      <type>range</type>
-      <min-m>0</min-m>
-      <max-property>/sim/rendering/static-lod/detailed</max-property>
-      <object-name>LOD_detail</object-name>
-    </animation>
-
 
     </PropertyList>
     """))
     xml.close()
-
-#    <animation>
-#      <type>range</type>
-#      <min-m>0</min-m>
-#      <max-property>/sim/rendering/static-lod/roof</max-property>
-#      <object-name>LOD_roof</object-name>
-#    </animation>
-
-#    <animation>
-#      <type>range</type>
-#      <min-property>/sim/rendering/static-lod/roof</min-property>
-#      <max-property>/sim/rendering/static-lod/rough</max-property>
-#      <object-name>LOD_roof_flat</object-name>
-#    </animation>
-
 
 
 # -----------------------------------------------------------------------------

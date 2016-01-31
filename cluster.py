@@ -14,25 +14,27 @@ Cluster borders overlap to make LOD less obvious.
 
 @author: tom
 """
-from vec2d import vec2d
-import tools
-import numpy as np
 import logging
 import os
+
+import numpy as np
+
+import tools
+from vec2d import vec2d
 
 
 class Cluster(object):
     def __init__(self, I, center, size):
-        #self.out = open
         self.objects = []
         self.I = I
-        self.center = center # -- center in local coord
+        self.center = center  # -- center in local coord
         self.min = center - size/2.
         self.max = center + size/2.
         self.stats = tools.Stats()
 
     def __str__(self):
         print "cl", self.I
+
 
 def clamp(i, vmin, vmax):
     return max(vmin, min(i, vmax))
@@ -48,20 +50,17 @@ class Clusters(object):
         self.__len = self.n.x * self.n.y
         self.prefix = prefix
 
-        #self.list = []
-        logging.info("Generating clusters %s %s"%(min,max))
-        self._clusters = [[self.init_cluster(vec2d(i,j)) 
-          for j in range(self.n.y)] for i in range(self.n.x)]
+        logging.info("Generating clusters %s %s", min, max)
+        self._clusters = [[self.init_cluster(vec2d(i, j))
+        for j in range(self.n.y)] for i in range(self.n.x)]
 #        for i in range(self.nx * self.ny):
 #            self.list.append([])
-
 
         print "cluster: ", self.n
         print "  delta: ", self.delta
         print "  min: ", self.min
         print "  max: ", self.max
 
-        #print self._clusters
     def __len__(self):
         return self.__len
         
@@ -72,12 +71,14 @@ class Clusters(object):
 
     def coords_to_index(self, X):
         """return cluster id for given point X"""
-        if X.x < self.min.x: X.x = self.min.x
-        if X.x > self.max.x: X.x = self.max.x
-        if X.y < self.min.y: X.y = self.min.y
-        if X.y > self.max.y: X.y = self.max.y
-        #print "min", self.min
-        #print "max", self.max
+        if X.x < self.min.x:
+            X.x = self.min.x
+        elif X.x > self.max.x:
+            X.x = self.max.x
+        if X.y < self.min.y:
+            X.y = self.min.y
+        elif X.y > self.max.y:
+            X.y = self.max.y
 
         I = ((X - self.min) / self.size).int()
         return I
@@ -85,13 +86,10 @@ class Clusters(object):
     def __call__(self, X):
         """return cluster instance for given point X"""
         I = self.coords_to_index(X)
-        #print "  I=(%s)" % I
 
         return self._clusters[I.x][I.y]
 
-    #def __len__(self):
-    #    return len(self._clusters)
-    
+
     def __iter__(self):
         for each_list in self._clusters: 
             for item in each_list: yield item
@@ -139,25 +137,20 @@ self._clusters[I.x][I.y]
         for j in range(self.n.y):
             for i in range(self.n.x):
                 cluster = self._clusters[i][j]
-                #print i, j, cluster.center
                 for b in cluster.objects:
-#                    if b.LOD == 1:
                     norm_coord = (b.anchor - cluster.center) / self.size
-                    rnd = vec2d(np.random.uniform(0,1,2))
+                    rnd = vec2d(np.random.uniform(0, 1, 2))
                     out = norm_coord.sign() * (rnd < abs(norm_coord)).int()
                     ni = int(i + out.x)
                     nj = int(j + out.y)
                     ni = clamp(ni, 0, self.n.x-1)
                     nj = clamp(nj, 0, self.n.y-1)
-#                    else:
-#                        ni = i
-#                        nj = j
 
                     newclusters[ni][nj].objects.append(b)
                     f.write("%4.0f %4.0f %i %i %i %i %i %i\n" %
-                        (b.anchor.x, b.anchor.y,
-                         i, j, i + j * self.n.x,
-                         ni, nj, ni + nj * self.n.x))
+                            (b.anchor.x, b.anchor.y,
+                             i, j, i + j * self.n.x,
+                             ni, nj, ni + nj * self.n.x))
         f.close()
         self._clusters = newclusters
         return
@@ -185,9 +178,8 @@ self._clusters[I.x][I.y]
         f = open(self.prefix + os.sep + "cluster_stats.dat", "w")
         for j in range(self.n.y):
             for i in range(self.n.x):
-                #id = j * self.n.x + i
                 cl = self._clusters[i][j]
-                f.write("%i %i %i\n" % (i,j,len(cl.objects)))
+                f.write("%i %i %i\n" % (i, j, len(cl.objects)))
             f.write("\n")
         f.close()
 
@@ -195,29 +187,17 @@ self._clusters[I.x][I.y]
         pass
     
 
-
-#c = Clusters(0,5,2,  0,7,3)
-#print c.cluster_id(-1111.999,3)
-
-#def test(x,y):
-#    return [x, y]
-#
-#a = test(1,2)
-#print a
 if __name__ == "__main__":
-    import random
     N = 20
-    X, Y = np.meshgrid(np.linspace(-1,1,N), np.linspace(-1,1,N))
+    X, Y = np.meshgrid(np.linspace(-1, 1, N), np.linspace(-1, 1, N))
     for i in range(len(X.ravel())):
         x = X.ravel()[i]
         y = Y.ravel()[i]
-        p = vec2d(x,y)
-        r = vec2d(np.random.uniform(0,1,2))
+        p = vec2d(x, y)
+        r = vec2d(np.random.uniform(0, 1, 2))
         out = p.sign() * (r < abs(p)).int()
         f = out.x + out.y*3
         x += out.x
         y += out.y
         print x, y, out.x, out.y, f
-        #int(f)
-
 
