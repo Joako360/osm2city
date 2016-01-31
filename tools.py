@@ -14,6 +14,7 @@ import csv
 import logging
 import math
 import os
+import os.path as osp
 import Queue
 import re
 import shutil
@@ -37,6 +38,16 @@ from _collections import defaultdict
 
 stats = None
 transform = None
+
+
+def get_osm2city_directory():
+    """Determines the absolute path of the osm2city root directory.
+
+    Used e.g. when copying roads.eff, elev.nas and other resources.
+    """
+    my_file = osp.realpath(__file__)
+    my_dir = osp.split(my_file)[0]
+    return my_dir
 
 
 class Interpolator(object):

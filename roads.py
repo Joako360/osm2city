@@ -78,56 +78,53 @@ required graph functions:
 - find neighbours
 -
 """
-# 24722952 OSMID
 
-import scipy.interpolate
-import matplotlib.pyplot as plt
-import numpy as np
-from vec2d import vec2d
-import textwrap
-import coordinates
-import tools
-import parameters
-import ac3d
-import linear
-import shapely.geometry as shg
-
+import argparse
 import logging
-import osmparser
-import stg_io2
-import objectlist
-import tools
-from cluster import Clusters
+import math
+import os
 import re
 import random
-import graph
-import troubleshoot
-import argparse
+import textwrap
 
-# debug stuff
-import test
-from pdb import pm
-import math
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.interpolate
+import shapely.geometry as shg
+
+import ac3d
+import coordinates
+import graph
+import linear
 import linear_bridge
+import objectlist
+import osmparser
+import parameters
+import stg_io2
 import textures.road
-#from memory_profiler import profile
+import tools
+import troubleshoot
+from vec2d import vec2d
+from cluster import Clusters
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 
-# -----------------------------------------------------------------------------
+
 def no_transform((x, y)):
     return x, y
-    
+
+
 def is_bridge(way):
-    return "bridge" in  way.tags
+    return "bridge" in way.tags
+
 
 def is_railway(way):
     return "railway" in way.tags
 
+
 class Roads(objectlist.ObjectList):
     valid_node_keys = []
 
-    #req_and_valid_keys = {"valid_way_keys" : ["highway"], "req_way_keys" : ["highway"]}
     req_keys = ['highway', 'railway', 'amenity']
 
     def __init__(self, transform, elev):
@@ -135,7 +132,7 @@ class Roads(objectlist.ObjectList):
         self.elev = elev
         self.ways_list = []
         self.bridges_list = []
-        self.roads_list = self.objects # alias
+        self.roads_list = self.objects  # alias
         self.nodes_dict = {}
 
     def __str__(self):
@@ -212,12 +209,6 @@ class Roads(objectlist.ObjectList):
     def propagate_h_add(self):
         """start at bridges, propagate h_add through nodes"""
         for the_bridge in self.bridges_list:
-            if the_bridge.osm_id == 240409294:
-#                print "here"
-                label=True
-#                continue
-            else:
-                label=False
             # build tree starting at node0
             node0 = the_bridge.refs[0]
             node1 = the_bridge.refs[-1]
@@ -230,7 +221,7 @@ class Roads(objectlist.ObjectList):
             graph.for_edges_in_bfs_call(self.propagate_h_add_over_edge, None, self.G, node0s, visited)
 
     def build_graph(self, source_iterable):
-        self.G=Graph()
+        self.G = graph.Graph()
         for the_way in source_iterable:
             self.G.add_edge(the_way.refs[0], the_way.refs[-1], obj=the_way)
 
@@ -296,7 +287,6 @@ class Roads(objectlist.ObjectList):
         return shg.LineString(nodes)
 
     def cleanup_topo(self):
-    
         logging.debug("len before %i" % len(self.ways_list))
         self.attached_ways_dict = self.find_junctions(self.ways_list)
         #self.debug_plot_junctions('ks')
@@ -315,7 +305,6 @@ class Roads(objectlist.ObjectList):
         #sys.exit(0)
     
         logging.debug("len after %i" % len(self.ways_list))
-
 
     def remove_tunnels(self):
         """remove tunnels"""
@@ -639,15 +628,12 @@ class Roads(objectlist.ObjectList):
 
             # write junction area polygon
 
-
     def debug_plot_ref(self, ref, style): 
         if not parameters.DEBUG_PLOT: return
         plt.plot(self.nodes_dict[ref].lon, self.nodes_dict[ref].lat, style)
 #        plt.text(self.nodes_dict[ref].lon, self.nodes_dict[ref].lat, ref.osm_id)
 
-
     def debug_plot_way(self, way, ls, lw, color=False, ends_marker=False, show_label=False, show_ends=False):
-#        return
         if not parameters.DEBUG_PLOT: return
         col = ['b', 'r', 'y', 'g', '0.25', 'k', 'c']
         if not color:
@@ -675,6 +661,7 @@ class Roads(objectlist.ObjectList):
             node = self.nodes_dict[ref]
             plt.plot(node.lon, node.lat, style, mfc='None')
             #plt.text(node.lon, node.lat, node.osm_id, color='r')
+
     def debug_label_node(self, ref, text=""):
         if not parameters.DEBUG_PLOT: return
 
@@ -717,8 +704,7 @@ class Roads(objectlist.ObjectList):
                         lw = lw_w[0]
                         
                     plt.plot(a[:,0], a[:,1], color=cluster_color, linewidth=lw+2)
-    
-            
+
         for the_way in self.ways_list:
             self.debug_plot_way(the_way, '-', lw=0.5, show_label=True, ends_marker='x')
             
@@ -732,6 +718,7 @@ class Roads(objectlist.ObjectList):
             plt.savefig(save)
         if show:
             plt.show()
+
     def debug_show_h_add(self, label=""):
         return
         print "====", label
@@ -741,13 +728,13 @@ class Roads(objectlist.ObjectList):
         return
         for the_node in self.nodes_dict.itervalues():
             print "n %12i h_add %5.2f" % (the_node.osm_id, the_node.h_add)
-            
+
     def cleanup_junctions(self):
         """Remove junctions that
            - have less than 3 ways attached
         """
         pass
-    
+
     def compatible_ways(self, way1, way2):
         logging.debug("trying join %i %i" % (way1.osm_id, way2.osm_id))
         if is_railway(way1) != is_railway(way2):
@@ -765,7 +752,7 @@ class Roads(objectlist.ObjectList):
             return
         for way, boolean in self.attached_ways_dict[the_ref]:
             if way == the_way:
-                logging.debug("removing way %s from node %i LIST " % (the_way, the_ref), self.attached_ways_dict[the_ref])
+                logging.debug("removing way %s from node %i", the_way, the_ref)
                 self.attached_ways_dict[the_ref].remove((the_way, boolean))
 
     def attached_ways_dict_append(self, the_ref, the_way, is_first, ignore_missing_ref=False):
@@ -774,7 +761,6 @@ class Roads(objectlist.ObjectList):
         if ignore_missing_ref and the_ref not in self.attached_ways_dict:
             return
         self.attached_ways_dict[the_ref].append((the_way, is_first))
-
 
     def join_ways(self, way1, way2):
         """join ways that
@@ -809,7 +795,6 @@ class Roads(objectlist.ObjectList):
         self.attached_ways_dict_append(new_way.refs[0], new_way, is_first=True, ignore_missing_ref=True)
         self.attached_ways_dict_append(new_way.refs[-1], new_way, is_first=False, ignore_missing_ref=True)
 
-            
         try:
             self.ways_list.remove(way1)
             logging.debug("1ok ")
@@ -869,7 +854,6 @@ class Roads(objectlist.ObjectList):
         # -- write OSM_ID label
         ac = ac3d.File(stats=tools.stats, show_labels=True)
 #        ac3d_obj = ac.new_object(file_name, '', default_swap_uv=True)
-        
 
         for way in self.bridges_list + self.roads_list:
             # -- label center with way ID
@@ -882,7 +866,6 @@ class Roads(objectlist.ObjectList):
 
             e = self.elev(anchor) + the_node.h_add + 1.
             ac.add_label('way %i' % (way.osm_id), -anchor.y, e, -anchor.x, scale=1.)
-
 
             # -- label first node
             the_node = self.nodes_dict[way.refs[0]]
@@ -915,6 +898,7 @@ class Roads(objectlist.ObjectList):
         for the_way in self.ways_list:
             if node_osm_id in the_way.refs:
                 print "+", the_way.osm_id
+
     def debug_print_refs_of_way(self, way_osm_id):
         """print refs of given way"""
         for the_way in self.ways_list:
@@ -922,8 +906,7 @@ class Roads(objectlist.ObjectList):
                 print "found", the_way
                 for the_ref in the_way.refs:
                     print "+", the_ref
-                    
-        
+
     def clip_at_cluster_border(self):
         """
                - loop all objects
@@ -945,6 +928,7 @@ class Roads(objectlist.ObjectList):
             cluster_ref = self.clusters.append(vec2d(the_object.center.centroid.coords[0]), the_object)
             the_object.cluster_ref = cluster_ref
 
+
 def write_xml(path_to_stg, file_name, object_name):
     xml = open(path_to_stg + file_name + '.xml', "w")
     if parameters.TRAFFIC_SHADER_ENABLE:
@@ -965,7 +949,8 @@ def write_xml(path_to_stg, file_name, object_name):
                 <object-name>%s</object-name>
         </effect>
         </PropertyList>
-    """  % (file_name, shader_str, object_name)))
+    """ % (file_name, shader_str, object_name)))
+
 
 def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
     """debug: plot roads map to .eps"""
@@ -1029,13 +1014,12 @@ def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
     plt.savefig('roads.eps')
     plt.clf()
 
-    
 
 def main():
     random.seed(42)
     parser = argparse.ArgumentParser(description="bridge.py reads OSM data and creates bridge models for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
-                      help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
+                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
     parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
     parser.add_argument("-b", "--bridges-only", action="store_true", help="create only bridges and embankments")
     parser.add_argument("-l", "--loglevel", help="set loglevel. Valid levels are DEBUG, INFO, WARNING, ERROR, CRITICAL")
@@ -1133,35 +1117,38 @@ def main():
 #    roads.debug_label_nodes(stg_manager)
 
     # -- write stg
+    stg_paths = set()
+
     for cl in roads.clusters:
         if len(cl.objects) < parameters.CLUSTER_MIN_OBJECTS: continue # skip almost empty clusters
 
-        replacement_prefix = re.sub('[\/]','_', parameters.PREFIX)
+        replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)
         file_name = replacement_prefix + "roads%02i%02i" % (cl.I.x, cl.I.y)
         center_global = vec2d(tools.transform.toGlobal(cl.center))
         offset_local = cl.center
         cluster_elev = elev(center_global, True)
-        #cluster_elev = 0.
+
         # -- Now write cluster to disk.
         #    First create ac object. Write cluster's objects. Register stg object.
         #    Write ac to file.
         ac = ac3d.File(stats=tools.stats, show_labels=True)
         ac3d_obj = ac.new_object(file_name, 'tex/roads.png', default_swap_uv=True)
         for rd in cl.objects:
-            if rd.osm_id == 98659369:
-                pass
-            rd.write_to(ac3d_obj, elev, cluster_elev, ac, offset=offset_local) # fixme: remove .ac, needed only for adding debug labels
+            rd.write_to(ac3d_obj, elev, cluster_elev, ac, offset=offset_local)  # FIXME: remove .ac, needed only for adding debug labels
 
         path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, cluster_elev, 0)
+        stg_paths.add(path_to_stg)
         ac.write(path_to_stg + file_name + '.ac')
         write_xml(path_to_stg, file_name, file_name)
-        tools.install_files(['roads.eff'], path_to_stg)
 
         for the_way in cl.objects:
             the_way.junction0.reset()
             the_way.junction1.reset()
-            
 
+    # copy roads.eff into scenery folders
+    for stg_path in stg_paths:
+        roads_eff_file_name = tools.get_osm2city_directory() + os.sep + 'roads.eff'
+        tools.install_files([roads_eff_file_name], stg_path)
 
     roads.debug_plot(show=True, plot_junctions=False, clusters=roads.clusters) #, label_nodes=self.nodes_dict.keys())#, label_nodes=[1132288594, 1132288612])
     

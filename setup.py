@@ -10,6 +10,8 @@ import os
 import os.path as osp
 import sys
 
+import tools
+
 
 def getFGHome():
     """Constructs the path to FGHome.
@@ -43,8 +45,7 @@ def get_elev_out_path(home_path):
 
 
 def _get_original_elev_nas_path():
-    my_file = osp.realpath(__file__)
-    my_dir = osp.split(my_file)[0]
+    my_dir = tools.get_osm2city_directory()
     return my_dir + os.sep + "elev.nas"
 
 
