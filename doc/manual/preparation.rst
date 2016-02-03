@@ -121,20 +121,22 @@ Create a ``params.ini`` file with your favorite text editor. In our example it w
 A few comments on the parameters:
 
 PREFIX
-    Needs to be the same as the specific folder ``fg_customscenery/projects/``. Do not use spaces in the name.
+    Needs to be the same as the specific folder below ``fg_customscenery/projects/``. Do not use spaces in the name.
 
 PATH_TO_SCENERY
     Full path to the scenery folder without trailing slash. This is where we will probe elevation and check for overlap with static objects. Most
     likely you'll want to use your TerraSync path here.
 
 PATH_TO_OUTPUT
-    The generated scenery (.stg, .ac, .xml) will be written to this path. If empty the correct location in PATH_TO_SCENERY is used. Note that if you use TerraSync for PATH_TO_SCENERY, you MUST choose a different path here. Otherwise, TerraSync will overwrite the generated scenery. Unless you know what you are doing, there is no reason not to specify a dedicated path here. While not absolutely needed it is good practice to name the output folder the same as ``PREFIX``.
+    The generated scenery (.stg, .ac, .xml) will be written to this path. If empty then the correct location in PATH_TO_SCENERY is used. Note that if you use TerraSync for PATH_TO_SCENERY, you MUST choose a different path here. Otherwise, TerraSync will overwrite the generated scenery. Unless you know what you are doing, there is no reason not to specify a dedicated path here. While not absolutely needed it is good practice to name the output folder the same as ``PREFIX``.
 OSM_FILE
     The file containing OpenStreetMap data. See previous chapter :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>`.
 BOUNDARY_*
     The longitude and latitude of the boundaries of the generated scenery. The boundaries should correspond to the boundaries in the ``OSM_FILE`` (open the \*.osm file in a text editor and check the data in ca. line 3). The boundaries can be different, but then you might either miss data (if the OSM boundaries are larger) or do more processing than necessary (if the OSM boundaries are more narrow).
 NO_ELEV
     Set this to ``False``. The only reason to set this to ``True`` would be for developers to check generated scenery objects a bit faster not caring about the vertical position in the scenery.
+ELEV_MODE
+    See chapter :ref:`Available Elevation Probing Mode<chapter-elev-modes-label>`.
 
 
 .. _chapter-generating-elevation-data-label:
@@ -158,6 +160,7 @@ Please be aware that the scenery data needed for your area might not have been d
 
 .. _TerraMaster: http://wiki.flightgear.org/TerraMaster
 
+.. _chapter-elev-modes-label:
 
 ---------------------------------
 Available Elevation Probing Modes
