@@ -4,5 +4,5 @@
 Scenery Generation
 ##################
 
-FIXME: hide objects folder for FGElevCaching?
+FIXME: 
 

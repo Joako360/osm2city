@@ -4,11 +4,25 @@
 Using Generated Scenery
 #######################
 
-FIXME: Add to path
+=========================
+Adding to FG_SCENERY Path
+=========================
 
-FIXME: consider sharing
+You need to add the directory containing the ``Objects`` folder (i.e. not the ``Objects`` folder itself) to the paths, where FlightGear searches for scenery. You can to this eithr through the command line option ``--fg-scenery`` or setting the FG_SCENERY environment variable. This is extensively described in the ``README.scenery`` and the ``getstart.pdf`` [#]_ documents found in $FG_ROOT/Docs as part of your FlightGear installation.
 
-FIXME: copy texture stuff
+If you followed the :ref:`directory structure <chapter-creating-directory-structure-label>` presented in chapter :ref:`Preparation <chapter-preparation-label>` and we take the example of ``LSZS`` then you would e.g. use the following command line option:
+
+::
+  --fg-scenery=/home/pingu/fg_customscenery/LSZS
+
+
+.. _chapter-copy-textures-label:
+
+=============
+Copy Textures
+=============
+
+FIXME
 
 
 .. _chapter-lod-label:
@@ -19,7 +33,7 @@ Adjusting Visibility of Scenery Objects
 
 The ``osm2city`` related programs and especially ``osm2city.py`` itself are using heuristics and parameters to determine at what level of detail (LOD) scenery objects should be visible. This is done by adding the objects to one of the three FlightGear LOD schemes: "bare", "rough" and "detailed".
 
-In ``osm2city.py`` you can influence into which of the three LOD ranges the objects are placed by using the following :ref:`Parameters <chapter-parameters-label>`:
+In ``osm2city.py`` you can influence into which of the three LOD ranges the objects are placed by using the following :ref:`Parameters <chapter-parameters-lod-label>`:
 
 * LOD_ALWAYS_DETAIL_BELOW_AREA
 * LOD_ALWAYS_ROUGH_ABOVE_AREA
@@ -69,7 +83,7 @@ In the same dialog press the ``Shader Options`` button and set the slider for ``
 Change Materials to Hide Urban Textures
 =======================================
 
-FlightGear allows to change the texture used for a given landclass. More information is available in ``$FG_ROOT/Docs/README.materials`` as well as in the FlightGear Forum thread regarding `New Regional Textures`_. There is not yet a good base texture replacing the urban textures. However many users find it more visually appealing to use a uniform texture like grass under the generated buildings etc. instead of urban textures.
+FlightGear allows to change the texture used for a given landclass. More information is available in ``$FG_ROOT/Docs/README.materials`` as well as in the FlightGear Forum thread regarding `New Regional Textures`_. There is not yet a good base texture replacing the urban textures. However many users find it more visually appealing to use a uniform texture like grass under the generated buildings etc. instead of urban textures (because urban textures interfere visually with ways, houses etc.). A drawback of using diferent textures is the absence of trees — owever in many regions of the world there are lot of trees / vegetation in urban areas.
 
 E.g. for the airport ``LSZS`` in Engadina in Switzerland you would have to go to ``$FG_ROOT/Materials/regions`` and edit file ``europe.xml`` in a text editor: add name-tags for e.g. ``BuiltUpCover``, ``Urban``, ``Town``, ``SubUrban`` to a material as shown below and comment out the existing name-tags using ``<!-- -->``. Basically all name-tags, which relate to a material using ``<effect>Effects/urban</effect>``. The outcome before and after edit (you need to restart FlightGear in between!) can be seen in the screenshots below (for illustration purposes the buildings and roads do not have textures).
 
@@ -110,3 +124,18 @@ Depending on your region and your shader settings you might want to search for e
 .. _`New Regional Textures`: http://forum.flightgear.org/viewtopic.php?f=5&t=26031
 
 .. _ALS: http://wiki.flightgear.org/Atmospheric_light_scattering
+
+
+===============================================
+Consider Sharing Your Generated Scenery Objects
+===============================================
+
+Although this guide hopefully helps, not eerybody might be able to generate scenery objects wih ``osm2city`` related programs. Therefore please consider sharing your generated scenery objects. You can do so by announcing it in the Sceneries_ part of the FlightGear Forums and linking from the bottom of the osm2city related Wiki_ article.
+
+.. _Sceneries: http://forum.flightgear.org/viewforum.php?f=5
+.. _Wiki: http://wiki.flightgear.org/Osm2city.py
+
+
+-----
+
+.. [#] As of beginning of 2016: chapters 3.1, 4.1, 4.5
