@@ -16,31 +16,35 @@ Created on Wed Mar 13 22:22:05 2013
 #                AND roof.shape = flat ')
 
 
-import numpy as np
-import random
-from pdb import pm
-import logging
-from PIL import Image
-import math
 import cPickle
-import string
-import os
-import sys
-import atlas
-from texture import Texture
-import catalog
-import tools
 import datetime
+import logging
+import math
+import os
+import random
+import re
+import string
+import sys
+
+import numpy as np
+from PIL import Image
+
+import atlas
+import catalog
 import img2np
 import parameters
-import re
+from texture import Texture
+import tools
 
 atlas_file_name = None
+
 
 def next_pow2(value):
     return 2**(int(math.log(value) / math.log(2)) + 1)
 
-def make_texture_atlas(texture_list, atlas_filename, ext, size_x = 256, pad_y = 0, lightmap=False, ambient_occlusion=False):
+
+def make_texture_atlas(texture_list, atlas_filename, ext, size_x = 256, pad_y = 0
+                       , lightmap=False, ambient_occlusion=False):
     """
     create texture atlas from all textures. Update all our item coordinates.
     """
@@ -51,9 +55,8 @@ def make_texture_atlas(texture_list, atlas_filename, ext, size_x = 256, pad_y = 
         sys.exit(-1)
 
     atlas_sx = size_x
-    keep_aspect = True # FIXME: False won't work -- im.thumbnail seems to keep aspect no matter what
+    keep_aspect = True  # FIXME: False won't work -- im.thumbnail seems to keep aspect no matter what
 
-#    atlas_sy = 0
     next_y = 0
 
     # -- load and rotate images, store image data in TextureManager object
@@ -90,7 +93,7 @@ def make_texture_atlas(texture_list, atlas_filename, ext, size_x = 256, pad_y = 
     # Sort textures by perimeter size in non-increasing order
     the_atlas = atlas.Atlas(0, 0, atlas_sx, 1e10, 'Facades')
     if 1:
-        non_repeat_list = sorted(non_repeat_list, key=lambda i:i.sy, reverse=True)
+        non_repeat_list = sorted(non_repeat_list, key=lambda i: i.sy, reverse=True)
         deb = 0
         for the_texture in non_repeat_list:
             the_texture.width_px, the_texture.height_px = the_texture.im.size
@@ -137,7 +140,6 @@ def make_texture_atlas(texture_list, atlas_filename, ext, size_x = 256, pad_y = 
     if ambient_occlusion:
         for l in texture_list:
             if l.cls == 'facade':
-                #print l.provides
                 R, G, B, A = img2np.img2RGBA(l.im)
                 height_px = R.shape[0]
                 # reversed height
@@ -145,7 +147,6 @@ def make_texture_atlas(texture_list, atlas_filename, ext, size_x = 256, pad_y = 
                 fac = 1. - parameters.BUILDING_FAKE_AMBIENT_OCCLUSION_VALUE * np.exp(-Z / parameters.BUILDING_FAKE_AMBIENT_OCCLUSION_HEIGHT)
                 l.im = img2np.RGBA2img(R * fac, G * fac, B * fac)
 
-    
     # -- paste, compute atlas coords
     #    lower left corner of texture is x0, y0
     for l in can_repeat_list:
@@ -198,6 +199,7 @@ def make_texture_atlas(texture_list, atlas_filename, ext, size_x = 256, pad_y = 
         if lightmap:
             del l.im_LM
 
+
 class TextureManager(object):
     def __init__(self,cls):
         self.__l = []
@@ -210,7 +212,7 @@ class TextureManager(object):
             return
 
         new_provides = []
-        logging.debug("Added %s "%t.filename)
+        logging.debug("Added %s " % t.filename)
         for item in t.provides:
             if item.split(':')[0] in ('age', 'region', 'compat'):
                 new_provides.append(item)
@@ -227,7 +229,7 @@ class TextureManager(object):
         """debug: loose all but this texture"""
         self.__l = [self.__l[i]]
 
-    def find_matching(self, requires = []):
+    def find_matching(self, requires=[]):
         candidates = self.find_candidates(requires)
         logging.verbose("looking for texture" + str(requires))  # @UndefinedVariable
         for c in candidates:
@@ -240,7 +242,7 @@ class TextureManager(object):
         tools.stats.count_texture(the_texture)        
         return the_texture 
 
-    def find_candidates(self, requires = [], excludes = []):
+    def find_candidates(self, requires=[], excludes=[]):
         #return [self.__l[0]]
         candidates = []
 #         requires = map_hex_colours(requires)
@@ -248,7 +250,7 @@ class TextureManager(object):
         requires = list(self.map_hex_colour(value) for value in requires)
         can_use = True
         for cand in self.__l:
-            for ex in excludes :
+            for ex in excludes:
                 #check if we maybe have a tag that doesn't match a requires
                 ex_material_key = 'XXX'
                 ex_colour_key = 'XXX'
@@ -261,20 +263,19 @@ class TextureManager(object):
                     ex_colour_key = re.match('(^.*:colour:)[^:]*', ex).group(1)
                     ex_colour = re.match('^.*:colour:([^:]*)', ex).group(1)
                 for req in cand.requires:
-                    if req.startswith( ex_colour_key ) and ex_colour is not re.match('^.*:colour:(.*)', req).group(1):
+                    if req.startswith(ex_colour_key) and ex_colour is not re.match('^.*:colour:(.*)', req).group(1):
                         can_use = False                        
-                    if req.startswith( ex_material_key ) and ex_material is not re.match('^.*:material:(.*)', req).group(1):
+                    if req.startswith(ex_material_key) and ex_material is not re.match('^.*:material:(.*)', req).group(1):
                         can_use = False                        
-                    
 
             if set(requires).issubset(cand.provides):
                 # Check for "specific" texture in order they do not pollute everything
-                if ( 'facade:specific' in cand.provides ) or  ( 'roof:specific' in cand.provides ) :
+                if ('facade:specific' in cand.provides) or ('roof:specific' in cand.provides):
                     can_use = False
                     req_material = None
-                    req_colour   = None
-                    for req in requires :
-                        if re.match('^.*material:.*', req) :
+                    req_colour = None
+                    for req in requires:
+                        if re.match('^.*material:.*', req):
                             req_material = re.match('^.*material:(.*)', req).group(0)
                         elif re.match('^.*:colour:.*', req) :
                             req_colour = re.match('^.*:colour:(.*)', req).group(0)
@@ -284,10 +285,10 @@ class TextureManager(object):
                     prov_material = None
                     prov_colour   = None
                     for prov in cand.provides :
-                        if re.match('^.*:material:.*', prov) :
+                        if re.match('^.*:material:.*', prov):
                             prov_material = re.match('^.*:material:(.*)', prov).group(0)
                             prov_materials.append(prov_material)
-                        elif re.match('^.*:colour:.*', prov) :
+                        elif re.match('^.*:colour:.*', prov):
                             prov_colour = re.match('^.*:colour:(.*)', prov).group(0)                    
                             prov_colours.append(prov_colour)
                     # one of the provided materials is required
@@ -299,32 +300,32 @@ class TextureManager(object):
                     
                     # req_material and colour
                     can_material = False
-                    if req_material != None :
+                    if req_material is not None:
                         for prov_material in prov_materials :
-                            logging.verbose( "Provides ", prov_material, " Requires ", requires )# @UndefinedVariable
-                            if prov_material in requires :
+                            logging.verbose("Provides ", prov_material, " Requires ", requires)  # @UndefinedVariable
+                            if prov_material in requires:
                                 can_material = True
                                 break
-                    else :
+                    else:
                         can_material = True
-                     
-                    
+
                     can_colour = False
-                    if req_colour != None : #and can_use:
-                        for prov_colour in prov_colours :
-                            if prov_colour in requires :
+                    if req_colour is not None:  #and can_use:
+                        for prov_colour in prov_colours:
+                            if prov_colour in requires:
                                 can_colour = True
                                 break
-                    else :
+                    else:
                         can_colour = True
                                 
-                    if can_material and can_colour  :
+                    if can_material and can_colour:
                         can_use = True
 
-                if can_use :
+                if can_use:
                     candidates.append(cand)
             else:
-                logging.verbose("  unmet requires %s req %s prov %s" % (str(cand.filename), str(requires), str(cand.provides)))  # @UndefinedVariable
+                logging.verbose("  unmet requires %s req %s prov %s"
+                                , str(cand.filename), str(requires), str(cand.provides))  # @UndefinedVariable
         return candidates
     
     def map_hex_colour(self, value):
@@ -337,26 +338,26 @@ class TextureManager(object):
     #000080    navy         #0000FF (or #00F)    blue
     #800080    purple         #FF00FF (or #F0F)    fuchsia
         colour_map = {
-                      "#000000":"black",
-                      "#FFFFFF":"white",
-                      "#fff":"white",
-                      "#808080":"grey",
-                      "#C0C0C0":"silver",
-                      "#800000":"maroon",         
-                      "#FF0000":"red",
-                      "# 808000":"olive",         
-                      "#FFFF00":"yellow",
-                      "#008000":"green" ,        
-                      "#00FF00":"lime",
-                      "#008080":"teal" ,        
-                      "#00FFFF":"aqua",
-                      "#000080":"navy" ,        
-                      "#0000FF":"blue",
-                      "#800080":"purple" ,        
-                      "#FF00FF":"fuchsia"
+                      "#000000": "black",
+                      "#FFFFFF": "white",
+                      "#fff": "white",
+                      "#808080": "grey",
+                      "#C0C0C0": "silver",
+                      "#800000": "maroon",
+                      "#FF0000": "red",
+                      "# 808000": "olive",
+                      "#FFFF00": "yellow",
+                      "#008000": "green",
+                      "#00FF00": "lime",
+                      "#008080": "teal",
+                      "#00FFFF": "aqua",
+                      "#000080": "navy",
+                      "#0000FF": "blue",
+                      "#800080": "purple",
+                      "#FF00FF": "fuchsia"
         }
         hash_pos = value.find("#")
-        if (value.startswith( "roof:colour" ) or value.startswith( "facade:building:colour" )) and  hash_pos > 0 :
+        if (value.startswith("roof:colour") or value.startswith("facade:building:colour")) and hash_pos > 0:
             try:
                 tag_string = value[:hash_pos]
                 colour_hex_string = value[hash_pos:].upper()
@@ -365,7 +366,6 @@ class TextureManager(object):
             except KeyError:
                 return value
         return value
-        
 
     def __str__(self):
         return string.join([str(t) + '\n' for t in self.__l])
@@ -381,16 +381,15 @@ class FacadeManager(TextureManager):
     def find_matching(self, requires, tags, height, width):
         exclusions = []
         if 'roof:colour' in tags:
-            exclusions.append( "%s:%s"%('roof:colour', tags['roof:colour']))
+            exclusions.append("%s:%s" % ('roof:colour', tags['roof:colour']))
         candidates = self.find_candidates(requires, exclusions, height, width)
         if len(candidates) == 0:
-            logging.warn("no matching facade texture for %1.f m x %1.1f m <%s>" % (height, width, str(requires)))
+            logging.warn("no matching facade texture for %1.f m x %1.1f m <%s>", height, width, str(requires))
             return None
         ranked_list = self.rank_candidates(candidates, tags)
         the_texture = ranked_list[random.randint(0, len(ranked_list) - 1)]
         tools.stats.count_texture(the_texture)        
         return the_texture 
-
 
     def rank_candidates(self, candidates, tags):
         ranked_list = []
@@ -405,7 +404,7 @@ class FacadeManager(TextureManager):
 #         b = ranked_list[:,0]
         ranked_list.sort(key=lambda tup: tup[0], reverse=True)
         max_val = ranked_list[0][0]
-        if(max_val > 0):
+        if max_val > 0:
             logging.info("Max Rank %d" % max_val)
         return [t[1] for t in ranked_list if t[0] >= max_val]
 
@@ -421,10 +420,12 @@ class FacadeManager(TextureManager):
 #            print "     building_height", building_height
 #            print "     min/max", t.height_min, t.height_max
             if height < t.height_min or height > t.height_max:
-                logging.verbose("height %.2f (%.2f-%.2f) outside bounds : %s" %(height, t.height_min, t.height_max, str(t.filename)))  # @UndefinedVariable
+                logging.verbose("height %.2f (%.2f-%.2f) outside bounds : %s"
+                                , height, t.height_min, t.height_max, str(t.filename))  # @UndefinedVariable
                 continue
             if width < t.width_min or width > t.width_max:
-                logging.verbose("width %.2f (%.2f-%.2f) outside bounds : %s"%(width, t.width_min, t.width_max,str(t.filename)))  # @UndefinedVariable
+                logging.verbose("width %.2f (%.2f-%.2f) outside bounds : %s"
+                                , width, t.width_min, t.width_max,str(t.filename))  # @UndefinedVariable
                 continue
 
             new_candidates.append(t)
@@ -434,22 +435,35 @@ class FacadeManager(TextureManager):
         #logging.info("After width/height test %i remaining" % len(new_candidates))
         return new_candidates
 
+
 def find_matching_texture(cls, textures):
     candidates = []
     for t in textures:
-        if t.cls == cls: candidates.append(t)
-    if len(candidates) == 0: return None
+        if t.cls == cls:
+            candidates.append(t)
+    if len(candidates) == 0:
+        return None
     return candidates[random.randint(0, len(candidates)-1)]
 
 
+def _get_os_tex_prefix(path):
+    """Takes a path and makes sure it has an os_specific trailing slash unless the path is empty."""
+    my_path = path
+    if len(my_path) > 0:
+        if not my_path.endswith(os.sep):
+            my_path += os.sep
+    return my_path
+
+
 # pitched roof: requires = facade:age:old
-def init(tex_prefix='', create_atlas=False):
+def init(tex_prefix='', create_atlas=False):  # in most situations tex_prefix should be osm2city root directory
     logging.debug("textures: init")
     global facades
     global roofs
     global atlas_file_name
-    
-    atlas_file_name = tex_prefix + 'tex/atlas_facades'
+
+    my_tex_prefix = _get_os_tex_prefix(tex_prefix)
+    atlas_file_name = my_tex_prefix + "tex" + os.sep + "atlas_facades"
 
     pkl_fname = atlas_file_name + '.pkl'
     
@@ -457,11 +471,11 @@ def init(tex_prefix='', create_atlas=False):
         facades = FacadeManager('facade')
         roofs = TextureManager('roof')
     
-        catalog.append_dynamic(tex_prefix, facades)
-        catalog.append_facades_de(tex_prefix, facades)
+        catalog.append_dynamic(my_tex_prefix, facades)
+        catalog.append_facades_de(my_tex_prefix, facades)
         #append_facades_test()
-        catalog.append_roofs(tex_prefix, roofs)
-        catalog.append_facades_us(tex_prefix, facades)
+        catalog.append_roofs(my_tex_prefix, roofs)
+        catalog.append_facades_us(my_tex_prefix, facades)
         #facades.keep_only(1)
     
         if False:
@@ -469,18 +483,19 @@ def init(tex_prefix='', create_atlas=False):
             print "black roofs: ", [str(i) for i in roofs.find_candidates(['roof:colour:black'])]
             print "red   roofs: ", [str(i) for i in roofs.find_candidates(['roof:colour:red'])]
             print "old facades: "
-            for i in facades.find_candidates(['facade:shape:residential','age:old'], 10):
+            for i in facades.find_candidates(['facade:shape:residential', 'age:old'], 10):
                 print i, i.v_cuts * i.v_size_meters
         #print facades[0].provides
     
         if False:
             facades = FacadeManager('facade')
             roofs = TextureManager('roof')
-            facades.append(Texture(tex_prefix + 'test.png',
-                                   10, [142,278,437,590,756,890,1024], True,
-                                   10, [130,216,297,387,512], True, True,
-                                   provides=['shape:urban','shape:residential','age:modern','age:old','compat:roof-flat','compat:roof-pitched']))
-            roofs.append(Texture(tex_prefix + 'test.png',
+            facades.append(Texture(my_tex_prefix + 'test.png',
+                                   10, [142, 278, 437, 590, 756, 890, 1024], True,
+                                   10, [130, 216, 297, 387, 512], True, True,
+                                   provides=['shape:urban', 'shape:residential', 'age:modern', 'age:old'
+                                             , 'compat:roof-flat', 'compat:roof-pitched']))
+            roofs.append(Texture(my_tex_prefix + 'test.png',
                                  10., [], True, 10., [], True, provides=['colour:black', 'colour:red']))
     
         # -- make texture atlas
@@ -491,8 +506,8 @@ def init(tex_prefix='', create_atlas=False):
 
         make_texture_atlas(texture_list, atlas_file_name, '.png', lightmap=True, ambient_occlusion=parameters.BUILDING_FAKE_AMBIENT_OCCLUSION)
         
-        params = {}
-        params['atlas_file_name'] =  atlas_file_name
+        params = dict()
+        params['atlas_file_name'] = atlas_file_name
 
         logging.info("Saving %s", pkl_fname)
         fpickle = open(pkl_fname, 'wb')
@@ -510,13 +525,13 @@ def init(tex_prefix='', create_atlas=False):
         fpickle.close()
 
     logging.debug(facades)
-    tools.stats.textures_total = dict((filename,0) for filename in map((lambda x: x.filename),facades.get_list()))
-    tools.stats.textures_total.update(dict((filename,0) for filename in map((lambda x: x.filename),roofs.get_list())))
+    tools.stats.textures_total = dict((filename, 0) for filename in map((lambda x: x.filename), facades.get_list()))
+    tools.stats.textures_total.update(dict((filename, 0) for filename in map((lambda x: x.filename), roofs.get_list())))
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
-    init(tex_prefix = "../")
+    init(tex_prefix="../")
 
     if 0:
         cands = facades.find_candidates([], 14)
@@ -524,4 +539,3 @@ if __name__ == "__main__":
         for t in cands:
             #print "%5.2g  %s" % (t.height_min, t.filename)
             logging.debug('%s (%4.2f, %4.2f) (%4.2f, %4.2f)' % (t.filename, t.x0, t.y0, t.x1, t.y1))
-

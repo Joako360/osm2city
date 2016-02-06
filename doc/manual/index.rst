@@ -33,7 +33,6 @@ Before you generate your own sceneries, you might want to get familiar with the 
    generation
    using
    parameters
-   deploy
 
 
 **Indices and tables:**

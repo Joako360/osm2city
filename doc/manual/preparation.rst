@@ -69,6 +69,8 @@ In the example directory structure above the directory ``fg_customscenery`` host
 
 The directory structure in the output folders (e.g. `fg_customscenery/LSZS``) is created by ``osm2city`` related programs, i.e. you do not need to create it manually.
 
+The directory ``.../fg_customscenery/projects`` will be called ``WORKING_DIRECTORY`` in the following. This is important because ``osm2city`` related programs will have assumptions about this.
+
 
 .. _chapter-getting-data-label:
 

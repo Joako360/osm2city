@@ -529,6 +529,8 @@ class Buildings(object):
 
 # -----------------------------------------------------------------------------
 # -- write xml
+
+
 def write_xml(path, fname, buildings):
     #  -- LOD animation
     xml = open(path + fname + ".xml", "w")
@@ -668,7 +670,7 @@ if __name__ == "__main__":
 
     tools.init(coordinates.Transformation(center, hdg=0))
 
-    tex.manager.init(create_atlas=parameters.CREATE_ATLAS)
+    tex.manager.init(tools.get_osm2city_directory(), create_atlas=parameters.CREATE_ATLAS)
     
     if args.create_atlas_only:
         sys.exit(0)
