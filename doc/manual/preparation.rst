@@ -20,7 +20,7 @@ It is recommended to start with generating scenery objects for a small area arou
 Creating a Directory Structure
 ==============================
 
-The following shows a directory structure, which one of the deverlopers is using — feel free to use any other structure.
+The following shows a directory structure, which one of the developers is using — feel free to use any other structure.
 
 ::
 
@@ -177,9 +177,9 @@ There are a few different possibilities to generate elevation data, each of whic
 
 The two methods using ``Fgelev`` require a bit less manual setup and intervention, however you need to be able to compile a C++ class with dependencies. ``FgelevCaching`` might give the best accuracy, be fastest and most automated. However memory requirements, speed etc. might vary depending on your parameter settings (e.g. ``ELEV_RASTER_*``) and the ratio between scenery area and the number of OSM objects.
 
-All methods apart from ``FgelevCaching`` will generate a file ``elev.out`` to be put into your input folder. ``FgelevCaching`` can also keep data cached (in a file called ``elev.pkl`` in the input directory) — so from a chaching perspective there is not much of a difference [#]_.
+All methods apart from ``FgelevCaching`` will generate a file ``elev.out`` to be put into your input folder. ``FgelevCaching`` can also keep data cached (in a file called ``elev.pkl`` in the input directory) — so from a caching perspective there is not much of a difference [#]_.
 
-The next chapters describe each elevation probing meode and link to a :ref:`detailed description of subtasks <chapter-subtasks-label>`.
+The next chapters describe each elevation probing mode and link to a :ref:`detailed description of sub-tasks <chapter-subtasks-label>`.
 
 .. FIXME: provide runtime data for each mode for comparison
 
@@ -248,7 +248,7 @@ This mode can be used with older FlightGear versions and is save, but also needs
 #. :ref:`Copy file elev.out <chapter-elev.out-copy-label>`
 #. :ref:`Unhide scenery objects <chapter-unhide-label>`
 
-While FlightGear is running, open menu ``Debug/Nasal Console`` in the FlighGear user interface. Write ``elev.get_elevation()`` and hit the "Execute" button. Be patient as it might seem as nothing is happening for many minutes. At the end you might get output like the following in the ``Nasal Console``:
+While FlightGear is running, open menu ``Debug/Nasal Console`` in the FlightGear user interface. Write ``elev.get_elevation()`` and hit the "Execute" button. Be patient as it might seem as nothing is happening for many minutes. At the end you might get output like the following in the ``Nasal Console``:
 
 ::
 
@@ -280,7 +280,7 @@ Compile Patched fgelev
 ``osm2city`` comes with a patched version of ``fgelev``, which by means of a parameter ``expire`` drastically can improve the speed and avoid hanging. The patched version can be found in 
 ``osm2city`` subdirectory ``fgelev`` as source file ``fgelev.cxx``. Before using it, you need to compile it and then replace the version, which comes with your FlightGear installation in the same directory as ``fgfs``/``fgfs.exe``. In Windows it might be in "D:/Program Files/FlightGear/bin/Win64/fgelev.exe".
 
-Compilation depends on your operating system and hardware. On a Linux Debian derivate you might use the following:
+Compilation depends on your operating system and hardware. On a Linux Debian derivative you might use the following:
 
 #. Download and compile according to `Scripted Compilation on Linux Debian/Ubuntu`_
 
@@ -495,7 +495,7 @@ Copy File elev.out
 
 Finally copy file ``elev.out`` from the path specified in the edited ``elev.nas`` file (see :ref:`Adapt File elev.nas <chapter-elev.nas-label>`) to the input directory (e.g. ``fg_customscenery/projects/LSZS``).
 
------
+
 
 .. [#] Failing to do so might result in an exception, where the stack trace might contain something like ``KeyError: 1227981870``.
 

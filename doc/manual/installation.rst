@@ -50,7 +50,7 @@ Do the following:
 
 #. Download the packages either using Git_ or as a zip-package.
 #. Add the ``osm2city`` directory to your ``PYTHONPATH``. You can read more about this at https://docs.python.org/2/using/cmdline.html#envvar-PYTHONPATH.
-#. Create soft links between as described in the following subchapter.
+#. Create soft links between as described in the following sub-chapter.
 
 .. _Git: http://www.git-scm.com/
 

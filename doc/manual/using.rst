@@ -8,7 +8,7 @@ Using Generated Scenery
 Adding to FG_SCENERY Path
 =========================
 
-You need to add the directory containing the ``Objects`` folder (i.e. not the ``Objects`` folder itself) to the paths, where FlightGear searches for scenery. You can to this eithr through the command line option ``--fg-scenery`` or setting the FG_SCENERY environment variable. This is extensively described in the ``README.scenery`` and the ``getstart.pdf`` [#]_ documents found in $FG_ROOT/Docs as part of your FlightGear installation.
+You need to add the directory containing the ``Objects`` folder (i.e. not the ``Objects`` folder itself) to the paths, where FlightGear searches for scenery. You can to this either through the command line option ``--fg-scenery`` or setting the FG_SCENERY environment variable. This is extensively described in the ``README.scenery`` and the ``getstart.pdf`` [#]_ documents found in $FG_ROOT/Docs as part of your FlightGear installation.
 
 If you followed the :ref:`directory structure <chapter-creating-directory-structure-label>` presented in chapter :ref:`Preparation <chapter-preparation-label>` and we take the example of ``LSZS`` then you would e.g. use the following command line option:
 
@@ -22,7 +22,13 @@ If you followed the :ref:`directory structure <chapter-creating-directory-struct
 Copy Textures
 =============
 
-FIXME
+If you are using ``osm2city.py`` to generate buildings or ``roads.py`` to generate roads, then you need to have the content of the ``tex`` linked from ``osm2city-data`` copied or linked into all scenery sub-folders, where there are ``*.stg`` files. There are two possibilities:
+
+#. Do it manually. In this case you can choose whether to create links or hard copies. If you want to distribute the generated scenery objects, then you must copy the whole directory. E.g. ``/home/pingu/fg_customscenery/LSZS/Objects/e000n40/e009n46/tex`` in the example used previously.
+#. Use ``copy_texture_stuff.py`` to do it automatically. E.g.
+
+::
+  /usr/bin/python2.7 /home/pingu/development/osm2city/copy_texture_stuff.py -f LSZS/params.ini
 
 
 .. _chapter-lod-label:
@@ -63,7 +69,7 @@ In FlightGear you can influence the actual distance (in meters) for the respecti
 Disable Urban Shader and Random Buildings
 =========================================
 
-There is no point in having both OSM building scenery objects and dynamically generated buildings in FlightGear. Therefore it is recommended to turn off the ranom building and urban shader features in FlightGear. Please be aware that this will also affect those areas in FlightGear, where there are no generated scenery objects from OSM.
+There is no point in having both OSM building scenery objects and dynamically generated buildings in FlightGear. Therefore it is recommended to turn off the random building and urban shader features in FlightGear. Please be aware that this will also affect those areas in FlightGear, where there are no generated scenery objects from OSM.
 
 There are two possibilities to disable random buildings:
 
@@ -83,9 +89,9 @@ In the same dialog press the ``Shader Options`` button and set the slider for ``
 Change Materials to Hide Urban Textures
 =======================================
 
-FlightGear allows to change the texture used for a given landclass. More information is available in ``$FG_ROOT/Docs/README.materials`` as well as in the FlightGear Forum thread regarding `New Regional Textures`_. There is not yet a good base texture replacing the urban textures. However many users find it more visually appealing to use a uniform texture like grass under the generated buildings etc. instead of urban textures (because urban textures interfere visually with ways, houses etc.). A drawback of using diferent textures is the absence of trees — owever in many regions of the world there are lot of trees / vegetation in urban areas.
+FlightGear allows to change the texture used for a given land-class. More information is available in ``$FG_ROOT/Docs/README.materials`` as well as in the FlightGear Forum thread regarding `New Regional Textures`_. There is not yet a good base texture replacing the urban textures. However many users find it more visually appealing to use a uniform texture like grass under the generated buildings etc. instead of urban textures (because urban textures interfere visually with ways, houses etc.). A drawback of using different textures is the absence of trees — however in many regions of the world there are lot of trees / vegetation in urban areas.
 
-E.g. for the airport ``LSZS`` in Engadina in Switzerland you would have to go to ``$FG_ROOT/Materials/regions`` and edit file ``europe.xml`` in a text editor: add name-tags for e.g. ``BuiltUpCover``, ``Urban``, ``Town``, ``SubUrban`` to a material as shown below and comment out the existing name-tags using ``<!-- -->``. Basically all name-tags, which relate to a material using ``<effect>Effects/urban</effect>``. The outcome before and after edit (you need to restart FlightGear in between!) can be seen in the screenshots below (for illustration purposes the buildings and roads do not have textures).
+E.g. for the airport ``LSZS`` in Engadin in Switzerland you would have to go to ``$FG_ROOT/Materials/regions`` and edit file ``europe.xml`` in a text editor: add name-tags for e.g. ``BuiltUpCover``, ``Urban``, ``Town``, ``SubUrban`` to a material as shown below and comment out the existing name-tags using ``<!-- -->``. Basically all name-tags, which relate to a material using ``<effect>Effects/urban</effect>``. The outcome before and after edit (you need to restart FlightGear in between!) can be seen in the screenshots below (for illustration purposes the buildings and roads do not have textures).
 
 ::
 
@@ -116,7 +122,7 @@ E.g. for the airport ``LSZS`` in Engadina in Switzerland you would have to go to
 
 .. image:: fgfs_materials_cropgrass.png
 
-Depending on your region and your shader settings you might want to search for e.g. ``GrassCover`` in file ``global-summer.xml`` instead (shown in screenshot below with ALS_ and more random vegetation). However be aware that you still need to outcomment in e.g. ``europe.xml`` and within ``global-summer.xml``.
+Depending on your region and your shader settings you might want to search for e.g. ``GrassCover`` in file ``global-summer.xml`` instead (shown in screenshot below with ALS_ and more random vegetation). However be aware that you still need to comment out in e.g. ``europe.xml`` and within ``global-summer.xml``.
 
 .. image:: fgfs_materials_grass.png
 
@@ -130,12 +136,10 @@ Depending on your region and your shader settings you might want to search for e
 Consider Sharing Your Generated Scenery Objects
 ===============================================
 
-Although this guide hopefully helps, not eerybody might be able to generate scenery objects wih ``osm2city`` related programs. Therefore please consider sharing your generated scenery objects. You can do so by announcing it in the Sceneries_ part of the FlightGear Forums and linking from the bottom of the osm2city related Wiki_ article.
+Although this guide hopefully helps, not everybody might be able to generate scenery objects wih ``osm2city`` related programs. Therefore please consider sharing your generated scenery objects. You can do so by announcing it in the Sceneries_ part of the FlightGear Forums and linking from the bottom of the osm2city related Wiki_ article.
 
 .. _Sceneries: http://forum.flightgear.org/viewforum.php?f=5
 .. _Wiki: http://wiki.flightgear.org/Osm2city.py
 
-
------
 
 .. [#] As of beginning of 2016: chapters 3.1, 4.1, 4.5

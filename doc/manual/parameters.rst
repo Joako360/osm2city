@@ -18,7 +18,7 @@ View a List of Parameters
 
 The final truth about parameters is stored in ``parameters.py`` — unfortunately the content in this chapter might be out of date (including default values).
 
-It might be easiest to read ``parameters.py`` directly. Phython code is easy to read also for non-programmers. Otherwise you can run the following to see a listing:
+It might be easiest to read ``parameters.py`` directly. Python code is easy to read also for non-programmers. Otherwise you can run the following to see a listing:
 
 ::
 
@@ -77,7 +77,7 @@ NO_ELEV                                         Boolean    False     Set this to
                                                                      developers to check generated scenery objects a bit faster not caring about 
                                                                      the vertical position in the scenery.
 
-ELEV_MODE                                       String     n/a       Choose one of "FgelevCaching", 2Fgelev", "Telnet", "Manual". See chapter
+ELEV_MODE                                       String     n/a       Choose one of "FgelevCaching", "Fgelev", "Telnet", "Manual". See chapter
                                                                      :ref:`Available Elevation Probing Mode<chapter-elev-modes-label>` for more 
                                                                      details.
 
