@@ -1310,7 +1310,7 @@ if __name__ == "__main__":
             # -- write .ac and .xml
             building_lib.write(path_to_stg + file_name + ".ac", cl.objects, elev, tile_elev, tools.transform, offset)
             write_xml(path_to_stg, file_name, cl.objects)
-            tools.install_files(['cityLM.eff', 'lightmap-switch.xml'], path_to_stg)
+            tools.install_files(['cityLM.eff', 'lightmap-switch.xml'], path_to_stg, True)
 
     if args.uninstall:
         for f in files_to_remove:
