@@ -31,7 +31,7 @@ def main():
                         level_two_dirs.append(sub_dir_path + os.sep + level_two_dir)
 
         if len(level_two_dirs) == 0:
-            logging("The scenery path does not seem to have necessary sub-directories in %s", scenery_path)
+            logging.error("The scenery path does not seem to have necessary sub-directories in %s", scenery_path)
             sys.exit(1)
         else:
             orig_tex_dir = tools.get_osm2city_directory() + os.sep + "tex"
