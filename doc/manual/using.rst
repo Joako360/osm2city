@@ -13,7 +13,8 @@ You need to add the directory containing the ``Objects`` folder (i.e. not the ``
 If you followed the :ref:`directory structure <chapter-creating-directory-structure-label>` presented in chapter :ref:`Preparation <chapter-preparation-label>` and we take the example of ``LSZS`` then you would e.g. use the following command line option:
 
 ::
-  --fg-scenery=/home/pingu/fg_customscenery/LSZS
+
+    --fg-scenery=/home/pingu/fg_customscenery/LSZS
 
 
 .. _chapter-copy-textures-label:
@@ -28,7 +29,10 @@ If you are using ``osm2city.py`` to generate buildings or ``roads.py`` to genera
 #. Use ``copy_texture_stuff.py`` to do it automatically. E.g.
 
 ::
-  /usr/bin/python2.7 /home/pingu/development/osm2city/copy_texture_stuff.py -f LSZS/params.ini
+
+    /usr/bin/python2.7 /home/pingu/development/osm2city/copy_texture_stuff.py -f LSZS/params.ini
+
+There is also a third possibility of copying the ``tex`` directory into ``$FG_ROOT``. However you would not be able to distribute thegenerated scenery objects and it might interfer with other scenery objects using a potentially different texture map.
 
 
 .. _chapter-lod-label:
