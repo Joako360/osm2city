@@ -5,7 +5,7 @@
 graph support stuff
 """
 import networkx as nx
-from pdb import pm
+
 
 def for_edges_in_bfs_call(func, args, G, node0_set, visited_set):
     """Start at nodes in node0_set. Breadth-first search, excluding nodes 
@@ -36,6 +36,7 @@ class Stub(object):
         self.is_first = is_first
         self.joint_nodes = joint_nodes
 
+
 class Junction(object):
     """store attached ways, joint_node indices
        current usage of attached_ways_dict:
@@ -54,7 +55,7 @@ class Junction(object):
     def __init__(self, way, is_first, joint_nodes=[]):
         self._attached_ways = [way]
         self._is_first = [is_first]
-        self.joint_nodes = joint_nodes # list of tuples -- unused?
+        self.joint_nodes = joint_nodes  # list of tuples -- unused?
         self.reset()
         
     def reset(self):
@@ -71,18 +72,18 @@ class Junction(object):
     
     def _use_left_node(self, way, is_left):
         i = self._attached_ways.index(way)
-        assert(i==0 or i==1)
+        assert(i == 0 or i == 1)
         return (i + self._is_first[i] + is_left) % 2 == 0
     
     def get_other_node(self, way, is_left, cluster_ref):
         if self._cluster_ref != cluster_ref:
             raise KeyError
         if self._use_left_node(way, is_left):
-            if self._left_node == None:
+            if self._left_node is None:
                 raise KeyError
             return self._left_node
         else:
-            if self._right_node == None:
+            if self._right_node is None:
                 raise KeyError
             return self._right_node
 
@@ -98,9 +99,9 @@ class Junction(object):
                 raise ValueError("other node already set")
             self._right_node = node
 
+
 class Graph(nx.Graph):
     """Inherit from nx.Graph, make accessing graph node attribute (Junction) easier"""
-    #def __init__(self, graph):
     def junction(self, the_ref):
         """return object attached to node"""
         return self.node[the_ref]['obj']
@@ -137,7 +138,7 @@ class Graph(nx.Graph):
 
 if __name__ == "__main__":
     import osm
-    G=Graph()
+    G = Graph()
     
     junction1 = 'j1'
     junction2 = 'j2'
@@ -148,7 +149,7 @@ if __name__ == "__main__":
     #G.add_node(3, "hj")
     G.add_edge(osm.Way(1, [], [1, 2]))
     G.add_edge(osm.Way(2, [], [4, 3]))
-    bla
+
     print "aa", G.node["a"]['obj']
     print "cur"
     print G["a"]
@@ -158,4 +159,3 @@ if __name__ == "__main__":
     for the_node in G.nodes(data=True):
         print the_node[0], " --",
         print the_node[1]['obj']
-        

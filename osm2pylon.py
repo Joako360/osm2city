@@ -30,6 +30,7 @@ import xml.sax
 import coordinates
 import osmparser
 import parameters
+import roads
 import stg_io2
 import tools
 import vec2d
@@ -1282,36 +1283,14 @@ class LinearOSMFeature(object):
 
 
 class Highway(LinearOSMFeature):
-    TYPE_MOTORWAY = 11
-    TYPE_TRUNK = 12
-    TYPE_PRIMARY = 13
-    TYPE_SECONDARY = 14
-    TYPE_TERTIARY = 15
-    TYPE_UNCLASSIFIED = 16
-    TYPE_ROAD = 17
-    TYPE_RESIDENTIAL = 18
-    TYPE_LIVING_STREET = 19
-    TYPE_SERVICE = 20
-    TYPE_PEDESTRIAN = 21
-    TYPE_SLOW = 30  # cycle ways, tracks, footpaths etc
 
     def __init__(self, osm_id):
         super(Highway, self).__init__(osm_id)
         self.is_roundabout = False
 
-    def get_width(self):  # FIXME: replace with parameters and a bit of logic including number of lanes
-        if self.type_ in [Highway.TYPE_SERVICE, Highway.TYPE_RESIDENTIAL, Highway.TYPE_LIVING_STREET
-                          , Highway.TYPE_PEDESTRIAN]:
-            my_width = 5.0
-        elif self.type_ in [Highway.TYPE_ROAD, Highway.TYPE_UNCLASSIFIED, Highway.TYPE_TERTIARY]:
-            my_width = 6.0
-        elif self.type_ in [Highway.TYPE_SECONDARY, Highway.TYPE_PRIMARY, Highway.TYPE_TRUNK]:
-            my_width = 7.0
-        elif self.type_ is Highway.TYPE_MOTORWAY:
-            my_width = 14.0
-        else:  # TYPE_SLOW
-            my_width = 3.0
-        return my_width
+    def get_width(self):
+        highway_attributes = roads.get_highway_attributes(self.type_)
+        return highway_attributes[2]
 
 
 def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
@@ -1325,31 +1304,8 @@ def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
             value = way.tags[key]
             if "highway" == key:
                 valid_highway = True
-                if value in ["motorway", "motorway_link"]:
-                    my_highway.type_ = Highway.TYPE_MOTORWAY
-                elif value in ["trunk", "trunk_link"]:
-                    my_highway.type_ = Highway.TYPE_TRUNK
-                elif value in ["primary", "primary_link"]:
-                    my_highway.type_ = Highway.TYPE_PRIMARY
-                elif value in ["secondary", "secondary_link"]:
-                    my_highway.type_ = Highway.TYPE_SECONDARY
-                elif value in ["tertiary", "tertiary_link"]:
-                    my_highway.type_ = Highway.TYPE_TERTIARY
-                elif value == "unclassified":
-                    my_highway.type_ = Highway.TYPE_UNCLASSIFIED
-                elif value == "road":
-                    my_highway.type_ = Highway.TYPE_ROAD
-                elif value == "residential":
-                    my_highway.type_ = Highway.TYPE_RESIDENTIAL
-                elif value == "living_street":
-                    my_highway.type_ = Highway.TYPE_LIVING_STREET
-                elif value == "service":
-                    my_highway.type_ = Highway.TYPE_SERVICE
-                elif value == "pedestrian":
-                    my_highway.type_ = Highway.TYPE_PEDESTRIAN
-                elif value in ["tack", "footway", "cycleway", "bridleway", "steps", "path"]:
-                    my_highway.type_ = Highway.TYPE_SLOW
-                else:
+                my_highway.type_ = roads.highway_type_from_osm_tags(key, value)
+                if None is my_highway.type_:
                     valid_highway = False
             elif ("tunnel" == key) and ("yes" == value):
                 is_challenged = True

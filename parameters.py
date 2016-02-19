@@ -73,6 +73,8 @@ ELEV_RASTER_Y = 10
 
 TELNET_PORT = 5501  # The port FlightGear listens to. Needed for ELEV_MODE = "Telnet"
 
+quiet = False
+
 #=============================================================================
 # PARAMETERS RELATED TO BUILDINGS IN osm2city
 #=============================================================================
@@ -241,7 +243,9 @@ CREATE_BRIDGES_ONLY = 0         # create only bridges and embankments
 BRIDGE_LAYER_HEIGHT = 4.         # bridge height per layer
 BRIDGE_BODY_HEIGHT = 0.9         # height of bridge body
 EMBANKMENT_TEXTURE = textures.road.EMBANKMENT_1  # Texture for the embankment
-quiet = False
+MIN_ABOVE_GROUND_LEVEL = 0.01    # how much a highway / railway is at least hovering above ground
+HIGHWAY_TYPE_MIN = 4  # The lower the number, the more ways are added. See roads.HighwayType
+POINTS_ON_LINE_DISTANCE_MAX = 1000  # the maximum distance between two points on a line. If longer, then new points are added
 
 # default_args_end # DO NOT MODIFY THIS LINE
 

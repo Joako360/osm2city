@@ -111,6 +111,60 @@ LOD_PERCENTAGE_DETAIL                           Decimal    0.5       Of the rema
 =============================================   ========   =======   ==============================================================================
 
 
+.. _chapter-parameters-roads:
+
+--------------
+Linear Objects
+--------------
+
+Parameters for roads, railways and related bridges. One of the challenges to show specific textures based on OSM data is to fit the texture such that it drapes ok on top of the scenery. Therefore several parameters relate to enabling proper draping.
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+TRAFFIC_SHADER_ENABLE                           Boolean    False     If True then the traffic shader gets enabled, otherwise the lightmap shader.
+                                                                     These effects are only for roads, not railways.
+
+BRIDGE_MIN_LENGTH                               Decimal    20.       Discard short bridges and draw roads or railways instead.
+
+MIN_ABOVE_GROUND_LEVEL                          Decimal    0.01      How much a highway / railway is at least hovering above ground
+
+HIGHWAY_TYPE_MIN                                Integer    5         The lower the number, the smaller ways in the highway hierarchy are added.
+                                                                     Currently the numbers are as follows (see roads.py -> HighwayType).
+                                                                     motorway = 12
+                                                                     trunk = 11
+                                                                     primary = 10
+                                                                     secondary = 9
+                                                                     tertiary = 8
+                                                                     unclassified = 7
+                                                                     road = 6
+                                                                     residential = 5
+                                                                     living_street = 4
+                                                                     service = 3
+                                                                     pedestrian = 2
+                                                                     slow = 1 (cycle ways, tracks, footpaths etc).
+
+POINTS_ON_LINE_DISTANCE_MAX                     Integer    1000      The maximum distance between two points on a line. If longer, then new points
+                                                                     are added. This parameter might need to get set to a smaller value in order to
+                                                                     have enough elevation probing along a road/highway. Together with parameter
+                                                                     MIN_ABOVE_GROUND_LEVEL it makes sure that fewer residuals of ways are below 
+                                                                     the scenery ground. The more uneven a scenery ground is, the smaller this 
+                                                                     value should be chosen. The drawback of small values are that the number
+                                                                     of faces gets bigger affecting frame rates.
+
+=============================================   ========   =======   ==============================================================================
+
+
+.. MAX_SLOPE_RAILWAY = 0.04
+   MAX_SLOPE_MOTORWAY = 0.03       # max slope for motorways
+   MAX_SLOPE_ROAD = 0.08
+   MAX_TRANSVERSE_GRADIENT = 0.1   #
+   BRIDGE_MIN_LENGTH = 20.         # discard short bridges, draw road instead
+   DEBUG_PLOT = 0
+   CREATE_BRIDGES_ONLY = 0         # create only bridges and embankments
+   BRIDGE_LAYER_HEIGHT = 4.         # bridge height per layer
+   BRIDGE_BODY_HEIGHT = 0.9         # height of bridge body
+   EMBANKMENT_TEXTURE = textures.road.EMBANKMENT_1  # Texture for the embankment
 
 
 .. [#] The only exception to the rule is the possibility to adjust the :ref:`Actual Distance of LOD Ranges <chapter-lod-label>`.
