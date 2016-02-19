@@ -136,26 +136,3 @@ class Graph(nx.Graph):
 #        for the_way in source_iterable:
 #            self.G.add_edge(the_way.refs[0], the_way.refs[-1], obj=the_way)
 
-if __name__ == "__main__":
-    import osm
-    G = Graph()
-    
-    junction1 = 'j1'
-    junction2 = 'j2'
-    #G.add_node("a", junction1)
-    #G.add_node("a", junction1)
-    
-    #G.add_node(2, junction2)
-    #G.add_node(3, "hj")
-    G.add_edge(osm.Way(1, [], [1, 2]))
-    G.add_edge(osm.Way(2, [], [4, 3]))
-
-    print "aa", G.node["a"]['obj']
-    print "cur"
-    print G["a"]
-    print G[2]
-    print "nodes:"
-    print G.junction(2)
-    for the_node in G.nodes(data=True):
-        print the_node[0], " --",
-        print the_node[1]['obj']

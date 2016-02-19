@@ -34,10 +34,6 @@ OUR_MAGIC = "osm2platforms"  # Used in e.g. stg files to mark edits by osm2platf
 # -----------------------------------------------------------------------------
 
 
-def no_transform((x, y)):
-    return x, y
-
-
 class Platform(object):
     def __init__(self, transform, osm_id, tags, refs, nodes_dict):
         self.osm_id = osm_id

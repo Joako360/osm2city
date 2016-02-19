@@ -110,10 +110,6 @@ from cluster import Clusters
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 
 
-def no_transform((x, y)):
-    return x, y
-
-
 PSEUDO_ID_NODES = -1  # For those nodes, which get added as part of Roads._check_points_on_line_distance()
 
 
