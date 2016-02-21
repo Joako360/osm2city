@@ -537,15 +537,15 @@ class Roads(objectlist.ObjectList):
             elif _is_railway(the_way):
                 if the_way.tags['railway'] in ['rail', 'disused', 'preserved', 'subway']:
                     priority = 20
-                    width = 2.87
+                    width = 3.17  # tracks are 57 px out of 126 px. European track width = 1.435m
                     tex = textures.road.TRACK
                 elif the_way.tags['railway'] in ['narrow_gauge']:
                     priority = 19
-                    width = 2.2  # FIXME: should use proper width
+                    width = 2.21
                     tex = textures.road.TRACK  # FIXME: should use proper texture
                 elif the_way.tags['railway'] in ['tram', 'light_rail']:
                     priority = 18
-                    width = 2.87
+                    width = 3.17
                     tex = textures.road.TRAMWAY
                 else:
                     priority = 0  # E.g. monorail, miniature
