@@ -8,15 +8,14 @@ TODO: linear deck: limit slope
       if h_add too high, continue/insert bridge
 """
 
-import linear
 import numpy as np
 import scipy.interpolate
-from pdb import pm
-from vec2d import vec2d
 import matplotlib.pyplot as plt
+
+import linear
 import parameters
 import textures.road
-#from turtle import Vec2D
+
 
 class Deck_shape_linear(object):
     def __init__(self, h0, h1):
@@ -132,8 +131,9 @@ class LinearBridge(linear.LinearObject):
             
         if (self.D(0.5) - MSL_mid) > required_height:
             return
-        
-        dh_dx = linear.max_slope_for_road(self)
+
+        import roads  # late import due to circular dependency
+        dh_dx = roads.max_slope_for_road(self)
         
         # -- need to elevate one or both ends
         deck_MSL_mid = MSL_mid + required_height

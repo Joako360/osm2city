@@ -1,19 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import numpy as np
-from vec2d import vec2d
-import ac3d
-import shapely.geometry as shg
-import matplotlib.pyplot as plt
-import math
 import copy
-import parameters
 import logging
+import math
+
+import matplotlib.pyplot as plt
+import numpy as np
+import shapely.geometry as shg
+
+
+import parameters
 import textures.road
-# debug
-import test
-#import warnings
-#warnings.filterwarnings('error')
+from vec2d import vec2d
+
 
 class LinearObject(object):
     """
@@ -81,7 +80,7 @@ class LinearObject(object):
             self.compute_angle_etc()
             self.edge = self.compute_offset(self.width / 2.)
         except Warning, reason:
-            print "Warning in OSM_ID %i: %s" % (self.osm_id, reason)
+            logging.warning("Warning in OSM_ID %i: %s", self.osm_id, reason)
 
         self.tex = tex  # determines which part of texture we use
 
@@ -90,40 +89,33 @@ class LinearObject(object):
 #            self.plot(left=False, right=False, angle=True)
 
     def compute_offset(self, offset):
+        offset += 1.
+        n = len(self.center.coords)
+        left = np.zeros((n, 2))
+        right = np.zeros((n, 2))
+        our_node = np.array(self.center.coords[0])
+        left[0] = our_node + self.normals[0] * offset
+        right[0] = our_node - self.normals[0] * offset
+        for i in range(1, n-1):
+            mean_normal = (self.normals[i-1] + self.normals[i])
+            l = (mean_normal[0]**2 + mean_normal[1]**2)**0.5
+            mean_normal /= l
+            angle = (np.pi + self.angle[i-1] - self.angle[i])/2.
+            if abs(angle) < 0.0175:  # 1 deg
+                raise ValueError('AGAIN angle > 179 in OSM_ID %i with refs %s' % (self.osm_id, str(self.refs)))
+            o = abs(offset / math.sin(angle))
+            our_node = np.array(self.center.coords[i])
+            left[i] = our_node + mean_normal * o
+            right[i] = our_node - mean_normal * o
 
-        if 0:
-            # -- shapely's parallel_offset sometimes introduces extra nodes??
-            left  = self.center.parallel_offset(offset, 'left', resolution=0, join_style=2, mitre_limit=100.0)
-            right = self.center.parallel_offset(offset, 'right', resolution=0, join_style=2, mitre_limit=100.0)
-        else:
-            offset += 1.
-            n = len(self.center.coords)
-            left = np.zeros((n, 2))
-            right = np.zeros((n, 2))
-            our_node = np.array(self.center.coords[0])
-            left[0] = our_node + self.normals[0] * offset
-            right[0] = our_node - self.normals[0] * offset
-            for i in range(1, n-1):
-                mean_normal = (self.normals[i-1] + self.normals[i])
-                l = (mean_normal[0]**2 + mean_normal[1]**2)**0.5
-                mean_normal /= l
-                angle = (np.pi + self.angle[i-1] - self.angle[i])/2.
-                if abs(angle) < 0.0175: # 1 deg 
-                    raise ValueError('AGAIN angle > 179 in OSM_ID %i with refs %s' % (self.osm_id, str(self.refs)))
-                o = abs(offset / math.sin(angle))
-                our_node = np.array(self.center.coords[i])
-                left[i] = our_node + mean_normal * o
-                right[i] = our_node - mean_normal * o
+        our_node = np.array(self.center.coords[-1])
+        left[-1] = our_node + self.normals[-1] * offset
+        right[-1] = our_node - self.normals[-1] * offset
 
-            our_node = np.array(self.center.coords[-1])
-            left[-1] = our_node + self.normals[-1] * offset
-            right[-1] = our_node - self.normals[-1] * offset
-#            right = copy.copy(right[::-1])
+        left = shg.LineString(left)
+        right = shg.LineString(right)
 
-            left = shg.LineString(left)
-            right = shg.LineString(right)
-
-            return left, right
+        return left, right
 
     def plot(self, center=True, left=False, right=False, angle=True, clf=True, show=True):
         """debug"""
@@ -132,11 +124,15 @@ class LinearObject(object):
         r = np.array(self.edge[1].coords)
 #        l1 = np.array(self.left1.coords)
 #        r1 = np.array(self.right1.coords)
-        if clf: plt.clf()
+        if clf:
+            plt.clf()
         #np.array([transform.toLocal((n.lon, n.lat)) for n in r.nodes])
-        if center: plt.plot(c[:,0], c[:,1], '-o', color='k')
-        if left:   plt.plot(l[:,0], l[:,1], '-o', color='g')
-        if right:  plt.plot(r[:,0], r[:,1], '-o', color='r')
+        if center:
+            plt.plot(c[:, 0], c[:, 1], '-o', color='k')
+        if left:
+            plt.plot(l[:, 0], l[:, 1], '-o', color='g')
+        if right:
+            plt.plot(r[:, 0], r[:, 1], '-o', color='r')
 
 #        plt.plot(l1[:,0], l1[:,1], '--.', color='g')
 #        plt.plot(r1[:,0], r1[:,1], '--.', color='r')
@@ -165,13 +161,9 @@ class LinearObject(object):
             plt.show()
             plt.savefig('roads_%i.eps' % self.osm_id)
 
-
     def compute_angle_etc(self):
-        """Compute normals, angle, segment_length, cumulated distance start"""
+        """Compute normals, angle, segment_length, accumulated distance start"""
         n = len(self.center.coords)
-        if self.osm_id == 24722952:
-            pass
-
 
         self.vectors = np.zeros((n-1, 2))
         self.normals = np.zeros((n, 2))
@@ -184,13 +176,13 @@ class LinearObject(object):
             dx, dy = vector
             self.angle[i] = math.atan2(dy, dx)
             angle = np.pi - abs(self.angle[i-1] - self.angle[i])
-            if i > 0 and abs(angle) < 0.0175: # 1 deg 
+            if i > 0 and abs(angle) < 0.0175:  # 1 deg
                 raise ValueError('CONSTR angle > 179 in OSM_ID %i at (%i, %i) with refs %s' 
                     % (self.osm_id, i, i-1, str(self.refs)))
 
             self.segment_len[i] = (dy*dy + dx*dx)**0.5
             if self.segment_len[i] == 0:
-                logging.error("osm id: %i contains a segment with zero len"%self.osm_id)
+                logging.error("osm id: %i contains a segment with zero len", self.osm_id)
             cumulated_distance += self.segment_len[i]
             self.dist[i+1] = cumulated_distance
             self.normals[i] = np.array((-dy, dx))/self.segment_len[i]
@@ -217,7 +209,7 @@ class LinearObject(object):
         to_write = copy.copy(line_string.coords)
         nodes_list = []
 #        print "JUNLEN", len(self.junction0), len(self.junction1)
-        assert(self.cluster_ref != None)
+        assert(self.cluster_ref is not None)
         if not join:
             nodes_list += list(obj.next_node_index() + np.arange(len(to_write)))
         else:
@@ -263,9 +255,6 @@ class LinearObject(object):
         if "tunnel" in self.tags:       # FIXME: this should be caught earlier
             return None, None, None
 
-        if self.osm_id == 204383381:
-            print "h"
-           
 #        if joint:
 #            remove left.coords[0]
 #            remove left_z[0]
@@ -273,7 +262,7 @@ class LinearObject(object):
         # write textured quads SURF
                 # -- write face as series of quads. Works OK, but produces more
                 #    SURFs in .ac.
-        scale = 32. # length of texture in meters 
+        scale = 32.  # length of texture in meters
                     # 2 lanes * 4m per lane = 128 px wide. 512px long = 32 m
 #         	Autobahnen 	Andere Straßen
 #          Schmalstrich 	0,15 m 	0,12 m
@@ -284,17 +273,15 @@ class LinearObject(object):
         for i in range(n_nodes-1):
             xl = self.dist[i]/scale
             xr = self.dist[i+1]/scale
-            face = [ (left_nodes_list[i],    xl, tex_y0),
-                     (left_nodes_list[i+1],  xr, tex_y0),
-                     (right_nodes_list[i+1], xr, tex_y1),
-                     (right_nodes_list[i],   xl, tex_y1) ]
+            face = [(left_nodes_list[i],    xl, tex_y0),
+                    (left_nodes_list[i+1],  xr, tex_y0),
+                    (right_nodes_list[i+1], xr, tex_y1),
+                    (right_nodes_list[i],   xl, tex_y1)]
             obj.face(face[::-1])
-        
 
     def probe_ground(self, elev, line_string):
         """probe ground elevation along given line string, return array"""
         return np.array([elev(the_node) for the_node in line_string.coords])
-
 
     def get_h_add(self, elev, elev_offset):
         """
@@ -303,10 +290,10 @@ class LinearObject(object):
         last_node = self.nodes_dict[self.refs[-1]]
                 
         # -- elevated road. Got h_add data for first and last node. Now lift intermediate
-        #    nodes. So far, h_add is for centerline only.
+        #    nodes. So far, h_add is for center line only.
         # FIXME: when do we need this? if left_z_given is None and right_z_given is None?
 
-        center_z = np.array([elev(the_node) for the_node in self.center.coords])  + self.AGL
+        center_z = np.array([elev(the_node) for the_node in self.center.coords]) + self.AGL
 
         EPS = 0.001
 
@@ -315,7 +302,8 @@ class LinearObject(object):
 
         h_add_0 = first_node.h_add
         h_add_1 = last_node.h_add
-        dh_dx = max_slope_for_road(self)
+        import roads  # late import due to circular dependency
+        dh_dx = roads.max_slope_for_road(self)
         MSL_0 = center_z[0] + h_add_0
         MSL_1 = center_z[-1] + h_add_1
 
@@ -331,7 +319,7 @@ class LinearObject(object):
             h_add = np.zeros(n_nodes)
             for i in range(n_nodes):
                 h_add[i] = max(0, MSL_0 - self.dist[i] * dh_dx - center_z[i])
-                if h_add[i] < EPS: # FIXME: different for other h_add?
+                if h_add[i] < EPS:  # FIXME: different for other h_add?
                     break
             
 #            for i in range(n_nodes):
@@ -446,20 +434,20 @@ class LinearObject(object):
             # -- h_add larger than terrain gradient:
             #    terrain gradient doesnt matter, just create level road at h_add
             if h_add[i] > abs(the_diff/2.):
-                 left_z[i]  += (h_add[i] - the_diff/2.)
-                 right_z[i] += (h_add[i] + the_diff/2.)
+                left_z[i] += (h_add[i] - the_diff/2.)
+                right_z[i] += (h_add[i] + the_diff/2.)
             else:
                 # h_add smaller than terrain gradient. 
                 # In case terrain gradient is significant, create level
                 # road which is then higher than h_add anyway.
                 # Otherwise, create sloped road and ignore h_add.
                 # FIXME: is this a bug?
-                if the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT: #  left > right
+                if the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT:  #  left > right
                     right_z[i] += the_diff  # dirty
                     h_add[i] += the_diff/2.
                 elif -the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT: # right > left
-                    left_z[i] += - the_diff # dirty
-                    h_add[i] -= the_diff/2. # the_diff is negative
+                    left_z[i] += - the_diff  # dirty
+                    h_add[i] -= the_diff/2.  # the_diff is negative
                 else:
                     # terrain gradient negligible and h_add small
                     pass
@@ -474,22 +462,17 @@ class LinearObject(object):
         #print "h_add0,1", h_add_0, h_add_1
         return left_z, right_z, h_add
 
-    def _write_to(self, obj, elev, elev_offset, edge0, edge1,
-                                          tex_y0, tex_y1, n_nodes=0, left_z_set=0, right_z_set=0, ac=0, offset=0):
-        print "FIXME: linear _write_to()"
-        return 0,0,0
-
     # FIXME: this is really a road type of linearObject, so make it linearRoad
     # FIXME: what is offset?
 
     def debug_print_node_info(self, the_node, h_add=None):
         if the_node in self.refs:
             i = self.refs.index(the_node)
-            print ">> OSMID %i %i h_add %5.2g" % (self.osm_id, i, self.nodes_dict[the_node].h_add),
+            logging.debug(">> OSMID %i %i h_add %5.2g", self.osm_id, i, self.nodes_dict[the_node].h_add)
             if h_add is not None:
-                print h_add #[i]
+                logging.debug(h_add)  #[i]
             else:
-                print
+                pass
             return True
         return False
 
@@ -509,15 +492,6 @@ class LinearObject(object):
         h_add, center_z = self.get_h_add(elev, elev_offset)
         left_z, right_z, h_add = self.level_out(elev, h_add)
 
-        if self.osm_id == 204383381: # 1st   (+)
-            print ">> 1st ", h_add
-            print self.nodes_dict[self.refs[0]].h_add
-        if self.osm_id == 138440237: # last (2)
-            print "<< las ", h_add
-            print self.nodes_dict[self.refs[-1]].h_add
-            print self.nodes_dict[self.refs[0]].h_add
-            print self.refs[0]
-            
         #if self.debug_print_node_info(21551419, h_add):
         #self.debug_label_nodes(self.center, left_z, debug_ac, elev_offset, offset, h_add)
         left_nodes_list =  self.write_nodes(obj, self.edge[0], left_z, elev_offset, 
@@ -561,7 +535,7 @@ class LinearObject(object):
             len_right = len(self.edge[1].coords)
 
             if len_left != len_right:
-                print "different lengths not yet implemented ", self.osm_id
+                logging.info("different lengths not yet implemented ", self.osm_id)
                 do_tex = False
                 #continue
             elif len_left != len(self.center.coords):
@@ -631,31 +605,6 @@ class LinearObject(object):
                     obj.face(face[::-1])
 
         except NotImplementedError:
-            print "error in osm_id", self.osm_id
+            logging.error("error in osm_id", self.osm_id)
 
         return True
-        
-def max_slope_for_road(obj): 
-    if 'highway' in obj.tags and obj.tags['highway'] in ['motorway']:
-        return parameters.MAX_SLOPE_MOTORWAY
-    elif 'railway' in obj.tags and obj.tags['railway'] in ['rail']:
-        return parameters.MAX_SLOPE_RAILWAY
-    else:
-        return parameters.MAX_SLOPE_ROAD
-
-
-def main():
-    ac = ac3d.File(stats=tools.stats)
-    obj = ac.new_object('roads', 'tex/bridge.png')
-    line.write_to(obj)
-
-    if 0:
-        ac.center()
-        plt.clf()
-        ac.plot()
-        plt.show()
-
-    ac.write('line.ac')
-
-if __name__ == "__main__":
-    main()

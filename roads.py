@@ -137,12 +137,22 @@ def _compatible_ways(way1, way2):
     if _is_railway(way1) != _is_railway(way2):
         logging.debug("Nope, either both or none must be railway")
         return False
-    if _is_bridge(way1) != _is_bridge(way2):
+    elif _is_bridge(way1) != _is_bridge(way2):
         logging.debug("Nope, either both or none must be a bridge")
         return False
-    if _is_highway(way1) != _is_highway(way2):
+    elif _is_highway(way1) != _is_highway(way2):
         logging.debug("Nope, either both or none must be a highway")
         return False
+    elif _is_highway(way1) and _is_highway(way2):
+        highway_type1 = highway_type_from_osm_tags(way1.tags["highway"])
+        highway_type2 = highway_type_from_osm_tags(way2.tags["highway"])
+        if highway_type1 != highway_type2:
+            logging.debug("Nope, both must be of same highway type")
+            return False
+    elif _is_railway(way1) and _is_railway(way2):
+        if way1.tags['railway'] != way2.tags['railway']:
+            logging.debug("Nope, both must be of same railway type")
+            return False
     return True
 
 
@@ -240,6 +250,17 @@ def highway_type_from_osm_tags(value):
         return HighwayType.slow
     else:
         return None
+
+
+def max_slope_for_road(obj):
+    if 'highway' in obj.tags:
+        if obj.tags['highway'] in ['motorway']:
+            return parameters.MAX_SLOPE_MOTORWAY
+        else:
+            return parameters.MAX_SLOPE_ROAD
+    # must be aligned with accepted railways in Roads._create_linear_objects
+    elif 'railway' in obj.tags and obj.tags['railway'] in ['rail', 'disused', 'preserved', 'subway', 'narrow_gauge']:
+        return parameters.MAX_SLOPE_RAILWAY
 
 
 def _find_junctions(ways_list, degree=2):
@@ -411,7 +432,7 @@ class Roads(objectlist.ObjectList):
     def _propagate_h_add_over_edge(self, ref0, ref1, args):
         """propagate h_add over edges of graph"""
         obj = self.G[ref0][ref1]['obj']
-        dh_dx = linear.max_slope_for_road(obj)
+        dh_dx = max_slope_for_road(obj)
         n0 = self.nodes_dict[ref0]
         n1 = self.nodes_dict[ref1]
         if n1.h_add > 0:

@@ -152,14 +152,15 @@ POINTS_ON_LINE_DISTANCE_MAX                     Integer    1000      The maximum
                                                                      value should be chosen. The drawback of small values are that the number
                                                                      of faces gets bigger affecting frame rates.
 
+MAX_SLOPE_ROAD, MAX_SLOPE_*                     Decimal    0.08      The maximum allowed slope. It is used for ramps to bridges, but it is also
+                                                                     used for other ramps. Especially in mountainous areas you might want to set
+                                                                     higher values (e.g. 0.15 for roads works fine in Switzerand). This leads to
+                                                                     steeper ramps to bridges, but give much fewer residuals with embankements.
+
 =============================================   ========   =======   ==============================================================================
 
 
-.. MAX_SLOPE_RAILWAY = 0.04
-   MAX_SLOPE_MOTORWAY = 0.03       # max slope for motorways
-   MAX_SLOPE_ROAD = 0.08
-   MAX_TRANSVERSE_GRADIENT = 0.1   #
-   BRIDGE_MIN_LENGTH = 20.         # discard short bridges, draw road instead
+.. FIXME missing explanations for MAX_TRANSVERSE_GRADIENT = 0.1   #
    DEBUG_PLOT = 0
    CREATE_BRIDGES_ONLY = 0         # create only bridges and embankments
    BRIDGE_LAYER_HEIGHT = 4.         # bridge height per layer
