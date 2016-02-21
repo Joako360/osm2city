@@ -159,6 +159,14 @@ MAX_SLOPE_ROAD, MAX_SLOPE_*                     Decimal    0.08      The maximum
 
 =============================================   ========   =======   ==============================================================================
 
+With residuals:
+
+.. image:: elev_residuals.png
+
+After adjusted MAX_SLOPE_* and POINTS_ON_LINE_DISTANCE_MAX parameters:
+
+.. image:: no_elev_residuals.png
+
 
 .. FIXME missing explanations for MAX_TRANSVERSE_GRADIENT = 0.1   #
    DEBUG_PLOT = 0
