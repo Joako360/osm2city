@@ -1114,10 +1114,7 @@ def main():
     handler.parse(parameters.get_OSM_file_name())
     logging.info("ways: %i", len(roads))
         
-    if parameters.PATH_TO_OUTPUT:
-        path_to_output = parameters.PATH_TO_OUTPUT
-    else:
-        path_to_output = parameters.PATH_TO_SCENERY
+    path_to_output = parameters.get_output_path()
     logging.debug("before linear " + str(roads))
 
     roads.process()  # does the heavy lifting based on OSM data including clustering

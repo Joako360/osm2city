@@ -180,10 +180,7 @@ def main():
     #                                                         , coord_transformator)
     #    logging.info('Number of forest to process: %s', len(trees))
     #    # -- initialize STG_Manager
-    if parameters.PATH_TO_OUTPUT:
-        path_to_output = parameters.PATH_TO_OUTPUT
-    else:
-        path_to_output = parameters.PATH_TO_SCENERY
+    path_to_output = parameters.get_output_path()
     replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
 

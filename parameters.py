@@ -250,6 +250,12 @@ POINTS_ON_LINE_DISTANCE_MAX = 1000  # the maximum distance between two points on
 # default_args_end # DO NOT MODIFY THIS LINE
 
 
+def get_output_path():
+    if PATH_TO_OUTPUT:
+        return PATH_TO_OUTPUT
+    return PATH_TO_SCENERY
+
+
 def get_OSM_file_name():
     """
     Returns the path to the OSM File

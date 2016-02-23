@@ -13,10 +13,7 @@ import tools
 
 
 def main():
-    if parameters.PATH_TO_OUTPUT:
-        scenery_path = parameters.PATH_TO_OUTPUT
-    else:
-        scenery_path = parameters.PATH_TO_SCENERY
+    scenery_path = parameters.get_output_path()
 
     scenery_path += os.sep + "Objects"
     if os.path.exists(scenery_path):
