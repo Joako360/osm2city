@@ -47,7 +47,7 @@ BOUNDARY_NORTH = 47.50
 BOUNDARY_CLIPPING = True
 BOUNDARY_CLIPPING_BORDER_SIZE = 0.25
 
-OSM_FILE = "buildings.osm"  # -- file name of the file with OSM data. Must reside in $PREFIX
+OSM_FILE = "buildings.osm"  # -- file name of the file with OSM data. Should reside in $PREFIX. No path components allowed.
 USE_PKL = False             # -- instead of parsing the OSM file, read a previously created cache file $PREFIX/buildings.pkl
 IGNORE_PKL_OVERWRITE = True # -- Ignore overwriting of Cache File
 

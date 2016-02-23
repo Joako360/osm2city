@@ -66,11 +66,11 @@ As described in chapter :ref:`Getting OpenStreetMap data <chapter-getting-data-l
 
 The default work flow is based on the sub-chapters of :ref:`Preparation <chapter-preparation-label>`.
 #. :ref:`Run setup.py <chapter-run-setup-label>`
-#. Adapt ``params.ini``. This will get copied to several subdirectories as part of the next process steps. Most importantly adapt parameters ``PREFIX`` (in the example below "CH_OSM") and ``PATH_TO_OUTPUT`` (in the example below "/home/fg_customscenery/CH_OSM").
+#. Adapt ``params.ini``. This will get copied to several subdirectories as part of the next process steps. Most importantly apapt the parameter ``PATH_TO_OUTPUT`` (in the example below "/home/fg_customscenery/CH_OSM"). The ``PREFIX`` and ``BOUNDARY_*`` parameters will automatically be updated.
 #. :ref:`Call build_tiles.py <chapter-build-tiles-label>`. This step creates subdirectories including a set of shell / command scripts. The top directory will be created in your ``WORKING_DIRECTORY`` and have the same name as the lon/lat area specified with parameter ``-t``
 #. If needed adapt the params.ini files in the subdirectories if you need to change specific characteristics within one tile (e.g. parameters for building height etc.). In a lot of situations this will not be needed.
 #. Call the FIXME scripts
-#. FIXME: copy tex
+#. :ref:`Copy textures <chapter-copy-textures-label>`
 
 
 .. _chapter-build-tiles-label:
@@ -85,13 +85,14 @@ Calling build_tiles.py
 
 Mandatory command line arguments:
 * -t: the name of the 1-degree lon/lat-area, e.g. w003n60 or e012s06 (you need to provide 3 digits for longitude and 2 digits for latitude). The lon/lat position is the lower left corner (e.g. e009n47 to cover most of the Lake of Constance region).
-* -f: the relative path to the main params.ini file, which is the template copied to all sub-directories.
+* -f: the relative path to the main params.ini file, which is the template copied to all sub-directories. Be sure to make a decision about parameter ``PATH_TO_OUTPUT``.
 * -o: the name of the copied params.ini files in the sub-directories
 
 Optional command line arguments:
 * -p: You can use this option on linux and mac in order to generate scripts with parallel processing support and specify the max number of parallel processes when calling the generated scripts. 
 * --url: Which API to use to download OSM data on the fly
 * -n: FIXME
+* -x: If ``python`` is not on your executable path or you want to specify a specific Python version if you have installed different versions, then use this argument (e.g. ``/usr/bin/python2.7``).
 
 
 

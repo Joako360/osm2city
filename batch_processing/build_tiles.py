@@ -33,8 +33,8 @@ def _open_file(name, directory):
     return open(directory + name, "wb")
 
 
-def _write_to_file(command, file_handle):
-    file_handle.write('python ' + command + ' -f ' + replacement_path + '/params.ini ')
+def _write_to_file(command, file_handle, python_exe):
+    file_handle.write(python_exe + ' ' + command + ' -f ' + replacement_path + '/params.ini ')
     if BASH_PARALLEL_PROCESS:
         file_handle.write('&' + os.linesep + 'parallel_wait $max_parallel_processus' + os.linesep)
     else:
@@ -50,7 +50,7 @@ if __name__ == '__main__':
                         help="The name of the property file to be copied", required=True)
     parser.add_argument("-o", "--out", dest="out",
                         help="The name of the property file to be generated", required=True)
-    parser.add_argument("--url",
+    parser.add_argument("-u", "--url",
                         help='Address of the api',
                         default="http://overpass-api.de/api/xapi?",
                         choices=["http://jxapi.osm.rambler.ru/xapi/api/0.6/",
@@ -68,8 +68,16 @@ if __name__ == '__main__':
                         action='store_true',
                         default=False,
                         required=False)
+    parser.add_argument("-x", dest="python_executable",
+                        help="Path to specific Python executable",
+                        default=False,
+                        required=False)
 
     args = parser.parse_args()
+
+    python_exe = "python"
+    if args.python_executable:
+        python_exe = args.python_executable
 
     logging.info('Generating directory structure for %s ', args.tile_name)
     matched = re.match("([ew])([0-9]{3})([ns])([0-9]{2})", args.tile_name)
@@ -160,7 +168,7 @@ done
                     sources.write(line)
 #            download_command = 'wget -O %s/buildings.osm ' + args.url + 'map?bbox=%f,%f,%f,%f   '
             if args.new_download:
-                download_command = 'python download_tile.py -f %s/params.ini' % path
+                download_command = '%s download_tile.py -f %s/params.ini' % (python_exe, path)
                 download_file.write(download_command + os.linesep)
             else:
                 download_command = 'curl -f --retry 6 --proxy-ntlm -o %s/buildings.osm http://overpass-api.de/api/map?bbox=%f,%f,%f,%f   ' + os.linesep                        
@@ -174,7 +182,7 @@ done
                 # wget -O FT_WILLIAM/buildings.osm http://overpass-api.de/api/map?bbox=-5.2,56.8,-5.,56.9
                 download_file.write(download_command % (replacement_path, calc_tile.get_west_lon(lon, lat, dx), calc_tile.get_south_lat(lat, dy), calc_tile.get_east_lon(lon, lat, dx), calc_tile.get_north_lat(lat, dy)))
             for command in files:
-                _write_to_file(command[0], command[1])
+                _write_to_file(command[0], command[1], python_exe)
     for command in files:
         command[1].close()
 

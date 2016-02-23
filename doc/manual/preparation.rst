@@ -132,7 +132,7 @@ PATH_TO_SCENERY
 PATH_TO_OUTPUT
     The generated scenery (.stg, .ac, .xml) will be written to this path — specified without triling slash. If empty then the correct location in PATH_TO_SCENERY is used. Note that if you use TerraSync for PATH_TO_SCENERY, you MUST choose a different path here. Otherwise, TerraSync will overwrite the generated scenery. Unless you know what you are doing, there is no reason not to specify a dedicated path here. While not absolutely needed it is good practice to name the output folder the same as ``PREFIX``.
 OSM_FILE
-    The file containing OpenStreetMap data. See previous chapter :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>`.
+    The file containing OpenStreetMap data. See previous chapter :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>`. The file should reside in $PREFIX and no path components are allowed (i.e. pure file name).
 BOUNDARY_*
     The longitude and latitude of the boundaries of the generated scenery. The boundaries should correspond to the boundaries in the ``OSM_FILE`` (open the \*.osm file in a text editor and check the data in ca. line 3). The boundaries can be different, but then you might either miss data (if the OSM boundaries are larger) or do more processing than necessary (if the OSM boundaries are more narrow).
 NO_ELEV
