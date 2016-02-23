@@ -16,6 +16,7 @@ Ludomotico contributed a cleaner version of read_from_file().
 import argparse
 import logging
 import os
+import re
 import sys
 import types
 import traceback
@@ -261,6 +262,11 @@ def get_OSM_file_name():
     Returns the path to the OSM File
     """
     return PREFIX + os.sep + OSM_FILE
+
+
+def get_repl_prefix():
+    """FIXME: what does the REGEXP actually mean?"""
+    return re.sub('[\/]', '_', PREFIX)
 
 
 def get_center_global():

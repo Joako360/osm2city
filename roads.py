@@ -1084,10 +1084,13 @@ def main():
     random.seed(42)
     parser = argparse.ArgumentParser(description="bridge.py reads OSM data and creates bridge models for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
-                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
-    parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
-    parser.add_argument("-b", "--bridges-only", action="store_true", help="create only bridges and embankments")
-    parser.add_argument("-l", "--loglevel", help="set loglevel. Valid levels are DEBUG, INFO, WARNING, ERROR, CRITICAL")
+                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
+    parser.add_argument("-e", dest="e", action="store_true"
+                        , help="skip elevation interpolation", required=False)
+    parser.add_argument("-b", "--bridges-only", action="store_true"
+                        , help="create only bridges and embankments", required=False)
+    parser.add_argument("-l", "--loglevel"
+                        , help="set loglevel. Valid levels are DEBUG, INFO, WARNING, ERROR, CRITICAL", required=False)
 
     args = parser.parse_args()
     # -- command line args override parameters
@@ -1119,7 +1122,7 @@ def main():
 
     roads.process()  # does the heavy lifting based on OSM data including clustering
 
-    replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)        
+    replacement_prefix = parameters.get_repl_prefix()
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
 #    roads.debug_label_nodes(stg_manager)
 

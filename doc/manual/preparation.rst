@@ -130,7 +130,7 @@ PATH_TO_SCENERY
     likely you'll want to use your TerraSync path here.
 
 PATH_TO_OUTPUT
-    The generated scenery (.stg, .ac, .xml) will be written to this path. If empty then the correct location in PATH_TO_SCENERY is used. Note that if you use TerraSync for PATH_TO_SCENERY, you MUST choose a different path here. Otherwise, TerraSync will overwrite the generated scenery. Unless you know what you are doing, there is no reason not to specify a dedicated path here. While not absolutely needed it is good practice to name the output folder the same as ``PREFIX``.
+    The generated scenery (.stg, .ac, .xml) will be written to this path — specified without triling slash. If empty then the correct location in PATH_TO_SCENERY is used. Note that if you use TerraSync for PATH_TO_SCENERY, you MUST choose a different path here. Otherwise, TerraSync will overwrite the generated scenery. Unless you know what you are doing, there is no reason not to specify a dedicated path here. While not absolutely needed it is good practice to name the output folder the same as ``PREFIX``.
 OSM_FILE
     The file containing OpenStreetMap data. See previous chapter :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>`.
 BOUNDARY_*

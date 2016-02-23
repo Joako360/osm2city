@@ -52,8 +52,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Copies texture related data in directory 'tex' into the scenery folders.")
     parser.add_argument("-f", "--file", dest="filename",
-                        help="Mandatory: read parameters from FILE (e.g. params.ini)", metavar="FILE")
-    parser.add_argument("-o", dest="o", action="store_true", help="do not overwrite existing elevation data")
+                        help="Mandatory: read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
     args = parser.parse_args()
     if args.filename is not None:
         parameters.read_from_file(args.filename)

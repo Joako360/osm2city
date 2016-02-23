@@ -630,13 +630,19 @@ if __name__ == "__main__":
     # -- Parse arguments. Command line overrides config file.
     parser = argparse.ArgumentParser(description="osm2city reads OSM data and creates buildings for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
-                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
-    parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
-    parser.add_argument("-c", dest="c", action="store_true", help="do not check for overlapping with static objects")
-    parser.add_argument("-A", "--create-atlas-only", action="store_true", help="create texture atlas and exit")
-    parser.add_argument("-a", "--create-atlas", action="store_true", help="create texture atlas")
-    parser.add_argument("-u", dest="uninstall", action="store_true", help="uninstall ours from .stg")
-    parser.add_argument("-l", "--loglevel", help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL")
+                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
+    parser.add_argument("-e", dest="e", action="store_true"
+                        , help="skip elevation interpolation", required=False)
+    parser.add_argument("-c", dest="c", action="store_true"
+                        , help="do not check for overlapping with static objects", required=False)
+    parser.add_argument("-A", "--create-atlas-only", action="store_true"
+                        , help="create texture atlas and exit", required=False)
+    parser.add_argument("-a", "--create-atlas", action="store_true"
+                        , help="create texture atlas", required=False)
+    parser.add_argument("-u", dest="uninstall", action="store_true"
+                        , help="uninstall ours from .stg", required=False)
+    parser.add_argument("-l", "--loglevel"
+                        , help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL", required=False)
     args = parser.parse_args()
 
     # -- command line args override paramters
@@ -1244,7 +1250,7 @@ if __name__ == "__main__":
 
     # -- initialize STG_Manager
     path_to_output = parameters.get_output_path()
-    replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)        
+    replacement_prefix = parameters.get_repl_prefix()
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
 #     for node in ac_nodes:
 #         print node
@@ -1291,7 +1297,6 @@ if __name__ == "__main__":
         #LOD_lists.append([])  # roof-flat
 
         # -- incase PREFIX is a path (batch processing)
-        replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)
         file_name = replacement_prefix + "city%02i%02i" % (cl.I.x, cl.I.y)
         logging.info("writing cluster %s (%i/%i)" % (file_name, ic, len(clusters)))
 
@@ -1326,6 +1331,3 @@ if __name__ == "__main__":
     troubleshoot.troubleshoot(tools.stats)
     logging.info("done.")
     sys.exit(0)
-
-
-# python -m cProfile -s time ./osm2city.py -f ULLL/params.ini -e -c

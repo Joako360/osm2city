@@ -8,7 +8,6 @@ import logging
 import sys
 import re
 import os
-import platform
 import stat
 from _io import open
 
@@ -30,8 +29,8 @@ def _get_file_name(name, tile_name):
     return name + tile_name + extension
 
 
-def _open_file(name):
-    return open(calc_tile.root_directory_name((lon, lat)) + os.sep + name, "wb")
+def _open_file(name, directory):
+    return open(directory + name, "wb")
 
 
 def _write_to_file(command, file_handle):
@@ -44,9 +43,9 @@ def _write_to_file(command, file_handle):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    parser = argparse.ArgumentParser(description="build-tiles generates a directory structure capable of generating complete tiles of scenery")
-    parser.add_argument("-t", "--tile", dest="tilename",
-                        help="The name of the tile", required=True)
+    parser = argparse.ArgumentParser(description="build-tiles generates a directory structure capable of generating a complete 1 degree lon/lat-areas of scenery")
+    parser.add_argument("-t", "--tile", dest="tile_name",
+                        help="The name of the lon/lat-area (e.g. e009n47)", required=True)
     parser.add_argument("-f", "--properties", dest="properties",
                         help="The name of the property file to be copied", required=True)
     parser.add_argument("-o", "--out", dest="out",
@@ -72,20 +71,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-#    if(args.tilename is None):
-#        logging.error("Tilename is required")
-#        parser.print_usage()
-#        exit(1)
-#    if(args.properties is None):
-#        logging.error("Input properties are required")
-#        parser.print_usage()
-#        exit(1)
-#    if(args.out is None):
-#        logging.error("Output properties are required")
-#        parser.print_usage()
-#        exit(1)
-    logging.info('Generating directory structure for %s ', args.tilename)
-    matched = re.match("([ew])([0-9]{3})([ns])([0-9]{2})", args.tilename)
+    logging.info('Generating directory structure for %s ', args.tile_name)
+    matched = re.match("([ew])([0-9]{3})([ns])([0-9]{2})", args.tile_name)
     lon = int(matched.group(2))
     lat = int(matched.group(4))
     if matched.group(1) == 'w':
@@ -96,31 +83,33 @@ if __name__ == '__main__':
         num_rows = 1
     else:
         num_rows = int(1 / calc_tile.bucket_span(lat))
-    # int(1/calc_tile.bucket_span(lat))
     num_cols = 8
+
+    root_dir_name = calc_tile.root_directory_name((lon, lat))
+
     try:
-        os.makedirs(calc_tile.root_directory_name((lon, lat)))
+        os.makedirs(root_dir_name)
     except OSError, e:
         if e.errno != 17:
             logging.exception("Unable to create path to output")
   
-    download_file = _open_file(_get_file_name("download_", args.tilename))
+    download_file = _open_file(_get_file_name("download_", args.tile_name), root_dir_name)
     files = []
-    utils = [ 'osm2city', 'osm2pylon', 'tools', 'platforms', 'roads', 'piers', ]
+    utils = ['tools', 'osm2city', 'osm2pylon', 'platforms', 'roads', 'piers', ]
     for util in utils:
         files.append((util + '.py',
-                      _open_file(_get_file_name(util + "_", args.tilename)),
+                      _open_file(_get_file_name(util + "_", args.tile_name), root_dir_name),
                       ))
 
-    #check if necessary to add parallel processing code
-        
+    # Check if necessary to add parallel processing code
     BASH_PARALLEL_PROCESS = False
+    is_linux_or_mac = setup.is_linux_or_mac()
     if args.parallel:
-        if re.search('linux|mac', platform.system().lower()):
+        if is_linux_or_mac:
             BASH_PARALLEL_PROCESS = True
         
-    #header for bash if necessary 
-    if re.search('linux|mac', platform.system().lower()):
+    # Header for bash if necessary
+    if is_linux_or_mac:
         header_bash = '''#!/bin/bash''' + os.linesep
         if BASH_PARALLEL_PROCESS:
             header_bash += '''#
@@ -190,10 +179,9 @@ done
         command[1].close()
 
     # chmod u+x on created scripts for linux
-    my_os_type = setup.get_os_type()
-    if my_os_type is setup.OSType.linux or my_os_type is setup.OSType.mac:
+    if is_linux_or_mac:
         for util in utils + ['download', ]:
-            f = calc_tile.root_directory_name((lon, lat)) + os.sep + _get_file_name(util + "_", args.tilename)
+            f = calc_tile.root_directory_name((lon, lat)) + os.sep + _get_file_name(util + "_", args.tile_name)
             try:
                 st = os.stat(f)
                 os.chmod(f, st.st_mode | stat.S_IEXEC)

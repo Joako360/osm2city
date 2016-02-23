@@ -53,6 +53,13 @@ def get_os_type():
         return OSType.other
 
 
+def is_linux_or_mac():
+    my_os_type = get_os_type()
+    if my_os_type is OSType.linux or my_os_type is OSType.mac:
+        return True
+    return False
+
+
 def get_elev_in_path(home_path):
     return home_path + "elev.in"
 
@@ -76,7 +83,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Setup will set some properties and copy the elev.nas")
     parser.add_argument("-fg", "--fg_root", dest="fg_root",
                         help="$FG_ROOT see http://wiki.flightgear.org/$FG_ROOT. \
-                        Typically '.../data' or '.../fgdata'.")
+                        Typically '.../data' or '.../fgdata'."
+                        , required=True)
     args = parser.parse_args()
 
     if args.fg_root is not None:

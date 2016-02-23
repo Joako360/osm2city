@@ -505,8 +505,7 @@ class Line(LineWithoutCables):
                                                                      , end_pylon.lon, end_pylon.lat)
                 angle_difference = angle_local - angle_global
                 # write stuff to files
-                replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)
-                cluster_filename = replacement_prefix + wayname + "%05d_%05d" % (line_index, cluster_index)
+                cluster_filename = parameters.get_repl_prefix() + wayname + "%05d_%05d" % (line_index, cluster_index)
                 path_to_stg = my_stg_mgr.add_object_static(cluster_filename + '.xml'
                                                            , vec2d.vec2d(start_pylon.lon, start_pylon.lat)
                                                            , start_pylon.elevation, 90 + angle_difference)
@@ -1427,10 +1426,13 @@ def main():
     parser = argparse.ArgumentParser(
         description="osm2pylon reads OSM data and creates pylons, powerlines and aerialways for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
-                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
-    parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
-    parser.add_argument("-u", dest="uninstall", action="store_true", help="uninstall ours from .stg")
-    parser.add_argument("-l", "--loglevel", help="Set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL")
+                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
+    parser.add_argument("-e", dest="e", action="store_true"
+                        , help="skip elevation interpolation", required=False)
+    parser.add_argument("-u", dest="uninstall", action="store_true"
+                        , help="uninstall ours from .stg", required=False)
+    parser.add_argument("-l", "--loglevel"
+                        , help="Set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL", required=False)
     args = parser.parse_args()
     if args.filename is not None:
         parameters.read_from_file(args.filename)
@@ -1523,8 +1525,7 @@ def main():
 
     # -- initialize STG_Manager
     path_to_output = parameters.get_output_path()
-    replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)
-    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
+    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, parameters.get_repl_prefix(), overwrite=True)
 
     # Write to Flightgear
     if parameters.C2P_PROCESS_POWERLINES:

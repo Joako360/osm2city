@@ -181,8 +181,7 @@ def main():
     #    logging.info('Number of forest to process: %s', len(trees))
     #    # -- initialize STG_Manager
     path_to_output = parameters.get_output_path()
-    replacement_prefix = re.sub('[\/]', '_', parameters.PREFIX)
-    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
+    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, parameters.get_repl_prefix(), overwrite=True)
 
     #write_stg_entries(stg_manager, files_to_remove, trees, "trees", 2000)
     for tree in trees.values() :

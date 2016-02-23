@@ -831,8 +831,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="tools prepares an elevation grid for Nasal script and then osm2city")
     parser.add_argument("-f", "--file", dest="filename",
-                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
-    parser.add_argument("-o", dest="o", action="store_true", help="do not overwrite existing elevation data")
+                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
+    parser.add_argument("-o", dest="o", action="store_true"
+                        , help="do not overwrite existing elevation data", required=False)
     args = parser.parse_args()
     if args.filename is not None:
         parameters.read_from_file(args.filename)
