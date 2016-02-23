@@ -80,6 +80,7 @@ required graph functions:
 """
 
 import argparse
+import enum
 import logging
 import math
 import os
@@ -173,8 +174,8 @@ def _has_duplicate_nodes(refs):
             return True
 
 
-# In Python 3.4+: @enum.unique and HighwayType(enum.IntEnum)
-class HighwayType(object):
+@enum.unique
+class HighwayType(enum.IntEnum):
     motorway = 12
     trunk = 11
     primary = 10
@@ -370,7 +371,7 @@ class Roads(objectlist.ObjectList):
             highway_type = highway_type_from_osm_tags(way.tags["highway"])
             if highway_type is None:
                 return
-            elif highway_type < parameters.HIGHWAY_TYPE_MIN:  # In Python 3.4+ use highway_type.value
+            elif highway_type.value < parameters.HIGHWAY_TYPE_MIN:
                 return
 
         self.ways_list.append(way)

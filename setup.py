@@ -5,6 +5,7 @@ Created on 10.05.2014
 """
 
 import argparse
+import enum
 import logging
 import os
 import os.path as osp
@@ -21,15 +22,35 @@ def getFGHome():
     Otherwise a platform specific path.
     """
     home_dir = osp.expanduser("~")
-    if sys.platform.startswith("win"):
+    my_os_type = get_os_type()
+    if my_os_type is OSType.windows:
         home = os.getenv("APPDATA", "APPDATA_NOT_FOUND") + os.sep + "flightgear.org" + os.sep
         return home.replace("\\", "/")
-    elif sys.platform.startswith("linux"):
+    elif my_os_type is OSType.linux:
         return home_dir + "/.fgfs/"
-    elif sys.platform.startswith("darwin"):
+    elif my_os_type is OSType.mac:
         return home_dir + "/Library/Application Support/FlightGear/"
     else:
         return None
+
+
+@enum.unique
+class OSType(enum.IntEnum):
+    windows = 1
+    linux = 2
+    mac = 3
+    other = 4
+
+
+def get_os_type():
+    if sys.platform.startswith("win"):
+        return OSType.windows
+    elif sys.platform.startswith("linux"):
+        return OSType.linux
+    elif sys.platform.startswith("darwin"):
+        return OSType.mac
+    else:
+        return OSType.other
 
 
 def get_elev_in_path(home_path):

@@ -27,6 +27,7 @@ Python Extension Packages
 osm2city uses the following Python extension packages, which must be installed on your system and be included in your ``PYTHONPATH``:
 
 * curl
+* enum34
 * matplotlib
 * networkx
 * numpy
