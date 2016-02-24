@@ -13,6 +13,9 @@ from _io import open
 
 import calc_tile
 import setup
+import tools
+
+OSM_FILE_NAME = "data.osm"
 
 
 def _get_file_name(name, tile_name):
@@ -34,9 +37,9 @@ def _open_file(name, directory):
 
 
 def _write_to_file(command, file_handle, python_exe):
-    file_handle.write(python_exe + ' ' + command + ' -f ' + replacement_path + '/params.ini ')
+    file_handle.write(python_exe + ' ' + tools.get_osm2city_directory() + os.sep + command + ' -f ' + replacement_path + '/params.ini ')
     if BASH_PARALLEL_PROCESS:
-        file_handle.write('&' + os.linesep + 'parallel_wait $max_parallel_processus' + os.linesep)
+        file_handle.write('&' + os.linesep + 'parallel_wait $max_parallel_process' + os.linesep)
     else:
         file_handle.write(os.linesep)
 
@@ -51,12 +54,12 @@ if __name__ == '__main__':
     parser.add_argument("-o", "--out", dest="out",
                         help="The name of the property file to be generated", required=True)
     parser.add_argument("-u", "--url",
-                        help='Address of the api',
-                        default="http://overpass-api.de/api/xapi?",
-                        choices=["http://jxapi.osm.rambler.ru/xapi/api/0.6/",
-                                 "http://open.mapquestapi.com/xapi/api/0.6/",
-                                 "http://jxapi.openstreetmap.org/xapi/api/0.6/",
-                                 "http://www.overpass-api.de/api/xapi?", ],
+                        help='Address of the api to download OSM data on the fly',
+                        dest="api_url",
+                        default="http://www.overpass-api.de/api/xapi_meta?",
+                        choices=["http://www.overpass-api.de/api/xapi_meta?",
+                                 "http://overpass.osm.rambler.ru/cgi/xapi_meta?",
+                                 "http://api.openstreetmap.fr/xapi?", ],
                         type=str, required=False)
     parser.add_argument("-p",  "--parallel", dest="parallel",
                         help="Force generated script to include parallel processing handling",
@@ -71,6 +74,10 @@ if __name__ == '__main__':
     parser.add_argument("-x", dest="python_executable",
                         help="Path to specific Python executable",
                         default=False,
+                        required=False)
+    parser.add_argument("-d", dest="orig_osm_data",
+                        help="Use the OSM data as specified in params.ini instead of dynamic download",
+                        action='store_true',
                         required=False)
 
     args = parser.parse_args()
@@ -151,36 +158,41 @@ done
             except OSError, e:
                 if e.errno != 17:
                     logging.exception("Unable to create path to output")
-            #if(path.count('\\')):
             replacement_path = re.sub('\\\\', '/', path) if(path.count('\\')) else path
             
-            #Manipulate the properties file and write to new destination
+            # Manipulate the properties file and write to new destination
             with open(args.properties, "r") as sources:
                 lines = sources.readlines()
             with open(path + os.sep + args.out, "w") as sources:
                 replacement = '\\1 "' + replacement_path + '"'
                 for line in lines:
-                    line = re.sub('^\s*(PREFIX\s*=)(.*)', replacement, line)
+                    if not args.orig_osm_data:
+                        line = re.sub('^\s*(PREFIX\s*=)(.*)', replacement, line)
                     line = re.sub('^\s*(BOUNDARY_EAST\s*=)(.*)', '\\1 %f' % (calc_tile.get_east_lon(lon, lat, dx)), line)
                     line = re.sub('^\s*(BOUNDARY_WEST\s*=)(.*)', '\\1 %f' % (calc_tile.get_west_lon(lon, lat, dx)), line)
                     line = re.sub('^\s*(BOUNDARY_NORTH\s*=)(.*)', '\\1 %f' % (calc_tile.get_north_lat(lat, dy)), line)
                     line = re.sub('^\s*(BOUNDARY_SOUTH\s*=)(.*)', '\\1 %f' % (calc_tile.get_south_lat(lat, dy)), line)
+                    if not args.orig_osm_data:
+                        line = re.sub('^\s*(OSM_FILE\s*=)(.*)', '\\1 "%s"' % OSM_FILE_NAME, line)
                     sources.write(line)
-#            download_command = 'wget -O %s/buildings.osm ' + args.url + 'map?bbox=%f,%f,%f,%f   '
             if args.new_download:
-                download_command = '%s download_tile.py -f %s/params.ini' % (python_exe, path)
+                download_command = '%s %s%sdownload_tile.py -f %s/params.ini -d "%s"' % (python_exe
+                                                                                       , tools.get_osm2city_directory()
+                                                                                       , os.sep
+                                                                                       , path, OSM_FILE_NAME)
                 download_file.write(download_command + os.linesep)
             else:
-                download_command = 'curl -f --retry 6 --proxy-ntlm -o %s/buildings.osm http://overpass-api.de/api/map?bbox=%f,%f,%f,%f   ' + os.linesep                        
+                download_command = 'curl -f --retry 6 --proxy-ntlm -o %s/%s -g %s*[bbox=%f,%f,%f,%f]   ' + os.linesep
                 if BASH_PARALLEL_PROCESS:
                     download_command += '&' + os.linesep + 'parallel_wait $max_parallel_process' + os.linesep
                 else:
                     download_command += os.linesep
-    #            download_command = 'curl --proxy-ntlm -o %s/buildings.osm http://overpass-api.de/api/map?bbox=%f,%f,%f,%f   ' + os.linesep            
-    #             download_command = 'wget -O %s/buildings.osm http://overpass-api.de/api/map?bbox=%f,%f,%f,%f   ' + os.linesep
-                
-                # wget -O FT_WILLIAM/buildings.osm http://overpass-api.de/api/map?bbox=-5.2,56.8,-5.,56.9
-                download_file.write(download_command % (replacement_path, calc_tile.get_west_lon(lon, lat, dx), calc_tile.get_south_lat(lat, dy), calc_tile.get_east_lon(lon, lat, dx), calc_tile.get_north_lat(lat, dy)))
+
+                download_file.write(download_command % (replacement_path, OSM_FILE_NAME, args.api_url
+                                                        , calc_tile.get_west_lon(lon, lat, dx)
+                                                        , calc_tile.get_south_lat(lat, dy)
+                                                        , calc_tile.get_east_lon(lon, lat, dx)
+                                                        , calc_tile.get_north_lat(lat, dy)))
             for command in files:
                 _write_to_file(command[0], command[1], python_exe)
     for command in files:
