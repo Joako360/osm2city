@@ -260,7 +260,7 @@ def max_slope_for_road(obj):
         else:
             return parameters.MAX_SLOPE_ROAD
     # must be aligned with accepted railways in Roads._create_linear_objects
-    elif 'railway' in obj.tags and obj.tags['railway'] in ['rail', 'disused', 'preserved', 'subway', 'narrow_gauge']:
+    elif 'railway' in obj.tags and obj.tags['railway'] in ['rail', 'disused', 'preserved', 'subway', 'narrow_gauge', 'tram', 'light_rail']:
         return parameters.MAX_SLOPE_RAILWAY
 
 
