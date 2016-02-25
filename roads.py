@@ -128,6 +128,29 @@ def _is_railway(way):
     return "railway" in way.tags
 
 
+def _is_processed_railway(way):
+    """Check whether this is not only a railway, but one that gets processed.
+
+    E.g. funiculars are currently not processed.
+    Must be aligned with accepted railways in Roads._create_linear_objects.
+    """
+    if not _is_railway(way):
+        return False
+    if way.tags['railway'] in ['rail', 'disused', 'preserved', 'subway', 'narrow_gauge', 'tram', 'light_rail']:
+        return True
+    return False
+
+
+def _calc_railway_width(way):
+    width = 1435
+    if way.tags['railway'] in ['narrow_gauge']:
+        width = 1000
+    if "gauge" in way.tags:
+        if osmparser.is_parsable_float(way.tags['gauge']):
+            width = float(way.tags['gauge'])
+    return width / 1000 * 126 / 57  # in the texture the track uses 57 out of 126 pixels
+
+
 def _is_highway(way):
     return "highway" in way.tags
 
@@ -260,7 +283,7 @@ def max_slope_for_road(obj):
         else:
             return parameters.MAX_SLOPE_ROAD
     # must be aligned with accepted railways in Roads._create_linear_objects
-    elif 'railway' in obj.tags and obj.tags['railway'] in ['rail', 'disused', 'preserved', 'subway', 'narrow_gauge', 'tram', 'light_rail']:
+    elif 'railway' in obj.tags:
         return parameters.MAX_SLOPE_RAILWAY
 
 
@@ -352,15 +375,8 @@ class Roads(objectlist.ObjectList):
         """OSMContentHandler way callback method.
 
         Take one osm way, store it. A linear object is created later."""
-        if not self.min_max_scanned:
-            self._process_nodes(nodes_dict)
-            logging.info("len of nodes_dict %i", len(nodes_dict))
-            self.min_max_scanned = True
-            cmin = vec2d(self.minlon, self.minlat)
-            cmax = vec2d(self.maxlon, self.maxlat)
-            logging.debug("min/max " + str(cmin) + " " + str(cmax))
 
-        if len(self.ways_list) >= parameters.MAX_OBJECTS: 
+        if len(self.ways_list) >= parameters.MAX_OBJECTS:
             return
 
         if way.osm_id in parameters.SKIP_LIST:
@@ -373,6 +389,17 @@ class Roads(objectlist.ObjectList):
                 return
             elif highway_type.value < parameters.HIGHWAY_TYPE_MIN:
                 return
+
+        if not _is_processed_railway(way):
+            return
+
+        if not self.min_max_scanned:
+            self._process_nodes(nodes_dict)
+            logging.info("len of nodes_dict %i", len(nodes_dict))
+            self.min_max_scanned = True
+            cmin = vec2d(self.minlon, self.minlat)
+            cmax = vec2d(self.maxlon, self.maxlat)
+            logging.debug("min/max " + str(cmin) + " " + str(cmax))
 
         self.ways_list.append(way)
 
@@ -559,18 +586,17 @@ class Roads(objectlist.ObjectList):
             elif _is_railway(the_way):
                 if the_way.tags['railway'] in ['rail', 'disused', 'preserved', 'subway']:
                     priority = 20
-                    width = 3.17  # tracks are 57 px out of 126 px. European track width = 1.435m
                     tex = textures.road.TRACK
                 elif the_way.tags['railway'] in ['narrow_gauge']:
                     priority = 19
-                    width = 2.21
                     tex = textures.road.TRACK  # FIXME: should use proper texture
                 elif the_way.tags['railway'] in ['tram', 'light_rail']:
                     priority = 18
-                    width = 3.17
                     tex = textures.road.TRAMWAY
                 else:
                     priority = 0  # E.g. monorail, miniature
+                if priority > 0:
+                    width = _calc_railway_width(the_way)
 
             if priority == 0:
                 continue
