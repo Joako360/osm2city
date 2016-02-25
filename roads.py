@@ -348,8 +348,8 @@ class Roads(objectlist.ObjectList):
     VALID_NODE_KEYS = []
     REQ_KEYS = ['highway', 'railway']
 
-    def __init__(self, transform, elev):
-        super(Roads, self).__init__(transform)
+    def __init__(self, transform, elev, boundary_clipping_complete_way):
+        super(Roads, self).__init__(transform, None, boundary_clipping_complete_way)
         self.elev = elev
         self.ways_list = list()
         self.bridges_list = list()
@@ -392,6 +392,11 @@ class Roads(objectlist.ObjectList):
             if not _is_processed_railway(way):
                 return
 
+        if self.boundary_clipping_complete_way is not None:
+            first_node = nodes_dict[way.refs[0]]
+            if not self.boundary_clipping_complete_way.contains(shg.Point(first_node.lon, first_node.lat)):
+                return
+
         if not self.min_max_scanned:
             self._process_nodes(nodes_dict)
 
@@ -408,7 +413,9 @@ class Roads(objectlist.ObjectList):
         self._cleanup_topology()
         self._check_points_on_line_distance()
 
+        self._remove_unused_nodes()
         self._probe_elev_at_nodes()
+
         logging.debug("before linear " + str(self))
         # self._debug_show_h_add("before linear ob")
 
@@ -431,9 +438,13 @@ class Roads(objectlist.ObjectList):
             self._keep_only_bridges_and_embankments()
         self._clusterize()
 
-
-    #roads.cleanup_junctions()
-#    roads.objects = [roads.objects[0]]
+    def _remove_unused_nodes(self):
+        """Remove all nodes which are not used in ways in order not to do elevation probing in vane."""
+        used_nodes_dict = dict()
+        for way in self.ways_list:
+            for ref in way.refs:
+                used_nodes_dict[ref] = self.nodes_dict[ref]
+        self.nodes_dict = used_nodes_dict
 
     def _probe_elev_at_nodes(self):
         """Add elevation info to all nodes.
@@ -1128,11 +1139,14 @@ def main():
     transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(transform)
     elev = tools.get_interpolator(fake=parameters.NO_ELEV)
-    roads = Roads(transform, elev)
-    if parameters.BOUNDARY_CLIPPING:
+
+    border = None
+    boundary_clipping_complete_way = None
+    if parameters.BOUNDARY_CLIPPING_COMPLETE_WAYS:
+        boundary_clipping_complete_way = shg.Polygon(parameters.get_clipping_extent(False))
+    elif parameters.BOUNDARY_CLIPPING:
         border = shg.Polygon(parameters.get_clipping_extent())
-    else:
-        border = None
+    roads = Roads(transform, elev, boundary_clipping_complete_way)
     handler = osmparser.OSMContentHandler(roads.VALID_NODE_KEYS, border=border)
     logging.info("Reading the OSM file might take some time ...")
 

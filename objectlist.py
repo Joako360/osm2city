@@ -15,7 +15,7 @@ class ObjectList(object):
     Class for storing a List OSM Objects
     '''
 
-    def __init__(self, transform=None, clusters=None):
+    def __init__(self, transform=None, clusters=None, boundary_clipping_complete_way=None):
         '''
         Constructor
         '''
@@ -27,6 +27,7 @@ class ObjectList(object):
         self.minlat = 91.
         self.maxlat = -91.
         self.min_max_scanned = False
+        self.boundary_clipping_complete_way = boundary_clipping_complete_way
 
     def _process_nodes(self, nodes_dict):
         self.nodes_dict = nodes_dict

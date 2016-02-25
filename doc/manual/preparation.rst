@@ -130,7 +130,7 @@ PATH_TO_SCENERY
     likely you'll want to use your TerraSync path here.
 
 PATH_TO_OUTPUT
-    The generated scenery (.stg, .ac, .xml) will be written to this path — specified without triling slash. If empty then the correct location in PATH_TO_SCENERY is used. Note that if you use TerraSync for PATH_TO_SCENERY, you MUST choose a different path here. Otherwise, TerraSync will overwrite the generated scenery. Unless you know what you are doing, there is no reason not to specify a dedicated path here. While not absolutely needed it is good practice to name the output folder the same as ``PREFIX``.
+    The generated scenery (.stg, .ac, .xml) will be written to this path — specified without trailing slash. If empty then the correct location in PATH_TO_SCENERY is used. Note that if you use TerraSync for PATH_TO_SCENERY, you MUST choose a different path here. Otherwise, TerraSync will overwrite the generated scenery. Unless you know what you are doing, there is no reason not to specify a dedicated path here. While not absolutely needed it is good practice to name the output folder the same as ``PREFIX``.
 OSM_FILE
     The file containing OpenStreetMap data. See previous chapter :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>`. The file should reside in $PREFIX and no path components are allowed (i.e. pure file name).
 BOUNDARY_*
@@ -168,7 +168,7 @@ Please be aware that the scenery data needed for your area might not have been d
 Available Elevation Probing Modes
 ---------------------------------
 
-There are a few different possibilities to generate elevation data, each of which is discussed in details in subchapters below. This is what is specified in parameter ``ELEV_MODE`` in the ``params.ini`` file:
+There are a few different possibilities to generate elevation data, each of which is discussed in details in sub-chapters below. This is what is specified in parameter ``ELEV_MODE`` in the ``params.ini`` file:
 
 * :ref:`ELEV_MODE = "FgelevCaching" <chapter-elev-fgelevcaching-label>`: most automated and convenient
 * :ref:`ELEV_MODE = "Fgelev" <chapter-elev-fgelev-label>`: use this instead of ``FgelevCaching`` if you have clear memory or speed limitations

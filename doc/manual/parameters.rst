@@ -111,11 +111,46 @@ LOD_PERCENTAGE_DETAIL                           Decimal    0.5       Of the rema
 =============================================   ========   =======   ==============================================================================
 
 
+.. _chapter-parameters-clipping:
+
+----------------
+Clipping Region
+----------------
+
+The boundary of a scenery as specified by the parameters ``BOUNDARY_*`` is not necessarily sharp. As described in :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>` it is recommended to use ``completeWays=yes``, when manipulating/getting OSM data - this happens also to be the case when using the `OSM Extended API`_ to retrieve data e.g. as part of :ref:`Working in batch mode <chapter-batch-mode>`. The parameters below give the possibility to influence, which data outside of the boundary is processed.
+
+.. _`OSM Extended API`: http://wiki.openstreetmap.org/wiki/Xapi
+
+BOUNDARY_CLIPPING = True
+BOUNDARY_CLIPPING_BORDER_SIZE = 0.25
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+BOUNDARY_CLIPPING                               Boolean    True      If True the everythin outside the boundary is clipped away. This clipping
+                                                                     includes ways (e.g. roads, buildings), where nodes outside the boundary
+                                                                     are removed.
+                                                                     If both this parameter and ``BOUNDARY_CLIPPING_COMPLETE_WAYS`` are set to 
+                                                                     False, then make sure that the ``OSM_FILE`` only contain the necessary data
+                                                                     (which in most situations is recommended).
+BOUNDARY_CLIPPING_BORDER_SIZE                   Decimal    0.25      Additional border in meters to catch OSM data just at the edge. Used together
+                                                                     with ``BOUNDARY_CLIPPING=True``.
+
+BOUNDARY_CLIPPING_COMPLETE_WAYS                 Boolean    False     If True it overrides ``BOUNDARY_CLIPPING`` and keeps all those ways, where the
+                                                                     first referenced node is within the boundary as specified by ``BOUNDARY_*``.
+                                                                     This leads to more a graceful handling when different adjacent sceneries are
+                                                                     created (e.g. batch processing), such that e.g. roads not just stop on either
+                                                                     side of the boundary. However this comes with the cost of more needed 
+                                                                     processing. Do not use if just one scenery area in one pass is created.
+
+=============================================   ========   =======   ==============================================================================
+
+
 .. _chapter-parameters-roads:
 
---------------
-Linear Objects
---------------
+--------------------------------
+Linear Objects (Roads, Railways)
+--------------------------------
 
 Parameters for roads, railways and related bridges. One of the challenges to show specific textures based on OSM data is to fit the texture such that it drapes ok on top of the scenery. Therefore several parameters relate to enabling proper draping.
 

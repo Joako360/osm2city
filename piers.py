@@ -63,6 +63,9 @@ class Piers(ObjectList):
     req_keys = ['man_made']
     valid_keys = ['area']
 
+    def __init__(self, transform, clusters, boundary_clipping_complete_way):
+        ObjectList.__init__(self, transform, clusters, boundary_clipping_complete_way)
+
     def create_from_way(self, way, nodes_dict):
         if not self.min_max_scanned:
             self._process_nodes(nodes_dict)
@@ -73,6 +76,11 @@ class Piers(ObjectList):
                 col = 6
         if col is None:
             return
+
+        if self.boundary_clipping_complete_way is not None:
+            first_node = nodes_dict[way.refs[0]]
+            if not self.boundary_clipping_complete_way.contains(shg.Point(first_node.lon, first_node.lat)):
+                return
 
         pier = Pier(self.transform, way.osm_id, way.tags, way.refs, nodes_dict)
         self.objects.append(pier)
@@ -349,11 +357,13 @@ def main():
     lmax = vec2d(tools.transform.toLocal(cmax))
     clusters = Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
    
-    piers = Piers(transform, clusters)
-    if parameters.BOUNDARY_CLIPPING:
+    border = None
+    boundary_clipping_complete_way = None
+    if parameters.BOUNDARY_CLIPPING_COMPLETE_WAYS:
+        boundary_clipping_complete_way = shg.Polygon(parameters.get_clipping_extent(False))
+    elif parameters.BOUNDARY_CLIPPING:
         border = shg.Polygon(parameters.get_clipping_extent())
-    else:
-        border = None
+    piers = Piers(transform, clusters, boundary_clipping_complete_way)
     handler = osmparser.OSMContentHandler(valid_node_keys=[], border=border)
     source = open(osm_fname)
     logging.info("Reading the OSM file might take some time ...")
