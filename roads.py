@@ -389,9 +389,9 @@ class Roads(objectlist.ObjectList):
                 return
             elif highway_type.value < parameters.HIGHWAY_TYPE_MIN:
                 return
-
-        if not _is_processed_railway(way):
-            return
+        elif _is_railway(way):
+            if not _is_processed_railway(way):
+                return
 
         if not self.min_max_scanned:
             self._process_nodes(nodes_dict)
