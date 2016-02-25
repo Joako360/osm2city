@@ -46,6 +46,7 @@ BOUNDARY_NORTH = 47.50
 # Clip all nodes outside the bounding box
 BOUNDARY_CLIPPING = True
 BOUNDARY_CLIPPING_BORDER_SIZE = 0.25
+BOUNDARY_CLIPPING_COMPLETE_WAYS = False
 
 OSM_FILE = "buildings.osm"  # -- file name of the file with OSM data. Should reside in $PREFIX. No path components allowed.
 USE_PKL = False             # -- instead of parsing the OSM file, read a previously created cache file $PREFIX/buildings.pkl

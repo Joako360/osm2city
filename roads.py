@@ -84,7 +84,6 @@ import enum
 import logging
 import math
 import os
-import re
 import random
 import textwrap
 
@@ -395,11 +394,6 @@ class Roads(objectlist.ObjectList):
 
         if not self.min_max_scanned:
             self._process_nodes(nodes_dict)
-            logging.info("len of nodes_dict %i", len(nodes_dict))
-            self.min_max_scanned = True
-            cmin = vec2d(self.minlon, self.minlat)
-            cmax = vec2d(self.maxlon, self.maxlat)
-            logging.debug("min/max " + str(cmin) + " " + str(cmax))
 
         self.ways_list.append(way)
 
@@ -826,7 +820,7 @@ class Roads(objectlist.ObjectList):
                     except:
                         lw = lw_w[0]
                         
-                    plt.plot(a[:,0], a[:,1], color=cluster_color, linewidth=lw+2)
+                    plt.plot(a[:, 0], a[:, 1], color=cluster_color, linewidth=lw+2)
 
         for the_way in self.ways_list:
             self.debug_plot_way(the_way, '-', lw=0.5, show_label=True, ends_marker='x')
@@ -1135,7 +1129,11 @@ def main():
     tools.init(transform)
     elev = tools.get_interpolator(fake=parameters.NO_ELEV)
     roads = Roads(transform, elev)
-    handler = osmparser.OSMContentHandler(roads.VALID_NODE_KEYS)
+    if parameters.BOUNDARY_CLIPPING:
+        border = shg.Polygon(parameters.get_clipping_extent())
+    else:
+        border = None
+    handler = osmparser.OSMContentHandler(roads.VALID_NODE_KEYS, border=border)
     logging.info("Reading the OSM file might take some time ...")
 
     handler.register_way_callback(roads.store_way, req_keys=roads.REQ_KEYS)

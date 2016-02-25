@@ -1,9 +1,12 @@
-'''
+"""
 Created on 15.06.2014
 
 @author: keith.paterson
-'''
+"""
+
 import logging
+import vec2d
+
 from __builtin__ import max
 
 
@@ -27,14 +30,18 @@ class ObjectList(object):
 
     def _process_nodes(self, nodes_dict):
         self.nodes_dict = nodes_dict
-        self.min_max_scanned = True
+        logging.debug("len of nodes_dict %i", len(nodes_dict))
+
         for node in nodes_dict.values():
-            #logging.debug('%s %.4f %.4f', node.osm_id, node.lon, node.lat)
-                self.maxlon = max(self.maxlon, node.lon)
-                self.minlon = min(self.minlon, node.lon)
-                self.maxlat = max(self.maxlat, node.lat)
-                self.minlat = min(self.minlat, node.lat)
-        logging.debug("")
+            self.maxlon = max(self.maxlon, node.lon)
+            self.minlon = min(self.minlon, node.lon)
+            self.maxlat = max(self.maxlat, node.lat)
+            self.minlat = min(self.minlat, node.lat)
+        self.min_max_scanned = True
+
+        cmin = vec2d.vec2d(self.minlon, self.minlat)
+        cmax = vec2d.vec2d(self.maxlon, self.maxlat)
+        logging.info("min/max " + str(cmin) + " " + str(cmax))
 
     def __len__(self):
         return len(self.objects)

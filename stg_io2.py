@@ -105,7 +105,7 @@ class STG_File(object):
     def _add_object(self, obj_prefix, ac_file_name, lon_lat, elev, hdg, once=False):
         """add OBJECT_XXXXX line to our_list. Returns path to stg."""
         line = "OBJECT_%s %s %1.5f %1.5f %1.2f %g\n" % (obj_prefix.upper(), ac_file_name, lon_lat.lon, lon_lat.lat, elev, hdg)
-        if once == False or (ac_file_name not in self.our_ac_file_name_list):
+        if once is False or (ac_file_name not in self.our_ac_file_name_list):
             self.our_list.append(line)
             self.our_ac_file_name_list.append(ac_file_name)
             logging.debug(self.file_name + ':' + line)

@@ -9,14 +9,12 @@ Created on Sun Sep 29 10:42:12 2013
 
 @author: Portree Kid
 """
-import matplotlib.pyplot as plt
 import numpy as np
 from vec2d import vec2d
 import shapely.geometry as shg
 import coordinates
 import tools
 import parameters
-import calc_tile
 import os
 import ac3d
 import stg_io2
@@ -25,9 +23,7 @@ from objectlist import ObjectList
 import logging
 import osmparser
 
-import re
 from cluster import Clusters
-from shapely.geos import lgeos
 
 
 OUR_MAGIC = "osm2platforms"  # Used in e.g. stg files to mark edits by osm2platforms
@@ -43,11 +39,10 @@ class Platform(object):
         self.nodes = []
         self.is_area = 'area' in tags
         self.logger = logging.getLogger("platforms")
-        
-        if 'layer' in tags:
-            self.logger.warn("layer %s %d"%(tags['layer'],osm_id))
 
-#    def transform(self, nodes_dict, transform):
+        if 'layer' in tags:
+            self.logger.warn("layer %s %d", tags['layer'], osm_id)
+
         self.osm_nodes = [nodes_dict[r] for r in refs]
         self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in self.osm_nodes])
         # self.nodes = np.array([(n.lon, n.lat) for n in osm_nodes])
@@ -65,58 +60,44 @@ class Platforms(ObjectList):
         self.logger = logging.getLogger("platforms")
 
     def create_from_way(self, way, nodes_dict):
-# Processes one way into a platform
         if not self.min_max_scanned:
             self._process_nodes(nodes_dict)
-            self.min_max_scanned = True
-            cmin = vec2d(self.minlon, self.minlat)
-            cmax = vec2d(self.maxlon, self.maxlat)
-            self.logger.info("min/max " + str(cmin) + " " + str(cmax))
-#            center_global = (cmin + cmax)*0.5
-            # center_global = vec2d(1.135e1+0.03, 0.02+4.724e1)
-            # self.transform = coordinates.Transformation(center_global, hdg = 0)
-            # tools.init(self.transform) # FIXME. Not a nice design.
 
         col = None
         if 'railway' in way.tags:
             if way.tags['railway'] == 'platform':
                 col = 6
-
-        if col == None:
-#            print "got", way.osm_id,
-#            for t in way.tags.keys():
-#                print (t), "=", (way.tags[t])+" ",
-#            print "(rejected)"
+        if col is None:
             return
+
         if 'layer' in way.tags and atoi(way.tags['layer']) < 0:
             return
 
-        # print "(accepted)"
         platform = Platform(self.transform, way.osm_id, way.tags, way.refs, nodes_dict)
         self.objects.append(platform)
         self.clusters.append(platform.anchor, platform)        
 
-    def write(self, elev, stg_manager, path, center_global):
+    def write(self, elev, stg_manager, replacement_prefix):
         for cl in self.clusters:
-            tile_elev = elev(cl.center)
-            if( len(cl.objects) > 0 ):            
-                center_tile = vec2d(tools.transform.toGlobal(cl.center))       
-                ac_fname = "platforms%02i%02i.ac" % (cl.I.x, cl.I.y)     
+            if len(cl.objects) > 0:
+                center_tile = vec2d(tools.transform.toGlobal(cl.center))
+                ac_fname = "%splatforms%02i%02i.ac" % (replacement_prefix, cl.I.x, cl.I.y)
                 ac = ac3d.File(stats=tools.stats)
                 obj = ac.new_object('platforms', "Textures/Terrain/asphalt.png")
                 for platform in cl.objects[:]:
-                    if(platform.is_area):
-                        self.write_area(platform, elev, ac, obj, cl.center)                        
+                    if platform.is_area:
+                        self._write_area(platform, elev, obj, cl.center)
                     else:
-                        self.write_line(platform, elev, ac, obj, cl.center)
+                        self._write_line(platform, elev, obj, cl.center)
+
+                # using 0 elevation and 0 heading because ac-models already account for it
                 path = stg_manager.add_object_static(ac_fname, center_tile, 0, 0)
                 fname = path + os.sep + ac_fname
                 f = open(fname, 'w')
                 f.write(str(ac))
                 f.close()                
-                        
 
-    def write_area(self, platform, elev, ac, obj, offset):
+    def _write_area(self, platform, elev, obj, offset):
     # Writes a platform mapped as an area
         linear_ring = shg.LinearRing(platform.nodes)
 
@@ -148,14 +129,14 @@ class Platforms(ObjectList):
             obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
 # Build Sides
         for i, n in enumerate(top_nodes[1:]):
-            sideface = []
+            sideface = list()
             sideface.append((n + o + rd_len - 1, x, 0.5))
             sideface.append((n + o + rd_len, x, 0.5))
             sideface.append((n + o, x, 0.5))
             sideface.append((n + o - 1, x, 0.5))
             obj.face(sideface, mat=0)
 
-    def write_line(self, platform, elev, ac, obj, offset):
+    def _write_line(self, platform, elev, obj, offset):
     # Writes a platform as a area which only is mapped as a line
         o = obj.next_node_index()
         left = platform.line_string.parallel_offset(2, 'left', resolution=8, join_style=1, mitre_limit=10.0)
@@ -199,7 +180,7 @@ class Platforms(ObjectList):
 # Build Sides
         for i, n in enumerate(nodes_l[1:]):
             # Start with Second point looking back
-            sideface = []
+            sideface = list()
             sideface.append((n + idx_bottom_left, x, 0.5))
             sideface.append((n + idx_bottom_left - 1, x, 0.5))
             sideface.append((n + idx_left - 1, x, 0.5))
@@ -207,20 +188,20 @@ class Platforms(ObjectList):
             obj.face(sideface, mat=0)
         for i, n in enumerate(nodes_r[1:]):
             # Start with Second point looking back
-            sideface = []
+            sideface = list()
             sideface.append((n + idx_bottom_right, x, 0.5))
             sideface.append((n + idx_bottom_right - 1, x, 0.5))
             sideface.append((n + idx_right - 1, x, 0.5))
             sideface.append((n + idx_right, x, 0.5))
             obj.face(sideface, mat=0)
 # Build Front&Back
-        sideface = []
+        sideface = list()
         sideface.append((idx_left, x, 0.5))
         sideface.append((idx_bottom_left, x, 0.5))
         sideface.append((idx_end, x, 0.5))
         sideface.append((idx_bottom_left - 1, x, 0.5))
         obj.face(sideface, mat=0)
-        sideface = []
+        sideface = list()
         sideface.append((idx_bottom_right, x, 0.5))
         sideface.append((idx_bottom_right - 1, x, 0.5))
         sideface.append((idx_right - 1, x, 0.5))
@@ -258,14 +239,17 @@ def main():
     transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(transform)
     
-     # -- create (empty) clusters
+    # -- create (empty) clusters
     lmin = vec2d(tools.transform.toLocal(cmin))
     lmax = vec2d(tools.transform.toLocal(cmax))
     clusters = Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
 
     platforms = Platforms(transform, clusters)
-
-    handler = osmparser.OSMContentHandler(valid_node_keys=[])
+    if parameters.BOUNDARY_CLIPPING:
+        border = shg.Polygon(parameters.get_clipping_extent())
+    else:
+        border = None
+    handler = osmparser.OSMContentHandler(valid_node_keys=[], border=border)
     source = open(osm_fname)
     logging.info("Reading the OSM file might take some time ...")
 
@@ -273,40 +257,18 @@ def main():
     handler.parse(source)
 
     logging.info("ways: %i", len(platforms))
-    if(len(platforms) == 0):
+    if len(platforms) == 0:
         logging.info("No platforms found ignoring")
         return
-
-    # transform = tools.transform
-    # center_global =  vec2d(transform.toGlobal(vec2d(0,0)))
-    if parameters.PATH_TO_OUTPUT:
-        path = calc_tile.construct_path_to_stg(parameters.PATH_TO_OUTPUT, center_global)
-    else:
-        path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center_global)
-
-    # -- quick test output
-    col = ['b', 'r', 'y', 'g', '0.75', '0.5', 'k']
-    lw = [2, 1.5, 1.2, 1, 1, 1, 1]
-    lw_w = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 1]
-
-    if 0:
-        for p in platforms.objects:
-            a = p.nodes
-            # np.array([transform.toLocal((n.lon, n.lat)) for n in r.nodes])
-            plt.plot(a[:, 0], a[:, 1], color=col[p.typ], linewidth=lw[p.typ])
-            plt.plot(a[:, 0], a[:, 1], color='w', linewidth=lw_w[p.typ], ls=":")
-
-        plt.axes().set_aspect('equal')
-        # plt.show()
-        plt.savefig('platforms.eps')
 
     elev = tools.get_interpolator()
 
     # -- initialize STG_Manager
     path_to_output = parameters.get_output_path()
-    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, parameters.get_repl_prefix(), overwrite=True)
+    replacement_prefix = parameters.get_repl_prefix()
+    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
 
-    ac = platforms.write(elev, stg_manager, path, center_global)
+    platforms.write(elev, stg_manager, replacement_prefix)
     logging.info("done.")
 
     # -- write stg
