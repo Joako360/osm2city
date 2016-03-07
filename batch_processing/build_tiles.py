@@ -182,7 +182,7 @@ done
                                                                                        , path, OSM_FILE_NAME)
                 download_file.write(download_command + os.linesep)
             else:
-                download_command = 'curl -f --retry 6 --proxy-ntlm -o %s/%s -g %s*[bbox=%f,%f,%f,%f]   ' + os.linesep
+                download_command = 'curl -f --retry 6 --proxy-ntlm -o %s/%s -g %s*[bbox=%f,%f,%f,%f]   '
                 if BASH_PARALLEL_PROCESS:
                     download_command += '&' + os.linesep + 'parallel_wait $max_parallel_process' + os.linesep
                 else:
