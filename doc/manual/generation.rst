@@ -98,7 +98,7 @@ Optional command line arguments:
 * -u: Which API to use to download OSM data on the fly.
 * -n: There are two implementations of downloading data on the fly. If this option is used, then a download program is used, which has better support for retries (FIXME: does this work?)
 * -x: If ``python`` is not in your executable path or you want to specify a specific Python version if you have installed several versions, then use this argument (e.g. ``/usr/bin/python2.7``).
-* -d: Use the OSM data file as specified in the overall ``params.ini`` instead of dynamic download. This can be used if e.g. ``curl`` is not available (mostly on Windows) or if you have problems with dynamic download. Be sure to set parameter ``BOUNDARY_CLIPPING=True`` and consider ``BOUNDARY_CLIPPING_COMPLETE_WAYS=True``.
+* -d: Use the OSM data file as specified in the overall ``params.ini`` instead of dynamic download. This can be used if e.g. ``curl`` is not available (mostly on Windows) or if you have problems with dynamic download. Be sure to set parameter ``BOUNDARY_CLIPPING=True`` and consider ``BOUNDARY_CLIPPING_COMPLETE_WAYS=True``. While this is a possibility, it is not recommended, because reading a large OSM-file repeatedly costs more time than downloading dynamically or even running a tool like Osmosis and manually copy the files into the sub-folders. This can be especially problematic if running parallel threads, all of which accessing the same file.
 
 ``build_tiles.py`` creates a directory layout like the following:
 
@@ -117,7 +117,7 @@ Optional command line arguments:
                     tools_e009n47.sh
 
 
-The contents of ``osm2city_e009n47.sh`` looks like 
+The contents of ``osm2city_e009n47.sh`` looks like the following if argument ``-p`` was not used. Otherwise the file would start with bash instructions for parallelization.
 
 ::
 
@@ -126,6 +126,13 @@ The contents of ``osm2city_e009n47.sh`` looks like
     python osm2city.py -f w010n60/w003n60/2909569/params.ini
     ...
     python osm2city.py -f w010n60/w003n60/2909627/params.ini
+
+
+If you used argument ``-p`` during generation of the shell / command files, then you would add the number of parallel processes like the following (in the example 4 processes):
+
+::
+
+    $ ./e000n40/osm2city_e009n47.sh 4
 
 
 .. [#] you can name this file whatever you want — "params.ini" is just a convenience / convention.
