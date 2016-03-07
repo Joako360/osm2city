@@ -43,7 +43,10 @@ class Platform(object):
         if 'layer' in tags:
             self.logger.warn("layer %s %d", tags['layer'], osm_id)
 
-        self.osm_nodes = [nodes_dict[r] for r in refs]
+        self.osm_nodes = list()
+        for r in refs:  # safe way instead of [nodes_dict[r] for r in refs] if ref would be missing
+            if r in nodes_dict:
+                self.osm_nodes.append(nodes_dict[r])
         self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in self.osm_nodes])
         # self.nodes = np.array([(n.lon, n.lat) for n in osm_nodes])
         self.line_string = shg.LineString(self.nodes)

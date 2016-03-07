@@ -41,8 +41,11 @@ class Pier(object):
         self.is_area = 'area' in tags
         self.elevation = 0
 
-        self.osm_nodes = [nodes_dict[r] for r in refs]
-        self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in self.osm_nodes])        
+        self.osm_nodes = list()
+        for r in refs:  # safe way instead of [nodes_dict[r] for r in refs] if ref would be missing
+            if r in nodes_dict:
+                self.osm_nodes.append(nodes_dict[r])
+        self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in self.osm_nodes])
         self.anchor = vec2d(self.nodes[0])
 
     def calc_elevation(self, elev_interpolator):
