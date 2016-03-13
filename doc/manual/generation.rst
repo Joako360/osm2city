@@ -72,7 +72,9 @@ The default work flow is based on the sub-chapters of :ref:`Preparation <chapter
 #. Adapt ``params.ini``. This will get copied to several subdirectories as part of the next process steps. Most importantly apapt the parameter ``PATH_TO_OUTPUT`` (in the example below "/home/fg_customscenery/CH_OSM"). The ``PREFIX`` and ``BOUNDARY_*`` parameters will automatically be updated.
 #. :ref:`Call build_tiles.py <chapter-build-tiles-label>`. This step creates sub-directories including a set of shell / command scripts. The top directory will be created in your ``WORKING_DIRECTORY`` and have the same name as the lon/lat area specified with argument ``-t``
 #. If needed adapt the params.ini files in the sub-directories if you need to change specific characteristics within one tile (e.g. parameters for building height etc.). In most situations this will not be needed.
-#. Call the generated scripts starting with ``download_xxxxx.sh`` and ``tiles_xxxxx.sh`` (depending on the chosen elevation probing mode) and then the rest.
+#. Call the generated scripts starting with ``download_xxxxx.sh``. Make sure you are still in the correct working directory, because path names are relative.
+#. Call ``tiles_xxxxx.sh`` depending on the chosen elevation probing mode
+#. Call ``osm2city_xxxxx.sh``, ``osm2pylons_xxxxx.sh`` etc. depending on your requirements.
 #. :ref:`Copy textures <chapter-copy-textures-label>`
 
 
@@ -84,13 +86,12 @@ Calling build_tiles.py
 
 ::
 
-    /usr/bin/python2.7 /home/pingu/develop_vcs/osm2city/batch_processing/build_tiles.py -t e009n47 -f CH_OSM/params_kp.ini -o params.ini
+    $ /usr/bin/python2.7 /home/pingu/develop_vcs/osm2city/batch_processing/build_tiles.py -t e009n47 -f CH_OSM/params_kp.ini -o params.ini
 
 Mandatory command line arguments:
 
-* -t: the name of the 1-degree lon/lat-area, e.g. w003n60 or e012s06 (you need to provide 3 digits for longitude and 2 digits for latitude). The lon/lat position is the lower left corner (e.g. e009n47 to cover most of the Lake of Constance region).
+* -t: the name of the 1-degree lon/lat-area, e.g. w003n60 or e012s06 (you need to provide 3 digits for longitude and 2 digits for latitude). The lon/lat position is the lower left corner (e.g. e009n47 to cover most of the Lake of Constance region in Europe).
 * -f: the relative path to the main params.ini file, which is the template copied to all sub-directories.
-* -o: the name of the copied params.ini files in the sub-directories
 
 Optional command line arguments:
 
@@ -98,7 +99,15 @@ Optional command line arguments:
 * -u: Which API to use to download OSM data on the fly.
 * -n: There are two implementations of downloading data on the fly. If this option is used, then a download program is used, which has better support for retries (FIXME: does this work?)
 * -x: If ``python`` is not in your executable path or you want to specify a specific Python version if you have installed several versions, then use this argument (e.g. ``/usr/bin/python2.7``).
-* -d: Use the OSM data file as specified in the overall ``params.ini`` instead of dynamic download. This can be used if e.g. ``curl`` is not available (mostly on Windows) or if you have problems with dynamic download. Be sure to set parameter ``BOUNDARY_CLIPPING=True`` and consider ``BOUNDARY_CLIPPING_COMPLETE_WAYS=True``. While this is a possibility, it is not recommended, because reading a large OSM-file repeatedly costs more time than downloading dynamically or even running a tool like Osmosis and manually copy the files into the sub-folders. This can be especially problematic if running parallel threads, all of which accessing the same file.
+* -d: Instead of dynamic download an existing OSM data file as specified in the overall ``params.ini`` will be used. This can be used if e.g. ``curl`` is not available (mostly on Windows) or if you have problems with dynamic download or if you need to manipulate the OSM data after download and before processing. A pre-requisite for this is that you have Osmosis installed on your computer (see also :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>`) — the path to the Osmosis executable needs to be specified with this command line argument.
+* -o: the name of the copied params.ini files in the sub-directories
+
+Calling build_tiles.py with optional argument ``-d`` could look like the following:
+
+::
+
+    $ /usr/bin/python2.7 /home/pingu/develop_vcs/osm2city/batch_processing/build_tiles.py -t e009n47 -f CH_OSM/params.ini -o params.ini -x /usr/bin/python2.7 -d /home/pingu/bin/osmosis-latest/bin/osmosis
+
 
 ``build_tiles.py`` creates a directory layout like the following:
 
@@ -108,7 +117,7 @@ Optional command line arguments:
         fg_customscenery/
             projects/
                 e000n40/
-                    download_e009n47.sh
+                    download_e009n47.sh        # If option -d was chosen, then the commands within will call Osmosis and not download stuff
                     osm2city_e009n47.sh
                     osm2pylon_e009n47.sh
                     piers_e009n47.sh

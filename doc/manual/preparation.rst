@@ -87,11 +87,14 @@ Be aware that ``osm2city`` only accepts OSM data in xml-format, i.e. ``*.osm`` f
     c:\> "C:\FlightGear\osmosis-latest\bin\osmosis.bat" --read-pbf file="C:\FlightGear\fg_customscenery\raw_data\switzerland-latest.osm.pbf"
          --bounding-box completeWays=yes top=46.7 left=9.75 bottom=46.4 right=10.0 --wx file="C:\FlightGear\fg_customscenery\projects\LSZS\lszs_wider.osm"
 
+The exception to the requirement of using OSM data in xml-format is if you use batch processing with the optional ``-d`` command line argument (see :ref:`Calling build_tiles.py <chapter-build-tiles-label>`). In that situation you might want to consider using the pbf-format_.
+
 Please be aware of the `Tile Index Schema`_ in FlightGear. It is advised to set boundaries, which do not cross tiles. Otherwise the scenery objects can jitter and disappear / re-appear due to the clusters of facades crossing tiles. Another reason to keep within boundaries is the sheer amount of data that needs to be kept in memory.
 
 .. _information: http://wiki.openstreetmap.org/wiki/Downloading_data
 .. _Osmosis: http://wiki.openstreetmap.org/wiki/Osmosis
 .. _`Tile Index Schema`: http://wiki.flightgear.org/Tile_Index_Scheme
+.. _pbf-format: http://wiki.openstreetmap.org/wiki/PBF_Format
 
 
 .. _chapter-setting-parameters-label:
