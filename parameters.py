@@ -75,8 +75,6 @@ ELEV_RASTER_Y = 10
 
 TELNET_PORT = 5501  # The port FlightGear listens to. Needed for ELEV_MODE = "Telnet"
 
-quiet = False
-
 #=============================================================================
 # PARAMETERS RELATED TO BUILDINGS IN osm2city
 #=============================================================================
@@ -298,27 +296,25 @@ def get_clipping_extent(use_border=True):
 
 def show():
     """
-    Prints all parameters as key = value
+    Prints all parameters as key = value if log level is INFO or lower
     """
-    global quiet
-    if quiet:
-        return
-    print '--- Using the following parameters: ---'
-    my_globals = globals()
-    for k in sorted(my_globals.iterkeys()):
-        if k.startswith('__'):
-            continue
-        elif k == "args":
-            continue
-        elif k == "parser":
-            continue
-        elif isinstance(my_globals[k], types.ClassType) or \
-                isinstance(my_globals[k], types.FunctionType) or \
-                isinstance(my_globals[k], types.ModuleType):
-            continue
-        else:
-            print '%s = %s' % (k, my_globals[k])
-    print '------'
+    if log_level_info_or_lower():
+        print '--- Using the following parameters: ---'
+        my_globals = globals()
+        for k in sorted(my_globals.iterkeys()):
+            if k.startswith('__'):
+                continue
+            elif k == "args":
+                continue
+            elif k == "parser":
+                continue
+            elif isinstance(my_globals[k], types.ClassType) or \
+                    isinstance(my_globals[k], types.FunctionType) or \
+                    isinstance(my_globals[k], types.ModuleType):
+                continue
+            else:
+                print '%s = %s' % (k, my_globals[k])
+        print '------'
 
 
 def read_from_file(filename):
@@ -380,9 +376,9 @@ def set_loglevel(args_loglevel=None):
     logging.basicConfig(level=numeric_level)
     logging.getLogger().setLevel(LOGLEVEL)
 
-    global quiet
-    if numeric_level > logging.INFO:
-        quiet = True
+
+def log_level_info_or_lower():
+    return logging.getLogger().level <= logging.INFO
 
 
 if __name__ == "__main__":

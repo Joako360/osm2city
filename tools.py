@@ -694,7 +694,7 @@ class Stats(object):
         self.textures_total[str(texture.filename)] += 1 
 
     def print_summary(self):
-        if parameters.quiet:
+        if not parameters.log_level_info_or_lower():
             return
         out = sys.stdout
         total_written = self.LOD.sum()
@@ -815,7 +815,7 @@ def get_interpolator(**kwargs):
 
 def progress(i, max_i):
     """progress indicator"""
-    if sys.stdout.isatty() and not parameters.quiet:
+    if sys.stdout.isatty() and parameters.log_level_info_or_lower():
         try:
             if i % (max_i / 100) > 0:
                 return
