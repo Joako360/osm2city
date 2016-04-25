@@ -231,7 +231,7 @@ done
             try:
                 st = os.stat(f)
                 os.chmod(f, st.st_mode | stat.S_IEXEC)
-            except:
-                print('[ WARNING ] could not add exec rights to ' + f)
+            except OSError:
+                logging.warning('[ WARNING ] could not add exec rights to ' + f)
             
     sys.exit(0)
