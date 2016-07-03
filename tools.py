@@ -50,6 +50,15 @@ def get_osm2city_directory():
     return my_dir
 
 
+def assert_trailing_slash(path):
+    """Takes a path and makes sure it has an os_specific trailing slash unless the path is empty."""
+    my_path = path
+    if len(my_path) > 0:
+        if not my_path.endswith(os.sep):
+            my_path += os.sep
+    return my_path
+
+
 class Interpolator(object):
     """load elevation data from file, interpolate"""
     def __init__(self, filename, fake=False, clamp=False):

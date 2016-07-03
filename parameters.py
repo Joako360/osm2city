@@ -79,7 +79,6 @@ TELNET_PORT = 5501  # The port FlightGear listens to. Needed for ELEV_MODE = "Te
 # PARAMETERS RELATED TO BUILDINGS IN osm2city
 #=============================================================================
 
-CREATE_ATLAS = True         # -- create texture atlas on osm2city startup
 ATLAS_SUFFIX_DATE = False   # -- add timestamp to file name
 
 # -- check for overlap with static models. The scenery folder must contain an "Objects" folder

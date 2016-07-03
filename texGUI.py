@@ -12,8 +12,6 @@ It is likely to contain some old, unsused stuff.
 """
 
 
-PROG="texGUI.py"
-import pdb
 import wx
 import sys
 import os
@@ -28,11 +26,12 @@ import shutil
 
 static_msg = ""
 
+
 def importName(modulename):
     """ Import a named object from a module in the context of this function.
     """
     # -- from "Importing from a Module Whose Name Is Determined at Runtime"
-    #    Credit: J�rgen Hermann
+    #    Credit: Jørgen Hermann
     print modulename
     modulename = string.split(modulename, '.')[0]
     print modulename
@@ -43,6 +42,7 @@ def importName(modulename):
         return None
 
     return module
+
 
 class MyFrame(wx.Frame):
     def __init__(self, *args, **kwds):
@@ -395,7 +395,7 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     if len(sys.argv) < 2:
-        print "usage:", PROG, "image"
+        print "usage:", "texGUI.py", "image"
         sys.exit(1)
 
     app = wx.PySimpleApp(0)

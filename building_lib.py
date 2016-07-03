@@ -8,7 +8,7 @@ Created on Thu Feb 28 23:18:08 2013
 import copy
 import logging
 import math
-from math import sin, cos, radians, tan, atan2, sqrt, pi
+from math import sin, cos, radians, tan, sqrt, pi
 import os
 import random
 import re
@@ -28,59 +28,27 @@ import textures.manager as tm
 import tools
 from vec2d import vec2d
 
-# nobjects = 0
 nb = 0
 out = ""
 
 
-class random_number(object):
-    def __init__(self, randtype, minimum, maximum):
-        self.min = minimum
-        self.max = maximum
-        if randtype == float:
-            self.callback = random.uniform
-        elif randtype == int:
-            self.callback = random.randint
-        elif randtype == 'gauss':
-            self.callback = random.gauss
-        else:
-            raise TypeError("randtype must be 'float' or 'int'")
-
-    def __call__(self):
-        return self.callback(self.min, self.max)
-
-
-def random_level_height(place="city"):
+def _random_level_height():
     """ Calculates the height for each level of a building based on place and random factor"""
     # FIXME: other places (e.g. village)
-
     return random.triangular(parameters.BUILDING_CITY_LEVEL_HEIGHT_LOW
                           , parameters.BUILDING_CITY_LEVEL_HEIGHT_HEIGH
                           , parameters.BUILDING_CITY_LEVEL_HEIGHT_MODE)
 
 
-def random_levels(place="city", dist=None):
+def _random_levels():
     """ Calculates the number of building levels based on place and random factor"""
     # FIXME: other places
-    if dist:
-        dist *= 2.
-        if 1000. > dist:
-            E = 15.
-        elif 2000. > dist:
-            E = (dist - 1000) / 1000.* 12 + 3
-        else:
-            E = 3.
-
-        levels = int(round(random.gauss(E, 0.3 * E)))
-#        print "dist %5.1f  %i levels" % (dist, levels)
-        return levels
-
     return int(round(random.triangular(parameters.BUILDING_CITY_LEVELS_LOW
                           , parameters.BUILDING_CITY_LEVELS_HEIGH
                           , parameters.BUILDING_CITY_LEVELS_MODE)))
 
 
-def check_height(building_height, t):
+def _check_height(building_height, t):
     """check if a texture t fits the building height (h)
        v-repeatable textures are repeated to fit h
        For non-repeatable textures,
@@ -100,7 +68,7 @@ def check_height(building_height, t):
         # - evaluate error
 
         # - error acceptable?
-        if building_height >= t.v_cuts_meters[0] and building_height <= t.v_size_meters:
+        if t.v_cuts_meters[0] <= building_height <= t.v_size_meters:
             if t.v_align_bottom or parameters.BUILDING_FAKE_AMBIENT_OCCLUSION:
                 logging.verbose("from bottom")
                 for i in range(len(t.v_cuts_meters)):
@@ -116,18 +84,13 @@ def check_height(building_height, t):
                         tex_y1 = 1
 
                         return tex_y0, tex_y1
-            raise ValueError("SHOULD NOT HAPPEN! found no tex_y0, tex_y1 (building_height %g splits %s %g)" % (building_height, str(t.v_cuts_meters), t.v_size_meters))
+            raise ValueError("SHOULD NOT HAPPEN! found no tex_y0, tex_y1 (building_height %g splits %s %g)" %
+                             (building_height, str(t.v_cuts_meters), t.v_size_meters))
         else:
-           # raise ValueError("SHOULD NOT HAPPEN! building_height %g outside %g %g" % (building_height, t.v_cuts_meters[0], t.v_size_meters))
             return 0, 0
 
 
-def reset_nb():
-    global nb
-    nb = 0
-
-
-def get_nodes_from_acs(objs, own_prefix):
+def _get_nodes_from_acs(objs, own_prefix):
     """load all .ac and .xml, extract nodes, skipping own .ac starting with own_prefix"""
     # FIXME: don't skip .xml
     # skip own .ac city-*.xml
@@ -160,10 +123,10 @@ def get_nodes_from_acs(objs, own_prefix):
         if fname.endswith(".ac"):
             try:
                 if fname in read_objects:
-                    logging.verbose( "CACHED_AC %s" % fname)
+                    logging.verbose("CACHED_AC %s" % fname)
                     ac = read_objects[fname]
                 else:
-                    logging.info( "READ_AC %s" % fname)
+                    logging.info("READ_AC %s" % fname)
                     ac = ac3d_fast.File(file_name=fname, stats=None)
                     read_objects[fname] = ac
                                 
@@ -176,27 +139,12 @@ def get_nodes_from_acs(objs, own_prefix):
                 transposed_ac_nodes += b.anchor.as_array().reshape(2,1)
                 all_nodes = np.append(all_nodes, transposed_ac_nodes.transpose(), 0)
             except Exception, e:
-                logging.error("Error reading %s %s"%(fname,e))
+                logging.error("Error reading %s %s" % (fname,e))
 
     return all_nodes
 
 
-def test_ac_load():
-    import stg_io
-    # FIXME: this is probably broken
-    # static_objects = stg_io.read("e010n50/e013n51", ["3171138.stg", "3171139.stg"], parameters.PREFIX, parameters.PATH_TO_SCENERY)
-    # s = get_nodes_from_acs(static_objects.objs, "e013n51/")
-    # np.savetxt("nodes.dat", s)
-#    out = open("nodes.dat", "w")
-#    for n in s:
-#            out.write("\n")
-#        else: out.write("%g %g\n" % (n[0], n[1]))
-
-#    out.close()
-    # print s
-
-
-def is_static_object_nearby(b, X, static_tree):
+def _is_static_object_nearby(b, X, static_tree):
     """check for static/shared objects close to given building"""
     # FIXME: which radius? Or use centroid point? make radius a parameter
     radius = parameters.OVERLAP_RADIUS  # alternative: radius = max(lenX)
@@ -211,34 +159,27 @@ def is_static_object_nearby(b, X, static_tree):
 
     if len(nearby):
         if parameters.OVERLAP_CHECK_INSIDE:
+            inside = False
             for i in nearby:
                 inside = b.polygon.contains(shg.Point(d[i]))
                 if inside:
                     break        
-    #        for i in range(b.nnodes_outer):
-    #            tools.stats.debug2.write("%g %g\n" % (X[i,0], X[i,1]))
-    #            print "nearby:", nearby
-    #            for n in nearby:
-    #                print "-->", s[n]
             if not inside:
                 return False
         try:
             if b.name is None or len(b.name) == 0:
-                logging.info("Static objects nearby. Skipping %d is near %d building nodes"
-                             , b.osm_id, len(nearby))
+                logging.info("Static objects nearby. Skipping %d is near %d building nodes",
+                             b.osm_id, len(nearby))
             else:
-                logging.info("Static objects nearby. Skipping %s (%d) is near %d building nodes"
-                             , b.name, b.osm_id, len(nearby))
+                logging.info("Static objects nearby. Skipping %s (%d) is near %d building nodes",
+                             b.name, b.osm_id, len(nearby))
         except RuntimeError as e:
             logging.error("FIXME: %s %s ID %d", e, b.name.encode('ascii', 'ignore'), b.osm_id)
-        # for n in nearby:
-        #    print static_objects.objs[n].name,
-        # print
         return True
     return False
 
 
-def is_large_enough(b, buildings):
+def _is_large_enough(b):
     """Checks whether a given building's area is too small for inclusion.
     Never drop tall buildings.
     FIXME: Exclusion might be skipped if the building touches another building (i.e. an annex)
@@ -259,14 +200,9 @@ def is_large_enough(b, buildings):
     return True
 
 
-def compute_height_and_levels(b):
+def _compute_height_and_levels(b):
     """Determines total height (and number of levels) of a building based on
        OSM values and other logic"""
-    if 0:
-        b.levels = 13
-        b.height = b.levels * 3.
-        return
-
     try:
         if isinstance(b.height, (int, long)):
             b.height = float(b.height)
@@ -278,7 +214,7 @@ def compute_height_and_levels(b):
     if b.height > 0 and b.levels > 0:
         return
 
-    level_height = random_level_height()
+    level_height = _random_level_height()
     if b.height > 0:
         b.levels = int(b.height / level_height)
         return
@@ -286,7 +222,7 @@ def compute_height_and_levels(b):
         pass
     else:
         # -- neither height nor levels given: use random levels
-        b.levels = random_levels()
+        b.levels = _random_levels()
         # b.levels = random_levels(dist=b.anchor.magnitude())  # gives CBD-like distribution
 
         if b.area < parameters.BUILDING_MIN_AREA:
@@ -294,10 +230,10 @@ def compute_height_and_levels(b):
     b.height = float(b.levels) * level_height
 
 
-def compute_roof_height(b, max_height=1e99):
+def _compute_roof_height(b, max_height=1e99):
     """Compute roof_height for each node"""
 
-    b.roof_height=0
+    b.roof_height = 0
     
     if b.roof_type == 'skillion':
         # get global roof_height and height for each vertex
@@ -308,7 +244,8 @@ def compute_roof_height(b, max_height=1e99):
                 if 'roof:angle' in b.tags:
                     angle = float(b.tags['roof:angle'])
                 else:
-                    angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE, parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
+                    angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE,
+                                           parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
             
                 while angle > 0:
                     roof_height = tan(np.deg2rad(angle)) * (b.lenX[1]/2)
@@ -337,10 +274,8 @@ def compute_roof_height(b, max_height=1e99):
             # and is a reference point (0,0)
             # compute line slope*x
             
-            slope=sin(angle90)
+            slope = sin(angle90)
             
-            dir1 = (cos(angle90), slope)
-            ndir1 = 1 #sqrt(1 + slope**2)
             dir1n = (cos(angle90), slope)  # (1/ndir1, slope/ndir1)
             
             # keep in mind direction
@@ -350,14 +285,14 @@ def compute_roof_height(b, max_height=1e99):
             #    dir1n=(-dir1n[0],-dir1n[1])
 
             # compute distance from points to line slope*x
-            X2=list()
-            XN=list()
-            nXN=list()
-            vprods=list()
+            X2 = list()
+            XN = list()
+            nXN = list()
+            vprods = list()
             
             X = b.X
             
-            p0=(X[0][0], X[0][1])
+            p0 = (X[0][0], X[0][1])
             for i in range(0,len(X)):
                 # compute coord in new referentiel
                 vecA = (X[i][0]-p0[0], X[i][1]-p0[1])
@@ -420,23 +355,7 @@ def compute_roof_height(b, max_height=1e99):
             #else :
             # should compute roof height for others roof type
             #    b.roof_height = 0
-    #except :
-    #    if 'roof:shape' in b.tags :
-    #        logging.error('in compute_height_and_levels', b.tags)
-    #    pass
-
     return
-
-
-def make_lightmap_dict(buildings):
-    """make a dictionary: map texture to objects"""
-    lightmap_dict = {}
-    for b in buildings:
-        key = b.facade_texture
-        if not lightmap_dict.has_key(key):
-            lightmap_dict[key] = []
-        lightmap_dict[key].append(b)
-    return lightmap_dict
 
 
 def decide_LOD(buildings):
@@ -476,9 +395,8 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
     # -- build KDtree for static models
     from scipy.spatial import KDTree
 
-    # s = get_nodes_from_acs(static_objects.objs, "e013n51/")
     if static_objects:
-        s = get_nodes_from_acs(static_objects, parameters.PREFIX + "city")
+        s = _get_nodes_from_acs(static_objects, parameters.PREFIX + "city")
 
         np.savetxt(parameters.PREFIX + os.sep + "nodes.dat", s)
         static_tree = KDTree(s, leafsize=10)  # -- switch to brute force at 10
@@ -556,7 +474,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             continue
 
         # -- check for nearby static objects
-        if static_objects and is_static_object_nearby(b, Xo, static_tree):
+        if static_objects and _is_static_object_nearby(b, Xo, static_tree):
             tools.stats.skipped_nearby += 1
             continue
 
@@ -566,16 +484,16 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         if False:
             if b.area >= 1500:
                 b.levels = int(random.gauss(35, 10))  # random_number(int, 10, 60)
-                b.height = float(b.levels) * random_level_height()
+                b.height = float(b.levels) * _random_level_height()
             if b.area < 1500:
             # if b.area < 200. or (b.area < 500. and random.uniform(0,1) < 0.5):
                 tools.stats.skipped_small += 1
                 continue
 
-        compute_height_and_levels(b)
+        _compute_height_and_levels(b)
 
         # -- check area
-        if not is_large_enough(b, buildings):
+        if not _is_large_enough(b):
             tools.stats.skipped_small += 1
             continue
 
@@ -664,7 +582,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             if str(material_type) == 'stone' and 'building:colour' not in b.tags:
                     b.tags['building:colour'] = 'white'
                     facade_requires.append(str('facade:building:colour:white'))
-            try :
+            try:
                 # stone use for
                 if str(material_type) in ['stone', 'concrete', ]:
                     try:
@@ -877,7 +795,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
     return new_buildings
 
 
-def write_and_count_vert(out, b, elev, offset, tile_elev):
+def _write_and_count_vert(out, b, elev, offset, tile_elev):
     """write numvert tag to .ac, update stats"""
 #    numvert = 2 * b._nnodes_ground
     # out.write("numvert %i\n" % numvert)
@@ -898,7 +816,7 @@ def write_and_count_vert(out, b, elev, offset, tile_elev):
 
     z = b.ground_elev - 0.1
     try:
-        z -= b.correct_ground
+        z -= b.correct_ground  # FIXME Rick
     except:
         pass
     
@@ -939,7 +857,7 @@ def write_and_count_vert(out, b, elev, offset, tile_elev):
 # ----
 
 
-def write_ground(out, b, elev):
+def _write_ground(out, b, elev):  # not used anywhere
     # align smallest rectangle
     d = 0
 
@@ -1023,7 +941,7 @@ def write_ground(out, b, elev):
                (o + 3, 0, 0)], mat=1)
 
 
-def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner=False):
+def _write_ring(out, b, ring, v0, texture, tex_y0, tex_y1):
     tex_y0 = texture.y(tex_y0)  # -- to atlas coordinates
     tex_y1_input = tex_y1
     tex_y1 = texture.y(tex_y1)
@@ -1066,9 +984,6 @@ def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner=False):
                    (j +     b._nnodes_ground, tex_x0, tex_y12) ],
                  swap_uv=texture.v_can_repeat)     
     return v1
-    # ---
-    # need numvert
-    # numsurf
 
 
 def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
@@ -1078,11 +993,8 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
        offset accounts for cluster center
        - all LOD in one file. Plus roofs. One Object per LOD
     """
-    def local_elev(p):
-        return elev(p + offset) - tile_elev
-
     ac = ac3d.File(stats=tools.stats)
-    LOD_objects = []
+    LOD_objects = list()
     LOD_objects.append(ac.new_object('LOD_bare', tm.atlas_file_name + '.png'))
     LOD_objects.append(ac.new_object('LOD_rough', tm.atlas_file_name + '.png'))
     LOD_objects.append(ac.new_object('LOD_detail', tm.atlas_file_name + '.png'))
@@ -1146,8 +1058,8 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
     # Correct height
     #
     for ib, b in enumerate(buildings):
-        autocorrect =True
-        try :
+        autocorrect = True
+        try:
             b.ground_elev += b.correct_ground
             autocorrect = False
         except:
@@ -1179,9 +1091,9 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
         tools.progress(ib, len(buildings))
         out = LOD_objects[b.LOD]
 
-        compute_roof_height(b, max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
+        _compute_roof_height(b, max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
         
-        write_and_count_vert(out, b, elev, offset, tile_elev)
+        _write_and_count_vert(out, b, elev, offset, tile_elev)
 
         nb += 1
 #        if nb % 70 == 0: print nb
@@ -1191,37 +1103,24 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
 #        if (not no_roof) and (not b.roof_complex): nsurf += 1 # -- because roof will be part of base model
 
-        tex_y0, tex_y1 = check_height(b.height, b.facade_texture)
+        tex_y0, tex_y1 = _check_height(b.height, b.facade_texture)
 
-
-        # -- outer and inner walls (if any)
-        # print "--1"
-        if b.facade_texture != 'wall_no' :
-            write_ring(out, b, b.polygon.exterior, 0, b.facade_texture, tex_y0, tex_y1)
-            if True:
-                v0 = b.nnodes_outer
-                for inner in b.polygon.interiors:
-                    # print "--2"
-                    v0 = write_ring(out, b, inner, v0, b.facade_texture, tex_y0, tex_y1, True)
-# def write_ring(out, b, ring, v0, texture, tex_y0, tex_y1, inner = False):
-
-        # -- roof
-        if False:  # -- a debug thing
-            tools.stats.count(b)
-            continue
+        if b.facade_texture != 'wall_no':
+            _write_ring(out, b, b.polygon.exterior, 0, b.facade_texture, tex_y0, tex_y1)
+            v0 = b.nnodes_outer
+            for inner in b.polygon.interiors:
+                v0 = _write_ring(out, b, inner, v0, b.facade_texture, tex_y0, tex_y1)
 
         if not parameters.EXPERIMENTAL_INNER and len(b.polygon.interiors) > 1:
             raise NotImplementedError("Can't yet handle relations with more than one inner way")
 
         if not b.roof_complex:
-        # if True:
             if b.roof_type == 'skillion':
                 roofs.separate_skillion2(out, b, b.X, max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
             elif b.roof_type in ['pyramidal', 'dome', ]:
                 roofs.separate_pyramidal(out, b, b.X)
             else:
                 roofs.flat(out, b, b.X)
-            #continue
 
         # -- roof
         #    We can have complex and non-complex roofs:
@@ -1284,7 +1183,3 @@ def mapType(tags):
     if 'building' in tags and not tags['building'] == 'yes':
         return tags['building']
     return 'unknown'
-
-
-if __name__ == "__main__":
-    test_ac_load()

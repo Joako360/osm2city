@@ -635,8 +635,6 @@ if __name__ == "__main__":
                         , help="skip elevation interpolation", required=False)
     parser.add_argument("-c", dest="c", action="store_true"
                         , help="do not check for overlapping with static objects", required=False)
-    parser.add_argument("-A", "--create-atlas-only", action="store_true"
-                        , help="create texture atlas and exit", required=False)
     parser.add_argument("-a", "--create-atlas", action="store_true"
                         , help="create texture atlas", required=False)
     parser.add_argument("-u", dest="uninstall", action="store_true"
@@ -662,9 +660,6 @@ if __name__ == "__main__":
         parameters.NO_ELEV = True
         parameters.OVERLAP_CHECK = False
 
-    if args.create_atlas or args.create_atlas_only:
-        parameters.CREATE_ATLAS = True
-
     parameters.show()
 
 
@@ -676,10 +671,7 @@ if __name__ == "__main__":
 
     tools.init(coordinates.Transformation(center, hdg=0))
 
-    tex.manager.init(tools.get_osm2city_directory(), create_atlas=parameters.CREATE_ATLAS)
-    
-    if args.create_atlas_only:
-        sys.exit(0)
+    tex.manager.init(tools.get_osm2city_directory(), args.create_atlas)
 
     logging.info("reading elevation data")
     elev = tools.get_interpolator(fake=parameters.NO_ELEV)

@@ -21,6 +21,23 @@ Therefore before running ``osm2city`` related programs please either:
   $ cd /home/pingu/fg_customscenery/projects
 
 
+.. _chapter-create-texture-atlas:
+
+==========================
+Creating the Texture Atlas
+==========================
+
+In order to consume the textures linked as described in chapter :ref:`Creating Soft Links to Texture Data <chapter-texture_data-label>` a texture atlas needs to be created. As this is a bit of a time consuming task, re-creating a texture atlas should only be done if the contained textures change. That is rarely the case. Also remember that if the texture atlas changes, then also the content has to be copied separately (see :ref:`chapter-copy-textures-label`).
+
+In most situations it is enough to call the following command once and then only if the textures have changed:
+
+::
+
+  /usr/bin/python2.7 /home/pingu/develop_vcs/osm2city/textures/manager.py -f LSZS/params.ini -a
+
+Alternatively `osm2city.py` can be called with the ``-a`` option.
+
+
 ====================
 Overview of Programs
 ====================
@@ -53,7 +70,7 @@ In most situations you may want to at least provide command line parameter ``-f`
 
 ::
 
-  /usr/bin/python2.7 /home/pingu/develop_vcs/osm2city/osm2city.py -f LSZS/params.ini -l DEBUG -a
+  /usr/bin/python2.7 /home/pingu/develop_vcs/osm2city/osm2city.py -f LSZS/params.ini -l DEBUG
 
 Remember that the paths are relative to the ``WORKING_DIRECTORY``. Alternatively provide the full path to your ``params.ini`` [#]_ file.
 

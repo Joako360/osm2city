@@ -56,6 +56,8 @@ Do the following:
 .. _Git: http://www.git-scm.com/
 
 
+.. _chapter-texture_data-label:
+
 -----------------------------------
 Creating Soft Links to Texture Data
 -----------------------------------
@@ -76,3 +78,4 @@ On a Windows computer do the following (path may differ):
     > mklink /J C:\development\osm2city\tex.src C:\development\osm2city-data\tex.src 
     > mklink /J C:\development\osm2city\tex C:\development\osm2city-data\tex
 
+You might as well check your installation and :ref:`create a texture atlas <chapter-create-texture-atlas>` — doing so makes sure your installation works and you do not run into the problem of having an empty texture atlas.
