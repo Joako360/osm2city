@@ -129,46 +129,6 @@ def append_facades_de(tex_prefix, facades):
                            provides=['shape:urban', 'age:modern', 'compat:roof-flat']))
 
 
-def append_facades_test(tex_prefix, facades):
-    """---------------- ADD YOUR FACADE TEXTURES HERE -------------------"""
-
-    # -- testing
-    facades.append(Texture(tex_prefix + 'tex.src/10storymodernconcrete.jpg',
-        h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
-        v_size_meters=169.2, v_cuts=[309, 443, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
-        v_align_bottom=True, height_min=40,
-        requires=['roof:colour:brown'],
-        provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
-
-    facades.append(Texture(tex_prefix + 'tex.src/11storymodernsq.jpg',
-        h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
-        v_size_meters=169.2, v_cuts=[309, 443, 1383, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
-        v_align_bottom=True, height_min=40,
-        requires=['roof:colour:brown'],
-        provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
-    
-    facades.append(Texture(tex_prefix + 'tex.src/12storyconcrglassblkwhtmodern.jpg',
-        h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
-        v_size_meters=169.2, v_cuts=[309, 443,  1204, 3135], v_can_repeat=False,
-        v_align_bottom=True, height_min=40,
-        requires=['roof:colour:brown'],
-        provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
-
-    facades.append(Texture(tex_prefix + 'tex.src/12storygovtmodern.jpg',
-        h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
-        v_size_meters=169.2, v_cuts=[309, 443, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
-        v_align_bottom=True, height_min=40,
-        requires=['roof:colour:brown'],
-        provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
-
-    facades.append(Texture(tex_prefix + 'tex.src/14storyconcrwhite.jpg',
-        h_size_meters=45.9, h_cuts=[107, 214, 322, 429, 532, 640, 747, 850], h_can_repeat=False,
-        v_size_meters=169.2, v_cuts=[309, 443, 577, 712, 846, 1204, 1383, 1567, 1652, 1755, 1845, 1939, 2024, 2113, 2216, 2306, 2396, 3135], v_can_repeat=False,
-        v_align_bottom=True, height_min=40,
-        requires=['roof:colour:brown'],
-        provides=['shape:urban', 'shape:commercial', 'age:modern', 'compat:roof-flat']))
-
-
 def append_facades_us(tex_prefix, facades):
 
     facades.append(Texture(tex_prefix + 'tex.src/us/commercial/facade_modern_commercial_46x169m.jpg',
