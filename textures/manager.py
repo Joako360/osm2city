@@ -31,19 +31,21 @@ import numpy as np
 from PIL import Image
 
 import atlas
-import catalog
 import img2np
 import parameters
 import tools
+from textures.texture import Texture
 
 atlas_file_name = None
+
+ROOFS_DEFAULT_FILE_NAME = "roofs_default.py"
 
 
 def _next_pow2(value):
     return 2**(int(math.log(value) / math.log(2)) + 1)
 
 
-def _make_texture_atlas(texture_list, atlas_filename, ext, size_x=256, pad_y=0,
+def _make_texture_atlas(texture_list, atlas_filename, ext, tex_prefix, size_x=256, pad_y=0,
                         lightmap=False, ambient_occlusion=False):
     """
     Create texture atlas from all textures. Update all our item coordinates.
@@ -190,15 +192,20 @@ class TextureManager(object):
     def __init__(self, cls):
         self.__l = []
         self.__cls = cls  # -- class (roof, facade, ...)
+        self.current_registration_file = ""
 
     def append(self, t):
-        # -- prepend each item in t.provides with class name,
-        #    except for class-independent keywords: age,region,compat
-        if not os.path.exists(t.filename):
-            return
+        """Appends a texture to the catalog if the referenced file exists, in which case True is returned.
+        Otherwise False is returned and the texture is not added.
+
+        Prepend each item in t.provides with class name, except for class-independent keywords: age,region,compat
+        """
+        if t.validation_message:
+            logging.warning("Defined in registration file %s: %s", self.current_registration_file, t.validation_message)
+            return False
 
         new_provides = []
-        logging.debug("Added %s " % t.filename)
+        logging.debug("Based on registration file %s: added %s ", self.current_registration_file, t.filename)
         for item in t.provides:
             if item.split(':')[0] in ('age', 'region', 'compat'):
                 new_provides.append(item)
@@ -209,6 +216,7 @@ class TextureManager(object):
         
         tools.stats.textures_total[t.filename] = None
         self.__l.append(t)
+        return True
 
     def find_matching(self, requires=[]):
         candidates = self.find_candidates(requires)
@@ -391,6 +399,37 @@ def _map_hex_colour(value):
     return value
 
 
+def append_dynamic(facades, tex_prefix):
+    """Dynamically runs .py files in tex.src and sub-directories to add facades.
+
+    For roofs see add_roofs(roofs)"""
+    for subdir, dirs, files in os.walk(tex_prefix, topdown=True):
+        for filename in files:
+            if filename[-2:] != "py":
+                continue
+            elif filename == ROOFS_DEFAULT_FILE_NAME:
+                continue
+
+            my_path = subdir + os.sep + filename
+            logging.info("Executing %s ", my_path)
+            try:
+                facades.current_registration_file = my_path
+                execfile(my_path)
+            except:
+                logging.exception("Error while running %s" % filename)
+
+
+def append_roofs(roofs, tex_prefix):  # parameter roofs is used dynamically in execfile
+    """Dynamically runs the content of a hard-coded file to fill the roofs texture list."""
+    try:
+        file_name = tex_prefix + os.sep + ROOFS_DEFAULT_FILE_NAME
+        roofs.current_registration_file = file_name
+        execfile(file_name)
+    except Exception as e:
+        logging.exception("Unrecoverable error while loading roofs")
+        sys.exit(1)
+
+
 def init(tex_prefix='', create_atlas=False):  # in most situations tex_prefix should be osm2city root directory
     logging.debug("textures: init")
     global facades
@@ -402,17 +441,18 @@ def init(tex_prefix='', create_atlas=False):  # in most situations tex_prefix sh
 
     my_tex_prefix = tools.assert_trailing_slash(tex_prefix)
     atlas_file_name = my_tex_prefix + "tex" + os.sep + "atlas_facades"
+    my_tex_prefix += 'tex.src'
+    Texture.tex_prefix = my_tex_prefix  # need to set static variable so managers get full path
+
 
     pkl_fname = atlas_file_name + '.pkl'
     
     if create_atlas:
         facades = FacadeManager('facade')
         roofs = TextureManager('roof')
-    
-        catalog.append_dynamic(my_tex_prefix, facades)
-        catalog.append_facades_de(my_tex_prefix, facades)
-        catalog.append_roofs(my_tex_prefix, roofs)
-        catalog.append_facades_us(my_tex_prefix, facades)
+
+        append_roofs(roofs, my_tex_prefix)
+        append_dynamic(facades, my_tex_prefix)
 
         # -- make texture atlas
         texture_list = facades.get_list() + roofs.get_list()
@@ -420,7 +460,7 @@ def init(tex_prefix='', create_atlas=False):  # in most situations tex_prefix sh
             now = datetime.datetime.now()
             atlas_file_name += "_%04i%02i%02i" % (now.year, now.month, now.day)
 
-        _make_texture_atlas(texture_list, atlas_file_name, '.png',
+        _make_texture_atlas(texture_list, atlas_file_name, '.png', my_tex_prefix,
                             lightmap=True, ambient_occlusion=parameters.BUILDING_FAKE_AMBIENT_OCCLUSION)
         
         params = dict()

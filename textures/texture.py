@@ -1,9 +1,12 @@
 import numpy as np
 from PIL import Image
 import logging
+import os
 
 
 class Texture(object):
+
+    tex_prefix = ''  # static variable to reduce the dynamic path info the texture registrations. Needs to be set first.
     """
     possible texture types:
         - facade
@@ -37,7 +40,7 @@ class Texture(object):
                  height_min=0, height_max=9999,
                  v_align_bottom=False,
                  provides=list(), requires=list(), levels=None):
-        self.filename = filename
+        self.filename = Texture.tex_prefix + os.sep + filename
         self.x0 = self.x1 = self.y0 = self.y1 = 0
         self.sy = self.sx = 0
         self.rotated = False
@@ -52,11 +55,12 @@ class Texture(object):
         v_cuts.sort()
         self.ax = 0  # coordinate in atlas (int)
         self.ay = 0
+        self.validation_message = None
 
         try:
             self.im = Image.open(self.filename)
         except IOError:
-            logging.warning("Skipping non-existing texture %s" % self.filename)
+            self.validation_message = "Skipping non-existing texture %s" % self.filename
             return
         self.width_px, self.height_px = self.im.size
         image_aspect = self.height_px / float(self.width_px)
@@ -123,8 +127,8 @@ class Texture(object):
             self.width_max = self.h_size_meters
 
         if self.h_can_repeat + self.v_can_repeat > 1:
-            raise ValueError('%s: Textures can repeat in one direction only. \
-Please set either h_can_repeat or v_can_repeat to False.' % self.filename)
+            self.validation_message = '%s: Textures can repeat in one direction only. \
+Please set either h_can_repeat or v_can_repeat to False.' % self.filename
 
     def x(self, x):
         """given non-dimensional texture coord, return position in atlas"""

@@ -209,7 +209,7 @@ class MyFrame(wx.Frame):
         from textures.texture import Texture
         """)
         s += textwrap.dedent("""
-        facades.append(Texture('tex.src/%s',
+        facades.append(Texture('%s',
             h_size_meters=%1.1f, h_cuts=%s, h_can_repeat=True,
             v_size_meters=%1.1f, v_cuts=%s, v_can_repeat=False,
             v_align_bottom=True, height_min=0,
