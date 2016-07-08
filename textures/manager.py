@@ -409,7 +409,26 @@ def _map_hex_colour(value):
     return value
 
 
-def append_dynamic(facades, tex_prefix):
+def _check_missed_input_textures(tex_prefix, registered_textures):
+    """Find all .jpg and .png files in tex.src and compare with registered textures.
+
+    If not found in registered textures, then log a warning"""
+    for subdir, dirs, files in os.walk(tex_prefix, topdown=True):
+        for filename in files:
+            if filename[-4:] in [".jpg", ".png"]:
+                if filename[-7:-4] in ["_LM", "_MA"]:
+                    continue
+                my_path = subdir + os.sep + filename
+                found = False
+                for registered in registered_textures:
+                    if registered.filename == my_path:
+                        found = True
+                        break
+                if not found:
+                    logging.warning("Texture %s has not been registered", my_path)
+
+
+def _append_dynamic(facades, tex_prefix):
     """Dynamically runs .py files in tex.src and sub-directories to add facades.
 
     For roofs see add_roofs(roofs)"""
@@ -429,7 +448,7 @@ def append_dynamic(facades, tex_prefix):
                 logging.exception("Error while running %s" % filename)
 
 
-def append_roofs(roofs, tex_prefix):  # parameter roofs is used dynamically in execfile
+def _append_roofs(roofs, tex_prefix):  # parameter roofs is used dynamically in execfile
     """Dynamically runs the content of a hard-coded file to fill the roofs texture list."""
     try:
         file_name = tex_prefix + os.sep + ROOFS_DEFAULT_FILE_NAME
@@ -454,18 +473,22 @@ def init(tex_prefix='', create_atlas=False):  # in most situations tex_prefix sh
     my_tex_prefix += 'tex.src'
     Texture.tex_prefix = my_tex_prefix  # need to set static variable so managers get full path
 
-
     pkl_fname = atlas_file_name + '.pkl'
     
     if create_atlas:
         facades = FacadeManager('facade')
         roofs = TextureManager('roof')
 
-        append_roofs(roofs, my_tex_prefix)
-        append_dynamic(facades, my_tex_prefix)
+        # read registration
+        _append_roofs(roofs, my_tex_prefix)
+        _append_dynamic(facades, my_tex_prefix)
+
+        texture_list = facades.get_list() + roofs.get_list()
+
+        # warn for missed out textures
+        _check_missed_input_textures(my_tex_prefix, texture_list)
 
         # -- make texture atlas
-        texture_list = facades.get_list() + roofs.get_list()
         if parameters.ATLAS_SUFFIX_DATE:
             now = datetime.datetime.now()
             atlas_file_name += "_%04i%02i%02i" % (now.year, now.month, now.day)
