@@ -56,6 +56,7 @@ class Texture(object):
         self.ax = 0  # coordinate in atlas (int)
         self.ay = 0
         self.validation_message = None
+        self.registered_in = None  # filename of the .py file, where this texture has been referenced
 
         try:
             self.im = Image.open(self.filename)

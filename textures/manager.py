@@ -192,7 +192,7 @@ class TextureManager(object):
     def __init__(self, cls):
         self.__l = []
         self.__cls = cls  # -- class (roof, facade, ...)
-        self.current_registration_file = ""
+        self.current_registered_in = ""
 
     def append(self, t):
         """Appends a texture to the catalog if the referenced file exists, in which case True is returned.
@@ -200,12 +200,22 @@ class TextureManager(object):
 
         Prepend each item in t.provides with class name, except for class-independent keywords: age,region,compat
         """
+        # check whether already during initialization an error occured
         if t.validation_message:
-            logging.warning("Defined in registration file %s: %s", self.current_registration_file, t.validation_message)
+            logging.warning("Defined in registration file %s: %s", self.current_registered_in, t.validation_message)
             return False
 
+        t.registered_in = self.current_registered_in
+
+        # check whether the same texture already has been referenced in an existing entry
+        for existing in self.__l:
+            if existing.filename == t.filename:
+                logging.warning("Defined in registration file %s: %s has already been referenced in %s",
+                                self.current_registered_in, t.filename, existing.registered_in)
+                return False
+
         new_provides = []
-        logging.debug("Based on registration file %s: added %s ", self.current_registration_file, t.filename)
+        logging.debug("Based on registration file %s: added %s ", self.current_registered_in, t.filename)
         for item in t.provides:
             if item.split(':')[0] in ('age', 'region', 'compat'):
                 new_provides.append(item)
@@ -413,7 +423,7 @@ def append_dynamic(facades, tex_prefix):
             my_path = subdir + os.sep + filename
             logging.info("Executing %s ", my_path)
             try:
-                facades.current_registration_file = my_path
+                facades.current_registered_in = my_path
                 execfile(my_path)
             except:
                 logging.exception("Error while running %s" % filename)
@@ -423,7 +433,7 @@ def append_roofs(roofs, tex_prefix):  # parameter roofs is used dynamically in e
     """Dynamically runs the content of a hard-coded file to fill the roofs texture list."""
     try:
         file_name = tex_prefix + os.sep + ROOFS_DEFAULT_FILE_NAME
-        roofs.current_registration_file = file_name
+        roofs.current_registered_in = file_name
         execfile(file_name)
     except Exception as e:
         logging.exception("Unrecoverable error while loading roofs")
