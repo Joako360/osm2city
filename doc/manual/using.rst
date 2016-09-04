@@ -30,7 +30,7 @@ If you are using ``osm2city.py`` to generate buildings or ``roads.py`` to genera
 
 ::
 
-    /usr/bin/python2.7 /home/pingu/development/osm2city/copy_texture_stuff.py -f LSZS/params.ini
+    /usr/bin/python3 /home/pingu/development/osm2city/copy_texture_stuff.py -f LSZS/params.ini
 
 There is also a third possibility of copying the ``tex`` directory into ``$FG_ROOT``. However you would not be able to distribute thegenerated scenery objects and it might interfer with other scenery objects using a potentially different texture map.
 

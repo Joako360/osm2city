@@ -5,9 +5,6 @@
 #   Class:      Roof
 #===============================================================================
 
-import mesh
-import polygon
-import straight_skeleton
 
 class Roof:
     """
@@ -22,7 +19,7 @@ class Roof:
         - 'Haussmannian'
     """
     
-    def __init__(self,footprint): pass
+    def __init__(self, footprint): pass
 
     def hip(self):pass    
     def gable(self):pass

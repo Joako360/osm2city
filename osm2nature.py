@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Script part of osm2city which takes OpenStreetMap data as input and generates data to be used in FlightGear
@@ -54,7 +53,7 @@ class TreeNode(object):
 
 def process_osm_tree(nodes_dict, ways_dict, my_elev_interpolator, my_coord_transformator):
     my_trees = {}
-    for node in nodes_dict.values():
+    for node in list(nodes_dict.values()):
         for key in node.tags :
             if node.tags[key] == "tree":
                 my_node = node
@@ -62,7 +61,7 @@ def process_osm_tree(nodes_dict, ways_dict, my_elev_interpolator, my_coord_trans
                 my_tree_node.lat = my_node.lat
                 my_tree_node.lon = my_node.lon
                 # try to get a suitable model
-                print(node.tags)
+                print((node.tags))
                 try:
                     if "type" in node.tags:
                         if node.tags["type"] == "conifer":
@@ -78,7 +77,7 @@ def process_osm_tree(nodes_dict, ways_dict, my_elev_interpolator, my_coord_trans
 
                 my_tree_node.x, my_tree_node.y = my_coord_transformator.toLocal((my_tree_node.lon, my_tree_node.lat))
                 my_tree_node.elevation = my_elev_interpolator(vec2d.vec2d(my_tree_node.lon, my_tree_node.lat), True)
-                print("adding entry to trees", my_node.osm_id, " ", my_tree_node.x, " ", my_tree_node.y, " ", my_tree_node.elevation)
+                print(("adding entry to trees", my_node.osm_id, " ", my_tree_node.x, " ", my_tree_node.y, " ", my_tree_node.elevation))
                 my_trees[my_tree_node.osm_id] = my_tree_node
 
     return my_trees
@@ -87,7 +86,7 @@ def process_osm_tree(nodes_dict, ways_dict, my_elev_interpolator, my_coord_trans
 def process_osm_forest(nodes_dict, ways_dict, my_elev_interpolator, my_coord_transformator):
     """ fist stage put trees on contour """
     my_trees = {}
-    for way in ways_dict.values():
+    for way in list(ways_dict.values()):
         for key in way.tags:
             if way.tags[key] == "forest":
                 print("found forest")
@@ -99,14 +98,14 @@ def process_osm_forest(nodes_dict, ways_dict, my_elev_interpolator, my_coord_tra
                         my_tree_node.lon = my_node.lon
                         my_tree_node.x, my_tree_node.y = my_coord_transformator.toLocal((my_tree_node.lon, my_tree_node.lat))
                         my_tree_node.elevation = my_elev_interpolator(vec2d.vec2d(my_tree_node.lon, my_tree_node.lat), True)
-                        print("adding entry to trees", my_tree_node.x, my_tree_node.y, my_tree_node.elevation)
+                        print(("adding entry to trees", my_tree_node.x, my_tree_node.y, my_tree_node.elevation))
                         my_trees[my_tree_node.osm_id] = my_tree_node
     return my_trees
 
 
 def write_stg_entries(my_stg_mgr, my_files_to_remove, lines_dict, wayname, cluster_max_length):
     line_index = 0
-    for line in lines_dict.values():
+    for line in list(lines_dict.values()):
         line_index += 1
         line.make_shared_pylons_stg_entries(my_stg_mgr)
         if None is not wayname:
@@ -184,12 +183,12 @@ def main():
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, parameters.get_repl_prefix(), overwrite=True)
 
     #write_stg_entries(stg_manager, files_to_remove, trees, "trees", 2000)
-    for tree in trees.values() :
-        print(tree.elevation)
+    for tree in list(trees.values()) :
+        print((tree.elevation))
         tree.make_stg_entry(stg_manager)
         #write_stg_entries(stg_manager, files_to_remove, trees, "trees", 2000)
-    for forest_tree in forest_trees.values() :
-        print(forest_tree.elevation)
+    for forest_tree in list(forest_trees.values()) :
+        print((forest_tree.elevation))
         forest_tree.make_stg_entry(stg_manager)
 
     # -- initialize STG_Manager

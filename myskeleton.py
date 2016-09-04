@@ -1,4 +1,3 @@
-#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
 Created on Fri Sep  6 19:37:03 2013
@@ -18,7 +17,7 @@ import parameters
 
 
 
-def myskel(out, b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header = False, max_height = 1e99):
+def myskel(out, b, name = "roof", offset_xy = vec2d(0, 0), offset_z = 0., header = False, max_height = 1e99):
 #vertices = [(202.0, 52.0), (400.0, 52.0), (400.0, 153.0), (202.0, 152.0)]
 #edges =  [(0, 1), (1, 2), (2, 3), (3, 0)]
 #speeds = [1.0, 1.0, 1.0, 1.0]
@@ -39,16 +38,16 @@ def myskel(out, b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header 
             vertices = np.array(vertices)
     #        print "vertices = ", vertices
 
-            minx = min(vertices[:,0])
-            maxx = max(vertices[:,0])
-            miny = min(vertices[:,1])
-            maxy = max(vertices[:,1])
-            print "minx", minx
-            print "miny", miny
+            minx = min(vertices[:, 0])
+            maxx = max(vertices[:, 0])
+            miny = min(vertices[:, 1])
+            maxy = max(vertices[:, 1])
+            print("minx", minx)
+            print("miny", miny)
             dx = (maxx - minx)
             dy = (maxy - miny)
-            vertices[:,0] -= (minx)
-            vertices[:,1] -= (miny)
+            vertices[:, 0] -= (minx)
+            vertices[:, 1] -= (miny)
 
             #sc = dx/600.
             #vertices /= sc
@@ -100,7 +99,7 @@ def myskel(out, b, name = "roof", offset_xy = vec2d(0,0), offset_z = 0., header 
             return False
 
         result = roof_mesh.to_out(out, b, offset_xy, offset_z, header)
-    except Exception, reason:
+    except Exception as reason:
 #    if False:
         logging.error("Error while creating 3d roof (OSM_ID %s, %s)" % (b.osm_id, reason))
         tools.stats.roof_errors += 1

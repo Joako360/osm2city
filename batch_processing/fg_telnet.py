@@ -11,33 +11,36 @@ import time
 
 class FG_Telnet(object):
 
+    PROMPT = bytes("/>", encoding="ascii")
+
     def __init__(self, host, port):
         self.host = host
         self.sock = telnetlib.Telnet(host, port)
-        self.sock.write("data")
+        self.sock.write(bytes("data", encoding="ascii"))
 
     def get_prop(self, property_name):
-        self.sock.write("get " + property_name + "\r\n")
-        result = self.sock.read_until("/>", 60)
+        self.sock.write(bytes("get " + property_name + "\n", encoding="ascii"))
+        result = self.sock.read_until(self.PROMPT, 60)
         return result
         
     def set_prop(self, property_name, value):
-        send_buffer = "set %s %s\r\n" % (property_name, value)
+        send_buffer = bytes("set %s %s\n" % (property_name, value), encoding="ascii")
         self.sock.write(send_buffer)
-        result = self.sock.read_until("/>", 60)
+        result = self.sock.read_until(self.PROMPT, 60)
         return result
     
     def run_command(self, command):
         try:
-            send_buffer = "run %s\r\n" % command
+            send_buffer = bytes("run %s\n" % command, encoding="ascii")
             self.sock.write(send_buffer)
-            result = self.sock.read_until("/>", 12000)
-            print result
-            if result.find("<completed>") >= 0:
+            result = self.sock.read_until(self.PROMPT, 12000)
+            result_str = result.decode("ascii")
+            print(result)
+            if result_str.find("<completed>") >= 0:
                 return True
             return False
-        except Exception, e:
-            print e
+        except Exception as e:
+            print(e)
             return False
 
     def get_elevation(self, lon, lat):

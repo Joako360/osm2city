@@ -5,7 +5,7 @@
 #   Class :     Mesh
 #===============================================================================
 
-import point3D
+from . import point3D
 #import rainbow
 from vec2d import vec2d
 import roofs
@@ -30,7 +30,7 @@ class Mesh:
         self.nv         = len(self.vertices)
         self.nf         = len(self.faces)
 
-    def add_vertex(self,p):
+    def add_vertex(self, p):
         """
         add a vertex into the list of vertices if the vertex is not already in the list
         @return the index of the vertex in the vertices list
@@ -42,7 +42,7 @@ class Mesh:
             self.nv += 1
             return self.nv-1
 
-    def add_face(self,face):
+    def add_face(self, face):
         """ add a face an return the index of the face in the list """
         self.faces.append(face)
         self.nf += 1
@@ -99,7 +99,7 @@ class Mesh:
 #
 #        f.close()
 
-    def ac3d_string(self, b, offset_xy = vec2d(0,0), offset_z = 0., header = False):
+    def ac3d_string(self, b, offset_xy = vec2d(0, 0), offset_z = 0., header = False):
         """return mesh as string in a AC3D format. You must append kids line."""
         s = ""
         if header:
@@ -117,7 +117,7 @@ class Mesh:
 #            s += "%f %f %f\n" % (p.x, p.y, p.z)
             x = -(p.x - offset_xy.x)
             y = -(p.y - offset_xy.y)
-            X.append([x,y])
+            X.append([x, y])
             s += "%f %f %f\n" % (y, p.z + offset_z, x)
 
 #        for p in self.vertices:
@@ -138,14 +138,14 @@ class Mesh:
             uv = roofs.face_uv(face, np.array(X), b.roof_texture.h_size_meters, b.roof_texture.v_size_meters)
             i = 0
             for index in face:
-                s += "%i %1.3g %1.3g\n" % (index, uv[i,0], uv[i,1])
+                s += "%i %1.3g %1.3g\n" % (index, uv[i, 0], uv[i, 1])
                 #print "UV coord", uv[i,0], uv[i,1]
 #                print "z=%g %g %g" % (self.vertices[index].z, uv[i,0], uv[i,1])
                 i += 1
 
         return s
 
-    def to_out(self, out, b, offset_xy = vec2d(0,0), offset_z = 0., header = False):
+    def to_out(self, out, b, offset_xy = vec2d(0, 0), offset_z = 0., header = False):
         """create 3d object"""
         if header:
             out.new_object(b.roof_ac_name, b.roof_texture.filename + '.png')
@@ -156,7 +156,7 @@ class Mesh:
 #            s += "%f %f %f\n" % (p.x, p.y, p.z)
             x = -(p.x - offset_xy.x)
             y = -(p.y - offset_xy.y)
-            X.append([x,y])
+            X.append([x, y])
             out.node(y, p.z + offset_z, x)
 
         for face in self.faces:
@@ -165,7 +165,7 @@ class Mesh:
             i = 0
             l = []
             for index in face:
-                l.append((o + index, uv[i,0], uv[i,1]))
+                l.append((o + index, uv[i, 0], uv[i, 1]))
                 #print "UV coord", uv[i,0], uv[i,1]
 #                print "z=%g %g %g" % (self.vertices[index].z, uv[i,0], uv[i,1])
                 i += 1

@@ -1,4 +1,3 @@
-#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
 Created on Sat Mar 23 18:32:18 2013
@@ -55,7 +54,7 @@ def read(path, stg_fname, our_magic):
             logging.debug("stg: %s %s", typ, path + ac_path)
             objs.append(osm2city.Building(osm_id=-1, tags=-1, outer_ring=point, name=path + ac_path, height=0, levels=0, stg_typ=typ, stg_hdg=hdg))
         f.close()
-    except IOError, reason:
+    except IOError as reason:
         logging.warning("stg_io:read: Ignoring unreadable file %s", reason)
         return []
 
@@ -88,7 +87,7 @@ def uninstall_ours(path, stg_fname, our_magic):
             stg.write(line)
         stg.flush()
         stg.close()
-    except IOError, reason:
+    except IOError as reason:
         logging.warning("error uninstalling %s: %s", path + stg_fname, reason)
 
 

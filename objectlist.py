@@ -7,7 +7,7 @@ Created on 15.06.2014
 import logging
 import vec2d
 
-from __builtin__ import max
+from builtins import max
 
 
 class ObjectList(object):
@@ -33,7 +33,7 @@ class ObjectList(object):
         self.nodes_dict = nodes_dict
         logging.debug("len of nodes_dict %i", len(nodes_dict))
 
-        for node in nodes_dict.values():
+        for node in list(nodes_dict.values()):
             self.maxlon = max(self.maxlon, node.lon)
             self.minlon = min(self.minlon, node.lon)
             self.maxlat = max(self.maxlat, node.lat)

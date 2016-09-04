@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 Specialized LinearObject for bridges. Overrides write_to() method.
 
@@ -164,7 +163,7 @@ class LinearBridge(linear.LinearObject):
 #            self.D = Deck_shape_poly(MSL_0, MSL_m+required_height, MSL_1)
 
         if self.osm_id == 126452863:
-            print "hj", node0.h_add, node1.h_add
+            print("hj", node0.h_add, node1.h_add)
 
 #        node0.h_add = h_add
 #        node1.h_add = h_add
@@ -172,16 +171,16 @@ class LinearBridge(linear.LinearObject):
 
         if 0:
             plt.clf()
-            X = np.linspace(0,1,11)
+            X = np.linspace(0, 1, 11)
             plt.plot(X, self.D(X), 'r-o')
 #            plt.plot(X, self.D(X) + h_add, 'r-o')
             plt.plot(X, self.elev(X), 'g-o')
             plt.show()
 
         if 473886072 == node0.osm_id:
-            print ">>>0", node0.h_add
+            print(">>>0", node0.h_add)
         if 473886072 == node1.osm_id:
-            print ">>>1", node1.h_add
+            print(">>>1", node1.h_add)
 
     def deck_height(self, l, normalized=True):
         """given linear distance [m], interpolate and return deck height"""

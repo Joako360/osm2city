@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Script part of osm2city which takes OpenStreetMap data as input and generates data to be used in FlightGear
@@ -71,7 +70,7 @@ class Cable(object):
         pylon_y = catenary_a * math.cosh((cable_distance / 2) / catenary_a)
         part_elevation = ((self.start_cable_vertex.elevation - self.end_cable_vertex.elevation) /
                           (1 + number_extra_vertices))
-        for i in xrange(1, number_extra_vertices + 1):
+        for i in range(1, number_extra_vertices + 1):
             x = self.start_cable_vertex.x + i * part_distance * math.sin(math.radians(self.heading))
             y = self.start_cable_vertex.y + i * part_distance * math.cos(math.radians(self.heading))
             catenary_x = i * part_distance - (cable_distance / 2)
@@ -115,7 +114,7 @@ class Cable(object):
         lines = list()
         lines.append("OBJECT group")
         lines.append("kids " + str(len(self.vertices) - 1))
-        for i in xrange(0, len(self.vertices) - 1):
+        for i in range(0, len(self.vertices) - 1):
             lines.append("OBJECT poly")
             lines.append("numvert 6")
             lines.append(self._create_numvert_lines(self.vertices[i]))
@@ -460,7 +459,7 @@ class Line(LineWithoutCables):
                                                       , segment.start_pylon.direction_type)
             end_cable_vertices = get_cable_vertices(segment.end_pylon.pylon_model
                                                     , segment.end_pylon.direction_type)
-            for i in xrange(0, len(start_cable_vertices)):
+            for i in range(0, len(start_cable_vertices)):
                 my_radius = radius
                 my_number_extra_vertices = number_extra_vertices
                 start_cable_vertices[i].calc_position(segment.start_pylon.x, segment.start_pylon.y
@@ -490,7 +489,7 @@ class Line(LineWithoutCables):
         cluster_length = 0.0
         cluster_index = 1
         start_pylon = None
-        for i in xrange(0, len(self.way_segments)):
+        for i in range(0, len(self.way_segments)):
             way_segment = self.way_segments[i]
             if start_pylon is None:
                 start_pylon = way_segment.start_pylon
@@ -536,13 +535,13 @@ class Line(LineWithoutCables):
                     xml_file_lines.append('<type>range</type>')
                     xml_file_lines.append('<min-m>0</min-m>')
                     xml_file_lines.append('<max-property>/sim/rendering/static-lod/rough</max-property>')
-                    for j in xrange(1, len(cluster_segments) + 1):
+                    for j in range(1, len(cluster_segments) + 1):
                         xml_file_lines.append('<object-name>segment%05d</object-name>' % j)
                     xml_file_lines.append('</animation>')
                     if parameters.C2P_CABLES_NO_SHADOW:
                         xml_file_lines.append('<animation>')
                         xml_file_lines.append('<type>noshadow</type>')
-                        for j in xrange(1, len(cluster_segments) + 1):
+                        for j in range(1, len(cluster_segments) + 1):
                             xml_file_lines.append('<object-name>segment%05d</object-name>' % j)
                         xml_file_lines.append('</animation>')
                     xml_file_lines.append('</PropertyList>')
@@ -838,7 +837,7 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_co
     my_shared_nodes = {}  # node osm_id as key, list of WayLine objects as value
 
     # First reduce to electrified narrow_gauge or rail, no tunnels and no abandoned
-    for way in ways_dict.values():
+    for way in list(ways_dict.values()):
         my_line = RailLine(way.osm_id)
         is_railway = False
         is_electrified = False
@@ -881,11 +880,11 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_co
                         logging.debug('Node outside of boundaries and therefore ignored: osm_id = %s ', my_node.osm_id)
             if len(my_line.nodes) > 1:
                 my_railways[my_line.osm_id] = my_line
-                if my_line.nodes[0].osm_id in my_shared_nodes.keys():
+                if my_line.nodes[0].osm_id in list(my_shared_nodes.keys()):
                     my_shared_nodes[my_line.nodes[0].osm_id].append(my_line)
                 else:
                     my_shared_nodes[my_line.nodes[0].osm_id] = [my_line]
-                if my_line.nodes[-1].osm_id in my_shared_nodes.keys():
+                if my_line.nodes[-1].osm_id in list(my_shared_nodes.keys()):
                     my_shared_nodes[my_line.nodes[-1].osm_id].append(my_line)
                 else:
                     my_shared_nodes[my_line.nodes[-1].osm_id] = [my_line]
@@ -893,7 +892,7 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_co
                 logging.warning('Line could not be validated or corrected. osm_id = %s', my_line.osm_id)
 
     # Attempt to merge lines
-    for key in my_shared_nodes.keys():
+    for key in list(my_shared_nodes.keys()):
         shared_node = my_shared_nodes[key]
         if len(shared_node) >= 2:
             pos1, pos2 = find_connecting_line(key, shared_node, 60)
@@ -908,7 +907,7 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_co
                     logging.error(e)
 
     # get LineStrings and remove those lines, which are less than the minimal requirement
-    for the_railway in my_railways.values():
+    for the_railway in list(my_railways.values()):
         my_coordinates = list()
         for node in the_railway.nodes:
             my_coordinates.append((node.x, node.y))
@@ -926,7 +925,7 @@ def process_highways_for_streetlamps(my_highways, landuse_buffers):
     placed - e.g. using a combination of highway type, one-way, number of lanes etc
     """
     my_streetlamps = {}
-    for key in my_highways.keys():
+    for key in list(my_highways.keys()):
         my_highway = my_highways[key]
         if not StreetlampWay.has_lamps(my_highway.type_):
             continue
@@ -958,7 +957,7 @@ def process_highways_for_streetlamps(my_highways, landuse_buffers):
                 del my_highways[key]
 
     # Remove the too short lines
-    for key in my_streetlamps.keys():
+    for key in list(my_streetlamps.keys()):
         my_streetlamp = my_streetlamps[key]
         if not isinstance(my_streetlamp.highway.linear, shg.LineString):
             del my_streetlamps[key]
@@ -973,7 +972,7 @@ def process_highways_for_streetlamps(my_highways, landuse_buffers):
 def merge_streetlamp_buffers(landuse_refs):
     """Based on existing landuses applies extra buffer and then unions as many as possible"""
     landuse_buffers = []
-    for landuse_ref in landuse_refs.values():
+    for landuse_ref in list(landuse_refs.values()):
         streetlamp_buffer = landuse_ref.polygon.buffer(parameters.C2P_STREETLAMPS_MAX_DISTANCE_LANDUSE)
         if 0 == len(landuse_buffers):
             landuse_buffers.append(streetlamp_buffer)
@@ -999,7 +998,7 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, my_elev_interpolator, my_
     my_powerlines = {}  # osm_id as key, WayLine object as value
     my_aerialways = {}  # osm_id as key, WayLine object as value
     my_shared_nodes = {}  # node osm_id as key, list of WayLine objects as value
-    for way in ways_dict.values():
+    for way in list(ways_dict.values()):
         my_line = WayLine(way.osm_id)
         for key in way.tags:
             value = way.tags[key]
@@ -1052,7 +1051,7 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, my_elev_interpolator, my_
                             elif "station" == value:
                                 my_pylon.type_ = Pylon.TYPE_AERIALWAY_STATION
                                 my_point = shg.Point(my_pylon.x, my_pylon.y)
-                                for osm_id in building_refs.keys():
+                                for osm_id in list(building_refs.keys()):
                                     building_ref = building_refs[osm_id]
                                     if building_ref.contains(my_point):
                                         my_pylon.in_osm_building = True
@@ -1074,7 +1073,7 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, my_elev_interpolator, my_
                     prev_pylon = my_pylon
             if len(my_line.shared_pylons) > 1:
                 for the_node in [my_line.shared_pylons[0], my_line.shared_pylons[-1]]:
-                    if the_node.osm_id in my_shared_nodes.keys():
+                    if the_node.osm_id in list(my_shared_nodes.keys()):
                         my_shared_nodes[the_node.osm_id].append(my_line)
                     else:
                         my_shared_nodes[the_node.osm_id] = [my_line]
@@ -1085,7 +1084,7 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, my_elev_interpolator, my_
             else:
                 logging.warning('Line could not be validated or corrected. osm_id = %s', my_line.osm_id)
 
-    for key in my_shared_nodes.keys():
+    for key in list(my_shared_nodes.keys()):
         shared_node = my_shared_nodes[key]
         if (len(shared_node) == 2) and (shared_node[0].type_ == shared_node[1].type_):
             my_osm_id = shared_node[1].osm_id
@@ -1127,8 +1126,8 @@ def find_connecting_line(key, lines, max_allowed_angle=360):
     pos1 = 0
     pos2 = 1
     max_angle = 500
-    for i in xrange(0, len(angles) - 1):
-        for j in xrange(i + 1, len(angles)):
+    for i in range(0, len(angles) - 1):
+        for j in range(i + 1, len(angles)):
             angle_between = abs(abs(angles[i] - angles[j]) - 180)
             if angle_between < max_angle:
                 max_angle = angle_between
@@ -1174,10 +1173,10 @@ def merge_lines(osm_id, line0, line1, shared_nodes):
             line0.nodes.insert(0, line1.nodes[len(line1.nodes) - x - 2])
 
     # in shared_nodes replace line1 with line2
-    for shared_node in shared_nodes.values():
+    for shared_node in list(shared_nodes.values()):
         has_line0 = False
         pos_line1 = -1
-        for i in xrange(0, len(shared_node)):
+        for i in range(0, len(shared_node)):
             if shared_node[i].osm_id == line0.osm_id:
                 has_line0 = True
             if shared_node[i].osm_id == line1.osm_id:
@@ -1190,7 +1189,7 @@ def merge_lines(osm_id, line0, line1, shared_nodes):
 
 def write_stg_entries(my_stg_mgr, my_files_to_remove, lines_dict, wayname, cluster_max_length):
     line_index = 0
-    for line in lines_dict.values():
+    for line in list(lines_dict.values()):
         line_index += 1
         line.make_shared_pylons_stg_entries(my_stg_mgr)
         if None is not wayname:
@@ -1246,7 +1245,7 @@ def optimize_catenary(half_distance_pylons, max_value, sag, max_variation):
     Calculates the parameter _a_ for a catenary with a given sag between the pylons and a mx_variation.
     See http://www.mathdemos.org/mathdemos/catenary/catenary.html and https://en.wikipedia.org/wiki/Catenary
     """
-    for a in xrange(1, max_value):
+    for a in range(1, max_value):
         value = a * math.cosh(float(half_distance_pylons)/a) - a  # float() needed to make sure result is float
         if (value >= (sag - max_variation)) and (value <= (sag + max_variation)):
             return a, value
@@ -1255,7 +1254,7 @@ def optimize_catenary(half_distance_pylons, max_value, sag, max_variation):
 
 def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator):
     my_buildings = dict()  # osm_id as key, Polygon
-    for way in ways_dict.values():
+    for way in list(ways_dict.values()):
         for key in way.tags:
             if "building" == key:
                 coordinates = list()
@@ -1295,7 +1294,7 @@ class Highway(LinearOSMFeature):
 def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
     my_highways = dict()  # osm_id as key, Highway
 
-    for way in ways_dict.values():
+    for way in list(ways_dict.values()):
         my_highway = Highway(way.osm_id)
         valid_highway = False
         is_challenged = False
@@ -1342,7 +1341,7 @@ class Landuse(object):
 def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator):
     my_landuses = dict()  # osm_id as key, Landuse as value
 
-    for way in ways_dict.values():
+    for way in list(ways_dict.values()):
         my_landuse = Landuse(way.osm_id)
         valid_landuse = True
         for key in way.tags:
@@ -1381,10 +1380,10 @@ def generate_landuse_from_buildings(osm_landuses, building_refs):
     """Adds "missing" landuses based on building clusters"""
     my_landuse_candidates = dict()
     index = 10000000000
-    for my_building in building_refs.values():
+    for my_building in list(building_refs.values()):
         # check whether the building already is in a land use
         within_existing_landuse = False
-        for osm_landuse in osm_landuses.values():
+        for osm_landuse in list(osm_landuses.values()):
             if my_building.intersects(osm_landuse.polygon):
                 within_existing_landuse = True
                 break
@@ -1398,7 +1397,7 @@ def generate_landuse_from_buildings(osm_landuses, building_refs):
             buffer_polygon = my_building.buffer(buffer_distance)
             buffer_polygon = buffer_polygon
             within_existing_landuse = False
-            for candidate in my_landuse_candidates.values():
+            for candidate in list(my_landuse_candidates.values()):
                 if buffer_polygon.intersects(candidate.polygon):
                     candidate.polygon = candidate.polygon.union(buffer_polygon)
                     candidate.number_of_buildings += 1
@@ -1413,7 +1412,7 @@ def generate_landuse_from_buildings(osm_landuses, building_refs):
                 my_landuse_candidates[my_candidate.osm_id] = my_candidate
     # add landuse candidates to landuses
     logging.debug("Candidate land-uses found: %s", len(my_landuse_candidates))
-    for candidate in my_landuse_candidates.values():
+    for candidate in list(my_landuse_candidates.values()):
         if candidate.polygon.area < parameters.LU_LANDUSE_MIN_AREA:
             del my_landuse_candidates[candidate.osm_id]
     logging.debug("Candidate land-uses with sufficient area found: %s", len(my_landuse_candidates))
@@ -1489,9 +1488,9 @@ def main():
             aerialways.clear()
         logging.info('Number of power lines to process: %s', len(powerlines))
         logging.info('Number of aerialways to process: %s', len(aerialways))
-        for wayline in powerlines.values():
+        for wayline in list(powerlines.values()):
             wayline.calc_and_map()
-        for wayline in aerialways.values():
+        for wayline in list(aerialways.values()):
             wayline.calc_and_map()
     # railway overhead lines
     rail_lines = {}
@@ -1499,15 +1498,15 @@ def main():
         rail_lines = process_osm_rail_overhead(handler.nodes_dict, handler.ways_dict, elev_interpolator
                                                , coord_transformator)
         logging.info('Reduced number of rail lines: %s', len(rail_lines))
-        for rail_line in rail_lines.values():
-            rail_line.calc_and_map(elev_interpolator, coord_transformator, rail_lines.values())
+        for rail_line in list(rail_lines.values()):
+            rail_line.calc_and_map(elev_interpolator, coord_transformator, list(rail_lines.values()))
     # street lamps
     streetlamp_ways = {}
     if parameters.C2P_PROCESS_STREETLAMPS:
         landuse_refs = process_osm_landuse_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
         if parameters.LU_LANDUSE_GENERATE_LANDUSE:
             generated_landuses = generate_landuse_from_buildings(landuse_refs, building_refs)
-            for generated in generated_landuses.values():
+            for generated in list(generated_landuses.values()):
                 landuse_refs[generated.osm_id] = generated
         logging.info('Number of landuse references: %s', len(landuse_refs))
         streetlamp_buffers = merge_streetlamp_buffers(landuse_refs)
@@ -1515,7 +1514,7 @@ def main():
         highways = process_osm_highway(handler.nodes_dict, handler.ways_dict, coord_transformator)
         streetlamp_ways = process_highways_for_streetlamps(highways, streetlamp_buffers)
         logging.info('Reduced number of streetlamp ways: %s', len(streetlamp_ways))
-        for highway in streetlamp_ways.values():
+        for highway in list(streetlamp_ways.values()):
             highway.calc_and_map(elev_interpolator, coord_transformator)
         landuse_refs = None
 
@@ -1629,7 +1628,7 @@ class TestOSMPylons(unittest.TestCase):
     def test_catenary(self):
         #  Values taken form example 2 in http://www.mathdemos.org/mathdemos/catenary/catenary.html
         a, value = optimize_catenary(170, 5000, 14, 0.01)
-        print a, value
+        print(a, value)
         self.assertAlmostEqual(1034/100, a/100, 2)
 
     def test_merge_lines(self):

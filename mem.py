@@ -40,7 +40,7 @@ def resident(since=0.0):
 
 def res(s=""):
     m = resident()
-    print "%s res mem %9i kb  %6i mb" % (s, m / 1024., m / 1024. / 1024.)
+    print("%s res mem %9i kb  %6i mb" % (s, m / 1024., m / 1024. / 1024.))
 
 def stacksize(since=0.0):
     '''Return stack size in bytes.
@@ -49,11 +49,11 @@ def stacksize(since=0.0):
 
 def show_sizeof(x, level=0):
 
-    print "\t" * level, x.__class__, sys.getsizeof(x), x
+    print("\t" * level, x.__class__, sys.getsizeof(x), x)
 
     if hasattr(x, '__iter__'):
         if hasattr(x, 'items'):
-            for xx in x.items():
+            for xx in list(x.items()):
                 show_sizeof(xx, level + 1)
         else:
             for xx in x:

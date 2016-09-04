@@ -33,7 +33,7 @@ In most situations it is enough to call the following command once and then only
 
 ::
 
-  /usr/bin/python2.7 /home/pingu/develop_vcs/osm2city/textures/manager.py -f LSZS/params.ini -a
+  /usr/bin/python3 /home/pingu/develop_vcs/osm2city/textures/manager.py -f LSZS/params.ini -a
 
 Alternatively `osm2city.py` can be called with the ``-a`` option.
 
@@ -54,7 +54,7 @@ Calling one of these programs only with command line option ``--help`` or ``-h``
 
 ::
 
-  /usr/bin/python2.7 /home/pingu/develop_vcs/osm2city/platforms.py --help
+  /usr/bin/python3 /home/pingu/develop_vcs/osm2city/platforms.py --help
   usage: platforms.py [-h] [-f FILE] [-l LOGLEVEL]
 
   platform.py reads OSM data and creates platform models for use with FlightGear
@@ -70,7 +70,7 @@ In most situations you may want to at least provide command line parameter ``-f`
 
 ::
 
-  /usr/bin/python2.7 /home/pingu/develop_vcs/osm2city/osm2city.py -f LSZS/params.ini -l DEBUG
+  /usr/bin/python3 /home/pingu/develop_vcs/osm2city/osm2city.py -f LSZS/params.ini -l DEBUG
 
 Remember that the paths are relative to the ``WORKING_DIRECTORY``. Alternatively provide the full path to your ``params.ini`` [#]_ file.
 
@@ -103,7 +103,7 @@ Calling build_tiles.py
 
 ::
 
-    $ /usr/bin/python2.7 /home/pingu/develop_vcs/osm2city/batch_processing/build_tiles.py -t e009n47 -f CH_OSM/params_kp.ini -o params.ini
+    $ /usr/bin/python3 /home/pingu/develop_vcs/osm2city/batch_processing/build_tiles.py -t e009n47 -f CH_OSM/params_kp.ini -o params.ini
 
 Mandatory command line arguments:
 
@@ -115,7 +115,7 @@ Optional command line arguments:
 * -p: You can use this option on Linux and Mac in order to generate scripts with parallel processing support and specify the max number of parallel processes when calling the generated scripts. 
 * -u: Which API to use to download OSM data on the fly.
 * -n: There are two implementations of downloading data on the fly. If this option is used, then a download program is used, which has better support for retries (FIXME: does this work?)
-* -x: If ``python`` is not in your executable path or you want to specify a specific Python version if you have installed several versions, then use this argument (e.g. ``/usr/bin/python2.7``).
+* -x: If ``python`` is not in your executable path or you want to specify a specific Python version if you have installed several versions, then use this argument (e.g. ``/usr/bin/python3.5``).
 * -d: Instead of dynamic download an existing OSM data file as specified in the overall ``params.ini`` will be used. This can be used if e.g. ``curl`` is not available (mostly on Windows) or if you have problems with dynamic download or if you need to manipulate the OSM data after download and before processing. A pre-requisite for this is that you have Osmosis installed on your computer (see also :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>`) — the path to the Osmosis executable needs to be specified with this command line argument.
 * -o: the name of the copied params.ini files in the sub-directories
 
@@ -123,7 +123,7 @@ Calling build_tiles.py with optional argument ``-d`` could look like the followi
 
 ::
 
-    $ /usr/bin/python2.7 /home/pingu/develop_vcs/osm2city/batch_processing/build_tiles.py -t e009n47 -f CH_OSM/params.ini -o params.ini -x /usr/bin/python2.7 -d /home/pingu/bin/osmosis-latest/bin/osmosis
+    $ /usr/bin/python3 /home/pingu/develop_vcs/osm2city/batch_processing/build_tiles.py -t e009n47 -f CH_OSM/params.ini -o params.ini -x /usr/bin/python3 -d /home/pingu/bin/osmosis-latest/bin/osmosis
 
 
 ``build_tiles.py`` creates a directory layout like the following:

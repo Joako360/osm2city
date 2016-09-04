@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Checks tools.stats after running any of osm2city's modules and shows troubleshooting
 hints if we detect problems.
 """ 

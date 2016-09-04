@@ -22,13 +22,13 @@ It might be easiest to read ``parameters.py`` directly. Python code is easy to r
 
 ::
 
-    /usr/bin/python2.7 /home/vanosten/develop_vcs/osm2city/parameters.py -d
+    /usr/bin/python3 /home/vanosten/develop_vcs/osm2city/parameters.py -d
 
 If you want to see a listing of the actual parameters used during scenery generation (i.e. a combination of the defaults with the overridden values in your ``params.ini`` file, then you can run the following command:
 
 ::
 
-    /usr/bin/python2.7 --file /home/pingu/development/osm2city/parameters.py -f LSZS/params.ini
+    /usr/bin/python3 --file /home/pingu/development/osm2city/parameters.py -f LSZS/params.ini
 
 
 ==================================

@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Central place to store parameters / settings / variables in osm2city.
@@ -96,7 +95,7 @@ CONCURRENCY = 1             # -- number of parallel OSM parsing threads. Unused 
 # -- skip buildings based on their OSM name tag or OSM ID, in case there's already
 #    a static model for these, and the overlap check fails.
 #    Use unicode strings as in the first example if there are non-ASCII characters.
-SKIP_LIST = [u"Theologische Fakultät", "Rhombergpassage", 55875208]
+SKIP_LIST = ["Theologische Fakultät", "Rhombergpassage", 55875208]
 # -- keep buildings based on their OSM name tag or OSM ID.
 #    keeps also, building:part of buildings
 KEEP_LIST = []
@@ -298,22 +297,22 @@ def show():
     Prints all parameters as key = value if log level is INFO or lower
     """
     if log_level_info_or_lower():
-        print '--- Using the following parameters: ---'
+        print('--- Using the following parameters: ---')
         my_globals = globals()
-        for k in sorted(my_globals.iterkeys()):
+        for k in sorted(my_globals.keys()):
             if k.startswith('__'):
                 continue
             elif k == "args":
                 continue
             elif k == "parser":
                 continue
-            elif isinstance(my_globals[k], types.ClassType) or \
+            elif isinstance(my_globals[k], type) or \
                     isinstance(my_globals[k], types.FunctionType) or \
                     isinstance(my_globals[k], types.ModuleType):
                 continue
             else:
-                print '%s = %s' % (k, my_globals[k])
-        print '------'
+                print('%s = %s' % (k, my_globals[k]))
+        print('------')
 
 
 def read_from_file(filename):
@@ -321,23 +320,23 @@ def read_from_file(filename):
     default_globals = globals()
     file_globals = {'textures': default_globals['textures']}
     try:
-        execfile(filename, file_globals)
-    except IOError, reason:
+        exec(compile(open(filename).read(), filename, 'exec'), file_globals)
+    except IOError as reason:
         logging.error("Error processing file with parameters: %s", reason)
         sys.exit(1)
     except NameError:
-        print traceback.format_exc()
+        print(traceback.format_exc())
         logging.error("Error while reading " + filename + ". Perhaps an unquoted string in your parameters file?")
         sys.exit(1)
 
-    for k, v in file_globals.iteritems():
+    for k, v in file_globals.items():
         if k.startswith('_'):
             continue
         k = k.upper()
         if k in default_globals:
             default_globals[k] = v
         else:
-            logging.warn('Unknown parameter: %s=%s' % (k, v))
+            logging.warning('Unknown parameter: %s=%s' % (k, v))
 
 
 def show_default():
@@ -353,7 +352,7 @@ def show_default():
         elif line.startswith('# default_args_end'):
             return
         if do_print:
-            print line,
+            print(line, end='')
 
 
 def set_loglevel(args_loglevel=None):

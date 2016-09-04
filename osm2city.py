@@ -1,4 +1,3 @@
-#!/usr/bin/env python2.7 
 # -*- coding: utf-8 -*-
 """
 osm2city.py aims at generating 3D city models for FG, using OSM data.
@@ -56,10 +55,9 @@ You should disable random buildings.
 # - comments: code # -- comment
 
 import argparse
-import cPickle
+import pickle
 import logging
 import os
-import re
 import random
 import sys
 import textwrap
@@ -75,7 +73,8 @@ import coordinates
 import osmparser
 import parameters
 import stg_io2
-import textures as tex
+import textures.manager as tex_manager
+from textures.manager import TextureManager, FacadeManager  # this is needed to make pickle know the context
 import tools
 import troubleshoot
 import vec2d as v
@@ -99,9 +98,8 @@ class Building(object):
         self.osm_id = osm_id
         self.tags = tags
         self.refs = refs
-        #self.outer_ring = outer_ring # (outer) local linear ring
         self.inner_rings_list = inner_rings_list
-        self.name = name.encode('ascii', 'ignore')     # stg: name
+        self.name = name
         self.stg_typ = stg_typ  # stg: OBJECT_SHARED or _STATIC
         self.stg_hdg = stg_hdg
         self.height = height
@@ -110,7 +108,6 @@ class Building(object):
         self.longest_edge_len = 0.
         self.levels = levels
         self.first_node = 0  # index of first node in final OBJECT node list
-        #self._nnodes_ground = 0 # number of nodes on ground
         self.anchor = v.vec2d(list(outer_ring.coords[0]))
         self.facade_texture = None
         self.roof_texture = None
@@ -143,7 +140,7 @@ class Building(object):
         """
         new_inner_rings_list = []
         self.outer_nodes_closest = []
-        outer_nodes_avail = range(self.nnodes_outer)
+        outer_nodes_avail = list(range(self.nnodes_outer))
         for inner in self.polygon.interiors:
             min_r = 1e99
             for i, node_i in enumerate(list(inner.coords)[:-1]):
@@ -164,8 +161,8 @@ class Building(object):
 #        print "---\n\n"
         # -- sort inner rings by index of closest outer node
         yx = sorted(zip(self.outer_nodes_closest, new_inner_rings_list))
-        self.inner_rings_list = [x for (y,x) in yx]
-        self.outer_nodes_closest = [y for (y,x) in yx]
+        self.inner_rings_list = [x for (y, x) in yx]
+        self.outer_nodes_closest = [y for (y, x) in yx]
         self.set_polygon(self.polygon.exterior, self.inner_rings_list)
 #        for o in self.outer_nodes_closest:
 #            assert(o < len(outer_ring.coords) - 1)
@@ -360,11 +357,11 @@ class Buildings(object):
             inner_rings_list = []
             for _way in inner_ways:
                 inner_rings_list.append(self._refs_to_ring(_way.refs, inner=True))
-        except KeyError, reason:
+        except KeyError as reason:
             logging.error("Failed to parse building referenced node missing clipped?(%s) WayID %d %s Refs %s" % (reason, osm_id, tags, refs))
             tools.stats.parse_errors += 1
             return False
-        except Exception, reason:
+        except Exception as reason:
             logging.error("Failed to parse building (%s)  WayID %d %s Refs %s" % (reason, osm_id, tags, refs))
             tools.stats.parse_errors += 1
             return False
@@ -440,7 +437,7 @@ class Buildings(object):
                 all_tags = relation.tags
                 for way in outer_multipolygons:
                     logging.info("Multipolygon " + str(way.osm_id))
-                    all_tags = dict(way.tags.items() + all_tags.items())
+                    all_tags = dict(list(way.tags.items()) + list(all_tags.items()))
                     res=False
                     try:
                         if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
@@ -480,13 +477,13 @@ class Buildings(object):
                 all_tags = relation.tags
                 for way in outer_ways:
                     #print "TAG", way.tags
-                    all_tags = dict(way.tags.items() + all_tags.items())
+                    all_tags = dict(list(way.tags.items()) + list(all_tags.items()))
                 #print "all tags", all_tags
                 #all_tags = dict([way.tags for way in outer_ways]) # + tags.items())
                 #print "all outer refs", all_outer_refs
                 #dict(outer.tags.items() + tags.items())
                 if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
-                    print "FIXME: ignoring all but first inner way (%i total) of ID %i" % (len(inner_ways), relation.osm_id)
+                    print("FIXME: ignoring all but first inner way (%i total) of ID %i" % (len(inner_ways), relation.osm_id))
                     res = self._make_building_from_way(relation.osm_id,
                                                 all_tags,
                                                 all_outer_refs, [inner_ways[0]])
@@ -512,7 +509,7 @@ class Buildings(object):
                         logging.error("Outer way (%d) not in list of ways. Building type missing?"%_way.osm_id)
 
     def _get_min_max_coords(self):
-        for node in self.nodes_dict.values():
+        for node in list(self.nodes_dict.values()):
             #logging.debug('%s %.4f %.4f', _node.osm_id, _node.lon, _node.lat)
             if node.lon > self.maxlon:
                 self.maxlon = node.lon
@@ -671,7 +668,7 @@ if __name__ == "__main__":
 
     tools.init(coordinates.Transformation(center, hdg=0))
 
-    tex.manager.init(tools.get_osm2city_directory(), args.create_atlas)
+    tex_manager.init(tools.get_osm2city_directory(), args.create_atlas)
 
     logging.info("reading elevation data")
     elev = tools.get_interpolator(fake=parameters.NO_ELEV)
@@ -694,8 +691,8 @@ if __name__ == "__main__":
     if not parameters.USE_PKL:
         # -- parse OSM, return
         if not parameters.IGNORE_PKL_OVERWRITE and os.path.exists(pkl_fname):
-            print "Existing cache file %s will be overwritten. Continue? (y/n)" % pkl_fname
-            if raw_input().lower() != 'y':
+            print("Existing cache file %s will be overwritten. Continue? (y/n)" % pkl_fname)
+            if input().lower() != 'y':
                 sys.exit(-1)
 
         if parameters.BOUNDARY_CLIPPING:
@@ -758,7 +755,7 @@ if __name__ == "__main__":
                     #if ref not in buildings.node_way_dict :
                     #     buildings.node_way_dict=[]
                         
-                    tmp_b_cands = list(set([ b_cand for b_cand in buildings.node_way_dict[ref] if ((b_cand not in b_cands) and (b_cand.osm_id != building.osm_id))]))
+                    tmp_b_cands = list({ b_cand for b_cand in buildings.node_way_dict[ref] if ((b_cand not in b_cands) and (b_cand.osm_id != building.osm_id))})
                     b_cands.extend(tmp_b_cands)
                     
                     if ref not in used_refs:
@@ -878,9 +875,9 @@ if __name__ == "__main__":
                     else:
                         logging.verbose("   cand %i doesn't contains  %i" % (cand_building.osm_id,  building.osm_id))
                                 
-                except shgs.TopologicalError, reason:
+                except shgs.TopologicalError as reason:
                     logging.warn("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d " % (reason, building.osm_id, cand_building.osm_id))
-                except shgs.PredicateError, reason:
+                except shgs.PredicateError as reason:
                     logging.warn("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d " % (reason, building.osm_id, cand_building.osm_id))
     
                 return False
@@ -920,7 +917,7 @@ if __name__ == "__main__":
                     pass
                     
                 # Search and set parent for building:part
-                cand_buildings = list(set([b_cand for ref in building.refs for b_cand in buildings.node_way_dict[ref] if ((b_cand.osm_id != building.osm_id ))]))
+                cand_buildings = list({b_cand for ref in building.refs for b_cand in buildings.node_way_dict[ref] if ((b_cand.osm_id != building.osm_id ))})
                 for b_cand in cand_buildings:
                     logging.verbose("      trying %i"%b_cand.osm_id )
                     check_and_set_parent(building, b_cand)
@@ -1185,13 +1182,13 @@ if __name__ == "__main__":
         # -- cache parsed data. To prevent accidentally overwriting,
         #    write to local dir, while we later read from $PREFIX/buildings.pkl
         fpickle = open(pkl_fname, 'wb')
-        cPickle.dump(buildings, fpickle, -1)
+        pickle.dump(buildings, fpickle, -1)
         fpickle.close()
     else:
         # -- load list of building objects from previously cached file
         logging.info("Loading %s", pkl_fname)
         fpickle = open(pkl_fname, 'rb')
-        buildings = cPickle.load(fpickle)[:parameters.MAX_OBJECTS]
+        buildings = pickle.load(fpickle)[:parameters.MAX_OBJECTS]
         fpickle.close()
 
 #        newbuildings = []
@@ -1238,7 +1235,7 @@ if __name__ == "__main__":
     #   - TODO: analyze surrounding: similar shaped buildings nearby? will get same texture
     #   - set building type, roof type etc
     buildings = building_lib.analyse(buildings, static_objects, tools.transform, elev,
-                                     tex.manager.facades, tex.manager.roofs)
+                                     tex_manager.facades, tex_manager.roofs)
 
     # -- initialize STG_Manager
     path_to_output = parameters.get_output_path()

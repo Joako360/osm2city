@@ -17,7 +17,7 @@ Python
 
 ``osm2city`` is written in Python and needs Python for execution. Python is available on all major desktop operating systems — including but not limited to Windows, Linux and Mac OS X. See http://www.python.org.
 
-Currently Python version 2.7 is used for development and is therefore the recommended version.
+Currently Python version 3.5 is used for development and is therefore the recommended version.
 
 
 -------------------------
@@ -27,7 +27,6 @@ Python Extension Packages
 osm2city uses the following Python extension packages, which must be installed on your system and be included in your ``PYTHONPATH``:
 
 * curl
-* enum34
 * matplotlib
 * networkx
 * numpy
@@ -35,7 +34,7 @@ osm2city uses the following Python extension packages, which must be installed o
 * scipy
 * shapely
 
-Please make sure to use Python 2.7 compatible extensions. Often Python 3 compatible packages have a "3" in their name. Most Linux distributions come by default with the necessary packages — often they are prefixed with ``python-`` (e.g. ``python-numpy``). On Windows WinPython (https://winpython.github.io/) together with Christoph Gohlke's unofficial Windows binaries for Python extension packages (http://www.lfd.uci.edu/~gohlke/pythonlibs/) works well.
+Please make sure to use Python 3.5 compatible extensions. Often Python 3 compatible packages have a "3" in their name. Most Linux distributions come by default with the necessary packages — often they are prefixed with ``python-`` (e.g. ``python-numpy``). On Windows WinPython (https://winpython.github.io/) together with Christoph Gohlke's unofficial Windows binaries for Python extension packages (http://www.lfd.uci.edu/~gohlke/pythonlibs/) works well.
 
 
 ========================
@@ -68,7 +67,7 @@ On a Linux workstation do the following:
 ::
 
     $ cd osm2city
-    $ ln -sf ../osm2city-data/tex
+    $ ln -sf ../osm2city-data/tex.src
     $ ln -sf ../osm2city-data/tex
 
 On a Windows computer do the following (path may differ):

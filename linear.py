@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import copy
 import logging
@@ -79,7 +78,7 @@ class LinearObject(object):
         try:
             self.compute_angle_etc()
             self.edge = self.compute_offset(self.width / 2.)
-        except Warning, reason:
+        except Warning as reason:
             logging.warning("Warning in OSM_ID %i: %s", self.osm_id, reason)
 
         self.tex = tex  # determines which part of texture we use
@@ -178,7 +177,7 @@ class LinearObject(object):
             angle = np.pi - abs(self.angle[i-1] - self.angle[i])
             if i > 0 and abs(angle) < 0.0175:  # 1 deg
                 raise ValueError('CONSTR angle > 179 in OSM_ID %i at (%i, %i) with refs %s' 
-                    % (self.osm_id, i, i-1, str(self.refs)))
+                                 % (self.osm_id, i, i-1, str(self.refs)))
 
             self.segment_len[i] = (dy*dy + dx*dx)**0.5
             if self.segment_len[i] == 0:
@@ -539,7 +538,7 @@ class LinearObject(object):
                 do_tex = False
                 #continue
             elif len_left != len(self.center.coords):
-                print "WTF? ", self.osm_id, len(self.center.coords)
+                print("WTF? ", self.osm_id, len(self.center.coords))
                 do_tex = False
 #            else:
 #                return False

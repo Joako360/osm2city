@@ -1,4 +1,3 @@
-#!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
 """
@@ -314,7 +313,7 @@ def _find_junctions(ways_list, degree=2):
                 attached_ways_dict[ref] = [(the_way, i == 0)]  # initialize node
 
     # kick nodes that belong to one way only
-    for ref, the_ways in attached_ways_dict.items():
+    for ref, the_ways in list(attached_ways_dict.items()):
 #            if len(value) >= 2: self.nodes_dict[ref].n_attached_ways = len(value)
         if len(the_ways) < degree:
             # FIXME: join_ways, then return 2 here
@@ -454,7 +453,7 @@ class Roads(objectlist.ObjectList):
 
         At the end save the cache.
         """
-        for the_node in self.nodes_dict.values():
+        for the_node in list(self.nodes_dict.values()):
             if math.isnan(the_node.lon) or math.isnan(the_node.lat):
                 logging.error("NaN encountered while probing elevation")
                 continue
@@ -628,7 +627,7 @@ class Roads(objectlist.ObjectList):
                         self.railway_list.append(obj)
                     else:
                         self.roads_list.append(obj)
-            except ValueError, reason:
+            except ValueError as reason:
                 logging.warn("skipping OSM_ID %i: %s" % (the_way.osm_id, reason))
                 continue
 
@@ -668,7 +667,7 @@ class Roads(objectlist.ObjectList):
            the ways attached to an junction join exactly, i.e., without gaps or overlap. 
         """
         def pr_angle(a):
-            print "%5.1f " % (a * 57.3),
+            print("%5.1f " % (a * 57.3), end='x')
 
         def angle_from(lin_obj, is_first):
             """if IS_FIRST, the way is pointing away from us, and we can use the angle straight away.
@@ -681,7 +680,7 @@ class Roads(objectlist.ObjectList):
                 if angle > np.pi: angle -= np.pi * 2
             return angle
 
-        for the_ref, ways_list in self.attached_ways_dict.items():
+        for the_ref, ways_list in list(self.attached_ways_dict.items()):
             # each junction knows about the attached ways
             # -- Sort (the_junction.ways) by angle, taking into account is_first. 
             #    This is tricky. x[0] is our linear_object (which has a property "angle").
@@ -710,7 +709,7 @@ class Roads(objectlist.ObjectList):
             for i, (way_a, is_first_a) in enumerate(ways_list):
                 (way_b, is_first_b) = ways_list[(i+1) % len(ways_list)] # wrap around
                 # now we have two neighboring ways
-                print way_a, is_first_a, "joins with", way_b, is_first_b
+                print(way_a, is_first_a, "joins with", way_b, is_first_b)
                 # compute their joining node
                 index_a = -1 + is_first_a                
                 index_b = -1 + is_first_b                
@@ -738,7 +737,7 @@ class Roads(objectlist.ObjectList):
                 way_b_lr = way_b.edge[is_first_b]  #.coords[index_b]
 
                 q1 = way_a_lr.junction(way_b_lr)
-                print q, q1
+                print(q, q1)
                 way_a.plot(center=False, left=True, right=True, show=False)
                 way_b.plot(center=False, left=True, right=True, clf=False, show=False)
                 plt.plot(q[0], q[1], 'b+')
@@ -779,7 +778,7 @@ class Roads(objectlist.ObjectList):
             plt.plot(a[0, 0], a[0, 1], ends_marker, linewidth=lw, color=color)
             plt.plot(a[-1, 0], a[-1, 1], ends_marker, linewidth=lw, color=color)
         if show_label:
-            plt.text(0.5*(a[0, 0]+a[-1, 0]), 0.5*(a[0,1]+a[-1,1]), way.osm_id, color="b")
+            plt.text(0.5*(a[0, 0]+a[-1, 0]), 0.5*(a[0, 1]+a[-1, 1]), way.osm_id, color="b")
     
     def debug_plot_junctions(self, style):
         if not parameters.DEBUG_PLOT:
@@ -819,7 +818,7 @@ class Roads(objectlist.ObjectList):
                                   [cl.min.x, cl.max.y],
                                   [cl.min.x, cl.min.y]])
                     c = np.array([self.transform.toGlobal(p) for p in c])
-                    plt.plot(c[:,0], c[:,1], '-', color=cluster_color)
+                    plt.plot(c[:, 0], c[:, 1], '-', color=cluster_color)
                 for r in cl.objects:
                     random_color = col[random.randint(0, len(col)-1)]
                     osmid_color = col[(r.osm_id + len(r.refs)) % len(col)]                
@@ -848,7 +847,7 @@ class Roads(objectlist.ObjectList):
             plt.show()
 
     def _debug_show_h_add(self, context):
-        for the_node in self.nodes_dict.itervalues():
+        for the_node in self.nodes_dict.values():
             logging.debug("Context: %s # id=%12i h_add %5.2f", context, the_node.osm_id, the_node.h_add)
 
     def _join_ways(self, way1, way2, attached_ways_dict):
@@ -902,7 +901,7 @@ class Roads(objectlist.ObjectList):
 
     def _join_degree2_junctions(self, attached_ways_dict):
         """bla"""
-        for ref, ways_tuple_list in attached_ways_dict.iteritems():
+        for ref, ways_tuple_list in attached_ways_dict.items():
             if len(ways_tuple_list) == 2:
                 if _compatible_ways(ways_tuple_list[0][0], ways_tuple_list[1][0]):
                     self._join_ways(ways_tuple_list[0][0], ways_tuple_list[1][0], attached_ways_dict)
@@ -961,16 +960,16 @@ class Roads(objectlist.ObjectList):
 
                 e = self.elev(anchor) + the_node.h_add + 3.
                 ac.add_label(' %i h=%1.1f' % (the_node.osm_id, the_node.h_add), -anchor.y, e, -anchor.x, scale=1.)
-        path_to_stg = stg_manager.add_object_static(file_name + '.ac', vec2d(self.transform.toGlobal((0,0))), 0, 0)
+        path_to_stg = stg_manager.add_object_static(file_name + '.ac', vec2d(self.transform.toGlobal((0, 0))), 0, 0)
         ac.write(path_to_stg + file_name + '.ac')
 
     def debug_print_refs_of_way(self, way_osm_id):
         """print refs of given way"""
         for the_way in self.ways_list:
             if the_way.osm_id == way_osm_id:
-                print "found", the_way
+                print("found", the_way)
                 for the_ref in the_way.refs:
-                    print "+", the_ref
+                    print("+", the_ref)
 
     def _clusterize(self):
         """Create cluster.
@@ -1078,7 +1077,7 @@ def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
                               [cl.min.x, cl.max.y],
                               [cl.min.x, cl.min.y]])
                 c = np.array([transform.toGlobal(p) for p in c])
-                plt.plot(c[:,0], c[:,1], '-', color=cluster_color)
+                plt.plot(c[:, 0], c[:, 1], '-', color=cluster_color)
             for r in cl.objects:
                 random_color = col[random.randint(0, len(col)-1)]
                 osmid_color = col[(r.osm_id + len(r.refs)) % len(col)]                

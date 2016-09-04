@@ -15,7 +15,7 @@ class File(object):
     
     def __init__(self, file_name, stats):
         self.vertices = []
-        if file_name != None:
+        if file_name is not None:
             self.read(file_name)
 
     def read(self, file_name):
@@ -28,8 +28,8 @@ class File(object):
                 continue
             if num_vertices>0:
                 num_vertices-=1
-                s = split("[ \t]",line)
-                vertice = map(float,split("[ \t]",line))
+                s = split("[ \t]", line)
+                vertice = list(map(float, split("[ \t]", line)))
                 self.vertices.append(vertice)
                         
     def nodes_as_array(self):

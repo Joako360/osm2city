@@ -34,7 +34,7 @@ def _get_file_name(name, tile_name):
 
 
 def _open_file(name, directory):
-    return open(directory + name, "wb")
+    return open(directory + name, "wr")
 
 
 def _write_to_file(command, file_handle, python_exe, params_out):
@@ -108,7 +108,7 @@ if __name__ == '__main__':
 
     try:
         os.makedirs(root_dir_name)
-    except OSError, e:
+    except OSError as e:
         if e.errno != 17:
             logging.exception("Unable to create path to output")
 
@@ -177,7 +177,7 @@ done
             logging.info("Writing to : %s" % path)
             try:
                 os.makedirs(path)
-            except OSError, e:
+            except OSError as e:
                 if e.errno != 17:
                     logging.exception("Unable to create path to output")
             replacement_path = re.sub('\\\\', '/', path) if(path.count('\\')) else path
@@ -196,17 +196,17 @@ done
                     line = re.sub('^\s*(OSM_FILE\s*=)(.*)', '\\1 "%s"' % OSM_FILE_NAME, line)
                     sources.write(line)
             if args.new_download:
-                download_command = '%s %s%sdownload_tile.py -f %s/params.ini -d "%s"' % (python_exe
-                                                                                         , tools.get_osm2city_directory()
-                                                                                         , os.sep
-                                                                                         , path, OSM_FILE_NAME)
+                download_command = '%s %s%sdownload_tile.py -f %s/params.ini -d "%s"' % (python_exe,
+                                                                                         tools.get_osm2city_directory(),
+                                                                                         os.sep,
+                                                                                         path, OSM_FILE_NAME)
                 download_file.write(download_command + os.linesep)
             elif args.osmosis_executable:
-                download_file.write(osmosis_command % (calc_tile.get_north_lat(lat, dy)
-                                                       , calc_tile.get_west_lon(lon, lat, dx)
-                                                       , calc_tile.get_south_lat(lat, dy)
-                                                       , calc_tile.get_east_lon(lon, lat, dx)
-                                                       , replacement_path + os.sep + OSM_FILE_NAME))
+                download_file.write(osmosis_command % (calc_tile.get_north_lat(lat, dy),
+                                                       calc_tile.get_west_lon(lon, lat, dx),
+                                                       calc_tile.get_south_lat(lat, dy),
+                                                       calc_tile.get_east_lon(lon, lat, dx),
+                                                       replacement_path + os.sep + OSM_FILE_NAME))
             else:
                 download_command = 'curl -f --retry 6 --proxy-ntlm -o %s/%s -g %s*[bbox=%f,%f,%f,%f]   '
                 if BASH_PARALLEL_PROCESS:
@@ -214,11 +214,11 @@ done
                 else:
                     download_command += os.linesep
 
-                download_file.write(download_command % (replacement_path, OSM_FILE_NAME, args.api_url
-                                                        , calc_tile.get_west_lon(lon, lat, dx)
-                                                        , calc_tile.get_south_lat(lat, dy)
-                                                        , calc_tile.get_east_lon(lon, lat, dx)
-                                                        , calc_tile.get_north_lat(lat, dy)))
+                download_file.write(download_command % (replacement_path, OSM_FILE_NAME, args.api_url,
+                                                        calc_tile.get_west_lon(lon, lat, dx),
+                                                        calc_tile.get_south_lat(lat, dy),
+                                                        calc_tile.get_east_lon(lon, lat, dx),
+                                                        calc_tile.get_north_lat(lat, dy)))
             for command in files:
                 _write_to_file(command[0], command[1], python_exe, replacement_path + os.sep + params_out_file_name)
     for command in files:

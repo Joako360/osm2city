@@ -5,17 +5,17 @@
 #   Class:      Polygon
 #===============================================================================
 
-from point import Point
-import point3D
+from .point import Point
+from . import point3D
 #import display
-import segment
-import sector
-import events
+from . import segment
+from . import sector
+from . import events
 import copy
 import math
 #import rainbow
-import mesh
-import graph
+from . import mesh
+from . import graph
 
 """
 !!!! Known bugs !!!!!
@@ -41,12 +41,12 @@ class Polygon :
         """
                 
         #initialize the vertices
-        self.vertices   = map(Point,vertices)
+        self.vertices   = list(map(Point, vertices))
         self.n          = len(self.vertices) #self.n is the number of vertices and also the number of edges, if all the vertices declared are used
         
         #process the edges list to make it consistent with the vertices
         if edges == []: #if no edge have been declared, the vertices are supposed to be given in the good order
-            edges = [(i,(i+1)%(self.n)) for i in range(self.n)]
+            edges = [(i, (i+1)%(self.n)) for i in range(self.n)]
             
         self.edge_indices = edges
         
@@ -76,7 +76,7 @@ class Polygon :
     def init_tracking(self):
         #Track the original vertices of the polygon
         #use an array of indices : track[i] give the index of the vertex linked to vertices[i]
-        self.track = range(len(self.vertices))
+        self.track = list(range(len(self.vertices)))
         
         #follow the differents events in the life of a point
         self.lives = [[copy.deepcopy(p)] for p in self.vertices]
@@ -85,53 +85,53 @@ class Polygon :
     #===========================================================================
     # Load and save a Polygon
     #===========================================================================
-    def save(self,filename):
+    def save(self, filename):
         #open a file
-        f = open(filename,'w')
+        f = open(filename, 'w')
         
         #save the vertices
         f.write("%i\n" %(len(self.vertices)))
         for p in self.vertices:
-            f.write("%f %f\n" %(p.x,p.y))
+            f.write("%f %f\n" %(p.x, p.y))
         
         #save the edges
         f.write("%i\n" %(len(self.edges)))
         for i in range(self.n):
-            f.write("%i %i %f\n" %(self.edge_indices[i][0],self.edge_indices[i][1],self.edges[i].w))
+            f.write("%i %i %f\n" %(self.edge_indices[i][0], self.edge_indices[i][1], self.edges[i].w))
             
         f.close()
         
-    def load(self,filename):
-        f = open(filename,'r')
+    def load(self, filename):
+        f = open(filename, 'r')
         
         #vertices
         nv      = int(f.readline())
         v       = []
         for i in range(nv):
-            line = map(float,f.readline().split())
-            v.append( (line[0],line[1]) )
+            line = list(map(float, f.readline().split()))
+            v.append( (line[0], line[1]) )
         
         #edges
         ne      = int(f.readline())
         e       = []
         w       = []
         for i in range(ne):
-            line = map(float,f.readline().split())
-            e.append( ( int(line[0]),int(line[1]) ) )
+            line = list(map(float, f.readline().split()))
+            e.append( ( int(line[0]), int(line[1]) ) )
             w.append(line[2])
         
         f.close()
-        self.__init__(v,e,w)
+        self.__init__(v, e, w)
         
     def clone(self):
         """
         Return a copy of the polygon
         """
-        v2  = map(lambda x:x.getData(),self.vertices)
+        v2  = [x.getData() for x in self.vertices]
         e2  = self.edge_indices
-        w2  = map(lambda x:x.w,self.edges)
+        w2  = [x.w for x in self.edges]
         
-        return Polygon(v2,e2,w2)
+        return Polygon(v2, e2, w2)
             
         
     #===========================================================================
@@ -148,7 +148,7 @@ class Polygon :
             
         s+= "\nEdges indices :\n"
         for ind in self.edge_indices:
-            s+= "\t %i-%i\n" %(ind[0],ind[1])
+            s+= "\t %i-%i\n" %(ind[0], ind[1])
             
         return s
     
@@ -174,7 +174,7 @@ class Polygon :
     #===========================================================================
     # Get information on the polygon
     #===========================================================================     
-    def getNext(self,edge_index):
+    def getNext(self, edge_index):
         """
         return the index of the next edge
         The adjacent edge is not necessarily the edge 'edge_index+1'
@@ -190,7 +190,7 @@ class Polygon :
             
         return next_index
 
-    def getLast(self,edge_index):
+    def getLast(self, edge_index):
         """
         return the index of the last edge, the one that ends the same way
         the edge 'edge_index' starts
@@ -206,7 +206,7 @@ class Polygon :
         
         return last_index
     
-    def get_sector(self,edge_index):
+    def get_sector(self, edge_index):
         """ compute the sector that corresponds to edge number 'edge_index' """
         last_index      = self.getLast(edge_index)
         next_index      = self.getNext(edge_index)
@@ -230,7 +230,7 @@ class Polygon :
             h2.revert()
             reflex2     = True
     
-        return sector.Sector(h1,h2,current_edge,reflex1,reflex2)
+        return sector.Sector(h1, h2, current_edge, reflex1, reflex2)
     
     def get_sectors(self):
         #recompute the sectors and their edge events
@@ -239,7 +239,7 @@ class Polygon :
         #take the split events into account
         self.update_split_event()
         
-    def is_reflex_adjacent(self,sec1,sec2):
+    def is_reflex_adjacent(self, sec1, sec2):
         """ sometimes two sectors are not adjacent, but the reflex vertex of one, belongs to
             an edge adjacent to the second one...
         """
@@ -248,20 +248,20 @@ class Polygon :
         
         if sec1.reflex1:
             ir1 = self.vertices.index(sec1.edge.pI)
-            for (i,j) in self.edge_indices:
+            for (i, j) in self.edge_indices:
                 if j==ir1:
                     other_end = i
                     break
-            other_edge_reflex_1 = self.edge_indices.index((other_end,ir1))
+            other_edge_reflex_1 = self.edge_indices.index((other_end, ir1))
             test1 = self.sectors[other_edge_reflex_1].is_adjacent_to(sec2)
             
         if sec1.reflex2:
             ir2 = self.vertices.index(sec1.edge.pF)
-            for (i,j) in self.edge_indices:
+            for (i, j) in self.edge_indices:
                 if i==ir2:
                     other_end = j
                     break
-            other_edge_reflex_2 = self.edge_indices.index((ir2,other_end))
+            other_edge_reflex_2 = self.edge_indices.index((ir2, other_end))
             test2 = self.sectors[other_edge_reflex_2].is_adjacent_to(sec2)
             
         return test1 or test2
@@ -269,7 +269,7 @@ class Polygon :
     #===========================================================================
     # Basic modification of the polygon
     #===========================================================================
-    def delete_edge(self,i):
+    def delete_edge(self, i):
         """
             Delete the edge i, both the indices representation and the points representation
             Do not delete the vertices associated to the ends of the edge
@@ -283,12 +283,12 @@ class Polygon :
             Add an edge between to existing vertices of the polygon.
             w is the weight of the edge (1 by default)
         """
-        self.edge_indices.append((i1,i2))
+        self.edge_indices.append((i1, i2))
         self.edges.append(segment.Segment(self.vertices[i1], self.vertices[i2], w))
         self.n += 1
         
         
-    def move(self,point_index,new_location):
+    def move(self, point_index, new_location):
         """
         Move a point with index 'point_index' to the location of the point 'new_location
         This method modifies both the list of vertices but also the list of edges
@@ -296,7 +296,7 @@ class Polygon :
         self.vertices[point_index].x = new_location.x
         self.vertices[point_index].y = new_location.y
     
-    def collapse_edge(self,edge_index,p):
+    def collapse_edge(self, edge_index, p):
         """
         When an edge become a single point 'p', we delete the edge from the set of edges
         and connect the p correctly
@@ -306,22 +306,22 @@ class Polygon :
         ip2 = self.edge_indices[edge_index][1]    
         
         #not in the test : must be done!!!
-        self.move(ip1,p)
+        self.move(ip1, p)
         
-        self.move(ip2,p)
+        self.move(ip2, p)
         self.track[ip2] = ip1
         self.lives[ip1].append(copy.deepcopy(p))
         
         #update the links
         next = self.getNext(edge_index)
         last = self.getLast(edge_index)
-        self.edge_indices[next] = (ip1,self.edge_indices[next][1])
+        self.edge_indices[next] = (ip1, self.edge_indices[next][1])
         self.edges[next].pI = self.edges[last].pF
         
         #delete the edge in the list and in the index list
         self.delete_edge(edge_index)
         
-    def split_edge(self,split_vertex_index,splitted_edge_index):
+    def split_edge(self, split_vertex_index, splitted_edge_index):
         """ a vertex enters an edge and split it into 2 """
         
         #duplicate the vertex that split the edge into 2
@@ -347,12 +347,12 @@ class Polygon :
                 toBeModified = k
                 break
         self.edges[toBeModified].pF = self.vertices[clone_index]
-        self.edge_indices[toBeModified] = (self.edge_indices[toBeModified][0],clone_index)
+        self.edge_indices[toBeModified] = (self.edge_indices[toBeModified][0], clone_index)
 
         
         #add 2 edges instead of the splited one
-        self.add_edge(i1,split_vertex_index,w)
-        self.add_edge(clone_index,i2,w)
+        self.add_edge(i1, split_vertex_index, w)
+        self.add_edge(clone_index, i2, w)
     
         #remove the edge that has been splitted.
         self.delete_edge(splitted_edge_index)
@@ -360,7 +360,7 @@ class Polygon :
         #update the number of edges
         self.n = len(self.edges)
         
-    def fusion_points(self,ps,new_point):
+    def fusion_points(self, ps, new_point):
         """
         ps is a list of point indices
         modify the topology of the polygon so that all the points of the list end at new_point
@@ -368,7 +368,7 @@ class Polygon :
         
         #move the point to the location
         for pi in ps:
-            self.move(pi,new_point)
+            self.move(pi, new_point)
             
         #take each point i to collide:
         # it belongs to 2 edges : i - a and b-i
@@ -378,15 +378,15 @@ class Polygon :
             next = ps[(i+1)%len(ps)]
             
             for e in range(len(self.edge_indices)):
-                (a,b) = self.edge_indices[e]
+                (a, b) = self.edge_indices[e]
                 if b == next:
-                    self.add_edge(a,curr,self.edges[e].w)
+                    self.add_edge(a, curr, self.edges[e].w)
                     self.delete_edge(e)
                     break
         
         self.n = len(self.edges)
     
-    def blind_shrink(self,d):
+    def blind_shrink(self, d):
         """
         Shrink the edges of the polygon according to their weight (speed)
         without paying attention to the event that might occur
@@ -398,7 +398,7 @@ class Polygon :
             p2  = self.vertices[ip2]
 
             new_p1 = self.sectors[i].move_first_point(float(d))
-            self.move(ip1,new_p1)
+            self.move(ip1, new_p1)
         
     #===========================================================================
     # Find some special event
@@ -416,7 +416,7 @@ class Polygon :
                 test1 = not sec1.is_adjacent_to(sec2)
                 test2 = not (sec1 == sec2)
                 test3 = sec1.reflex()
-                test4 = not self.is_reflex_adjacent(sec1,sec2)
+                test4 = not self.is_reflex_adjacent(sec1, sec2)
                 
                 if test1 and test2 and test3 and test4:
                     sec1.get_split_event(sec2)
@@ -432,8 +432,8 @@ class Polygon :
                 test1 = sec1.reflex()
                 test2 = sec2.reflex()
                 test3 = not (sec1 == sec2)
-                test4 = self.is_reflex_adjacent(sec1,sec2)
-                test5 = self.is_reflex_adjacent(sec2,sec1)
+                test4 = self.is_reflex_adjacent(sec1, sec2)
+                test5 = self.is_reflex_adjacent(sec2, sec1)
                 
                 sec1.get_vertex_event(sec2)
 
@@ -467,7 +467,7 @@ class Polygon :
             #    first_event = sec.event
             #    index = i
             
-        return event_list,index #first_event,index
+        return event_list, index #first_event,index
     
     def first_split_event(self):
         """ compute the first split event that is going to happen and to which edge it happens..."""
@@ -490,7 +490,7 @@ class Polygon :
         
         for i in range(len(self.edges)):
             if self.edges[i].is_degenerated():
-                self.collapse_edge(i,self.edges[i].pI)
+                self.collapse_edge(i, self.edges[i].pI)
                 goOn = True
                 break
         
@@ -501,9 +501,9 @@ class Polygon :
         goOn = False
         
         for i in range(len(self.edge_indices)):
-            (a,b) = self.edge_indices[i]
+            (a, b) = self.edge_indices[i]
             if self.edge_indices[self.getNext(i)][1]==a:
-                j = self.edge_indices.index((b,a))
+                j = self.edge_indices.index((b, a))
                 self.delete_edge(j)
                 self.delete_edge(i)
                 self.lives[a].append(self.vertices[b].copy())
@@ -521,14 +521,14 @@ class Polygon :
     #===========================================================================
     # Main function : Shrink to get a straigth skeleton
     #===========================================================================
-    def shrink(self,d):
+    def shrink(self, d):
         """
         Shrink the edges of the polygon of distance d, taking into account
         the possible event that can occurs: edge event or split event
         """
         #get the first event:
         self.clean()
-        el,index = self.first_event()
+        el, index = self.first_event()
         
         #first event = first split event if it exists
         fe = el[0]
@@ -543,13 +543,13 @@ class Polygon :
             
             #case edge event
             if fe.isEdgeEvent():
-                self.collapse_edge(index,self.edges[index].pI)
+                self.collapse_edge(index, self.edges[index].pI)
             
             #case split event
             elif fe.isSplitEvent():
                 iv = self.vertices.index(fe.reflex_vertex)
                 ie = self.edges.index(fe.splitted_edge)
-                self.split_edge(iv,ie)
+                self.split_edge(iv, ie)
                 
             #case vertex event
             elif fe.isVertexEvent():
@@ -560,7 +560,7 @@ class Polygon :
     
             #update (while loop)
             d -= fe.shrinking_distance
-            el,index = self.first_event()        
+            el, index = self.first_event()        
             #first event = first split event
             fe = el[0]
             for e in el:
@@ -594,11 +594,11 @@ class Polygon :
         for i in range(len(roof.vertices)):
             self.lives[i].append(self.vertices[i])
         for edge in self.edges:
-            roof.edges.append(segment.Segment(edge.pI,edge.pF,edge.w))
+            roof.edges.append(segment.Segment(edge.pI, edge.pF, edge.w))
         
         #connect the old points, with the new ones        
         for i in range(len(self.lives)):
-            roof.edges.append(segment.Segment(self.lives[i][0],self.lives[self.track[i]][-1]))
+            roof.edges.append(segment.Segment(self.lives[i][0], self.lives[self.track[i]][-1]))
             
         #update some parameters
         roof.n = len(roof.edges)
@@ -634,7 +634,7 @@ class Polygon :
             for j in range(len(self.lives[i])-1):
                 p1 = skeleton.add_node(self.lives[i][j])
                 p2 = skeleton.add_node(self.lives[i][j+1])
-                skeleton.add_arc(p1,p2)
+                skeleton.add_arc(p1, p2)
         
         return skeleton
     
@@ -650,11 +650,11 @@ class Polygon :
         
         faces = []
         for i in range(len(self.edges)):
-            face = self.straight_skeleton_get_face(skeleton,i)
+            face = self.straight_skeleton_get_face(skeleton, i)
             faces.append(face)
         return faces
     
-    def straight_skeleton_get_face(self,skeleton,i):
+    def straight_skeleton_get_face(self, skeleton, i):
         """
         Compute the face 'i' of the straight skeleton
         """        
@@ -679,7 +679,7 @@ class Polygon :
                 
         return face2D
     
-    def roof_face_3D(self,skeleton,msh,i,angle):
+    def roof_face_3D(self, skeleton, msh, i, angle):
         """
         Compute the 3D face 'i' of the roof, based on the straight_skeleton computation
             @arg i          : the number og the face. There are as many faces on the roofs, 
@@ -715,7 +715,7 @@ class Polygon :
         for node in face:            
             current_point   = node.value
             d               = edge.weighted_distance_to(current_point)
-            index           = msh.add_vertex(point3D.Point3D((node.value.x,node.value.y,d*tan_angle)))
+            index           = msh.add_vertex(point3D.Point3D((node.value.x, node.value.y, d*tan_angle)))
             face3D.append(index)
                 
         msh.add_face(face3D)
@@ -733,7 +733,7 @@ class Polygon :
         #skeleton.exportPNG()
         
         for i in range(len(self.edges)):
-            self.roof_face_3D(skeleton,roof_mesh,i,angle)
+            self.roof_face_3D(skeleton, roof_mesh, i, angle)
         
         return roof_mesh
 
@@ -742,19 +742,19 @@ class Polygon :
 #===============================================================================
 if __name__ == '__main__':
     #define a polygon 1
-    v = [(0,0),(0,0.2),(1,0.2),(1.5,1.5),(1.5,-0.5),(1,0)]
+    v = [(0, 0), (0, 0.2), (1, 0.2), (1.5, 1.5), (1.5, -0.5), (1, 0)]
     s = 300
-    v = map(lambda x:(x[0]*s+100,500-x[1]*s) , v)
+    v = [(x[0]*s+100, 500-x[1]*s) for x in v]
     
     #define a second one
-    v2 = [(0,2),(0,5),(8,5),(8,2),(5,2),(6,0),(2,0),(3,2)]
+    v2 = [(0, 2), (0, 5), (8, 5), (8, 2), (5, 2), (6, 0), (2, 0), (3, 2)]
     s2 = 60
-    v2 = map(lambda x:(x[0]*s2+100,500-x[1]*s2) , v2)
+    v2 = [(x[0]*s2+100, 500-x[1]*s2) for x in v2]
     
     #test fusion
-    v3 = [(5,7),(10,8),(10,5),(13,5),(13,2),(9,2),(9,0),(6,0),(6,2),(4,0),(1,1),(3,3),(0,4),(4,5)]
+    v3 = [(5, 7), (10, 8), (10, 5), (13, 5), (13, 2), (9, 2), (9, 0), (6, 0), (6, 2), (4, 0), (1, 1), (3, 3), (0, 4), (4, 5)]
     s3 = 40
-    v3 = map(lambda x:(x[0]*s3+100,500-x[1]*s3) , v3)
+    v3 = [(x[0]*s3+100, 500-x[1]*s3) for x in v3]
     
     p = Polygon(v2)
     #p.fusion_points([3,8,13],Point((7*s3+100,500-4*s3)))

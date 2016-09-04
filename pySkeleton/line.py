@@ -7,7 +7,7 @@
 
 from math import sqrt
 import numpy, numpy.linalg
-import point
+from . import point
 
 class Line:
     """
@@ -22,13 +22,13 @@ class Line:
         self.normalise()
 
     def __repr__(self):
-        return "%f %f %f" %(self.a,self.b,self.c)
+        return "%f %f %f" %(self.a, self.b, self.c)
 
-    def __getitem__(self,i):
+    def __getitem__(self, i):
         return self.getData()[i]
 
     def getData(self):
-        return [self.a,self.b,self.c]
+        return [self.a, self.b, self.c]
 
     def norm(self):
         return sqrt(self.a**2+self.b**2)
@@ -39,24 +39,24 @@ class Line:
         self.b *= 1/float(n)
         self.c *= 1/float(n)
         
-    def fromVector(self,p1,p2):
+    def fromVector(self, p1, p2):
         p=(p2-p1).getNormal()
         self.a=p.x
         self.b=p.y
         self.c=-p*p1
         self.normalise()
         
-    def distance(self,p):
+    def distance(self, p):
         return -(self.a*p.x + self.b*p.y+self.c)
 
-    def intersect(self,segment):
+    def intersect(self, segment):
         p1=segment[0]
         p2=segment[1]
         t=-1
         a=self.a
         b=self.b
         c=self.c
-        q=point.Point((a,b))
+        q=point.Point((a, b))
         if (p1-p2)*q != 0:
             t=-(c+p2*q)/float((p1-p2)*q)
             p=p1.get_scalar_prod(t)+p2.get_scalar_prod(1-t)
@@ -65,13 +65,13 @@ class Line:
         else:
             return False
         
-    def intersect_line(self,d):
+    def intersect_line(self, d):
         """ Intersection of two lines. d is a line. It returns a point"""
-        a = numpy.matrix([[self.a,self.b],[d.a,d.b]])
-        b = numpy.matrix([[-self.c],[-d.c]])
+        a = numpy.matrix([[self.a, self.b], [d.a, d.b]])
+        b = numpy.matrix([[-self.c], [-d.c]])
         try :
-            x = numpy.linalg.solve(a,b)
-            return point.Point((x.A[0][0],x.A[1][0]))
+            x = numpy.linalg.solve(a, b)
+            return point.Point((x.A[0][0], x.A[1][0]))
         except :
             return False
 

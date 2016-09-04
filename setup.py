@@ -101,7 +101,7 @@ if __name__ == '__main__':
             lines = sources.readlines()
         with open(nasalDir + os.sep + "elev.nas", "w") as sources:
             for line in lines:
-                if "var in" in line:
+                if "var in " in line:
                     line = '  var in = "' + get_elev_in_path(fg_home_path) + '";\n'
                 if "var out" in line:
                     line = '  var out = "' + get_elev_out_dir(fg_home_path) + '";\n'

@@ -1,4 +1,3 @@
-#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
 Manage I/O for .stg files. There are two classes, STG_Manager and STG_File.
@@ -43,7 +42,7 @@ class STG_File(object):
         #deprecated usage
         self.our_magic_start = delimiter_string(self.magic, None, True)
         self.our_magic_end = delimiter_string(self.magic, None, False)
-        self.our_magic_start_new = delimiter_string(self.magic, prefix , True)
+        self.our_magic_start_new = delimiter_string(self.magic, prefix, True)
         self.our_magic_end_new = delimiter_string(self.magic, prefix, False)
         self.read()
 
@@ -53,7 +52,7 @@ class STG_File(object):
             stg = open(self.file_name, 'r')
             lines = stg.readlines()
             stg.close()
-        except IOError, reason:
+        except IOError as reason:
             logging.warning("error reading %s: %s", self.file_name, reason)
             return
 
@@ -125,7 +124,7 @@ class STG_File(object):
     def make_path_to_stg(self):
         try:
             os.makedirs(self.path_to_stg)
-        except OSError, e:
+        except OSError as e:
             if e.errno != 17:
                 logging.exception("Unable to create path to output %s", self.path_to_stg)
 
@@ -189,11 +188,11 @@ class STG_Manager(object):
         return the_stg.add_object_shared(ac_file_name, lon_lat, elev, hdg)
 
     def drop_ours(self):
-        for the_stg in self.stg_dict.values():
+        for the_stg in list(self.stg_dict.values()):
             the_stg.drop_ours()
 
     def write(self):
-        for the_stg in self.stg_dict.values():
+        for the_stg in list(self.stg_dict.values()):
             the_stg.write()
 
 
@@ -264,21 +263,21 @@ def read_stg_entries(stg_path_and_name, our_magic, ignore_bad_lines=False):
                     entry = STGEntry(type_, obj_filename, path, lon, lat, elev, hdg)
                     entries.append(entry)                
                     logger.debug("stg: %s %s", type_, entry.get_obj_path_and_name())
-                except ValueError, reason:
+                except ValueError as reason:
                     if not ignore_bad_lines:
                         logger.warning("stg_io:read: Damaged file %s", reason)
                         logger.warning("Damaged line: %s", line.strip())
                         return []
                     else:
                         logger.warning("Damaged line: %s", line.strip())
-                except IndexError, reason:
+                except IndexError as reason:
                     if not ignore_bad_lines:
                         logger.warning("stg_io:read: Ignoring unreadable file %s", reason)
                         logger.warning("Offending line: %s", line.strip())
                         return []
                     else:
                         logger.warning("Damaged line: %s", line.strip())
-    except IOError, reason:
+    except IOError as reason:
         logger.warning("stg_io:read: Ignoring unreadable file %s", reason)
         return []
     return entries
@@ -314,9 +313,9 @@ def quick_stg_line(path_to_scenery, ac_fname, position, elevation, heading, show
     stg_fname = calc_tile.construct_stg_file_name(position)
     stg_line = "OBJECT_STATIC %s %1.7f %1.7f %1.2f %g\n" % (ac_fname, position.lon, position.lat, elevation, heading)
     if show == 1 or show == 3:
-        print stg_path + stg_fname
+        print(stg_path + stg_fname)
     if show == 2 or show == 3:
-        print stg_line
+        print(stg_line)
 #        print "%s\n%s" % (stg_path + stg_fname, stg_line)
     return stg_path, stg_fname, stg_line
 

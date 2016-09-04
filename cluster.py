@@ -1,4 +1,3 @@
-#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
 Created on Thu Feb 28 23:39:23 2013
@@ -33,7 +32,7 @@ class Cluster(object):
         self.stats = tools.Stats()
 
     def __str__(self):
-        print "cl", self.I
+        print("cl", self.I)
 
 
 def clamp(i, vmin, vmax):
@@ -46,7 +45,7 @@ class Clusters(object):
         self.min = min
         self.delta = max - min
         self.size = size
-        self.n = (self.delta / size).int() + 1
+        self.n = (self.delta // size).int() + 1
         self.__len = self.n.x * self.n.y
         self.prefix = prefix
 
@@ -56,10 +55,10 @@ class Clusters(object):
 #        for i in range(self.nx * self.ny):
 #            self.list.append([])
 
-        print "cluster: ", self.n
-        print "  delta: ", self.delta
-        print "  min: ", self.min
-        print "  max: ", self.max
+        print("cluster: ", self.n)
+        print("  delta: ", self.delta)
+        print("  min: ", self.min)
+        print("  max: ", self.max)
 
     def __len__(self):
         return self.__len
@@ -80,7 +79,7 @@ class Clusters(object):
         elif X.y > self.max.y:
             X.y = self.max.y
 
-        I = ((X - self.min) / self.size).int()
+        I = ((X - self.min) // self.size).int()
         return I
 
     def __call__(self, X):
@@ -130,15 +129,15 @@ class Clusters(object):
         #int(f)
 self._clusters[I.x][I.y]
         """
-        print "clusters", self.n
-        newclusters = [[self.init_cluster(vec2d(i,j)) for j in range(self.n.y)] for i in range(self.n.x)]
+        print("clusters", self.n)
+        newclusters = [[self.init_cluster(vec2d(i, j)) for j in range(self.n.y)] for i in range(self.n.x)]
 
         f = open(self.prefix + os.sep + "reclustered.dat", "w")
         for j in range(self.n.y):
             for i in range(self.n.x):
                 cluster = self._clusters[i][j]
                 for b in cluster.objects:
-                    norm_coord = (b.anchor - cluster.center) / self.size
+                    norm_coord = (b.anchor - cluster.center) // self.size
                     rnd = vec2d(np.random.uniform(0, 1, 2))
                     out = norm_coord.sign() * (rnd < abs(norm_coord)).int()
                     ni = int(i + out.x)
@@ -199,5 +198,5 @@ if __name__ == "__main__":
         f = out.x + out.y*3
         x += out.x
         y += out.y
-        print x, y, out.x, out.y, f
+        print(x, y, out.x, out.y, f)
 
