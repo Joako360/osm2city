@@ -15,7 +15,6 @@ import math
 import os
 import os.path as osp
 import queue
-import re
 import shutil
 import subprocess
 import sys
@@ -420,28 +419,6 @@ def raster_glob(prevent_overwrite=False):
         sys.exit(1)
 
 
-def wait_for_fg(fg):
-    """Waits for FlightGear to signal, that the elevation processing has finished."""
-    for count in range(0, 1000):
-        semaphore = fg.get_prop("/osm2city/tiles")
-        semaphore = semaphore.split('=')[1]
-        m = re.search("([0-9.]+)", semaphore)
-        # We don't care if we get 0.0000 (String) or 0 (Int)
-        record = fg.get_prop("/osm2city/record")
-        record = record.split('=')[1]
-        m2 = re.search("([0-9.]+)", record)
-        if m is not None and float(m.groups()[0]) > 0:
-            try:
-                return True
-            except:
-                # perform an action#
-                pass
-        time.sleep(1)
-        if m2 is not None:
-            logging.debug("Waiting for Semaphore " + m2.groups()[0])
-    return False
-
-
 def _raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
     """Writes elev.in and elev.out using Telnet to a running FlightGear instance."""
     fg_home_path = setup.getFGHome()
@@ -469,7 +446,7 @@ def _raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5,
     logging.info("Running FG Command")
     fg.set_prop("/osm2city/tiles", 0)
     if fg.run_command("get-elevation"):
-        if not wait_for_fg(fg):
+        if not fg.wait_loop():
             logging.error("Process in FG timed out")
         else:
             logging.info("Success")
