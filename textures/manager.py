@@ -333,7 +333,7 @@ class FacadeManager(TextureManager):
             exclusions.append("%s:%s" % ('roof:colour', tags['roof:colour']))
         candidates = self.find_candidates(requires, exclusions, height, width)
         if len(candidates) == 0:
-            logging.warn("no matching facade texture for %1.f m x %1.1f m <%s>", height, width, str(requires))
+            logging.warning("no matching facade texture for %1.f m x %1.1f m <%s>", height, width, str(requires))
             return None
         ranked_list = self.rank_candidates(candidates, tags)
         the_texture = ranked_list[random.randint(0, len(ranked_list) - 1)]

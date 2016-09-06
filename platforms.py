@@ -40,7 +40,7 @@ class Platform(object):
         self.logger = logging.getLogger("platforms")
 
         if 'layer' in tags:
-            self.logger.warn("layer %s %d", tags['layer'], osm_id)
+            self.logger.warning("layer %s %d", tags['layer'], osm_id)
 
         self.osm_nodes = list()
         for r in refs:  # safe way instead of [nodes_dict[r] for r in refs] if ref would be missing

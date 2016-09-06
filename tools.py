@@ -220,10 +220,10 @@ class Probe_fgelev(object):
                 fpickle.close()
                 logging.info("OK")
             except IOError as reason:
-                logging.warn("Loading elev cache failed (%s)", reason)
+                logging.warning("Loading elev cache failed (%s)", reason)
                 self._cache = {}
             except EOFError as reason:
-                logging.warn("Loading elev cache failed (%s)", reason)
+                logging.warning("Loading elev cache failed (%s)", reason)
                 self._cache = {}
         else:
             self._cache = None
@@ -234,11 +234,8 @@ class Probe_fgelev(object):
 
         fgelev_cmd = path_to_fgelev + ' --expire 1000000 --fg-scenery ' + parameters.PATH_TO_SCENERY
         logging.info("cmd line: " + fgelev_cmd)
-        self.fgelev_pipe = subprocess.Popen(fgelev_cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        # -- This should catch spawn errors, but it doesn't. We
-        #    check for sane return values on fgelev calls later.
-#        if self.fgelev_pipe.poll() != 0:
-#            raise RuntimeError("Spawning fgelev failed.")
+        self.fgelev_pipe = subprocess.Popen(fgelev_cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                            bufsize=1, universal_newlines=True)
 
     def save_cache(self):
         """save cache to disk"""
@@ -467,8 +464,9 @@ def _raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5,
 
     fg_elev_path = parameters.FG_ELEV
 
-    fgelev = subprocess.Popen(fg_elev_path + ' --expire 1000000 --fg-scenery ' + parameters.PATH_TO_SCENERY
-                              , shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    fgelev = subprocess.Popen(fg_elev_path + ' --expire 1000000 --fg-scenery ' + parameters.PATH_TO_SCENERY,
+                              shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                              bufsize=1, universal_newlines=True)
 
     buf_in = queue.Queue(maxsize=0)
     f = open(fname, 'w')
@@ -496,13 +494,10 @@ def _raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5,
             if not buf_in.empty():
                 line = buf_in.get()
                 logging.debug(line)
-                encoded = line.encode()
-                fgelev.stdin.write(encoded)
+                fgelev.stdin.write(line)
             tmp, elev = fgelev.stdout.readline().split()
             lon, lat = transform.toGlobal((x, y))
-            # f.write("%i " % i)
             f.write("%1.8f %1.8f %g %g %g\n" % (lon, lat, x, y, float(elev)))
-            # if i > 10000: return
         f.write("\n")
         logging.info("done %i %3.1f %%\r", i, i*100/n_total)
 
@@ -783,9 +778,9 @@ def install_files(file_list, dst, from_osm2city_root=False):
             shutil.copy2(my_file, the_dst)
         except OSError as reason:
             if reason.errno not in [17]:
-                logging.warn("Error while installing %s: %s" % (the_file, reason))
+                logging.warning("Error while installing %s: %s" % (the_file, reason))
         except (AttributeError, shutil.Error) as e:
-            logging.warn("Error while installing %s: %s" % (the_file, repr(e)))
+            logging.warning("Error while installing %s: %s" % (the_file, repr(e)))
 
 
 def get_interpolator(**kwargs):

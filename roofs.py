@@ -367,7 +367,7 @@ def separate_skillion(out, b, X, inward_meters = 0., max_height = 1e99):
                 break
             angle = angle - 5
         if roof_height > max_height:
-            logging.warn("roof too high %g > %g" % (roof_height, max_height))
+            logging.warning("roof too high %g > %g" % (roof_height, max_height))
             return False
 
     #We don't want the hipped part to be greater than the height, which is 45 deg

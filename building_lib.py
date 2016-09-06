@@ -347,7 +347,7 @@ def _compute_roof_height(b, max_height=1e99):
                         break
                     angle -= 5
                 if roof_height > max_height:
-                    logging.warn("roof too high %g > %g" % (roof_height, max_height))
+                    logging.warning("roof too high %g > %g" % (roof_height, max_height))
                     return False
                     
                 b.roof_height = roof_height
@@ -426,7 +426,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             tools.stats.nodes_simplified += b.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
             b.roll_inner_nodes()
         except Exception as reason:
-            logging.warn("simplify or roll_inner_nodes failed (OSM ID %i, %s)", b.osm_id, reason)
+            logging.warning("simplify or roll_inner_nodes failed (OSM ID %i, %s)", b.osm_id, reason)
             continue
 
         # -- array of local outer coordinates
@@ -712,7 +712,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             b.roof_texture = roofs.find_matching(roof_requires)
             if not b.roof_texture:
                 tools.stats.skipped_texture += 1
-                logging.warn("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
+                logging.warning("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
                 continue
         else:
             # 1 - Check if building and building parent infos are the same
@@ -768,7 +768,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                     b.roof_texture = roofs.find_matching(roof_requires)
                     if not b.roof_texture:
                         tools.stats.skipped_texture += 1
-                        logging.warn("WARNING: no matching texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
+                        logging.warning("WARNING: no matching texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
                         continue
                     b.parent.roof_texture = b.roof_texture
                 else:
@@ -777,7 +777,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 b.roof_texture = roofs.find_matching(roof_requires)
                 if not b.roof_texture:
                     tools.stats.skipped_texture += 1
-                    logging.warn("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
+                    logging.warning("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
                     continue
         
         if b.roof_texture:
@@ -785,7 +785,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
         else:
             tools.stats.skipped_texture += 1
-            logging.warn("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
+            logging.warning("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
             continue
 
         # -- finally: append building to new list

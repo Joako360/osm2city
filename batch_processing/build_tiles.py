@@ -34,7 +34,7 @@ def _get_file_name(name, tile_name):
 
 
 def _open_file(name, directory):
-    return open(directory + name, "wr")
+    return open(directory + name, "w")
 
 
 def _write_to_file(command, file_handle, python_exe, params_out):

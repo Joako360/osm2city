@@ -17,7 +17,7 @@ import tools
 #        return "%s %s %g %g %g %g" % (self.typ, self.path, self.lon, self.lat, self.alt, self.hdg)
 
 DEPRECATED_MESSAGE = "stg_io.py is deprecated. Please consider porting to stg_io2.py"
-logging.warn(DEPRECATED_MESSAGE)
+logging.warning(DEPRECATED_MESSAGE)
 
 
 def read(path, stg_fname, our_magic):

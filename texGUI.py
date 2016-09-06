@@ -226,7 +226,7 @@ class MyFrame(wx.Frame):
         try:
             shutil.copyfile(self.in_file_name, dst)
         except OSError as reason:
-            logging.warn("Error while copying %s to %s: %s" % (self.in_file_name, dst, reason))
+            logging.warning("Error while copying %s to %s: %s" % (self.in_file_name, dst, reason))
 
         print(s)
 

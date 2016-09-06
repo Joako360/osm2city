@@ -685,7 +685,7 @@ if __name__ == "__main__":
     osm_fname = parameters.PREFIX + os.sep + parameters.OSM_FILE
 
     if parameters.USE_PKL and not os.path.exists(pkl_fname):
-        logging.warn("pkl file %s not found, will parse OSM file %s instead." % (pkl_fname, osm_fname))
+        logging.warning("pkl file %s not found, will parse OSM file %s instead." % (pkl_fname, osm_fname))
         parameters.USE_PKL = False
 
     if not parameters.USE_PKL:
@@ -876,9 +876,9 @@ if __name__ == "__main__":
                         logging.verbose("   cand %i doesn't contains  %i" % (cand_building.osm_id,  building.osm_id))
                                 
                 except shgs.TopologicalError as reason:
-                    logging.warn("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d " % (reason, building.osm_id, cand_building.osm_id))
+                    logging.warning("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d " % (reason, building.osm_id, cand_building.osm_id))
                 except shgs.PredicateError as reason:
-                    logging.warn("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d " % (reason, building.osm_id, cand_building.osm_id))
+                    logging.warning("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d " % (reason, building.osm_id, cand_building.osm_id))
     
                 return False
                

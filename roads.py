@@ -628,7 +628,7 @@ class Roads(objectlist.ObjectList):
                     else:
                         self.roads_list.append(obj)
             except ValueError as reason:
-                logging.warn("skipping OSM_ID %i: %s" % (the_way.osm_id, reason))
+                logging.warning("skipping OSM_ID %i: %s" % (the_way.osm_id, reason))
                 continue
 
             self.G.add_edge(obj)
@@ -858,7 +858,7 @@ class Roads(objectlist.ObjectList):
         """
         logging.debug("Joining %i and %i", way1.osm_id, way2.osm_id)
         if way1.osm_id == way2.osm_id:
-            logging.warn("Not joining way %i with itself", way1.osm_id)
+            logging.warning("Not joining way %i with itself", way1.osm_id)
             return
         if way1.refs[0] == way2.refs[0]:
             new_refs = way1.refs[::-1] + way2.refs[1:]
@@ -869,7 +869,7 @@ class Roads(objectlist.ObjectList):
         elif way1.refs[-1] == way2.refs[-1]:
             new_refs = way1.refs[:-1] + way2.refs[::-1]
         else:
-            logging.warn("Not joining ways that share no endpoint %i %i", way1.osm_id, way2.osm_id)
+            logging.warning("Not joining ways that share no endpoint %i %i", way1.osm_id, way2.osm_id)
             return
             
         new_way = _init_way_from_existing(way1, new_refs)
