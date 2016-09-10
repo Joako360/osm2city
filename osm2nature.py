@@ -165,7 +165,7 @@ def main():
     req_way_keys = ["natural", "landuse"]
     handler = osmparser.OSMContentHandlerOld(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
                                              req_relation_keys)
-    source = open(osm_fname)
+    source = open(osm_fname, encoding="utf8")
     xml.sax.parse(source, handler)
 
     trees = {}

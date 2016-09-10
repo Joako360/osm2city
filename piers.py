@@ -367,7 +367,7 @@ def main():
         border = shg.Polygon(parameters.get_clipping_extent())
     piers = Piers(transform, clusters, boundary_clipping_complete_way)
     handler = osmparser.OSMContentHandler(valid_node_keys=[], border=border)
-    source = open(osm_fname)
+    source = open(osm_fname, encoding="utf8")
     logging.info("Reading the OSM file might take some time ...")
 
     handler.register_way_callback(piers.create_from_way, req_keys=piers.req_keys)
