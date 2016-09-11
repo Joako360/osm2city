@@ -125,7 +125,7 @@ def _get_nodes_from_acs(objs, own_prefix):
                     logging.verbose("CACHED_AC %s" % fname)
                     ac = read_objects[fname]
                 else:
-                    logging.info("READ_AC %s" % fname)
+                    logging.debug("READ_AC %s" % fname)
                     ac = ac3d_fast.File(file_name=fname, stats=None)
                     read_objects[fname] = ac
                                 

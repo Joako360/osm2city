@@ -85,7 +85,7 @@ As described in chapter :ref:`Getting OpenStreetMap data <chapter-getting-data-l
 
 The default work flow is based on the sub-chapters of :ref:`Preparation <chapter-preparation-label>`:
 
-#. :ref:`Run setup.py <chapter-run-setup-label>` depending on your chosen `Elevation Probing Mode <chapter-elev-modes-label>`.
+#. :ref:`Run setup.py <chapter-run-setup-label>` depending on your chosen :ref:`Elevation Probing Mode <chapter-elev-modes-label>`.
 #. Adapt ``params.ini``. This will get copied to several subdirectories as part of the next process steps. Most importantly apapt the parameter ``PATH_TO_OUTPUT`` (in the example below "/home/fg_customscenery/CH_OSM"). The ``PREFIX`` and ``BOUNDARY_*`` parameters will automatically be updated.
 #. :ref:`Call build_tiles.py <chapter-build-tiles-label>`. This step creates sub-directories including a set of shell / command scripts. The top directory will be created in your ``WORKING_DIRECTORY`` and have the same name as the lon/lat area specified with argument ``-t``
 #. If needed adapt the params.ini files in the sub-directories if you need to change specific characteristics within one tile (e.g. parameters for building height etc.). In most situations this will not be needed.
@@ -113,11 +113,11 @@ Mandatory command line arguments:
 Optional command line arguments:
 
 * -p: You can use this option on Linux and Mac in order to generate scripts with parallel processing support and specify the max number of parallel processes when calling the generated scripts. 
-* -u: Which API to use to download OSM data on the fly.
+* -u: The URL of the API to use to download OSM data on the fly (e.g. http://www.overpass-api.de/api/xapi_meta?). Only useful if argument ``-d`` is not used.
 * -n: There are two implementations of downloading data on the fly. If this option is used, then a download program is used, which has better support for retries (FIXME: does this work?)
 * -x: If ``python`` is not in your executable path or you want to specify a specific Python version if you have installed several versions, then use this argument (e.g. ``/usr/bin/python3.5``).
 * -d: Instead of dynamic download an existing OSM data file as specified in the overall ``params.ini`` will be used. This can be used if e.g. ``curl`` is not available (mostly on Windows) or if you have problems with dynamic download or if you need to manipulate the OSM data after download and before processing. A pre-requisite for this is that you have Osmosis installed on your computer (see also :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>`) — the path to the Osmosis executable needs to be specified with this command line argument.
-* -o: the name of the copied params.ini files in the sub-directories
+* -o: the name of the copied params.ini files in the sub-directories. There is rarely a reason to deviate from the standard and therefore using this parameter.
 
 Calling build_tiles.py with optional argument ``-d`` could look like the following:
 

@@ -219,11 +219,8 @@ class Probe_fgelev(object):
                 self._cache = pickle.load(fpickle)
                 fpickle.close()
                 logging.info("OK")
-            except IOError as reason:
-                logging.warning("Loading elev cache failed (%s)", reason)
-                self._cache = {}
-            except EOFError as reason:
-                logging.warning("Loading elev cache failed (%s)", reason)
+            except (IOError, EOFError) as reason:
+                logging.info("Loading elev cache failed (%s)", reason)
                 self._cache = {}
         else:
             self._cache = None

@@ -113,21 +113,18 @@ LOD_PERCENTAGE_DETAIL                           Decimal    0.5       Of the rema
 
 .. _chapter-parameters-clipping:
 
-----------------
+---------------
 Clipping Region
-----------------
+---------------
 
 The boundary of a scenery as specified by the parameters ``BOUNDARY_*`` is not necessarily sharp. As described in :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>` it is recommended to use ``completeWays=yes``, when manipulating/getting OSM data - this happens also to be the case when using the `OSM Extended API`_ to retrieve data e.g. as part of :ref:`Working in batch mode <chapter-batch-mode>`. The parameters below give the possibility to influence, which data outside of the boundary is processed.
 
 .. _`OSM Extended API`: http://wiki.openstreetmap.org/wiki/Xapi
 
-BOUNDARY_CLIPPING = True
-BOUNDARY_CLIPPING_BORDER_SIZE = 0.25
-
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
-BOUNDARY_CLIPPING                               Boolean    True      If True the everythin outside the boundary is clipped away. This clipping
+BOUNDARY_CLIPPING                               Boolean    True      If True the everything outside the boundary is clipped away. This clipping
                                                                      includes ways (e.g. roads, buildings), where nodes outside the boundary
                                                                      are removed.
                                                                      If both this parameter and ``BOUNDARY_CLIPPING_COMPLETE_WAYS`` are set to 
@@ -138,7 +135,7 @@ BOUNDARY_CLIPPING_BORDER_SIZE                   Decimal    0.25      Additional 
 
 BOUNDARY_CLIPPING_COMPLETE_WAYS                 Boolean    False     If True it overrides ``BOUNDARY_CLIPPING`` and keeps all those ways, where the
                                                                      first referenced node is within the boundary as specified by ``BOUNDARY_*``.
-                                                                     This leads to more a graceful handling when different adjacent sceneries are
+                                                                     This leads to a more graceful handling when different adjacent sceneries are
                                                                      created (e.g. batch processing), such that e.g. roads not just stop on either
                                                                      side of the boundary. However this comes with the cost of more needed 
                                                                      processing. Do not use if just one scenery area in one pass is created.

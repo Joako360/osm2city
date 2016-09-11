@@ -318,14 +318,14 @@ def show():
 def read_from_file(filename):
     logging.info('Reading parameters from file: %s' % filename)
     default_globals = globals()
-    file_globals = {'textures': default_globals['textures']}
+    file_globals = dict()  # {'textures': default_globals['textures']}
     try:
         exec(compile(open(filename).read(), filename, 'exec'), file_globals)
     except IOError as reason:
         logging.error("Error processing file with parameters: %s", reason)
         sys.exit(1)
     except NameError:
-        print(traceback.format_exc())
+        logging.error(traceback.format_exc())
         logging.error("Error while reading " + filename + ". Perhaps an unquoted string in your parameters file?")
         sys.exit(1)
 

@@ -20,7 +20,6 @@ import osm2city
 import tools
 from vec2d import vec2d
 import calc_tile
-from pdb import pm
 import time
 
 
@@ -39,7 +38,7 @@ class STG_File(object):
         self.our_ac_file_name_list = []
         self.magic = magic
         self.prefix = prefix
-        #deprecated usage
+        # deprecated usage
         self.our_magic_start = delimiter_string(self.magic, None, True)
         self.our_magic_end = delimiter_string(self.magic, None, False)
         self.our_magic_start_new = delimiter_string(self.magic, prefix, True)
@@ -53,12 +52,11 @@ class STG_File(object):
             lines = stg.readlines()
             stg.close()
         except IOError as reason:
-            logging.warning("error reading %s: %s", self.file_name, reason)
+            logging.info("Error reading %s as it might not exist yet: %s", self.file_name, reason)
             return
 
-
         temp_other_list = []
-        #deal with broken files containing several sections (old version) 
+        # deal with broken files containing several sections (old version)
         while lines.count(self.our_magic_start) > 0:
             try:
                 ours_start = lines.index(self.our_magic_start)
@@ -72,12 +70,11 @@ class STG_File(object):
                 ours_end = len(lines)
 
             temp_other_list = temp_other_list + lines[:ours_start]
-#            self.our_list = lines[ours_start+1:ours_end]
             lines = lines[ours_end+1:]
         temp_other_list = temp_other_list + lines
         
         self.other_list = []
-        #deal with broken files containing several sections (new version) 
+        # deal with broken files containing several sections (new version)
         while temp_other_list.count(self.our_magic_start_new) > 0:
             try:
                 ours_start = temp_other_list.index(self.our_magic_start_new)
@@ -91,10 +88,8 @@ class STG_File(object):
                 ours_end = len(temp_other_list)
 
             self.other_list = self.other_list + lines[:ours_start]
-#            self.our_list = lines[ours_start+1:ours_end]
             temp_other_list = temp_other_list[ours_end+1:]
         self.other_list = self.other_list + temp_other_list
-
 
     def drop_ours(self):
         """Clear our list. Call write() afterwards to finish uninstall"""
@@ -130,21 +125,21 @@ class STG_File(object):
 
     def write(self):
         """write others and ours to file"""
-        #read directly before write to 
+        # read directly before write to
         self.read()
         self.make_path_to_stg()
         stg = open(self.file_name, 'w')
-        logging.info("Writing %d other lines"%len(self.other_list))
+        logging.info("Writing %d other lines" % len(self.other_list))
         for line in self.other_list:
             stg.write(line)
 
         if self.our_list:
-            logging.info("Writing %d lines"%len(self.our_list))
+            logging.info("Writing %d lines" % len(self.our_list))
             stg.write(self.our_magic_start_new)
             stg.write("# do not edit below this line\n")
             stg.write("# Last Written %s\n#\n"%time.strftime("%c"))
             for line in self.our_list:
-                logging.info(line.strip())
+                logging.debug(line.strip())
                 stg.write(line)
             stg.write(self.our_magic_end_new)
 
@@ -156,7 +151,7 @@ class STG_Manager(object):
        prefix separates different writers to work around two PREFIX areas interleaving 
     """
     def __init__(self, path_to_scenery, magic, prefix=None, overwrite=False):
-        self.stg_dict = {} # maps tile index to stg object
+        self.stg_dict = dict()  # maps tile index to stg object
         self.path_to_scenery = path_to_scenery
         self.overwrite = overwrite
         self.magic = magic
@@ -170,7 +165,7 @@ class STG_Manager(object):
         except KeyError:
             the_stg = STG_File(lon_lat, tile_index, self.path_to_scenery, self.magic, self.prefix)
             self.stg_dict[tile_index] = the_stg
-            if overwrite == None:
+            if overwrite is None:
                 overwrite = self.overwrite
             if overwrite:
                 # this will only drop the section we previously wrote ()
@@ -229,8 +224,6 @@ def read_stg_entries(stg_path_and_name, our_magic, ignore_bad_lines=False):
     TODO: In the future, take care of multiple scenery paths here.
     TODO: should be able to take a list of our_magic"""
     entries = []  # list of STGEntry objects
-    
-    logger = logging.getLogger("stgio2")
 
     if None is not our_magic:
         our_magic_start = delimiter_string(our_magic, None, True)
@@ -262,23 +255,23 @@ def read_stg_entries(stg_path_and_name, our_magic, ignore_bad_lines=False):
                     hdg = float(splitted[5])
                     entry = STGEntry(type_, obj_filename, path, lon, lat, elev, hdg)
                     entries.append(entry)                
-                    logger.debug("stg: %s %s", type_, entry.get_obj_path_and_name())
+                    logging.debug("stg: %s %s", type_, entry.get_obj_path_and_name())
                 except ValueError as reason:
                     if not ignore_bad_lines:
-                        logger.warning("stg_io:read: Damaged file %s", reason)
-                        logger.warning("Damaged line: %s", line.strip())
+                        logging.warning("stg_io:read: Damaged file %s", reason)
+                        logging.warning("Damaged line: %s", line.strip())
                         return []
                     else:
-                        logger.warning("Damaged line: %s", line.strip())
+                        logging.warning("Damaged line: %s", line.strip())
                 except IndexError as reason:
                     if not ignore_bad_lines:
-                        logger.warning("stg_io:read: Ignoring unreadable file %s", reason)
-                        logger.warning("Offending line: %s", line.strip())
+                        logging.warning("stg_io:read: Ignoring unreadable file %s", reason)
+                        logging.warning("Offending line: %s", line.strip())
                         return []
                     else:
-                        logger.warning("Damaged line: %s", line.strip())
+                        logging.warning("Damaged line: %s", line.strip())
     except IOError as reason:
-        logger.warning("stg_io:read: Ignoring unreadable file %s", reason)
+        logging.warning("stg_io:read: Ignoring unreadable file %s", reason)
         return []
     return entries
 
@@ -289,10 +282,10 @@ def read(path, stg_fname, our_magic):
     building_objs = []
     for entry in stg_entries:
         point = shg.Point(tools.transform.toLocal((entry.lon, entry.lat)))
-        building_objs.append(osm2city.Building(osm_id=-1, tags=-1, outer_ring=point
-                                               , name=entry.get_obj_path_and_name()
-                                               , height=0, levels=0, stg_typ=entry.get_object_type_as_string()
-                                               , stg_hdg=entry.hdg))
+        building_objs.append(osm2city.Building(osm_id=-1, tags=-1, outer_ring=point,
+                                               name=entry.get_obj_path_and_name(),
+                                               height=0, levels=0, stg_typ=entry.get_object_type_as_string(),
+                                               stg_hdg=entry.hdg))
 
     return building_objs
 

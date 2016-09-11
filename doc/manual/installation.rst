@@ -52,6 +52,14 @@ Do the following:
 #. Add the ``osm2city`` directory to your ``PYTHONPATH``. You can read more about this at https://docs.python.org/2/using/cmdline.html#envvar-PYTHONPATH.
 #. Create soft links between as described in the following sub-chapter.
 
+On Linux you would typically add something like the following to your ``.bashrc`` file:
+
+::
+
+    PYTHONPATH=$HOME/develop_vcs/python3/osm2city
+    export PYTHONPATH
+
+
 .. _Git: http://www.git-scm.com/
 
 
