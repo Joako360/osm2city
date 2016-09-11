@@ -5,9 +5,10 @@
 #   Class:      Hline
 #===============================================================================
 
-from point import Point
+from .point import Point
 #import display
 import numpy, numpy.linalg
+
 
 class Hline:
     """
@@ -16,7 +17,7 @@ class Hline:
         * intersect a half line with another half line, or with a segment
     """
     
-    def __init__(self,direction,p):
+    def __init__(self, direction, p):
         self.d = direction
         self.d.normalize()
         self.p = p
@@ -42,49 +43,48 @@ class Hline:
 #        #display the normal (orientation)
 #        disp.canvas.create_line(self.p.x,self.p.y,p3.x,p3.y,fill="black",width=2)
     
-    def side(self,p):
+    def side(self, p):
         q = p-self.p
         return self.d.cross_prod(q)>= 0
     
-    def getPoint(self,alpha):
+    def getPoint(self, alpha):
         """
         return the point p+a*d, belonging to the half line
         """
         return self.p + self.d.scale(alpha)
     
-    def intersect(self,other):
+    def intersect(self, other):
         """intersection of two half line"""
         result = None
         
         #linear system
-        a = numpy.matrix([[self.d.x,-other.d.x],[self.d.y,-other.d.y]])
-        b = numpy.matrix([[-self.p.x+other.p.x],[-self.p.y+other.p.y]])
+        a = numpy.matrix([[self.d.x, -other.d.x], [self.d.y, -other.d.y]])
+        b = numpy.matrix([[-self.p.x+other.p.x], [-self.p.y+other.p.y]])
         
         try :
-            x = numpy.linalg.solve(a,b)
+            x = numpy.linalg.solve(a, b)
             lambda1 = x.A[0][0]
             lambda2 = x.A[1][0]
-            if lambda1>0 and lambda2>0:
+            if lambda1 > 0 and lambda2 > 0:
                 result = self.getPoint(lambda1)
         except :
             pass
         
         return result
 
-
-    def intersect_segment(self,seg):
+    def intersect_segment(self, seg):
         """ intersection of the half line with the segment """
         result = None
         
         #build the linear system
-        a = numpy.matrix([[self.d.x,seg.pF.x-seg.pI.x],[self.d.y,seg.pF.y-seg.pI.y]])
-        b = numpy.matrix([[seg.pF.x-self.p.x],[seg.pF.y-self.p.y]])
+        a = numpy.matrix([[self.d.x, seg.pF.x-seg.pI.x], [self.d.y, seg.pF.y-seg.pI.y]])
+        b = numpy.matrix([[seg.pF.x-self.p.x], [seg.pF.y-self.p.y]])
             
         #try to solve it
         try:
-            x = numpy.linalg.solve(a,b)
-            alpha = x.A[0][0] #parameter of the half line
-            beta  = x.A[1][0] #parameter on the segment
+            x = numpy.linalg.solve(a, b)
+            alpha = x.A[0][0]  #parameter of the half line
+            beta  = x.A[1][0]  #parameter on the segment
             
             #check if the solution is in the segment and in the half line
             if alpha>0 and 0<beta<1:
@@ -94,5 +94,3 @@ class Hline:
             pass
         
         return result
-            
-

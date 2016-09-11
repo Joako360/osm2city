@@ -101,7 +101,6 @@ def _get_nodes_from_acs(objs, own_prefix):
 
     for b in objs:
         fname = b.name
-        # print "in objs <%s>" % b.name
         if fname.endswith(".xml"):
             if fname.startswith(own_prefix):
                 continue
@@ -126,7 +125,7 @@ def _get_nodes_from_acs(objs, own_prefix):
                     logging.verbose("CACHED_AC %s" % fname)
                     ac = read_objects[fname]
                 else:
-                    logging.info("READ_AC %s" % fname)
+                    logging.debug("READ_AC %s" % fname)
                     ac = ac3d_fast.File(file_name=fname, stats=None)
                     read_objects[fname] = ac
                                 
@@ -136,10 +135,10 @@ def _get_nodes_from_acs(objs, own_prefix):
     
                 transposed_ac_nodes = -np.delete(ac.nodes_as_array().transpose(), 1, 0)[::-1]
                 transposed_ac_nodes = np.dot(Rot_mat, transposed_ac_nodes)
-                transposed_ac_nodes += b.anchor.as_array().reshape(2,1)
+                transposed_ac_nodes += b.anchor.as_array().reshape(2, 1)
                 all_nodes = np.append(all_nodes, transposed_ac_nodes.transpose(), 0)
-            except Exception, e:
-                logging.error("Error reading %s %s" % (fname,e))
+            except Exception as e:
+                logging.error("Error reading %s %s" % (fname, e))
 
     return all_nodes
 
@@ -204,7 +203,7 @@ def _compute_height_and_levels(b):
     """Determines total height (and number of levels) of a building based on
        OSM values and other logic"""
     try:
-        if isinstance(b.height, (int, long)):
+        if isinstance(b.height, (int)):
             b.height = float(b.height)
         assert(isinstance(b.height, float))
     except AssertionError:
@@ -293,7 +292,7 @@ def _compute_roof_height(b, max_height=1e99):
             X = b.X
             
             p0 = (X[0][0], X[0][1])
-            for i in range(0,len(X)):
+            for i in range(0, len(X)):
                 # compute coord in new referentiel
                 vecA = (X[i][0]-p0[0], X[i][1]-p0[1])
                 X2.append(vecA)
@@ -348,7 +347,7 @@ def _compute_roof_height(b, max_height=1e99):
                         break
                     angle -= 5
                 if roof_height > max_height:
-                    logging.warn("roof too high %g > %g" % (roof_height, max_height))
+                    logging.warning("roof too high %g > %g" % (roof_height, max_height))
                     return False
                     
                 b.roof_height = roof_height
@@ -426,8 +425,8 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         try:
             tools.stats.nodes_simplified += b.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
             b.roll_inner_nodes()
-        except Exception, reason:
-            logging.warn("simplify or roll_inner_nodes failed (OSM ID %i, %s)", b.osm_id, reason)
+        except Exception as reason:
+            logging.warning("simplify or roll_inner_nodes failed (OSM ID %i, %s)", b.osm_id, reason)
             continue
 
         # -- array of local outer coordinates
@@ -552,13 +551,13 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             facade_requires.append('compat:roof-flat')
             
         try:
-            if 'terminal' in string.lower(b.tags['aeroway']):
+            if 'terminal' in b.tags['aeroway'].lower():
                 facade_requires.append('facade:shape:terminal')
         except KeyError:
             pass
         try:
-            if 'building:material' not in b.tags :
-                if b.tags['building:part'] == "column" :
+            if 'building:material' not in b.tags:
+                if b.tags['building:part'] == "column":
                     facade_requires.append(str('facade:building:material:stone'))
         except KeyError:
             pass
@@ -570,11 +569,11 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 del(b.tags['building:color'])
             elif 'building:color' in b.tags and 'building:colour' in b.tags:
                 del(b.tags['building:color'])
-            facade_requires.append('facade:building:colour:'+string.lower(b.tags['building:colour']))
+            facade_requires.append('facade:building:colour:' + b.tags['building:colour'].lower())
         except KeyError:
             pass    
         try:
-            material_type = string.lower(b.tags['building:material'])
+            material_type = b.tags['building:material'].lower()
             if str(material_type) in ['stone', 'brick', 'timber_framing', 'concrete', 'glass']:
                 facade_requires.append(str('facade:building:material:' + str(material_type)))
                 
@@ -713,7 +712,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             b.roof_texture = roofs.find_matching(roof_requires)
             if not b.roof_texture:
                 tools.stats.skipped_texture += 1
-                logging.warn("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
+                logging.warning("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
                 continue
         else:
             # 1 - Check if building and building parent infos are the same
@@ -769,7 +768,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                     b.roof_texture = roofs.find_matching(roof_requires)
                     if not b.roof_texture:
                         tools.stats.skipped_texture += 1
-                        logging.warn("WARNING: no matching texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
+                        logging.warning("WARNING: no matching texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
                         continue
                     b.parent.roof_texture = b.roof_texture
                 else:
@@ -778,7 +777,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 b.roof_texture = roofs.find_matching(roof_requires)
                 if not b.roof_texture:
                     tools.stats.skipped_texture += 1
-                    logging.warn("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
+                    logging.warning("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
                     continue
         
         if b.roof_texture:
@@ -786,7 +785,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
         else:
             tools.stats.skipped_texture += 1
-            logging.warn("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
+            logging.warning("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
             continue
 
         # -- finally: append building to new list
@@ -894,7 +893,7 @@ def _write_ground(out, b, elev):  # not used anywhere
         angle = math.atan2(Xo[i1, 1] - Xo[i, 1], Xo[i1, 0] - Xo[i, 0])
 
         l = ((Xo[i1, 1] - Xo[i, 1]) ** 2 + (Xo[i1, 0] - Xo[i, 0]) ** 2) ** 0.5
-        print l, b.lenX[i]
+        print(l, b.lenX[i])
         # assert (l == b.lenX[i])
         # angle = 10./57.3
         R = np.array([[cos(angle), sin(angle)],
@@ -978,8 +977,8 @@ def _write_ring(out, b, ring, v0, texture, tex_y0, tex_y1):
         j = i + b.first_node
         jpp = ipp + b.first_node  
 
-        out.face([ (j                       , tex_x0, tex_y0),
-                   (jpp                     , tex_x1, tex_y0),
+        out.face([ (j, tex_x0, tex_y0),
+                   (jpp, tex_x1, tex_y0),
                    (jpp   + b._nnodes_ground, tex_x1, tex_y11),
                    (j +     b._nnodes_ground, tex_x0, tex_y12) ],
                  swap_uv=texture.v_can_repeat)     

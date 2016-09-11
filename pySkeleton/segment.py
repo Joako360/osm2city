@@ -5,9 +5,9 @@
 #   Class :     Segment, ParallelSegmentError
 #===============================================================================
 
-from line import Line
-import half_line
-import point
+from .line import Line
+from . import half_line
+from . import point
 #import display
 
 class SegmentError(Exception):pass
@@ -33,16 +33,16 @@ class Segment:
     def __repr__(self):
         return "Segment : " + self.pI.__repr__() + "- " + self.pF.__repr__() + "  weight : %f" %(self.w)
     
-    def __eq__(self,other):
+    def __eq__(self, other):
         return ((self.pI==other.pI and self.pF==other.pF) or (self.pI==other.pF and self.pF==other.pI))
     
     def getData(self):
         return(self.pI, self.pF)
         
-    def __getitem__(self,i):
+    def __getitem__(self, i):
         return self.getData()[i]
     
-    def distance_to(self,p):
+    def distance_to(self, p):
         """ compute the normal distance between p and the segment """
         u = self.pF-self.pI
         u.normalize()
@@ -51,7 +51,7 @@ class Segment:
         d = v - u.get_scalar_prod(v*u)
         return d.norm()
     
-    def weighted_distance_to(self,p):
+    def weighted_distance_to(self, p):
         """
         compute the distance from a point to the segment, taking the weight (or speed)
         of the segment into account
@@ -62,7 +62,7 @@ class Segment:
         """ decide if a segment is reduced to a single point """
         return (self.pI - self.pF).norm()<1e-6
     
-    def bisector_with(self,other):
+    def bisector_with(self, other):
         """ compute the bisector of two segments """
         
         bisector = None
@@ -76,9 +76,9 @@ class Segment:
                 inter = self.pF
             else:
                 l1 = Line()
-                l1.fromVector(self.pI,self.pF)
+                l1.fromVector(self.pI, self.pF)
                 l2 = Line()
-                l2.fromVector(other.pI,other.pF)
+                l2.fromVector(other.pI, other.pF)
             
                 inter = l1.intersect_line(l2)
                 if not inter : raise ParallelSegmentError
@@ -95,7 +95,7 @@ class Segment:
             u1.scalar_prod(1./float(self.w))
             u2.normalize()
             u2.scalar_prod(1./float(other.w))
-            bisector = half_line.Hline(u1+u2,inter)
+            bisector = half_line.Hline(u1+u2, inter)
         
         except(ParallelSegmentError) :
             d = 0.5*self.distance_to(other.pI)
@@ -104,7 +104,7 @@ class Segment:
             bisector = half_line.Hline(self.u, inter)
             
         except(OppositeSegmentError):
-            bisector = half_line.Hline(self.u.getNormal(),self.pI)
+            bisector = half_line.Hline(self.u.getNormal(), self.pI)
             
         return bisector
     

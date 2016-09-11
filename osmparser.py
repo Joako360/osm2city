@@ -164,7 +164,7 @@ class OSMContentHandler(xml.sax.ContentHandler):
 
 def find_callback_for(tags, callbacks):
     for (callback, req_keys) in callbacks:
-        for key in tags.keys():
+        for key in list(tags.keys()):
             if key in req_keys:
                 return callback
     return None
@@ -206,23 +206,23 @@ class OSMContentHandlerOld(xml.sax.ContentHandler):
             self.nodes_dict = nodes_dict
         all_tags = current_way.tags
         current_way.tags = {}
-        for key, value in all_tags.items():
+        for key in list(all_tags.keys()):
             if key in self.valid_way_keys:
-                current_way.add_tag(key, value)
+                current_way.add_tag(key, all_tags[key])
         self.ways_dict[current_way.osm_id] = current_way
 
     def process_relation(self, current_relation):
         all_tags = current_relation.tags
         current_relation.tags = {}
-        for key, value in all_tags.items():
+        for key in list(all_tags.keys()):
             if key in self.valid_way_keys:
-                current_relation.add_tag(key, value)
+                current_relation.add_tag(key, all_tags[key])
         self.relations_dict[current_relation.osm_id] = current_relation
 
 
 def has_required_tag_keys(my_tags, my_required_keys):
     """ Checks whether a given set of actual tags contains at least one of the required tags """
-    for key in my_tags.keys():
+    for key in list(my_tags.keys()):
         if key in my_required_keys:
             return True
     return False
@@ -293,8 +293,8 @@ class TestOSMParser(unittest.TestCase):
         self.assertAlmostEqual(2092.1472, parse_length(' 1.3mi'), 2, "Correct number with mile unit without space")
         self.assertAlmostEqual(3.048, parse_length("10'"), 2, "Correct number with feet unit without space")
         self.assertAlmostEqual(3.073, parse_length('10\'1"'), 2, "Correct number with feet unit without space")
-        self.assertEquals(0, parse_length('m'), "Only valid unit")
-        self.assertEquals(0, parse_length('"'), "Only inches, no feet")
+        self.assertEqual(0, parse_length('m'), "Only valid unit")
+        self.assertEqual(0, parse_length('"'), "Only inches, no feet")
 
     def test_is_parsable_float(self):
         self.assertFalse(is_parsable_float('1,2'))

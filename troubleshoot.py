@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Checks tools.stats after running any of osm2city's modules and shows troubleshooting
 hints if we detect problems.
 """ 
@@ -53,7 +52,7 @@ def troubleshoot(stats):
         msg += t.skipped_no_texture()
     
     if t.n_problems > 0:
-        logging.warn("We've detected %i problem(s):\n\n%s" % (t.n_problems, msg))
+        logging.warning("We've detected %i problem(s):\n\n%s" % (t.n_problems, msg))
 
 
 if __name__ == "__main__":

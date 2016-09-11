@@ -1,4 +1,3 @@
-#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
 Created on Wed Mar 13 22:22:05 2013
@@ -17,20 +16,19 @@ Created on Wed Mar 13 22:22:05 2013
 
 
 import argparse
-import cPickle
+import pickle
 import datetime
 import logging
 import math
 import os
 import random
 import re
-import string
 import sys
 
 import numpy as np
 from PIL import Image
 
-import atlas
+from textures import atlas
 import img2np
 import parameters
 import tools
@@ -103,10 +101,10 @@ def _make_texture_atlas(texture_list, atlas_filename, ext, tex_prefix, size_x=25
             if the_atlas.pack(the_texture):
                 if deb:
                     the_atlas.write("atlas.png", "RGBA")
-                    raw_input("Press Enter to continue...")
+                    input("Press Enter to continue...")
                 pass
             else:
-                print "no"
+                print("no")
 
     atlas_sy = the_atlas.cur_height()
 
@@ -319,7 +317,7 @@ class TextureManager(object):
         return candidates
 
     def __str__(self):
-        return string.join([str(t) + '\n' for t in self.__l])
+        return "".join([str(t) + '\n' for t in self.__l])
 
     def __getitem__(self, i):
         return self.__l[i]
@@ -335,7 +333,7 @@ class FacadeManager(TextureManager):
             exclusions.append("%s:%s" % ('roof:colour', tags['roof:colour']))
         candidates = self.find_candidates(requires, exclusions, height, width)
         if len(candidates) == 0:
-            logging.warn("no matching facade texture for %1.f m x %1.1f m <%s>", height, width, str(requires))
+            logging.warning("no matching facade texture for %1.f m x %1.1f m <%s>", height, width, str(requires))
             return None
         ranked_list = self.rank_candidates(candidates, tags)
         the_texture = ranked_list[random.randint(0, len(ranked_list) - 1)]
@@ -370,7 +368,7 @@ class FacadeManager(TextureManager):
                 continue
             if width < t.width_min or width > t.width_max:
                 logging.verbose("width %.2f (%.2f-%.2f) outside bounds : %s"
-                                , width, t.width_min, t.width_max,str(t.filename))  # @UndefinedVariable
+                                , width, t.width_min, t.width_max, str(t.filename))  # @UndefinedVariable
                 continue
 
             new_candidates.append(t)
@@ -443,7 +441,7 @@ def _append_dynamic(facades, tex_prefix):
             logging.info("Executing %s ", my_path)
             try:
                 facades.current_registered_in = my_path
-                execfile(my_path)
+                exec(compile(open(my_path).read(), my_path, 'exec'))
             except:
                 logging.exception("Error while running %s" % filename)
 
@@ -453,7 +451,7 @@ def _append_roofs(roofs, tex_prefix):  # parameter roofs is used dynamically in 
     try:
         file_name = tex_prefix + os.sep + ROOFS_DEFAULT_FILE_NAME
         roofs.current_registered_in = file_name
-        execfile(file_name)
+        exec(compile(open(file_name).read(), file_name, 'exec'))
     except Exception as e:
         logging.exception("Unrecoverable error while loading roofs")
         sys.exit(1)
@@ -501,16 +499,16 @@ def init(tex_prefix='', create_atlas=False):  # in most situations tex_prefix sh
 
         logging.info("Saving %s", pkl_fname)
         fpickle = open(pkl_fname, 'wb')
-        cPickle.dump(facades, fpickle, -1)
-        cPickle.dump(roofs, fpickle, -1)
-        cPickle.dump(params, fpickle, -1)
+        pickle.dump(facades, fpickle, -1)
+        pickle.dump(roofs, fpickle, -1)
+        pickle.dump(params, fpickle, -1)
         fpickle.close()
     else:
         logging.info("Loading %s", pkl_fname)
         fpickle = open(pkl_fname, 'rb')
-        facades = cPickle.load(fpickle)
-        roofs = cPickle.load(fpickle)
-        params = cPickle.load(fpickle)
+        facades = pickle.load(fpickle)
+        roofs = pickle.load(fpickle)
+        params = pickle.load(fpickle)
         atlas_file_name = params['atlas_file_name']
         fpickle.close()
 

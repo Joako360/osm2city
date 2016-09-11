@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # wx <--> PIL  image conversion routines
 
 # Tested with wxPython 2.3.4.2 and PIL 1.1.3.
@@ -25,7 +23,7 @@ def pilToImage(pil):
 #Or, if you want to copy alpha channels too (available from wxPython 2.5)
 def piltoimage(pil,alpha=True):
    if alpha:
-       image = apply( wx.EmptyImage, pil.size )
+       image = wx.EmptyImage(*pil.size)
        image.SetData( pil.convert( "RGB").tostring() )
        image.SetAlphaData(pil.convert("RGBA").tostring()[3::4])
    else:

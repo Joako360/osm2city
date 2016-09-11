@@ -44,12 +44,12 @@ if __name__ == '__main__':
                                                , parameters.BOUNDARY_SOUTH, parameters.BOUNDARY_EAST
                                                , parameters.BOUNDARY_NORTH)
         while tries < 10:    
-            proc = subprocess.Popen(download_command, stderr=PIPE, stdout=PIPE,bufsize=1, universal_newlines=True)
+            proc = subprocess.Popen(download_command, stderr=PIPE, stdout=PIPE, bufsize=1, universal_newlines=True)
         #     exitcode = proc.wait()
             outlines = ""
             with proc.stderr:
                 for line in iter(proc.stderr.readline, b''):
-                    print line.strip()
+                    print(line.strip())
                     sys.stdout.flush()
                     outlines += line
 # Already read stderr setting to None lets us get stdout

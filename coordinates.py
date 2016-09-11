@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Transform global (aka geodetic) coordinates to a local cartesian, in meters.
@@ -63,7 +62,8 @@ class Transformation(object):
     """global <-> local coordinate system transformation, using flat earth approximation
        http://williams.best.vwh.net/avform.htm#flat
     """
-    def __init__(self, (lon, lat)=(0, 0), hdg=0):
+    def __init__(self, xxx_todo_changeme=(0, 0), hdg=0):
+        (lon, lat) = xxx_todo_changeme
         if hdg != 0.:
             logging.error("heading != 0 not yet implemented.")
             raise NotImplemented
@@ -82,8 +82,9 @@ class Transformation(object):
         self._R1 = a*(1.-e2)/(1.-e2*(sinlat**2))**(3./2.)
         self._R2 = a/sqrt(1-e2*sinlat**2)
 
-    def setOrigin(self, (lon, lat)):
+    def setOrigin(self, xxx_todo_changeme1):
         """set origin to given global coordinates (lon, lat)"""
+        (lon, lat) = xxx_todo_changeme1
         self._lon, self._lat = lon, lat
         self._update()
 
@@ -93,14 +94,16 @@ class Transformation(object):
 
     origin = property(getOrigin, setOrigin)
 
-    def toLocal(self, (lon, lat)):
+    def toLocal(self, xxx_todo_changeme2):
         """transform global -> local coordinates"""
+        (lon, lat) = xxx_todo_changeme2
         y = self._R1 * radians(lat - self._lat)
         x = self._R2 * radians(lon - self._lon) * self._coslat
         return x, y
 
-    def toGlobal(self, (x, y)):
+    def toGlobal(self, xxx_todo_changeme3):
         """transform local -> global coordinates"""
+        (x, y) = xxx_todo_changeme3
         lat = degrees(y / self._R1) + self._lat
         lon = degrees(x / (self._R2 * self._coslat)) + self._lon
         return lon, lat
@@ -154,14 +157,14 @@ def calc_angle_of_line_global(lon1, lat1, lon2, lat2):
 
 if __name__ == "__main__":
     t = Transformation((0, 0))
-    print t.toLocal((0., 0))
-    print t.toLocal((1., 0))
-    print t.toLocal((0, 1.))
-    print
-    print t.toGlobal((100., 0))
-    print t.toGlobal((1000., 0))
-    print t.toGlobal((10000., 0))
-    print t.toGlobal((100000., 0))
+    print(t.toLocal((0., 0)))
+    print(t.toLocal((1., 0)))
+    print(t.toLocal((0, 1.)))
+    print()
+    print(t.toGlobal((100., 0)))
+    print(t.toGlobal((1000., 0)))
+    print(t.toGlobal((10000., 0)))
+    print(t.toGlobal((100000., 0)))
 
 # ================ UNITTESTS =======================
 

@@ -5,9 +5,8 @@
 #   Class:      Graph
 #===============================================================================
 
-import os
-import point
-import segment
+from . import point
+
 
 #===============================================================================
 # Node
@@ -20,7 +19,7 @@ class Node:
     
     count = 0
     
-    def __init__(self,p):
+    def __init__(self, p):
         self.value      = p
 
         self.id         = Node.count
@@ -29,20 +28,20 @@ class Node:
         self.neighbors  = []
         self.visited    = False
         
-    def __eq__(self,other):
+    def __eq__(self, other):
         return self.value == other.value
 
     def __repr__(self):
         return self.id.__repr__()
             
-    def add_neighbor(self,a):
+    def add_neighbor(self, a):
         try :
             return self.neighbors.index(a)
         except:
             self.neighbors.append(a)
             return len(self.neighbors)-1
                 
-    def minimal_path_to(self,other):
+    def minimal_path_to(self, other):
         """
         find the minimal path between two nodes 
         return the path = list of ids
@@ -71,7 +70,7 @@ class Node:
                         path_length = 0
                         start       = self
                         for q in min_path:
-                            path_length += Arc(start,q).distance()
+                            path_length += Arc(start, q).distance()
                             start = q
                         
                         #check if this path is minimal
@@ -94,11 +93,11 @@ class Arc:
     An arc between two nodes
     """
     
-    def __init__(self,p1,p2):
+    def __init__(self, p1, p2):
         self.p1 = p1
         self.p2 = p2
         
-    def __eq__(self,other):
+    def __eq__(self, other):
         """
         Compare two arcs
         As the arcs represent undirected links, arc(p1,p2) = arc(p2,p1)
@@ -110,7 +109,7 @@ class Arc:
         give the length of the arc
         if the arc connect 2D points, it give the euclidian distance between the two end points
         """
-        if type(self.p1.value) == type(point.Point((0,0))):
+        if isinstance(self.p1.value, type(point.Point((0, 0)))):
             return (self.p1.value - self.p2.value).norm()
         else:
             return 1
@@ -129,13 +128,13 @@ class Arc:
     def __repr__(self):
         return self.p1.__repr__() +" -- "+ self.p2.__repr__()
     
-    def get_other_end(self,p):
+    def get_other_end(self, p):
         if p==self.p1:
             return self.p2
         elif p==self.p2:
             return self.p1
         else:
-            print 'O_o'
+            print('O_o')
 
 
 #===============================================================================
@@ -147,16 +146,16 @@ class Graph:
     to find minimal path
     """
     
-    def __init__(self,nodes=[],arcs=[]):
-        Node.count  = 0
-        self.nodes  = nodes
-        self.arcs   = arcs
+    def __init__(self, nodes=[], arcs=[]):
+        Node.count = 0
+        self.nodes = nodes
+        self.arcs = arcs
         
     def reset_visit(self):
         for node in self.nodes:
             node.visited = False
     
-    def find(self,value):
+    def find(self, value):
         """ Find the node of the graph which value is 'value' """
         result = False
         for node in self.nodes:
@@ -168,14 +167,14 @@ class Graph:
     #===========================================================================
     # Change the topology of the graph
     #===========================================================================
-    def add_arc(self,p1,p2):
+    def add_arc(self, p1, p2):
         """
         @arg p1 : Node
         @arg p2 : Node
         @return : the created arc itself
         """
         
-        a = Arc(p1,p2)
+        a = Arc(p1, p2)
         if p1==p2:
             return None
         
@@ -186,7 +185,7 @@ class Graph:
         
         return a
         
-    def add_node(self,p):
+    def add_node(self, p):
         """
         @arg p : the value of the node to be added. The information contained in the node
                  to be created. (point, index, whatever)
@@ -214,12 +213,12 @@ class Graph:
     def exportDOT(self,filename='graph'):
         """ create a dot file """
         
-        dotFile = open(filename+'.dot','w')
+        dotFile = open(filename+'.dot', 'w')
         dotFile.write("graph G {\n")
         for p in self.nodes:
-            dotFile.write('\tNode%i [label = "%i"];\n' %(p.id,p.id))
+            dotFile.write('\tNode%i [label = "%i"];\n' %(p.id, p.id))
         for a in self.arcs:
-            dotFile.write('\tNode%i -- Node%i [label ="%i"];\n' %(a.p1.id,a.p2.id,a.distance()))
+            dotFile.write('\tNode%i -- Node%i [label ="%i"];\n' %(a.p1.id, a.p2.id, a.distance()))
         dotFile.write("}\n")
         dotFile.close()
         
@@ -270,29 +269,28 @@ if __name__ == '__main__':
     p16 = g.add_node(16)
     p17 = g.add_node(17)
     
-    g.add_arc(p0,p1)
-    g.add_arc(p0,p2)
-    g.add_arc(p0,p3)
-    g.add_arc(p2,p4)
-    g.add_arc(p2,p5)
-    g.add_arc(p3,p11)
-    g.add_arc(p3,p9)
-    g.add_arc(p3,p17)
-    g.add_arc(p17,p8)
-    g.add_arc(p9,p10)
-    g.add_arc(p10,p14)
-    g.add_arc(p4,p7)
-    g.add_arc(p7,p6)
-    g.add_arc(p5,p6)
-    g.add_arc(p6,p8)
-    g.add_arc(p11,p12)
-    g.add_arc(p12,p13)
-    g.add_arc(p13,p17)
-    g.add_arc(p13,p15)
-    g.add_arc(p15,p16)
-    g.add_arc(p16,p8)
+    g.add_arc(p0, p1)
+    g.add_arc(p0, p2)
+    g.add_arc(p0, p3)
+    g.add_arc(p2, p4)
+    g.add_arc(p2, p5)
+    g.add_arc(p3, p11)
+    g.add_arc(p3, p9)
+    g.add_arc(p3, p17)
+    g.add_arc(p17, p8)
+    g.add_arc(p9, p10)
+    g.add_arc(p10, p14)
+    g.add_arc(p4, p7)
+    g.add_arc(p7, p6)
+    g.add_arc(p5, p6)
+    g.add_arc(p6, p8)
+    g.add_arc(p11, p12)
+    g.add_arc(p12, p13)
+    g.add_arc(p13, p17)
+    g.add_arc(p13, p15)
+    g.add_arc(p15, p16)
+    g.add_arc(p16, p8)
         
     g.exportPNG()
     
-    print p0.minimal_path_to(p8)
-        
+    print(p0.minimal_path_to(p8))

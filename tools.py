@@ -1,4 +1,3 @@
-#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
 tools.py
@@ -9,14 +8,13 @@ Created on Sat Mar 23 18:42:23 2013½
 @author: tom
 """
 import argparse
-import cPickle
+import pickle
 import csv
 import logging
 import math
 import os
 import os.path as osp
-import Queue
-import re
+import queue
 import shutil
 import subprocess
 import sys
@@ -88,7 +86,7 @@ class Interpolator(object):
         elev = np.zeros((nx * ny, 5))
         with open(filename, 'r') as f:
             reader = csv.reader(f, delimiter=' ')
-            tmp = reader.next()
+            tmp = next(reader)
             i = 0
             for row in reader:
                 tmp = np.array(row)
@@ -110,8 +108,8 @@ class Interpolator(object):
         # print self.h[0,0], self.h[0,1], self.h[0,2]
         self.dx = self.x[0, 1] - self.x[0, 0]
         self.dy = self.y[1, 0] - self.y[0, 0]
-        print "dx, dy", self.dx, self.dy
-        print "min %s  max %s" % (self.min, self.max)
+        print("dx, dy", self.dx, self.dy)
+        print("min %s  max %s" % (self.min, self.max))
 
     def _move_to_boundary(self, x, y):
         if x <= self.min.x:
@@ -218,14 +216,11 @@ class Probe_fgelev(object):
             try:
                 logging.info("Loading %s", self.pkl_fname)
                 fpickle = open(self.pkl_fname, 'rb')
-                self._cache = cPickle.load(fpickle)
+                self._cache = pickle.load(fpickle)
                 fpickle.close()
                 logging.info("OK")
-            except IOError, reason:
-                logging.warn("Loading elev cache failed (%s)", reason)
-                self._cache = {}
-            except EOFError, reason:
-                logging.warn("Loading elev cache failed (%s)", reason)
+            except (IOError, EOFError) as reason:
+                logging.info("Loading elev cache failed (%s)", reason)
                 self._cache = {}
         else:
             self._cache = None
@@ -236,18 +231,15 @@ class Probe_fgelev(object):
 
         fgelev_cmd = path_to_fgelev + ' --expire 1000000 --fg-scenery ' + parameters.PATH_TO_SCENERY
         logging.info("cmd line: " + fgelev_cmd)
-        self.fgelev_pipe = subprocess.Popen(fgelev_cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        # -- This should catch spawn errors, but it doesn't. We
-        #    check for sane return values on fgelev calls later.
-#        if self.fgelev_pipe.poll() != 0:
-#            raise RuntimeError("Spawning fgelev failed.")
+        self.fgelev_pipe = subprocess.Popen(fgelev_cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                            bufsize=1, universal_newlines=True)
 
     def save_cache(self):
         """save cache to disk"""
         if self.fake:
             return
         fpickle = open(self.pkl_fname, 'wb')
-        cPickle.dump(self._cache, fpickle, -1)
+        pickle.dump(self._cache, fpickle, -1)
         fpickle.close()
 
     def shift(self, h):
@@ -262,7 +254,7 @@ class Probe_fgelev(object):
                 btg_file = parameters.PATH_TO_SCENERY + os.sep + "Terrain" \
                            + os.sep + calc_tile.directory_name(position) + os.sep \
                            + calc_tile.construct_btg_file_name(position)
-                print calc_tile.construct_btg_file_name(position)
+                print(calc_tile.construct_btg_file_name(position))
                 if not os.path.exists(btg_file):
                     logging.error("Terrain File " + btg_file + " does not exist. Set scenery path correctly or fly there with TerraSync enabled")
                     sys.exit(2)
@@ -275,7 +267,7 @@ class Probe_fgelev(object):
 
             try:
                 self.fgelev_pipe.stdin.write("%i %1.10f %1.10f\r\n" % (self.record, position.lon, position.lat))
-            except IOError, reason:
+            except IOError as reason:
                 logging.error(reason)
 
             empty_lines = 0
@@ -285,7 +277,7 @@ class Probe_fgelev(object):
                     empty_lines += 1
                     line = self.fgelev_pipe.stdout.readline().strip()
                 elev = float(line.split()[1]) + self.h_offset
-            except IndexError, reason:
+            except IndexError as reason:
                 self.save_cache()
                 if empty_lines > 1:
                     logging.fatal("Skipped %i lines" % empty_lines)
@@ -360,7 +352,7 @@ def test_fgelev(cache, N):
     for y in Y:
         for x in X:
             p = ve.vec2d(x, y)
-            print i / 2,
+            print(i / 2, end='')
             e = elev(p, True, check_btg)
             i += 1
             e = elev(p, True)
@@ -371,7 +363,7 @@ def test_fgelev(cache, N):
     end = time.time()
     # for item in s:
     #    print item
-    print cache, N, "%d records/s" % (i / (end - start))
+    print(cache, N, "%d records/s" % (i / (end - start)))
     elev.save_cache()
 
 
@@ -421,34 +413,13 @@ def raster_glob(prevent_overwrite=False):
         sys.exit(1)
 
 
-def wait_for_fg(fg):
-    """Waits for FlightGear to signal, that the elevation processing has finished."""
-    for count in range(0, 1000):
-        semaphore = fg.get_prop("/osm2city/tiles")
-        semaphore = semaphore.split('=')[1]
-        m = re.search("([0-9.]+)", semaphore)
-        # We don't care if we get 0.0000 (String) or 0 (Int)
-        record = fg.get_prop("/osm2city/record")
-        record = record.split('=')[1]
-        m2 = re.search("([0-9.]+)", record)
-        if m is not None and float(m.groups()[0]) > 0:
-            try:
-                return True
-            except:
-                # perform an action#
-                pass
-        time.sleep(1)
-        if m2 is not None:
-            logging.debug("Waiting for Semaphore " + m2.groups()[0])
-    return False
-
-
 def _raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
     """Writes elev.in and elev.out using Telnet to a running FlightGear instance."""
     fg_home_path = setup.getFGHome()
     if fg_home_path is None:
         logging.error("Operating system unknown and therefore FGHome unknown.")
         sys.exit(1)
+    logging.info("Writing elev.in")
     f = open(setup.get_elev_in_path(fg_home_path), "w")
     f.write("# %g %g %g %g %g %g\n" % (x0, y0, size_x, size_y, step_x, step_y))
     for y in np.arange(y0, y0 + size_y, step_y):
@@ -458,6 +429,7 @@ def _raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5,
         f.write("\n")
     f.close()
 
+    logging.info("Connecting to FlightGear by means of telnet")
     fg = telnet.FG_Telnet("localhost", parameters.TELNET_PORT)
     center_lat = abs(parameters.BOUNDARY_NORTH - parameters.BOUNDARY_SOUTH) / 2 + parameters.BOUNDARY_SOUTH
     center_lon = abs(parameters.BOUNDARY_WEST - parameters.BOUNDARY_EAST) / 2 + parameters.BOUNDARY_WEST
@@ -468,7 +440,7 @@ def _raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5,
     logging.info("Running FG Command")
     fg.set_prop("/osm2city/tiles", 0)
     if fg.run_command("get-elevation"):
-        if not wait_for_fg(fg):
+        if not fg.wait_loop():
             logging.error("Process in FG timed out")
         else:
             logging.info("Success")
@@ -489,10 +461,11 @@ def _raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5,
 
     fg_elev_path = parameters.FG_ELEV
 
-    fgelev = subprocess.Popen(fg_elev_path + ' --expire 1000000 --fg-scenery ' + parameters.PATH_TO_SCENERY
-                              , shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    fgelev = subprocess.Popen(fg_elev_path + ' --expire 1000000 --fg-scenery ' + parameters.PATH_TO_SCENERY,
+                              shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                              bufsize=1, universal_newlines=True)
 
-    buf_in = Queue.Queue(maxsize=0)
+    buf_in = queue.Queue(maxsize=0)
     f = open(fname, 'w')
     f.write("# %g %g %g %g %g %g\n" % (x0, y0, size_x, size_y, step_x, step_y))
     i = 0
@@ -507,11 +480,6 @@ def _raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5,
             lon, lat = transform.toGlobal((x, y))
             buf_in.put("%i %g %g\n" % (i, lon, lat))
 
-# Doesn't work on Windows. Process will block if output buffer isn't read
-    if 0:
-        print "sending buffer"
-        for i in range(1000):
-            fgelev.stdin.write(buf_in.get())
     start = time.time()
 
     logging.info("reading")
@@ -526,9 +494,7 @@ def _raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5,
                 fgelev.stdin.write(line)
             tmp, elev = fgelev.stdout.readline().split()
             lon, lat = transform.toGlobal((x, y))
-            # f.write("%i " % i)
             f.write("%1.8f %1.8f %g %g %g\n" % (lon, lat, x, y, float(elev)))
-            # if i > 10000: return
         f.write("\n")
         logging.info("done %i %3.1f %%\r", i, i*100/n_total)
 
@@ -554,7 +520,7 @@ def write_map(filename, transform, elev, gmin, gmax):
     lmax = ve.vec2d(transform.toLocal((gmax.x, gmax.y)))
     map_z0 = 0.
     elev_offset = elev(ve.vec2d(0, 0))
-    print "offset", elev_offset
+    print("offset", elev_offset)
 
     nx, ny = ((lmax - lmin) / 100.).int().list()  # 100m raster
 
@@ -731,8 +697,8 @@ class Stats(object):
             roof_line += """\n          %s\t%i""" % (roof_type, self.roof_types[roof_type])
         out.write(textwrap.dedent(roof_line))
 
-        textures_used = {k: v for k, v in self.textures_total.iteritems() if v > 0}
-        textures_notused = {k: v for k, v in self.textures_total.iteritems() if v == 0}
+        textures_used = {k: v for k, v in self.textures_total.items() if v > 0}
+        textures_notused = {k: v for k, v in self.textures_total.items() if v == 0}
         try:
             textures_used_percent = len(textures_used) * 100. / len(self.textures_total)
         except:
@@ -742,12 +708,12 @@ class Stats(object):
             used tex        %i out of %i (%2.0f %%)""" % (len(textures_used), len(self.textures_total), textures_used_percent)))
         out.write(textwrap.dedent("""
             Used Textures : """))    
-        for item in sorted(textures_used.items(), key=lambda item: item[1], reverse=True):            
+        for item in sorted(list(textures_used.items()), key=lambda item: item[1], reverse=True):            
             out.write(textwrap.dedent("""
                  %i %s""" % (item[1], item[0])))
         out.write(textwrap.dedent("""
             Unused Textures : """))    
-        for item in sorted(textures_notused.items(), key=lambda item: item[1], reverse=True):            
+        for item in sorted(list(textures_notused.items()), key=lambda item: item[1], reverse=True):            
             out.write(textwrap.dedent("""
                  %i %s""" % (item[1], item[0])))
         out.write(textwrap.dedent("""
@@ -769,7 +735,7 @@ class Stats(object):
                    self.LOD[2], lodtwo)))
         out.write("\narea >=\n")
         max_area_above = max(1, self.area_above.max())
-        for i in xrange(len(self.area_levels)):
+        for i in range(len(self.area_levels)):
             out.write(" %5g m^2  %5i |%s\n" % (self.area_levels[i], self.area_above[i],
                       "#" * int(56. * self.area_above[i] / max_area_above)))
 
@@ -779,7 +745,7 @@ class Stats(object):
 
         out.write("\nnumber of corners >=\n")
         max_corners = max(1, self.corners.max())
-        for i in xrange(3, len(self.corners)):
+        for i in range(3, len(self.corners)):
             out.write("     %2i %6i |%s\n" % (i, self.corners[i],
                       "#" * int(56. * self.corners[i] / max_corners)))
         out.write(" complex %5i |%s\n" % (self.corners[0],
@@ -807,11 +773,11 @@ def install_files(file_list, dst, from_osm2city_root=False):
             return
         try:
             shutil.copy2(my_file, the_dst)
-        except OSError, reason:
+        except OSError as reason:
             if reason.errno not in [17]:
-                logging.warn("Error while installing %s: %s" % (the_file, reason))
+                logging.warning("Error while installing %s: %s" % (the_file, reason))
         except (AttributeError, shutil.Error) as e:
-            logging.warn("Error while installing %s: %s" % (the_file, repr(e)))
+            logging.warning("Error while installing %s: %s" % (the_file, repr(e)))
 
 
 def get_interpolator(**kwargs):
@@ -830,9 +796,9 @@ def progress(i, max_i):
                 return
         except ZeroDivisionError:
             pass
-        print "%i %i %5.1f%%     \r" % (i+1, max_i, (float(i+1)/max_i) * 100),
+        print("%i %i %5.1f%%     \r" % (i+1, max_i, (float(i+1)/max_i) * 100), end='')
         if i > max_i - 2:
-            print
+            print()
 
 
 if __name__ == "__main__":

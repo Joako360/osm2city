@@ -1,6 +1,3 @@
-#!/usr/bin/env python2
-#
-#
 """Atlas of textures, where a couple of textures are put into one file including thier attributes"""
 
 import PIL.Image as Image
@@ -59,8 +56,8 @@ class Atlas(Region):
                 self._textures.append(the_texture)
                 logging.debug("  packed at %i %i" % (the_texture.ax, the_texture.ay))
                 logging.debug("now have %i regions" % len(self.regions))
-                for the_region in self.regions:
-                    logging.debug("  - " + str(the_region))
+                for a_region in self.regions:
+                    logging.debug("  - " + str(a_region))
                 return True
         return False
 

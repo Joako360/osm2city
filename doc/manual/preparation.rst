@@ -384,7 +384,7 @@ Change the work directory to e.g. ``fg_customscenery/projects`` and then run too
     $ ls LSZS
     lszs_narrow.osm  params.ini
     
-    $ /usr/bin/python2.7 /home/pingu/development/osm2city/tools.py -f LSZS/params.ini
+    $ /usr/bin/python3 /home/pingu/development/osm2city/tools.py -f LSZS/params.ini
     ...
     
     $ ls LSZS
@@ -405,7 +405,7 @@ Change the work directory to e.g. ``fg_customscenery/projects`` and then run set
 
     $ cd fg_customscenery/projects
     
-    $ /usr/bin/python2.7 /home/pingu/development/osm2city/setup.py --fg_root=/home/pingu/bin/fgfs_git/next/install/flightgear/fgdata
+    $ /usr/bin/python3 /home/pingu/development/osm2city/setup.py --fg_root=/home/pingu/bin/fgfs_git/next/install/flightgear/fgdata
     ...
 
 The command-line option ``--fg_root`` is essential and points to `$FG_ROOT`_ (see also :ref:`Setting environment variable $FG_ROOT <chapter-set-fgroot-label>`).
@@ -474,7 +474,7 @@ Change the work directory to e.g. ``fg_customscenery/projects`` and then run too
     $ ls LSZS
     lszs_narrow.osm  params.ini
     
-    $ /usr/bin/python2.7 /home/pingu/development/osm2city/tools.py -f LSZS/params.ini
+    $ /usr/bin/python3 /home/pingu/development/osm2city/tools.py -f LSZS/params.ini
     ...
     
     $ ls LSZS

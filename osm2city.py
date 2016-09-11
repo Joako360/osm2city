@@ -1,4 +1,3 @@
-#!/usr/bin/env python2.7 
 # -*- coding: utf-8 -*-
 """
 osm2city.py aims at generating 3D city models for FG, using OSM data.
@@ -56,10 +55,9 @@ You should disable random buildings.
 # - comments: code # -- comment
 
 import argparse
-import cPickle
+import pickle
 import logging
 import os
-import re
 import random
 import sys
 import textwrap
@@ -75,7 +73,8 @@ import coordinates
 import osmparser
 import parameters
 import stg_io2
-import textures as tex
+import textures.manager as tex_manager
+from textures.manager import TextureManager, FacadeManager  # this is needed to make pickle know the context
 import tools
 import troubleshoot
 import vec2d as v
@@ -99,9 +98,8 @@ class Building(object):
         self.osm_id = osm_id
         self.tags = tags
         self.refs = refs
-        #self.outer_ring = outer_ring # (outer) local linear ring
         self.inner_rings_list = inner_rings_list
-        self.name = name.encode('ascii', 'ignore')     # stg: name
+        self.name = name
         self.stg_typ = stg_typ  # stg: OBJECT_SHARED or _STATIC
         self.stg_hdg = stg_hdg
         self.height = height
@@ -110,7 +108,6 @@ class Building(object):
         self.longest_edge_len = 0.
         self.levels = levels
         self.first_node = 0  # index of first node in final OBJECT node list
-        #self._nnodes_ground = 0 # number of nodes on ground
         self.anchor = v.vec2d(list(outer_ring.coords[0]))
         self.facade_texture = None
         self.roof_texture = None
@@ -143,7 +140,7 @@ class Building(object):
         """
         new_inner_rings_list = []
         self.outer_nodes_closest = []
-        outer_nodes_avail = range(self.nnodes_outer)
+        outer_nodes_avail = list(range(self.nnodes_outer))
         for inner in self.polygon.interiors:
             min_r = 1e99
             for i, node_i in enumerate(list(inner.coords)[:-1]):
@@ -164,8 +161,8 @@ class Building(object):
 #        print "---\n\n"
         # -- sort inner rings by index of closest outer node
         yx = sorted(zip(self.outer_nodes_closest, new_inner_rings_list))
-        self.inner_rings_list = [x for (y,x) in yx]
-        self.outer_nodes_closest = [y for (y,x) in yx]
+        self.inner_rings_list = [x for (y, x) in yx]
+        self.outer_nodes_closest = [y for (y, x) in yx]
         self.set_polygon(self.polygon.exterior, self.inner_rings_list)
 #        for o in self.outer_nodes_closest:
 #            assert(o < len(outer_ring.coords) - 1)
@@ -235,12 +232,6 @@ class Building(object):
     def area(self):
         return self.polygon.area
 
-#    def translate(self, offset)
-#        shapely.affinity.translate(geom, xoff=0.0, yoff=0.0, zoff=0.0)
-
-        #print "tr X", self.X
-
-
 class Buildings(object):
     """Holds buildings list. Interfaces with OSM handler"""
     valid_node_keys = []
@@ -266,7 +257,6 @@ class Buildings(object):
         handler.register_uncategorized_way_callback(self.store_uncategorzied_way)
         handler.register_relation_callback(self.process_relation, self.req_relation_keys)
 
-#            valid_relation_keys, req_relation_keys)
     def _refs_to_ring(self, refs, inner=False):
         """accept a list of OSM refs, return a linear ring. Also
            fixes face orientation, depending on inner/outer.
@@ -276,8 +266,6 @@ class Buildings(object):
                 c = self.nodes_dict[ref]
                 coords.append(tools.transform.toLocal((c.lon, c.lat)))
 
-        #print "before inner", refs
-#        print "cord", coords
         ring = shgm.polygon.LinearRing(coords)
         # -- outer -> CCW, inner -> not CCW
         if ring.is_ccw == inner:
@@ -285,7 +273,7 @@ class Buildings(object):
         return ring
 
     def make_way_buildings(self):
-        #Converts all the ways into buildings
+        """Converts all the ways into buildings"""
         def tag_matches(tags, req_tags):
             for tag in tags:
                 if tag in req_tags:
@@ -297,7 +285,7 @@ class Buildings(object):
                 self._make_building_from_way(way.osm_id, way.tags, way.refs)
 
     def _make_building_from_way(self, osm_id, tags, refs, inner_ways=[]):
-        #Creates a building object from a way
+        """Creates a building object from a way"""
         if refs[0] == refs[-1]:
             refs = refs[0:-1]  # -- kick last ref if it coincides with first
 
@@ -305,7 +293,6 @@ class Buildings(object):
         height = 0.
         levels = 0
         layer = 99
-        _building_type = 'unknown'
 
         # -- funny things might happen while parsing OSM
         try:
@@ -318,7 +305,6 @@ class Buildings(object):
             #        pass
             if 'name' in tags:
                 name = tags['name']
-                #print "%s" % _name
                 if name in parameters.SKIP_LIST:
                     logging.info("SKIPPING " + name)
                     return False
@@ -337,17 +323,18 @@ class Buildings(object):
             else:
                 _roof_type = parameters.BUILDING_UNKNOWN_ROOF_TYPE
 
-            _roof_height=0
+            _roof_height = 0
             if 'roof:height' in tags:
-                try :
+                try:
                     _roof_height = float(tags['roof:height'])
-                except :
+                except:
                     _roof_height = 0
 
             _building_type = building_lib.mapType(tags)
 
             # -- simple (silly?) heuristics to 'respect' layers
-            if layer == 0: return False
+            if layer == 0:
+                return False
             if layer < 99 and height == 0 and levels == 0:
                 levels = layer + 2
 
@@ -360,19 +347,16 @@ class Buildings(object):
             inner_rings_list = []
             for _way in inner_ways:
                 inner_rings_list.append(self._refs_to_ring(_way.refs, inner=True))
-        except KeyError, reason:
+        except KeyError as reason:
             logging.error("Failed to parse building referenced node missing clipped?(%s) WayID %d %s Refs %s" % (reason, osm_id, tags, refs))
             tools.stats.parse_errors += 1
             return False
-        except Exception, reason:
+        except Exception as reason:
             logging.error("Failed to parse building (%s)  WayID %d %s Refs %s" % (reason, osm_id, tags, refs))
             tools.stats.parse_errors += 1
             return False
 
         building = Building(osm_id, tags, outer_ring, name, height, levels, inner_rings_list=inner_rings_list, building_type=_building_type, roof_type=_roof_type, roof_height=_roof_height, refs=refs)
-#        if building.osm_id == 3825399:
-#            print building
-#
         self.buildings.append(building)
 
         tools.stats.objects += 1
@@ -411,10 +395,7 @@ class Buildings(object):
             outer_ways = []
             inner_ways = []
             outer_multipolygons = []
-#            print "rel: ", relation.osm_id, relation.tags #, members
             for m in relation.members:
-#                print "  member", m, m.type_, m.role
-#                    if typ == 'way' and role == 'inner':
                 if m.type_ == 'way':
                     if m.role == 'outer':
                         for way in self.way_list:
@@ -439,8 +420,8 @@ class Buildings(object):
             if outer_multipolygons:
                 all_tags = relation.tags
                 for way in outer_multipolygons:
-                    logging.info("Multipolygon " + str(way.osm_id))
-                    all_tags = dict(way.tags.items() + all_tags.items())
+                    logging.debug("Multipolygon " + str(way.osm_id))
+                    all_tags = dict(list(way.tags.items()) + list(all_tags.items()))
                     res=False
                     try:
                         if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
@@ -457,10 +438,9 @@ class Buildings(object):
                                                                    way.refs)
 
             if outer_ways:
-                #print "len outer ways", len(outer_ways)
                 #all_outer_refs = [ref for way in outer_ways for ref in way.refs]
                 # build all_outer_refs
-                list_outer_refs = [ way.refs for way in outer_ways[1:] ]
+                list_outer_refs = [way.refs for way in outer_ways[1:]]
                 # get some order :
                 all_outer_refs = []
                 all_outer_refs.extend( outer_ways[0].refs )
@@ -480,20 +460,20 @@ class Buildings(object):
                 all_tags = relation.tags
                 for way in outer_ways:
                     #print "TAG", way.tags
-                    all_tags = dict(way.tags.items() + all_tags.items())
+                    all_tags = dict(list(way.tags.items()) + list(all_tags.items()))
                 #print "all tags", all_tags
                 #all_tags = dict([way.tags for way in outer_ways]) # + tags.items())
                 #print "all outer refs", all_outer_refs
                 #dict(outer.tags.items() + tags.items())
                 if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
-                    print "FIXME: ignoring all but first inner way (%i total) of ID %i" % (len(inner_ways), relation.osm_id)
+                    print("FIXME: ignoring all but first inner way (%i total) of ID %i" % (len(inner_ways), relation.osm_id))
                     res = self._make_building_from_way(relation.osm_id,
-                                                all_tags,
-                                                all_outer_refs, [inner_ways[0]])
+                                                       all_tags,
+                                                       all_outer_refs, [inner_ways[0]])
                 else:
                     res = self._make_building_from_way(relation.osm_id,
-                                                all_tags,
-                                                all_outer_refs, inner_ways)
+                                                       all_tags,
+                                                       all_outer_refs, inner_ways)
 #                print ":::::mk_build returns", res,
 #                if bla:
 #                    print relation.tags['name']
@@ -506,14 +486,13 @@ class Buildings(object):
                     if _way in self.way_list:
                         logging.info("removing ways" + str(_way.osm_id))
                         # keep way if not closed, might be used elsewhere
-                        if _way.refs[0] == _way.refs[-1] :
+                        if _way.refs[0] == _way.refs[-1]:
                             self.way_list.remove(_way)
                     else:
-                        logging.error("Outer way (%d) not in list of ways. Building type missing?"%_way.osm_id)
+                        logging.error("Outer way (%d) not in list of ways. Building type missing?" % _way.osm_id)
 
     def _get_min_max_coords(self):
-        for node in self.nodes_dict.values():
-            #logging.debug('%s %.4f %.4f', _node.osm_id, _node.lon, _node.lat)
+        for node in list(self.nodes_dict.values()):
             if node.lon > self.maxlon:
                 self.maxlon = node.lon
             if node.lon < self.minlon:
@@ -572,7 +551,7 @@ def write_xml(path, fname, buildings):
                     <pitch-deg> 0.00</pitch-deg>
                     <heading-deg>0.0 </heading-deg>
                   </offsets>
-                </model>""" % (-yo, xo, zo) ))  # -- I just don't get those coordinate systems.
+                </model>""" % (-yo, xo, zo)))  # -- I just don't get those coordinate systems.
 
         if b.LOD is not None:
             if b.LOD == Building.LOD_BARE:
@@ -631,16 +610,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="osm2city reads OSM data and creates buildings for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
-    parser.add_argument("-e", dest="e", action="store_true"
-                        , help="skip elevation interpolation", required=False)
-    parser.add_argument("-c", dest="c", action="store_true"
-                        , help="do not check for overlapping with static objects", required=False)
-    parser.add_argument("-a", "--create-atlas", action="store_true"
-                        , help="create texture atlas", required=False)
-    parser.add_argument("-u", dest="uninstall", action="store_true"
-                        , help="uninstall ours from .stg", required=False)
-    parser.add_argument("-l", "--loglevel"
-                        , help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL", required=False)
+    parser.add_argument("-e", dest="e", action="store_true",
+                        help="skip elevation interpolation", required=False)
+    parser.add_argument("-c", dest="c", action="store_true",
+                        help="do not check for overlapping with static objects", required=False)
+    parser.add_argument("-a", "--create-atlas", action="store_true",
+                        help="create texture atlas", required=False)
+    parser.add_argument("-u", dest="uninstall", action="store_true",
+                        help="uninstall ours from .stg", required=False)
+    parser.add_argument("-l", "--loglevel",
+                        help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL", required=False)
     args = parser.parse_args()
 
     # -- command line args override paramters
@@ -662,7 +641,6 @@ if __name__ == "__main__":
 
     parameters.show()
 
-
     # -- initialize modules
 
     # -- prepare transformation to local coordinates
@@ -671,16 +649,12 @@ if __name__ == "__main__":
 
     tools.init(coordinates.Transformation(center, hdg=0))
 
-    tex.manager.init(tools.get_osm2city_directory(), args.create_atlas)
+    tex_manager.init(tools.get_osm2city_directory(), args.create_atlas)
 
     logging.info("reading elevation data")
     elev = tools.get_interpolator(fake=parameters.NO_ELEV)
-    #elev.write("elev.out.small", 4)
-    #sys.exit(0)
     logging.debug("height at origin" + str(elev(v.vec2d(0, 0))))
     logging.debug("origin at " + str(tools.transform.toGlobal((0, 0))))
-
-    #tools.write_map('dresden.png', transform, elev, vec2d(minlon, minlat), vec2d(maxlon, maxlat))
 
     # -- now read OSM data. Either parse OSM xml, or read a previously cached .pkl file
     #    End result is 'buildings', a list of building objects
@@ -688,14 +662,14 @@ if __name__ == "__main__":
     osm_fname = parameters.PREFIX + os.sep + parameters.OSM_FILE
 
     if parameters.USE_PKL and not os.path.exists(pkl_fname):
-        logging.warn("pkl file %s not found, will parse OSM file %s instead." % (pkl_fname, osm_fname))
+        logging.warning("pkl file %s not found, will parse OSM file %s instead." % (pkl_fname, osm_fname))
         parameters.USE_PKL = False
 
     if not parameters.USE_PKL:
         # -- parse OSM, return
         if not parameters.IGNORE_PKL_OVERWRITE and os.path.exists(pkl_fname):
-            print "Existing cache file %s will be overwritten. Continue? (y/n)" % pkl_fname
-            if raw_input().lower() != 'y':
+            print("Existing cache file %s will be overwritten. Continue? (y/n)" % pkl_fname)
+            if input().lower() != 'y':
                 sys.exit(-1)
 
         if parameters.BOUNDARY_CLIPPING:
@@ -705,44 +679,37 @@ if __name__ == "__main__":
         handler = osmparser.OSMContentHandler(valid_node_keys=[], border=border)
         buildings = Buildings()
         buildings.register_callbacks_with(handler)
-        source = open(osm_fname)
+        source = open(osm_fname, encoding="utf8")
         logging.info("Reading the OSM file might take some time ...")
         handler.parse(source)
 
-        #tools.stats.print_summary()
+        # tools.stats.print_summary()
         buildings.make_way_buildings()
         buildings._get_min_max_coords()
         cmin = v.vec2d(buildings.minlon, buildings.minlat)
         cmax = v.vec2d(buildings.maxlon, buildings.maxlat)
         logging.info("min/max " + str(cmin) + " " + str(cmax))
         
-        #
         # Search parents
-        #
         if parameters.BUILDING_REMOVE_WITH_PARTS:  # and 'building' not in building.tags :
-            #
             # Build neighbours
-            #
             def add_candidates(building, b_cands=[], used_refs=[], flag_init=True, recurs=0):
-                ''' Build list of parent candidates for building, return parent if one of the candidates already parsed'''
+                """Build list of parent candidates for building, return parent if one of the candidates already parsed"""
                 
-                if recurs > 20 :
+                if recurs > 20:
                     return False
+
+                if flag_init is True:
+                    used_refs = []
+                    b_cands = []
                 
-                #if recurs > 10 :
-                #    return False
-                
-                if flag_init == True :
-                    used_refs=[]
-                    b_cands=[]
-                
-                if building not in b_cands :
+                if building not in b_cands:
                     b_cands.append(building)
                     
                 process_refs = []
                 process_refs.extend(building.refs)
                 for ref in used_refs:
-                    try :
+                    try:
                         process_refs.remove(ref)
                     except:
                         pass
@@ -758,7 +725,7 @@ if __name__ == "__main__":
                     #if ref not in buildings.node_way_dict :
                     #     buildings.node_way_dict=[]
                         
-                    tmp_b_cands = list(set([ b_cand for b_cand in buildings.node_way_dict[ref] if ((b_cand not in b_cands) and (b_cand.osm_id != building.osm_id))]))
+                    tmp_b_cands = list({ b_cand for b_cand in buildings.node_way_dict[ref] if ((b_cand not in b_cands) and (b_cand.osm_id != building.osm_id))})
                     b_cands.extend(tmp_b_cands)
                     
                     if ref not in used_refs:
@@ -791,7 +758,7 @@ if __name__ == "__main__":
                     cand_valid = False
                     
                     if flag_search == 'equal':
-                        if  cand_building.polygon.intersection(building.polygon).equals(building.polygon):
+                        if cand_building.polygon.intersection(building.polygon).equals(building.polygon):
                             cand_valid = True
                     if flag_search == 'intersects':
                         #
@@ -831,57 +798,43 @@ if __name__ == "__main__":
                                         buildings.remove_buildings_parts.append(building)
                                         logging.info(" removed 'invisible' building:part " + str(building.osm_id))
                                         return
-                                    #    #break
                                     else:
-                                    # store parent that is itset a building:part
+                                        # store parent that is itset a building:part
                                         logging.verbose("    found possible " + str(cand_building.osm_id))
                                         building.parents_parts.append(cand_building)
                                         #building.parent_part.cand_building 
                                         return
                             except KeyError:
                                 pass
-                            #except :
-                            #    print("Unknown error processing cand_building building:part", cand_building.osm_id, "for ", building.osm_id)
-                            #    e = sys.exc_info()[0]
-                            #    print( "Error: %s" % e )
-                            #    pass
-                                
+
                             try:
                                 if cand_building.tags['building'] != 'no':
                                     #
                                     # found building parent
                                     #
-                                    #print("    found", cand_building.osm_id)
-                                    #buildings.buildings.remove(cand_building)
                                     if cand_building not in buildings.remove_buildings:
                                         buildings.remove_buildings.append(cand_building)
                                         logging.info('Found Building for removing %d' % cand_building.osm_id)
 
                                     if cand_building not in buildings.buildings_with_parts:
                                         buildings.buildings_with_parts.append(cand_building)   
-                                        #buildings.buildings_with_parts=list(set(self.buildings_with_parts))
                                         logging.info('Found Building for removing %d' % cand_building.osm_id)
 
                                     building.parent = cand_building
                                     return
                             except KeyError:
                                 pass
-                            #except :
-                            #    print("Unknown error processing cand_building building", cand_building.osm_id, "for ", building.osm_id)
-                            #    e = sys.exc_info()[0]
-                            #    print( "Error: %s" % e )
-                            #    pass
-                                
+
                         else:
                             logging.verbose(" cand %i not in cand_buildings nor buildings_with_parts" % cand_building.osm_id)
                             
                     else:
                         logging.verbose("   cand %i doesn't contains  %i" % (cand_building.osm_id,  building.osm_id))
                                 
-                except shgs.TopologicalError, reason:
-                    logging.warn("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d " % (reason, building.osm_id, cand_building.osm_id))
-                except shgs.PredicateError, reason:
-                    logging.warn("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d " % (reason, building.osm_id, cand_building.osm_id))
+                except shgs.TopologicalError as reason:
+                    logging.warning("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d " % (reason, building.osm_id, cand_building.osm_id))
+                except shgs.PredicateError as reason:
+                    logging.warning("Error while checking for intersection %s. This might lead to double buildings ID1 : %d ID2 : %d " % (reason, building.osm_id, cand_building.osm_id))
     
                 return False
                
@@ -920,7 +873,7 @@ if __name__ == "__main__":
                     pass
                     
                 # Search and set parent for building:part
-                cand_buildings = list(set([b_cand for ref in building.refs for b_cand in buildings.node_way_dict[ref] if ((b_cand.osm_id != building.osm_id ))]))
+                cand_buildings = list({b_cand for ref in building.refs for b_cand in buildings.node_way_dict[ref] if ((b_cand.osm_id != building.osm_id ))})
                 for b_cand in cand_buildings:
                     logging.verbose("      trying %i"%b_cand.osm_id )
                     check_and_set_parent(building, b_cand)
@@ -1185,18 +1138,18 @@ if __name__ == "__main__":
         # -- cache parsed data. To prevent accidentally overwriting,
         #    write to local dir, while we later read from $PREFIX/buildings.pkl
         fpickle = open(pkl_fname, 'wb')
-        cPickle.dump(buildings, fpickle, -1)
+        pickle.dump(buildings, fpickle, -1)
         fpickle.close()
     else:
         # -- load list of building objects from previously cached file
         logging.info("Loading %s", pkl_fname)
         fpickle = open(pkl_fname, 'rb')
-        buildings = cPickle.load(fpickle)[:parameters.MAX_OBJECTS]
+        buildings = pickle.load(fpickle)[:parameters.MAX_OBJECTS]
         fpickle.close()
 
 #        newbuildings = []
 
-        logging.info("unpickled %g buildings ", len(buildings))
+        logging.info("Unpickled %g buildings ", len(buildings))
         tools.stats.objects = len(buildings)
 
     # -- debug filter
@@ -1238,7 +1191,7 @@ if __name__ == "__main__":
     #   - TODO: analyze surrounding: similar shaped buildings nearby? will get same texture
     #   - set building type, roof type etc
     buildings = building_lib.analyse(buildings, static_objects, tools.transform, elev,
-                                     tex.manager.facades, tex.manager.roofs)
+                                     tex_manager.facades, tex_manager.roofs)
 
     # -- initialize STG_Manager
     path_to_output = parameters.get_output_path()
@@ -1265,7 +1218,8 @@ if __name__ == "__main__":
 
     for ic, cl in enumerate(clusters):
         nb = len(cl.objects)
-        if nb < parameters.CLUSTER_MIN_OBJECTS: continue # skip almost empty clusters
+        if nb < parameters.CLUSTER_MIN_OBJECTS:
+            continue  # skip almost empty clusters
 
         # -- get cluster center
         offset = cl.center
@@ -1273,13 +1227,14 @@ if __name__ == "__main__":
         # -- count roofs == separate objects
         nroofs = 0
         for b in cl.objects:
-            if b.roof_complex: nroofs += 2  # we have 2 different LOD models for each roof
+            if b.roof_complex:
+                nroofs += 2  # we have 2 different LOD models for each roof
 
         tile_elev = elev(cl.center)
         center_global = v.vec2d(tools.transform.toGlobal(cl.center))
         if tile_elev == -9999:
             logging.warning("Skipping tile elev = -9999 at lat %.3f and lon %.3f", center_global.lat, center_global.lon)
-            continue # skip tile with improper elev
+            continue  # skip tile with improper elev
 
         #LOD_lists = []
         #LOD_lists.append([])  # bare

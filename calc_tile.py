@@ -1,4 +1,3 @@
-#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
 shamelessly translated from calc-tile.pl
@@ -44,15 +43,17 @@ def format_lat(lat):
         return "n%02d" % int(lat)
 
 
-def root_directory_name((lon, lat)):
+def root_directory_name(xxx_todo_changeme):
     """Generate the directory name for a location."""
+    (lon, lat) = xxx_todo_changeme
     lon_chunk = floor(lon/10.0) * 10
     lat_chunk = floor(lat/10.0) * 10
     return format_lon(lon_chunk) + format_lat(lat_chunk) + os.sep 
 
 
-def directory_name((lon, lat)):
+def directory_name(xxx_todo_changeme1):
     """Generate the directory name for a location."""
+    (lon, lat) = xxx_todo_changeme1
     lon_floor = floor(lon)
     lat_floor = floor(lat)
     lon_chunk = floor(lon/10.0) * 10
@@ -61,7 +62,8 @@ def directory_name((lon, lat)):
          + format_lon(lon_floor) + format_lat(lat_floor)
 
 
-def tile_index((lon, lat), x=0, y=0):
+def tile_index(xxx_todo_changeme2, x=0, y=0):
+    (lon, lat) = xxx_todo_changeme2
     if x == 0 and y == 0:
         y = calc_y(lat)
         x = calc_x(lon, lat)
@@ -153,5 +155,5 @@ if __name__ == "__main__":
                           (13.775, 51.9638889, 3171195),
                           (0.258094, 29.226081, 2956745),
                           (-2.216667, 30.008333, 2907651)):
-        print tile_index([lon, lat]) - idx
-        print directory_name([lon, lat])
+        print(tile_index([lon, lat]) - idx)
+        print(directory_name([lon, lat]))

@@ -1,26 +1,25 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import string
 import matplotlib.pyplot as plt
 import logging
-from pdb import pm
 import numpy as np
 
-from pyparsing import Literal, Word, quotedString, alphas, Optional, OneOrMore, \
-    Group, ParseException, nums, Combine, Regex, alphanums, LineEnd, Each,\
-    ParserElement, ZeroOrMore
+from pyparsing import Literal, Word, alphas, Optional, OneOrMore, \
+    Group, nums, Regex, alphanums, LineEnd, Each,\
+    ZeroOrMore
 
-#fmt_node = '%1.6f'
 fmt_node = '%g'
 fmt_surf = '%1.4g'
+
 
 class Node(object):
     def __init__(self, x, y, z):
         self.x = x
         self.y = y
         self.z = z
+
     def __str__(self):
         return (fmt_node + ' ' + fmt_node + ' ' + fmt_node + '\n') % (self.x, self.y, self.z)
+
 
 class Face(object):
     """if our texture is rotated in texture_atlas, set swap_uv=True"""
@@ -38,7 +37,7 @@ class Face(object):
         s = "SURF %s\n" % self.typ
         s += "mat %i\n" % self.mat
         s += "refs %i\n" % len(self.nodes_uv_list)
-        s += string.join([("%i " + fmt_surf + " " + fmt_surf + "\n") % (n[0], n[1], n[2]) for n in self.nodes_uv_list], '')
+        s += "".join([("%i " + fmt_surf + " " + fmt_surf + "\n") % (n[0], n[1], n[2]) for n in self.nodes_uv_list])
         return s
 
 
@@ -112,26 +111,26 @@ backface.  bit1 = shaded surface bit2 = twosided.
 
     def __str__(self):
         s = 'OBJECT poly\n'
-        if self.name != None:
+        if self.name is not None:
             s += 'name "%s"\n' % self.name
-        if self.texrep != None:
+        if self.texrep is not None:
             s += 'texrep %g %g\n' % (self.texrep[0], self.texrep[1])
-        if self.texoff != None:
+        if self.texoff is not None:
             s += 'texoff %g %g\n' % (self.texoff[0], self.texoff[1])
-        if self.rot != None:
-            s += 'rot %s\n' % string.join(["%g" % item for item in self.rot])
-        if self.loc != None:
-            s += 'loc %g %g %g\n' %  (self.loc[0], self.loc[1], self.loc[2])
-        if self.crease != None:
+        if self.rot is not None:
+            s += 'rot %s\n' % "".join(["%g" % item for item in self.rot])
+        if self.loc is not None:
+            s += 'loc %g %g %g\n' % (self.loc[0], self.loc[1], self.loc[2])
+        if self.crease is not None:
             s += 'crease %g\n' % self.crease
-        if self.url != None:
+        if self.url is not None:
             s += 'url %s\n' % self.url
         if self.texture:
-            s += 'texture "%s"\n' %self.texture
+            s += 'texture "%s"\n' % self.texture
         s += 'numvert %i\n' % len(self._nodes)
-        s += string.join([str(n) for n in self._nodes], '')
+        s += "".join([str(n) for n in self._nodes])
         s += 'numsurf %i\n' % len(self._faces)
-        s += string.join([str(f) for f in self._faces], '')
+        s += "".join([str(f) for f in self._faces])
         s += 'kids %i\n' % self.kids
         return s
 
@@ -151,6 +150,7 @@ backface.  bit1 = shaded surface bit2 = twosided.
                 x = 0.5*(X[i] + X[i+1])
                 y = 0.5*(Y[i] + Y[i+1])
                 plt.text(x+Z[i], y+Z[i], "%i" % i)
+
 
 class Label(Object):
     def __init__(self):
@@ -177,11 +177,12 @@ class Label(Object):
                 self.node(x, y, z+w)
                 self.node(x+h, y, z+w)
                 self.node(x+h, y, z)
-                self.face([(o,  u0,v0),
-                           (o+1,u1,v0),
-                           (o+2,u1,v1),
-                           (o+3,u0,v1)])
+                self.face([(o,  u0, v0),
+                           (o+1, u1, v0),
+                           (o+2, u1, v1),
+                           (o+3, u0, v1)])
                 z += w
+
 
 class File(object):
     """
@@ -193,7 +194,7 @@ class File(object):
     a common source of bugs. Can also add 3d labels (useful for debugging, disabled
     by default)
     """
-    def __init__(self, file_name = None, stats=None, show_labels = False):
+    def __init__(self, file_name=None, stats=None, show_labels=False):
         """Read ac3d data from file_name if given. Otherwise create empty ac3d object"""
         self.objects = []
         self.materials_list = []
@@ -201,7 +202,7 @@ class File(object):
         self.stats = stats
         self._current_object = None
         self.label_object = None
-        if file_name != None:
+        if file_name is not None:
             self.read(file_name)
 
     def new_object(self, name, texture, **kwargs):
@@ -213,7 +214,8 @@ class File(object):
     def add_label(self, text, x, y, z, orientation=0, scale=1.):
         if not self.label_object:
             self.label_object = Label()
-            if self.show_labels: self.objects.append(self.label_object)
+            if self.show_labels:
+                self.objects.append(self.label_object)
         self.label_object.add(text, x, y, z, orientation, scale)
         return self.label_object
 
@@ -259,9 +261,10 @@ class File(object):
 
     def nodes_as_array(self):
         """return all nodes as a numpy array"""
-        the_nodes = np.zeros((0,3))
+        the_nodes = np.zeros((0, 3))
         for o in self.objects:
-            if o.is_empty(): continue
+            if o.is_empty():
+                continue
             a = o.nodes_as_array()
             the_nodes = np.vstack((the_nodes, a))
         return the_nodes
@@ -269,14 +272,14 @@ class File(object):
     def __str__(self):
         s = 'AC3Db\n'
         if self.materials_list:
-            s += string.join(['MATERIAL %s\n' % the_mat for the_mat in self.materials_list], '')
+            s += "".join(['MATERIAL %s\n' % the_mat for the_mat in self.materials_list])
         else:
             s += 'MATERIAL "" rgb 1 1 1 amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0\n'
 #        s += 'MATERIAL "" rgb 1 1 1 amb 0.5 0.5 0.5 emis 1 1 1 spec 0.5 0.5 0.5 shi 64 trans 0\n'
         non_empty = [o for o in self.objects if not o.is_empty()]
         # FIXME: this doesnt handle nested kids properly
         s += 'OBJECT world\nkids %i\n' % len(non_empty)
-        s += string.join([str(o) for o in non_empty], '')
+        s += "".join([str(o) for o in non_empty])
         return s
 
     def write(self, file_name):
@@ -299,7 +302,6 @@ class File(object):
         def convertLObj(tokens):
             self.new_object(None, None)
             self._current_object._type = tokens[1]
-
 
         def convertLKids(tokens):
             self._current_object.kids = int(tokens[1])
@@ -383,11 +385,11 @@ class File(object):
 
         pObjectWorld = Group(lObject + Optional(lName) + lKids)
         pSurf = (lSurf + Optional(lMat) + lRefs + Group(OneOrMore(lNodes))).setParseAction( convertSurf )
-        pObjectHeader = Group(lObject + Each([Optional(lName), Optional(lData), Optional(lTexture), Optional(lTexrep), \
-            Optional(lTexoff), Optional(lRot), Optional(lLoc), Optional(lUrl), Optional(lCrease)]))
-        pObject = Group(pObjectHeader + Optional(lNumvert + Group(ZeroOrMore(lVertex)) \
-                   + Optional(lNumsurf + Group(ZeroOrMore(pSurf)))) \
-          + lKids)#.setParseAction( convertObject )
+        pObjectHeader = Group(lObject + Each([Optional(lName), Optional(lData), Optional(lTexture), Optional(lTexrep),
+                              Optional(lTexoff), Optional(lRot), Optional(lLoc), Optional(lUrl), Optional(lCrease)]))
+        pObject = Group(pObjectHeader + Optional(lNumvert + Group(ZeroOrMore(lVertex))
+                        + Optional(lNumsurf + Group(ZeroOrMore(pSurf))))
+                        + lKids)  # .setParseAction( convertObject )
 #         pObject.setDebug(True)
 #         pObject.debug = True
 #         ParserElement.verbose_stacktrace = True
@@ -397,7 +399,7 @@ class File(object):
 
         try:
             self.p = pFile.parseFile(file_name)
-        except IOError, e:
+        except IOError as e:
             logging.warning(e)
 
         # todo:
@@ -414,12 +416,12 @@ if __name__ == "__main__":
     if 0:
         a = File()
         a.new_object('bla', '')
-        a.node(0,0,0)
-        a.node(0,0,1)
-        a.node(1,0,1)
-        a.node(1,0,0)
-        a.face([(0,0,0), (1,0,0), (2,0,0), (3,0,0)])
-        print a.total_faces(), a.total_nodes()
+        a.node(0, 0, 0)
+        a.node(0, 0, 1)
+        a.node(1, 0, 1)
+        a.node(1, 0, 0)
+        a.face([(0, 0, 0), (1, 0, 0), (2, 0, 0), (3, 0, 0)])
+        print(a.total_faces(), a.total_nodes())
         nodes = a.nodes_as_array()
 
 
@@ -443,23 +445,23 @@ if __name__ == "__main__":
     nodes = -np.delete(a.nodes_as_array().transpose(), 1, 0)[::-1]
     r = np.dot(Rot_mat, nodes)
 
-    print a.total_faces()
-    print a.total_nodes()
+    print(a.total_faces())
+    print(a.total_nodes())
 
 
     if 1:
         #plt.clf()
         #a.plot()
-        plt.xlim(-50,50)
-        plt.ylim(-50,50)
+        plt.xlim(-50, 50)
+        plt.ylim(-50, 50)
 # plt.show()
 
     plt.plot(nodes[0], nodes[1], 'k-')
     r = np.dot(Rot_mat, nodes)
     #plt.plot(r[0], r[1], 'r-')
     plt.show()
-    print ac_nodes
-    print nodes
+    print(ac_nodes)
+    print(nodes)
 
     bla
     node = np.array([-float(splitted[2]),

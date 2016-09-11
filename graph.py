@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 """
@@ -21,7 +20,7 @@ def for_edges_in_bfs_call(func, args, G, node0_set, visited_set):
             next_nodes[node0] = neighbours
         
         node0_set = set()
-        for n0, n1s in next_nodes.iteritems():
+        for n0, n1s in next_nodes.items():
             for n1 in n1s:
                 if func(n0, n1, args):
                     node0_set.add(n1)

@@ -31,7 +31,7 @@ def scan_dir(dir):
                     content = f.readlines()
                     for line in content:
                         if "<path>" in line:
-                            fname = re.split("</?path>",line)[1]
+                            fname = re.split("</?path>", line)[1]
                             refs[fname] = dir
                             break
                     f.close()
@@ -41,15 +41,14 @@ def scan_dir(dir):
                 continue
             elif os.path.isfile(dir + os.sep + file):
                 if not file in refs:
-                    print dir + os.sep + file
+                    print(dir + os.sep + file)
                     os.remove(dir + os.sep + file)
         for file in files:
             if not os.path.isfile(dir + os.sep + file) and not  ".svn" in file:
                 scan_dir(dir + os.sep + file)
     #             print file
-    except WindowsError, e:
-#         print e
-        pass 
+    except OSError as e:
+        pass
 
 
 if __name__ == "__main__":
@@ -58,7 +57,7 @@ if __name__ == "__main__":
     parser.add_argument("-d", dest="dir", help="the directory to be scanned")
     args = parser.parse_args()
 
-    print args.dir
+    print(args.dir)
     
     scan_dir(args.dir)
 

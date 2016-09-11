@@ -1,4 +1,3 @@
-#!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 from locale import atoi
 
@@ -41,7 +40,7 @@ class Platform(object):
         self.logger = logging.getLogger("platforms")
 
         if 'layer' in tags:
-            self.logger.warn("layer %s %d", tags['layer'], osm_id)
+            self.logger.warning("layer %s %d", tags['layer'], osm_id)
 
         self.osm_nodes = list()
         for r in refs:  # safe way instead of [nodes_dict[r] for r in refs] if ref would be missing
@@ -260,7 +259,7 @@ def main():
         border = shg.Polygon(parameters.get_clipping_extent())
     platforms = Platforms(transform, clusters, boundary_clipping_complete_way)
     handler = osmparser.OSMContentHandler(valid_node_keys=[], border=border)
-    source = open(osm_fname)
+    source = open(osm_fname, encoding="utf8")
     logging.info("Reading the OSM file might take some time ...")
 
     handler.register_way_callback(platforms.create_from_way, req_keys=platforms.req_keys)

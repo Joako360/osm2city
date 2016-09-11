@@ -1,4 +1,3 @@
-#!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
 """
@@ -146,7 +145,7 @@ def _write_boat_area(pier, stg_manager):
                 try:
                     pos_global = tools.transform.toGlobal((boat_position.x, boat_position.y))
                     _write_model(segment.length, stg_manager, pos_global, direction, pier.elevation)
-                except AttributeError, reason:
+                except AttributeError as reason:
                     logging.error(reason)
 
 
@@ -163,7 +162,7 @@ def _write_boat_line(pier, stg_manager):
                                                 , segment.coords[0][1] - segment.coords[1][1]))
             if segment.length > 5:
                 _write_model(segment.length, stg_manager, pos_global, direction, pier.elevation)
-        except AttributeError, reason:
+        except AttributeError as reason:
             logging.error(reason)
 
 
@@ -368,7 +367,7 @@ def main():
         border = shg.Polygon(parameters.get_clipping_extent())
     piers = Piers(transform, clusters, boundary_clipping_complete_way)
     handler = osmparser.OSMContentHandler(valid_node_keys=[], border=border)
-    source = open(osm_fname)
+    source = open(osm_fname, encoding="utf8")
     logging.info("Reading the OSM file might take some time ...")
 
     handler.register_way_callback(piers.create_from_way, req_keys=piers.req_keys)

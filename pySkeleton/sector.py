@@ -6,12 +6,12 @@
 #===============================================================================
 
 import math
-import half_line
-from point import Point
+from . import half_line
+from .point import Point
 #import display
-import segment
-import line
-import events
+from . import segment
+from . import line
+from . import events
 
 class Sector:
     """
@@ -38,11 +38,11 @@ class Sector:
     def reflex(self):
         return self.reflex1 or self.reflex2
     
-    def contains(self,p):
+    def contains(self, p):
         """ decide whether or not a point 'p' is inside a the sector """
-        return (not self.h1.side(p)) and self.h2.side(p) and half_line.Hline(self.edge.u,self.edge.pI).side(p)
+        return (not self.h1.side(p)) and self.h2.side(p) and half_line.Hline(self.edge.u, self.edge.pI).side(p)
     
-    def is_adjacent_to(self,other):
+    def is_adjacent_to(self, other):
         """ decide if the two sectors are adjacent """
         return self.edge.pI == other.edge.pF or self.edge.pF == other.edge.pI
             
@@ -52,11 +52,11 @@ class Sector:
         free    = events.NoEvent()
         top     = self.h1.intersect(self.h2)
         if top:
-            free = events.EdgeEvent(self.edge.weighted_distance_to(top),top)
+            free = events.EdgeEvent(self.edge.weighted_distance_to(top), top)
         
         return free
     
-    def get_split_event(self,other):
+    def get_split_event(self, other):
         """
         update the event field by checking if a split event is possible between 'self' and 'other'...
         
@@ -71,9 +71,9 @@ class Sector:
         
         candidates = []
         if self.reflex1 and p1 and other.contains(p1):
-            candidates.append(events.SplitEvent(self.edge.weighted_distance_to(p1),other.edge,self.h1.p))
+            candidates.append(events.SplitEvent(self.edge.weighted_distance_to(p1), other.edge, self.h1.p))
         if self.reflex2 and p2 and other.contains(p2):
-            candidates.append(events.SplitEvent(self.edge.weighted_distance_to(p2),other.edge,self.h2.p))
+            candidates.append(events.SplitEvent(self.edge.weighted_distance_to(p2), other.edge, self.h2.p))
                      
         #now we have a list of split events (possibly empty), take the one with minimal distance
         for ev in candidates:
@@ -83,7 +83,7 @@ class Sector:
         if free < self.event:
             self.event = free
             
-    def get_vertex_event(self,other):
+    def get_vertex_event(self, other):
         """"
         update the event field by checking if a vertex event is possible between 'self' and 'other'
         The configuration is supposed to have been checked before, so that we know that computing a reflex event makes sense
@@ -95,7 +95,7 @@ class Sector:
         #keep the minimum
         
     
-    def move_first_point(self,d):
+    def move_first_point(self, d):
         """ move the first point along the first half line with respect to its speed """
         
         cosAlpha = self.edge.u*self.h1.d
