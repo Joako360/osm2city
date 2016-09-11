@@ -679,7 +679,7 @@ if __name__ == "__main__":
         handler = osmparser.OSMContentHandler(valid_node_keys=[], border=border)
         buildings = Buildings()
         buildings.register_callbacks_with(handler)
-        source = open(osm_fname)
+        source = open(osm_fname, encoding="utf8")
         logging.info("Reading the OSM file might take some time ...")
         handler.parse(source)
 
