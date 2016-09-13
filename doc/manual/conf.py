@@ -106,7 +106,7 @@ html_theme = 'default'
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if on_rtd:
-    html_style = 'default'
+    html_style = '/default.css'
 
 
 # Theme options are theme-specific and customize the look and feel of a theme
