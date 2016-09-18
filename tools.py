@@ -13,7 +13,6 @@ import csv
 import logging
 import math
 import os
-import os.path as osp
 import queue
 import shutil
 import subprocess
@@ -28,7 +27,7 @@ import batch_processing.fg_telnet as telnet
 import calc_tile
 import coordinates
 import parameters
-import setup
+import utils.utilities as util
 import vec2d as ve
 
 from _collections import defaultdict
@@ -36,25 +35,6 @@ from _collections import defaultdict
 
 stats = None
 transform = None
-
-
-def get_osm2city_directory():
-    """Determines the absolute path of the osm2city root directory.
-
-    Used e.g. when copying roads.eff, elev.nas and other resources.
-    """
-    my_file = osp.realpath(__file__)
-    my_dir = osp.split(my_file)[0]
-    return my_dir
-
-
-def assert_trailing_slash(path):
-    """Takes a path and makes sure it has an os_specific trailing slash unless the path is empty."""
-    my_path = path
-    if len(my_path) > 0:
-        if not my_path.endswith(os.sep):
-            my_path += os.sep
-    return my_path
 
 
 class Interpolator(object):
@@ -282,8 +262,8 @@ class Probe_fgelev(object):
                 if empty_lines > 1:
                     logging.fatal("Skipped %i lines" % empty_lines)
                 logging.fatal("%i %g %g" % (self.record, position.lon, position.lat))
-                logging.fatal("fgelev returned <%s>, resulting in %s. Did fgelev start OK (Record : %i)?"
-                              , line, reason, self.record)
+                logging.fatal("fgelev returned <%s>, resulting in %s. Did fgelev start OK (Record : %i)?",
+                              line, reason, self.record)
                 raise RuntimeError("fgelev errors are fatal.")
 
             return elev
@@ -415,12 +395,12 @@ def raster_glob(prevent_overwrite=False):
 
 def _raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y=5):
     """Writes elev.in and elev.out using Telnet to a running FlightGear instance."""
-    fg_home_path = setup.getFGHome()
+    fg_home_path = util.get_fg_home()
     if fg_home_path is None:
         logging.error("Operating system unknown and therefore FGHome unknown.")
         sys.exit(1)
     logging.info("Writing elev.in")
-    f = open(setup.get_elev_in_path(fg_home_path), "w")
+    f = open(util.get_elev_in_path(fg_home_path), "w")
     f.write("# %g %g %g %g %g %g\n" % (x0, y0, size_x, size_y, step_x, step_y))
     for y in np.arange(y0, y0 + size_y, step_y):
         for x in np.arange(x0, x0 + size_x, step_x):
@@ -444,7 +424,7 @@ def _raster_telnet(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5,
             logging.error("Process in FG timed out")
         else:
             logging.info("Success")
-            shutil.copy2(setup.get_elev_out_path(fg_home_path), fname)
+            shutil.copy2(util.get_elev_out_path(fg_home_path), fname)
     fg.close()
 
 
@@ -766,7 +746,7 @@ def install_files(file_list, dst, from_osm2city_root=False):
     for the_file in file_list:
         my_file = the_file
         if from_osm2city_root:
-            my_file = get_osm2city_directory() + os.sep + the_file
+            my_file = util.get_osm2city_directory() + os.sep + the_file
         the_dst = dst
         logging.info("cp %s %s", my_file, the_dst)
         if os.path.exists(the_dst + the_file):

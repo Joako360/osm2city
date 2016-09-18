@@ -76,6 +76,7 @@ import stg_io2
 import textures.manager as tex_manager
 from textures.manager import TextureManager, FacadeManager  # this is needed to make pickle know the context
 import tools
+import utils.utilities as util
 import troubleshoot
 import vec2d as v
 
@@ -649,7 +650,7 @@ if __name__ == "__main__":
 
     tools.init(coordinates.Transformation(center, hdg=0))
 
-    tex_manager.init(tools.get_osm2city_directory(), args.create_atlas)
+    tex_manager.init(util.get_osm2city_directory(), args.create_atlas)
 
     logging.info("reading elevation data")
     elev = tools.get_interpolator(fake=parameters.NO_ELEV)

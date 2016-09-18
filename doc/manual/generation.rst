@@ -85,7 +85,7 @@ As described in chapter :ref:`Getting OpenStreetMap data <chapter-getting-data-l
 
 The default work flow is based on the sub-chapters of :ref:`Preparation <chapter-preparation-label>`:
 
-#. :ref:`Run setup.py <chapter-run-setup-label>` depending on your chosen :ref:`Elevation Probing Mode <chapter-elev-modes-label>`.
+#. :ref:`Run prepare_elev.py <chapter-run-prepare_elev-label>` depending on your chosen :ref:`Elevation Probing Mode <chapter-elev-modes-label>`.
 #. Adapt ``params.ini``. This will get copied to several subdirectories as part of the next process steps. Most importantly apapt the parameter ``PATH_TO_OUTPUT`` (in the example below "/home/fg_customscenery/CH_OSM"). The ``PREFIX`` and ``BOUNDARY_*`` parameters will automatically be updated.
 #. :ref:`Call build_tiles.py <chapter-build-tiles-label>`. This step creates sub-directories including a set of shell / command scripts. The top directory will be created in your ``WORKING_DIRECTORY`` and have the same name as the lon/lat area specified with argument ``-t``
 #. If needed adapt the params.ini files in the sub-directories if you need to change specific characteristics within one tile (e.g. parameters for building height etc.). In most situations this will not be needed.

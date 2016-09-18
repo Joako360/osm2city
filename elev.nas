@@ -1,8 +1,8 @@
 var get_elevation = func {
-#Set via setup.py
+#Set via prepare_elev.py
   setprop("/osm2city/tiles", 0);
-  var in = "WILL_BE_SET_BY_SETUP.PY";
-  var out = "WILL_BE_SET_BY_SETUP.PY";
+  var in = "WILL_BE_SET_BY_PREPARE_ELEV.PY";
+  var out = "WILL_BE_SET_BY_PREPARE_ELEV.PY";
 
   print( "Checking if tile is loaded");
   

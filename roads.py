@@ -103,6 +103,7 @@ import stg_io2
 import textures.road
 import tools
 import troubleshoot
+import utils.utilities as util
 from vec2d import vec2d
 from cluster import Clusters
 
@@ -1171,7 +1172,7 @@ def main():
 
     # copy roads.eff into scenery folders
     for stg_path in stg_paths:
-        roads_eff_file_name = tools.get_osm2city_directory() + os.sep + 'roads.eff'
+        roads_eff_file_name = util.get_osm2city_directory() + os.sep + 'roads.eff'
         tools.install_files([roads_eff_file_name], stg_path)
 
     roads.debug_plot(show=True, plot_junctions=False, clusters=roads.clusters) #, label_nodes=self.nodes_dict.keys())#, label_nodes=[1132288594, 1132288612])

@@ -32,6 +32,7 @@ from textures import atlas
 import img2np
 import parameters
 import tools
+import utils.utilities as util
 from textures.texture import Texture
 
 atlas_file_name = None
@@ -43,7 +44,7 @@ def _next_pow2(value):
     return 2**(int(math.log(value) / math.log(2)) + 1)
 
 
-def _make_texture_atlas(texture_list, atlas_filename, ext, tex_prefix, size_x=256, pad_y=0,
+def _make_texture_atlas(texture_list, atlas_filename, ext, size_x=256, pad_y=0,
                         lightmap=False, ambient_occlusion=False):
     """
     Create texture atlas from all textures. Update all our item coordinates.
@@ -466,32 +467,32 @@ def init(tex_prefix='', create_atlas=False):  # in most situations tex_prefix sh
     if tools.stats is None:  # if e.g. manager.init is called from osm2city, then tools.init does not need to be called
         tools.init(None)
 
-    my_tex_prefix = tools.assert_trailing_slash(tex_prefix)
-    atlas_file_name = my_tex_prefix + "tex" + os.sep + "atlas_facades"
-    my_tex_prefix += 'tex.src'
-    Texture.tex_prefix = my_tex_prefix  # need to set static variable so managers get full path
+    my_tex_prefix = util.assert_trailing_slash(tex_prefix)
+    atlas_file_name = "tex" + os.sep + "atlas_facades"
+    my_tex_prefix_src = my_tex_prefix + 'tex.src'
+    Texture.tex_prefix = my_tex_prefix_src  # need to set static variable so managers get full path
 
-    pkl_fname = atlas_file_name + '.pkl'
+    pkl_fname = my_tex_prefix + "tex" + os.sep + "atlas_facades.pkl"
     
     if create_atlas:
         facades = FacadeManager('facade')
         roofs = TextureManager('roof')
 
         # read registration
-        _append_roofs(roofs, my_tex_prefix)
-        _append_dynamic(facades, my_tex_prefix)
+        _append_roofs(roofs, my_tex_prefix_src)
+        _append_dynamic(facades, my_tex_prefix_src)
 
         texture_list = facades.get_list() + roofs.get_list()
 
         # warn for missed out textures
-        _check_missed_input_textures(my_tex_prefix, texture_list)
+        _check_missed_input_textures(my_tex_prefix_src, texture_list)
 
         # -- make texture atlas
         if parameters.ATLAS_SUFFIX_DATE:
             now = datetime.datetime.now()
             atlas_file_name += "_%04i%02i%02i" % (now.year, now.month, now.day)
 
-        _make_texture_atlas(texture_list, atlas_file_name, '.png', my_tex_prefix,
+        _make_texture_atlas(texture_list, my_tex_prefix + atlas_file_name, '.png',
                             lightmap=True, ambient_occlusion=parameters.BUILDING_FAKE_AMBIENT_OCCLUSION)
         
         params = dict()
@@ -532,4 +533,4 @@ if __name__ == "__main__":
         parameters.read_from_file(args.filename)
     parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
 
-    init(tools.get_osm2city_directory(), args.a)
+    init(util.get_osm2city_directory(), args.a)

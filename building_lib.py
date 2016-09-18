@@ -12,7 +12,6 @@ from math import sin, cos, radians, tan, sqrt, pi
 import os
 import random
 import re
-import string
 
 import matplotlib.pyplot as plt
 import numpy as np

@@ -9,7 +9,7 @@ import shutil
 import sys
 
 import parameters
-import tools
+import utils.utilities as util
 
 
 def main():
@@ -31,7 +31,7 @@ def main():
             logging.error("The scenery path does not seem to have necessary sub-directories in %s", scenery_path)
             sys.exit(1)
         else:
-            orig_tex_dir = tools.get_osm2city_directory() + os.sep + "tex"
+            orig_tex_dir = util.get_osm2city_directory() + os.sep + "tex"
             tex_content_list = os.listdir(orig_tex_dir)
             if not os.path.exists(orig_tex_dir):
                 logging.error("The original tex dir seems to be missing: %s", orig_tex_dir)
