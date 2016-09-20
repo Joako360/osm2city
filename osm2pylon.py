@@ -21,7 +21,6 @@ import argparse
 import logging
 import math
 import os
-import re
 import sys
 import unittest
 import xml.sax

@@ -17,18 +17,162 @@ import matplotlib.pyplot as plt
 import numpy as np
 import shapely.geometry as shg
 
+
 import ac3d
 import ac3d_fast
 import myskeleton
-import osm2city
 import parameters
 import roofs
 import textures.manager as tm
 import tools
+import utils.utilities as util
 from vec2d import vec2d
 
 nb = 0
 out = ""
+
+
+class Building(object):
+    """Central object class.
+       Holds all data relevant for a building. Coordinates, type, area, ...
+       Read-only access to node coordinates via self.X[node][0|1]
+    """
+
+    def __init__(self, osm_id, tags, outer_ring, name, height, levels,
+                 stg_typ=None, stg_hdg=None, inner_rings_list=[], building_type='unknown', roof_type='flat', roof_height=0, refs=[]):
+        self.osm_id = osm_id
+        self.tags = tags
+        self.refs = refs
+        self.inner_rings_list = inner_rings_list
+        self.name = name
+        self.stg_typ = stg_typ  # stg: OBJECT_SHARED or _STATIC
+        self.stg_hdg = stg_hdg
+        self.height = height
+        self.roof_height = roof_height
+        self.roof_height_X = []
+        self.longest_edge_len = 0.
+        self.levels = levels
+        self.first_node = 0  # index of first node in final OBJECT node list
+        self.anchor = vec2d(list(outer_ring.coords[0]))
+        self.facade_texture = None
+        self.roof_texture = None
+        self.roof_complex = False
+        self.roof_separate_LOD = False # May or may not be faster
+        self.ac_name = None
+        self.ceiling = 0.
+        self.LOD = None  # see utils.utilities.LOD for values
+        self.outer_nodes_closest = []
+        if len(outer_ring.coords) > 2:
+            self.set_polygon(outer_ring, self.inner_rings_list)
+        else:
+            self.polygon = None
+        if self.inner_rings_list: self.roll_inner_nodes()
+        self.building_type = building_type
+        self.roof_type = roof_type
+        self.parent = None
+        self.parent_part = []
+        self.parents_parts = []
+        self.cand_buildings = []
+        self.children = []
+        self.ground_elev = None
+        self.ground_elev_min = None
+        self.ground_elev_max = None
+
+    def roll_inner_nodes(self):
+        """Roll inner rings such that the node closest to an outer node goes first.
+
+           Also, create a list of outer corresponding outer nodes.
+        """
+        new_inner_rings_list = []
+        self.outer_nodes_closest = []
+        outer_nodes_avail = list(range(self.nnodes_outer))
+        for inner in self.polygon.interiors:
+            min_r = 1e99
+            for i, node_i in enumerate(list(inner.coords)[:-1]):
+                node_i = vec2d(node_i)
+                for o in outer_nodes_avail:
+                    r = node_i.distance_to(vec2d(self.X_outer[o]))
+                    if r <= min_r:
+                        closest_i = node_i
+                        min_r = r
+                        min_i = i
+                        min_o = o
+            new_inner = shg.polygon.LinearRing(np.roll(np.array(inner.coords)[:-1], -min_i, axis=0))
+            new_inner_rings_list.append(new_inner)
+            self.outer_nodes_closest.append(min_o)
+            outer_nodes_avail.remove(min_o)
+        # -- sort inner rings by index of closest outer node
+        yx = sorted(zip(self.outer_nodes_closest, new_inner_rings_list))
+        self.inner_rings_list = [x for (y, x) in yx]
+        self.outer_nodes_closest = [y for (y, x) in yx]
+        self.set_polygon(self.polygon.exterior, self.inner_rings_list)
+#        for o in self.outer_nodes_closest:
+#            assert(o < len(outer_ring.coords) - 1)
+
+    def simplify(self, tolerance):
+        original_nodes = self.nnodes_outer + len(self.X_inner)
+        #print ">> outer nodes", b.nnodes_outer
+        #print ">> inner nodes", len(b.X_inner)
+        #print "total", total_nodes
+        #print "now simply"
+        self.polygon = self.polygon.simplify(tolerance)
+        #print ">> outer nodes", b.nnodes_outer
+        #print ">> inner nodes", len(b.X_inner)
+        nnodes_simplified = original_nodes - (self.nnodes_outer + len(self.X_inner))
+        # FIXME: simplifiy interiors
+        #print "now", simple_nodes
+        #print "--------------------"
+        return nnodes_simplified
+
+    def set_polygon(self, outer, inner=[]):
+        #ring = shg.polygon.LinearRing(list(outer))
+        # make linear rings for inner(s)
+        #inner_rings = [shg.polygon.LinearRing(list(i)) for i in inner]
+        #if inner_rings:
+        #    print "inner!", inner_rings
+        self.polygon = shg.Polygon(outer, inner)
+
+    def _set_X(self, the_offset: vec2d) -> None:
+        self.X = np.array(self.X_outer + self.X_inner)
+        for i in range(self._nnodes_ground):
+            self.X[i, 0] -= the_offset.x  # -- cluster coordinates. NB: this changes building coordinates!
+            self.X[i, 1] -= the_offset.y
+
+    def set_ground_elev(self, elev, tile_elev, the_offset: vec2d) -> None:
+
+        def local_elev(p):
+            return elev(p + the_offset) - tile_elev
+
+        self._set_X(the_offset)
+
+        elevs = [local_elev(vec2d(self.X[i])) for i in range(self._nnodes_ground)]
+
+        self.ground_elev_min = min(elevs)
+        self.ground_elev_max = max(elevs)
+        self.ground_elev = self.ground_elev_min
+
+    @property
+    def X_outer(self):
+        return list(self.polygon.exterior.coords)[:-1]
+
+    @property
+    def X_inner(self):
+        return [coord for interior in self.polygon.interiors for coord in list(interior.coords)[:-1]]
+
+    @property
+    def _nnodes_ground(self):  # FIXME: changed behavior. Keep _ until all bugs found
+        n = len(self.polygon.exterior.coords) - 1
+        for item in self.polygon.interiors:
+            n += len(item.coords) - 1
+        return n
+
+    @property
+    def nnodes_outer(self):
+        return len(self.polygon.exterior.coords) - 1
+
+    @property
+    def area(self):
+        return self.polygon.area
 
 
 def _random_level_height():
@@ -361,21 +505,21 @@ def decide_LOD(buildings):
     for b in buildings:
         r = random.uniform(0, 1)
         if r < parameters.LOD_PERCENTAGE_DETAIL:
-            lod = osm2city.Building.LOD_DETAIL
+            lod = util.LOD.detail
         else:
-            lod = osm2city.Building.LOD_ROUGH
+            lod = util.LOD.rough
 
         if b.levels > parameters.LOD_ALWAYS_ROUGH_ABOVE_LEVELS:
-            lod = osm2city.Building.LOD_ROUGH  # tall buildings        -> rough
+            lod = util.LOD.rough  # tall buildings        -> rough
         if b.levels > parameters.LOD_ALWAYS_BARE_ABOVE_LEVELS:
-            lod = osm2city.Building.LOD_BARE  # really tall buildings -> bare
+            lod = util.LOD.bare  # really tall buildings -> bare
         if b.levels < parameters.LOD_ALWAYS_DETAIL_BELOW_LEVELS:
-            lod = osm2city.Building.LOD_DETAIL  # small buildings       -> detail
+            lod = util.LOD.detail  # small buildings       -> detail
 
         if b.area < parameters.LOD_ALWAYS_DETAIL_BELOW_AREA:
-            lod = osm2city.Building.LOD_DETAIL
+            lod = util.LOD.detail
         elif b.area > parameters.LOD_ALWAYS_ROUGH_ABOVE_AREA:
-            lod = osm2city.Building.LOD_ROUGH
+            lod = util.LOD.rough
 
         b.LOD = lod
         tools.stats.count_LOD(lod)
@@ -1003,7 +1147,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
     # get local medium ground elevation for each building
     #
     for ib, b in enumerate(buildings):
-        b.set_ground_elev(elev, tile_elev)
+        b.set_ground_elev(elev, tile_elev, offset)
     
     #
     # Exchange informations
@@ -1011,7 +1155,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
     for ib, b in enumerate(buildings):
         if b.parent:
             if not b.parent.ground_elev:
-                b.parent.set_ground_elev(elev, tile_elev)
+                b.parent.set_ground_elev(elev, tile_elev, offset)
 
             b.ground_elev_min = min(b.parent.ground_elev, b.ground_elev)
             b.ground_elev_max = max(b.parent.ground_elev, b.ground_elev)
@@ -1021,7 +1165,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
             if b.parent.children:
                 for child in b.parent.children:
                     if not child.ground_elev:
-                        child.set_ground_elev(elev, tile_elev)
+                        child.set_ground_elev(elev, tile_elev, offset)
                             
                 for child in b.parent.children:
                     b.ground_elev_min = min(child.ground_elev_min, b.ground_elev)
@@ -1035,7 +1179,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
         if b.children:
             for child in b.parent.children:
                 if not child.ground_elev:
-                    child.set_ground_elev(elev, tile_elev)
+                    child.set_ground_elev(elev, tile_elev, offset)
             
             for child in b.children:
                 b.ground_elev_min = min(child.ground_elev_min, b.ground_elev)

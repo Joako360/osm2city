@@ -89,3 +89,10 @@ def assert_trailing_slash(path):
         if not my_path.endswith(os.sep):
             my_path += os.sep
     return my_path
+
+
+@enum.unique
+class LOD(enum.IntEnum):
+    bare = 0
+    rough = 1
+    detail = 2

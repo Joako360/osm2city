@@ -59,6 +59,7 @@ import pickle
 import logging
 import os
 import random
+from typing import List
 import sys
 import textwrap
 
@@ -84,154 +85,6 @@ import vec2d as v
 buildings = []  # -- master list, holds all buildings
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
 
-
-class Building(object):
-    """Central object class.
-       Holds all data relevant for a building. Coordinates, type, area, ...
-       Read-only access to node coordinates via self.X[node][0|1]
-    """
-    LOD_BARE = 0
-    LOD_ROUGH = 1
-    LOD_DETAIL = 2
-
-    def __init__(self, osm_id, tags, outer_ring, name, height, levels,
-                 stg_typ=None, stg_hdg=None, inner_rings_list=[], building_type='unknown', roof_type='flat', roof_height=0, refs=[]):
-        self.osm_id = osm_id
-        self.tags = tags
-        self.refs = refs
-        self.inner_rings_list = inner_rings_list
-        self.name = name
-        self.stg_typ = stg_typ  # stg: OBJECT_SHARED or _STATIC
-        self.stg_hdg = stg_hdg
-        self.height = height
-        self.roof_height = roof_height
-        self.roof_height_X = []
-        self.longest_edge_len = 0.
-        self.levels = levels
-        self.first_node = 0  # index of first node in final OBJECT node list
-        self.anchor = v.vec2d(list(outer_ring.coords[0]))
-        self.facade_texture = None
-        self.roof_texture = None
-        self.roof_complex = False
-        self.roof_separate_LOD = False # May or may not be faster
-        self.ac_name = None
-        self.ceiling = 0.
-        self.LOD = None  # see Building.LOD_* for values
-        self.outer_nodes_closest = []
-        if len(outer_ring.coords) > 2:
-            self.set_polygon(outer_ring, self.inner_rings_list)
-        else:
-            self.polygon = None
-        if self.inner_rings_list: self.roll_inner_nodes()
-        self.building_type = building_type
-        self.roof_type = roof_type
-        self.parent = None
-        self.parent_part = []
-        self.parents_parts = []
-        self.cand_buildings = []
-        self.children = []
-        self.ground_elev = None
-        self.ground_elev_min = None
-        self.ground_elev_max = None
-
-    def roll_inner_nodes(self):
-        """Roll inner rings such that the node closest to an outer node goes first.
-
-           Also, create a list of outer corresponding outer nodes.
-        """
-        new_inner_rings_list = []
-        self.outer_nodes_closest = []
-        outer_nodes_avail = list(range(self.nnodes_outer))
-        for inner in self.polygon.interiors:
-            min_r = 1e99
-            for i, node_i in enumerate(list(inner.coords)[:-1]):
-                node_i = v.vec2d(node_i)
-                for o in outer_nodes_avail:
-                    r = node_i.distance_to(v.vec2d(self.X_outer[o]))
-                    if r <= min_r:
-                        closest_i = node_i
-                        min_r = r
-                        min_i = i
-                        min_o = o
-#            print "\nfirst nodes", closest_i, closest_o, r
-            new_inner = shgm.polygon.LinearRing(np.roll(np.array(inner.coords)[:-1], -min_i, axis=0))
-            new_inner_rings_list.append(new_inner)
-            self.outer_nodes_closest.append(min_o)
-            outer_nodes_avail.remove(min_o)
-#            print self.outer_nodes_closest
-#        print "---\n\n"
-        # -- sort inner rings by index of closest outer node
-        yx = sorted(zip(self.outer_nodes_closest, new_inner_rings_list))
-        self.inner_rings_list = [x for (y, x) in yx]
-        self.outer_nodes_closest = [y for (y, x) in yx]
-        self.set_polygon(self.polygon.exterior, self.inner_rings_list)
-#        for o in self.outer_nodes_closest:
-#            assert(o < len(outer_ring.coords) - 1)
-
-    def simplify(self, tolerance):
-        original_nodes = self.nnodes_outer + len(self.X_inner)
-        #print ">> outer nodes", b.nnodes_outer
-        #print ">> inner nodes", len(b.X_inner)
-        #print "total", total_nodes
-        #print "now simply"
-        self.polygon = self.polygon.simplify(tolerance)
-        #print ">> outer nodes", b.nnodes_outer
-        #print ">> inner nodes", len(b.X_inner)
-        nnodes_simplified = original_nodes - (self.nnodes_outer + len(self.X_inner))
-        # FIXME: simplifiy interiors
-        #print "now", simple_nodes
-        #print "--------------------"
-        return nnodes_simplified
-
-    def set_polygon(self, outer, inner=[]):
-        #ring = shg.polygon.LinearRing(list(outer))
-        # make linear rings for inner(s)
-        #inner_rings = [shg.polygon.LinearRing(list(i)) for i in inner]
-        #if inner_rings:
-        #    print "inner!", inner_rings
-        self.polygon = shgm.Polygon(outer, inner)
-        
-    def set_X(self):
-        self.X = np.array(self.X_outer + self.X_inner)
-        for i in range(self._nnodes_ground):
-            self.X[i, 0] -= offset.x  # -- cluster coordinates. NB: this changes building coordinates!
-            self.X[i, 1] -= offset.y
-
-    def set_ground_elev(self, elev, tile_elev, min_elev=None, flag='local'):
-
-        def local_elev(p):
-            return elev(p + offset) - tile_elev
-
-        self.set_X()
-        
-        elevs = [local_elev(v.vec2d(self.X[i])) for i in range(self._nnodes_ground)]
-        
-        self.ground_elev_min = min(elevs)
-        self.ground_elev_max = max(elevs)
-        self.ground_elev = self.ground_elev_min
-
-    @property
-    def X_outer(self):
-        return list(self.polygon.exterior.coords)[:-1]
-
-    @property
-    def X_inner(self):
-        return [coord for interior in self.polygon.interiors for coord in list(interior.coords)[:-1]]
-
-    @property
-    def _nnodes_ground(self):  # FIXME: changed behavior. Keep _ until all bugs found
-        n = len(self.polygon.exterior.coords) - 1
-        for item in self.polygon.interiors:
-            n += len(item.coords) - 1
-        return n
-
-    @property
-    def nnodes_outer(self):
-        return len(self.polygon.exterior.coords) - 1
-
-    @property
-    def area(self):
-        return self.polygon.area
 
 class Buildings(object):
     """Holds buildings list. Interfaces with OSM handler"""
@@ -357,7 +210,7 @@ class Buildings(object):
             tools.stats.parse_errors += 1
             return False
 
-        building = Building(osm_id, tags, outer_ring, name, height, levels, inner_rings_list=inner_rings_list, building_type=_building_type, roof_type=_roof_type, roof_height=_roof_height, refs=refs)
+        building = building_lib.Building(osm_id, tags, outer_ring, name, height, levels, inner_rings_list=inner_rings_list, building_type=_building_type, roof_type=_roof_type, roof_height=_roof_height, refs=refs)
         self.buildings.append(building)
 
         tools.stats.objects += 1
@@ -511,11 +364,11 @@ class Buildings(object):
 # -- write xml
 
 
-def write_xml(path, fname, buildings):
+def write_xml(path: str, file_name: str, buildings: List[building_lib.Building], the_offset: v.vec2d) -> None:
     #  -- LOD animation
-    xml = open(path + fname + ".xml", "w")
+    xml = open(path + file_name + ".xml", "w")
     xml.write("""<?xml version="1.0"?>\n<PropertyList>\n""")
-    xml.write("<path>%s.ac</path>" % fname)
+    xml.write("<path>%s.ac</path>" % file_name)
 
     has_lod_bare = False
     has_lod_rough = False
@@ -538,8 +391,8 @@ def write_xml(path, fname, buildings):
         if b.levels >= parameters.OBSTRUCTION_LIGHT_MIN_LEVELS:
             Xo = np.array(b.X_outer)
             for i in np.arange(0, b.nnodes_outer, b.nnodes_outer/4.):
-                xo = Xo[int(i+0.5), 0] - offset.x
-                yo = Xo[int(i+0.5), 1] - offset.y
+                xo = Xo[int(i+0.5), 0] - the_offset.x
+                yo = Xo[int(i+0.5), 1] - the_offset.y
                 zo = b.ceiling + 1.5
                 # <path>cursor.ac</path>
                 xml.write(textwrap.dedent("""
@@ -555,11 +408,11 @@ def write_xml(path, fname, buildings):
                 </model>""" % (-yo, xo, zo)))  # -- I just don't get those coordinate systems.
 
         if b.LOD is not None:
-            if b.LOD == Building.LOD_BARE:
+            if b.LOD is util.LOD.bare:
                 has_lod_bare = True
-            elif b.LOD == Building.LOD_ROUGH:
+            elif b.LOD is util.LOD.rough:
                 has_lod_rough = True
-            elif b.LOD == Building.LOD_DETAIL:
+            elif b.LOD is util.LOD.detail:
                 has_lod_detail = True
             else:
                 logging.warning("Building %s with unknown LOD level %i", b.osm_id, b.LOD)
@@ -1237,13 +1090,6 @@ if __name__ == "__main__":
             logging.warning("Skipping tile elev = -9999 at lat %.3f and lon %.3f", center_global.lat, center_global.lon)
             continue  # skip tile with improper elev
 
-        #LOD_lists = []
-        #LOD_lists.append([])  # bare
-        #LOD_lists.append([])  # rough
-        #LOD_lists.append([])  # detail
-        #LOD_lists.append([])  # roof
-        #LOD_lists.append([])  # roof-flat
-
         # -- incase PREFIX is a path (batch processing)
         file_name = replacement_prefix + "city%02i%02i" % (cl.I.x, cl.I.y)
         logging.info("writing cluster %s (%i/%i)" % (file_name, ic, len(clusters)))
@@ -1259,7 +1105,7 @@ if __name__ == "__main__":
         else:
             # -- write .ac and .xml
             building_lib.write(path_to_stg + file_name + ".ac", cl.objects, elev, tile_elev, tools.transform, offset)
-            write_xml(path_to_stg, file_name, cl.objects)
+            write_xml(path_to_stg, file_name, cl.objects, offset)
             tools.install_files(['cityLM.eff', 'lightmap-switch.xml'], path_to_stg, True)
 
     if args.uninstall:

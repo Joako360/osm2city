@@ -16,7 +16,7 @@ import logging
 
 import shapely.geometry as shg
 import os
-import osm2city
+import building_lib
 import tools
 from vec2d import vec2d
 import calc_tile
@@ -98,7 +98,8 @@ class STG_File(object):
 
     def _add_object(self, obj_prefix, ac_file_name, lon_lat, elev, hdg, once=False):
         """add OBJECT_XXXXX line to our_list. Returns path to stg."""
-        line = "OBJECT_%s %s %1.5f %1.5f %1.2f %g\n" % (obj_prefix.upper(), ac_file_name, lon_lat.lon, lon_lat.lat, elev, hdg)
+        line = "OBJECT_%s %s %1.5f %1.5f %1.2f %g\n" % (obj_prefix.upper(),
+                                                        ac_file_name, lon_lat.lon, lon_lat.lat, elev, hdg)
         if once is False or (ac_file_name not in self.our_ac_file_name_list):
             self.our_list.append(line)
             self.our_ac_file_name_list.append(ac_file_name)
@@ -137,7 +138,7 @@ class STG_File(object):
             logging.info("Writing %d lines" % len(self.our_list))
             stg.write(self.our_magic_start_new)
             stg.write("# do not edit below this line\n")
-            stg.write("# Last Written %s\n#\n"%time.strftime("%c"))
+            stg.write("# Last Written %s\n#\n" % time.strftime("%c"))
             for line in self.our_list:
                 logging.debug(line.strip())
                 stg.write(line)
@@ -282,7 +283,7 @@ def read(path, stg_fname, our_magic):
     building_objs = []
     for entry in stg_entries:
         point = shg.Point(tools.transform.toLocal((entry.lon, entry.lat)))
-        building_objs.append(osm2city.Building(osm_id=-1, tags=-1, outer_ring=point,
+        building_objs.append(building_lib.Building(osm_id=-1, tags=-1, outer_ring=point,
                                                name=entry.get_obj_path_and_name(),
                                                height=0, levels=0, stg_typ=entry.get_object_type_as_string(),
                                                stg_hdg=entry.hdg))
