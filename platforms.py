@@ -218,7 +218,7 @@ class Platforms(ObjectList):
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="platform.py reads OSM data and creates platform models for use with FlightGear")
+    parser = argparse.ArgumentParser(description="platforms.py reads OSM data and creates platform models for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename"
                         , help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
     parser.add_argument("-l", "--loglevel"

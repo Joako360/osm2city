@@ -784,7 +784,7 @@ def progress(i, max_i):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
-    parser = argparse.ArgumentParser(description="tools prepares an elevation grid for Nasal script and then osm2city")
+    parser = argparse.ArgumentParser(description="tools.py prepares an elevation grid for Nasal script and other osm2city applications")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
     parser.add_argument("-o", dest="o", action="store_true"

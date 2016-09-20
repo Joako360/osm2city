@@ -1422,7 +1422,7 @@ def generate_landuse_from_buildings(osm_landuses, building_refs):
 def main():
     # Handling arguments and parameters
     parser = argparse.ArgumentParser(
-        description="osm2pylon reads OSM data and creates pylons, powerlines and aerialways for use with FlightGear")
+        description="pylons.py reads OSM data and creates pylons, powerlines and aerialways for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
     parser.add_argument("-e", dest="e", action="store_true"

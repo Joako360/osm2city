@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-osm2city.py aims at generating 3D city models for FG, using OSM data.
+buildings.py aims at generating 3D city models for FG, using OSM data.
 Currently, it generates 3D textured buildings.
 However, it has a somewhat more advanced texture manager, and comes with a
 number of facade/roof textures.
@@ -461,7 +461,7 @@ def write_xml(path: str, file_name: str, buildings: List[building_lib.Building],
 if __name__ == "__main__":
     random.seed(42)
     # -- Parse arguments. Command line overrides config file.
-    parser = argparse.ArgumentParser(description="osm2city reads OSM data and creates buildings for use with FlightGear")
+    parser = argparse.ArgumentParser(description="buildings.py reads OSM data and creates buildings for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
     parser.add_argument("-e", dest="e", action="store_true",

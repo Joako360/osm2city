@@ -326,7 +326,7 @@ def main():
     # logging.basicConfig(level=logging.DEBUG)
 
     import argparse
-    parser = argparse.ArgumentParser(description="Pier.py reads OSM data and creates Pier models for use with FlightGear")
+    parser = argparse.ArgumentParser(description="piers.py reads OSM data and creates Pier models for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
 #    parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
