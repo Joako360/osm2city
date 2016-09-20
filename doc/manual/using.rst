@@ -23,7 +23,7 @@ If you followed the :ref:`directory structure <chapter-creating-directory-struct
 Copy Textures
 =============
 
-If you are using ``osm2city.py`` to generate buildings or ``roads.py`` to generate roads, then you need to have the content of the ``tex`` linked from ``osm2city-data`` copied or linked into all scenery sub-folders, where there are ``*.stg`` files. There are two possibilities:
+If you are using ``buildings.py`` to generate buildings or ``roads.py`` to generate roads, then you need to have the content of the ``tex`` linked from ``osm2city-data`` copied or linked into all scenery sub-folders, where there are ``*.stg`` files. There are two possibilities:
 
 #. Do it manually. In this case you can choose whether to create links or hard copies. If you want to distribute the generated scenery objects, then you must copy the whole directory. E.g. ``/home/pingu/fg_customscenery/LSZS/Objects/e000n40/e009n46/tex`` in the example used previously.
 #. Use ``copy_texture_stuff.py`` to do it automatically. E.g.
@@ -41,9 +41,9 @@ There is also a third possibility of copying the ``tex`` directory into ``$FG_RO
 Adjusting Visibility of Scenery Objects
 =======================================
 
-The ``osm2city`` related programs and especially ``osm2city.py`` itself are using heuristics and parameters to determine at what level of detail (LOD) scenery objects should be visible. This is done by adding the objects to one of the three FlightGear LOD schemes: "bare", "rough" and "detailed".
+The ``osm2city`` related programs and especially ``buildings.py`` are using heuristics and parameters to determine at what level of detail (LOD) scenery objects should be visible. This is done by adding the objects to one of the three FlightGear LOD schemes: "bare", "rough" and "detailed".
 
-In ``osm2city.py`` you can influence into which of the three LOD ranges the objects are placed by using the following :ref:`Parameters <chapter-parameters-lod-label>`:
+In ``buildings.py`` you can influence into which of the three LOD ranges the objects are placed by using the following :ref:`Parameters <chapter-parameters-lod-label>`:
 
 * LOD_ALWAYS_DETAIL_BELOW_AREA
 * LOD_ALWAYS_ROUGH_ABOVE_AREA
@@ -140,7 +140,7 @@ Depending on your region and your shader settings you might want to search for e
 Consider Sharing Your Generated Scenery Objects
 ===============================================
 
-Although this guide hopefully helps, not everybody might be able to generate scenery objects wih ``osm2city`` related programs. Therefore please consider sharing your generated scenery objects. You can do so by announcing it in the Sceneries_ part of the FlightGear Forums and linking from the bottom of the osm2city related Wiki_ article.
+Although this guide hopefully helps, not everybody might be able to generate scenery objects wih ``osm2city`` related programs. Therefore please consider sharing your generated scenery objects. You can do so by announcing it in the Sceneries_ part of the FlightGear Forums and linking from the bottom of the ``osm2city`` related Wiki_ article.
 
 .. _Sceneries: http://forum.flightgear.org/viewforum.php?f=5
 .. _Wiki: http://wiki.flightgear.org/Osm2city.py

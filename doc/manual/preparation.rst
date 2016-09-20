@@ -476,6 +476,6 @@ Finally copy file ``elev.out`` from the path specified in the edited ``elev.nas`
 
 .. [#] Failing to do so might result in an exception, where the stack trace might contain something like ``KeyError: 1227981870``.
 
-.. [#] It is a bit more complicated than that. The three other methods keep data in a grid — and the grid stays the same across e.g. ``osm2city`` and ``osm2pylon``. That is different for ``FgelevCaching``, because it will get the position for every object, which by nature is different between e.g. ``osm2city`` and ``osm2pylon``.
+.. [#] It is a bit more complicated than that. The three other methods keep data in a grid — and the grid stays the same across e.g. ``buildings.py`` and ``pylons.py``. That is different for ``FgelevCaching``, because it will get the position for every object, which by nature is different between e.g. ``buildings`` and ``pylons``.
 
 .. [#] See `Using TerraGear <http://wiki.flightgear.org/Using_TerraGear#Elevation_data>`_.

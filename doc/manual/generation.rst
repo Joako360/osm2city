@@ -35,7 +35,7 @@ In most situations it is enough to call the following command once and then only
 
   /usr/bin/python3 /home/pingu/develop_vcs/osm2city/textures/manager.py -f LSZS/params.ini -a
 
-Alternatively `osm2city.py` can be called with the ``-a`` option.
+Alternatively `buildings.py` can be called with the ``-a`` option.
 
 
 ====================
@@ -44,8 +44,8 @@ Overview of Programs
 
 ``osm2city`` contains the following programs to generate scenery objects based on OSM data:
 
-* ``osm2city.py``: generates buildings. See also the related `Wiki osm2city article <http://wiki.flightgear.org/Osm2city.py>`_.
-* ``osm2pylon.py``: generates pylons and cables between them for power lines, aerial ways, railway overhead lines as well as street-lamps. See also the related `Wiki osm2pylon article <http://wiki.flightgear.org/Osm2pylons.py>`_.
+* ``buildings.py``: generates buildings. See also the related `Wiki osm2city article <http://wiki.flightgear.org/Osm2city.py>`_.
+* ``pylons.py``: generates pylons and cables between them for power lines, aerial ways, railway overhead lines as well as street-lamps. See also the related `Wiki osm2pylon article <http://wiki.flightgear.org/Osm2pylons.py>`_.
 * ``roads.py``: generates different types of roads. See also the related `Wiki roads article <http://wiki.flightgear.org/Osm2roads.py>`_.
 * ``piers.py``: generates piers and boats. See also the related `Wiki piers article <http://wiki.flightgear.org/OsmPiers.py>`_.
 * ``platforms.py``: generates (railway) platforms. See also the related `Wiki platforms article <http://wiki.flightgear.org/OsmPlatforms.py>`_.
@@ -70,7 +70,7 @@ In most situations you may want to at least provide command line parameter ``-f`
 
 ::
 
-  /usr/bin/python3 /home/pingu/develop_vcs/osm2city/osm2city.py -f LSZS/params.ini -l DEBUG
+  /usr/bin/python3 /home/pingu/develop_vcs/osm2city/buildings.py -f LSZS/params.ini -l DEBUG
 
 Remember that the paths are relative to the ``WORKING_DIRECTORY``. Alternatively provide the full path to your ``params.ini`` [#]_ file.
 
@@ -148,10 +148,10 @@ The contents of ``osm2city_e009n47.sh`` looks like the following if argument ``-
 ::
 
     #!/bin/bash
-    python osm2city.py -f w010n60/w003n60/2909568/params.ini
-    python osm2city.py -f w010n60/w003n60/2909569/params.ini
+    python buildings.py -f w010n60/w003n60/2909568/params.ini
+    python buildings.py -f w010n60/w003n60/2909569/params.ini
     ...
-    python osm2city.py -f w010n60/w003n60/2909627/params.ini
+    python buildings.py -f w010n60/w003n60/2909627/params.ini
 
 
 If you used argument ``-p`` during generation of the shell / command files, then you would add the number of parallel processes like the following (in the example 4 processes):
