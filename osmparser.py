@@ -38,7 +38,7 @@ class Way(OSMElement):
         OSMElement.__init__(self, osm_id)
         self.refs = []
 
-    def addRef(self, ref):
+    def add_ref(self, ref):
         self.refs.append(ref)
 
 
@@ -47,7 +47,7 @@ class Relation(OSMElement):
         OSMElement.__init__(self, osm_id)
         self.members = []
 
-    def addMember(self, member):
+    def add_member(self, member):
         self.members.append(member)
 
 
@@ -94,10 +94,12 @@ class OSMContentHandler(xml.sax.ContentHandler):
     def parse(self, source):
         xml.sax.parse(source, self)
 
-    def register_way_callback(self, callback, req_keys=[]):
+    def register_way_callback(self, callback, req_keys=None):
+        if req_keys is None:
+            req_keys = []
         self._way_callbacks.append((callback, req_keys))
 
-    def register_relation_callback(self, callback, req_keys=[]):
+    def register_relation_callback(self, callback, req_keys):
         self._relation_callbacks.append((callback, req_keys))
 
     def register_uncategorized_way_callback(self, callback):
@@ -130,19 +132,19 @@ class OSMContentHandler(xml.sax.ContentHandler):
                 self._current_relation.add_tag(key, value)
         elif name == "nd":
             ref = int(attrs.getValue("ref"))
-            self._current_way.addRef(ref)
+            self._current_way.add_ref(ref)
         elif name == "member":
             ref = int(attrs.getValue("ref"))
             type_ = attrs.getValue("type")
             role = attrs.getValue("role")
-            self._current_relation.addMember(Member(ref, type_, role))
+            self._current_relation.add_member(Member(ref, type_, role))
 
     def endElement(self, name):
         if name == "node":
             if self.border is None or self.border.contains(shg.Point(self._current_node.lon, self._current_node.lat)):        
                 self.nodes_dict[self._current_node.osm_id] = self._current_node
             else:
-                logging.debug("Ignored Osmid %d outside clipping" % (self._current_node.osm_id))
+                logging.debug("Ignored Osmid %d outside clipping", self._current_node.osm_id)
         elif name == "way":
             cb = find_callback_for(self._current_way.tags, self._way_callbacks)
             # no longer filter valid_way_keys here. That's up to the callback.
@@ -183,6 +185,7 @@ class OSMContentHandlerOld(xml.sax.ContentHandler):
     elements. A better way is to have the input file processed by e.g. Osmosis first.
     """
     def __init__(self, valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys):
+        super(OSMContentHandlerOld, self).__init__()
         self.valid_way_keys = valid_way_keys
         self.valid_relation_keys = valid_relation_keys
         self._handler = OSMContentHandler(valid_node_keys)
@@ -230,7 +233,8 @@ def has_required_tag_keys(my_tags, my_required_keys):
 
 def parse_length(str_length):
     """
-    Transform length to meters if not yet default. Input is a string, output is a float. If the string cannot be parsed, then 0 is returned.
+    Transform length to meters if not yet default. Input is a string, output is a float.
+    If the string cannot be parsed, then 0 is returned.
     Length (and width/height) in OSM is per default meters cf. OSM Map Features / Units.
     Possible units can be "m" (metre), "km" (kilometre -> 0.001), "mi" (mile -> 0.00062137) and
     <feet>' <inch>" (multiply feet by 12, add inches and then multiply by 0.0254).
