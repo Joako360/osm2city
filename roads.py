@@ -92,20 +92,20 @@ import scipy.interpolate
 import shapely.geometry as shg
 
 import ac3d
+from cluster import Clusters
 import coordinates
 import graph
 import linear
 import linear_bridge
 import objectlist
-import osmparser
 import parameters
 import stg_io2
 import textures.road
 import tools
 import troubleshoot
 import utils.utilities as util
+from utils import osmparser
 from vec2d import vec2d
-from cluster import Clusters
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 

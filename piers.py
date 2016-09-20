@@ -7,25 +7,25 @@ Created on Sun Sep 29 10:42:12 2013
 
 @author: Portree Kid
 """
-import numpy as np
-from vec2d import vec2d
-import shapely.geometry as shg
-import coordinates
-import tools
-import parameters
+import logging
+import math
 import os
-import ac3d
-import stg_io2
-from objectlist import ObjectList
 from random import randint
 
-
-import logging
-import osmparser
+import shapely.geometry as shg
 from shapely.geometry.base import CAP_STYLE, JOIN_STYLE
-import math
 from shapely.geometry.linestring import LineString
+
+import ac3d
+import coordinates
+import numpy as np
+import parameters
+import stg_io2
+import tools
 from cluster import Clusters
+from objectlist import ObjectList
+from utils import osmparser
+from vec2d import vec2d
 
 OUR_MAGIC = "osm2piers"  # Used in e.g. stg files to mark edits by osm2Piers
 

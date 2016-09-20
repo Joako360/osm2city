@@ -14,13 +14,11 @@ import sys
 import xml.sax
 
 import coordinates
-import osmparser
 import parameters
 import stg_io2
 import tools
+from utils import osmparser
 import vec2d
-import re
-
 
 OUR_MAGIC = "osm2nature"  # Used in e.g. stg files to mark edits by osm2nature.py
 

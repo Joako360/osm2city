@@ -55,32 +55,29 @@ You should disable random buildings.
 # - comments: code # -- comment
 
 import argparse
-import pickle
 import logging
 import os
+import pickle
 import random
-from typing import List
 import sys
 import textwrap
-
-import numpy as np
-import shapely.geometry as shgm
-import shapely.geos as shgs
+from typing import List
 
 import building_lib
 import calc_tile
 import cluster
 import coordinates
-import osmparser
+import numpy as np
 import parameters
+import shapely.geometry as shgm
+import shapely.geos as shgs
 import stg_io2
 import textures.manager as tex_manager
-from textures.manager import TextureManager, FacadeManager  # this is needed to make pickle know the context
 import tools
-import utils.utilities as util
 import troubleshoot
+from utils import osmparser
+import utils.utilities as util
 import vec2d as v
-
 
 buildings = []  # -- master list, holds all buildings
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
