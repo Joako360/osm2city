@@ -15,13 +15,13 @@ from math import sin, cos, radians, tan, sqrt, pi
 
 import ac3d
 import ac3d_fast
+import prepare_textures as tm
 import matplotlib.pyplot as plt
 import myskeleton
 import numpy as np
 import parameters
 import roofs
 import shapely.geometry as shg
-import textures.manager as tm
 import tools
 import utils.utilities as util
 from utils.vec2d import Vec2d
@@ -765,7 +765,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         # -- find local texture if infos different from parent
         #
         if b.parent is None:
-            b.facade_texture = facades.find_matching(facade_requires, b.tags, b.height, b.longest_edge_len)
+            b.facade_texture = facades.find_matching_facade(facade_requires, b.tags, b.height, b.longest_edge_len)
         else:
             # 1 - Check if building and building parent infos are the same
             
@@ -796,12 +796,12 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             # 2 - If same infos use building parent facade else find new texture
             if b_color == b_parent_color and b_material == b_parent_material:
                     if b.parent.facade_texture is None:
-                        b.facade_texture = facades.find_matching(facade_requires, b.parent.tags, b.height, b.longest_edge_len)
+                        b.facade_texture = facades.find_matching_facade(facade_requires, b.parent.tags, b.height, b.longest_edge_len)
                         b.parent.facade_texture = b.facade_texture
                     else:
                         b.facade_texture = b.parent.facade_texture
             else:
-                b.facade_texture = facades.find_matching(facade_requires, b.tags, b.height, b.longest_edge_len)
+                b.facade_texture = facades.find_matching_facade(facade_requires, b.tags, b.height, b.longest_edge_len)
 
         if b.facade_texture:
             logging.verbose("__done" + str(b.facade_texture) + str(b.facade_texture.provides))
@@ -850,7 +850,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         #
         logging.verbose("___find roof for building %i" % b.osm_id)
         if b.parent is None:
-            b.roof_texture = roofs.find_matching(roof_requires)
+            b.roof_texture = roofs.find_matching_roof(roof_requires)
             if not b.roof_texture:
                 tools.stats.skipped_texture += 1
                 logging.warning("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
@@ -906,7 +906,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             # 2 - If same infos use building parent facade else find new texture
             if r_color == r_parent_color and r_material == r_parent_material:
                 if b.parent.roof_texture is None:
-                    b.roof_texture = roofs.find_matching(roof_requires)
+                    b.roof_texture = roofs.find_matching_roof(roof_requires)
                     if not b.roof_texture:
                         tools.stats.skipped_texture += 1
                         logging.warning("WARNING: no matching texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
@@ -915,7 +915,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 else:
                     b.roof_texture = b.parent.roof_texture
             else :
-                b.roof_texture = roofs.find_matching(roof_requires)
+                b.roof_texture = roofs.find_matching_roof(roof_requires)
                 if not b.roof_texture:
                     tools.stats.skipped_texture += 1
                     logging.warning("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))

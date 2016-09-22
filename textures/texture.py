@@ -1,4 +1,8 @@
+import random
+import re
+
 import numpy as np
+import tools
 from PIL import Image
 import logging
 import os
@@ -161,3 +165,224 @@ Please set either h_can_repeat or v_can_repeat to False.' % self.filename
 
     def closest_h_match(self, frac):
         return self.h_cuts[np.abs(self.h_cuts - frac).argmin()]
+
+
+class RoofManager(object):
+    def __init__(self, cls):
+        self.__l = []
+        self.__cls = cls  # -- class (roof, facade, ...)
+        self.current_registered_in = ""
+
+    def append(self, t):
+        """Appends a texture to the catalog if the referenced file exists, in which case True is returned.
+        Otherwise False is returned and the texture is not added.
+
+        Prepend each item in t.provides with class name, except for class-independent keywords: age,region,compat
+        """
+        # check whether already during initialization an error occured
+        if t.validation_message:
+            logging.warning("Defined in registration file %s: %s", self.current_registered_in, t.validation_message)
+            return False
+
+        t.registered_in = self.current_registered_in
+
+        # check whether the same texture already has been referenced in an existing entry
+        for existing in self.__l:
+            if existing.filename == t.filename:
+                logging.warning("Defined in registration file %s: %s has already been referenced in %s",
+                                self.current_registered_in, t.filename, existing.registered_in)
+                return False
+
+        new_provides = []
+        logging.debug("Based on registration file %s: added %s ", self.current_registered_in, t.filename)
+        for item in t.provides:
+            if item.split(':')[0] in ('age', 'region', 'compat'):
+                new_provides.append(item)
+            else:
+                new_provides.append(self.__cls + ':' + item)
+        t.provides = new_provides
+        t.cls = self.__cls
+
+        tools.stats.textures_total[t.filename] = None
+        self.__l.append(t)
+        return True
+
+    def find_matching_roof(self, requires=[]):
+        candidates = self.find_candidates(requires)
+        logging.verbose("looking for texture" + str(requires))  # @UndefinedVariable
+        for c in candidates:
+            logging.verbose("  candidate " + c.filename + " provides " + str(c.provides))  # @UndefinedVariable
+        if len(candidates) == 0:
+            return None
+        the_texture = candidates[random.randint(0, len(candidates)-1)]
+        tools.stats.count_texture(the_texture)
+        return the_texture
+
+    def find_candidates(self, requires=[], excludes=[]):
+        candidates = []
+        # replace known hex colour codes
+        requires = list(_map_hex_colour(value) for value in requires)
+        can_use = True
+        for candidate in self.__l:
+            for ex in excludes:
+                # check if we maybe have a tag that doesn't match a requires
+                ex_material_key = 'XXX'
+                ex_colour_key = 'XXX'
+                ex_material = ''
+                ex_colour = ''
+                if re.match('^.*material:.*', ex) :
+                    ex_material_key = re.match('(^.*:material:)[^:]*', ex).group(1)
+                    ex_material = re.match('^.*material:([^:]*)', ex).group(1)
+                elif re.match('^.*:colour:.*', ex) :
+                    ex_colour_key = re.match('(^.*:colour:)[^:]*', ex).group(1)
+                    ex_colour = re.match('^.*:colour:([^:]*)', ex).group(1)
+                for req in candidate.requires:
+                    if req.startswith(ex_colour_key) and ex_colour is not re.match('^.*:colour:(.*)', req).group(1):
+                        can_use = False
+                    if req.startswith(ex_material_key) and ex_material is not re.match('^.*:material:(.*)',
+                                                                                       req).group(1):
+                        can_use = False
+
+            if set(requires).issubset(candidate.provides):
+                # Check for "specific" texture in order they do not pollute everything
+                if ('facade:specific' in candidate.provides) or ('roof:specific' in candidate.provides):
+                    can_use = False
+                    req_material = None
+                    req_colour = None
+                    for req in requires:
+                        if re.match('^.*material:.*', req):
+                            req_material = re.match('^.*material:(.*)', req).group(0)
+                        elif re.match('^.*:colour:.*', req):
+                            req_colour = re.match('^.*:colour:(.*)', req).group(0)
+
+                    prov_materials = []
+                    prov_colours = []
+                    prov_material = None
+                    prov_colour   = None
+                    for prov in candidate.provides :
+                        if re.match('^.*:material:.*', prov):
+                            prov_material = re.match('^.*:material:(.*)', prov).group(0)
+                            prov_materials.append(prov_material)
+                        elif re.match('^.*:colour:.*', prov):
+                            prov_colour = re.match('^.*:colour:(.*)', prov).group(0)
+                            prov_colours.append(prov_colour)
+
+                    # req_material and colour
+                    can_material = False
+                    if req_material is not None:
+                        for prov_material in prov_materials :
+                            logging.verbose("Provides ", prov_material, " Requires ", requires)  # @UndefinedVariable
+                            if prov_material in requires:
+                                can_material = True
+                                break
+                    else:
+                        can_material = True
+
+                    can_colour = False
+                    if req_colour is not None:
+                        for prov_colour in prov_colours:
+                            if prov_colour in requires:
+                                can_colour = True
+                                break
+                    else:
+                        can_colour = True
+
+                    if can_material and can_colour:
+                        can_use = True
+
+                if can_use:
+                    candidates.append(candidate)
+            else:
+                logging.verbose("  unmet requires %s req %s prov %s"
+                                , str(candidate.filename), str(requires), str(candidate.provides))  # @UndefinedVariable
+        return candidates
+
+    def __str__(self):
+        return "".join([str(t) + '\n' for t in self.__l])
+
+    def __getitem__(self, i):
+        return self.__l[i]
+
+    def get_list(self):
+        return self.__l
+
+
+class FacadeManager(RoofManager):
+    def find_matching_facade(self, requires, tags, height, width):
+        exclusions = []
+        if 'roof:colour' in tags:
+            exclusions.append("%s:%s" % ('roof:colour', tags['roof:colour']))
+        candidates = self.find_candidates(requires, exclusions, height, width)
+        if len(candidates) == 0:
+            logging.warning("no matching facade texture for %1.f m x %1.1f m <%s>", height, width, str(requires))
+            return None
+        ranked_list = self.rank_candidates(candidates, tags)
+        the_texture = ranked_list[random.randint(0, len(ranked_list) - 1)]
+        tools.stats.count_texture(the_texture)
+        return the_texture
+
+    def rank_candidates(self, candidates, tags):
+        ranked_list = []
+        for t in candidates:
+            match = 0
+            if 'building:material' in tags:
+                val = tags['building:material']
+                new_key = ("facade:building:material:%s") % (val)
+                if new_key in t.provides:
+                    match += 1
+            ranked_list.append([match, t])
+#         b = ranked_list[:,0]
+        ranked_list.sort(key=lambda tup: tup[0], reverse=True)
+        max_val = ranked_list[0][0]
+        if max_val > 0:
+            logging.info("Max Rank %d" % max_val)
+        return [t[1] for t in ranked_list if t[0] >= max_val]
+
+    def find_candidates(self, requires, excludes, height, width):
+        candidates = RoofManager.find_candidates(self, requires, excludes)
+        # -- check height
+        new_candidates = []
+        for t in candidates:
+            if height < t.height_min or height > t.height_max:
+                logging.verbose("height %.2f (%.2f-%.2f) outside bounds : %s"
+                                , height, t.height_min, t.height_max, str(t.filename))  # @UndefinedVariable
+                continue
+            if width < t.width_min or width > t.width_max:
+                logging.verbose("width %.2f (%.2f-%.2f) outside bounds : %s"
+                                , width, t.width_min, t.width_max, str(t.filename))  # @UndefinedVariable
+                continue
+
+            new_candidates.append(t)
+        return new_candidates
+
+
+def _map_hex_colour(value):
+    colour_map = {
+                  "#000000": "black",
+                  "#FFFFFF": "white",
+                  "#fff": "white",
+                  "#808080": "grey",
+                  "#C0C0C0": "silver",
+                  "#800000": "maroon",
+                  "#FF0000": "red",
+                  "#808000": "olive",
+                  "#FFFF00": "yellow",
+                  "#008000": "green",
+                  "#00FF00": "lime",
+                  "#008080": "teal",
+                  "#00FFFF": "aqua",
+                  "#000080": "navy",
+                  "#0000FF": "blue",
+                  "#800080": "purple",
+                  "#FF00FF": "fuchsia"
+    }
+    hash_pos = value.find("#")
+    if (value.startswith("roof:colour") or value.startswith("facade:building:colour")) and hash_pos > 0:
+        try:
+            tag_string = value[:hash_pos]
+            colour_hex_string = value[hash_pos:].upper()
+
+            return tag_string + colour_map[colour_hex_string]
+        except KeyError:
+            return value
+    return value

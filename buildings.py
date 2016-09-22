@@ -66,12 +66,12 @@ from typing import List
 import building_lib
 import cluster
 import coordinates
+import prepare_textures
 import numpy as np
 import parameters
 import shapely.geometry as shgm
 import shapely.geos as shgs
 import stg_io2
-import textures.manager as tex_manager
 import tools
 import troubleshoot
 import utils.utilities as util
@@ -499,7 +499,7 @@ if __name__ == "__main__":
 
     tools.init(coordinates.Transformation(center, hdg=0))
 
-    tex_manager.init(util.get_osm2city_directory(), args.create_atlas)
+    prepare_textures.init(util.get_osm2city_directory(), args.create_atlas)
 
     logging.info("reading elevation data")
     elev = tools.get_interpolator(fake=parameters.NO_ELEV)
@@ -1041,7 +1041,7 @@ if __name__ == "__main__":
     #   - TODO: analyze surrounding: similar shaped buildings nearby? will get same texture
     #   - set building type, roof type etc
     buildings = building_lib.analyse(buildings, static_objects, tools.transform, elev,
-                                     tex_manager.facades, tex_manager.roofs)
+                                     prepare_textures.facades, prepare_textures.roofs)
 
     # -- initialize STG_Manager
     path_to_output = parameters.get_output_path()
