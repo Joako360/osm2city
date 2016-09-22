@@ -306,9 +306,9 @@ class SharedPylon(object):
         elif self.direction_type == SharedPylon.DIRECTION_TYPE_START:
             direction_correction = 180
 
-        my_stg_mgr.add_object_shared(self.pylon_model, vec2d.vec2d(self.lon, self.lat)
-                                     , self.elevation
-                                     , stg_angle(self.heading - 90 + direction_correction))  # 90 less because arms are in x-direction in ac-file
+        my_stg_mgr.add_object_shared(self.pylon_model, vec2d.vec2d(self.lon, self.lat),
+                                     self.elevation,
+                                     stg_angle(self.heading - 90 + direction_correction))  # 90 less because arms are in x-direction in ac-file
 
 
 class Pylon(SharedPylon):
@@ -351,7 +351,6 @@ class LineWithoutCables(object):
         """
         Adds the stg entries for the pylons of this WayLine
         """
-        entries = []
         for my_pylon in self.shared_pylons:
             my_pylon.make_stg_entry(my_stg_mgr)
 
@@ -374,7 +373,7 @@ class StreetlampWay(LineWithoutCables):
 
     @staticmethod
     def has_lamps(highway_type):
-        if Highway.TYPE_SLOW == highway_type:
+        if highway_type is roads.HighwayType.slow:
             return False
         return True
 
@@ -390,8 +389,8 @@ class StreetlampWay(LineWithoutCables):
             model = "Models/StreetFurniture/Streetlamp2.xml"
             default_distance = parameters.C2P_STREETLAMPS_OTHER_DISTANCE
             parallel_offset = self.highway.get_width()/2
-            if self.highway.type_ in [Highway.TYPE_SERVICE, Highway.TYPE_RESIDENTIAL, Highway.TYPE_LIVING_STREET
-                                      , Highway.TYPE_PEDESTRIAN]:
+            if self.highway.type_ in [roads.HighwayType.service, roads.HighwayType.residential,
+                                      roads.HighwayType.living_street, roads.HighwayType.pedestrian]:
                 model = "Models/StreetFurniture/Streetlamp1.xml"
                 default_distance = parameters.C2P_STREETLAMPS_RESIDENTIAL_DISTANCE
 
@@ -650,7 +649,8 @@ class WayLine(Line):  # The name "Line" is also used in e.g. SymPy
 
         # use statistics to determine type_ and pylon_model
         if (self.type_ == self.TYPE_POWER_MINOR_LINE and nbr_towers <= nbr_poles
-           and max_height <= 25.0 and max_length <= 250.0) or (self.type_ == self.TYPE_POWER_LINE and max_length <= 150):
+                and max_height <= 25.0 and max_length <= 250.0) \
+                or (self.type_ == self.TYPE_POWER_LINE and max_length <= 150):
             self.type_ = self.TYPE_POWER_MINOR_LINE
             pylon_model = "Models/Power/wooden_pole_14m.ac"
         else:
@@ -768,8 +768,8 @@ class RailLine(Line):
                 else:
                     test_distance = current_distance + RailLine.DEFAULT_MAST_DISTANCE
                     point_on_line = self.linear.interpolate(test_distance)
-                    new_angle = coordinates.calc_angle_of_line_local(prev_point.x, prev_point.y
-                                                                     , point_on_line.x, point_on_line.y)
+                    new_angle = coordinates.calc_angle_of_line_local(prev_point.x, prev_point.y,
+                                                                     point_on_line.x, point_on_line.y)
                     difference = abs(new_angle - prev_angle)
                     if difference >= 25:
                         current_distance += 10
@@ -817,8 +817,8 @@ class RailLine(Line):
             my_mast.calc_global_coordinates(my_elev_interpolator, my_coord_transformator)
 
         # cables
-        self._calc_cables(parameters.C2P_RADIUS_OVERHEAD_LINE, parameters.C2P_EXTRA_VERTICES_OVERHEAD_LINE
-                          , parameters.C2P_CATENARY_A_OVERHEAD_LINE)
+        self._calc_cables(parameters.C2P_RADIUS_OVERHEAD_LINE, parameters.C2P_EXTRA_VERTICES_OVERHEAD_LINE,
+                          parameters.C2P_CATENARY_A_OVERHEAD_LINE)
 
     def check_mast_left_right(self, mast_point, rail_lines_list):
         mast_buffer = mast_point.buffer(RailLine.MAST_BUFFER)
@@ -1054,7 +1054,8 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, my_elev_interpolator, my_
                                     building_ref = building_refs[osm_id]
                                     if building_ref.contains(my_point):
                                         my_pylon.in_osm_building = True
-                                        logging.debug('Station with osm_id = %s found within building reference', my_pylon.osm_id)
+                                        logging.debug('Station with osm_id = %s found within building reference',
+                                                      my_pylon.osm_id)
                                         break
                         elif "height" == key:
                             my_pylon.height = osmparser.parse_length(value)
@@ -1256,13 +1257,13 @@ def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator):
     for way in list(ways_dict.values()):
         for key in way.tags:
             if "building" == key:
-                coordinates = list()
+                my_coordinates = list()
                 for ref in way.refs:
                     if ref in nodes_dict:
                         my_node = nodes_dict[ref]
-                        coordinates.append(my_coord_transformator.toLocal((my_node.lon, my_node.lat)))
-                if 2 < len(coordinates):
-                    my_polygon = shg.Polygon(coordinates)
+                        my_coordinates.append(my_coord_transformator.toLocal((my_node.lon, my_node.lat)))
+                if 2 < len(my_coordinates):
+                    my_polygon = shg.Polygon(my_coordinates)
                     if my_polygon.is_valid and not my_polygon.is_empty:
                         my_buildings[way.osm_id] = my_polygon.convex_hull
     return my_buildings
@@ -1301,7 +1302,7 @@ def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
             value = way.tags[key]
             if "highway" == key:
                 valid_highway = True
-                my_highway.type_ = roads.highway_type_from_osm_tags(key, value)
+                my_highway.type_ = roads.highway_type_from_osm_tags(value)
                 if None is my_highway.type_:
                     valid_highway = False
             elif ("tunnel" == key) and ("yes" == value):
@@ -1456,13 +1457,13 @@ def main():
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
     # the lists below are in sequence: buildings references, power/aerialway, railway overhead, landuse and highway
-    valid_node_keys = ["power", "structure", "material", "height", "colour", "aerialway"
-                       , "railway"]
-    valid_way_keys = ["building"
-                      , "power", "aerialway", "voltage", "cables", "wires"
-                      , "railway", "electrified", "tunnel"
-                      , "landuse"
-                      , "highway", "junction"]
+    valid_node_keys = ["power", "structure", "material", "height", "colour", "aerialway",
+                       "railway"]
+    valid_way_keys = ["building",
+                      "power", "aerialway", "voltage", "cables", "wires",
+                      "railway", "electrified", "tunnel",
+                      "landuse",
+                      "highway", "junction"]
     valid_relation_keys = []
     req_relation_keys = []
     req_way_keys = ["building", "power", "aerialway", "railway", "landuse", "highway"]
