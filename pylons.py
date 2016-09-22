@@ -49,8 +49,8 @@ class Cable(object):
         self.end_cable_vertex = end_cable_vertex
         self.vertices = [self.start_cable_vertex, self.end_cable_vertex]
         self.radius = radius
-        self.heading = coordinates.calc_angle_of_line_local(start_cable_vertex.x, start_cable_vertex.y
-                                                            , end_cable_vertex.x, end_cable_vertex.y)
+        self.heading = coordinates.calc_angle_of_line_local(start_cable_vertex.x, start_cable_vertex.y,
+                                                            end_cable_vertex.x, end_cable_vertex.y)
 
         if (number_extra_vertices > 0) and (catenary_a > 0) and (distance >= parameters.C2P_CATENARY_MIN_DISTANCE):
             self._make_catenary_cable(number_extra_vertices, catenary_a)
@@ -62,8 +62,8 @@ class Cable(object):
         be taken into account https://en.wikipedia.org/wiki/File:Catenary-tension.png.
         However the elevation correction actually already helps quite a bit, because the x/y are kept constant.
         """
-        cable_distance = coordinates.calc_distance_local(self.start_cable_vertex.x, self.start_cable_vertex.y
-                                                         , self.end_cable_vertex.x, self.end_cable_vertex.y)
+        cable_distance = coordinates.calc_distance_local(self.start_cable_vertex.x, self.start_cable_vertex.y,
+                                                         self.end_cable_vertex.x, self.end_cable_vertex.y)
         part_distance = cable_distance / (1 + number_extra_vertices)
         pylon_y = catenary_a * math.cosh((cable_distance / 2) / catenary_a)
         part_elevation = ((self.start_cable_vertex.elevation - self.end_cable_vertex.elevation) /
@@ -165,73 +165,73 @@ class CableVertex(object):
 
 
 def create_generic_pylon_25_vertices():
-    vertices = [CableVertex(5.0, 12.6)
-                , CableVertex(-5.0, 12.6)
-                , CableVertex(5.0, 16.8)
-                , CableVertex(-5.0, 16.8)
-                , CableVertex(5.0, 21.0)
-                , CableVertex(-5.0, 21.0)
-                , CableVertex(0.0, 25.2, top_cable=True)]
+    vertices = [CableVertex(5.0, 12.6),
+                CableVertex(-5.0, 12.6),
+                CableVertex(5.0, 16.8),
+                CableVertex(-5.0, 16.8),
+                CableVertex(5.0, 21.0),
+                CableVertex(-5.0, 21.0),
+                CableVertex(0.0, 25.2, top_cable=True)]
     return vertices
 
 
 def create_generic_pylon_50_vertices():
-    vertices = [CableVertex(10.0, 25.2)
-                , CableVertex(-10.0, 25.2)
-                , CableVertex(10.0, 33.6)
-                , CableVertex(-10.0, 33.6)
-                , CableVertex(10.0, 42.0)
-                , CableVertex(-10.0, 42.0)
-                , CableVertex(0.0, 50.4, top_cable=True)]
+    vertices = [CableVertex(10.0, 25.2),
+                CableVertex(-10.0, 25.2),
+                CableVertex(10.0, 33.6),
+                CableVertex(-10.0, 33.6),
+                CableVertex(10.0, 42.0),
+                CableVertex(-10.0, 42.0),
+                CableVertex(0.0, 50.4, top_cable=True)]
     return vertices
 
 
 def create_generic_pylon_100_vertices():
-    vertices = [CableVertex(20.0, 50.4)
-                , CableVertex(-20.0, 50.4)
-                , CableVertex(20.0, 67.2)
-                , CableVertex(-20.0, 67.2)
-                , CableVertex(20.0, 84.0)
-                , CableVertex(-20.0, 84.0)
-                , CableVertex(0.0, 100.8, top_cable=True)]
+    vertices = [CableVertex(20.0, 50.4),
+                CableVertex(-20.0, 50.4),
+                CableVertex(20.0, 67.2),
+                CableVertex(-20.0, 67.2),
+                CableVertex(20.0, 84.0),
+                CableVertex(-20.0, 84.0),
+                CableVertex(0.0, 100.8, top_cable=True)]
     return vertices
 
 
 def create_wooden_pole_14m_vertices():
-    vertices = [CableVertex(1.7, 14.4)
-                , CableVertex(-1.7, 14.4)
-                , CableVertex(2.7, 12.6)
-                , CableVertex(0.7, 12.6)
-                , CableVertex(-2.7, 12.6)
-                , CableVertex(-0.7, 12.6)]
+    vertices = [CableVertex(1.7, 14.4),
+                CableVertex(-1.7, 14.4),
+                CableVertex(2.7, 12.6),
+                CableVertex(0.7, 12.6),
+                CableVertex(-2.7, 12.6),
+                CableVertex(-0.7, 12.6)]
     return vertices
 
 
 def create_drag_lift_pylon():
-    vertices = [CableVertex(2.8, 8.1)
-                , CableVertex(-0.8, 8.1)]
+    vertices = [CableVertex(2.8, 8.1),
+                CableVertex(-0.8, 8.1)]
     return vertices
 
 
 def create_drag_lift_in_osm_building():
-    vertices = [CableVertex(2.8, 3.0)
-                , CableVertex(-0.8, 3.0)]
+    vertices = [CableVertex(2.8, 3.0),
+                CableVertex(-0.8, 3.0)]
     return vertices
 
 
 def create_rail_power_vertices(direction_type):
     if direction_type == SharedPylon.DIRECTION_TYPE_MIRROR:
-        vertices = [CableVertex(-1.95, 5.85)
-                    , CableVertex(-1.95, 4.95, no_catenary=True)]
+        vertices = [CableVertex(-1.95, 5.85),
+                    CableVertex(-1.95, 4.95, no_catenary=True)]
     else:
-        vertices = [CableVertex(1.95, 5.85)
-                    , CableVertex(1.95, 4.95, no_catenary=True)]
+        vertices = [CableVertex(1.95, 5.85),
+                    CableVertex(1.95, 4.95, no_catenary=True)]
     return vertices
 
 
 def create_rail_stop_tension():
-    vertices = [CableVertex(0, 5.35)
-                , CableVertex(0, 4.95, no_catenary=True)]
+    vertices = [CableVertex(0, 5.35),
+                CableVertex(0, 4.95, no_catenary=True)]
     return vertices
 
 
@@ -264,8 +264,8 @@ class WaySegment(object):
         self.end_pylon = end_pylon
         self.cables = []
         self.length = coordinates.calc_distance_local(start_pylon.x, start_pylon.y, end_pylon.x, end_pylon.y)
-        self.heading = coordinates.calc_angle_of_line_local(start_pylon.x, start_pylon.y
-                                                            , end_pylon.x, end_pylon.y)
+        self.heading = coordinates.calc_angle_of_line_local(start_pylon.x, start_pylon.y,
+                                                            end_pylon.x, end_pylon.y)
 
 
 class SharedPylon(object):
@@ -453,23 +453,23 @@ class Line(LineWithoutCables):
         Afterwards use the start and end points to create all cables for a given WaySegment
         """
         for segment in self.way_segments:
-            start_cable_vertices = get_cable_vertices(segment.start_pylon.pylon_model
-                                                      , segment.start_pylon.direction_type)
-            end_cable_vertices = get_cable_vertices(segment.end_pylon.pylon_model
-                                                    , segment.end_pylon.direction_type)
+            start_cable_vertices = get_cable_vertices(segment.start_pylon.pylon_model,
+                                                      segment.start_pylon.direction_type)
+            end_cable_vertices = get_cable_vertices(segment.end_pylon.pylon_model,
+                                                    segment.end_pylon.direction_type)
             for i in range(0, len(start_cable_vertices)):
                 my_radius = radius
                 my_number_extra_vertices = number_extra_vertices
-                start_cable_vertices[i].calc_position(segment.start_pylon.x, segment.start_pylon.y
-                                                      , segment.start_pylon.elevation, segment.start_pylon.heading)
-                end_cable_vertices[i].calc_position(segment.end_pylon.x, segment.end_pylon.y
-                                                    , segment.end_pylon.elevation, segment.end_pylon.heading)
+                start_cable_vertices[i].calc_position(segment.start_pylon.x, segment.start_pylon.y,
+                                                      segment.start_pylon.elevation, segment.start_pylon.heading)
+                end_cable_vertices[i].calc_position(segment.end_pylon.x, segment.end_pylon.y,
+                                                    segment.end_pylon.elevation, segment.end_pylon.heading)
                 if start_cable_vertices[i].top_cable:
                     my_radius = parameters.C2P_RADIUS_TOP_LINE
                 if start_cable_vertices[i].no_catenary:
                     my_number_extra_vertices = 0
-                cable = Cable(start_cable_vertices[i], end_cable_vertices[i], my_radius, my_number_extra_vertices
-                              , catenary_a, segment.length)
+                cable = Cable(start_cable_vertices[i], end_cable_vertices[i], my_radius, my_number_extra_vertices,
+                              catenary_a, segment.length)
                 segment.cables.append(cable)
 
     def make_cables_ac_xml_stg_entries(self, my_stg_mgr, line_index, wayname, cluster_max_length, my_files_to_remove):
@@ -496,16 +496,16 @@ class Line(LineWithoutCables):
             if (cluster_length >= cluster_max_length) or (len(self.way_segments) - 1 == i):
                 # calculate the angle between local and global
                 end_pylon = way_segment.end_pylon
-                angle_local = coordinates.calc_angle_of_line_local(start_pylon.x, start_pylon.y
-                                                                   , end_pylon.x, end_pylon.y)
-                angle_global = coordinates.calc_angle_of_line_global(start_pylon.lon, start_pylon.lat
-                                                                     , end_pylon.lon, end_pylon.lat)
+                angle_local = coordinates.calc_angle_of_line_local(start_pylon.x, start_pylon.y,
+                                                                   end_pylon.x, end_pylon.y)
+                angle_global = coordinates.calc_angle_of_line_global(start_pylon.lon, start_pylon.lat,
+                                                                     end_pylon.lon, end_pylon.lat)
                 angle_difference = angle_local - angle_global
                 # write stuff to files
                 cluster_filename = parameters.get_repl_prefix() + wayname + "%05d_%05d" % (line_index, cluster_index)
-                path_to_stg = my_stg_mgr.add_object_static(cluster_filename + '.xml'
-                                                           , vec2d.vec2d(start_pylon.lon, start_pylon.lat)
-                                                           , start_pylon.elevation, 90 + angle_difference)
+                path_to_stg = my_stg_mgr.add_object_static(cluster_filename + '.xml',
+                                                           vec2d.vec2d(start_pylon.lon, start_pylon.lat),
+                                                           start_pylon.elevation, 90 + angle_difference)
                 if None is not my_files_to_remove:
                     my_files_to_remove.append(path_to_stg + cluster_filename + ".ac")
                     my_files_to_remove.append(path_to_stg + cluster_filename + ".xml")
@@ -652,7 +652,7 @@ class WayLine(Line):  # The name "Line" is also used in e.g. SymPy
         if (self.type_ == self.TYPE_POWER_MINOR_LINE and nbr_towers <= nbr_poles
            and max_height <= 25.0 and max_length <= 250.0) or (self.type_ == self.TYPE_POWER_LINE and max_length <= 150):
             self.type_ = self.TYPE_POWER_MINOR_LINE
-            pylon_model = "Models/Power/wooden_pole_14m.xml"
+            pylon_model = "Models/Power/wooden_pole_14m.ac"
         else:
             self.type_ = self.TYPE_POWER_LINE
             if average_height < 35.0 and max_length < 300.0:
@@ -728,11 +728,11 @@ class RailLine(Line):
         point_on_line = self.linear.interpolate(0)
         mast_point = my_right_parallel.interpolate(my_right_parallel_length)
         if self.nodes[0].buffer_stop:
-            self.shared_pylons.append(RailMast(RailMast.TYPE_STOP_MAST, point_on_line, point_on_line
-                                               , SharedPylon.DIRECTION_TYPE_START))
+            self.shared_pylons.append(RailMast(RailMast.TYPE_STOP_MAST, point_on_line, point_on_line,
+                                               SharedPylon.DIRECTION_TYPE_START))
         else:
-            self.shared_pylons.append(RailMast(RailMast.TYPE_VIRTUAL_MAST, point_on_line, mast_point
-                                               , SharedPylon.DIRECTION_TYPE_MIRROR))
+            self.shared_pylons.append(RailMast(RailMast.TYPE_VIRTUAL_MAST, point_on_line, mast_point,
+                                               SharedPylon.DIRECTION_TYPE_MIRROR))
         prev_point = point_on_line
 
         # get the first mast point
@@ -792,19 +792,19 @@ class RailLine(Line):
                     direction_type = SharedPylon.DIRECTION_TYPE_NORMAL
                     mast_point = my_left_parallel.interpolate(current_distance * (my_left_parallel_length / my_length))
                 self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point, direction_type))
-                prev_angle = coordinates.calc_angle_of_line_local(prev_point.x, prev_point.y
-                                                                  , point_on_line.x, point_on_line.y)
+                prev_angle = coordinates.calc_angle_of_line_local(prev_point.x, prev_point.y,
+                                                                  point_on_line.x, point_on_line.y)
                 prev_point = point_on_line
 
         # virtual end point
         point_on_line = self.linear.interpolate(my_length)
         mast_point = my_right_parallel.interpolate(0)
         if self.nodes[-1].buffer_stop:
-            self.shared_pylons.append(RailMast(RailMast.TYPE_STOP_MAST, point_on_line, point_on_line
-                                               , SharedPylon.DIRECTION_TYPE_END))
+            self.shared_pylons.append(RailMast(RailMast.TYPE_STOP_MAST, point_on_line, point_on_line,
+                                               SharedPylon.DIRECTION_TYPE_END))
         else:
-            self.shared_pylons.append(RailMast(RailMast.TYPE_VIRTUAL_MAST, point_on_line, mast_point
-                                               , SharedPylon.DIRECTION_TYPE_MIRROR))
+            self.shared_pylons.append(RailMast(RailMast.TYPE_VIRTUAL_MAST, point_on_line, mast_point,
+                                               SharedPylon.DIRECTION_TYPE_MIRROR))
 
         # calculate heading
         calc_heading_nodes(self.shared_pylons)
@@ -959,7 +959,8 @@ def process_highways_for_streetlamps(my_highways, landuse_buffers):
         my_streetlamp = my_streetlamps[key]
         if not isinstance(my_streetlamp.highway.linear, shg.LineString):
             del my_streetlamps[key]
-        elif my_streetlamp.highway.is_roundabout and (50 > my_streetlamp.highway.linear.length or 300 < my_streetlamp.highway.linear.length):
+        elif my_streetlamp.highway.is_roundabout and\
+                (50 > my_streetlamp.highway.linear.length or 300 < my_streetlamp.highway.linear.length):
             del my_streetlamps[key]
         elif my_streetlamp.highway.linear.length < parameters.C2P_STREETLAMPS_MIN_STREET_LENGTH:
             del my_streetlamps[key]
@@ -1112,11 +1113,11 @@ def find_connecting_line(key, lines, max_allowed_angle=360):
     # Get the angle of each line
     for line in lines:
         if line.nodes[0].osm_id == key:
-            angle = coordinates.calc_angle_of_line_local(line.nodes[0].x, line.nodes[0].y
-                                                         , line.nodes[1].x, line.nodes[1].y)
+            angle = coordinates.calc_angle_of_line_local(line.nodes[0].x, line.nodes[0].y,
+                                                         line.nodes[1].x, line.nodes[1].y)
         elif line.nodes[-1].osm_id == key:
-            angle = coordinates.calc_angle_of_line_local(line.nodes[-1].x, line.nodes[-1].y
-                                                         , line.nodes[-2].x, line.nodes[-2].y)
+            angle = coordinates.calc_angle_of_line_local(line.nodes[-1].x, line.nodes[-1].y,
+                                                         line.nodes[-2].x, line.nodes[-2].y)
         else:
             raise Exception("The referenced node is not at the beginning or end of line0")
         angles.append(angle)
@@ -1204,8 +1205,8 @@ def calc_heading_nodes(nodes_array):
         prev_angle = current_angle
         current_pylon = nodes_array[x]
         next_pylon = nodes_array[x + 1]
-        current_angle = coordinates.calc_angle_of_line_local(current_pylon.x, current_pylon.y
-                                                             , next_pylon.x, next_pylon.y)
+        current_angle = coordinates.calc_angle_of_line_local(current_pylon.x, current_pylon.y,
+                                                             next_pylon.x, next_pylon.y)
         current_pylon.heading = calc_middle_angle(prev_angle, current_angle)
     nodes_array[-1].heading = current_angle
 
@@ -1390,8 +1391,8 @@ def generate_landuse_from_buildings(osm_landuses, building_refs):
             buffer_distance = parameters.LU_LANDUSE_BUILDING_BUFFER_DISTANCE
             if my_building.area > parameters.LU_LANDUSE_BUILDING_BUFFER_DISTANCE**2:
                 factor = math.sqrt(my_building.area / parameters.LU_LANDUSE_BUILDING_BUFFER_DISTANCE**2)
-                buffer_distance = min(factor*parameters.LU_LANDUSE_BUILDING_BUFFER_DISTANCE
-                                      , parameters.LU_LANDUSE_BUILDING_BUFFER_DISTANCE_MAX)
+                buffer_distance = min(factor*parameters.LU_LANDUSE_BUILDING_BUFFER_DISTANCE,
+                                      parameters.LU_LANDUSE_BUILDING_BUFFER_DISTANCE_MAX)
             buffer_polygon = my_building.buffer(buffer_distance)
             buffer_polygon = buffer_polygon
             within_existing_landuse = False
@@ -1424,12 +1425,12 @@ def main():
         description="pylons.py reads OSM data and creates pylons, powerlines and aerialways for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
-    parser.add_argument("-e", dest="e", action="store_true"
-                        , help="skip elevation interpolation", required=False)
-    parser.add_argument("-u", dest="uninstall", action="store_true"
-                        , help="uninstall ours from .stg", required=False)
-    parser.add_argument("-l", "--loglevel"
-                        , help="Set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL", required=False)
+    parser.add_argument("-e", dest="e", action="store_true",
+                        help="skip elevation interpolation", required=False)
+    parser.add_argument("-u", dest="uninstall", action="store_true",
+                        help="uninstall ours from .stg", required=False)
+    parser.add_argument("-l", "--loglevel",
+                        help="Set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL", required=False)
     args = parser.parse_args()
     if args.filename is not None:
         parameters.read_from_file(args.filename)
@@ -1526,14 +1527,14 @@ def main():
 
     # Write to Flightgear
     if parameters.C2P_PROCESS_POWERLINES:
-        write_stg_entries(stg_manager, files_to_remove, powerlines
-                          , "powerline", parameters.C2P_CLUSTER_POWER_LINE_MAX_LENGTH)
+        write_stg_entries(stg_manager, files_to_remove, powerlines,
+                          "powerline", parameters.C2P_CLUSTER_POWER_LINE_MAX_LENGTH)
     if parameters.C2P_PROCESS_AERIALWAYS:
-        write_stg_entries(stg_manager, files_to_remove, aerialways
-                          , "aerialway", parameters.C2P_CLUSTER_AERIALWAY_MAX_LENGTH)
+        write_stg_entries(stg_manager, files_to_remove, aerialways,
+                          "aerialway", parameters.C2P_CLUSTER_AERIALWAY_MAX_LENGTH)
     if parameters.C2P_PROCESS_OVERHEAD_LINES:
-        write_stg_entries(stg_manager, files_to_remove, rail_lines
-                          , "overhead", parameters.C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH)
+        write_stg_entries(stg_manager, files_to_remove, rail_lines,
+                          "overhead", parameters.C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH)
     if parameters.C2P_PROCESS_STREETLAMPS:
         write_stg_entries(stg_manager, files_to_remove, streetlamp_ways, None, None)
 
