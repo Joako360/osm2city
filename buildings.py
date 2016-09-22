@@ -65,10 +65,9 @@ from typing import List
 
 import building_lib
 import cluster
-import coordinates
-import prepare_textures
 import numpy as np
 import parameters
+import prepare_textures
 import shapely.geometry as shgm
 import shapely.geos as shgs
 import stg_io2
@@ -76,7 +75,7 @@ import tools
 import troubleshoot
 import utils.utilities as util
 import utils.vec2d as v
-from utils import osmparser, calc_tile
+from utils import osmparser, calc_tile, coordinates
 
 buildings = []  # -- master list, holds all buildings
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city

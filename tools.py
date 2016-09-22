@@ -21,13 +21,12 @@ import textwrap
 import time
 
 import batch_processing.fg_telnet as telnet
-import coordinates
 import matplotlib.pyplot as plt
 import numpy as np
 import parameters
 import utils.utilities as util
 import utils.vec2d as ve
-from utils import calc_tile
+from utils import calc_tile, coordinates
 from utils.utilities import Stats
 
 stats = None

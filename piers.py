@@ -13,7 +13,6 @@ import os
 from random import randint
 
 import ac3d
-import coordinates
 import numpy as np
 import parameters
 import shapely.geometry as shg
@@ -23,7 +22,7 @@ from cluster import Clusters
 from objectlist import ObjectList
 from shapely.geometry.base import CAP_STYLE, JOIN_STYLE
 from shapely.geometry.linestring import LineString
-from utils import osmparser
+from utils import osmparser, coordinates
 from utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2piers"  # Used in e.g. stg files to mark edits by osm2Piers

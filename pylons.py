@@ -25,13 +25,12 @@ import sys
 import unittest
 import xml.sax
 
-import coordinates
 import parameters
 import roads
 import shapely.geometry as shg
 import stg_io2
 import tools
-from utils import osmparser, vec2d
+from utils import osmparser, vec2d, coordinates
 
 OUR_MAGIC = "osm2pylon"  # Used in e.g. stg files to mark edits by osm2pylon
 

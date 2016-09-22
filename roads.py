@@ -87,7 +87,6 @@ import random
 import textwrap
 
 import ac3d
-import coordinates
 import graph
 import linear
 import linear_bridge
@@ -103,7 +102,7 @@ import tools
 import troubleshoot
 import utils.utilities as util
 from cluster import Clusters
-from utils import osmparser
+from utils import osmparser, coordinates
 from utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits

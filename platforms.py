@@ -15,12 +15,11 @@ import shapely.geometry as shg
 
 import ac3d
 from cluster import Clusters
-import coordinates
 from objectlist import ObjectList
 import parameters
 import stg_io2
 import tools
-from utils import osmparser
+from utils import osmparser, coordinates
 from utils.vec2d import Vec2d
 
 
