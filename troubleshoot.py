@@ -7,6 +7,7 @@ import textwrap
 
 import parameters
 import tools
+import utils.utilities
 
 
 class Troubleshoot:
@@ -57,7 +58,7 @@ def troubleshoot(stats):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    stats = tools.Stats()
+    stats = utils.utilities.Stats()
     stats.skipped_no_elev = 1
     stats.skipped_texture = 1
     troubleshoot(stats)

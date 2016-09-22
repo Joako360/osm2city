@@ -18,6 +18,7 @@ import os
 
 import numpy as np
 import tools
+import utils.utilities
 from utils.vec2d import Vec2d
 
 
@@ -28,7 +29,7 @@ class Cluster(object):
         self.center = center  # -- center in local coord
         self.min = center - size/2.
         self.max = center + size/2.
-        self.stats = tools.Stats()
+        self.stats = utils.utilities.Stats()
 
     def __str__(self):
         print("cl", self.I)
