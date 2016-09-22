@@ -13,14 +13,14 @@ STG_file represents an .stg file. Usually you don't deal with them directly,
 """
 
 import logging
-
-import shapely.geometry as shg
 import os
-import building_lib
-import tools
-from vec2d import vec2d
-import calc_tile
 import time
+
+import building_lib
+import shapely.geometry as shg
+import tools
+from utils import calc_tile
+from utils.vec2d import Vec2d
 
 
 class STG_File(object):
@@ -317,7 +317,7 @@ def quick_stg_line(path_to_scenery, ac_fname, position, elevation, heading, show
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     OUR_MAGIC = "osm2test"
-    center_global = vec2d(13.7, 51)
+    center_global = Vec2d(13.7, 51)
 
     # 1. Init STG_Manager
     stg_manager = STG_Manager("/home/albrecht/fgfs/my/osm2city/EDDC", OUR_MAGIC, overwrite=True)

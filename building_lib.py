@@ -8,25 +8,23 @@ Created on Thu Feb 28 23:18:08 2013
 import copy
 import logging
 import math
-from math import sin, cos, radians, tan, sqrt, pi
 import os
 import random
 import re
-
-import matplotlib.pyplot as plt
-import numpy as np
-import shapely.geometry as shg
-
+from math import sin, cos, radians, tan, sqrt, pi
 
 import ac3d
 import ac3d_fast
+import matplotlib.pyplot as plt
 import myskeleton
+import numpy as np
 import parameters
 import roofs
+import shapely.geometry as shg
 import textures.manager as tm
 import tools
 import utils.utilities as util
-from vec2d import vec2d
+from utils.vec2d import Vec2d
 
 nb = 0
 out = ""
@@ -53,7 +51,7 @@ class Building(object):
         self.longest_edge_len = 0.
         self.levels = levels
         self.first_node = 0  # index of first node in final OBJECT node list
-        self.anchor = vec2d(list(outer_ring.coords[0]))
+        self.anchor = Vec2d(list(outer_ring.coords[0]))
         self.facade_texture = None
         self.roof_texture = None
         self.roof_complex = False
@@ -89,9 +87,9 @@ class Building(object):
         for inner in self.polygon.interiors:
             min_r = 1e99
             for i, node_i in enumerate(list(inner.coords)[:-1]):
-                node_i = vec2d(node_i)
+                node_i = Vec2d(node_i)
                 for o in outer_nodes_avail:
-                    r = node_i.distance_to(vec2d(self.X_outer[o]))
+                    r = node_i.distance_to(Vec2d(self.X_outer[o]))
                     if r <= min_r:
                         closest_i = node_i
                         min_r = r
@@ -132,20 +130,20 @@ class Building(object):
         #    print "inner!", inner_rings
         self.polygon = shg.Polygon(outer, inner)
 
-    def _set_X(self, the_offset: vec2d) -> None:
+    def _set_X(self, the_offset: Vec2d) -> None:
         self.X = np.array(self.X_outer + self.X_inner)
         for i in range(self._nnodes_ground):
             self.X[i, 0] -= the_offset.x  # -- cluster coordinates. NB: this changes building coordinates!
             self.X[i, 1] -= the_offset.y
 
-    def set_ground_elev(self, elev, tile_elev, the_offset: vec2d) -> None:
+    def set_ground_elev(self, elev, tile_elev, the_offset: Vec2d) -> None:
 
         def local_elev(p):
             return elev(p + the_offset) - tile_elev
 
         self._set_X(the_offset)
 
-        elevs = [local_elev(vec2d(self.X[i])) for i in range(self._nnodes_ground)]
+        elevs = [local_elev(Vec2d(self.X[i])) for i in range(self._nnodes_ground)]
 
         self.ground_elev_min = min(elevs)
         self.ground_elev_max = max(elevs)
@@ -610,7 +608,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                         #        Or is there a shapely equivalent?
 
         # -- skip buildings outside elevation raster
-        if elev(vec2d(Xo[0])) == -9999:
+        if elev(Vec2d(Xo[0])) == -9999:
             logging.debug("-9999")
             tools.stats.skipped_no_elev += 1
             continue
@@ -1067,10 +1065,10 @@ def _write_ground(out, b, elev):  # not used anywhere
         # bla
 
     offset_z = 0.05
-    z0 = elev(vec2d(x0, y0)) + offset_z
-    z1 = elev(vec2d(x1, y0)) + offset_z
-    z2 = elev(vec2d(x1, y1)) + offset_z
-    z3 = elev(vec2d(x0, y1)) + offset_z
+    z0 = elev(Vec2d(x0, y0)) + offset_z
+    z1 = elev(Vec2d(x1, y0)) + offset_z
+    z2 = elev(Vec2d(x1, y1)) + offset_z
+    z3 = elev(Vec2d(x0, y1)) + offset_z
 
     o = out.next_node_index()
     out.node(-y0, z0, -x0)

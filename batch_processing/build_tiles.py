@@ -5,15 +5,15 @@ Created on 25.04.2014
 """
 import argparse
 import logging
-import sys
-import re
 import os
+import re
 import stat
+import sys
 from _io import open
 
-import calc_tile
 import parameters
 import utils.utilities as util
+from utils import calc_tile
 
 OSM_FILE_NAME = "data.osm"
 
@@ -36,8 +36,8 @@ def _open_file(name, directory):
     return open(directory + name, "w")
 
 
-def _write_to_file(command, file_handle, python_exe, params_out):
-    file_handle.write(python_exe + ' ' + util.get_osm2city_directory() + os.sep + command)
+def _write_to_file(the_command, file_handle, python_exec, params_out):
+    file_handle.write(python_exec + ' ' + util.get_osm2city_directory() + os.sep + the_command)
     file_handle.write(' -f ' + params_out)
     if BASH_PARALLEL_PROCESS:
         file_handle.write(' &' + os.linesep + 'parallel_wait $max_parallel_process' + os.linesep)
@@ -47,7 +47,8 @@ def _write_to_file(command, file_handle, python_exe, params_out):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    parser = argparse.ArgumentParser(description="build-tiles generates a directory structure capable of generating a complete 1 degree lon/lat-areas of scenery")
+    parser = argparse.ArgumentParser(description="build-tiles generates a directory structure capable of \
+    generating a complete 1 degree lon/lat-areas of scenery")
     parser.add_argument("-t", "--tile", dest="tile_name",
                         help="The name of the lon/lat-area (e.g. e009n47)", required=True)
     parser.add_argument("-f", "--properties", dest="properties",
@@ -76,7 +77,8 @@ if __name__ == '__main__':
                         help="Path to specific Python executable",
                         required=False)
     parser.add_argument("-d", dest="osmosis_executable",
-                        help="Use the OSM data as specified in params.ini and split it with Osmosis using the specified path to Osmosis",
+                        help="Use the OSM data as specified in params.ini and split it with Osmosis \
+                        using the specified path to Osmosis",
                         required=False)
 
     args = parser.parse_args()
@@ -188,8 +190,10 @@ done
                 replacement = '\\1 "' + replacement_path + '"'
                 for line in lines:
                     line = re.sub('^\s*(PREFIX\s*=)(.*)', replacement, line)
-                    line = re.sub('^\s*(BOUNDARY_EAST\s*=)(.*)', '\\1 %f' % (calc_tile.get_east_lon(lon, lat, dx)), line)
-                    line = re.sub('^\s*(BOUNDARY_WEST\s*=)(.*)', '\\1 %f' % (calc_tile.get_west_lon(lon, lat, dx)), line)
+                    line = re.sub('^\s*(BOUNDARY_EAST\s*=)(.*)', '\\1 %f' % (calc_tile.get_east_lon(lon, lat, dx)),
+                                  line)
+                    line = re.sub('^\s*(BOUNDARY_WEST\s*=)(.*)', '\\1 %f' % (calc_tile.get_west_lon(lon, lat, dx)),
+                                  line)
                     line = re.sub('^\s*(BOUNDARY_NORTH\s*=)(.*)', '\\1 %f' % (calc_tile.get_north_lat(lat, dy)), line)
                     line = re.sub('^\s*(BOUNDARY_SOUTH\s*=)(.*)', '\\1 %f' % (calc_tile.get_south_lat(lat, dy)), line)
                     line = re.sub('^\s*(OSM_FILE\s*=)(.*)', '\\1 "%s"' % OSM_FILE_NAME, line)

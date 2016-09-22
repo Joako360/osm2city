@@ -8,30 +8,27 @@ Created on Sat Mar 23 18:42:23 2013½
 @author: tom
 """
 import argparse
-import pickle
 import csv
 import logging
 import math
 import os
+import pickle
 import queue
 import shutil
 import subprocess
 import sys
 import textwrap
 import time
-
-import matplotlib.pyplot as plt
-import numpy as np
-
-import batch_processing.fg_telnet as telnet
-import calc_tile
-import coordinates
-import parameters
-import utils.utilities as util
-import vec2d as ve
-
 from _collections import defaultdict
 
+import batch_processing.fg_telnet as telnet
+import coordinates
+import matplotlib.pyplot as plt
+import numpy as np
+import parameters
+import utils.utilities as util
+import utils.vec2d as ve
+from utils import calc_tile
 
 stats = None
 transform = None
@@ -80,8 +77,8 @@ class Interpolator(object):
         if nx * ny != len(self.x):
             raise ValueError("expected %i, but read %i lines." % (nx * ny, len(self.x)))
 
-        self.min = ve.vec2d(min(self.x), min(self.y))
-        self.max = ve.vec2d(max(self.x), max(self.y))
+        self.min = ve.Vec2d(min(self.x), min(self.y))
+        self.max = ve.Vec2d(max(self.x), max(self.y))
         self.h = self.h.reshape(ny, nx)
         self.x = self.x.reshape(ny, nx)
         self.y = self.y.reshape(ny, nx)
@@ -273,9 +270,9 @@ class Probe_fgelev(object):
 
         global transform
         if not is_global:
-            position = ve.vec2d(transform.toGlobal(position))
+            position = ve.Vec2d(transform.toGlobal(position))
         else:
-            position = ve.vec2d(position[0], position[1])
+            position = ve.Vec2d(position[0], position[1])
 
         self.record += 1
         if self._cache is None:
@@ -302,9 +299,9 @@ def test_fgelev(cache, N):
     elev = Probe_fgelev(cache=cache)
     delta = 0.3
     check_btg = True
-    p = ve.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
+    p = ve.Vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
     elev(p, True, check_btg)  # -- ensure fgelev is up and running
-    #p = vec2d(parameters.BOUNDARY_WEST+delta, parameters.BOUNDARY_SOUTH+delta)
+    #p = Vec2d(parameters.BOUNDARY_WEST+delta, parameters.BOUNDARY_SOUTH+delta)
     # elev(p, True, check_btg) # -- ensure fgelev is up and running
     nx = ny = N
     ny = 1
@@ -331,7 +328,7 @@ def test_fgelev(cache, N):
     i = 0
     for y in Y:
         for x in X:
-            p = ve.vec2d(x, y)
+            p = ve.Vec2d(x, y)
             print(i / 2, end='')
             e = elev(p, True, check_btg)
             i += 1
@@ -348,12 +345,12 @@ def test_fgelev(cache, N):
 
 
 def raster_glob(prevent_overwrite=False):
-    cmin = ve.vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
-    cmax = ve.vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
+    cmin = ve.Vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
+    cmax = ve.Vec2d(parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
     center = (cmin + cmax) * 0.5
     transform = coordinates.Transformation((center.x, center.y), hdg=0)
-    lmin = ve.vec2d(transform.toLocal(cmin.__iter__()))
-    lmax = ve.vec2d(transform.toLocal(cmax.__iter__()))
+    lmin = ve.Vec2d(transform.toLocal(cmin.__iter__()))
+    lmax = ve.Vec2d(transform.toLocal(cmax.__iter__()))
     delta = (lmax - lmin) * 0.5
     logging.info("Distance from center to boundary in meters: x=%d, y=%d", delta.x, delta.y)
 
@@ -432,7 +429,7 @@ def _raster_fgelev(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5,
     """fgelev seems to freeze every now and then, so this can be really slow.
        Same happens when run from bash: fgelev < fgelev.in
     """
-    center_global = ve.vec2d(transform.toGlobal((x0, y0)))
+    center_global = ve.Vec2d(transform.toGlobal((x0, y0)))
     btg_file = parameters.PATH_TO_SCENERY + os.sep + "Terrain"
     btg_file = btg_file + os.sep + calc_tile.directory_name(center_global) + os.sep + calc_tile.construct_btg_file_name(center_global)
     if not os.path.exists(btg_file):
@@ -496,10 +493,10 @@ def _raster(transform, fname, x0, y0, size_x=1000, size_y=1000, step_x=5, step_y
 
 
 def write_map(filename, transform, elev, gmin, gmax):
-    lmin = ve.vec2d(transform.toLocal((gmin.x, gmin.y)))
-    lmax = ve.vec2d(transform.toLocal((gmax.x, gmax.y)))
+    lmin = ve.Vec2d(transform.toLocal((gmin.x, gmin.y)))
+    lmax = ve.Vec2d(transform.toLocal((gmax.x, gmax.y)))
     map_z0 = 0.
-    elev_offset = elev(ve.vec2d(0, 0))
+    elev_offset = elev(ve.Vec2d(0, 0))
     print("offset", elev_offset)
 
     nx, ny = ((lmax - lmin) / 100.).int().list()  # 100m raster
@@ -524,7 +521,7 @@ def write_map(filename, transform, elev, gmin, gmax):
 
     for j in range(ny):
         for i in range(nx):
-            out.write("%g %g %g\n" % (y[j], (elev(ve.vec2d(x[i], y[j])) - elev_offset), x[i]))
+            out.write("%g %g %g\n" % (y[j], (elev(ve.Vec2d(x[i], y[j])) - elev_offset), x[i]))
 
     out.write("numsurf %i\n" % ((nx - 1) * (ny - 1)))
     for j in range(ny - 1):
@@ -784,7 +781,8 @@ def progress(i, max_i):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
-    parser = argparse.ArgumentParser(description="tools.py prepares an elevation grid for Nasal script and other osm2city applications")
+    parser = argparse.ArgumentParser(description="tools.py prepares an elevation grid for Nasal script and other \
+    osm2city applications")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
     parser.add_argument("-o", dest="o", action="store_true"

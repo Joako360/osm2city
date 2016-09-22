@@ -21,7 +21,7 @@ import parameters
 import stg_io2
 import tools
 from utils import osmparser
-from vec2d import vec2d
+from utils.vec2d import Vec2d
 
 
 OUR_MAGIC = "osm2platforms"  # Used in e.g. stg files to mark edits by osm2platforms
@@ -48,7 +48,7 @@ class Platform(object):
         self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in self.osm_nodes])
         # self.nodes = np.array([(n.lon, n.lat) for n in osm_nodes])
         self.line_string = shg.LineString(self.nodes)
-        self.anchor = vec2d(self.nodes[0])        
+        self.anchor = Vec2d(self.nodes[0])
 
 
 class Platforms(ObjectList):
@@ -86,7 +86,7 @@ class Platforms(ObjectList):
     def write(self, elev, stg_manager, replacement_prefix):
         for cl in self.clusters:
             if len(cl.objects) > 0:
-                center_tile = vec2d(tools.transform.toGlobal(cl.center))
+                center_tile = Vec2d(tools.transform.toGlobal(cl.center))
                 ac_fname = "%splatforms%02i%02i.ac" % (replacement_prefix, cl.I.x, cl.I.y)
                 ac = ac3d.File(stats=tools.stats)
                 obj = ac.new_object('platforms', "Textures/Terrain/asphalt.png")
@@ -114,10 +114,10 @@ class Platforms(ObjectList):
             self.logger.info("Clockwise")
             platform.nodes = platform.nodes[::-1]
         for p in platform.nodes:
-            e = elev(vec2d(p[0], p[1])) + 1
+            e = elev(Vec2d(p[0], p[1])) + 1
             obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
         top_nodes = np.arange(len(platform.nodes))
-        platform.segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(platform.line_string.coords[i])) for i, coord in enumerate(platform.line_string.coords[1:])])
+        platform.segment_len = np.array([0] + [Vec2d(coord).distance_to(Vec2d(platform.line_string.coords[i])) for i, coord in enumerate(platform.line_string.coords[1:])])
         rd_len = len(platform.line_string.coords)
         platform.dist = np.zeros((rd_len))
         for i in range(1, rd_len):
@@ -131,7 +131,7 @@ class Platforms(ObjectList):
         obj.face(face, mat=0)
 # Build bottom ring
         for p in platform.nodes:
-            e = elev(vec2d(p[0], p[1])) - 1
+            e = elev(Vec2d(p[0], p[1])) - 1
             obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
 # Build Sides
         for i, n in enumerate(top_nodes[1:]):
@@ -150,15 +150,15 @@ class Platforms(ObjectList):
         e = 10000
         idx_left = obj.next_node_index()
         for p in left.coords:
-            e = elev(vec2d(p[0], p[1])) + 1
+            e = elev(Vec2d(p[0], p[1])) + 1
             obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
         idx_right = obj.next_node_index()
         for p in right.coords:
-            e = elev(vec2d(p[0], p[1])) + 1
+            e = elev(Vec2d(p[0], p[1])) + 1
             obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
         nodes_l = np.arange(len(left.coords))
         nodes_r = np.arange(len(right.coords))
-        platform.segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(platform.line_string.coords[i])) for i, coord in enumerate(platform.line_string.coords[1:])])
+        platform.segment_len = np.array([0] + [Vec2d(coord).distance_to(Vec2d(platform.line_string.coords[i])) for i, coord in enumerate(platform.line_string.coords[1:])])
         rd_len = len(platform.line_string.coords)
         platform.dist = np.zeros((rd_len))
         for i in range(1, rd_len):
@@ -175,12 +175,12 @@ class Platforms(ObjectList):
 # Build bottom left line
         idx_bottom_left = obj.next_node_index()
         for p in left.coords:
-            e = elev(vec2d(p[0], p[1])) - 1
+            e = elev(Vec2d(p[0], p[1])) - 1
             obj.node(-p[1]+ offset.y, e, -p[0]+ offset.x)
 # Build bottom right line
         idx_bottom_right = obj.next_node_index()
         for p in right.coords:
-            e = elev(vec2d(p[0], p[1])) - 1
+            e = elev(Vec2d(p[0], p[1])) - 1
             obj.node(-p[1]+ offset.y, e, -p[0]+ offset.x)
         idx_end = obj.next_node_index() - 1
 # Build Sides
@@ -246,8 +246,8 @@ def main():
     tools.init(transform)
     
     # -- create (empty) clusters
-    lmin = vec2d(tools.transform.toLocal(cmin))
-    lmax = vec2d(tools.transform.toLocal(cmax))
+    lmin = Vec2d(tools.transform.toLocal(cmin))
+    lmax = Vec2d(tools.transform.toLocal(cmax))
     clusters = Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
 
     border = None

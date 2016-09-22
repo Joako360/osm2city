@@ -5,9 +5,9 @@ Created on 15.06.2014
 """
 
 import logging
-import vec2d
-
 from builtins import max
+
+from utils import vec2d
 
 
 class ObjectList(object):
@@ -40,8 +40,8 @@ class ObjectList(object):
             self.minlat = min(self.minlat, node.lat)
         self.min_max_scanned = True
 
-        cmin = vec2d.vec2d(self.minlon, self.minlat)
-        cmax = vec2d.vec2d(self.maxlon, self.maxlat)
+        cmin = vec2d.Vec2d(self.minlon, self.minlat)
+        cmax = vec2d.Vec2d(self.maxlon, self.maxlat)
         logging.info("min/max " + str(cmin) + " " + str(cmax))
 
     def __len__(self):

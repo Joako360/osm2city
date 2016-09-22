@@ -5,19 +5,18 @@ Created on Fri Sep  6 19:37:03 2013
 @author: tom
 """
 
-import pySkeleton.polygon as polygon
-from vec2d import vec2d
-import random
-import textwrap
-import numpy as np
-import tools
-import os
 import logging
+import os
+import random
+
+import numpy as np
 import parameters
+import pySkeleton.polygon as polygon
+import tools
+from utils.vec2d import Vec2d
 
 
-
-def myskel(out, b, name = "roof", offset_xy = vec2d(0, 0), offset_z = 0., header = False, max_height = 1e99):
+def myskel(out, b, name = "roof", offset_xy = Vec2d(0, 0), offset_z = 0., header = False, max_height = 1e99):
 #vertices = [(202.0, 52.0), (400.0, 52.0), (400.0, 153.0), (202.0, 152.0)]
 #edges =  [(0, 1), (1, 2), (2, 3), (3, 0)]
 #speeds = [1.0, 1.0, 1.0, 1.0]

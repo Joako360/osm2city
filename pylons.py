@@ -25,15 +25,13 @@ import sys
 import unittest
 import xml.sax
 
-import shapely.geometry as shg
-
 import coordinates
 import parameters
 import roads
+import shapely.geometry as shg
 import stg_io2
 import tools
-from utils import osmparser
-import vec2d
+from utils import osmparser, vec2d
 
 OUR_MAGIC = "osm2pylon"  # Used in e.g. stg files to mark edits by osm2pylon
 
@@ -288,7 +286,7 @@ class SharedPylon(object):
 
     def calc_global_coordinates(self, my_elev_interpolator, my_coord_transformator):
         self.lon, self.lat = my_coord_transformator.toGlobal((self.x, self.y))
-        self.elevation = my_elev_interpolator(vec2d.vec2d(self.lon, self.lat), True)
+        self.elevation = my_elev_interpolator(vec2d.Vec2d(self.lon, self.lat), True)
 
     def make_stg_entry(self, my_stg_mgr):
         """
@@ -306,7 +304,7 @@ class SharedPylon(object):
         elif self.direction_type == SharedPylon.DIRECTION_TYPE_START:
             direction_correction = 180
 
-        my_stg_mgr.add_object_shared(self.pylon_model, vec2d.vec2d(self.lon, self.lat),
+        my_stg_mgr.add_object_shared(self.pylon_model, vec2d.Vec2d(self.lon, self.lat),
                                      self.elevation,
                                      stg_angle(self.heading - 90 + direction_correction))  # 90 less because arms are in x-direction in ac-file
 
@@ -503,7 +501,7 @@ class Line(LineWithoutCables):
                 # write stuff to files
                 cluster_filename = parameters.get_repl_prefix() + wayname + "%05d_%05d" % (line_index, cluster_index)
                 path_to_stg = my_stg_mgr.add_object_static(cluster_filename + '.xml',
-                                                           vec2d.vec2d(start_pylon.lon, start_pylon.lat),
+                                                           vec2d.Vec2d(start_pylon.lon, start_pylon.lat),
                                                            start_pylon.elevation, 90 + angle_difference)
                 if None is not my_files_to_remove:
                     my_files_to_remove.append(path_to_stg + cluster_filename + ".ac")
@@ -865,7 +863,7 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_co
                     my_rail_node.lat = my_node.lat
                     my_rail_node.lon = my_node.lon
                     my_rail_node.x, my_rail_node.y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
-                    my_rail_node.elevation = my_elev_interpolator(vec2d.vec2d(my_rail_node.lon, my_rail_node.lat), True)
+                    my_rail_node.elevation = my_elev_interpolator(vec2d.Vec2d(my_rail_node.lon, my_rail_node.lat), True)
                     for key in my_node.tags:
                         value = my_node.tags[key]
                         if "railway" == key and "switch" == value:
@@ -1036,7 +1034,7 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, my_elev_interpolator, my_
                     my_pylon.lat = my_node.lat
                     my_pylon.lon = my_node.lon
                     my_pylon.x, my_pylon.y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
-                    my_pylon.elevation = my_elev_interpolator(vec2d.vec2d(my_pylon.lon, my_pylon.lat), True)
+                    my_pylon.elevation = my_elev_interpolator(vec2d.Vec2d(my_pylon.lon, my_pylon.lat), True)
                     for key in my_node.tags:
                         value = my_node.tags[key]
                         if "power" == key:

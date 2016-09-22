@@ -17,9 +17,8 @@ import logging
 import os
 
 import numpy as np
-
 import tools
-from vec2d import vec2d
+from utils.vec2d import Vec2d
 
 
 class Cluster(object):
@@ -50,7 +49,7 @@ class Clusters(object):
         self.prefix = prefix
 
         logging.info("Generating clusters %s %s", min, max)
-        self._clusters = [[self.init_cluster(vec2d(i, j))
+        self._clusters = [[self.init_cluster(Vec2d(i, j))
         for j in range(self.n.y)] for i in range(self.n.x)]
 #        for i in range(self.nx * self.ny):
 #            self.list.append([])
@@ -119,8 +118,8 @@ class Clusters(object):
     for i in range(len(X.ravel())):
         x = X.ravel()[i]
         y = Y.ravel()[i]
-        p = vec2d(x,y)
-        r = vec2d(np.random.uniform(0,1,2))
+        p = Vec2d(x,y)
+        r = Vec2d(np.random.uniform(0,1,2))
         out = p.sign() * (r < abs(p)).int()
         f = out.x + out.y*3
         x += out.x
@@ -130,7 +129,7 @@ class Clusters(object):
 self._clusters[I.x][I.y]
         """
         print("clusters", self.n)
-        newclusters = [[self.init_cluster(vec2d(i, j)) for j in range(self.n.y)] for i in range(self.n.x)]
+        newclusters = [[self.init_cluster(Vec2d(i, j)) for j in range(self.n.y)] for i in range(self.n.x)]
 
         f = open(self.prefix + os.sep + "reclustered.dat", "w")
         for j in range(self.n.y):
@@ -138,7 +137,7 @@ self._clusters[I.x][I.y]
                 cluster = self._clusters[i][j]
                 for b in cluster.objects:
                     norm_coord = (b.anchor - cluster.center) // self.size
-                    rnd = vec2d(np.random.uniform(0, 1, 2))
+                    rnd = Vec2d(np.random.uniform(0, 1, 2))
                     out = norm_coord.sign() * (rnd < abs(norm_coord)).int()
                     ni = int(i + out.x)
                     nj = int(j + out.y)
@@ -192,8 +191,8 @@ if __name__ == "__main__":
     for i in range(len(X.ravel())):
         x = X.ravel()[i]
         y = Y.ravel()[i]
-        p = vec2d(x, y)
-        r = vec2d(np.random.uniform(0, 1, 2))
+        p = Vec2d(x, y)
+        r = Vec2d(np.random.uniform(0, 1, 2))
         out = p.sign() * (r < abs(p)).int()
         f = out.x + out.y*3
         x += out.x

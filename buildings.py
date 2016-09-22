@@ -64,7 +64,6 @@ import textwrap
 from typing import List
 
 import building_lib
-import calc_tile
 import cluster
 import coordinates
 import numpy as np
@@ -75,9 +74,9 @@ import stg_io2
 import textures.manager as tex_manager
 import tools
 import troubleshoot
-from utils import osmparser
 import utils.utilities as util
-import vec2d as v
+import utils.vec2d as v
+from utils import osmparser, calc_tile
 
 buildings = []  # -- master list, holds all buildings
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
@@ -353,15 +352,15 @@ class Buildings(object):
             if node.lat < self.minlat:
                 self.minlat = node.lat
 
-#        cmin = vec2d(self.minlon, self.minlat)
-#        cmax = vec2d(self.maxlon, self.maxlat)
+#        cmin = Vec2d(self.minlon, self.minlat)
+#        cmax = Vec2d(self.maxlon, self.maxlat)
 #        logging.info("min/max coord" + str(cmin) + " " + str(cmax))
 
 # -----------------------------------------------------------------------------
 # -- write xml
 
 
-def write_xml(path: str, file_name: str, buildings: List[building_lib.Building], the_offset: v.vec2d) -> None:
+def write_xml(path: str, file_name: str, buildings: List[building_lib.Building], the_offset: v.Vec2d) -> None:
     #  -- LOD animation
     xml = open(path + file_name + ".xml", "w")
     xml.write("""<?xml version="1.0"?>\n<PropertyList>\n""")
@@ -504,7 +503,7 @@ if __name__ == "__main__":
 
     logging.info("reading elevation data")
     elev = tools.get_interpolator(fake=parameters.NO_ELEV)
-    logging.debug("height at origin" + str(elev(v.vec2d(0, 0))))
+    logging.debug("height at origin" + str(elev(v.Vec2d(0, 0))))
     logging.debug("origin at " + str(tools.transform.toGlobal((0, 0))))
 
     # -- now read OSM data. Either parse OSM xml, or read a previously cached .pkl file
@@ -537,8 +536,8 @@ if __name__ == "__main__":
         # tools.stats.print_summary()
         buildings.make_way_buildings()
         buildings._get_min_max_coords()
-        cmin = v.vec2d(buildings.minlon, buildings.minlat)
-        cmax = v.vec2d(buildings.maxlon, buildings.maxlat)
+        cmin = v.Vec2d(buildings.minlon, buildings.minlat)
+        cmax = v.Vec2d(buildings.maxlon, buildings.maxlat)
         logging.info("min/max " + str(cmin) + " " + str(cmax))
         
         # Search parents
@@ -1011,8 +1010,8 @@ if __name__ == "__main__":
 #    buildings = new_buildings
 
     # -- create (empty) clusters
-    lmin = v.vec2d(tools.transform.toLocal(cmin))
-    lmax = v.vec2d(tools.transform.toLocal(cmax))
+    lmin = v.Vec2d(tools.transform.toLocal(cmin))
+    lmax = v.Vec2d(tools.transform.toLocal(cmax))
     clusters = cluster.Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
 
     if parameters.OVERLAP_CHECK:
@@ -1052,7 +1051,7 @@ if __name__ == "__main__":
 #         print node
 #         lon, lat = tools.transform.toGlobal(node)
 #         e = elev((lon,lat), is_global=True)
-#         stg_manager.add_object_shared("Models/Communications/cell-monopole1-75m.xml", vec2d(lon, lat), e, 0)
+#         stg_manager.add_object_shared("Models/Communications/cell-monopole1-75m.xml", Vec2d(lon, lat), e, 0)
 
     #tools.write_gp(buildings)
 
@@ -1082,7 +1081,7 @@ if __name__ == "__main__":
                 nroofs += 2  # we have 2 different LOD models for each roof
 
         tile_elev = elev(cl.center)
-        center_global = v.vec2d(tools.transform.toGlobal(cl.center))
+        center_global = v.Vec2d(tools.transform.toGlobal(cl.center))
         if tile_elev == -9999:
             logging.warning("Skipping tile elev = -9999 at lat %.3f and lon %.3f", center_global.lat, center_global.lon)
             continue  # skip tile with improper elev

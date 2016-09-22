@@ -17,8 +17,7 @@ import coordinates
 import parameters
 import stg_io2
 import tools
-from utils import osmparser
-import vec2d
+from utils import osmparser, vec2d
 
 OUR_MAGIC = "osm2nature"  # Used in e.g. stg files to mark edits by osm2nature.py
 
@@ -37,14 +36,14 @@ class TreeNode(object):
 
     def calc_global_coordinates(self, my_elev_interpolator, my_coord_transformator):
         self.lon, self.lat = my_coord_transformator.toGlobal((self.x, self.y))
-        self.elevation = my_elev_interpolator(vec2d.vec2d(self.lon, self.lat), True)
+        self.elevation = my_elev_interpolator(vec2d.Vec2d(self.lon, self.lat), True)
 
     def make_stg_entry(self, my_stg_mgr):
         """
         Returns a stg entry for this tree.
         E.g. OBJECT_SHARED Models/Airport/ils.xml 5.313108 45.364122 374.49 268.92
         """
-        my_stg_mgr.add_object_shared(self.tree_model, vec2d.vec2d(self.lon, self.lat)
+        my_stg_mgr.add_object_shared(self.tree_model, vec2d.Vec2d(self.lon, self.lat)
                                      , self.elevation
                                      , stg_angle(0))  # 90 less because arms are in x-direction in ac-file 
 
@@ -74,7 +73,7 @@ def process_osm_tree(nodes_dict, ways_dict, my_elev_interpolator, my_coord_trans
                 my_tree_node.tree_model = "Models/Trees/egkk_woods.xml"
 
                 my_tree_node.x, my_tree_node.y = my_coord_transformator.toLocal((my_tree_node.lon, my_tree_node.lat))
-                my_tree_node.elevation = my_elev_interpolator(vec2d.vec2d(my_tree_node.lon, my_tree_node.lat), True)
+                my_tree_node.elevation = my_elev_interpolator(vec2d.Vec2d(my_tree_node.lon, my_tree_node.lat), True)
                 print(("adding entry to trees", my_node.osm_id, " ", my_tree_node.x, " ", my_tree_node.y, " ", my_tree_node.elevation))
                 my_trees[my_tree_node.osm_id] = my_tree_node
 
@@ -95,7 +94,7 @@ def process_osm_forest(nodes_dict, ways_dict, my_elev_interpolator, my_coord_tra
                         my_tree_node.lat = my_node.lat
                         my_tree_node.lon = my_node.lon
                         my_tree_node.x, my_tree_node.y = my_coord_transformator.toLocal((my_tree_node.lon, my_tree_node.lat))
-                        my_tree_node.elevation = my_elev_interpolator(vec2d.vec2d(my_tree_node.lon, my_tree_node.lat), True)
+                        my_tree_node.elevation = my_elev_interpolator(vec2d.Vec2d(my_tree_node.lon, my_tree_node.lat), True)
                         print(("adding entry to trees", my_tree_node.x, my_tree_node.y, my_tree_node.elevation))
                         my_trees[my_tree_node.osm_id] = my_tree_node
     return my_trees

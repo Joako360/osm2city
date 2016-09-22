@@ -12,20 +12,19 @@ import math
 import os
 from random import randint
 
-import shapely.geometry as shg
-from shapely.geometry.base import CAP_STYLE, JOIN_STYLE
-from shapely.geometry.linestring import LineString
-
 import ac3d
 import coordinates
 import numpy as np
 import parameters
+import shapely.geometry as shg
 import stg_io2
 import tools
 from cluster import Clusters
 from objectlist import ObjectList
+from shapely.geometry.base import CAP_STYLE, JOIN_STYLE
+from shapely.geometry.linestring import LineString
 from utils import osmparser
-from vec2d import vec2d
+from utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2piers"  # Used in e.g. stg files to mark edits by osm2Piers
 
@@ -45,7 +44,7 @@ class Pier(object):
             if r in nodes_dict:
                 self.osm_nodes.append(nodes_dict[r])
         self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in self.osm_nodes])
-        self.anchor = vec2d(self.nodes[0])
+        self.anchor = Vec2d(self.nodes[0])
 
     def calc_elevation(self, elev_interpolator):
         """Calculates the elevation (level above sea) as a minimum of all nodes.
@@ -91,7 +90,7 @@ class Piers(ObjectList):
     def write_piers(self, stg_manager, replacement_prefix):
         for cl in self.clusters:
             if len(cl.objects) > 0:
-                center_tile = vec2d(tools.transform.toGlobal(cl.center))       
+                center_tile = Vec2d(tools.transform.toGlobal(cl.center))
                 ac_fname = "%spiers%02i%02i.ac" % (replacement_prefix, cl.I.x, cl.I.y)
                 ac = ac3d.File(stats=tools.stats)
                 obj = ac.new_object('piers', "Textures/Terrain/asphalt.png")
@@ -129,7 +128,7 @@ def _write_boat_area(pier, stg_manager):
     # Simplyfy
     ring = linear_ring.convex_hull.buffer(40, cap_style=CAP_STYLE.square, join_style=JOIN_STYLE.bevel).simplify(20)
     for p in ring.exterior.coords:
-        coord = vec2d(p[0], p[1])
+        coord = Vec2d(p[0], p[1])
         line_coords = [[centroid.x, centroid.y], p]
         target_vector = shg.LineString(line_coords)
         boat_position = linear_ring.intersection(target_vector)
@@ -202,7 +201,7 @@ def _write_model(length, stg_manager, pos_global, direction, my_elev):
                   ('Models/Maritime/Civilian/FerryBoat1.ac', 70)]
         choice = randint(0, len(models) - 1)
         model = models[choice]
-    stg_manager.add_object_shared(model[0], vec2d(pos_global), my_elev, direction + model[1])
+    stg_manager.add_object_shared(model[0], Vec2d(pos_global), my_elev, direction + model[1])
 
 
 def _write_pier_area(pier, obj, offset):
@@ -222,7 +221,7 @@ def _write_pier_area(pier, obj, offset):
     for p in pier.nodes:
         obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
     top_nodes = np.arange(len(pier.nodes))
-    pier.segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(linear_ring.coords[i])) for i, coord in enumerate(linear_ring.coords[1:])])
+    pier.segment_len = np.array([0] + [Vec2d(coord).distance_to(Vec2d(linear_ring.coords[i])) for i, coord in enumerate(linear_ring.coords[1:])])
     rd_len = len(linear_ring.coords)
     pier.dist = np.zeros((rd_len))
     for i in range(1, rd_len):
@@ -264,7 +263,7 @@ def _write_pier_line(pier, obj, offset):
         obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
     nodes_l = np.arange(len(left.coords))
     nodes_r = np.arange(len(right.coords))
-    pier.segment_len = np.array([0] + [vec2d(coord).distance_to(vec2d(line_string.coords[i])) for i, coord in enumerate(line_string.coords[1:])])
+    pier.segment_len = np.array([0] + [Vec2d(coord).distance_to(Vec2d(line_string.coords[i])) for i, coord in enumerate(line_string.coords[1:])])
     rd_len = len(line_string.coords)
     pier.dist = np.zeros((rd_len))
     for i in range(1, rd_len):
@@ -355,8 +354,8 @@ def main():
     tools.init(transform)
     
     # -- create (empty) clusters
-    lmin = vec2d(tools.transform.toLocal(cmin))
-    lmax = vec2d(tools.transform.toLocal(cmax))
+    lmin = Vec2d(tools.transform.toLocal(cmin))
+    lmax = Vec2d(tools.transform.toLocal(cmax))
     clusters = Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
    
     border = None

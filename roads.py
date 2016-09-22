@@ -86,26 +86,25 @@ import os
 import random
 import textwrap
 
-import matplotlib.pyplot as plt
-import numpy as np
-import scipy.interpolate
-import shapely.geometry as shg
-
 import ac3d
-from cluster import Clusters
 import coordinates
 import graph
 import linear
 import linear_bridge
+import matplotlib.pyplot as plt
+import numpy as np
 import objectlist
 import parameters
+import scipy.interpolate
+import shapely.geometry as shg
 import stg_io2
 import textures.road
 import tools
 import troubleshoot
 import utils.utilities as util
+from cluster import Clusters
 from utils import osmparser
-from vec2d import vec2d
+from utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 
@@ -930,7 +929,7 @@ class Roads(objectlist.ObjectList):
         for way in self.bridges_list + self.roads_list + self.railway_list:
             # -- label center with way ID
             the_node = self.nodes_dict[way.refs[len(way.refs)/2]]
-            anchor = vec2d(self.transform.toLocal(vec2d(the_node.lon, the_node.lat)))
+            anchor = Vec2d(self.transform.toLocal(Vec2d(the_node.lon, the_node.lat)))
 #            anchor.x += random.uniform(-1,1)
             if math.isnan(anchor.lon) or math.isnan(anchor.lat):
                 logging.error("Nan encountered while probing anchor elevation")
@@ -941,7 +940,7 @@ class Roads(objectlist.ObjectList):
 
             # -- label first node
             the_node = self.nodes_dict[way.refs[0]]
-            anchor = vec2d(self.transform.toLocal(vec2d(the_node.lon, the_node.lat)))
+            anchor = Vec2d(self.transform.toLocal(Vec2d(the_node.lon, the_node.lat)))
 #            anchor.x += random.uniform(-1,1)
             if math.isnan(anchor.lon) or math.isnan(anchor.lat):
                 logging.error("Nan encountered while probing anchor elevation")
@@ -953,7 +952,7 @@ class Roads(objectlist.ObjectList):
             # -- label last node
             if 1:
                 the_node = self.nodes_dict[way.refs[-1]]
-                anchor = vec2d(self.transform.toLocal(vec2d(the_node.lon, the_node.lat)))
+                anchor = Vec2d(self.transform.toLocal(Vec2d(the_node.lon, the_node.lat)))
 #                anchor.x += random.uniform(-1,1)
                 if math.isnan(anchor.lon) or math.isnan(anchor.lat):
                     logging.error("Nan encountered while probing anchor elevation")
@@ -961,7 +960,7 @@ class Roads(objectlist.ObjectList):
 
                 e = self.elev(anchor) + the_node.h_add + 3.
                 ac.add_label(' %i h=%1.1f' % (the_node.osm_id, the_node.h_add), -anchor.y, e, -anchor.x, scale=1.)
-        path_to_stg = stg_manager.add_object_static(file_name + '.ac', vec2d(self.transform.toGlobal((0, 0))), 0, 0)
+        path_to_stg = stg_manager.add_object_static(file_name + '.ac', Vec2d(self.transform.toGlobal((0, 0))), 0, 0)
         ac.write(path_to_stg + file_name + '.ac')
 
     def debug_print_refs_of_way(self, way_osm_id):
@@ -976,15 +975,15 @@ class Roads(objectlist.ObjectList):
         """Create cluster.
            Put objects in clusters based on their centroid.
         """
-        lmin, lmax = [vec2d(self.transform.toLocal(c)) for c in parameters.get_extent_global()]
+        lmin, lmax = [Vec2d(self.transform.toLocal(c)) for c in parameters.get_extent_global()]
         self.roads_clusters = Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
         self.railways_clusters = Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
 
         for the_object in self.bridges_list + self.roads_list + self.railway_list:
             if _is_railway(the_object):
-                cluster_ref = self.railways_clusters.append(vec2d(the_object.center.centroid.coords[0]), the_object)
+                cluster_ref = self.railways_clusters.append(Vec2d(the_object.center.centroid.coords[0]), the_object)
             else:
-                cluster_ref = self.roads_clusters.append(vec2d(the_object.center.centroid.coords[0]), the_object)
+                cluster_ref = self.roads_clusters.append(Vec2d(the_object.center.centroid.coords[0]), the_object)
             the_object.cluster_ref = cluster_ref
 
 
@@ -998,7 +997,7 @@ def _process_clusters(clusters, replacement_prefix, elev, stg_manager, stg_paths
         else:
             file_start = "roads"
         file_name = replacement_prefix + file_start + "%02i%02i" % (cl.I.x, cl.I.y)
-        center_global = vec2d(tools.transform.toGlobal(cl.center))
+        center_global = Vec2d(tools.transform.toGlobal(cl.center))
         offset_local = cl.center
         cluster_elev = elev(center_global, True)
 

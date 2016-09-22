@@ -17,12 +17,11 @@ import logging
 import os
 import re
 import sys
-import types
 import traceback
+import types
 
 import textures.road
-import vec2d as v
-
+from utils import vec2d as v
 
 # default_args_start # DO NOT MODIFY THIS LINE
 # -*- coding: utf-8 -*-
@@ -267,14 +266,14 @@ def get_repl_prefix():
 
 
 def get_center_global():
-    cmin = v.vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
-    cmax = v.vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
+    cmin = v.Vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
+    cmax = v.Vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
     return (cmin + cmax) * 0.5
 
 
 def get_extent_global():
-    cmin = v.vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
-    cmax = v.vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
+    cmin = v.Vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
+    cmax = v.Vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
     return cmin, cmax
 
 

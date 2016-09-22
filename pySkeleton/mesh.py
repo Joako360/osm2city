@@ -5,11 +5,11 @@
 #   Class :     Mesh
 #===============================================================================
 
-from . import point3D
-#import rainbow
-from vec2d import vec2d
-import roofs
 import numpy as np
+import roofs
+from utils.vec2d import Vec2d
+
+
 class Mesh:
     """
     A mesh is represented by an indexed face structure (IFS):
@@ -99,7 +99,7 @@ class Mesh:
 #
 #        f.close()
 
-    def ac3d_string(self, b, offset_xy = vec2d(0, 0), offset_z = 0., header = False):
+    def ac3d_string(self, b, offset_xy = Vec2d(0, 0), offset_z = 0., header = False):
         """return mesh as string in a AC3D format. You must append kids line."""
         s = ""
         if header:
@@ -145,7 +145,7 @@ class Mesh:
 
         return s
 
-    def to_out(self, out, b, offset_xy = vec2d(0, 0), offset_z = 0., header = False):
+    def to_out(self, out, b, offset_xy = Vec2d(0, 0), offset_z = 0., header = False):
         """create 3d object"""
         if header:
             out.new_object(b.roof_ac_name, b.roof_texture.filename + '.png')

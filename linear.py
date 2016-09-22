@@ -5,12 +5,10 @@ import math
 
 import matplotlib.pyplot as plt
 import numpy as np
-import shapely.geometry as shg
-
-
 import parameters
+import shapely.geometry as shg
 import textures.road
-from vec2d import vec2d
+from utils.vec2d import Vec2d
 
 
 class LinearObject(object):
@@ -196,7 +194,7 @@ class LinearObject(object):
            Return nodes_list         
         """
 #        if not offset:
-#            offset = vec2d(0,0)            
+#            offset = Vec2d(0,0)
         # if joint0 == 1D:
         #     if neighbour0.already_written:
         #         left_coords = left.coords[1:]
@@ -548,7 +546,7 @@ class LinearObject(object):
             # -- write OSM_ID label
             if 0:
                 anchor = self.edge[0].coords[len_left/2]
-                e = elev(vec2d(anchor[0], anchor[1])) + self.AGL
+                e = elev(Vec2d(anchor[0], anchor[1])) + self.AGL
                 ac.add_label('   ' + str(self.osm_id), -anchor[1], e+4.8, -anchor[0], scale=2)
 
             # -- write nodes
@@ -556,14 +554,14 @@ class LinearObject(object):
                 ni = 0
                 ofs_l = obj.next_node_index()
                 for p in self.edge[0].coords:
-                    e = elev(vec2d(p[0], p[1])) + self.AGL
+                    e = elev(Vec2d(p[0], p[1])) + self.AGL
                     obj.node(-p[1], e, -p[0])
 #                    ac.add_label('l'+str(ni), -p[1], e+5, -p[0], scale=5)
                     ni += 1
 
                 ofs_r = obj.next_node_index()
                 for p in self.edge[1].coords[::-1]:
-                    e = elev(vec2d(p[0], p[1])) + self.AGL
+                    e = elev(Vec2d(p[0], p[1])) + self.AGL
                     obj.node(-p[1], e, -p[0])
 #                    ac.add_label('r'+str(ni), -p[1], e+5, -p[0], scale=5)
                     ni += 1
