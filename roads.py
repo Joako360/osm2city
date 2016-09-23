@@ -1160,7 +1160,6 @@ def main():
 
     replacement_prefix = parameters.get_repl_prefix()
     stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
-#    roads.debug_label_nodes(stg_manager)
 
     # -- write stg
     stg_paths = set()
@@ -1168,12 +1167,7 @@ def main():
     _process_clusters(roads.railways_clusters, replacement_prefix, elev, stg_manager, stg_paths, True)
     _process_clusters(roads.roads_clusters, replacement_prefix, elev, stg_manager, stg_paths, False)
 
-    # copy roads.eff into scenery folders
-    for stg_path in stg_paths:
-        roads_eff_file_name = util.get_osm2city_directory() + os.sep + 'roads.eff'
-        tools.install_files([roads_eff_file_name], stg_path)
-
-    roads.debug_plot(show=True, plot_junctions=False, clusters=roads.clusters) #, label_nodes=self.nodes_dict.keys())#, label_nodes=[1132288594, 1132288612])
+    roads.debug_plot(show=True, plot_junctions=False, clusters=roads.clusters)
     
     debug_create_eps(roads, roads.clusters, elev, plot_cluster_borders=1)
     stg_manager.write()

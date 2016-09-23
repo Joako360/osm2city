@@ -37,6 +37,8 @@ osm2city uses the following Python extension packages, which must be installed o
 Please make sure to use Python 3.5 compatible extensions. Often Python 3 compatible packages have a "3" in their name. Most Linux distributions come by default with the necessary packages — often they are prefixed with ``python-`` (e.g. ``python-numpy``). On Windows WinPython (https://winpython.github.io/) together with Christoph Gohlke's unofficial Windows binaries for Python extension packages (http://www.lfd.uci.edu/~gohlke/pythonlibs/) works well.
 
 
+.. _chapter-osm2city-install:
+
 ========================
 Installation of osm2city
 ========================
@@ -49,8 +51,17 @@ There is no installer package - neither on Windows nor Linux. ``osm2city`` consi
 Do the following:
 
 #. Download the packages either using Git_ or as a zip-package.
-#. Add the ``osm2city`` directory to your ``PYTHONPATH``. You can read more about this at https://docs.python.org/3.5/using/cmdline.html#envvar-PYTHONPATH.
-#. Create soft links between as described in the following sub-chapter.
+#. Add the ``osm2city`` directory to your ``PYTHONPATH`` (see :ref:`below <chapter-set-pythonpath-label>`).
+#. Make sure that you have :ref:`set $FG_ROOT <chapter-set-fgroot-label>`
+
+You might as well check your installation and :ref:`create a texture atlas <chapter-create-texture-atlas>` — doing so makes sure your installation works and you do not run into the problem of having an empty texture atlas.
+
+.. _chapter-set-pythonpath-label:
+
+------------------
+Setting PYTHONPATH
+------------------
+You can read more about this at https://docs.python.org/3.5/using/cmdline.html#envvar-PYTHONPATH.
 
 On Linux you would typically add something like the following to your ``.bashrc`` file:
 
@@ -63,26 +74,13 @@ On Linux you would typically add something like the following to your ``.bashrc`
 .. _Git: http://www.git-scm.com/
 
 
-.. _chapter-texture_data-label:
+.. _chapter-set-fgroot-label:
 
------------------------------------
-Creating Soft Links to Texture Data
------------------------------------
-Many of the ``osm2city`` programs must have access to texture data in ``osm2city-data``. The following assumes that both the ``osm2city`` and ``osm2city-data`` are stored within the same directory.
+-------------------------------------
+Setting Environment Variable $FG_ROOT
+-------------------------------------
+The environment variable ``$FG_ROOT`` must be set in your operating system or at least your current session, such that ``fgelev`` can work optimally. How you set environment variables is depending on your operating system and not described here. I.e. this is NOT something you set as a parameter in ``params.ini``!
 
-On a Linux workstation do the following:
+You might have to restart Windows to be able to read the environment variable that you set through the control panel. In Linux you might have to create a new console session.
 
-::
-
-    $ cd osm2city
-    $ ln -sf ../osm2city-data/tex.src
-    $ ln -sf ../osm2city-data/tex
-
-On a Windows computer do the following (path may differ):
-
-::
-
-    > mklink /J C:\development\osm2city\tex.src C:\development\osm2city-data\tex.src 
-    > mklink /J C:\development\osm2city\tex C:\development\osm2city-data\tex
-
-You might as well check your installation and :ref:`create a texture atlas <chapter-create-texture-atlas>` — doing so makes sure your installation works and you do not run into the problem of having an empty texture atlas.
+`$FG_ROOT`_ is typically a path ending with directories ``data`` or ``fgdata`` (e.g. on Linux it could be ``/home/pingu/bin/fgfs_git/next/install/flightgear/fgdata``).

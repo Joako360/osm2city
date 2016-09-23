@@ -19,20 +19,22 @@ If you followed the :ref:`directory structure <chapter-creating-directory-struct
 
 .. _chapter-copy-textures-label:
 
-=============
-Copy Textures
-=============
+=====================================
+Copy Textures, Effects and Other Data
+=====================================
 
 If you are using ``buildings.py`` to generate buildings or ``roads.py`` to generate roads, then you need to have the content of the ``tex`` linked from ``osm2city-data`` copied or linked into all scenery sub-folders, where there are ``*.stg`` files. There are two possibilities:
 
 #. Do it manually. In this case you can choose whether to create links or hard copies. If you want to distribute the generated scenery objects, then you must copy the whole directory. E.g. ``/home/pingu/fg_customscenery/LSZS/Objects/e000n40/e009n46/tex`` in the example used previously.
-#. Use ``copy_texture_stuff.py`` to do it automatically. E.g.
+#. Use ``copy_data_stuff.py`` to do it automatically. E.g.
 
 ::
 
-    /usr/bin/python3 /home/pingu/development/osm2city/copy_texture_stuff.py -f LSZS/params.ini
+    /usr/bin/python3 /home/pingu/development/osm2city/copy_data_stuff.py -f LSZS/params.ini
 
-There is also a third possibility of copying the ``tex`` directory into ``$FG_ROOT``. However you would not be able to distribute thegenerated scenery objects and it might interfer with other scenery objects using a potentially different texture map.
+If ``copy_data_stuff.py`` is called with the optional ``-a`` argument, then also the effects and shaders in directory ``fgdata`` in  ``osm2city-data`` are copied to ``$FG_ROOT``. This is necessary if you set parameter ``TRAFFIC_SHADER_ENABLE`` to ``True`` (see chapter :ref:`Light Effects <chapter-parameters-light>`).
+
+There is also a third possibility of copying the ``tex`` directory into ``$FG_ROOT``. However you would not be able to distribute the generated scenery objects and it might interfere with other scenery objects using a potentially different texture map.
 
 
 .. _chapter-lod-label:
@@ -93,7 +95,7 @@ In the same dialog press the ``Shader Options`` button and set the slider for ``
 Change Materials to Hide Urban Textures
 =======================================
 
-FlightGear allows to change the texture used for a given land-class. More information is available in ``$FG_ROOT/Docs/README.materials`` as well as in the FlightGear Forum thread regarding `New Regional Textures`_. There is not yet a good base texture replacing the urban textures. However many users find it more visually appealing to use a uniform texture like grass under the generated buildings etc. instead of urban textures (because urban textures interfere visually with ways, houses etc.). A drawback of using different textures is the absence of trees — however in many regions of the world there are lot of trees / vegetation in urban areas.
+FlightGear allows to change the texture used for a given land-class. More information is available in ``$FG_ROOT/Docs/README.materials`` as well as in the FlightGear Forum thread regarding `New Regional Textures <http://forum.flightgear.org/viewtopic.php?f=5&t=26031>`_. There is not yet a good base texture replacing the urban textures. However many users find it more visually appealing to use a uniform texture like grass under the generated buildings etc. instead of urban textures (because urban textures interfere visually with ways, houses etc.). A drawback of using different textures is the absence of trees — however in many regions of the world there are lot of trees / vegetation in urban areas.
 
 E.g. for the airport ``LSZS`` in Engadin in Switzerland you would have to go to ``$FG_ROOT/Materials/regions`` and edit file ``europe.xml`` in a text editor: add name-tags for e.g. ``BuiltUpCover``, ``Urban``, ``Town``, ``SubUrban`` to a material as shown below and comment out the existing name-tags using ``<!-- -->``. Basically all name-tags, which relate to a material using ``<effect>Effects/urban</effect>``. The outcome before and after edit (you need to restart FlightGear in between!) can be seen in the screenshots below (for illustration purposes the buildings and roads do not have textures).
 
@@ -130,8 +132,6 @@ Depending on your region and your shader settings you might want to search for e
 
 .. image:: fgfs_materials_grass.png
 
-
-.. _`New Regional Textures`: http://forum.flightgear.org/viewtopic.php?f=5&t=26031
 
 .. _ALS: http://wiki.flightgear.org/Atmospheric_light_scattering
 

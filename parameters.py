@@ -62,6 +62,8 @@ PATH_TO_SCENERY = "/home/user/fgfs/scenery/TerraSync"
 #    Also make sure PATH_TO_OUTPUT is included in your $FG_SCENERY.
 PATH_TO_OUTPUT = "/home/user/fgfs/scenery/osm2city"
 
+PATH_TO_OSM2CITY_DATA = "/home/user/osm2city-data"
+
 NO_ELEV = False             # -- skip elevation probing
 ELEV_MODE = "Fgelev"  # -- elev probing mode. Possible values are FgelevCaching (recommended), Fgelev, Manual, or Telnet
 FG_ELEV = '"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'
@@ -145,7 +147,7 @@ LOD_ALWAYS_DETAIL_BELOW_LEVELS = 3  # -- below this number of levels, buildings 
 LOD_PERCENTAGE_DETAIL = 0.5         # -- of the remaining buildings, this percentage will be LOD detail,
                                     #    the rest will be LOD rough.
 
-LIGHTMAP_ENABLE = 1                 # -- include lightmap in xml
+LIGHTMAP_ENABLE = True                 # -- include lightmap in xml
 OBSTRUCTION_LIGHT_MIN_LEVELS = 15   # -- put obstruction lights on buildings with >= given levels
 
 CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if too little objects

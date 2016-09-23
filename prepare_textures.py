@@ -234,7 +234,7 @@ def _append_roofs(roofs, tex_prefix):  # parameter roofs is used dynamically in 
         sys.exit(1)
 
 
-def init(tex_prefix='', create_atlas=False):  # in most situations tex_prefix should be osm2city root directory
+def init(create_atlas=True):
     logging.debug("textures: init")
     global facades
     global roofs
@@ -243,7 +243,7 @@ def init(tex_prefix='', create_atlas=False):  # in most situations tex_prefix sh
     if tools.stats is None:  # if e.g. manager.init is called from osm2city, then tools.init does not need to be called
         tools.init(None)
 
-    my_tex_prefix = util.assert_trailing_slash(tex_prefix)
+    my_tex_prefix = util.assert_trailing_slash(parameters.PATH_TO_OSM2CITY_DATA)
     atlas_file_name = "tex" + os.sep + "atlas_facades"
     my_tex_prefix_src = my_tex_prefix + 'tex.src'
     Texture.tex_prefix = my_tex_prefix_src  # need to set static variable so managers get full path
@@ -307,4 +307,4 @@ if __name__ == "__main__":
         parameters.read_from_file(args.filename)
     parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
 
-    init(util.get_osm2city_directory(), True)
+    init()

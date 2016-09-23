@@ -192,10 +192,9 @@ The next chapters describe each elevation probing mode and link to a :ref:`detai
 ---------------------------
 ELEV_MODE = "FgelevCaching"
 ---------------------------
-In this mode elevation probing happens while running ``osm2city`` related scenery generation — instead of a data preparation task. There are 2 pre-requisites:
+In this mode elevation probing happens while running ``osm2city`` related scenery generation — instead of a data preparation task. There is only one pre-requisite:
 
 #. :ref:`Setting parameter FG_ELEV <chapter-set-fgelev-path-label>`
-#. :ref:`Setting environment variable FG_ROOT <chapter-set-fgroot-label>`
 
 
 .. _chapter-elev-fgelev-label:
@@ -208,7 +207,6 @@ This elevation probing mode and the next modes generate a file ``elev.out``, whi
 
 #. :ref:`Setting parameter FG_ELEV <chapter-set-fgelev-path-label>`
 #. :ref:`Setting parameters ELEV_RASTER_* <chapter-set-elev-raster-label>`
-#. :ref:`Setting environment variable FG_ROOT <chapter-set-fgroot-label>`
 #. :ref:`Run tools.py to generate elevation data <chapter-run-tools-label>`
 
 
@@ -279,17 +277,6 @@ Setting Parameter FG_ELEV
 +++++++++++++++++++++++++
 
 Set parameter ``FG_ELEV`` to point to the full path of the executable. On Linux it could be something like ``FG_ELEV = '/home/pingu/bin/fgfs_git/next/install/flightgear/bin/fgelev'``. On Windows you might have to put quotes around the path due to whitespace e.g. ``FG_ELEV = '"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'``.
-
-
-.. _chapter-set-fgroot-label:
-
-+++++++++++++++++++++++++++++++++++++
-Setting Environment Variable $FG_ROOT
-+++++++++++++++++++++++++++++++++++++
-
-The environment variable ``$FG_ROOT`` must be set in your operating system or at least your current session, such that ``fgelev`` can work optimally. How you set environment variables is depending on your operating system and not described here. I.e. this is NOT something you set as a parameter in ``params.ini``!
-
-`$FG_ROOT`_ is typically a path ending with directories ``data`` or ``fgdata`` (e.g. on Linux it could be ``/home/pingu/bin/fgfs_git/next/install/flightgear/fgdata``).
 
 
 .. _chapter-set-elev-raster-label:
@@ -379,10 +366,9 @@ Change the work directory to e.g. ``fg_customscenery/projects`` and then run pre
 
     $ cd fg_customscenery/projects
     
-    $ /usr/bin/python3 /home/pingu/development/osm2city/prepare_elev.py --fg_root=/home/pingu/bin/fgfs_git/next/install/flightgear/fgdata
+    $ /usr/bin/python3 /home/pingu/development/osm2city/prepare_elev.py  -f LSZS/params.ini
     ...
 
-The command-line option ``--fg_root`` is essential and points to `$FG_ROOT`_ (see also :ref:`Setting environment variable $FG_ROOT <chapter-set-fgroot-label>`).
 
 .. _chapter-elev.nas-label:
 
@@ -390,7 +376,7 @@ The command-line option ``--fg_root`` is essential and points to `$FG_ROOT`_ (se
 Adapt File elev.nas
 +++++++++++++++++++
 
-The root directory of ``osm2city`` contains a file ``elev.nas``. First copy the file into the ``Nasal`` directory in `$FG_ROOT`_ (see also :ref:`Setting environment variable $FG_ROOT <chapter-set-fgroot-label>`).
+The root directory of ``osm2city-data`` contains a file ``nasal/elev.nas``. First copy the file into the ``Nasal`` directory in `$FG_ROOT`_ (see also :ref:`Setting environment variable $FG_ROOT <chapter-set-fgroot-label>`).
 
 Then open ``elev.nas`` in a text editor. Change the ``in`` variable as well as the ``out`` variable to a directory with write access (e.g. $FG_HOME/Export). See IORules_ and `$FG_HOME`_.
 

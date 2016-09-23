@@ -3,6 +3,7 @@
 """
 
 import argparse
+from distutils.dir_util import copy_tree
 import logging
 import os
 import shutil
@@ -12,7 +13,7 @@ import parameters
 import utils.utilities as util
 
 
-def main():
+def main(copy_fg_data: bool) -> None:
     scenery_path = parameters.get_output_path()
 
     scenery_path += os.sep + "Objects"
@@ -31,18 +32,38 @@ def main():
             logging.error("The scenery path does not seem to have necessary sub-directories in %s", scenery_path)
             sys.exit(1)
         else:
-            orig_tex_dir = util.get_osm2city_directory() + os.sep + "tex"
-            tex_content_list = os.listdir(orig_tex_dir)
-            if not os.path.exists(orig_tex_dir):
-                logging.error("The original tex dir seems to be missing: %s", orig_tex_dir)
+            data_dir = util.assert_trailing_slash(parameters.PATH_TO_OSM2CITY_DATA)
+            # textures
+            source_dir = data_dir + "tex"
+            content_list = os.listdir(source_dir)
+            if not os.path.exists(source_dir):
+                logging.error("The original tex dir seems to be missing: %s", source_dir)
                 sys.exit(1)
             for level_two_dir in level_two_dirs:
                 tex_dir = level_two_dir + os.sep + "tex"
                 if not os.path.exists(tex_dir):
                     os.mkdir(tex_dir)
                 logging.info("Copying texture stuff to sub-directory %s", tex_dir)
-                for content in tex_content_list:
-                    shutil.copy(orig_tex_dir + os.sep + content, tex_dir)
+                for content in content_list:
+                    shutil.copy(source_dir + os.sep + content, tex_dir)
+            # light-map effects
+            source_dir = data_dir + "lightmap"
+            if not os.path.exists(source_dir):
+                logging.error("The original lightmap dir seems to be missing: %s", source_dir)
+                sys.exit(1)
+            for level_two_dir in level_two_dirs:
+                logging.info("Copying lightmap stuff directory %s", level_two_dir)
+                content_list = os.listdir(source_dir)
+                for content in content_list:
+                    shutil.copy(source_dir + os.sep + content, level_two_dir)
+
+            if copy_fg_data:
+                fg_root_dir = util.get_fg_root()
+                logging.info("Copying fgdata directory into $FG_ROOT (%s)", fg_root_dir)
+                source_dir = data_dir + "fgdata"
+                copy_tree(source_dir, fg_root_dir)
+
+
     else:
         logging.error("The scenery path must include a directory 'Objects' like %s", scenery_path)
         sys.exit(1)
@@ -50,14 +71,14 @@ def main():
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
-    parser = argparse.ArgumentParser(description="Copies texture related data in directory 'tex' into the scenery folders.")
+    parser = argparse.ArgumentParser(description="Copies texture and effects related data in directory 'tex' \
+    into the scenery folders.")
     parser.add_argument("-f", "--file", dest="filename",
                         help="Mandatory: read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
+    parser.add_argument("-a", action="store_true",
+                        help="also copy effects etc. in fgdata to $FG_ROOT", required=False)
     args = parser.parse_args()
-    if args.filename is not None:
-        parameters.read_from_file(args.filename)
-    else:
-        logging.error("The filename argument is mandatory")
-        sys.exit(1)
 
-    main()
+    parameters.read_from_file(args.filename)
+
+    main(args.a)

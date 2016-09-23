@@ -14,7 +14,7 @@ import numpy as np
 import parameters
 
 
-def get_osm2city_directory():
+def get_osm2city_directory() -> str:
     """Determines the absolute path of the osm2city root directory.
 
     Used e.g. when copying roads.eff, elev.nas and other resources.
@@ -23,6 +23,16 @@ def get_osm2city_directory():
     my_dir = osp.split(my_file)[0]  # now we are in the osm2city/utils directory
     my_dir = osp.split(my_dir)[0]
     return my_dir
+
+
+def get_fg_root() -> str:
+    """Reads the path to FG_ROOT based on environment variable.
+    If it is not set, then exit.
+    """
+    my_fg_root = os.getenv("FG_ROOT")
+    if my_fg_root is None:
+        sys.exit(1)
+    return my_fg_root
 
 
 def get_fg_home() -> str:
@@ -72,11 +82,11 @@ def is_linux_or_mac() -> bool:
 
 
 def get_elev_in_path(home_path) -> str:
-    return home_path + "elev.in"
+    return assert_trailing_slash(home_path) + "elev.in"
 
 
 def get_elev_out_dir(home_path) -> str:
-    return home_path + "Export/"
+    return assert_trailing_slash(home_path) + "Export" + os.sep
 
 
 def get_elev_out_path(home_path) -> str:
@@ -84,11 +94,11 @@ def get_elev_out_path(home_path) -> str:
 
 
 def get_original_elev_nas_path() -> str:
-    my_dir = get_osm2city_directory()
-    return my_dir + os.sep + "elev.nas"
+    my_dir = assert_trailing_slash(parameters.PATH_TO_OSM2CITY_DATA)
+    return my_dir + "nasal" + os.sep + "elev.nas"
 
 
-def assert_trailing_slash(path):
+def assert_trailing_slash(path: str) -> str:
     """Takes a path and makes sure it has an os_specific trailing slash unless the path is empty."""
     my_path = path
     if len(my_path) > 0:

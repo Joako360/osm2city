@@ -369,9 +369,6 @@ def write_xml(path: str, file_name: str, buildings: List[building_lib.Building],
     has_lod_rough = False
     has_lod_detail = False
 
-    # -- lightmap
-    # FIXME: use Effect/Building? What's the difference?
-    #                <lightmap-factor type="float" n="0"><use>/scenery/LOWI/garage[0]/door[0]/position-norm</use></lightmap-factor>
     if parameters.LIGHTMAP_ENABLE:
         xml.write(textwrap.dedent("""
         <effect>
@@ -498,7 +495,7 @@ if __name__ == "__main__":
 
     tools.init(coordinates.Transformation(center, hdg=0))
 
-    prepare_textures.init(util.get_osm2city_directory(), args.create_atlas)
+    prepare_textures.init(args.create_atlas)
 
     logging.info("reading elevation data")
     elev = tools.get_interpolator(fake=parameters.NO_ELEV)
@@ -1101,7 +1098,6 @@ if __name__ == "__main__":
             # -- write .ac and .xml
             building_lib.write(path_to_stg + file_name + ".ac", cl.objects, elev, tile_elev, tools.transform, offset)
             write_xml(path_to_stg, file_name, cl.objects, offset)
-            tools.install_files(['cityLM.eff', 'lightmap-switch.xml'], path_to_stg, True)
 
     if args.uninstall:
         for f in files_to_remove:

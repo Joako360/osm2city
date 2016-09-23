@@ -62,6 +62,10 @@ PATH_TO_OUTPUT                                  Path       n/a       The generat
                                                                      While not absolutely needed it is good practice to name the output folder 
                                                                      the same as ``PREFIX``.
 
+PATH_TO_OSM2CITY_DATA                           Path       n/a       Full path to the folder with osm2city-data. See chapter
+                                                                     :ref:`Installation of osm2city <chapter-osm2city-install>` (e.g.
+                                                                     "/home/user/osm2city-data").
+
 OSM_FILE                                        String     n/a       The file containing OpenStreetMap data. See chapter
                                                                      :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>`. 
 
@@ -111,6 +115,27 @@ LOD_PERCENTAGE_DETAIL                           Decimal    0.5       Of the rema
 =============================================   ========   =======   ==============================================================================
 
 
+.. _chapter-parameters-light:
+
+-------------
+Light Effects
+-------------
+
+Parameters for some light effects / shaders.
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+TRAFFIC_SHADER_ENABLE                           Boolean    False     If True then the traffic shader gets enabled, otherwise the light-map shader.
+                                                                     These effects are only for roads, not railways. The traffic shader has moving
+                                                                     cars, however it only works with the default renderer — ALS/Rembrandt must be
+                                                                     off.
+OBSTRUCTION_LIGHT_MIN_LEVELS                    Integer    15        Puts obstruction lights on buildings >= the specified number levels.
+LIGHTMAP_ENABLE                                 Boolean    True      Creates simulated light effects on buildings from street lights.
+
+=============================================   ========   =======   ==============================================================================
+
+
 .. _chapter-parameters-clipping:
 
 ---------------
@@ -154,14 +179,11 @@ Parameters for roads, railways and related bridges. One of the challenges to sho
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
-TRAFFIC_SHADER_ENABLE                           Boolean    False     If True then the traffic shader gets enabled, otherwise the lightmap shader.
-                                                                     These effects are only for roads, not railways.
-
 BRIDGE_MIN_LENGTH                               Decimal    20.       Discard short bridges and draw roads or railways instead.
 
 MIN_ABOVE_GROUND_LEVEL                          Decimal    0.01      How much a highway / railway is at least hovering above ground
 
-HIGHWAY_TYPE_MIN                                Integer    5         The lower the number, the smaller ways in the highway hierarchy are added.
+HIGHWAY_TYPE_MIN                                Integer    4         The lower the number, the smaller ways in the highway hierarchy are added.
                                                                      Currently the numbers are as follows (see roads.py -> HighwayType).
                                                                      motorway = 12
                                                                      trunk = 11
@@ -186,8 +208,8 @@ POINTS_ON_LINE_DISTANCE_MAX                     Integer    1000      The maximum
 
 MAX_SLOPE_ROAD, MAX_SLOPE_*                     Decimal    0.08      The maximum allowed slope. It is used for ramps to bridges, but it is also
                                                                      used for other ramps. Especially in mountainous areas you might want to set
-                                                                     higher values (e.g. 0.15 for roads works fine in Switzerand). This leads to
-                                                                     steeper ramps to bridges, but give much fewer residuals with embankements.
+                                                                     higher values (e.g. 0.15 for roads works fine in Switzeland). This leads to
+                                                                     steeper ramps to bridges, but give much fewer residuals with embankments.
 
 =============================================   ========   =======   ==============================================================================
 
