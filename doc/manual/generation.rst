@@ -92,7 +92,7 @@ The default work flow is based on the sub-chapters of :ref:`Preparation <chapter
 #. Call the generated scripts starting with ``download_xxxxx.sh``. Make sure you are still in the correct working directory, because path names are relative.
 #. Call ``tiles_xxxxx.sh`` depending on the chosen elevation probing mode
 #. Call ``osm2city_xxxxx.sh``, ``osm2pylons_xxxxx.sh`` etc. depending on your requirements.
-#. :ref:`Copy textures <chapter-copy-textures-label>`
+#. :ref:`Copy textures, effects and other data <chapter-copy-textures-label>`
 
 
 .. _chapter-build-tiles-label:

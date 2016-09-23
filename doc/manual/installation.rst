@@ -84,3 +84,5 @@ The environment variable ``$FG_ROOT`` must be set in your operating system or at
 You might have to restart Windows to be able to read the environment variable that you set through the control panel. In Linux you might have to create a new console session.
 
 `$FG_ROOT`_ is typically a path ending with directories ``data`` or ``fgdata`` (e.g. on Linux it could be ``/home/pingu/bin/fgfs_git/next/install/flightgear/fgdata``).
+
+.. _$FG_ROOT: http://wiki.flightgear.org/$FG_ROOT

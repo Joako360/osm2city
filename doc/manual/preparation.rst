@@ -112,6 +112,7 @@ Create a ``params.ini`` file with your favorite text editor. In our example it w
     PREFIX = "LSZS"
     PATH_TO_SCENERY = "/home/flightgear/fgfs_terrasync"
     PATH_TO_OUTPUT = "/home/fg_customscenery/LSZS"
+    PATH_TO_OSM2CITY_DATA = "/home/user/osm2city-data"
     OSM_FILE = "lszs_narrow.osm"
 
     BOUNDARY_WEST = 9.81
@@ -376,7 +377,7 @@ Change the work directory to e.g. ``fg_customscenery/projects`` and then run pre
 Adapt File elev.nas
 +++++++++++++++++++
 
-The root directory of ``osm2city-data`` contains a file ``nasal/elev.nas``. First copy the file into the ``Nasal`` directory in `$FG_ROOT`_ (see also :ref:`Setting environment variable $FG_ROOT <chapter-set-fgroot-label>`).
+The root directory of ``osm2city-data`` contains a file ``nasal/elev.nas``. First copy the file into the ``Nasal`` directory in ``$FG_ROOT`` (see also :ref:`Setting environment variable $FG_ROOT <chapter-set-fgroot-label>`).
 
 Then open ``elev.nas`` in a text editor. Change the ``in`` variable as well as the ``out`` variable to a directory with write access (e.g. $FG_HOME/Export). See IORules_ and `$FG_HOME`_.
 
@@ -414,7 +415,6 @@ AFTER editing ``elev.nas`` might look as follows on Linux:
 
 .. _IORules: http://wiki.flightgear.org/IORules
 .. _$FG_HOME: http://wiki.flightgear.org/$FG_HOME
-.. _$FG_ROOT: http://wiki.flightgear.org/$FG_ROOT
 
 (Note: the description in this sub-task is basically what :ref:`running prepare_elev.py <chapter-run-prepare_elev-label>` does automatically.)
 

@@ -42,7 +42,7 @@ Detailed Description of Parameters
 Minimal Set
 -----------
 
-See also :ref:`Setting a Minimal Set of Parameters <chapter-setting-parameters-label>`
+See also :ref:`Setting a Minimal Set of Parameters <chapter-setting-parameters-label>`.
 
 
 =============================================   ========   =======   ==============================================================================
@@ -142,7 +142,7 @@ LIGHTMAP_ENABLE                                 Boolean    True      Creates sim
 Clipping Region
 ---------------
 
-The boundary of a scenery as specified by the parameters ``BOUNDARY_*`` is not necessarily sharp. As described in :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>` it is recommended to use ``completeWays=yes``, when manipulating/getting OSM data - this happens also to be the case when using the `OSM Extended API`_ to retrieve data e.g. as part of :ref:`Working in batch mode <chapter-batch-mode>`. The parameters below give the possibility to influence, which data outside of the boundary is processed.
+The boundary of a scenery as specified by the parameters ``BOUNDARY_*`` is not necessarily sharp. As described in :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>` it is recommended to use ``completeWays=yes``, when manipulating/getting OSM data - this happens also to be the case when using the `OSM Extended API`_ to retrieve data e.g. as part of :ref:`working in batch mode <chapter-batch-mode>`. The parameters below give the possibility to influence, which data outside of the boundary is processed.
 
 .. _`OSM Extended API`: http://wiki.openstreetmap.org/wiki/Xapi
 
