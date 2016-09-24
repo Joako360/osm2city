@@ -1,5 +1,6 @@
 import random
 import re
+from typing import List
 
 import numpy as np
 import tools
@@ -30,20 +31,20 @@ class Texture(object):
         - maxlevels: 4
       requires
         - roof:shape:flat
-        - roof:color:red|black
+        - roof:colour:red|black
 
-    roof:
+    roof: http://wiki.openstreetmap.org/wiki/Simple_3D_buildings#Roof
       provides
-        - color:black (red, ..)
+        - colour:black (red, ..)  # internally in osm2city we use "colour" and not "color"
         - shape:flat  (pitched, ..)
 
     """
-    def __init__(self, filename,
+    def __init__(self, filename:str,
                  h_size_meters=None, h_cuts=list(), h_can_repeat=False,
                  v_size_meters=None, v_cuts=list(), v_can_repeat=False,
                  height_min=0, height_max=9999,
                  v_align_bottom=False,
-                 provides=list(), requires=list(), levels=None):
+                 provides=list(), requires=list(), levels=None) -> None:
         self.filename = Texture.tex_prefix + os.sep + filename
         self.x0 = self.x1 = self.y0 = self.y1 = 0
         self.sy = self.sx = 0
@@ -173,38 +174,43 @@ class RoofManager(object):
         self.__cls = cls  # -- class (roof, facade, ...)
         self.current_registered_in = ""
 
-    def append(self, t):
+    def append(self, texture: Texture) -> None:
         """Appends a texture to the catalog if the referenced file exists, in which case True is returned.
         Otherwise False is returned and the texture is not added.
 
         Prepend each item in t.provides with class name, except for class-independent keywords: age,region,compat
         """
-        # check whether already during initialization an error occured
-        if t.validation_message:
-            logging.warning("Defined in registration file %s: %s", self.current_registered_in, t.validation_message)
+        # check whether already during initialization an error occurred
+        if texture.validation_message:
+            logging.warning("Error during initialization. Defined in registration file %s: %s",
+                            self.current_registered_in, texture.validation_message)
             return False
 
-        t.registered_in = self.current_registered_in
+        texture.registered_in = self.current_registered_in
 
         # check whether the same texture already has been referenced in an existing entry
         for existing in self.__l:
-            if existing.filename == t.filename:
-                logging.warning("Defined in registration file %s: %s has already been referenced in %s",
-                                self.current_registered_in, t.filename, existing.registered_in)
+            if existing.filename == texture.filename:
+                logging.warning("Double registration. Defined in registration file %s: %s is already referenced in %s",
+                                self.current_registered_in, texture.filename, existing.registered_in)
                 return False
 
-        new_provides = []
-        logging.debug("Based on registration file %s: added %s ", self.current_registered_in, t.filename)
-        for item in t.provides:
+        new_provides = list()
+        logging.debug("Based on registration file %s: added %s ", self.current_registered_in, texture.filename)
+        for item in texture.provides:
             if item.split(':')[0] in ('age', 'region', 'compat'):
-                new_provides.append(item)
+                new_provides.append(replace_color_in_string(item))
             else:
-                new_provides.append(self.__cls + ':' + item)
-        t.provides = new_provides
-        t.cls = self.__cls
+                new_provides.append(replace_color_in_string(self.__cls + ':' + item))
+        texture.provides = new_provides
+        new_requires = list()
+        for item in texture.requires:
+            new_requires.append(replace_color_in_string(item))
+        texture.requires = new_requires
+        texture.cls = self.__cls
 
-        tools.stats.textures_total[t.filename] = None
-        self.__l.append(t)
+        tools.stats.textures_total[texture.filename] = None
+        self.__l.append(texture)
         return True
 
     def find_matching_roof(self, requires=[]):
@@ -230,10 +236,10 @@ class RoofManager(object):
                 ex_colour_key = 'XXX'
                 ex_material = ''
                 ex_colour = ''
-                if re.match('^.*material:.*', ex) :
+                if re.match('^.*material:.*', ex):
                     ex_material_key = re.match('(^.*:material:)[^:]*', ex).group(1)
                     ex_material = re.match('^.*material:([^:]*)', ex).group(1)
-                elif re.match('^.*:colour:.*', ex) :
+                elif re.match('^.*:colour:.*', ex):
                     ex_colour_key = re.match('(^.*:colour:)[^:]*', ex).group(1)
                     ex_colour = re.match('^.*:colour:([^:]*)', ex).group(1)
                 for req in candidate.requires:
@@ -257,9 +263,7 @@ class RoofManager(object):
 
                     prov_materials = []
                     prov_colours = []
-                    prov_material = None
-                    prov_colour   = None
-                    for prov in candidate.provides :
+                    for prov in candidate.provides:
                         if re.match('^.*:material:.*', prov):
                             prov_material = re.match('^.*:material:(.*)', prov).group(0)
                             prov_materials.append(prov_material)
@@ -270,7 +274,7 @@ class RoofManager(object):
                     # req_material and colour
                     can_material = False
                     if req_material is not None:
-                        for prov_material in prov_materials :
+                        for prov_material in prov_materials:
                             logging.verbose("Provides ", prov_material, " Requires ", requires)  # @UndefinedVariable
                             if prov_material in requires:
                                 can_material = True
@@ -293,8 +297,8 @@ class RoofManager(object):
                 if can_use:
                     candidates.append(candidate)
             else:
-                logging.verbose("  unmet requires %s req %s prov %s"
-                                , str(candidate.filename), str(requires), str(candidate.provides))  # @UndefinedVariable
+                logging.verbose("  unmet requires %s req %s prov %s",
+                                str(candidate.filename), str(requires), str(candidate.provides))  # @UndefinedVariable
         return candidates
 
     def __str__(self):
@@ -312,7 +316,7 @@ class FacadeManager(RoofManager):
         exclusions = []
         if 'roof:colour' in tags:
             exclusions.append("%s:%s" % ('roof:colour', tags['roof:colour']))
-        candidates = self.find_candidates(requires, exclusions, height, width)
+        candidates = self.find_facade_candidates(requires, exclusions, height, width)
         if len(candidates) == 0:
             logging.warning("no matching facade texture for %1.f m x %1.1f m <%s>", height, width, str(requires))
             return None
@@ -327,29 +331,28 @@ class FacadeManager(RoofManager):
             match = 0
             if 'building:material' in tags:
                 val = tags['building:material']
-                new_key = ("facade:building:material:%s") % (val)
+                new_key = "facade:building:material:%s" % val
                 if new_key in t.provides:
                     match += 1
             ranked_list.append([match, t])
-#         b = ranked_list[:,0]
         ranked_list.sort(key=lambda tup: tup[0], reverse=True)
         max_val = ranked_list[0][0]
         if max_val > 0:
             logging.info("Max Rank %d" % max_val)
         return [t[1] for t in ranked_list if t[0] >= max_val]
 
-    def find_candidates(self, requires, excludes, height, width):
+    def find_facade_candidates(self, requires, excludes, height, width):
         candidates = RoofManager.find_candidates(self, requires, excludes)
         # -- check height
         new_candidates = []
         for t in candidates:
             if height < t.height_min or height > t.height_max:
-                logging.verbose("height %.2f (%.2f-%.2f) outside bounds : %s"
-                                , height, t.height_min, t.height_max, str(t.filename))  # @UndefinedVariable
+                logging.verbose("height %.2f (%.2f-%.2f) outside bounds : %s",
+                                height, t.height_min, t.height_max, str(t.filename))  # @UndefinedVariable
                 continue
             if width < t.width_min or width > t.width_max:
-                logging.verbose("width %.2f (%.2f-%.2f) outside bounds : %s"
-                                , width, t.width_min, t.width_max, str(t.filename))  # @UndefinedVariable
+                logging.verbose("width %.2f (%.2f-%.2f) outside bounds : %s",
+                                width, t.width_min, t.width_max, str(t.filename))  # @UndefinedVariable
                 continue
 
             new_candidates.append(t)
@@ -386,3 +389,11 @@ def _map_hex_colour(value):
         except KeyError:
             return value
     return value
+
+
+def replace_color_in_string(original: str) -> str:
+    """Replaces all occurrences of color with colour"""
+    if "color" in original:
+        return original.replace("color", "colour")
+    else:
+        return original

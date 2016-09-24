@@ -814,7 +814,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         if b.longest_edge_len > b.facade_texture.width_max:
             logging.error("OsmID : %d b.longest_edge_len <= b.facade_texture.width_max" % b.osm_id)
             continue
-        # print "long", b.longest_edge_len, b.facade_texture.width_max, str(b.facade_texture)
+
         #
         # roof search
         #
@@ -825,27 +825,33 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         else:
             roof_requires.append('compat:roof-flat')
 
+        # Try to match materials and colors defined in OSM with available roof textures
         try:
             if 'roof:material' in b.tags:
                 if str(b.tags['roof:material']) in ['roof_tiles', 'copper', 'glass', 'grass', 'metal', 'concrete', 'stone', 'slate', ]:
                     roof_requires.append(str('roof:material:') + str(b.tags['roof:material']))
-            
         except KeyError:
             pass
-            
         try:
+            # cleanup roof:colour and use it
+            if 'roof:color' in b.tags and 'roof:colour' not in b.tags:
+                logging.warning('osm_id %i uses color instead of colour' % b.osm_id)
+                b.tags['roof:colour'] = b.tags['roof:color']
+                del(b.tags['roof:color'])
+            elif 'roof:color' in b.tags and 'roof:colour' in b.tags:
+                del(b.tags['roof:color'])
             roof_requires.append('roof:colour:' + str(b.tags['roof:colour']))
         except KeyError:
             pass
 
         # force use of default roof texture, don't want too weird things
-        if ('roof:material' not in b.tags) and ('roof:color' not in b.tags) and ('roof:colour' not in b.tags):
+        if ('roof:material' not in b.tags) and ('roof:colour' not in b.tags):
             roof_requires.append(str('roof:default'))
 
         roof_requires = list(set(roof_requires))
 
         #
-        # -- find local texture for roof if infos different from parent
+        # -- find local texture for roof if information different from parent
         #
         logging.verbose("___find roof for building %i" % b.osm_id)
         if b.parent is None:
@@ -855,9 +861,9 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
                 logging.warning("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
                 continue
         else:
-            # 1 - Check if building and building parent infos are the same
+            # 1 - Check if building and building parent information is the same
             
-            # 1.1 Infos about colour
+            # 1.1 Information about colour
             try:
                 r_color = b.tags['roof:colour']
             except:
@@ -868,7 +874,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             except:
                 r_parent_color = None
             
-            # 1.2 Infos about material
+            # 1.2 Information about material
             try:
                 r_material = b.tags['roof:material']
             except:
