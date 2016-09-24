@@ -13,17 +13,16 @@ import random
 import re
 from math import sin, cos, radians, tan, sqrt, pi
 
-import ac3d
-import ac3d_fast
-import prepare_textures as tm
 import matplotlib.pyplot as plt
 import myskeleton
 import numpy as np
 import parameters
+import prepare_textures as tm
 import roofs
 import shapely.geometry as shg
 import tools
 import utils.utilities as util
+from utils import ac3d, ac3d_fast
 from utils.vec2d import Vec2d
 
 nb = 0
@@ -267,7 +266,7 @@ def _get_nodes_from_acs(objs, own_prefix):
                     ac = read_objects[fname]
                 else:
                     logging.debug("READ_AC %s" % fname)
-                    ac = ac3d_fast.File(file_name=fname, stats=None)
+                    ac = ac3d_fast.File(file_name=fname)
                     read_objects[fname] = ac
                                 
                 angle = radians(b.stg_hdg)

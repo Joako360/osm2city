@@ -11,14 +11,9 @@ from utils import vec2d
 
 
 class ObjectList(object):
-    '''
-    Class for storing a List OSM Objects
-    '''
+    """Class for storing a List OSM Objects"""
 
     def __init__(self, transform=None, clusters=None, boundary_clipping_complete_way=None):
-        '''
-        Constructor
-        '''
         self.objects = []
         self.transform = transform
         self.clusters = clusters

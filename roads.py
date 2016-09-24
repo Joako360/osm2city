@@ -82,27 +82,21 @@ import argparse
 import enum
 import logging
 import math
-import os
 import random
 import textwrap
 
-import ac3d
 import graph
 import linear
 import linear_bridge
 import matplotlib.pyplot as plt
 import numpy as np
-import objectlist
 import parameters
 import scipy.interpolate
 import shapely.geometry as shg
-import stg_io2
 import textures.road
 import tools
-import troubleshoot
-import utils.utilities as util
 from cluster import Clusters
-from utils import osmparser, coordinates
+from utils import osmparser, coordinates, ac3d, objectlist, stg_io2, troubleshoot
 from utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
@@ -1159,7 +1153,7 @@ def main():
     roads.process()  # does the heavy lifting based on OSM data including clustering
 
     replacement_prefix = parameters.get_repl_prefix()
-    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
+    stg_manager = stg_io2.STGManager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
 
     # -- write stg
     stg_paths = set()

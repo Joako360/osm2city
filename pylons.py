@@ -28,9 +28,8 @@ import xml.sax
 import parameters
 import roads
 import shapely.geometry as shg
-import stg_io2
 import tools
-from utils import osmparser, vec2d, coordinates
+from utils import osmparser, vec2d, coordinates, stg_io2
 
 OUR_MAGIC = "osm2pylon"  # Used in e.g. stg files to mark edits by osm2pylon
 
@@ -1519,9 +1518,9 @@ def main():
     building_refs = None
     handler = None
 
-    # -- initialize STG_Manager
+    # -- initialize STGManager
     path_to_output = parameters.get_output_path()
-    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, parameters.get_repl_prefix(), overwrite=True)
+    stg_manager = stg_io2.STGManager(path_to_output, OUR_MAGIC, parameters.get_repl_prefix(), overwrite=True)
 
     # Write to Flightgear
     if parameters.C2P_PROCESS_POWERLINES:

@@ -4,8 +4,7 @@ import logging
 import numpy as np
 
 from pyparsing import Literal, Word, alphas, Optional, OneOrMore, \
-    Group, nums, Regex, alphanums, LineEnd, Each,\
-    ZeroOrMore
+    Group, nums, Regex, alphanums, LineEnd, Each, ZeroOrMore
 
 fmt_node = '%g'
 fmt_surf = '%1.4g'
@@ -53,7 +52,8 @@ backface.  bit1 = shaded surface bit2 = twosided.
          0x20: two-sided poly
          0x00: single-sided poly
     """
-    def __init__(self, name=None, stats=None, texture=None, texrep=None, texoff=None, rot=None, loc=None, crease=None, url=None, default_type=0x00, default_mat=0, default_swap_uv=False, kids=0):
+    def __init__(self, name=None, stats=None, texture=None, texrep=None, texoff=None, rot=None, loc=None, crease=None,
+                 url=None, default_type=0x00, default_mat=0, default_swap_uv=False, kids=0):
         self._nodes = []
         self._faces = []
         self.name = name
@@ -343,7 +343,7 @@ class File(object):
             assert(tokens[0] == 'SURF')
             assert(tokens[2] == 'mat')
             assert(tokens[4] == 'refs')
-            self._current_object.face(nodes_uv_list = tokens[6], typ = tokens[1], mat = tokens[3])
+            self._current_object.face(nodes_uv_list=tokens[6], typ=tokens[1], mat=tokens[3])
 
         def convertIntegers(tokens):
             return int(tokens[0])
@@ -354,9 +354,9 @@ class File(object):
             except ValueError:
                 logging.error(tokens[0])
 
-        integer = Word( nums ).setParseAction( convertIntegers )
+        integer = Word(nums).setParseAction(convertIntegers)
         string = Regex(r'"[^"]*"')
-        floatNumber = Regex(r'[+-]?(\d+(\.\d*)?|(\.\d*))([eE][+-]\d+)?').setParseAction( convertFloats )
+        floatNumber = Regex(r'[+-]?(\d+(\.\d*)?|(\.\d*))([eE][+-]\d+)?').setParseAction(convertFloats)
         anything = Regex(r'.*')
 
         debug = False
@@ -401,73 +401,3 @@ class File(object):
             self.p = pFile.parseFile(file_name)
         except IOError as e:
             logging.warning(e)
-
-        # todo:
-        # groups -- how do they work?
-
-
-if __name__ == "__main__":
-    a = File()
-    #a.read('big-hangar.ac')
-    #nn =  a.nodes_as_array()
-    #print nn.shape
-    #print "%s" % str(a)
-    from math import sin, cos, radians
-    if 0:
-        a = File()
-        a.new_object('bla', '')
-        a.node(0, 0, 0)
-        a.node(0, 0, 1)
-        a.node(1, 0, 1)
-        a.node(1, 0, 0)
-        a.face([(0, 0, 0), (1, 0, 0), (2, 0, 0), (3, 0, 0)])
-        print(a.total_faces(), a.total_nodes())
-        nodes = a.nodes_as_array()
-
-
-        ac_nodes = np.array([[0, 0]])
-        for x, y, z in nodes:
-            node = np.dot(Rot_mat, [-z, -x]).reshape(1, 2)
-            ac_nodes = np.append(ac_nodes, node, 0)
-
-    angle = radians(98.9)
-    Rot_mat = np.array([[cos(angle), -sin(angle)],
-                        [sin(angle), cos(angle)]])
-
-#     a = File("C:/Users/keith.paterson/Documents/FlightGear/TerraSync\Objects\e010n50\e012n51\EDDP_DHL_hangar.ac")
-#     a = File("C:/Users/keith.paterson/Documents/FlightGear/TerraSync\Objects\e010n50\e012n51\eddp_antonov_hangar.ac")
-    #a = File("C:/Users/keith.paterson/Documents/FlightGear/TerraSync/Objects/e010n50\e013n51/frauenkirche.ac")
-    a = File("/mnt/hgfs/albrecht/daten/fgfs/fg_scenery/Scenery-TerraSync/Objects/e010n50/e012n51/eddp_antonov_hangar.ac")
-    #a = File("/mnt/hgfs/albrecht/daten/fgfs/fg_scenery/Scenery-TerraSync/Objects/e010n50/e013n51/frauenkirche.ac") 
-    #a = File("/mnt/hgfs/albrecht/daten/fgfs/fg_scenery/Scenery-TerraSync/Objects/e010n50/e012n51/EDDP_TerminalC.ac")
-    #for o in a.objects:
-    #    print "n", o.name, o.kids, o._type
-    nodes = -np.delete(a.nodes_as_array().transpose(), 1, 0)[::-1]
-    r = np.dot(Rot_mat, nodes)
-
-    print(a.total_faces())
-    print(a.total_nodes())
-
-
-    if 1:
-        #plt.clf()
-        #a.plot()
-        plt.xlim(-50, 50)
-        plt.ylim(-50, 50)
-# plt.show()
-
-    plt.plot(nodes[0], nodes[1], 'k-')
-    r = np.dot(Rot_mat, nodes)
-    #plt.plot(r[0], r[1], 'r-')
-    plt.show()
-    print(ac_nodes)
-    print(nodes)
-
-    bla
-    node = np.array([-float(splitted[2]),
-                    - float(splitted[0])])
-
-    node = np.dot(Rot_mat, node).reshape(1, 2)
-    ac_nodes = np.append(ac_nodes, node, 0)
-
-#        a.write('test.ac')

@@ -14,9 +14,8 @@ import sys
 import xml.sax
 
 import parameters
-import stg_io2
 import tools
-from utils import osmparser, vec2d, coordinates
+from utils import osmparser, vec2d, coordinates, stg_io2
 
 OUR_MAGIC = "osm2nature"  # Used in e.g. stg files to mark edits by osm2nature.py
 
@@ -174,9 +173,9 @@ def main():
     #    forest_trees = process_osm_forest(handler.nodes_dict, handler.ways_dict, elev_interpolator
     #                                                         , coord_transformator)
     #    logging.info('Number of forest to process: %s', len(trees))
-    #    # -- initialize STG_Manager
+    #    # -- initialize STGManager
     path_to_output = parameters.get_output_path()
-    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, parameters.get_repl_prefix(), overwrite=True)
+    stg_manager = stg_io2.STGManager(path_to_output, OUR_MAGIC, parameters.get_repl_prefix(), overwrite=True)
 
     #write_stg_entries(stg_manager, files_to_remove, trees, "trees", 2000)
     for tree in list(trees.values()) :
@@ -187,7 +186,7 @@ def main():
         print((forest_tree.elevation))
         forest_tree.make_stg_entry(stg_manager)
 
-    # -- initialize STG_Manager
+    # -- initialize STGManager
     if args.uninstall:
         for f in files_to_remove:
             try:

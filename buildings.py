@@ -70,12 +70,10 @@ import parameters
 import prepare_textures
 import shapely.geometry as shgm
 import shapely.geos as shgs
-import stg_io2
 import tools
-import troubleshoot
 import utils.utilities as util
 import utils.vec2d as v
-from utils import osmparser, calc_tile, coordinates
+from utils import osmparser, calc_tile, coordinates, stg_io2, troubleshoot
 
 buildings = []  # -- master list, holds all buildings
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
@@ -1039,10 +1037,10 @@ if __name__ == "__main__":
     buildings = building_lib.analyse(buildings, static_objects, tools.transform, elev,
                                      prepare_textures.facades, prepare_textures.roofs)
 
-    # -- initialize STG_Manager
+    # -- initialize STGManager
     path_to_output = parameters.get_output_path()
     replacement_prefix = parameters.get_repl_prefix()
-    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
+    stg_manager = stg_io2.STGManager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
 #     for node in ac_nodes:
 #         print node
 #         lon, lat = tools.transform.toGlobal(node)

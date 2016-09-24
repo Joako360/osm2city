@@ -1,19 +1,17 @@
-'''
+"""
 Performing reader for vertices of a ac3d file
 Created on 06.04.2015
 
 @author: keith.paterson
-'''
+"""
 from re import split
 import numpy as np
 
 
-'''
-Fast dedicated vertice reader for ac3d files
-'''
 class File(object):
-    
-    def __init__(self, file_name, stats):
+    """Fast dedicated vertice reader for ac3d files."""
+
+    def __init__(self, file_name):
         self.vertices = []
         if file_name is not None:
             self.read(file_name)
@@ -26,9 +24,8 @@ class File(object):
             if line.startswith("numvert"):
                 num_vertices = int(line[8:])
                 continue
-            if num_vertices>0:
-                num_vertices-=1
-                s = split("[ \t]", line)
+            if num_vertices > 0:
+                num_vertices -= 1
                 vertice = list(map(float, split("[ \t]", line)))
                 self.vertices.append(vertice)
                         

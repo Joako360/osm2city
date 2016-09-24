@@ -3,11 +3,12 @@ Created on 25.05.2015
 
 @author: keith.paterson
 '''
-import os
 import argparse
 import logging
-import stg_io2
+import os
 import re
+
+from utils import stg_io2
 
 
 def scan_dir(dir):

@@ -13,13 +13,11 @@ import numpy as np
 import os
 import shapely.geometry as shg
 
-import ac3d
 from cluster import Clusters
-from objectlist import ObjectList
+from utils.objectlist import ObjectList
 import parameters
-import stg_io2
 import tools
-from utils import osmparser, coordinates
+from utils import osmparser, coordinates, ac3d, stg_io2
 from utils.vec2d import Vec2d
 
 
@@ -270,10 +268,10 @@ def main():
 
     elev = tools.get_interpolator()
 
-    # -- initialize STG_Manager
+    # -- initialize STGManager
     path_to_output = parameters.get_output_path()
     replacement_prefix = parameters.get_repl_prefix()
-    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
+    stg_manager = stg_io2.STGManager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
 
     platforms.write(elev, stg_manager, replacement_prefix)
     logging.info("done.")

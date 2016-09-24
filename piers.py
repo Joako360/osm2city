@@ -12,17 +12,15 @@ import math
 import os
 from random import randint
 
-import ac3d
 import numpy as np
 import parameters
 import shapely.geometry as shg
-import stg_io2
 import tools
 from cluster import Clusters
-from objectlist import ObjectList
 from shapely.geometry.base import CAP_STYLE, JOIN_STYLE
 from shapely.geometry.linestring import LineString
-from utils import osmparser, coordinates
+from utils import osmparser, coordinates, ac3d, stg_io2
+from utils.objectlist import ObjectList
 from utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2piers"  # Used in e.g. stg files to mark edits by osm2Piers
@@ -379,10 +377,10 @@ def main():
     for pier in piers.objects:
         pier.calc_elevation(elev)
 
-    # -- initialize STG_Manager
+    # -- initialize STGManager
     path_to_output = parameters.get_output_path()
     replacement_prefix = parameters.get_repl_prefix()
-    stg_manager = stg_io2.STG_Manager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
+    stg_manager = stg_io2.STGManager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
 
     piers.write_piers(stg_manager, replacement_prefix)
     logging.info("done.")

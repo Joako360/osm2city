@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Manage I/O for .stg files. There are two classes, STG_Manager and STG_File.
+Manage I/O for .stg files. There are two classes, STGManager and STGFile.
 
-STG_Manager is the main interface for writing OBJECT_STATIC (_SHARED will
+STGManager is the main interface for writing OBJECT_STATIC (_SHARED will
 follow) to .stg files. It knows about the scenery path, tile indices etc. You
 only need to provide the actual ac_file_name, position, elevation, hdg.
 See __main__ for usage.
@@ -23,7 +23,7 @@ from utils import calc_tile
 from utils.vec2d import Vec2d
 
 
-class STG_File(object):
+class STGFile(object):
     """represents an .stg file.
        takes care of writing/reading/uninstalling OBJECT_* lines
     """
@@ -147,7 +147,7 @@ class STG_File(object):
         stg.close()
 
 
-class STG_Manager(object):
+class STGManager(object):
     """manages STG objects. Knows about scenery path.
        prefix separates different writers to work around two PREFIX areas interleaving 
     """
@@ -164,7 +164,7 @@ class STG_Manager(object):
         try:
             return self.stg_dict[tile_index]
         except KeyError:
-            the_stg = STG_File(lon_lat, tile_index, self.path_to_scenery, self.magic, self.prefix)
+            the_stg = STGFile(lon_lat, tile_index, self.path_to_scenery, self.magic, self.prefix)
             self.stg_dict[tile_index] = the_stg
             if overwrite is None:
                 overwrite = self.overwrite
@@ -226,10 +226,9 @@ def read_stg_entries(stg_path_and_name, our_magic, ignore_bad_lines=False):
     TODO: should be able to take a list of our_magic"""
     entries = []  # list of STGEntry objects
 
-    if None is not our_magic:
-        our_magic_start = delimiter_string(our_magic, None, True)
-        our_magic_end = delimiter_string(our_magic, None, False)
-        ours = False
+    our_magic_start = delimiter_string(our_magic, None, True)
+    our_magic_end = delimiter_string(our_magic, None, False)
+    ours = False
     try:
         with open(stg_path_and_name, 'r') as my_file:
             path, stg_name = os.path.split(stg_path_and_name)
@@ -284,21 +283,25 @@ def read(path, stg_fname, our_magic):
     for entry in stg_entries:
         point = shg.Point(tools.transform.toLocal((entry.lon, entry.lat)))
         building_objs.append(building_lib.Building(osm_id=-1, tags=-1, outer_ring=point,
-                                               name=entry.get_obj_path_and_name(),
-                                               height=0, levels=0, stg_typ=entry.get_object_type_as_string(),
-                                               stg_hdg=entry.hdg))
+                                                   name=entry.get_obj_path_and_name(),
+                                                   height=0, levels=0, stg_typ=entry.get_object_type_as_string(),
+                                                   stg_hdg=entry.hdg))
 
     return building_objs
 
 
 def delimiter_string(our_magic, prefix, is_start):
+    if our_magic is None:
+        magic = ""
+    else:
+        magic = our_magic
     delimiter = '# '
     if not is_start:
         delimiter += 'END '
     if prefix is None:
-        return delimiter + our_magic + '\n'
+        return delimiter + magic + '\n'
     else:
-        return delimiter + our_magic + '_' + prefix + '\n'
+        return delimiter + magic + '_' + prefix + '\n'
 
 
 def quick_stg_line(path_to_scenery, ac_fname, position, elevation, heading, show=True):
@@ -319,11 +322,11 @@ if __name__ == "__main__":
     OUR_MAGIC = "osm2test"
     center_global = Vec2d(13.7, 51)
 
-    # 1. Init STG_Manager
-    stg_manager = STG_Manager("/home/albrecht/fgfs/my/osm2city/EDDC", OUR_MAGIC, overwrite=True)
+    # 1. Init STGManager
+    stg_manager = STGManager("/home/albrecht/fgfs/my/osm2city/EDDC", OUR_MAGIC, overwrite=True)
 
     # 2. add object(s) to it, will return path_to_stg. If the .stg in question
-    #    is encountered for the first time, read it into an STG_File object and
+    #    is encountered for the first time, read it into an STGFile object and
     #    separate "our" lines from "other" lines.
     path_to_stg = stg_manager.add_object_static("test.ac", center_global, 0, 0)
 
