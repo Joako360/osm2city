@@ -1,6 +1,6 @@
 import random
 import re
-from typing import List
+from typing import Dict
 
 import numpy as np
 import tools
@@ -13,6 +13,10 @@ class Texture(object):
 
     tex_prefix = ''  # static variable to reduce the dynamic path info the texture registrations. Needs to be set first.
     """
+    spelling used internally in osm2city and in many cases automatically converted:
+        - colour (instead of color)
+        - grey (instead of gray)
+
     possible texture types:
         - facade
         - roof
@@ -35,7 +39,7 @@ class Texture(object):
 
     roof: http://wiki.openstreetmap.org/wiki/Simple_3D_buildings#Roof
       provides
-        - colour:black (red, ..)  # internally in osm2city we use "colour" and not "color"
+        - colour:black (red, ..)
         - shape:flat  (pitched, ..)
 
     """
@@ -173,6 +177,7 @@ class RoofManager(object):
         self.__l = []
         self.__cls = cls  # -- class (roof, facade, ...)
         self.current_registered_in = ""
+        self.available_materials = set()
 
     def append(self, texture: Texture) -> None:
         """Appends a texture to the catalog if the referenced file exists, in which case True is returned.
@@ -199,13 +204,15 @@ class RoofManager(object):
         logging.debug("Based on registration file %s: added %s ", self.current_registered_in, texture.filename)
         for item in texture.provides:
             if item.split(':')[0] in ('age', 'region', 'compat'):
-                new_provides.append(replace_color_in_string(item))
+                new_provides.append(screen_texture_tags_for_colour_spelling(item))
             else:
-                new_provides.append(replace_color_in_string(self.__cls + ':' + item))
+                if item.split(":")[0] == "material":
+                    self.available_materials.add(item.split(":")[1])
+                new_provides.append(screen_texture_tags_for_colour_spelling(self.__cls + ':' + item))
         texture.provides = new_provides
         new_requires = list()
         for item in texture.requires:
-            new_requires.append(replace_color_in_string(item))
+            new_requires.append(screen_texture_tags_for_colour_spelling(item))
         texture.requires = new_requires
         texture.cls = self.__cls
 
@@ -363,7 +370,6 @@ def _map_hex_colour(value):
     colour_map = {
                   "#000000": "black",
                   "#FFFFFF": "white",
-                  "#fff": "white",
                   "#808080": "grey",
                   "#C0C0C0": "silver",
                   "#800000": "maroon",
@@ -391,9 +397,27 @@ def _map_hex_colour(value):
     return value
 
 
-def replace_color_in_string(original: str) -> str:
+def screen_texture_tags_for_colour_spelling(original: str) -> str:
     """Replaces all occurrences of color with colour"""
-    if "color" in original:
-        return original.replace("color", "colour")
+    if "color" in original or "gray" in original:
+        new_string = original.replace("color", "colour")
+        new_string = new_string.replace("gray", "grey")
+        return new_string
     else:
         return original
+
+
+def screen_osm_tags_for_colour_spelling(osm_id: int, tags: Dict[str, str]) -> None:
+    if 'building:color' in tags and 'building:colour' not in tags:
+        logging.debug('osm_id %i uses color instead of colour' % osm_id)
+        tags['building:colour'] = tags['building:color']
+        del (tags['building:color'])
+    elif 'building:color' in tags and 'building:colour' in tags:
+        del (tags['building:color'])
+    if 'roof:color' in tags and 'roof:colour' not in tags:
+        logging.debug('osm_id %i uses color instead of colour' % osm_id)
+        tags['roof:colour'] = tags['roof:color']
+        del (tags['roof:color'])
+    elif 'roof:color' in tags and 'roof:colour' in tags:
+        del (tags['roof:color'])
+

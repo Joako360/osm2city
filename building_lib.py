@@ -702,13 +702,6 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         except KeyError:
             pass
         try:
-            # cleanup building:colour and use it
-            if 'building:color' in b.tags and 'building:colour' not in b.tags:
-                logging.warning('osm_id %i uses color instead of colour' % b.osm_id)
-                b.tags['building:colour'] = b.tags['building:color']
-                del(b.tags['building:color'])
-            elif 'building:color' in b.tags and 'building:colour' in b.tags:
-                del(b.tags['building:color'])
             facade_requires.append('facade:building:colour:' + b.tags['building:colour'].lower())
         except KeyError:
             pass    
@@ -828,18 +821,11 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
         # Try to match materials and colors defined in OSM with available roof textures
         try:
             if 'roof:material' in b.tags:
-                if str(b.tags['roof:material']) in ['roof_tiles', 'copper', 'glass', 'grass', 'metal', 'concrete', 'stone', 'slate', ]:
+                if str(b.tags['roof:material']) in roofs.available_materials:
                     roof_requires.append(str('roof:material:') + str(b.tags['roof:material']))
         except KeyError:
             pass
         try:
-            # cleanup roof:colour and use it
-            if 'roof:color' in b.tags and 'roof:colour' not in b.tags:
-                logging.warning('osm_id %i uses color instead of colour' % b.osm_id)
-                b.tags['roof:colour'] = b.tags['roof:color']
-                del(b.tags['roof:color'])
-            elif 'roof:color' in b.tags and 'roof:colour' in b.tags:
-                del(b.tags['roof:color'])
             roof_requires.append('roof:colour:' + str(b.tags['roof:colour']))
         except KeyError:
             pass

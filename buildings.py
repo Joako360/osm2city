@@ -70,6 +70,7 @@ import parameters
 import prepare_textures
 import shapely.geometry as shgm
 import shapely.geos as shgs
+import textures.texture as tex
 import tools
 import utils.utilities as util
 import utils.vec2d as v
@@ -996,12 +997,9 @@ if __name__ == "__main__":
         logging.info("Unpickled %g buildings ", len(buildings))
         tools.stats.objects = len(buildings)
 
-    # -- debug filter
-#    for b in buildings:
-#        if b.osm_id == 35336:
-#            new_buildings = [b]
-#            break
-#    buildings = new_buildings
+    # clean up "color" in tags
+    for b in buildings:
+        tex.screen_osm_tags_for_colour_spelling(b.osm_id, b.tags)
 
     # -- create (empty) clusters
     lmin = v.Vec2d(tools.transform.toLocal(cmin))
