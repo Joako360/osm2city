@@ -20,6 +20,7 @@ import numpy as np
 import tools
 import utils.utilities
 from utils.vec2d import Vec2d
+from utils.stg_io2 import STGVerbType
 
 
 class Cluster(object):
@@ -40,7 +41,7 @@ def clamp(i, vmin, vmax):
 
 
 class Clusters(object):
-    def __init__(self, min, max, size, prefix):
+    def __init__(self, min, max, size, prefix, stg_verb_type: STGVerbType=STGVerbType.object_static) -> None:
         self.max = max
         self.min = min
         self.delta = max - min
@@ -48,6 +49,7 @@ class Clusters(object):
         self.n = (self.delta // size).int() + 1
         self.__len = self.n.x * self.n.y
         self.prefix = prefix
+        self.stg_verb_type = stg_verb_type
 
         logging.info("Generating clusters %s %s", min, max)
         self._clusters = [[self.init_cluster(Vec2d(i, j))
@@ -173,8 +175,8 @@ self._clusters[I.x][I.y]
 #        print "  vacant", len(self.vacant[0]), len(self.vacant[1]), len(self.vacant[2]), len(self.vacant[3]), "new", len(self.objects)
 #
 
-    def write_stats(self):
-        f = open(self.prefix + os.sep + "cluster_stats.dat", "w")
+    def write_stats(self, clusters_name: str):
+        f = open(self.prefix + os.sep + clusters_name + ".dat", "w")
         for j in range(self.n.y):
             for i in range(self.n.x):
                 cl = self._clusters[i][j]

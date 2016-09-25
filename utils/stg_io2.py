@@ -20,12 +20,27 @@ from utils import calc_tile
 from utils.vec2d import Vec2d
 
 
+@enum.unique
+class LOD(enum.IntEnum):
+    bare = 0
+    rough = 1
+    detail = 2
+
+
+@enum.unique
+class STGVerbType(enum.IntEnum):  # must be the same as actual string in lowercase in FGFS
+    object_shared = 1
+    object_static = 2
+    object_building_mesh_rough = 3
+    object_building_mesh_detailed = 4
+
+
 class STGFile(object):
     """represents an .stg file.
        takes care of writing/reading/uninstalling OBJECT_* lines
     """
     
-    def __init__(self, lon_lat, tile_index, path_to_scenery, magic, prefix):
+    def __init__(self, lon_lat: Vec2d, tile_index: int, path_to_scenery: str, magic: str, prefix: str) -> None:
         """Read all lines from stg to memory.
            Store our/other lines in two separate lists."""
         self.path_to_stg = calc_tile.construct_path_to_stg(path_to_scenery, lon_lat)
@@ -42,7 +57,7 @@ class STGFile(object):
         self.our_magic_end_new = delimiter_string(self.magic, prefix, False)
         self.read()
 
-    def read(self):
+    def read(self) -> None:
         """read others and ours from file"""
         try:
             stg = open(self.file_name, 'r')
@@ -93,28 +108,20 @@ class STGFile(object):
         self.our_list = []
         self.our_ac_file_name_list = []
 
-    def _add_object(self, obj_prefix, ac_file_name, lon_lat, elev, hdg, once=False):
+    def add_object(self, stg_verb: str, ac_file_name: str, lon_lat, elev: float, hdg: float, once=False) -> str:
         """add OBJECT_XXXXX line to our_list. Returns path to stg."""
-        line = "OBJECT_%s %s %1.5f %1.5f %1.2f %g\n" % (obj_prefix.upper(),
-                                                        ac_file_name, lon_lat.lon, lon_lat.lat, elev, hdg)
+        line = "%s %s %1.5f %1.5f %1.2f %g\n" % (stg_verb.upper(),
+                                                 ac_file_name, lon_lat.lon, lon_lat.lat, elev, hdg)
         if once is False or (ac_file_name not in self.our_ac_file_name_list):
             self.our_list.append(line)
             self.our_ac_file_name_list.append(ac_file_name)
             logging.debug(self.file_name + ':' + line)
         else:
             logging.debug(self.file_name + ': not writing (once=True) ' + line)
-        self.make_path_to_stg()
+        self._make_path_to_stg()
         return self.path_to_stg
 
-    def add_object_static(self, ac_file_name, lon_lat, elev, hdg, once=False):
-        """add OBJECT_STATIC line to our_list. Returns path to stg."""
-        return self._add_object('STATIC', ac_file_name, lon_lat, elev, hdg, once)
-
-    def add_object_shared(self, ac_file_name, lon_lat, elev, hdg, once=False):
-        """add OBJECT_SHARED line to our_list. Returns path to stg."""
-        return self._add_object('SHARED', ac_file_name, lon_lat, elev, hdg, once)
-
-    def make_path_to_stg(self):
+    def _make_path_to_stg(self) -> str:
         try:
             os.makedirs(self.path_to_stg)
         except OSError as e:
@@ -125,7 +132,7 @@ class STGFile(object):
         """write others and ours to file"""
         # read directly before write to
         self.read()
-        self.make_path_to_stg()
+        self._make_path_to_stg()
         stg = open(self.file_name, 'w')
         logging.info("Writing %d other lines" % len(self.other_list))
         for line in self.other_list:
@@ -148,7 +155,7 @@ class STGManager(object):
     """manages STG objects. Knows about scenery path.
        prefix separates different writers to work around two PREFIX areas interleaving 
     """
-    def __init__(self, path_to_scenery, magic, prefix=None, overwrite=False):
+    def __init__(self, path_to_scenery: str, magic: str, prefix=None, overwrite=False) -> None:
         self.stg_dict = dict()  # maps tile index to stg object
         self.path_to_scenery = path_to_scenery
         self.overwrite = overwrite
@@ -170,15 +177,16 @@ class STGManager(object):
                 the_stg.drop_ours()
         return the_stg
 
-    def add_object_static(self, ac_file_name, lon_lat, elev, hdg, once=False):
+    def add_object_static(self, ac_file_name, lon_lat, elev, hdg,
+                          stg_verb_type: STGVerbType=STGVerbType.object_static, once=False):
         """Adds OBJECT_STATIC line. Returns path to stg."""
         the_stg = self(lon_lat)
-        return the_stg.add_object_static(ac_file_name, lon_lat, elev, hdg, once)
+        return the_stg.add_object(stg_verb_type.name.upper(), ac_file_name, lon_lat, elev, hdg, once)
 
     def add_object_shared(self, ac_file_name, lon_lat, elev, hdg):
         """Adds OBJECT_SHARED line. Returns path to stg it was added to."""
         the_stg = self(lon_lat)
-        return the_stg.add_object_shared(ac_file_name, lon_lat, elev, hdg)
+        return the_stg.add_object('OBJECT_SHARED', ac_file_name, lon_lat, elev, hdg)
 
     def drop_ours(self):
         for the_stg in list(self.stg_dict.values()):
@@ -187,21 +195,6 @@ class STGManager(object):
     def write(self):
         for the_stg in list(self.stg_dict.values()):
             the_stg.write()
-
-
-@enum.unique
-class LOD(enum.IntEnum):
-    bare = 0
-    rough = 1
-    detail = 2
-
-
-@enum.unique
-class STGVerbType(enum.IntEnum):  # must be the same as actual string in lowercase in FGFS
-    object_shared = 1
-    object_static = 2
-    object_building_mesh_rough = 3
-    object_building_mesh_detailed = 4
 
 
 class STGEntry(object):
@@ -216,7 +209,7 @@ class STGEntry(object):
         self.elev = elev
         self.hdg = hdg
 
-    def _translate_verb_type(self, type_string:str) -> None:
+    def _translate_verb_type(self, type_string: str) -> None:
         """Translates from a string in FGFS to an enumeration.
         If nothing is found, then the default in __init__ is used."""
         for verb in STGVerbType:

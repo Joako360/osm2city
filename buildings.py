@@ -73,7 +73,6 @@ import shapely.geos as shgs
 import textures.texture as tex
 import tools
 import utils.stg_io2
-import utils.utilities as util
 import utils.vec2d as v
 from utils import osmparser, calc_tile, coordinates, stg_io2, troubleshoot
 
@@ -1006,7 +1005,18 @@ if __name__ == "__main__":
     # -- create (empty) clusters
     lmin = v.Vec2d(tools.transform.toLocal(cmin))
     lmax = v.Vec2d(tools.transform.toLocal(cmax))
-    clusters = cluster.Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
+
+    handled_clusters = list()  # cluster.Clusters objects
+    # cluster_non_lod is used when not using new STG verbs and for mesh_detailed when using new STG verbs
+    clusters_default = cluster.Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
+    handled_clusters.append(clusters_default)
+    clusters_building_mesh_rough = None
+
+    if parameters.USE_NEW_STG_VERBS:
+        clusters_default.stg_verb_type = stg_io2.STGVerbType.object_building_mesh_detailed
+        clusters_building_mesh_rough = cluster.Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX,
+                                                        stg_io2.STGVerbType.object_building_mesh_rough)
+        handled_clusters.append(clusters_building_mesh_rough)
 
     if parameters.OVERLAP_CHECK:
         # -- read static/shared objects in our area from .stg(s)
@@ -1015,19 +1025,18 @@ if __name__ == "__main__":
         #    Then read objects from .stg.
         stgs = []
         static_objects = []
-        for cl in clusters:
+        for cl in clusters_default:
             center_global = tools.transform.toGlobal(cl.center)
             path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center_global)
-            stg_fname = calc_tile.construct_stg_file_name(center_global)
+            stg_file_name = calc_tile.construct_stg_file_name(center_global)
 
-            if stg_fname not in stgs:
-                stgs.append(stg_fname)
-                static_objects.extend(building_lib.read_buildings_from_stg_entries(path, stg_fname, OUR_MAGIC))
+            if stg_file_name not in stgs:
+                stgs.append(stg_file_name)
+                static_objects.extend(building_lib.read_buildings_from_stg_entries(path, stg_file_name, OUR_MAGIC))
 
         logging.info("read %i objects from %i tiles", len(static_objects), len(stgs))
     else:
         static_objects = None
-
 
     # - analyze buildings
     #   - calculate area
@@ -1036,6 +1045,7 @@ if __name__ == "__main__":
     #   - set building type, roof type etc
     buildings = building_lib.analyse(buildings, static_objects, tools.transform, elev,
                                      prepare_textures.facades, prepare_textures.roofs)
+    building_lib.decide_LOD(buildings)
 
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
@@ -1051,51 +1061,61 @@ if __name__ == "__main__":
 
     # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
     for b in buildings:
-        clusters.append(b.anchor, b)
-    building_lib.decide_LOD(buildings)
-    clusters.transfer_buildings()
+        if parameters.USE_NEW_STG_VERBS:
+            if b.LOD is utils.stg_io2.LOD.detail:
+                clusters_default.append(b.anchor, b)
+            elif b.LOD is utils.stg_io2.LOD.rough:
+                clusters_building_mesh_rough.append(b.anchor, b)
+            else:
+                pass  # FIXME: to be replaced if mesh_bare would be introduced
+        else:
+            clusters_default.append(b.anchor, b)
+
+    if parameters.USE_NEW_STG_VERBS is False:
+        clusters_default.transfer_buildings()
 
     # -- write clusters
-    clusters.write_stats()
     stg_fp_dict = {}    # -- dictionary of stg file pointers
     stg = None  # stg-file object
+    for my_clusters in handled_clusters:
+        my_clusters.write_stats("foo")
 
-    for ic, cl in enumerate(clusters):
-        nb = len(cl.objects)
-        if nb < parameters.CLUSTER_MIN_OBJECTS:
-            continue  # skip almost empty clusters
+        for ic, cl in enumerate(my_clusters):
+            nb = len(cl.objects)
+            if nb < parameters.CLUSTER_MIN_OBJECTS:
+                continue  # skip almost empty clusters
 
-        # -- get cluster center
-        offset = cl.center
+            # -- get cluster center
+            offset = cl.center
 
-        # -- count roofs == separate objects
-        nroofs = 0
-        for b in cl.objects:
-            if b.roof_complex:
-                nroofs += 2  # we have 2 different LOD models for each roof
+            # -- count roofs == separate objects
+            nroofs = 0
+            for b in cl.objects:
+                if b.roof_complex:
+                    nroofs += 2  # we have 2 different LOD models for each roof
 
-        tile_elev = elev(cl.center)
-        center_global = v.Vec2d(tools.transform.toGlobal(cl.center))
-        if tile_elev == -9999:
-            logging.warning("Skipping tile elev = -9999 at lat %.3f and lon %.3f", center_global.lat, center_global.lon)
-            continue  # skip tile with improper elev
+            tile_elev = elev(cl.center)
+            center_global = v.Vec2d(tools.transform.toGlobal(cl.center))
+            if tile_elev == -9999:
+                logging.warning("Skipping tile elev = -9999 at lat %.3f and lon %.3f", center_global.lat, center_global.lon)
+                continue  # skip tile with improper elev
 
-        # -- incase PREFIX is a path (batch processing)
-        file_name = replacement_prefix + "city%02i%02i" % (cl.I.x, cl.I.y)
-        logging.info("writing cluster %s (%i/%i)" % (file_name, ic, len(clusters)))
+            # -- in case PREFIX is a path (batch processing)
+            file_name = replacement_prefix + "city%02i%02i" % (cl.I.x, cl.I.y)
+            logging.info("writing cluster %s (%i/%i)" % (file_name, ic, len(my_clusters)))
 
-        path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, tile_elev, 0)
+            path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, tile_elev, 0,
+                                                        my_clusters.stg_verb_type)
 
-#        if cl.I.x == 0 and cl.I.y == 0:
-        stg_manager.add_object_static('lightmap-switch.xml', center_global, tile_elev, 0, once=True)
+            stg_manager.add_object_static('lightmap-switch.xml', center_global, tile_elev, 0, once=True)
 
-        if args.uninstall:
-            files_to_remove.append(path_to_stg + file_name + ".ac")
-            files_to_remove.append(path_to_stg + file_name + ".xml")
-        else:
-            # -- write .ac and .xml
-            building_lib.write(path_to_stg + file_name + ".ac", cl.objects, elev, tile_elev, tools.transform, offset)
-            write_xml(path_to_stg, file_name, cl.objects, offset)
+            if args.uninstall:
+                files_to_remove.append(path_to_stg + file_name + ".ac")
+                files_to_remove.append(path_to_stg + file_name + ".xml")
+            else:
+                # -- write .ac and .xml
+                building_lib.write(path_to_stg + file_name + ".ac", cl.objects, elev, tile_elev, tools.transform, offset)
+                write_xml(path_to_stg, file_name, cl.objects, offset)
 
     if args.uninstall:
         for f in files_to_remove:
