@@ -16,14 +16,18 @@ from math import sin, cos, radians, tan, sqrt, pi
 import matplotlib.pyplot as plt
 import myskeleton
 import numpy as np
+import shapely.geometry as shg
+
+
 import parameters
 import prepare_textures as tm
 import roofs
-import shapely.geometry as shg
 import tools
+import utils.stg_io2
 import utils.utilities as util
 from utils import ac3d, ac3d_fast
 from utils.vec2d import Vec2d
+from utils.stg_io2 import STGVerbType, read_stg_entries
 
 nb = 0
 out = ""
@@ -36,13 +40,14 @@ class Building(object):
     """
 
     def __init__(self, osm_id, tags, outer_ring, name, height, levels,
-                 stg_typ=None, stg_hdg=None, inner_rings_list=[], building_type='unknown', roof_type='flat', roof_height=0, refs=[]):
+                 stg_typ: STGVerbType=None, stg_hdg=None, inner_rings_list=[], building_type='unknown',
+                 roof_type='flat', roof_height=0, refs=[]):
         self.osm_id = osm_id
         self.tags = tags
         self.refs = refs
         self.inner_rings_list = inner_rings_list
         self.name = name
-        self.stg_typ = stg_typ  # stg: OBJECT_SHARED or _STATIC
+        self.stg_typ = stg_typ  # STGVerbType
         self.stg_hdg = stg_hdg
         self.height = height
         self.roof_height = roof_height
@@ -502,21 +507,21 @@ def decide_LOD(buildings):
     for b in buildings:
         r = random.uniform(0, 1)
         if r < parameters.LOD_PERCENTAGE_DETAIL:
-            lod = util.LOD.detail
+            lod = utils.stg_io2.LOD.detail
         else:
-            lod = util.LOD.rough
+            lod = utils.stg_io2.LOD.rough
 
         if b.levels > parameters.LOD_ALWAYS_ROUGH_ABOVE_LEVELS:
-            lod = util.LOD.rough  # tall buildings        -> rough
-        if b.levels > parameters.LOD_ALWAYS_BARE_ABOVE_LEVELS:
-            lod = util.LOD.bare  # really tall buildings -> bare
+            lod = utils.stg_io2.LOD.rough  # tall buildings        -> rough
+        if (parameters.USE_NEW_STG_VERBS is False) and (b.levels > parameters.LOD_ALWAYS_BARE_ABOVE_LEVELS):
+            lod = utils.stg_io2.LOD.bare  # really tall buildings -> bare
         if b.levels < parameters.LOD_ALWAYS_DETAIL_BELOW_LEVELS:
-            lod = util.LOD.detail  # small buildings       -> detail
+            lod = utils.stg_io2.LOD.detail  # small buildings       -> detail
 
         if b.area < parameters.LOD_ALWAYS_DETAIL_BELOW_AREA:
-            lod = util.LOD.detail
+            lod = utils.stg_io2.LOD.detail
         elif b.area > parameters.LOD_ALWAYS_ROUGH_ABOVE_AREA:
-            lod = util.LOD.rough
+            lod = utils.stg_io2.LOD.rough
 
         b.LOD = lod
         tools.stats.count_LOD(lod)
@@ -1314,3 +1319,16 @@ def mapType(tags):
     if 'building' in tags and not tags['building'] == 'yes':
         return tags['building']
     return 'unknown'
+
+
+def read_buildings_from_stg_entries(path, stg_fname, our_magic):
+    """Same as read_stg_entries, but returns osm2city.Building objects"""
+    stg_entries = read_stg_entries(path + stg_fname, our_magic)
+    building_objs = []
+    for entry in stg_entries:
+        point = shg.Point(tools.transform.toLocal((entry.lon, entry.lat)))
+        building_objs.append(Building(osm_id=-1, tags=-1, outer_ring=point,
+                                      name=entry.get_obj_path_and_name(),
+                                      height=0, levels=0, stg_typ=entry.verb_type,
+                                      stg_hdg=entry.hdg))
+    return building_objs

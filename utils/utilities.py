@@ -4,9 +4,9 @@ Diverse utility methods used throughout osm2city and not having a clear other ho
 
 import enum
 import logging
+import os
 import os.path as osp
 import sys
-import os
 import textwrap
 from collections import defaultdict
 
@@ -105,13 +105,6 @@ def assert_trailing_slash(path: str) -> str:
         if not my_path.endswith(os.sep):
             my_path += os.sep
     return my_path
-
-
-@enum.unique
-class LOD(enum.IntEnum):
-    bare = 0
-    rough = 1
-    detail = 2
 
 
 class Stats(object):

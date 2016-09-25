@@ -11,14 +11,11 @@ STG_file represents an .stg file. Usually you don't deal with them directly,
 
 @author: tom
 """
-
+import enum
 import logging
 import os
 import time
 
-import building_lib
-import shapely.geometry as shg
-import tools
 from utils import calc_tile
 from utils.vec2d import Vec2d
 
@@ -192,14 +189,26 @@ class STGManager(object):
             the_stg.write()
 
 
-class STGEntry(object):
-    SHARED_OBJECT = "OBJECT_SHARED"
-    STATIC_OBJECT = "OBJECT_STATIC"
+@enum.unique
+class LOD(enum.IntEnum):
+    bare = 0
+    rough = 1
+    detail = 2
 
-    def __init__(self, type_string, obj_filename, stg_path, lon, lat, elev, hdg):
-        self.is_static = True
-        if type_string == STGEntry.SHARED_OBJECT:
-            self.is_static = False
+
+@enum.unique
+class STGVerbType(enum.IntEnum):  # must be the same as actual string in lowercase in FGFS
+    object_shared = 1
+    object_static = 2
+    object_building_mesh_rough = 3
+    object_building_mesh_detailed = 4
+
+
+class STGEntry(object):
+    def __init__(self, type_string: str, obj_filename: str, stg_path: str,
+                 lon: float, lat: float, elev: float, hdg: float) -> None:
+        self.verb_type = STGVerbType.object_shared
+        self._translate_verb_type(type_string)
         self.obj_filename = obj_filename
         self.stg_path = stg_path  # the path of the stg_file without file name and trailing path-separator
         self.lon = lon
@@ -207,17 +216,20 @@ class STGEntry(object):
         self.elev = elev
         self.hdg = hdg
 
-    def get_object_type_as_string(self):
-        if self.is_static:
-            return STGEntry.STATIC_OBJECT
-        return STGEntry.SHARED_OBJECT
+    def _translate_verb_type(self, type_string:str) -> None:
+        """Translates from a string in FGFS to an enumeration.
+        If nothing is found, then the default in __init__ is used."""
+        for verb in STGVerbType:
+            if verb.name == type_string.lower():
+                self.verb_type = verb
+                return
 
-    def get_obj_path_and_name(self):
-        if self.is_static:
-            return self.stg_path + os.sep + self.obj_filename
-        else:
+    def get_obj_path_and_name(self) -> str:
+        if self.verb_type is STGVerbType.object_shared:
             p = os.path.abspath(self.stg_path + os.sep + '..' + os.sep + '..' + os.sep + '..')
             return os.path.abspath(p + os.sep + self.obj_filename)
+        else:
+            return self.stg_path + os.sep + self.obj_filename
 
 
 def read_stg_entries(stg_path_and_name, our_magic, ignore_bad_lines=False):
@@ -274,20 +286,6 @@ def read_stg_entries(stg_path_and_name, our_magic, ignore_bad_lines=False):
         logging.warning("stg_io:read: Ignoring unreadable file %s", reason)
         return []
     return entries
-
-
-def read(path, stg_fname, our_magic):
-    """Same as read_stg_entries, but returns osm2city.Building objects"""
-    stg_entries = read_stg_entries(path + stg_fname, our_magic)
-    building_objs = []
-    for entry in stg_entries:
-        point = shg.Point(tools.transform.toLocal((entry.lon, entry.lat)))
-        building_objs.append(building_lib.Building(osm_id=-1, tags=-1, outer_ring=point,
-                                                   name=entry.get_obj_path_and_name(),
-                                                   height=0, levels=0, stg_typ=entry.get_object_type_as_string(),
-                                                   stg_hdg=entry.hdg))
-
-    return building_objs
 
 
 def delimiter_string(our_magic, prefix, is_start):

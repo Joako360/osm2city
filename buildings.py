@@ -72,6 +72,7 @@ import shapely.geometry as shgm
 import shapely.geos as shgs
 import textures.texture as tex
 import tools
+import utils.stg_io2
 import utils.utilities as util
 import utils.vec2d as v
 from utils import osmparser, calc_tile, coordinates, stg_io2, troubleshoot
@@ -399,45 +400,46 @@ def write_xml(path: str, file_name: str, buildings: List[building_lib.Building],
                 </model>""" % (-yo, xo, zo)))  # -- I just don't get those coordinate systems.
 
         if b.LOD is not None:
-            if b.LOD is util.LOD.bare:
+            if b.LOD is utils.stg_io2.LOD.bare:
                 has_lod_bare = True
-            elif b.LOD is util.LOD.rough:
+            elif b.LOD is utils.stg_io2.LOD.rough:
                 has_lod_rough = True
-            elif b.LOD is util.LOD.detail:
+            elif b.LOD is utils.stg_io2.LOD.detail:
                 has_lod_detail = True
             else:
                 logging.warning("Building %s with unknown LOD level %i", b.osm_id, b.LOD)
 
-    # -- LOD animation
-    #    no longer use bare (reserved for terrain)
-    #    instead use rough, detail, roof
-    if has_lod_bare:
-        xml.write(textwrap.dedent("""
-        <animation>
-          <type>range</type>
-          <min-m>0</min-m>
-          <max-property>/sim/rendering/static-lod/bare</max-property>
-          <object-name>LOD_bare</object-name>
-        </animation>
-        """))
-    if has_lod_rough:
-        xml.write(textwrap.dedent("""
-        <animation>
-          <type>range</type>
-          <min-m>0</min-m>
-          <max-property>/sim/rendering/static-lod/rough</max-property>
-          <object-name>LOD_rough</object-name>
-        </animation>
-        """))
-    if has_lod_detail:
-        xml.write(textwrap.dedent("""
-        <animation>
-          <type>range</type>
-          <min-m>0</min-m>
-          <max-property>/sim/rendering/static-lod/detailed</max-property>
-          <object-name>LOD_detail</object-name>
-        </animation>
-        """))
+    if parameters.USE_NEW_STG_VERBS is False:
+        # -- LOD animation
+        #    no longer use bare (reserved for terrain)
+        #    instead use rough, detail, roof
+        if has_lod_bare:
+            xml.write(textwrap.dedent("""
+            <animation>
+              <type>range</type>
+              <min-m>0</min-m>
+              <max-property>/sim/rendering/static-lod/bare</max-property>
+              <object-name>LOD_bare</object-name>
+            </animation>
+            """))
+        if has_lod_rough:
+            xml.write(textwrap.dedent("""
+            <animation>
+              <type>range</type>
+              <min-m>0</min-m>
+              <max-property>/sim/rendering/static-lod/rough</max-property>
+              <object-name>LOD_rough</object-name>
+            </animation>
+            """))
+        if has_lod_detail:
+            xml.write(textwrap.dedent("""
+            <animation>
+              <type>range</type>
+              <min-m>0</min-m>
+              <max-property>/sim/rendering/static-lod/detailed</max-property>
+              <object-name>LOD_detail</object-name>
+            </animation>
+            """))
     xml.write(textwrap.dedent("""
 
     </PropertyList>
@@ -1020,7 +1022,7 @@ if __name__ == "__main__":
 
             if stg_fname not in stgs:
                 stgs.append(stg_fname)
-                static_objects.extend(stg_io2.read(path, stg_fname, OUR_MAGIC))
+                static_objects.extend(building_lib.read_buildings_from_stg_entries(path, stg_fname, OUR_MAGIC))
 
         logging.info("read %i objects from %i tiles", len(static_objects), len(stgs))
     else:
