@@ -20,7 +20,7 @@ def scan_dir(dir):
         #First scan the stgs
         for file in files:
             if file.endswith(".stg"):
-                stg = stg_io2.read_stg_entries(dir + os.sep + file, "", ignore_bad_lines=True)
+                stg = stg_io2.read_stg_entries(dir + os.sep + file, True, "", ignore_bad_lines=True)
                 for entry in stg:
                     if not "/" in entry.obj_filename and not "\\" in entry.obj_filename:
                         refs[entry.obj_filename] = dir

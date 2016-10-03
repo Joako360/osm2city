@@ -15,6 +15,7 @@ import enum
 import logging
 import os
 import time
+from typing import List, Optional
 
 from utils import calc_tile
 from utils.vec2d import Vec2d
@@ -51,10 +52,10 @@ class STGFile(object):
         self.magic = magic
         self.prefix = prefix
         # deprecated usage
-        self.our_magic_start = delimiter_string(self.magic, None, True)
-        self.our_magic_end = delimiter_string(self.magic, None, False)
-        self.our_magic_start_new = delimiter_string(self.magic, prefix, True)
-        self.our_magic_end_new = delimiter_string(self.magic, prefix, False)
+        self.our_magic_start = _make_delimiter_string(self.magic, None, True)
+        self.our_magic_end = _make_delimiter_string(self.magic, None, False)
+        self.our_magic_start_new = _make_delimiter_string(self.magic, prefix, True)
+        self.our_magic_end_new = _make_delimiter_string(self.magic, prefix, False)
         self.read()
 
     def read(self) -> None:
@@ -103,7 +104,7 @@ class STGFile(object):
             temp_other_list = temp_other_list[ours_end+1:]
         self.other_list = self.other_list + temp_other_list
 
-    def drop_ours(self):
+    def drop_ours(self) -> None:
         """Clear our list. Call write() afterwards to finish uninstall"""
         self.our_list = []
         self.our_ac_file_name_list = []
@@ -128,7 +129,7 @@ class STGFile(object):
             if e.errno != 17:
                 logging.exception("Unable to create path to output %s", self.path_to_stg)
 
-    def write(self):
+    def write(self) -> None:
         """write others and ours to file"""
         # read directly before write to
         self.read()
@@ -225,20 +226,21 @@ class STGEntry(object):
             return self.stg_path + os.sep + self.obj_filename
 
 
-def read_stg_entries(stg_path_and_name, our_magic, ignore_bad_lines=False):
+def read_stg_entries(stg_path_and_name: str, consider_shared: bool = True, our_magic: str = "",
+                     ignore_bad_lines: bool = False) -> List[STGEntry]:
     """Reads an stg-file and extracts STGEntry objects outside of marked areas for our_magic.
     TODO: In the future, take care of multiple scenery paths here.
     TODO: should be able to take a list of our_magic"""
     entries = []  # list of STGEntry objects
 
-    our_magic_start = delimiter_string(our_magic, None, True)
-    our_magic_end = delimiter_string(our_magic, None, False)
+    our_magic_start = _make_delimiter_string(our_magic, None, True)
+    our_magic_end = _make_delimiter_string(our_magic, None, False)
     ours = False
     try:
         with open(stg_path_and_name, 'r') as my_file:
             path, stg_name = os.path.split(stg_path_and_name)
             for line in my_file:
-                if None is not our_magic:
+                if len(our_magic) > 0:
                     if line.startswith(our_magic_start):
                         ours = True
                         continue
@@ -249,6 +251,8 @@ def read_stg_entries(stg_path_and_name, our_magic, ignore_bad_lines=False):
                         continue
 
                 if line.startswith('#') or line.lstrip() == "":
+                    continue
+                if consider_shared is False and line.startswith("OBJECT_SHARED"):
                     continue
                 try:
                     splitted = line.split()
@@ -281,7 +285,7 @@ def read_stg_entries(stg_path_and_name, our_magic, ignore_bad_lines=False):
     return entries
 
 
-def delimiter_string(our_magic, prefix, is_start):
+def _make_delimiter_string(our_magic: Optional[str], prefix: Optional[str], is_start: bool) -> str:
     if our_magic is None:
         magic = ""
     else:

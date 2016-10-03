@@ -83,8 +83,12 @@ USE_NEW_STG_VERBS = False
 
 ATLAS_SUFFIX_DATE = False   # -- add timestamp to file name
 
-# -- check for overlap with static models. The scenery folder must contain an "Objects" folder
+# -- Check for static objects in the PATH_TO_SCENERY folder based on convex hull around all points
+OVERLAP_CHECK_STATIC_HULL = False
+
+# -- Check for overlap with static and shared models. The scenery folder must contain an "Objects" folder
 OVERLAP_CHECK = True
+OVERLAP_CHECK_CONSIDER_SHARED = True
 # -- Additionally check if one of the near nodes is actually inside the building
 OVERLAP_CHECK_INSIDE = False
 OVERLAP_RADIUS = 5
@@ -98,7 +102,8 @@ CONCURRENCY = 1             # -- number of parallel OSM parsing threads. Unused 
 # -- skip buildings based on their OSM name tag or OSM ID, in case there's already
 #    a static model for these, and the overlap check fails.
 #    Use unicode strings as in the first example if there are non-ASCII characters.
-SKIP_LIST = ["Theologische Fakultät", "Rhombergpassage", 55875208]
+#    E.g. SKIP_LIST = ["Theologische Fakultät", "Rhombergpassage", 55875208]
+SKIP_LIST = []
 # -- keep buildings based on their OSM name tag or OSM ID.
 #    keeps also, building:part of buildings
 KEEP_LIST = []

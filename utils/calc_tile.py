@@ -138,11 +138,12 @@ def calc_y(lat):
     return int((lat - floor(lat)) * 8)
     
 
-def get_stg_files_in_boundary(boundary_west, boundary_south, boundary_east, boundary_north, path_to_scenery):
+def get_stg_files_in_boundary(boundary_west: float, boundary_south: float, boundary_east: float, boundary_north: float,
+                              path_to_scenery: str):
     """Based on boundary rectangle returns a list of stg-files (incl. full path) to be found within the boundary of
     the scenery"""
     stg_files = []
-    for my_lat in np.arange(boundary_south, boundary_north, 0.125):  # latitude
+    for my_lat in np.arange(boundary_south, boundary_north, 0.125):  # latitude; FIXME: why use a factor?
         for my_lon in np.arange(boundary_west, boundary_east, bucket_span(my_lat)):  # longitude
             coords = (my_lon, my_lat)
             stg_files.append(construct_path_to_stg(path_to_scenery, coords) + construct_stg_file_name(coords))

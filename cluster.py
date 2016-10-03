@@ -24,7 +24,7 @@ from utils.stg_io2 import STGVerbType
 
 
 class Cluster(object):
-    def __init__(self, I, center, size):
+    def __init__(self, I: Vec2d, center: Vec2d, size: int) -> None:
         self.objects = []
         self.I = I
         self.center = center  # -- center in local coord
@@ -41,7 +41,8 @@ def clamp(i, vmin, vmax):
 
 
 class Clusters(object):
-    def __init__(self, min, max, size, prefix, stg_verb_type: STGVerbType=STGVerbType.object_static) -> None:
+    def __init__(self, min: Vec2d, max: Vec2d, size: int, prefix: str,
+                 stg_verb_type: STGVerbType=STGVerbType.object_static) -> None:
         self.max = max
         self.min = min
         self.delta = max - min
@@ -90,15 +91,12 @@ class Clusters(object):
 
         return self._clusters[I.x][I.y]
 
-
     def __iter__(self):
         for each_list in self._clusters: 
             for item in each_list: yield item
 
-    def append(self, anchor, obj):
+    def append(self, anchor: Vec2d, obj) -> Cluster:
         """find cluster of """
-        #print "appending at pos", X
-        #print "  to ", self(X)
         the_cluster = self(anchor)
         the_cluster.objects.append(obj)
         try:
@@ -107,11 +105,10 @@ class Clusters(object):
             # Global stats
             tools.stats.count(obj)
         except AttributeError:
-            #logging.debug("count broken, fix me")
             pass
         return the_cluster
         
-    def transfer_buildings(self):
+    def transfer_buildings(self) -> None:
         """1|0
            -+-
            3|2
@@ -154,7 +151,6 @@ self._clusters[I.x][I.y]
                              ni, nj, ni + nj * self.n.x))
         f.close()
         self._clusters = newclusters
-        return
 
 #        import random
 #        new_objects = []

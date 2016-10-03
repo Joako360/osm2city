@@ -132,7 +132,7 @@ class Buildings(object):
             if tag_matches(way.tags, self.req_way_keys) and len(way.refs) > 3:
                 self._make_building_from_way(way.osm_id, way.tags, way.refs)
 
-    def _make_building_from_way(self, osm_id, tags, refs, inner_ways=[]):
+    def _make_building_from_way(self, osm_id, tags, refs, inner_ways=list()):
         """Creates a building object from a way"""
         if refs[0] == refs[-1]:
             refs = refs[0:-1]  # -- kick last ref if it coincides with first
@@ -204,8 +204,10 @@ class Buildings(object):
             tools.stats.parse_errors += 1
             return False
 
-        building = building_lib.Building(osm_id, tags, outer_ring, name, height, levels, inner_rings_list=inner_rings_list, building_type=_building_type, roof_type=_roof_type, roof_height=_roof_height, refs=refs)
-        self.buildings.append(building)
+        my_building = building_lib.Building(osm_id, tags, outer_ring, name, height, levels,
+                                            inner_rings_list=inner_rings_list, building_type=_building_type,
+                                            roof_type=_roof_type, roof_height=_roof_height, refs=refs)
+        self.buildings.append(my_building)
 
         tools.stats.objects += 1
         # show progress here?
@@ -539,7 +541,7 @@ if __name__ == "__main__":
         # Search parents
         if parameters.BUILDING_REMOVE_WITH_PARTS:  # and 'building' not in building.tags :
             # Build neighbours
-            def add_candidates(building, b_cands=[], used_refs=[], flag_init=True, recurs=0):
+            def add_candidates(building, b_cands=list(), used_refs=list(), flag_init=True, recurs=0):
                 """Build list of parent candidates for building, return parent if one of the candidates already parsed"""
                 
                 if recurs > 20:
@@ -1037,6 +1039,9 @@ if __name__ == "__main__":
         logging.info("read %i objects from %i tiles", len(static_objects), len(stgs))
     else:
         static_objects = None
+
+    if parameters.OVERLAP_CHECK_STATIC_HULL:  # needs to be before building_lib.analyse to catch more at first hit
+        buildings = building_lib.overlap_check_static_hull(buildings, tools.transform)
 
     # - analyze buildings
     #   - calculate area

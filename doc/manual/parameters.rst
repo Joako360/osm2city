@@ -115,6 +115,35 @@ LOD_PERCENTAGE_DETAIL                           Decimal    0.5       Of the rema
 =============================================   ========   =======   ==============================================================================
 
 
+.. _chapter-parameters-overlap-label:
+
+---------------------------
+Overlap Check for Buildings
+---------------------------
+
+Overlap checks try to omit overlap of buildings generated based on OSM data with static and shared objects in the default scenery (defined by PATH_TO_SCENERY).
+
+# -- Check for static objects in the PATH_TO_SCENERY folder based on convex hull around all points
+OVERLAP_CHECK_STATIC_HULL = False
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+OVERLAP_CHECK_STATIC_HULL                       Bool       False     Reads all points from static (not shared) objects and creates a convex hull
+                                                                     around all points. This is a brute force algorithm only taking into account
+                                                                     the firsts object's vertices.
+
+=============================================   ========   =======   ==============================================================================
+
+Examples of overlap objects based on static objects at LSZS (light grey structures at bottom of buildings):
+
+.. image:: lszs_hull_front.png
+
+
+.. image:: lszs_hull_back.png
+
+
+
 .. _chapter-parameters-light:
 
 -------------

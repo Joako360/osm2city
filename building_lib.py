@@ -12,11 +12,14 @@ import os
 import random
 import re
 from math import sin, cos, radians, tan, sqrt, pi
+from typing import List, Dict
 
 import matplotlib.pyplot as plt
 import myskeleton
 import numpy as np
+from shapely import affinity
 import shapely.geometry as shg
+from  shapely.geometry.base import BaseGeometry
 
 
 import parameters
@@ -24,8 +27,8 @@ import prepare_textures as tm
 import roofs
 import tools
 import utils.stg_io2
-import utils.utilities as util
-from utils import ac3d, ac3d_fast
+from utils import ac3d, ac3d_fast, calc_tile
+from utils.coordinates import Transformation
 from utils.vec2d import Vec2d
 from utils.stg_io2 import STGVerbType, read_stg_entries
 
@@ -39,9 +42,10 @@ class Building(object):
        Read-only access to node coordinates via self.X[node][0|1]
     """
 
-    def __init__(self, osm_id, tags, outer_ring, name, height, levels,
-                 stg_typ: STGVerbType=None, stg_hdg=None, inner_rings_list=[], building_type='unknown',
-                 roof_type='flat', roof_height=0, refs=[]):
+    def __init__(self, osm_id: int, tags: Dict[str, str], outer_ring: BaseGeometry, name: str,
+                 height: float, levels: int,
+                 stg_typ: STGVerbType=None, stg_hdg=None, inner_rings_list=list(), building_type='unknown',
+                 roof_type: str='flat', roof_height: int=0, refs: List[int]=list()) -> None:
         self.osm_id = osm_id
         self.tags = tags
         self.refs = refs
@@ -65,10 +69,10 @@ class Building(object):
         self.LOD = None  # see utils.utilities.LOD for values
         self.outer_nodes_closest = []
         if len(outer_ring.coords) > 2:
-            self.set_polygon(outer_ring, self.inner_rings_list)
+            self._set_polygon(outer_ring, self.inner_rings_list)
         else:
             self.polygon = None
-        if self.inner_rings_list: self.roll_inner_nodes()
+        if self.inner_rings_list: self._roll_inner_nodes()
         self.building_type = building_type
         self.roof_type = roof_type
         self.parent = None
@@ -80,7 +84,7 @@ class Building(object):
         self.ground_elev_min = None
         self.ground_elev_max = None
 
-    def roll_inner_nodes(self):
+    def _roll_inner_nodes(self) -> None:
         """Roll inner rings such that the node closest to an outer node goes first.
 
            Also, create a list of outer corresponding outer nodes.
@@ -107,7 +111,7 @@ class Building(object):
         yx = sorted(zip(self.outer_nodes_closest, new_inner_rings_list))
         self.inner_rings_list = [x for (y, x) in yx]
         self.outer_nodes_closest = [y for (y, x) in yx]
-        self.set_polygon(self.polygon.exterior, self.inner_rings_list)
+        self._set_polygon(self.polygon.exterior, self.inner_rings_list)
 #        for o in self.outer_nodes_closest:
 #            assert(o < len(outer_ring.coords) - 1)
 
@@ -126,12 +130,7 @@ class Building(object):
         #print "--------------------"
         return nnodes_simplified
 
-    def set_polygon(self, outer, inner=[]):
-        #ring = shg.polygon.LinearRing(list(outer))
-        # make linear rings for inner(s)
-        #inner_rings = [shg.polygon.LinearRing(list(i)) for i in inner]
-        #if inner_rings:
-        #    print "inner!", inner_rings
+    def _set_polygon(self, outer, inner=list()) -> None:
         self.polygon = shg.Polygon(outer, inner)
 
     def _set_X(self, the_offset: Vec2d) -> None:
@@ -177,7 +176,7 @@ class Building(object):
         return self.polygon.area
 
 
-def _random_level_height():
+def _random_level_height() -> float:
     """ Calculates the height for each level of a building based on place and random factor"""
     # FIXME: other places (e.g. village)
     return random.triangular(parameters.BUILDING_CITY_LEVEL_HEIGHT_LOW
@@ -185,7 +184,7 @@ def _random_level_height():
                           , parameters.BUILDING_CITY_LEVEL_HEIGHT_MODE)
 
 
-def _random_levels():
+def _random_levels() -> int:
     """ Calculates the number of building levels based on place and random factor"""
     # FIXME: other places
     return int(round(random.triangular(parameters.BUILDING_CITY_LEVELS_LOW
@@ -288,7 +287,7 @@ def _get_nodes_from_acs(objs, own_prefix):
     return all_nodes
 
 
-def _is_static_object_nearby(b, X, static_tree):
+def _is_static_object_nearby(b: Building, X, static_tree) -> bool:  # X is ndarray, static_tree is KDTree
     """check for static/shared objects close to given building"""
     # FIXME: which radius? Or use centroid point? make radius a parameter
     radius = parameters.OVERLAP_RADIUS  # alternative: radius = max(lenX)
@@ -323,7 +322,7 @@ def _is_static_object_nearby(b, X, static_tree):
     return False
 
 
-def _is_large_enough(b):
+def _is_large_enough(b: Building) -> bool:
     """Checks whether a given building's area is too small for inclusion.
     Never drop tall buildings.
     FIXME: Exclusion might be skipped if the building touches another building (i.e. an annex)
@@ -344,11 +343,11 @@ def _is_large_enough(b):
     return True
 
 
-def _compute_height_and_levels(b):
+def _compute_height_and_levels(b: Building) -> float:
     """Determines total height (and number of levels) of a building based on
        OSM values and other logic"""
     try:
-        if isinstance(b.height, (int)):
+        if isinstance(b.height, int):
             b.height = float(b.height)
         assert(isinstance(b.height, float))
     except AssertionError:
@@ -569,17 +568,13 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
         try:
             tools.stats.nodes_simplified += b.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
-            b.roll_inner_nodes()
+            b._roll_inner_nodes()
         except Exception as reason:
             logging.warning("simplify or roll_inner_nodes failed (OSM ID %i, %s)", b.osm_id, reason)
             continue
 
         # -- array of local outer coordinates
         Xo = np.array(b.X_outer)
-
-        # -- write nodes to separate debug file
-#        for i in range(b.nnodes_outer):
-#            tools.stats.debug1.write("%g %g\n" % (Xo[i,0], Xo[i,1]))
 
         tools.stats.nodes_ground += b._nnodes_ground
 
@@ -606,7 +601,7 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             if b.lenX[0] < b.lenX[1]:
                 Xo = np.roll(Xo, 1, axis=0)
                 b.lenX = np.roll(b.lenX, 1)
-                b.set_polygon(Xo, b.inner_rings_list)
+                b._set_polygon(Xo, b.inner_rings_list)
 
         b.lenX = b.lenX  # FIXME: compute on the fly, or on set_polygon()?
                         #        Or is there a shapely equivalent?
@@ -1187,7 +1182,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
         try:
             b.ground_elev = float(b.ground_elev)
         except:
-            logging.fatal("non float elevation for building %" % b.osm_id)
+            logging.fatal("non float elevation for building %d" % b.osm_id)
             exit(1)
     
     #
@@ -1321,14 +1316,110 @@ def mapType(tags):
     return 'unknown'
 
 
-def read_buildings_from_stg_entries(path, stg_fname, our_magic):
+def read_buildings_from_stg_entries(path: str, stg_fname: str, our_magic: str) -> List[Building]:
     """Same as read_stg_entries, but returns osm2city.Building objects"""
-    stg_entries = read_stg_entries(path + stg_fname, our_magic)
-    building_objs = []
+    stg_entries = read_stg_entries(path + stg_fname, parameters.OVERLAP_CHECK_CONSIDER_SHARED, our_magic)
+    building_objs = list()
     for entry in stg_entries:
         point = shg.Point(tools.transform.toLocal((entry.lon, entry.lat)))
-        building_objs.append(Building(osm_id=-1, tags=-1, outer_ring=point,
+        building_objs.append(Building(osm_id=-1, tags=dict(), outer_ring=point,
                                       name=entry.get_obj_path_and_name(),
                                       height=0, levels=0, stg_typ=entry.verb_type,
                                       stg_hdg=entry.hdg))
     return building_objs
+
+
+# ======================= New overlap detection ==========================
+
+def overlap_check_static_hull(buildings: List[Building], my_coord_transformation: Transformation) -> List[Building]:
+    """Checks for all buildings whether their polygon intersects with a static object's convex hull.
+    Be aware that method 'analyse' also makes overlap checks based on circles around static/shared
+    object's anchor point.
+    """
+    boundaries = _create_static_obj_boundaries(my_coord_transformation)
+
+    cleared_buildings = list()
+
+    for building in buildings:
+        is_intersecting = False
+        for key, value in boundaries.items():
+            if value.intersects(building.polygon):
+                is_intersecting = True
+                tools.stats.skipped_nearby += 1
+                if building.name is None or len(building.name) == 0:
+                    logging.info("Hull of static object '%s' is intersecting. Skipping building with osm_id %d",
+                                 key, building.osm_id)
+                else:
+                    logging.info("Hull of static object '%s' is intersecting. Skipping building '%s' (osm_id %d)",
+                                 key, building.name, building.osm_id)
+                break
+        if not is_intersecting:
+            cleared_buildings.append(building)
+    return cleared_buildings
+
+
+def _parse_ac_file_name(xml_string: str) -> str:
+    """Finds the corresponding ac-file in an xml-file"""
+    try:
+        x1 = xml_string.index("<path>")
+        x2 = xml_string.index("</path>", x1)
+    except ValueError as e:
+        raise e
+    ac_file_name = (xml_string[x1+6:x2]).strip()
+    return ac_file_name
+
+
+def _extract_boundary(ac_filename: str) -> shg.Polygon:
+    """Reads an ac-file and constructs a convex hull as a proxy to the real boundary.
+    No attempt is made to follow rotations and translations.
+    Returns a tuple (x_min, y_min, x_max, y_max) in meters."""
+    numvert = 0
+    points = list()
+    try:
+        with open(ac_filename, 'r') as my_file:
+            for my_line in my_file:
+                if 0 == my_line.find("numvert"):
+                    numvert = int(my_line.split()[1])
+                elif numvert > 0:
+                    vertex_values = my_line.split()
+                    # minus factor in y-axis due to ac3d coordinate system. Switch of y_min and y_max for same reason
+                    points.append((float(vertex_values[0]), -1 * float(vertex_values[2])))
+                    numvert -= 1
+    except IOError as e:
+        raise e
+
+    hull_polygon = shg.MultiPoint(points).convex_hull
+    return hull_polygon
+
+
+def _create_static_obj_boundaries(my_coord_transformation: Transformation) -> Dict[str, shg.Polygon]:
+    """
+    Finds all static objects referenced in stg-files within the scenery boundaries and returns them as a list of
+    Shapely polygon objects (convex hull of all points in ac-files) in the local x/y coordinate system.
+    """
+    static_obj_boundaries = dict()
+    stg_files = calc_tile.get_stg_files_in_boundary(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH
+                                                    , parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH
+                                                    , parameters.PATH_TO_SCENERY)
+    for filename in stg_files:
+        # find referenced files for STATIC_OBJECTs.
+        stg_entries = read_stg_entries(filename, False)
+        counter = 1  # RICG
+        for entry in stg_entries:
+            counter += 1  # RICG
+            if entry.verb_type is STGVerbType.object_static:
+                try:
+                    ac_filename = entry.obj_filename
+                    if ac_filename.endswith(".xml"):
+                        with open(entry.get_obj_path_and_name(), 'r') as f:
+                            xml_data = f.read()
+                            ac_filename = _parse_ac_file_name(xml_data)
+                    boundary_polygon = _extract_boundary(entry.stg_path + os.sep + ac_filename)
+                    rotated_polygon = affinity.rotate(boundary_polygon, entry.hdg - 90, (0, 0))
+                    x_y_point = my_coord_transformation.toLocal(Vec2d(entry.lon, entry.lat))
+                    translated_polygon = affinity.translate(rotated_polygon, x_y_point[0], x_y_point[1])
+                    static_obj_boundaries[ac_filename] = translated_polygon
+                except IOError as reason:
+                    logging.warning("Ignoring unreadable stg_entry %s", reason)
+
+    return static_obj_boundaries
