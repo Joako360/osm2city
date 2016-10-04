@@ -84,7 +84,7 @@ USE_NEW_STG_VERBS = False
 ATLAS_SUFFIX_DATE = False   # -- add timestamp to file name
 
 # -- Check for static objects in the PATH_TO_SCENERY folder based on convex hull around all points
-OVERLAP_CHECK_STATIC_HULL = False
+OVERLAP_CHECK_CONVEX_HULL = False
 
 # -- Check for overlap with static and shared models. The scenery folder must contain an "Objects" folder
 OVERLAP_CHECK = True

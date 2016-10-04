@@ -129,7 +129,7 @@ OVERLAP_CHECK_STATIC_HULL = False
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
-OVERLAP_CHECK_STATIC_HULL                       Bool       False     Reads all points from static (not shared) objects and creates a convex hull
+OVERLAP_CHECK_CONVEX_HULL                       Bool       False     Reads all points from static (not shared) objects and creates a convex hull
                                                                      around all points. This is a brute force algorithm only taking into account
                                                                      the firsts object's vertices.
 
