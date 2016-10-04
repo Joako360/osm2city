@@ -1331,8 +1331,8 @@ def read_buildings_from_stg_entries(path: str, stg_fname: str, our_magic: str) -
 
 # ======================= New overlap detection ==========================
 
-def overlap_check_static_hull(buildings: List[Building], my_coord_transformation: Transformation) -> List[Building]:
-    """Checks for all buildings whether their polygon intersects with a static object's convex hull.
+def overlap_check_convex_hull(buildings: List[Building], my_coord_transformation: Transformation) -> List[Building]:
+    """Checks for all buildings whether their polygon intersects with a static or shared object's convex hull.
     Be aware that method 'analyse' also makes overlap checks based on circles around static/shared
     object's anchor point.
     """
@@ -1347,10 +1347,10 @@ def overlap_check_static_hull(buildings: List[Building], my_coord_transformation
                 is_intersecting = True
                 tools.stats.skipped_nearby += 1
                 if building.name is None or len(building.name) == 0:
-                    logging.info("Hull of static object '%s' is intersecting. Skipping building with osm_id %d",
+                    logging.info("Convex hull of object '%s' is intersecting. Skipping building with osm_id %d",
                                  key, building.osm_id)
                 else:
-                    logging.info("Hull of static object '%s' is intersecting. Skipping building '%s' (osm_id %d)",
+                    logging.info("Convex hull of object '%s' is intersecting. Skipping building '%s' (osm_id %d)",
                                  key, building.name, building.osm_id)
                 break
         if not is_intersecting:
@@ -1397,29 +1397,34 @@ def _create_static_obj_boundaries(my_coord_transformation: Transformation) -> Di
     Finds all static objects referenced in stg-files within the scenery boundaries and returns them as a list of
     Shapely polygon objects (convex hull of all points in ac-files) in the local x/y coordinate system.
     """
-    static_obj_boundaries = dict()
+    boundaries = dict()
     stg_files = calc_tile.get_stg_files_in_boundary(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH
                                                     , parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH
                                                     , parameters.PATH_TO_SCENERY)
     for filename in stg_files:
-        # find referenced files for STATIC_OBJECTs.
-        stg_entries = read_stg_entries(filename, False)
-        counter = 1  # RICG
+        stg_entries = read_stg_entries(filename, parameters.OVERLAP_CHECK_CONSIDER_SHARED)
         for entry in stg_entries:
-            counter += 1  # RICG
-            if entry.verb_type is STGVerbType.object_static:
+            if entry.verb_type in [STGVerbType.object_static, STGVerbType.object_shared]:
                 try:
                     ac_filename = entry.obj_filename
                     if ac_filename.endswith(".xml"):
                         with open(entry.get_obj_path_and_name(), 'r') as f:
                             xml_data = f.read()
                             ac_filename = _parse_ac_file_name(xml_data)
-                    boundary_polygon = _extract_boundary(entry.stg_path + os.sep + ac_filename)
+                            entry.overwrite_filename(ac_filename)
+                    boundary_polygon = _extract_boundary(entry.get_obj_path_and_name())
                     rotated_polygon = affinity.rotate(boundary_polygon, entry.hdg - 90, (0, 0))
                     x_y_point = my_coord_transformation.toLocal(Vec2d(entry.lon, entry.lat))
                     translated_polygon = affinity.translate(rotated_polygon, x_y_point[0], x_y_point[1])
-                    static_obj_boundaries[ac_filename] = translated_polygon
+                    if entry.verb_type is STGVerbType.object_static and parameters.OVERLAP_CHECK_CH_BUFFER_STATIC > 0.01:
+                        boundaries[ac_filename] = translated_polygon.buffer(
+                            parameters.OVERLAP_CHECK_CH_BUFFER_STATIC, shg.CAP_STYLE.square)
+                    elif entry.verb_type is STGVerbType.object_shared and parameters.OVERLAP_CHECK_CH_BUFFER_SHARED > 0.01:
+                        boundaries[ac_filename] = translated_polygon.buffer(
+                            parameters.OVERLAP_CHECK_CH_BUFFER_SHARED, shg.CAP_STYLE.square)
+                    else:
+                        boundaries[ac_filename] = translated_polygon
                 except IOError as reason:
                     logging.warning("Ignoring unreadable stg_entry %s", reason)
 
-    return static_obj_boundaries
+    return boundaries

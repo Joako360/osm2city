@@ -1041,7 +1041,7 @@ if __name__ == "__main__":
         static_objects = None
 
     if parameters.OVERLAP_CHECK_CONVEX_HULL:  # needs to be before building_lib.analyse to catch more at first hit
-        buildings = building_lib.overlap_check_static_hull(buildings, tools.transform)
+        buildings = building_lib.overlap_check_convex_hull(buildings, tools.transform)
 
     # - analyze buildings
     #   - calculate area

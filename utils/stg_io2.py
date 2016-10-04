@@ -218,6 +218,15 @@ class STGEntry(object):
                 self.verb_type = verb
                 return
 
+    def overwrite_filename(self, new_name: str) -> None:
+        if self.verb_type is STGVerbType.object_static:
+            self.obj_filename = new_name
+        else:
+            slash_index = self.obj_filename.rfind("/")
+            backslash_index = self.obj_filename.rfind("\\")
+            chosen_index = max([slash_index, backslash_index])
+            self.obj_filename = self.obj_filename[:chosen_index + 1] + new_name
+
     def get_obj_path_and_name(self) -> str:
         if self.verb_type is STGVerbType.object_shared:
             p = os.path.abspath(self.stg_path + os.sep + '..' + os.sep + '..' + os.sep + '..')

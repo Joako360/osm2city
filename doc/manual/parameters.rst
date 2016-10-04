@@ -123,15 +123,22 @@ Overlap Check for Buildings
 
 Overlap checks try to omit overlap of buildings generated based on OSM data with static and shared objects in the default scenery (defined by PATH_TO_SCENERY).
 
-# -- Check for static objects in the PATH_TO_SCENERY folder based on convex hull around all points
-OVERLAP_CHECK_STATIC_HULL = False
-
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
 OVERLAP_CHECK_CONVEX_HULL                       Bool       False     Reads all points from static (not shared) objects and creates a convex hull
                                                                      around all points. This is a brute force algorithm only taking into account
                                                                      the firsts object's vertices.
+
+OVERLAP_CHECK_CH_BUFFER_STATIC                  Decimal    0.0       Buffer around static objects to extend the overlap area. In general convex
+                                                                     hull is already a conservative approach, so using 0 (zero) should be fine.
+
+OVERLAP_CHECK_CH_BUFFER_SHARED                  Decimal    0.0       Same as above but for shared objects.
+
+OVERLAP_CHECK_CONSIDER_SHARED                   Bool       True      Whether only static objects (i.e. a unique representation of a real world
+                                                                     thing) should be taken into account — or also shared objects (i.e. generic
+                                                                     models reused in different places like a church model).
+                                                                     For this to work ``PATH_TO_SCENERY`` must point to the TerraSync directory.
 
 =============================================   ========   =======   ==============================================================================
 
