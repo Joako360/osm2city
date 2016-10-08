@@ -34,7 +34,7 @@ class Atlas(Region):
         self.height_px = height
         self._compute_nondim_tex_coords()
 
-    def write(self, filename, format, image_var):
+    def write(self, filename, image_var):
         """Allocate memory for the actual atlas image, paste images, write to disk.
            image_var is the name (string) of the class variable that stores the image;
            usually in osm2city it's im or im_LM."""

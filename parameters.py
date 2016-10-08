@@ -328,7 +328,7 @@ def show():
 def read_from_file(filename):
     logging.info('Reading parameters from file: %s' % filename)
     default_globals = globals()
-    file_globals = dict()  # {'textures': default_globals['textures']}
+    file_globals = dict()
     try:
         exec(compile(open(filename).read(), filename, 'exec'), file_globals)
     except IOError as reason:

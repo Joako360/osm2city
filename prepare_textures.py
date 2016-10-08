@@ -66,8 +66,8 @@ def _make_texture_atlas(texture_list, atlas_filename, ext, size_x=256, pad_y=0,
         l.im = Image.open(filename)
         logging.debug("name %s size " % filename + str(l.im.size))
         if lightmap:
-            filename, fileext = os.path.splitext(l.filename)
-            filename += '_LM' + fileext
+            filename, file_extension = os.path.splitext(l.filename)
+            filename += '_LM' + file_extension
             try:
                 l.im_LM = Image.open(filename)
             except IOError:
@@ -90,19 +90,6 @@ def _make_texture_atlas(texture_list, atlas_filename, ext, size_x=256, pad_y=0,
     # -- pack non_repeatables
     # Sort textures by perimeter size in non-increasing order
     the_atlas = atlas.Atlas(0, 0, atlas_sx, 1e10, 'Facades')
-    if 1:
-        non_repeat_list = sorted(non_repeat_list, key=lambda i: i.sy, reverse=True)
-        deb = 0
-        for the_texture in non_repeat_list:
-            the_texture.width_px, the_texture.height_px = the_texture.im.size
-
-            if the_atlas.pack(the_texture):
-                if deb:
-                    the_atlas.write("atlas.png", "RGBA")
-                    input("Press Enter to continue...")
-                pass
-            else:
-                print("no")
 
     atlas_sy = the_atlas.cur_height()
 
@@ -152,14 +139,6 @@ def _make_texture_atlas(texture_list, atlas_filename, ext, size_x=256, pad_y=0,
         next_y += l.height_px + pad_y
         if not the_atlas.pack(l):
             logging.info("Failed to pack" + str(l))
-        try:        
-            #l.x0 = x_px / atlas_sx
-            #l.y0 = y_px / atlas_sy
-            #the_atlas.write('atlas.png', 'RGBA')
-            #raw_input("Press Enter to continue...")
-            pass
-        except:
-            logging.info("Failed to pack", l)
 
 #    the_atlas.write("atlas.png", "RGBA")
 #    return
@@ -168,14 +147,14 @@ def _make_texture_atlas(texture_list, atlas_filename, ext, size_x=256, pad_y=0,
     the_atlas.set_height(atlas_sy)
     logging.info("Final atlas height %i" % atlas_sy)
 
-    the_atlas.write(atlas_filename + ext, "RGBA", 'im')
+    the_atlas.write(atlas_filename + ext, 'im')
 
     # -- create LM atlas, using the coordinates of the main atlas
     if lightmap:
         LM_atlas = atlas.Atlas(0, 0, atlas_sx, the_atlas.height_px, 'FacadesLM')
         for l in texture_list:
             LM_atlas.pack_at(l, l.ax, l.ay)
-        LM_atlas.write(atlas_filename + '_LM' + ext, "RGBA", 'im_LM')
+        LM_atlas.write(atlas_filename + '_LM' + ext, 'im_LM')
 
     for l in texture_list:
         logging.debug('%s (%4.2f, %4.2f) (%4.2f, %4.2f)' % (l.filename, l.x0, l.y0, l.x1, l.y1))
@@ -203,7 +182,7 @@ def _check_missed_input_textures(tex_prefix, registered_textures):
                     logging.warning("Texture %s has not been registered", my_path)
 
 
-def _append_dynamic(facades, tex_prefix):
+def _append_dynamic(my_facades, tex_prefix):
     """Dynamically runs .py files in tex.src and sub-directories to add facades.
 
     For roofs see add_roofs(roofs)"""
@@ -217,7 +196,7 @@ def _append_dynamic(facades, tex_prefix):
             my_path = subdir + os.sep + filename
             logging.info("Executing %s ", my_path)
             try:
-                facades.current_registered_in = my_path
+                my_facades.current_registered_in = my_path
                 exec(compile(open(my_path).read(), my_path, 'exec'))
             except:
                 logging.exception("Error while running %s" % filename)
@@ -230,7 +209,7 @@ def _append_roofs(roofs, tex_prefix):  # parameter roofs is used dynamically in 
         roofs.current_registered_in = file_name
         exec(compile(open(file_name).read(), file_name, 'exec'))
     except Exception as e:
-        logging.exception("Unrecoverable error while loading roofs")
+        logging.exception("Unrecoverable error while loading roofs", e)
         sys.exit(1)
 
 
