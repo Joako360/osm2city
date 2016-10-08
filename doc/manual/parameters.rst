@@ -172,6 +172,34 @@ LIGHTMAP_ENABLE                                 Boolean    True      Creates sim
 =============================================   ========   =======   ==============================================================================
 
 
+.. _chapter-parameters-textures:
+
+--------
+Textures
+--------
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+ATLAS_SUFFIX_DATE                               Boolean    False     Add the current date as a suffix to the texture atlas in ``osm2city-data``.
+
+TEXTURES_ROOFS_NAME_EXCLUDE                     List       []        List of roof file names to exclude, e.g. ["roof_red3.png", "roof_orange.png"].
+                                                                     The file names must be relative paths to the ``tex.src`` directory within
+                                                                     ``PATH_TO_OSM2CITY_DATA``.
+                                                                     Be aware the excluding roofs can lead to indirectly excluding facade textures,
+                                                                     which might be depending on provided roof types.
+                                                                     An empty list means that no filtering is done.
+
+TEXTURES_FACADES_NAME_EXCLUDE                   List       []        Same as ``TEXTURES_ROOFS_EXCLUDE`` but for facades — e.g.
+                                                                     ["de/commercial/facade_modern_21x42m.jpg"].
+
+TEXTURES_ROOFS_PROVIDE_EXCLUDE                  List       []        List of provided features for roofs to exclude, e.g. ["colour:red"].
+
+TEXTURES_FACADES_PROVIDE_EXCLUDE                List       []        Ditto for facades.
+
+=============================================   ========   =======   ==============================================================================
+
+
 .. _chapter-parameters-clipping:
 
 ---------------

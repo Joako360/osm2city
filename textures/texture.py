@@ -1,12 +1,14 @@
+import logging
+import os
+from PIL import Image
 import random
 import re
 from typing import Dict
 
 import numpy as np
+
 import tools
-from PIL import Image
-import logging
-import os
+import parameters
 
 
 class Texture(object):
@@ -43,11 +45,11 @@ class Texture(object):
         - shape:flat  (pitched, ..)
 
     """
-    def __init__(self, filename:str,
+    def __init__(self, filename: str,
                  h_size_meters=None, h_cuts=list(), h_can_repeat=False,
                  v_size_meters=None, v_cuts=list(), v_can_repeat=False,
                  height_min=0, height_max=9999,
-                 v_align_bottom=False,
+                 v_align_bottom: bool=False,
                  provides=list(), requires=list(), levels=None) -> None:
         self.filename = Texture.tex_prefix + os.sep + filename
         self.x0 = self.x1 = self.y0 = self.y1 = 0
@@ -193,6 +195,10 @@ class RoofManager(object):
 
         texture.registered_in = self.current_registered_in
 
+        # check whether the texture should be excluded based on parameter for name
+        if not self._screen_exclude_texture_by_name(texture):
+            return False
+
         # check whether the same texture already has been referenced in an existing entry
         for existing in self.__l:
             if existing.filename == texture.filename:
@@ -201,23 +207,54 @@ class RoofManager(object):
                 return False
 
         new_provides = list()
+        my_available_materials = list()
         logging.debug("Based on registration file %s: added %s ", self.current_registered_in, texture.filename)
         for item in texture.provides:
-            if item.split(':')[0] in ('age', 'region', 'compat'):
-                new_provides.append(screen_texture_tags_for_colour_spelling(item))
+            screened_item = screen_texture_tags_for_colour_spelling(item)
+            if not self._screen_exclude_texture_by_provides(screened_item):
+                return False
+            if screened_item.split(':')[0] in ('age', 'region', 'compat'):
+                new_provides.append(screened_item)
             else:
-                if item.split(":")[0] == "material":
-                    self.available_materials.add(item.split(":")[1])
-                new_provides.append(screen_texture_tags_for_colour_spelling(self.__cls + ':' + item))
+                if screened_item.split(":")[0] == "material":
+                    my_available_materials.append(screened_item.split(":")[1])
+                new_provides.append(self.__cls + ':' + screened_item)
         texture.provides = new_provides
         new_requires = list()
         for item in texture.requires:
             new_requires.append(screen_texture_tags_for_colour_spelling(item))
         texture.requires = new_requires
+        self.available_materials.update(my_available_materials)
         texture.cls = self.__cls
 
         tools.stats.textures_total[texture.filename] = None
         self.__l.append(texture)
+        return True
+
+    def _screen_exclude_texture_by_name(self, texture: Texture) -> bool:
+        if isinstance(self, FacadeManager):
+            if len(parameters.TEXTURES_FACADES_NAME_EXCLUDE) > 0:
+                for a_facade_path in parameters.TEXTURES_FACADES_NAME_EXCLUDE:
+                    if texture.filename.rfind(a_facade_path) >= 0:
+                        return False
+        else:
+            if len(parameters.TEXTURES_ROOFS_NAME_EXCLUDE) > 0:
+                for a_roof_path in parameters.TEXTURES_ROOFS_NAME_EXCLUDE:
+                    if texture.filename.rfind(a_roof_path) >= 0:
+                        return False
+        return True
+
+    def _screen_exclude_texture_by_provides(self, provided_feature: str) -> bool:
+        if isinstance(self, FacadeManager):
+            if len(parameters.TEXTURES_FACADES_PROVIDE_EXCLUDE) > 0:
+                for a_feature in parameters.TEXTURES_FACADES_PROVIDE_EXCLUDE:
+                    if screen_texture_tags_for_colour_spelling(a_feature) == provided_feature:
+                        return False
+        else:
+            if len(parameters.TEXTURES_ROOFS_PROVIDE_EXCLUDE) > 0:
+                for a_feature in parameters.TEXTURES_ROOFS_PROVIDE_EXCLUDE:
+                    if screen_texture_tags_for_colour_spelling(a_feature) == provided_feature:
+                        return False
         return True
 
     def find_matching_roof(self, requires=[]):

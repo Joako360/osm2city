@@ -37,6 +37,8 @@ In most situations it is enough to call the following command once and then only
 
 Alternatively `buildings.py` can be called with the ``-a`` option.
 
+Chapter :ref:`Textures <chapter-parameters-textures>` has an overview of how roof and facade textures can be filtered.
+
 
 ====================
 Overview of Programs

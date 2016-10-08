@@ -22,6 +22,7 @@ import math
 import os
 import pickle
 import sys
+from typing import List
 
 import img2np
 import numpy as np
@@ -41,8 +42,8 @@ def _next_pow2(value):
     return 2**(int(math.log(value) / math.log(2)) + 1)
 
 
-def _make_texture_atlas(texture_list, atlas_filename, ext, size_x=256, pad_y=0,
-                        lightmap=False, ambient_occlusion=False):
+def _make_texture_atlas(texture_list: List[Texture], atlas_filename: str, ext: str, size_x: int=256, pad_y: int=0,
+                        lightmap: bool=False, ambient_occlusion: bool=False):
     """
     Create texture atlas from all textures. Update all our item coordinates.
     """
@@ -151,10 +152,10 @@ def _make_texture_atlas(texture_list, atlas_filename, ext, size_x=256, pad_y=0,
 
     # -- create LM atlas, using the coordinates of the main atlas
     if lightmap:
-        LM_atlas = atlas.Atlas(0, 0, atlas_sx, the_atlas.height_px, 'FacadesLM')
+        light_map_atlas = atlas.Atlas(0, 0, atlas_sx, the_atlas.height_px, 'FacadesLM')
         for l in texture_list:
-            LM_atlas.pack_at(l, l.ax, l.ay)
-        LM_atlas.write(atlas_filename + '_LM' + ext, 'im_LM')
+            light_map_atlas.pack_at(l, l.ax, l.ay)
+        light_map_atlas.write(atlas_filename + '_LM' + ext, 'im_LM')
 
     for l in texture_list:
         logging.debug('%s (%4.2f, %4.2f) (%4.2f, %4.2f)' % (l.filename, l.x0, l.y0, l.x1, l.y1))
@@ -163,7 +164,7 @@ def _make_texture_atlas(texture_list, atlas_filename, ext, size_x=256, pad_y=0,
             del l.im_LM
 
 
-def _check_missed_input_textures(tex_prefix, registered_textures):
+def _check_missed_input_textures(tex_prefix: str, registered_textures: List[Texture]) -> None:
     """Find all .jpg and .png files in tex.src and compare with registered textures.
 
     If not found in registered textures, then log a warning"""
@@ -182,7 +183,7 @@ def _check_missed_input_textures(tex_prefix, registered_textures):
                     logging.warning("Texture %s has not been registered", my_path)
 
 
-def _append_dynamic(my_facades, tex_prefix):
+def _append_dynamic(facade_manager: FacadeManager, tex_prefix: str) -> None:
     """Dynamically runs .py files in tex.src and sub-directories to add facades.
 
     For roofs see add_roofs(roofs)"""
@@ -196,24 +197,27 @@ def _append_dynamic(my_facades, tex_prefix):
             my_path = subdir + os.sep + filename
             logging.info("Executing %s ", my_path)
             try:
-                my_facades.current_registered_in = my_path
+                facade_manager.current_registered_in = my_path
                 exec(compile(open(my_path).read(), my_path, 'exec'))
             except:
                 logging.exception("Error while running %s" % filename)
 
 
-def _append_roofs(roofs, tex_prefix):  # parameter roofs is used dynamically in execfile
-    """Dynamically runs the content of a hard-coded file to fill the roofs texture list."""
+def _append_roofs(roof_manager: RoofManager, tex_prefix: str) -> None:
+    """Dynamically runs the content of a hard-coded file to fill the roofs texture list.
+
+    Argument roof_manager is used dynamically in execfile
+    ."""
     try:
         file_name = tex_prefix + os.sep + ROOFS_DEFAULT_FILE_NAME
-        roofs.current_registered_in = file_name
+        roof_manager.current_registered_in = file_name
         exec(compile(open(file_name).read(), file_name, 'exec'))
     except Exception as e:
         logging.exception("Unrecoverable error while loading roofs", e)
         sys.exit(1)
 
 
-def init(create_atlas=True):
+def init(create_atlas: bool=True) -> None:
     logging.debug("textures: init")
     global facades
     global roofs
@@ -227,13 +231,13 @@ def init(create_atlas=True):
     my_tex_prefix_src = my_tex_prefix + 'tex.src'
     Texture.tex_prefix = my_tex_prefix_src  # need to set static variable so managers get full path
 
-    pkl_fname = my_tex_prefix + "tex" + os.sep + "atlas_facades.pkl"
+    pkl_file_name = my_tex_prefix + "tex" + os.sep + "atlas_facades.pkl"
     
     if create_atlas:
         facades = FacadeManager('facade')
         roofs = RoofManager('roof')
 
-        # read registration
+        # read registrations
         _append_roofs(roofs, my_tex_prefix_src)
         _append_dynamic(facades, my_tex_prefix_src)
 
@@ -253,20 +257,20 @@ def init(create_atlas=True):
         params = dict()
         params['atlas_file_name'] = atlas_file_name
 
-        logging.info("Saving %s", pkl_fname)
-        fpickle = open(pkl_fname, 'wb')
-        pickle.dump(facades, fpickle, -1)
-        pickle.dump(roofs, fpickle, -1)
-        pickle.dump(params, fpickle, -1)
-        fpickle.close()
+        logging.info("Saving %s", pkl_file_name)
+        pickle_file = open(pkl_file_name, 'wb')
+        pickle.dump(facades, pickle_file, -1)
+        pickle.dump(roofs, pickle_file, -1)
+        pickle.dump(params, pickle_file, -1)
+        pickle_file.close()
     else:
-        logging.info("Loading %s", pkl_fname)
-        fpickle = open(pkl_fname, 'rb')
-        facades = pickle.load(fpickle)
-        roofs = pickle.load(fpickle)
-        params = pickle.load(fpickle)
+        logging.info("Loading %s", pkl_file_name)
+        pickle_file = open(pkl_file_name, 'rb')
+        facades = pickle.load(pickle_file)
+        roofs = pickle.load(pickle_file)
+        params = pickle.load(pickle_file)
         atlas_file_name = params['atlas_file_name']
-        fpickle.close()
+        pickle_file.close()
 
     logging.debug(facades)
     tools.stats.textures_total = dict((filename, 0) for filename in map((lambda x: x.filename), facades.get_list()))

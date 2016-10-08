@@ -28,9 +28,9 @@ from utils import vec2d as v
 # The preceding line sets encoding of this file to utf-8. Needed for non-ascii
 # object names. It must stay on the first or second line.
 
-#=============================================================================
+# =============================================================================
 # PARAMETERS FOR ALL osm2city MODULES
-#=============================================================================
+# =============================================================================
 LOGLEVEL = "INFO"
 
 # -- Scenery folder, typically a geographic name or the ICAO code of the airport
@@ -77,11 +77,9 @@ TELNET_PORT = 5501  # The port FlightGear listens to. Needed for ELEV_MODE = "Te
 
 USE_NEW_STG_VERBS = False
 
-#=============================================================================
+# =============================================================================
 # PARAMETERS RELATED TO BUILDINGS IN osm2city
-#=============================================================================
-
-ATLAS_SUFFIX_DATE = False   # -- add timestamp to file name
+# =============================================================================
 
 # -- Check for static objects in the PATH_TO_SCENERY folder based on convex hull around all points
 OVERLAP_CHECK_CONVEX_HULL = False
@@ -161,15 +159,10 @@ OBSTRUCTION_LIGHT_MIN_LEVELS = 15   # -- put obstruction lights on buildings wit
 
 CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if too little objects
 
-#=============================================================================
-# EXPERIMENTAL PARAMETERS, work in progress, YMMV
-#=============================================================================
 
-
-
-#=============================================================================
+# =============================================================================
 # PARAMETERS RELATED TO PYLONS, POWERLINES, AERIALWAYS IN osm2pylons.py
-#=============================================================================
+# =============================================================================
 
 C2P_PROCESS_POWERLINES = True
 C2P_PROCESS_AERIALWAYS = True
@@ -228,17 +221,17 @@ C2P_STREETLAMPS_RESIDENTIAL_DISTANCE = 40
 C2P_STREETLAMPS_OTHER_DISTANCE = 70
 C2P_STREETLAMPS_MIN_STREET_LENGTH = 20
 
-#=============================================================================
+# =============================================================================
 # PARAMETERS RELATED TO landuse.py - might be replaced by another library
-#=============================================================================
+# =============================================================================
 LU_LANDUSE_GENERATE_LANDUSE = True
 LU_LANDUSE_BUILDING_BUFFER_DISTANCE = 25
 LU_LANDUSE_BUILDING_BUFFER_DISTANCE_MAX = 50
 LU_LANDUSE_MIN_AREA = 5000
 
-#=============================================================================
+# =============================================================================
 # PARAMETERS RELATED TO roads.py
-#=============================================================================
+# =============================================================================
 
 TRAFFIC_SHADER_ENABLE = False
 MAX_SLOPE_RAILWAY = 0.04
@@ -254,6 +247,18 @@ EMBANKMENT_TEXTURE = textures.road.EMBANKMENT_1  # Texture for the embankment
 MIN_ABOVE_GROUND_LEVEL = 0.01    # how much a highway / railway is at least hovering above ground
 HIGHWAY_TYPE_MIN = 4  # The lower the number, the more ways are added. See roads.HighwayType
 POINTS_ON_LINE_DISTANCE_MAX = 1000  # the maximum distance between two points on a line. If longer, then new points are added
+
+
+# =============================================================================
+# PARAMETERS RELATED TO TEXTURES
+# =============================================================================
+
+ATLAS_SUFFIX_DATE = False   # -- add timestamp to file name
+TEXTURES_ROOFS_NAME_EXCLUDE = []  # list of roof file names to exclude, e.g. ["roof_red3.png", "roof_orange.png"]
+TEXTURES_FACADES_NAME_EXCLUDE = []  # e.g. ["de/commercial/facade_modern_21x42m.jpg"]
+TEXTURES_ROOFS_PROVIDE_EXCLUDE = []  # list of roof provides features to exclude, e.g. ["colour:red"]
+TEXTURES_FACADES_PROVIDE_EXCLUDE = []  # ditto for facade provides features, e.g. ["age:modern"]
+
 
 # default_args_end # DO NOT MODIFY THIS LINE
 
