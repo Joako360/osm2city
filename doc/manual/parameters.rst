@@ -197,6 +197,13 @@ TEXTURES_ROOFS_PROVIDE_EXCLUDE                  List       []        List of pro
 
 TEXTURES_FACADES_PROVIDE_EXCLUDE                List       []        Ditto for facades.
 
+TEXTURES_REGIONS_EXPLICIT                       List       []        Explicit list of regions to include. If list is empty, then all regions are
+                                                                     accepted.
+                                                                     There is also a special region "generic", which corresponds to
+                                                                     top directory structure. In many situations it might not make sense to include
+                                                                     "generic", as it provides a lot of colours etc. (which however could be
+                                                                     filtered with the other parameters).
+
 =============================================   ========   =======   ==============================================================================
 
 

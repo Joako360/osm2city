@@ -107,6 +107,12 @@ def assert_trailing_slash(path: str) -> str:
     return my_path
 
 
+def replace_with_os_separator(path: str) -> str:
+    """Switches forward and backward slash depending on os."""
+    my_string = path.replace("/", os.sep)
+    my_string = my_string.replace("\\", os.sep)
+    return my_string
+
 class Stats(object):
     def __init__(self):
         self.objects = 0

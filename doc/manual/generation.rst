@@ -27,7 +27,7 @@ Therefore before running ``osm2city`` related programs please either:
 Creating the Texture Atlas
 ==========================
 
-In order to consume the textures linked as described in chapter :ref:`Creating Soft Links to Texture Data <chapter-texture_data-label>` a texture atlas needs to be created. As this is a bit of a time consuming task, re-creating a texture atlas should only be done if the contained textures change. That is rarely the case. Also remember that if the texture atlas changes, then also the content has to be copied separately (see :ref:`chapter-copy-textures-label`).
+In order to be able to use textures for buildings a texture atlas (a structured collection of textures stored in a single image file) needs to be created. As this is a bit of a time consuming task, re-creating a texture atlas should only be done if the contained textures change. That is rarely the case. Also remember that if the texture atlas changes, then also the content has to be copied separately (see :ref:`chapter-copy-textures-label`).
 
 In most situations it is enough to call the following command once and then only if the textures have changed:
 
@@ -37,7 +37,7 @@ In most situations it is enough to call the following command once and then only
 
 Alternatively `buildings.py` can be called with the ``-a`` option.
 
-Chapter :ref:`Textures <chapter-parameters-textures>` has an overview of how roof and facade textures can be filtered.
+Chapter :ref:`Textures <chapter-parameters-textures>` has an overview of how roof and facade textures can be filtered to suit a given scenery's needs by means of parameters.
 
 
 ====================

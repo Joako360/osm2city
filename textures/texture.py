@@ -9,6 +9,7 @@ import numpy as np
 
 import tools
 import parameters
+from utils.utilities import replace_with_os_separator
 
 
 class Texture(object):
@@ -51,11 +52,12 @@ class Texture(object):
                  height_min=0, height_max=9999,
                  v_align_bottom: bool=False,
                  provides=list(), requires=list(), levels=None) -> None:
-        self.filename = Texture.tex_prefix + os.sep + filename
+        self.filename = Texture.tex_prefix + os.sep + replace_with_os_separator(filename)
         self.x0 = self.x1 = self.y0 = self.y1 = 0
         self.sy = self.sx = 0
         self.rotated = False
         self.provides = provides
+        self._parse_region()
         self.requires = requires
         self.height_min = height_min
         self.height_max = height_max
@@ -173,6 +175,15 @@ Please set either h_can_repeat or v_can_repeat to False.' % self.filename
     def closest_h_match(self, frac):
         return self.h_cuts[np.abs(self.h_cuts - frac).argmin()]
 
+    def _parse_region(self) -> None:
+        """Parses its filename to find out, which region it is and then adds it to self.provides."""
+        my_region = "generic"
+        specific_name = self.filename[len(Texture.tex_prefix) + 1:]
+        index = specific_name.find(os.sep)
+        if index > 0:
+            my_region = specific_name[:index]
+        self.provides.append("region:" + my_region)
+
 
 class RoofManager(object):
     def __init__(self, cls):
@@ -185,7 +196,7 @@ class RoofManager(object):
         """Appends a texture to the catalog if the referenced file exists, in which case True is returned.
         Otherwise False is returned and the texture is not added.
 
-        Prepend each item in t.provides with class name, except for class-independent keywords: age,region,compat
+        Prepend each item in t.provides with class name, except for class-independent keywords: age, region, compat
         """
         # check whether already during initialization an error occurred
         if texture.validation_message:
@@ -197,6 +208,9 @@ class RoofManager(object):
 
         # check whether the texture should be excluded based on parameter for name
         if not self._screen_exclude_texture_by_name(texture):
+            return False
+
+        if not self._screen_exclude_texture_by_region(texture):
             return False
 
         # check whether the same texture already has been referenced in an existing entry
@@ -255,6 +269,16 @@ class RoofManager(object):
                 for a_feature in parameters.TEXTURES_ROOFS_PROVIDE_EXCLUDE:
                     if screen_texture_tags_for_colour_spelling(a_feature) == provided_feature:
                         return False
+        return True
+
+    def _screen_exclude_texture_by_region(self, texture: Texture) -> bool:
+        if isinstance(self, FacadeManager):
+            if len(parameters.TEXTURES_REGIONS_EXPLICIT) > 0:
+                for feature in texture.provides:
+                    for region in parameters.TEXTURES_REGIONS_EXPLICIT:
+                        if len(feature) > 7 and feature[7:] == region:  # [:7] because "region:gb" in texture.provides
+                            return True
+                return False
         return True
 
     def find_matching_roof(self, requires=[]):

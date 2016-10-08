@@ -141,9 +141,6 @@ def _make_texture_atlas(texture_list: List[Texture], atlas_filename: str, ext: s
         if not the_atlas.pack(l):
             logging.info("Failed to pack" + str(l))
 
-#    the_atlas.write("atlas.png", "RGBA")
-#    return
-        
     atlas_sy = _next_pow2(atlas_sy)
     the_atlas.set_height(atlas_sy)
     logging.info("Final atlas height %i" % atlas_sy)
@@ -217,6 +214,30 @@ def _append_roofs(roof_manager: RoofManager, tex_prefix: str) -> None:
         sys.exit(1)
 
 
+def _dump_all_provides_across_textures(texture_list: List[Texture]) -> None:
+    provided_features_level_one = set()
+    provided_features_level_two = set()
+    provided_features_level_three = set()
+    provided_features_level_four = set()
+
+    for texture in texture_list:
+        for feature in texture.provides:
+            parts = feature.split(":")
+            if len(parts) > 0:
+                provided_features_level_one.add(parts[0])
+            if len(parts) > 1:
+                provided_features_level_two.add(parts[1])
+            if len(parts) > 2:
+                provided_features_level_three.add(parts[2])
+            if len(parts) > 3:
+                provided_features_level_four.add(parts[3])
+
+    logging.debug("1st level provides: %s", provided_features_level_one)
+    logging.debug("2nd level provides: %s", provided_features_level_two)
+    logging.debug("3rd level provides: %s", provided_features_level_three)
+    logging.debug("4th level provides: %s", provided_features_level_four)
+
+
 def init(create_atlas: bool=True) -> None:
     logging.debug("textures: init")
     global facades
@@ -242,6 +263,7 @@ def init(create_atlas: bool=True) -> None:
         _append_dynamic(facades, my_tex_prefix_src)
 
         texture_list = facades.get_list() + roofs.get_list()
+
 
         # warn for missed out textures
         _check_missed_input_textures(my_tex_prefix_src, texture_list)
