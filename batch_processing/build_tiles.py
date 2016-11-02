@@ -12,7 +12,7 @@ import sys
 from _io import open
 
 import parameters
-import utils.utilities as util
+import utils.utilities as uu
 from utils import calc_tile
 
 OSM_FILE_NAME = "data.osm"
@@ -22,10 +22,10 @@ def _get_file_name(name, tile_name):
     """
     Returns a command file (Extension cmd for windows)
     """
-    my_os_type = util.get_os_type()
-    if my_os_type is util.OSType.windows:
+    my_os_type = uu.get_os_type()
+    if my_os_type is uu.OSType.windows:
         extension = ".cmd"
-    elif my_os_type is util.OSType.linux or my_os_type is util.OSType.mac:
+    elif my_os_type is uu.OSType.linux or my_os_type is uu.OSType.mac:
         extension = ".sh" 
     else:
         extension = ""
@@ -37,7 +37,7 @@ def _open_file(name, directory):
 
 
 def _write_to_file(the_command, file_handle, python_exec, params_out):
-    file_handle.write(python_exec + ' ' + util.get_osm2city_directory() + os.sep + the_command)
+    file_handle.write(python_exec + ' ' + uu.get_osm2city_directory() + os.sep + the_command)
     file_handle.write(' -f ' + params_out)
     if BASH_PARALLEL_PROCESS:
         file_handle.write(' &' + os.linesep + 'parallel_wait $max_parallel_process' + os.linesep)
@@ -141,7 +141,7 @@ if __name__ == '__main__':
 
     # Check if necessary to add parallel processing code
     BASH_PARALLEL_PROCESS = False
-    is_linux_or_mac = util.is_linux_or_mac()
+    is_linux_or_mac = uu.is_linux_or_mac()
     if args.parallel:
         if is_linux_or_mac:
             BASH_PARALLEL_PROCESS = True
@@ -200,7 +200,7 @@ done
                     sources.write(line)
             if args.new_download:
                 download_command = '%s %s%sdownload_tile.py -f %s/params.ini -d "%s"' % (python_exe,
-                                                                                         util.get_osm2city_directory(),
+                                                                                         uu.get_osm2city_directory(),
                                                                                          os.sep,
                                                                                          path, OSM_FILE_NAME)
                 download_file.write(download_command + os.linesep)
