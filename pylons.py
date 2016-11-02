@@ -687,11 +687,11 @@ class RailMast(SharedPylon):
         self.point_on_line = point_on_line
         self.x = mast_point.x
         self.y = mast_point.y
-        self.pylon_model = "Models/StreetFurniture/RailPower.xml"
+        self.pylon_model = "Models/StreetFurniture/RailPower.ac"
         if self.type_ == RailMast.TYPE_VIRTUAL_MAST:
             self.needs_stg_entry = False
         elif self.type_ == RailMast.TYPE_STOP_MAST:
-            self.pylon_model = "Models/StreetFurniture/rail_stop_tension.xml"
+            self.pylon_model = "Models/StreetFurniture/rail_stop_tension.ac"
         self.direction_type = direction_type
 
 
