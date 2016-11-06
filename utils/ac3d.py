@@ -41,14 +41,9 @@ class Face(object):
 
 
 class Object(object):
-    """An object (3D) in an AC3D file with faces and nodes
-       type:  
-         The first 4 bits (flags & 0xF) is the type. 0 = polygon, 1 = closedline, 2 = line  
-         The next four bits (flags >> 4) specify the shading and 
-backface.  bit1 = shaded surface bit2 = twosided.
-         ts0000
-         31 
-         268421
+    """An object (3D) in an AC3D file with faces and nodes.
+         The first 4 bits (flags & 0xF) is the type. 0 = polygon, 1 = closed line, 2 = line
+         The next four bits (flags >> 4) specify the shading and back-face:  bit1 = shaded surface bit2 = two-sided.
          0x20: two-sided poly
          0x00: single-sided poly
     """
@@ -73,7 +68,7 @@ backface.  bit1 = shaded surface bit2 = twosided.
     def close(self):
         pass
 
-    def node(self, x, y, z):
+    def node(self, x, y, z) -> int:
         """Add new node. Return its index."""
         self._nodes.append(Node(x, y, z))
         if self.stats:
@@ -194,8 +189,8 @@ class File(object):
     a common source of bugs. Can also add 3d labels (useful for debugging, disabled
     by default)
     """
-    def __init__(self, file_name=None, stats=None, show_labels=False):
-        """Read ac3d data from file_name if given. Otherwise create empty ac3d object"""
+    def __init__(self, file_name=None, stats=None, show_labels=False) -> None:
+        """If file_name not None, then read ac3d data from file_name if given. Otherwise create empty ac3d object."""
         self.objects = []
         self.materials_list = []
         self.show_labels = show_labels
@@ -205,7 +200,7 @@ class File(object):
         if file_name is not None:
             self.read(file_name)
 
-    def new_object(self, name, texture, **kwargs):
+    def new_object(self, name: str, texture: str, **kwargs) -> Object:
         o = Object(name, self.stats, texture, **kwargs)
         self.objects.append(o)
         self._current_object = o
@@ -269,20 +264,19 @@ class File(object):
             the_nodes = np.vstack((the_nodes, a))
         return the_nodes
 
-    def __str__(self):
+    def __str__(self) -> str:
         s = 'AC3Db\n'
         if self.materials_list:
             s += "".join(['MATERIAL %s\n' % the_mat for the_mat in self.materials_list])
         else:
             s += 'MATERIAL "" rgb 1 1 1 amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0\n'
-#        s += 'MATERIAL "" rgb 1 1 1 amb 0.5 0.5 0.5 emis 1 1 1 spec 0.5 0.5 0.5 shi 64 trans 0\n'
         non_empty = [o for o in self.objects if not o.is_empty()]
-        # FIXME: this doesnt handle nested kids properly
+        # FIXME: this doesn't handle nested kids properly
         s += 'OBJECT world\nkids %i\n' % len(non_empty)
         s += "".join([str(o) for o in non_empty])
         return s
 
-    def write(self, file_name):
+    def write(self, file_name: str) -> None:
         f = open(file_name, 'w')
         f.write(str(self))
         f.close()
@@ -390,9 +384,6 @@ class File(object):
         pObject = Group(pObjectHeader + Optional(lNumvert + Group(ZeroOrMore(lVertex))
                         + Optional(lNumsurf + Group(ZeroOrMore(pSurf))))
                         + lKids)  # .setParseAction( convertObject )
-#         pObject.setDebug(True)
-#         pObject.debug = True
-#         ParserElement.verbose_stacktrace = True
 
         pFile = lHeader + Group(OneOrMore(lMaterial)) + pObjectWorld \
           + Group(OneOrMore(pObject))

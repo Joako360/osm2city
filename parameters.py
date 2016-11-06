@@ -77,6 +77,8 @@ TELNET_PORT = 5501  # The port FlightGear listens to. Needed for ELEV_MODE = "Te
 
 USE_NEW_STG_VERBS = False
 
+USE_EXTERNAL_MODELS = False
+
 # =============================================================================
 # PARAMETERS RELATED TO BUILDINGS IN osm2city
 # =============================================================================

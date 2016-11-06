@@ -178,7 +178,7 @@ class Buildings(object):
                 except:
                     _roof_height = 0
 
-            _building_type = building_lib.mapType(tags)
+            _building_type = building_lib.map_building_type(tags)
 
             # -- simple (silly?) heuristics to 'respect' layers
             if layer == 0:
@@ -341,7 +341,7 @@ class Buildings(object):
                     else:
                         logging.error("Outer way (%d) not in list of ways. Building type missing?" % _way.osm_id)
 
-    def _get_min_max_coords(self):
+    def get_min_max_coords(self):
         for node in list(self.nodes_dict.values()):
             if node.lon > self.maxlon:
                 self.maxlon = node.lon
@@ -501,7 +501,7 @@ if __name__ == "__main__":
 
     logging.info("reading elevation data")
     elev = tools.get_interpolator(fake=parameters.NO_ELEV)
-    logging.debug("height at origin" + str(elev(v.Vec2d(0, 0))))
+    logging.debug("height at origin " + str(elev(v.Vec2d(0, 0))))
     logging.debug("origin at " + str(tools.transform.toGlobal((0, 0))))
 
     # -- now read OSM data. Either parse OSM xml, or read a previously cached .pkl file
@@ -533,7 +533,7 @@ if __name__ == "__main__":
 
         # tools.stats.print_summary()
         buildings.make_way_buildings()
-        buildings._get_min_max_coords()
+        buildings.get_min_max_coords()
         cmin = v.Vec2d(buildings.minlon, buildings.minlat)
         cmax = v.Vec2d(buildings.maxlon, buildings.maxlat)
         logging.info("min/max " + str(cmin) + " " + str(cmax))
@@ -968,16 +968,6 @@ if __name__ == "__main__":
             for building in buildings.buildings:
                 if building.parent == building:
                     building.parent = None
-            
-        #self.buildings.append(building)
-
-        #tools.stats.objects += 1
-        # show progress here?
-        # if tools.stats.objects % 50 == 0:
-        #    logging.info(tools.stats.objects)
-        
-        #    #if building.parent : 
-        #            print("building ", str(building.osm_id), " found parent", str(building.parent.osm_id))
 
         buildings_with_parts = buildings.buildings_with_parts
         buildings = buildings.buildings
@@ -988,15 +978,12 @@ if __name__ == "__main__":
         fpickle = open(pkl_fname, 'wb')
         pickle.dump(buildings, fpickle, -1)
         fpickle.close()
-    else:
-        # -- load list of building objects from previously cached file
+
+    else:  # load list of building objects from previously cached file
         logging.info("Loading %s", pkl_fname)
         fpickle = open(pkl_fname, 'rb')
         buildings = pickle.load(fpickle)[:parameters.MAX_OBJECTS]
         fpickle.close()
-
-#        newbuildings = []
-
         logging.info("Unpickled %g buildings ", len(buildings))
         tools.stats.objects = len(buildings)
 
@@ -1013,9 +1000,14 @@ if __name__ == "__main__":
     clusters_default = cluster.Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
     handled_clusters.append(clusters_default)
     clusters_building_mesh_rough = None
+    # all external models go into detailed meshes. If USE_EXTERNAL_MODELS is False or just no external found
+    # then clusters will be discarded because empty
+    clusters_external_models = cluster.Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
+    handled_clusters.append(clusters_external_models)
 
     if parameters.USE_NEW_STG_VERBS:
         clusters_default.stg_verb_type = stg_io2.STGVerbType.object_building_mesh_detailed
+        clusters_external_models.stg_verb_type = stg_io2.STGVerbType.object_building_mesh_detailed
         clusters_building_mesh_rough = cluster.Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX,
                                                         stg_io2.STGVerbType.object_building_mesh_rough)
         handled_clusters.append(clusters_building_mesh_rough)
@@ -1048,7 +1040,7 @@ if __name__ == "__main__":
     #   - location clash with stg static models? drop building
     #   - TODO: analyze surrounding: similar shaped buildings nearby? will get same texture
     #   - set building type, roof type etc
-    buildings = building_lib.analyse(buildings, static_objects, tools.transform, elev,
+    buildings = building_lib.analyse(buildings, static_objects, elev,
                                      prepare_textures.facades, prepare_textures.roofs)
     building_lib.decide_LOD(buildings)
 
@@ -1056,13 +1048,6 @@ if __name__ == "__main__":
     path_to_output = parameters.get_output_path()
     replacement_prefix = parameters.get_repl_prefix()
     stg_manager = stg_io2.STGManager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
-#     for node in ac_nodes:
-#         print node
-#         lon, lat = tools.transform.toGlobal(node)
-#         e = elev((lon,lat), is_global=True)
-#         stg_manager.add_object_shared("Models/Communications/cell-monopole1-75m.xml", Vec2d(lon, lat), e, 0)
-
-    #tools.write_gp(buildings)
 
     # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
     for b in buildings:
@@ -1082,8 +1067,10 @@ if __name__ == "__main__":
     # -- write clusters
     stg_fp_dict = {}    # -- dictionary of stg file pointers
     stg = None  # stg-file object
+    handled_index = 0
+    total_buildings_written = 0
     for my_clusters in handled_clusters:
-        my_clusters.write_stats("foo")
+        my_clusters.write_stats("cluster_%d" % handled_index)
 
         for ic, cl in enumerate(my_clusters):
             nb = len(cl.objects)
@@ -1099,15 +1086,18 @@ if __name__ == "__main__":
                 if b.roof_complex:
                     nroofs += 2  # we have 2 different LOD models for each roof
 
+            total_buildings_written += len(cl.objects)
+
             tile_elev = elev(cl.center)
             center_global = v.Vec2d(tools.transform.toGlobal(cl.center))
             if tile_elev == -9999:
-                logging.warning("Skipping tile elev = -9999 at lat %.3f and lon %.3f", center_global.lat, center_global.lon)
+                logging.warning("Skipping tile elev = -9999 at lat %.3f and lon %.3f",
+                                center_global.lat, center_global.lon)
                 continue  # skip tile with improper elev
 
             # -- in case PREFIX is a path (batch processing)
-            file_name = replacement_prefix + "city%02i%02i" % (cl.I.x, cl.I.y)
-            logging.info("writing cluster %s (%i/%i)" % (file_name, ic, len(my_clusters)))
+            file_name = replacement_prefix + "city" + str(handled_index) + "%02i%02i" % (cl.I.x, cl.I.y)
+            logging.info("writing cluster %s with %d buildings" % (file_name, len(cl.objects)))
 
             path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, tile_elev, 0,
                                                         my_clusters.stg_verb_type)
@@ -1119,8 +1109,11 @@ if __name__ == "__main__":
                 files_to_remove.append(path_to_stg + file_name + ".xml")
             else:
                 # -- write .ac and .xml
-                building_lib.write(path_to_stg + file_name + ".ac", cl.objects, elev, tile_elev, tools.transform, offset)
+                building_lib.write(path_to_stg + file_name + ".ac", cl.objects, elev, tile_elev, offset)
                 write_xml(path_to_stg, file_name, cl.objects, offset)
+
+        handled_index += 1
+    logging.debug("Total number of buildings written to a cluster *.ac files: %d", total_buildings_written)
 
     if args.uninstall:
         for f in files_to_remove:

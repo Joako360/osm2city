@@ -19,7 +19,7 @@ import myskeleton
 import numpy as np
 from shapely import affinity
 import shapely.geometry as shg
-from  shapely.geometry.base import BaseGeometry
+from shapely.geometry.base import BaseGeometry
 
 
 import parameters
@@ -83,6 +83,12 @@ class Building(object):
         self.ground_elev = None
         self.ground_elev_min = None
         self.ground_elev_max = None
+        self.is_external_model = False
+        if parameters.USE_EXTERNAL_MODELS:
+            if 'model3d' in tags:
+                self.is_external_model = True
+                self.model3d = tags['model3d']
+                self.angle3d = tags['angle3d']
 
     def _roll_inner_nodes(self) -> None:
         """Roll inner rings such that the node closest to an outer node goes first.
@@ -274,11 +280,11 @@ def _get_nodes_from_acs(objs, own_prefix):
                     read_objects[fname] = ac
                                 
                 angle = radians(b.stg_hdg)
-                Rot_mat = np.array([[cos(angle), -sin(angle)],
+                rotation_matrix = np.array([[cos(angle), -sin(angle)],
                                     [sin(angle), cos(angle)]])
     
                 transposed_ac_nodes = -np.delete(ac.nodes_as_array().transpose(), 1, 0)[::-1]
-                transposed_ac_nodes = np.dot(Rot_mat, transposed_ac_nodes)
+                transposed_ac_nodes = np.dot(rotation_matrix, transposed_ac_nodes)
                 transposed_ac_nodes += b.anchor.as_array().reshape(2, 1)
                 all_nodes = np.append(all_nodes, transposed_ac_nodes.transpose(), 0)
             except Exception as e:
@@ -330,15 +336,10 @@ def _is_large_enough(b: Building) -> bool:
     """
     if b.levels >= parameters.BUILDING_NEVER_SKIP_LEVELS: 
         return True
-    if b.parent is not None:
-        #Check parent if we're a part
+    if b.parent is not None:  # Check parent if we're a part
         b = b.parent
     if b.area < parameters.BUILDING_MIN_AREA or \
        (b.area < parameters.BUILDING_REDUCE_THRESHOLD and random.uniform(0, 1) < parameters.BUILDING_REDUCE_RATE):
-        # if parameters.BUILDING_REDUCE_CHECK_TOUCH:
-            # for k in buildings:
-                # if k.touches(b): # using Shapely, but buildings have no polygon currently
-                    # return True
         return False
     return True
 
@@ -412,7 +413,6 @@ def _compute_roof_height(b, max_height=1e99):
                 angle00 = 0
                 
             angle90 = angle00 + pi/2.
-            ibottom = 0
             # assume that first point is on the bottom side of the roof
             # and is a reference point (0,0)
             # compute line slope*x
@@ -463,7 +463,6 @@ def _compute_roof_height(b, max_height=1e99):
             # compute height for each point with thales
             L = float(max(norms_o)) 
 
-            #try :
             b.roof_height_X = [roof_height*l/L for l in norms_o]
             b.roof_height = roof_height
 
@@ -495,9 +494,6 @@ def _compute_roof_height(b, max_height=1e99):
                     return False
                     
                 b.roof_height = roof_height
-            #else :
-            # should compute roof height for others roof type
-            #    b.roof_height = 0
     return
 
 
@@ -526,8 +522,8 @@ def decide_LOD(buildings):
         tools.stats.count_LOD(lod)
 
 
-def analyse(buildings, static_objects, transform, elev, facades, roofs):
-    """analyse all buildings
+def analyse(buildings, static_objects, elev, facades, roofs) -> List[Building]:
+    """Analyse all buildings:
     - calculate area
     - location clash with stg static models? drop building
     - analyze surrounding: similar shaped buildings nearby? will get same texture
@@ -546,6 +542,10 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
 
     new_buildings = []
     for b in buildings:
+        if b.is_external_model:
+            new_buildings.append(b)
+            continue
+
         # am anfang geometrieanalyse
         # - ort: urban, residential, rural
         # - region: europe, asia...
@@ -618,16 +618,6 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
             continue
 
         # -- work on height and levels
-
-        # -- LOWI year 2525: generate a 'futuristic' city of skyscrapers
-        if False:
-            if b.area >= 1500:
-                b.levels = int(random.gauss(35, 10))  # random_number(int, 10, 60)
-                b.height = float(b.levels) * _random_level_height()
-            if b.area < 1500:
-            # if b.area < 200. or (b.area < 500. and random.uniform(0,1) < 0.5):
-                tools.stats.skipped_small += 1
-                continue
 
         _compute_height_and_levels(b)
 
@@ -926,26 +916,12 @@ def analyse(buildings, static_objects, transform, elev, facades, roofs):
     return new_buildings
 
 
-def _write_and_count_vert(out, b, elev, offset, tile_elev):
-    """write numvert tag to .ac, update stats"""
-#    numvert = 2 * b._nnodes_ground
-    # out.write("numvert %i\n" % numvert)
+def _write_and_count_vert(ac_object: ac3d.Object, b: Building) -> None:
+    """Write numvert tag to .ac, update stats."""
 
-    # b.n_verts += numvert
+    b.first_node = ac_object.next_node_index()
 
-    # print b.refs[0].lon
-    # ground_elev = 200. + (b.refs[0].lon-13.6483695)*5000.
-    # print "ground_elev", ground_elev
-
-    # print "LEN", b._nnodes_ground
-    # print "X  ", len(X)
-    # print "Xo  ", len(b.X_outer), b.nnodes_outer
-    # print "Xi  ", len(b.X_inner)
-    # bla
-
-    b.first_node = out.next_node_index()
-
-    z = b.ground_elev - 0.1
+    z = b.ground_elev - 0.1  # FIXME: instead maybe we should have 1 meter of "bottom" texture
     try:
         z -= b.correct_ground  # FIXME Rick
     except:
@@ -961,8 +937,7 @@ def _write_and_count_vert(out, b, elev, offset, tile_elev):
 
     # ground nodes        
     for x in b.X:
-        #z = b.ground_elev - 1
-        out.node(-x[1], z, -x[0])
+        ac_object.node(-x[1], z, -x[0])
     # under the roof nodes
     if b.roof_type == 'skillion':
         # skillion       
@@ -974,7 +949,7 @@ def _write_and_count_vert(out, b, elev, offset, tile_elev):
         #
         if b.roof_height_X:
             for i in range(len(b.X)):
-                out.node(-b.X[i][1], b.ground_elev + b.height - b.roof_height + b.roof_height_X[i], -b.X[i][0])
+                ac_object.node(-b.X[i][1], b.ground_elev + b.height - b.roof_height + b.roof_height_X[i], -b.X[i][0])
     else:
         # others roofs
         #  
@@ -983,9 +958,8 @@ def _write_and_count_vert(out, b, elev, offset, tile_elev):
         #  +-----+------+
         #
         for x in b.X:
-            out.node(-x[1], b.ground_elev + b.height - b.roof_height, -x[0])
+            ac_object.node(-x[1], b.ground_elev + b.height - b.roof_height, -x[0])
     b.ceiling = b.ground_elev + b.height
-# ----
 
 
 def _write_ground(out, b, elev):  # not used anywhere
@@ -1117,12 +1091,11 @@ def _write_ring(out, b, ring, v0, texture, tex_y0, tex_y1):
     return v1
 
 
-def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
-    """now actually write buildings of one LOD for given tile.
-       While writing, accumulate some statistics
-       (totals stored in global stats object, individually also in building)
-       offset accounts for cluster center
-       - all LOD in one file. Plus roofs. One Object per LOD
+def write(ac_file_name: str, buildings, elev, tile_elev, offset) -> None:
+    """Write buildings across LOD for given tile.
+       While writing, accumulate some statistics (totals stored in global stats object, individually also in building).
+       Offset accounts for cluster center
+       All LOD in one file. Plus roofs. One ac3d.Object per LOD
     """
     ac = ac3d.File(stats=tools.stats)
     LOD_objects = list()
@@ -1132,15 +1105,11 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
     global nb  # FIXME: still need this?
 
-    #
     # get local medium ground elevation for each building
-    #
     for ib, b in enumerate(buildings):
         b.set_ground_elev(elev, tile_elev, offset)
     
-    #
-    # Exchange informations
-    #
+    # Update building hierarchy information
     for ib, b in enumerate(buildings):
         if b.parent:
             if not b.parent.ground_elev:
@@ -1184,24 +1153,22 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
         except:
             logging.fatal("non float elevation for building %d" % b.osm_id)
             exit(1)
-    
-    #
+
     # Correct height
-    #
     for ib, b in enumerate(buildings):
-        autocorrect = True
+        auto_correct = True
         try:
             b.ground_elev += b.correct_ground
-            autocorrect = False
+            auto_correct = False
         except:
             try:
                 b.ground_elev += b.parent.correct_ground
-                autocorrect = False
+                auto_correct = False
             except:
                 pass
                 
         # auto-correct
-        if autocorrect:
+        if auto_correct:
             if b.children:
                 ground_elev_max = b.ground_elev_max  # max( [ child.ground_elev_max for child in b.children ] )
                 min_roof = min([child.height - child.roof_height for child in b.children])
@@ -1220,38 +1187,34 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
     for ib, b in enumerate(buildings):
         tools.progress(ib, len(buildings))
-        out = LOD_objects[b.LOD]
+        ac_object = LOD_objects[b.LOD]
 
         _compute_roof_height(b, max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
         
-        _write_and_count_vert(out, b, elev, offset, tile_elev)
+        _write_and_count_vert(ac_object, b)
 
         nb += 1
-#        if nb % 70 == 0: print nb
-#        else: sys.stdout.write(".")
 
         b.ac_name = "b%i" % nb
-
-#        if (not no_roof) and (not b.roof_complex): nsurf += 1 # -- because roof will be part of base model
 
         tex_y0, tex_y1 = _check_height(b.height, b.facade_texture)
 
         if b.facade_texture != 'wall_no':
-            _write_ring(out, b, b.polygon.exterior, 0, b.facade_texture, tex_y0, tex_y1)
+            _write_ring(ac_object, b, b.polygon.exterior, 0, b.facade_texture, tex_y0, tex_y1)
             v0 = b.nnodes_outer
             for inner in b.polygon.interiors:
-                v0 = _write_ring(out, b, inner, v0, b.facade_texture, tex_y0, tex_y1)
+                v0 = _write_ring(ac_object, b, inner, v0, b.facade_texture, tex_y0, tex_y1)
 
         if not parameters.EXPERIMENTAL_INNER and len(b.polygon.interiors) > 1:
             raise NotImplementedError("Can't yet handle relations with more than one inner way")
 
         if not b.roof_complex:
             if b.roof_type == 'skillion':
-                roofs.separate_skillion2(out, b, b.X, max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
+                roofs.separate_skillion2(ac_object, b, b.X, max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
             elif b.roof_type in ['pyramidal', 'dome', ]:
-                roofs.separate_pyramidal(out, b, b.X)
+                roofs.separate_pyramidal(ac_object, b, b.X)
             else:
-                roofs.flat(out, b, b.X)
+                roofs.flat(ac_object, b, b.X)
 
         # -- roof
         #    We can have complex and non-complex roofs:
@@ -1270,36 +1233,35 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
 
             if b._nnodes_ground > 4 and parameters.BUILDING_SKEL_ROOFS:
                 if b.roof_type == 'skillion':
-                    roofs.separate_skillion2(out, b, b.X, max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
+                    roofs.separate_skillion2(ac_object, b, b.X, max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
                 elif b.roof_type in ['pyramidal', 'dome']:
-                    roofs.separate_pyramidal(out, b, b.X)
+                    roofs.separate_pyramidal(ac_object, b, b.X)
                 else:
-                    s = myskeleton.myskel(out, b, offset_xy=offset,
+                    s = myskeleton.myskel(ac_object, b, offset_xy=offset,
                                           offset_z=b.ground_elev + b.height - b.roof_height,
                                         max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
                     if s:
                         tools.stats.have_complex_roof += 1
 
                     else:  # -- fall back to flat roof
-                        roofs.flat(out, b, b.X)
+                        roofs.flat(ac_object, b, b.X)
                     # FIXME: move to analyse. If we fall back, don't require separate LOD
             # -- pitched roof for exactly 4 ground nodes
             else:
                 max_height = b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO
                 if b.roof_type == 'gabled' or b.roof_type == 'half-hipped':
-                    roofs.separate_gable(out, b, b.X, max_height=max_height)
+                    roofs.separate_gable(ac_object, b, b.X, max_height=max_height)
                 elif b.roof_type == 'hipped':
-                    roofs.separate_hipped(out, b, b.X, max_height=max_height)
+                    roofs.separate_hipped(ac_object, b, b.X, max_height=max_height)
                 elif b.roof_type in ['pyramidal', 'dome']:
-                    roofs.separate_pyramidal(out, b, b.X)
+                    roofs.separate_pyramidal(ac_object, b, b.X)
                 elif b.roof_type == 'skillion':
-                    roofs.separate_skillion2(out, b, b.X, max_height=max_height)
+                    roofs.separate_skillion2(ac_object, b, b.X, max_height=max_height)
                 elif b.roof_type == 'flat':
-                    roofs.flat(out, b, b.X)
+                    roofs.flat(ac_object, b, b.X)
                 else:
                     logging.debug("FIXME simple rooftype %s unsupported ", b.roof_type)
-                    roofs.flat(out, b, b.X)
-            # out_surf.write("kids 0\n")
+                    roofs.flat(ac_object, b, b.X)
 
     ac.write(ac_file_name)
     # plot on-screen using matplotlib
@@ -1308,9 +1270,7 @@ def write(ac_file_name, buildings, elev, tile_elev, transform, offset):
         plt.show()
 
 
-# Maps the Type of the building
-#
-def mapType(tags):
+def map_building_type(tags) -> str:
     if 'building' in tags and not tags['building'] == 'yes':
         return tags['building']
     return 'unknown'
