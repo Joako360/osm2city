@@ -74,7 +74,7 @@ import textures.texture as tex
 import tools
 import utils.stg_io2
 import utils.vec2d as v
-from utils import osmparser, calc_tile, coordinates, stg_io2, troubleshoot
+from utils import osmparser, calc_tile, coordinates, stg_io2, utilities
 
 buildings = []  # -- master list, holds all buildings
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
@@ -495,13 +495,14 @@ if __name__ == "__main__":
     cmin, cmax = parameters.get_extent_global()
     center = parameters.get_center_global()
 
-    tools.init(coordinates.Transformation(center, hdg=0))
+    coords_transform = coordinates.Transformation(center, hdg=0)
+    tools.init(coords_transform)
 
     prepare_textures.init(args.create_atlas)
 
     logging.info("reading elevation data")
-    elev = tools.get_interpolator(fake=parameters.NO_ELEV)
-    logging.debug("height at origin " + str(elev(v.Vec2d(0, 0))))
+    fg_elev = utilities.FGElev(coords_transform, fake=parameters.NO_ELEV)
+    logging.debug("height at origin " + str(fg_elev.probe_elev(v.Vec2d(0, 0))))
     logging.debug("origin at " + str(tools.transform.toGlobal((0, 0))))
 
     # -- now read OSM data. Either parse OSM xml, or read a previously cached .pkl file
@@ -1040,7 +1041,7 @@ if __name__ == "__main__":
     #   - location clash with stg static models? drop building
     #   - TODO: analyze surrounding: similar shaped buildings nearby? will get same texture
     #   - set building type, roof type etc
-    buildings = building_lib.analyse(buildings, static_objects, elev,
+    buildings = building_lib.analyse(buildings, static_objects, fg_elev,
                                      prepare_textures.facades, prepare_textures.roofs)
     building_lib.decide_LOD(buildings)
 
@@ -1088,7 +1089,7 @@ if __name__ == "__main__":
 
             total_buildings_written += len(cl.objects)
 
-            tile_elev = elev(cl.center)
+            tile_elev = fg_elev.probe_elev(cl.center)
             center_global = v.Vec2d(tools.transform.toGlobal(cl.center))
             if tile_elev == -9999:
                 logging.warning("Skipping tile elev = -9999 at lat %.3f and lon %.3f",
@@ -1109,7 +1110,7 @@ if __name__ == "__main__":
                 files_to_remove.append(path_to_stg + file_name + ".xml")
             else:
                 # -- write .ac and .xml
-                building_lib.write(path_to_stg + file_name + ".ac", cl.objects, elev, tile_elev, offset)
+                building_lib.write(path_to_stg + file_name + ".ac", cl.objects, fg_elev, tile_elev, offset)
                 write_xml(path_to_stg, file_name, cl.objects, offset)
 
         handled_index += 1
@@ -1126,9 +1127,9 @@ if __name__ == "__main__":
         logging.info("uninstall done.")
         sys.exit(0)
 
-    elev.save_cache()
+    fg_elev.save_cache()
     stg_manager.write()
     tools.stats.print_summary()
-    troubleshoot.troubleshoot(tools.stats)
+    utilities.troubleshoot(tools.stats)
     logging.info("done.")
     sys.exit(0)

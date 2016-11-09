@@ -16,6 +16,7 @@ import xml.sax
 import parameters
 import tools
 from utils import osmparser, vec2d, coordinates, stg_io2
+from utils.utilities import FGElev
 
 OUR_MAGIC = "osm2nature"  # Used in e.g. stg files to mark edits by osm2nature.py
 
@@ -32,9 +33,9 @@ class TreeNode(object):
         self.elevation = 500.0  # elevation above sea level in meters
         self.tree_model = "Models/Trees/platanus_acerifolia_15m.xml"
 
-    def calc_global_coordinates(self, my_elev_interpolator, my_coord_transformator):
+    def calc_global_coordinates(self, fg_elev: FGElev, my_coord_transformator):
         self.lon, self.lat = my_coord_transformator.toGlobal((self.x, self.y))
-        self.elevation = my_elev_interpolator(vec2d.Vec2d(self.lon, self.lat), True)
+        self.elevation = fg_elev.probe_elev(vec2d.Vec2d(self.lon, self.lat), True)
 
     def make_stg_entry(self, my_stg_mgr):
         """
@@ -46,7 +47,7 @@ class TreeNode(object):
                                      , stg_angle(0))  # 90 less because arms are in x-direction in ac-file 
 
 
-def process_osm_tree(nodes_dict, ways_dict, my_elev_interpolator, my_coord_transformator):
+def process_osm_tree(nodes_dict, fg_elev: FGElev, my_coord_transformator):
     my_trees = {}
     for node in list(nodes_dict.values()):
         for key in node.tags :
@@ -71,7 +72,7 @@ def process_osm_tree(nodes_dict, ways_dict, my_elev_interpolator, my_coord_trans
                 my_tree_node.tree_model = "Models/Trees/egkk_woods.xml"
 
                 my_tree_node.x, my_tree_node.y = my_coord_transformator.toLocal((my_tree_node.lon, my_tree_node.lat))
-                my_tree_node.elevation = my_elev_interpolator(vec2d.Vec2d(my_tree_node.lon, my_tree_node.lat), True)
+                my_tree_node.elevation = fg_elev.probe_elev(vec2d.Vec2d(my_tree_node.lon, my_tree_node.lat), True)
                 print(("adding entry to trees", my_node.osm_id, " ", my_tree_node.x, " ", my_tree_node.y, " ", my_tree_node.elevation))
                 my_trees[my_tree_node.osm_id] = my_tree_node
 
@@ -144,12 +145,12 @@ def main():
     # Initializing tools for global/local coordinate transformations
     center_global = parameters.get_center_global()
     osm_fname = parameters.get_OSM_file_name()
-    coord_transformator = coordinates.Transformation(center_global, hdg=0)
-    tools.init(coord_transformator)
+    coords_transform = coordinates.Transformation(center_global, hdg=0)
+    tools.init(coords_transform)
 
     # Reading elevation data
     logging.info("Reading ground elevation data might take some time ...")
-    elev_interpolator = tools.get_interpolator(fake=parameters.NO_ELEV)
+    fg_elev = FGElev(coords_transform, fake=parameters.NO_ELEV)
 
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
@@ -166,12 +167,11 @@ def main():
     trees = {}
     forest_trees = {}
     if True :  # parameters.PROCESS_TREES :
-        trees = process_osm_tree(handler.nodes_dict, handler.ways_dict, elev_interpolator
-                                 , coord_transformator)
+        trees = process_osm_tree(handler.nodes_dict, fg_elev, coords_transform)
         logging.info('Number of trees to process: %s', len(trees))
     #if True :
     #    forest_trees = process_osm_forest(handler.nodes_dict, handler.ways_dict, elev_interpolator
-    #                                                         , coord_transformator)
+    #                                                         , coords_transform)
     #    logging.info('Number of forest to process: %s', len(trees))
     #    # -- initialize STGManager
     path_to_output = parameters.get_output_path()
@@ -199,7 +199,7 @@ def main():
         sys.exit(0)
 
     stg_manager.write()
-    elev_interpolator.save_cache()
+    fg_elev.save_cache()
 
     logging.info("******* Finished *******")
 

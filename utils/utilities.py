@@ -2,16 +2,25 @@
 Diverse utility methods used throughout osm2city and not having a clear other home.
 """
 
+from collections import defaultdict
 import enum
 import logging
+import math
 import os
 import os.path as osp
+import pickle
+import subprocess
 import sys
 import textwrap
-from collections import defaultdict
+import time
+from typing import Tuple
 
 import numpy as np
 import parameters
+
+from utils import calc_tile
+from utils import coordinates
+import utils.vec2d as ve
 
 
 def get_osm2city_directory() -> str:
@@ -81,23 +90,6 @@ def is_linux_or_mac() -> bool:
     return False
 
 
-def get_elev_in_path(home_path) -> str:
-    return assert_trailing_slash(home_path) + "elev.in"
-
-
-def get_elev_out_dir(home_path) -> str:
-    return assert_trailing_slash(home_path) + "Export" + os.sep
-
-
-def get_elev_out_path(home_path) -> str:
-    return get_elev_out_dir(home_path) + "elev.out"
-
-
-def get_original_elev_nas_path() -> str:
-    my_dir = assert_trailing_slash(parameters.PATH_TO_OSM2CITY_DATA)
-    return my_dir + "nasal" + os.sep + "elev.nas"
-
-
 def assert_trailing_slash(path: str) -> str:
     """Takes a path and makes sure it has an os_specific trailing slash unless the path is empty."""
     my_path = path
@@ -112,6 +104,7 @@ def replace_with_os_separator(path: str) -> str:
     my_string = path.replace("/", os.sep)
     my_string = my_string.replace("\\", os.sep)
     return my_string
+
 
 class Stats(object):
     def __init__(self):
@@ -135,6 +128,7 @@ class Stats(object):
         self.nodes_simplified = 0
         self.nodes_ground = 0
         self.textures_total = defaultdict(int)
+        self.textures_used = None
 
     def count(self, b):
         """update stats (vertices, surfaces, area, corners) with given building's data
@@ -248,3 +242,227 @@ class Stats(object):
                       "#" * int(56. * self.corners[i] / max_corners)))
         out.write(" complex %5i |%s\n" % (self.corners[0],
                   "#" * int(56. * self.corners[0] / max_corners)))
+
+
+class Troubleshoot:
+    def __init__(self):
+        self.msg = ""
+        self.n_problems = 0
+
+    def skipped_no_elev(self):
+        self.n_problems += 1
+        msg = "%i. Some objects were skipped because we could not obtain their elevation.\n" % self.n_problems
+        msg += textwrap.dedent("""
+        Make sure
+        - you have FG's scenery tiles for your area installed
+        - PATH_TO_SCENERY is correct\n
+        """)
+        return msg
+
+    def skipped_no_texture(self):
+        self.n_problems += 1
+        msg = "%i. Some objects were skipped because we could not find a matching texture.\n\n" % self.n_problems
+        return msg
+
+
+def troubleshoot(stats):
+    """Analyzes statistics from Stats objects and prints out logging information"""
+    msg = ""
+    t = Troubleshoot()
+    if stats.skipped_no_elev:
+        msg += t.skipped_no_elev()
+    if stats.skipped_texture:
+        msg += t.skipped_no_texture()
+
+    if t.n_problems > 0:
+        logging.warning("We've detected %i problem(s):\n\n%s" % (t.n_problems, msg))
+
+
+class FGElev(object):
+    """Probes elevation and ground solidness via fgelev.
+       By default, queries are cached. Call save_cache() to
+       save the cache to disk before freeing the object.
+    """
+    def __init__(self, coords_transform: coordinates.Transformation,
+                 fake: bool=False, use_cache: bool=True, auto_save_every: int=50000) -> None:
+        """Open pipe to fgelev.
+           Unless disabled by cache=False, initialize the cache and try to read
+           it from disk. Automatically save the cache to disk every auto_save_every misses.
+           If fake=True, never do any probing and return 0 on all queries.
+        """
+        if fake:
+            self.h = fake
+            self.fake = True
+            return
+        else:
+            self.fake = False
+
+        self.auto_save_every = auto_save_every
+        self.h_offset = 0
+        self.fgelev_pipe = None
+        self.record = 0
+        self.coords_transform = coords_transform
+
+        self._cache = None  # dictionary of tuple of float for elevation and boolean for is_solid
+
+        if use_cache:
+            self.pkl_fname = parameters.PREFIX + os.sep + 'elev.pkl'
+            try:
+                logging.info("Loading %s", self.pkl_fname)
+                fpickle = open(self.pkl_fname, 'rb')
+                self._cache = pickle.load(fpickle)
+                fpickle.close()
+                logging.info("OK")
+            except (IOError, EOFError) as reason:
+                logging.info("Loading elev cache failed (%s)", reason)
+                self._cache = {}
+
+    def _open_fgelev(self) -> None:
+        logging.info("Spawning fgelev")
+        path_to_fgelev = parameters.FG_ELEV
+
+        fgelev_cmd = path_to_fgelev
+        if parameters.PROBE_FOR_WATER:
+            fgelev_cmd += ' --print-solidness'
+        fgelev_cmd += ' --expire 1000000 --fg-scenery ' + parameters.PATH_TO_SCENERY
+        logging.info("cmd line: " + fgelev_cmd)
+        self.fgelev_pipe = subprocess.Popen(fgelev_cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                            bufsize=1, universal_newlines=True)
+
+    def save_cache(self) -> None:
+        """save cache to disk"""
+        if self.fake:
+            return
+        fpickle = open(self.pkl_fname, 'wb')
+        pickle.dump(self._cache, fpickle, -1)
+        fpickle.close()
+
+    def probe_elev(self, position: ve.Vec2d, is_global: bool=False, check_btg: bool=False) -> float:
+        elev_is_solid_tuple = self.probe(position, is_global, check_btg)
+        return elev_is_solid_tuple[0]
+
+    def probe(self, position: ve.Vec2d, is_global: bool=False, check_btg: bool=False) -> Tuple[float, bool]:
+        """Return elevation and ground solidness at (x,y). We try our cache first. Failing that, call fgelev.
+        """
+        def really_probe(position: ve.Vec2d) -> Tuple[float, bool]:
+            if check_btg:
+                btg_file = parameters.PATH_TO_SCENERY + os.sep + "Terrain" \
+                           + os.sep + calc_tile.directory_name(position) + os.sep \
+                           + calc_tile.construct_btg_file_name(position)
+                print(calc_tile.construct_btg_file_name(position))
+                if not os.path.exists(btg_file):
+                    logging.error("Terrain File " + btg_file + " does not exist. Set scenery path correctly or fly there with TerraSync enabled")
+                    sys.exit(2)
+
+            if not self.fgelev_pipe:
+                self._open_fgelev()
+            if math.isnan(position.lon) or math.isnan(position.lat):
+                logging.error("Nan encountered while probing elevation")
+                return -9999, True
+
+            try:
+                self.fgelev_pipe.stdin.write("%i %1.10f %1.10f\r\n" % (self.record, position.lon, position.lat))
+            except IOError as reason:
+                logging.error(reason)
+
+            empty_lines = 0
+            line = ""
+            try:
+                while line == "" and empty_lines < 20:
+                    empty_lines += 1
+                    line = self.fgelev_pipe.stdout.readline().strip()
+                elev = float(line.split()[1]) + self.h_offset
+                is_solid = True
+                if parameters.PROBE_FOR_WATER and line.split()[2] == '-':
+                    is_solid = False
+            except IndexError as reason:
+                self.save_cache()
+                if empty_lines > 1:
+                    logging.fatal("Skipped %i lines" % empty_lines)
+                logging.fatal("%i %g %g" % (self.record, position.lon, position.lat))
+                logging.fatal("fgelev returned <%s>, resulting in %s. Did fgelev start OK (Record : %i)?",
+                              line, reason, self.record)
+                raise RuntimeError("fgelev errors are fatal.")
+            return elev, is_solid
+
+        if self.fake:
+            return self.h, True
+
+        if not is_global:
+            position = ve.Vec2d(self.coords_transform.toGlobal(position))
+        else:
+            position = ve.Vec2d(position[0], position[1])
+
+        self.record += 1
+        if self._cache is None:
+            return really_probe(position)
+
+        key = (position.lon, position.lat)
+        try:
+            elev_is_solid_tuple = self._cache[key]
+            return elev_is_solid_tuple
+        except KeyError:
+            elev_is_solid_tuple = really_probe(position)
+            self._cache[key] = elev_is_solid_tuple
+
+            if self.auto_save_every and len(self._cache) % self.auto_save_every == 0:
+                self.save_cache()
+            return elev_is_solid_tuple
+
+
+def test_fgelev(cache, N):
+    """simple testing for FGElev class"""
+    fg_elev = FGElev(use_cache=cache)
+    delta = 0.3
+    check_btg = True
+    p = ve.Vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
+    fg_elev.probe_elev(p, True, check_btg)  # -- ensure fgelev is up and running
+    #p = Vec2d(parameters.BOUNDARY_WEST+delta, parameters.BOUNDARY_SOUTH+delta)
+    # elev(p, True, check_btg) # -- ensure fgelev is up and running
+    nx = ny = N
+    ny = 1
+    # X = np.linspace(parameters.BOUNDARY_WEST, parameters.BOUNDARY_WEST+delta, nx)
+    # Y = np.linspace(parameters.BOUNDARY_SOUTH, parameters.BOUNDARY_SOUTH+delta, ny)
+    X = np.linspace(parameters.BOUNDARY_WEST, parameters.BOUNDARY_EAST, nx)
+    Y = np.linspace(parameters.BOUNDARY_SOUTH, parameters.BOUNDARY_NORTH, ny)
+
+
+    # cache? N  speed
+    # True   10 30092 records/s
+    # False  10 17914 records/s
+    # True   20 27758 records/s
+    # False  20 18010 records/s
+    # True   50 29937 records/s
+    # False  50 18481 records/s
+    # True  100 30121 records/s
+    # False 100 18230 records/s
+    # True  200 29868 records/s
+    # False 200 18271 records/s
+
+    start = time.time()
+    s = []
+    i = 0
+    for y in Y:
+        for x in X:
+            p = ve.Vec2d(x, y)
+            print(i / 2, end='')
+            e = fg_elev.probe_elev(p, True, check_btg)
+            i += 1
+            e = fg_elev.probe_elev(p, True)
+            i += 1
+    end = time.time()
+    print(cache, N, "%d records/s" % (i / (end - start)))
+    fg_elev.save_cache()
+
+
+def progress(i, max_i):
+    """progress indicator"""
+    if sys.stdout.isatty() and parameters.log_level_info_or_lower():
+        try:
+            if i % (max_i / 100) > 0:
+                return
+        except ZeroDivisionError:
+            pass
+        print("%i %i %5.1f%%     \r" % (i+1, max_i, (float(i+1)/max_i) * 100), end='')
+        if i > max_i - 2:
+            print()

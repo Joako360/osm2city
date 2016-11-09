@@ -29,6 +29,7 @@ import tools
 import utils.stg_io2
 from utils import ac3d, ac3d_fast, calc_tile
 from utils.coordinates import Transformation
+from utils.utilities import FGElev, progress
 from utils.vec2d import Vec2d
 from utils.stg_io2 import STGVerbType, read_stg_entries
 
@@ -145,10 +146,10 @@ class Building(object):
             self.X[i, 0] -= the_offset.x  # -- cluster coordinates. NB: this changes building coordinates!
             self.X[i, 1] -= the_offset.y
 
-    def set_ground_elev(self, elev, tile_elev, the_offset: Vec2d) -> None:
+    def set_ground_elev(self, fg_elev: FGElev, tile_elev: float, the_offset: Vec2d) -> None:
 
         def local_elev(p):
-            return elev(p + the_offset) - tile_elev
+            return fg_elev.probe_elev(p + the_offset) - tile_elev
 
         self._set_X(the_offset)
 
@@ -522,7 +523,7 @@ def decide_LOD(buildings):
         tools.stats.count_LOD(lod)
 
 
-def analyse(buildings, static_objects, elev, facades, roofs) -> List[Building]:
+def analyse(buildings, static_objects, fg_elev: FGElev, facades, roofs) -> List[Building]:
     """Analyse all buildings:
     - calculate area
     - location clash with stg static models? drop building
@@ -542,10 +543,6 @@ def analyse(buildings, static_objects, elev, facades, roofs) -> List[Building]:
 
     new_buildings = []
     for b in buildings:
-        if b.is_external_model:
-            new_buildings.append(b)
-            continue
-
         # am anfang geometrieanalyse
         # - ort: urban, residential, rural
         # - region: europe, asia...
@@ -566,15 +563,30 @@ def analyse(buildings, static_objects, elev, facades, roofs) -> List[Building]:
         #    - simplify
         #    - compute edge lengths
 
-        try:
-            tools.stats.nodes_simplified += b.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
-            b._roll_inner_nodes()
-        except Exception as reason:
-            logging.warning("simplify or roll_inner_nodes failed (OSM ID %i, %s)", b.osm_id, reason)
-            continue
+        if not b.is_external_model:
+            try:
+                tools.stats.nodes_simplified += b.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
+                b._roll_inner_nodes()
+            except Exception as reason:
+                logging.warning("simplify or roll_inner_nodes failed (OSM ID %i, %s)", b.osm_id, reason)
+                continue
 
         # -- array of local outer coordinates
         Xo = np.array(b.X_outer)
+
+        # -- skip buildings outside elevation raster or if not solid
+        elev_is_solid_tuple = fg_elev.probe(Vec2d(Xo[0]))
+        if elev_is_solid_tuple[0] == -9999:
+            logging.debug("-9999")
+            tools.stats.skipped_no_elev += 1
+            continue
+        elif not elev_is_solid_tuple[1]:
+            logging.debug("in water")
+            continue
+
+        if b.is_external_model:
+            new_buildings.append(b)
+            continue
 
         tools.stats.nodes_ground += b._nnodes_ground
 
@@ -605,12 +617,6 @@ def analyse(buildings, static_objects, elev, facades, roofs) -> List[Building]:
 
         b.lenX = b.lenX  # FIXME: compute on the fly, or on set_polygon()?
                         #        Or is there a shapely equivalent?
-
-        # -- skip buildings outside elevation raster
-        if elev(Vec2d(Xo[0])) == -9999:
-            logging.debug("-9999")
-            tools.stats.skipped_no_elev += 1
-            continue
 
         # -- check for nearby static objects
         if static_objects and _is_static_object_nearby(b, Xo, static_tree):
@@ -647,8 +653,8 @@ def analyse(buildings, static_objects, elev, facades, roofs) -> List[Building]:
             if not b.polygon.interiors and b.area < parameters.BUILDING_COMPLEX_ROOFS_MAX_AREA:
                 if b._nnodes_ground == 4:
                     b.roof_complex = True
-                if (parameters.BUILDING_SKEL_ROOFS and \
-                    b._nnodes_ground in range(4, parameters.BUILDING_SKEL_MAX_NODES)):
+                if (parameters.BUILDING_SKEL_ROOFS and
+                            b._nnodes_ground in range(4, parameters.BUILDING_SKEL_MAX_NODES)):
                     b.roof_complex = True
                 try:
                     if str(b.tags['roof:shape']) == 'skillion' :
@@ -1091,7 +1097,7 @@ def _write_ring(out, b, ring, v0, texture, tex_y0, tex_y1):
     return v1
 
 
-def write(ac_file_name: str, buildings, elev, tile_elev, offset) -> None:
+def write(ac_file_name: str, buildings, fg_elev: FGElev, tile_elev, offset) -> None:
     """Write buildings across LOD for given tile.
        While writing, accumulate some statistics (totals stored in global stats object, individually also in building).
        Offset accounts for cluster center
@@ -1107,13 +1113,13 @@ def write(ac_file_name: str, buildings, elev, tile_elev, offset) -> None:
 
     # get local medium ground elevation for each building
     for ib, b in enumerate(buildings):
-        b.set_ground_elev(elev, tile_elev, offset)
+        b.set_ground_elev(fg_elev, tile_elev, offset)
     
     # Update building hierarchy information
     for ib, b in enumerate(buildings):
         if b.parent:
             if not b.parent.ground_elev:
-                b.parent.set_ground_elev(elev, tile_elev, offset)
+                b.parent.set_ground_elev(fg_elev, tile_elev, offset)
 
             b.ground_elev_min = min(b.parent.ground_elev, b.ground_elev)
             b.ground_elev_max = max(b.parent.ground_elev, b.ground_elev)
@@ -1123,7 +1129,7 @@ def write(ac_file_name: str, buildings, elev, tile_elev, offset) -> None:
             if b.parent.children:
                 for child in b.parent.children:
                     if not child.ground_elev:
-                        child.set_ground_elev(elev, tile_elev, offset)
+                        child.set_ground_elev(fg_elev, tile_elev, offset)
                             
                 for child in b.parent.children:
                     b.ground_elev_min = min(child.ground_elev_min, b.ground_elev)
@@ -1137,7 +1143,7 @@ def write(ac_file_name: str, buildings, elev, tile_elev, offset) -> None:
         if b.children:
             for child in b.parent.children:
                 if not child.ground_elev:
-                    child.set_ground_elev(elev, tile_elev, offset)
+                    child.set_ground_elev(fg_elev, tile_elev, offset)
             
             for child in b.children:
                 b.ground_elev_min = min(child.ground_elev_min, b.ground_elev)
@@ -1186,7 +1192,7 @@ def write(ac_file_name: str, buildings, elev, tile_elev, offset) -> None:
                 b.ground_elev = b.ground_elev_max
 
     for ib, b in enumerate(buildings):
-        tools.progress(ib, len(buildings))
+        progress(ib, len(buildings))
         ac_object = LOD_objects[b.LOD]
 
         _compute_roof_height(b, max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)

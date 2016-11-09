@@ -30,6 +30,7 @@ import roads
 import shapely.geometry as shg
 import tools
 from utils import osmparser, vec2d, coordinates, stg_io2
+from utils.utilities import FGElev
 
 OUR_MAGIC = "osm2pylon"  # Used in e.g. stg files to mark edits by osm2pylon
 
@@ -282,9 +283,9 @@ class SharedPylon(object):
         self.needs_stg_entry = True
         self.direction_type = SharedPylon.DIRECTION_TYPE_NORMAL  # correction for which direction mast looks at
 
-    def calc_global_coordinates(self, my_elev_interpolator, my_coord_transformator):
+    def calc_global_coordinates(self, fg_elev: FGElev, my_coord_transformator) -> None:
         self.lon, self.lat = my_coord_transformator.toGlobal((self.x, self.y))
-        self.elevation = my_elev_interpolator(vec2d.Vec2d(self.lon, self.lat), True)
+        self.elevation = fg_elev.probe_elev(vec2d.Vec2d(self.lon, self.lat), True)
 
     def make_stg_entry(self, my_stg_mgr):
         """
@@ -373,7 +374,7 @@ class StreetlampWay(LineWithoutCables):
             return False
         return True
 
-    def calc_and_map(self, my_elev_interpolator, my_coord_transformator):
+    def calc_and_map(self, fg_elev: FGElev, my_coord_transformator):
         if self.highway.is_roundabout:
             shared_pylon = SharedPylon()
             shared_pylon.pylon_model = "Models/StreetFurniture/Streetlamp3.xml"
@@ -396,7 +397,7 @@ class StreetlampWay(LineWithoutCables):
             shared_pylon.x = x
             shared_pylon.y = y
             shared_pylon.needs_stg_entry = False
-            shared_pylon.calc_global_coordinates(my_elev_interpolator, my_coord_transformator)
+            shared_pylon.calc_global_coordinates(fg_elev, my_coord_transformator)
             self.shared_pylons.append(shared_pylon)  # used for calculating heading - especially if only one lamp
 
             my_right_parallel = self.highway.linear.parallel_offset(parallel_offset, 'right', join_style=1)
@@ -412,7 +413,7 @@ class StreetlampWay(LineWithoutCables):
                 shared_pylon.y = point_on_line.y
                 shared_pylon.pylon_model = model
                 shared_pylon.direction_type = SharedPylon.DIRECTION_TYPE_MIRROR
-                shared_pylon.calc_global_coordinates(my_elev_interpolator, my_coord_transformator)
+                shared_pylon.calc_global_coordinates(fg_elev, my_coord_transformator)
                 self.shared_pylons.append(shared_pylon)
                 current_distance += default_distance
 
@@ -710,7 +711,7 @@ class RailLine(Line):
         self.nodes = []  # RailNodes
         self.linear = None  # The LineaString of the line
 
-    def calc_and_map(self, my_elev_interpolator, my_coord_transformator, rail_lines_list):
+    def calc_and_map(self, fg_elev: FGElev, my_coord_transformator, rail_lines_list):
         self.shared_pylons = []  # array of RailMasts
         current_distance = 0  # the distance from the origin of the current mast
         my_length = self.linear.length  # omit recalculating length all the time
@@ -810,7 +811,7 @@ class RailLine(Line):
 
         # calculate global coordinates
         for my_mast in self.shared_pylons:
-            my_mast.calc_global_coordinates(my_elev_interpolator, my_coord_transformator)
+            my_mast.calc_global_coordinates(fg_elev, my_coord_transformator)
 
         # cables
         self._calc_cables(parameters.C2P_RADIUS_OVERHEAD_LINE, parameters.C2P_EXTRA_VERTICES_OVERHEAD_LINE,
@@ -826,7 +827,7 @@ class RailLine(Line):
         return is_right
 
 
-def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_coord_transformator):
+def process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: FGElev, my_coord_transformator):
     my_railways = {}  # osm_id as key, RailLine
     my_shared_nodes = {}  # node osm_id as key, list of WayLine objects as value
 
@@ -861,7 +862,7 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, my_elev_interpolator, my_co
                     my_rail_node.lat = my_node.lat
                     my_rail_node.lon = my_node.lon
                     my_rail_node.x, my_rail_node.y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
-                    my_rail_node.elevation = my_elev_interpolator(vec2d.Vec2d(my_rail_node.lon, my_rail_node.lat), True)
+                    my_rail_node.elevation = fg_elev.probe_elev(vec2d.Vec2d(my_rail_node.lon, my_rail_node.lat), True)
                     for key in my_node.tags:
                         value = my_node.tags[key]
                         if "railway" == key and "switch" == value:
@@ -984,7 +985,7 @@ def merge_streetlamp_buffers(landuse_refs):
     return landuse_buffers
 
 
-def process_osm_power_aerialway(nodes_dict, ways_dict, my_elev_interpolator, my_coord_transformator, building_refs):
+def process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: FGElev, my_coord_transformator, building_refs):
     """
     Transforms a dict of Node and a dict of Way OSMElements from osmparser.py to a dict of WayLine objects for
     electrical power lines and a dict of WayLine objects for aerialways. Nodes are transformed to Pylons.
@@ -1032,7 +1033,7 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, my_elev_interpolator, my_
                     my_pylon.lat = my_node.lat
                     my_pylon.lon = my_node.lon
                     my_pylon.x, my_pylon.y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
-                    my_pylon.elevation = my_elev_interpolator(vec2d.Vec2d(my_pylon.lon, my_pylon.lat), True)
+                    my_pylon.elevation = fg_elev.probe_elev(vec2d.Vec2d(my_pylon.lon, my_pylon.lat), True)
                     for key in my_node.tags:
                         value = my_node.tags[key]
                         if "power" == key:
@@ -1443,12 +1444,12 @@ def main():
     # Initializing tools for global/local coordinate transformations
     center_global = parameters.get_center_global()
     osm_fname = parameters.get_OSM_file_name()
-    coord_transformator = coordinates.Transformation(center_global, hdg=0)
-    tools.init(coord_transformator)
+    coords_transform = coordinates.Transformation(center_global, hdg=0)
+    tools.init(coords_transform)
 
     # Reading elevation data
     logging.info("Reading ground elevation data might take some time ...")
-    elev_interpolator = tools.get_interpolator(fake=parameters.NO_ELEV)
+    fg_elev = FGElev(coords_transform, fake=parameters.NO_ELEV)
 
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
@@ -1470,14 +1471,14 @@ def main():
     # References for buildings
     building_refs = {}
     if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_AERIALWAYS or parameters.C2P_PROCESS_STREETLAMPS:
-        building_refs = process_osm_building_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
+        building_refs = process_osm_building_refs(handler.nodes_dict, handler.ways_dict, coords_transform)
         logging.info('Number of reference buildings: %s', len(building_refs))
     # Power lines and aerialways
     powerlines = {}
     aerialways = {}
     if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_AERIALWAYS:
-        powerlines, aerialways = process_osm_power_aerialway(handler.nodes_dict, handler.ways_dict, elev_interpolator
-                                                             , coord_transformator, building_refs)
+        powerlines, aerialways = process_osm_power_aerialway(handler.nodes_dict, handler.ways_dict, fg_elev
+                                                             , coords_transform, building_refs)
         if not parameters.C2P_PROCESS_POWERLINES:
             powerlines.clear()
         if not parameters.C2P_PROCESS_AERIALWAYS:
@@ -1491,15 +1492,15 @@ def main():
     # railway overhead lines
     rail_lines = {}
     if parameters.C2P_PROCESS_OVERHEAD_LINES:
-        rail_lines = process_osm_rail_overhead(handler.nodes_dict, handler.ways_dict, elev_interpolator
-                                               , coord_transformator)
+        rail_lines = process_osm_rail_overhead(handler.nodes_dict, handler.ways_dict, fg_elev
+                                               , coords_transform)
         logging.info('Reduced number of rail lines: %s', len(rail_lines))
         for rail_line in list(rail_lines.values()):
-            rail_line.calc_and_map(elev_interpolator, coord_transformator, list(rail_lines.values()))
+            rail_line.calc_and_map(fg_elev, coords_transform, list(rail_lines.values()))
     # street lamps
     streetlamp_ways = {}
     if parameters.C2P_PROCESS_STREETLAMPS:
-        landuse_refs = process_osm_landuse_refs(handler.nodes_dict, handler.ways_dict, coord_transformator)
+        landuse_refs = process_osm_landuse_refs(handler.nodes_dict, handler.ways_dict, coords_transform)
         if parameters.LU_LANDUSE_GENERATE_LANDUSE:
             generated_landuses = generate_landuse_from_buildings(landuse_refs, building_refs)
             for generated in list(generated_landuses.values()):
@@ -1507,16 +1508,16 @@ def main():
         logging.info('Number of landuse references: %s', len(landuse_refs))
         streetlamp_buffers = merge_streetlamp_buffers(landuse_refs)
         logging.info('Number of streetlamp buffers: %s', len(streetlamp_buffers))
-        highways = process_osm_highway(handler.nodes_dict, handler.ways_dict, coord_transformator)
+        highways = process_osm_highway(handler.nodes_dict, handler.ways_dict, coords_transform)
         streetlamp_ways = process_highways_for_streetlamps(highways, streetlamp_buffers)
         logging.info('Reduced number of streetlamp ways: %s', len(streetlamp_ways))
         for highway in list(streetlamp_ways.values()):
-            highway.calc_and_map(elev_interpolator, coord_transformator)
-        landuse_refs = None
+            highway.calc_and_map(fg_elev, coords_transform)
+        del landuse_refs
 
     # free some memory
-    building_refs = None
-    handler = None
+    del building_refs
+    del handler
 
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
@@ -1547,7 +1548,7 @@ def main():
         sys.exit(0)
 
     stg_manager.write()
-    elev_interpolator.save_cache()
+    fg_elev.save_cache()
 
     logging.info("******* Finished *******")
 

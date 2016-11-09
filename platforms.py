@@ -18,11 +18,11 @@ from utils.objectlist import ObjectList
 import parameters
 import tools
 from utils import osmparser, coordinates, ac3d, stg_io2
+from utils.utilities import FGElev
 from utils.vec2d import Vec2d
 
 
 OUR_MAGIC = "osm2platforms"  # Used in e.g. stg files to mark edits by osm2platforms
-# -----------------------------------------------------------------------------
 
 
 class Platform(object):
@@ -80,7 +80,7 @@ class Platforms(ObjectList):
         self.objects.append(platform)
         self.clusters.append(platform.anchor, platform)        
 
-    def write(self, elev, stg_manager, replacement_prefix):
+    def write(self, fg_elev: FGElev, stg_manager, replacement_prefix):
         for cl in self.clusters:
             if len(cl.objects) > 0:
                 center_tile = Vec2d(tools.transform.toGlobal(cl.center))
@@ -89,9 +89,9 @@ class Platforms(ObjectList):
                 obj = ac.new_object('platforms', "Textures/Terrain/asphalt.png")
                 for platform in cl.objects[:]:
                     if platform.is_area:
-                        self._write_area(platform, elev, obj, cl.center)
+                        self._write_area(platform, fg_elev, obj, cl.center)
                     else:
-                        self._write_line(platform, elev, obj, cl.center)
+                        self._write_line(platform, fg_elev, obj, cl.center)
 
                 # using 0 elevation and 0 heading because ac-models already account for it
                 path = stg_manager.add_object_static(ac_fname, center_tile, 0, 0)
@@ -100,8 +100,8 @@ class Platforms(ObjectList):
                 f.write(str(ac))
                 f.close()                
 
-    def _write_area(self, platform, elev, obj, offset):
-    # Writes a platform mapped as an area
+    def _write_area(self, platform, fg_elev: FGElev, obj, offset):
+        """Writes a platform mapped as an area"""
         linear_ring = shg.LinearRing(platform.nodes)
 
         o = obj.next_node_index()
@@ -111,7 +111,7 @@ class Platforms(ObjectList):
             self.logger.info("Clockwise")
             platform.nodes = platform.nodes[::-1]
         for p in platform.nodes:
-            e = elev(Vec2d(p[0], p[1])) + 1
+            e = fg_elev.probe_elev(Vec2d(p[0], p[1])) + 1
             obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
         top_nodes = np.arange(len(platform.nodes))
         platform.segment_len = np.array([0] + [Vec2d(coord).distance_to(Vec2d(platform.line_string.coords[i])) for i, coord in enumerate(platform.line_string.coords[1:])])
@@ -121,16 +121,15 @@ class Platforms(ObjectList):
             platform.dist[i] = platform.dist[i - 1] + platform.segment_len[i]
         face = []
         x = 0.
-        # reversed(list(enumerate(a)))
-# Top Face
+        # Top Face
         for i, n in enumerate(top_nodes):
             face.append((n + o, x, 0.5))
         obj.face(face, mat=0)
-# Build bottom ring
+        # Build bottom ring
         for p in platform.nodes:
-            e = elev(Vec2d(p[0], p[1])) - 1
+            e = fg_elev.probe_elev(Vec2d(p[0], p[1])) - 1
             obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
-# Build Sides
+        # Build Sides
         for i, n in enumerate(top_nodes[1:]):
             sideface = list()
             sideface.append((n + o + rd_len - 1, x, 0.5))
@@ -140,18 +139,18 @@ class Platforms(ObjectList):
             obj.face(sideface, mat=0)
 
     def _write_line(self, platform, elev, obj, offset):
-    # Writes a platform as a area which only is mapped as a line
+        """Writes a platform as a area which only is mapped as a line"""
         o = obj.next_node_index()
         left = platform.line_string.parallel_offset(2, 'left', resolution=8, join_style=1, mitre_limit=10.0)
         right = platform.line_string.parallel_offset(2, 'right', resolution=8, join_style=1, mitre_limit=10.0)
         e = 10000
         idx_left = obj.next_node_index()
         for p in left.coords:
-            e = elev(Vec2d(p[0], p[1])) + 1
+            e = elev(Vec2d(p[0], p[1]))[0] + 1
             obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
         idx_right = obj.next_node_index()
         for p in right.coords:
-            e = elev(Vec2d(p[0], p[1])) + 1
+            e = elev(Vec2d(p[0], p[1]))[0] + 1
             obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
         nodes_l = np.arange(len(left.coords))
         nodes_r = np.arange(len(right.coords))
@@ -160,7 +159,7 @@ class Platforms(ObjectList):
         platform.dist = np.zeros((rd_len))
         for i in range(1, rd_len):
             platform.dist[i] = platform.dist[i - 1] + platform.segment_len[i]
-# Top Surface
+        # Top Surface
         face = []
         x = 0.
         for i, n in enumerate(nodes_l):
@@ -169,18 +168,18 @@ class Platforms(ObjectList):
         for i, n in enumerate(nodes_r):
             face.append((n + o, x, 0.75))
         obj.face(face[::-1], mat=0)
-# Build bottom left line
+        # Build bottom left line
         idx_bottom_left = obj.next_node_index()
         for p in left.coords:
-            e = elev(Vec2d(p[0], p[1])) - 1
+            e = elev(Vec2d(p[0], p[1]))[0] - 1
             obj.node(-p[1]+ offset.y, e, -p[0]+ offset.x)
-# Build bottom right line
+        # Build bottom right line
         idx_bottom_right = obj.next_node_index()
         for p in right.coords:
-            e = elev(Vec2d(p[0], p[1])) - 1
+            e = elev(Vec2d(p[0], p[1]))[0] - 1
             obj.node(-p[1]+ offset.y, e, -p[0]+ offset.x)
         idx_end = obj.next_node_index() - 1
-# Build Sides
+        # Build Sides
         for i, n in enumerate(nodes_l[1:]):
             # Start with Second point looking back
             sideface = list()
@@ -197,7 +196,7 @@ class Platforms(ObjectList):
             sideface.append((n + idx_right - 1, x, 0.5))
             sideface.append((n + idx_right, x, 0.5))
             obj.face(sideface, mat=0)
-# Build Front&Back
+        # Build Front&Back
         sideface = list()
         sideface.append((idx_left, x, 0.5))
         sideface.append((idx_bottom_left, x, 0.5))
@@ -239,8 +238,8 @@ def main():
     # -- prepare transformation to local coordinates
     cmin, cmax = parameters.get_extent_global()
     center_global = parameters.get_center_global()
-    transform = coordinates.Transformation(center_global, hdg=0)
-    tools.init(transform)
+    coords_transform = coordinates.Transformation(center_global, hdg=0)
+    tools.init(coords_transform)
     
     # -- create (empty) clusters
     lmin = Vec2d(tools.transform.toLocal(cmin))
@@ -253,7 +252,7 @@ def main():
         boundary_clipping_complete_way = shg.Polygon(parameters.get_clipping_extent(False))
     elif parameters.BOUNDARY_CLIPPING:
         border = shg.Polygon(parameters.get_clipping_extent())
-    platforms = Platforms(transform, clusters, boundary_clipping_complete_way)
+    platforms = Platforms(coords_transform, clusters, boundary_clipping_complete_way)
     handler = osmparser.OSMContentHandler(valid_node_keys=[], border=border)
     source = open(osm_fname, encoding="utf8")
     logging.info("Reading the OSM file might take some time ...")
@@ -266,19 +265,19 @@ def main():
         logging.info("No platforms found ignoring")
         return
 
-    elev = tools.get_interpolator()
+    fg_elev = FGElev(coords_transform)
 
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
     replacement_prefix = parameters.get_repl_prefix()
     stg_manager = stg_io2.STGManager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
 
-    platforms.write(elev, stg_manager, replacement_prefix)
+    platforms.write(fg_elev, stg_manager, replacement_prefix)
     logging.info("done.")
 
     # -- write stg
     stg_manager.write()
-    elev.save_cache()
+    fg_elev.save_cache()
 
     logging.info("Done")
 

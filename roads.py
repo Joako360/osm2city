@@ -96,7 +96,7 @@ import shapely.geometry as shg
 import textures.road
 import tools
 from cluster import Clusters
-from utils import osmparser, coordinates, ac3d, objectlist, stg_io2, troubleshoot
+from utils import osmparser, coordinates, ac3d, objectlist, stg_io2, utilities
 from utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
@@ -292,7 +292,7 @@ def _find_junctions(ways_list, degree=2):
     logging.info('Finding junctions...')
     attached_ways_dict = {}  # a dict: for each ref (aka node) hold a list of attached ways
     for j, the_way in enumerate(ways_list):
-        tools.progress(j, len(ways_list))
+        utilities.progress(j, len(ways_list))
         for i, ref in enumerate(the_way.refs):
             try:
                 attached_ways_dict[ref].append((the_way, i == 0))  # store tuple (the_way, is_first)
@@ -307,13 +307,9 @@ def _find_junctions(ways_list, degree=2):
 
     # kick nodes that belong to one way only
     for ref, the_ways in list(attached_ways_dict.items()):
-#            if len(value) >= 2: self.nodes_dict[ref].n_attached_ways = len(value)
         if len(the_ways) < degree:
             # FIXME: join_ways, then return 2 here
             attached_ways_dict.pop(ref)
-#            else:
-#                pass
-#                check if one is first node and one last node. If so, join_ways
     return attached_ways_dict
 
 
@@ -340,9 +336,9 @@ class Roads(objectlist.ObjectList):
     VALID_NODE_KEYS = []
     REQ_KEYS = ['highway', 'railway']
 
-    def __init__(self, transform, elev, boundary_clipping_complete_way):
+    def __init__(self, transform, fg_elev: utilities.FGElev, boundary_clipping_complete_way) -> None:
         super(Roads, self).__init__(transform, None, boundary_clipping_complete_way)
-        self.elev = elev
+        self.fg_elev = fg_elev
         self.ways_list = list()
         self.bridges_list = list()
         self.railway_list = list()
@@ -409,22 +405,11 @@ class Roads(objectlist.ObjectList):
         self._probe_elev_at_nodes()
 
         logging.debug("before linear " + str(self))
-        # self._debug_show_h_add("before linear ob")
 
         # -- no change in topology beyond create_linear_objects() !
         self._create_linear_objects()
-        # self._debug_show_h_add("after linear ob")
-
         self._propagate_h_add()
-        # self._debug_show_h_add("after propagate")
         logging.debug("after linear" + str(self))
-
-#    roads.debug_plot(show=True, plot_junctions=True)#, label_nodes=[1132288594, 1132288612])
-#    print "before", len(roads.attached_ways_dict)
-
-#    _find_junctions(roads.roads_list)
-        if 0:
-            self._compute_junction_nodes()
 
         if parameters.CREATE_BRIDGES_ONLY:
             self._keep_only_bridges_and_embankments()
@@ -450,9 +435,9 @@ class Roads(objectlist.ObjectList):
             if math.isnan(the_node.lon) or math.isnan(the_node.lat):
                 logging.error("NaN encountered while probing elevation")
                 continue
-            the_node.MSL = self.elev((the_node.lon, the_node.lat), is_global=True)
+            the_node.MSL = self.fg_elev.probe_elev(Vec2d(the_node.lon, the_node.lat), is_global=True)
             the_node.h_add = 0.
-        self.elev.save_cache()
+        self.fg_elev.save_cache()
     
     def _propagate_h_add_over_edge(self, ref0, ref1, args):
         """propagate h_add over edges of graph"""
@@ -463,10 +448,7 @@ class Roads(objectlist.ObjectList):
         if n1.h_add > 0:
             return False
             # FIXME: should we really just stop here? Probably yes.
-#        if label: self.debug_label_node(ref0, n0.h_add)
-        #n1.h_add = max(0, n0.h_add - obj.center.length * parameters.DH_DX)
         n1.h_add = max(0, n0.MSL + n0.h_add - obj.center.length * dh_dx - n1.MSL)
-#        if label: self.debug_label_node(ref1, n1.h_add)
         if n1.h_add <= 0.:
             return False
         return True
@@ -494,20 +476,9 @@ class Roads(objectlist.ObjectList):
         """Cleans op the topology for junctions etc."""
         logging.debug("len before %i" % len(self.ways_list))
         attached_ways_dict = _find_junctions(self.ways_list)
-        #self.debug_plot_junctions('ks')
-        #self.count_inner_junctions('bs')
         self._split_ways_at_inner_junctions(attached_ways_dict)
-        #self.debug_print_refs_of_way(239806431)
         self._join_degree2_junctions(attached_ways_dict)
-        #self.debug_print_refs_of_way(239806431)
-        #_find_junctions(self.ways_list, 3)
-    #        self.print_junctions_stats()
-    #        self.count_inner_junctions('rs')
-        #bla
-        #self.debug_print_dict()
-        #self.debug_plot_junctions('k.')
-        #sys.exit(0)
-    
+
         logging.debug("len after %i" % len(self.ways_list))
 
     def _remove_tunnels(self):
@@ -606,7 +577,7 @@ class Roads(objectlist.ObjectList):
 
             try:
                 if _is_bridge(the_way):
-                    obj = linear_bridge.LinearBridge(self.transform, self.elev, the_way.osm_id
+                    obj = linear_bridge.LinearBridge(self.transform, self.fg_elev, the_way.osm_id
                                                      , the_way.tags, the_way.refs, self.nodes_dict
                                                      , width=width, tex=tex, AGL=above_ground_level)
                     obj.typ = priority  # FIXME: can this be deleted. does not seem to be used at all
@@ -635,9 +606,8 @@ class Roads(objectlist.ObjectList):
         #        i.e. way1 and way2 share TWO nodes, both end nodes of one of them 
         new_list = []
         for i, the_way in enumerate(self.ways_list):
-            tools.progress(i, len(self.ways_list))
+            utilities.progress(i, len(self.ways_list))
             self.debug_plot_way(the_way, '-', lw=2, color='0.90', show_label=0)
-#            self.ways_list.remove(the_way)
 
             new_way = _init_way_from_existing(the_way, the_way.refs[0])
             for the_ref in the_way.refs[1:]:
@@ -726,8 +696,8 @@ class Roads(objectlist.ObjectList):
                     s = scipy.linalg.solve(A, RHS)
                     q = our_node + na * s[0]
 
-                way_a_lr = way_a.edge[1-is_first_a] #.coords [index_a]
-                way_b_lr = way_b.edge[is_first_b]  #.coords[index_b]
+                way_a_lr = way_a.edge[1-is_first_a]
+                way_b_lr = way_b.edge[is_first_b]
 
                 q1 = way_a_lr.junction(way_b_lr)
                 print(q, q1)
@@ -736,19 +706,11 @@ class Roads(objectlist.ObjectList):
                 plt.plot(q[0], q[1], 'b+')
                 plt.plot(q1.coords[0][0], q1.coords[0][1], 'bo')
                 plt.show()
-                
-                
-                # create ac3d node, insert, get index                
-                # store index for junction area polygon
-                # store that node index in each way as first_left, first_right, last_left, last_right
-
-            # write junction area polygon
 
     def debug_plot_ref(self, ref, style): 
         if not parameters.DEBUG_PLOT:
             return
         plt.plot(self.nodes_dict[ref].lon, self.nodes_dict[ref].lat, style)
-#        plt.text(self.nodes_dict[ref].lon, self.nodes_dict[ref].lat, ref.osm_id)
 
     def debug_plot_way(self, way, ls, lw, color=False, ends_marker=False, show_label=False, show_ends=False):
         if not parameters.DEBUG_PLOT:
@@ -756,16 +718,9 @@ class Roads(objectlist.ObjectList):
         col = ['b', 'r', 'y', 'g', '0.25', 'k', 'c']
         if not color:
             color = col[random.randint(0, len(col)-1)]
-            #color = col[(way.osm_id + len(way.refs)) % len(col)]
-            #color = col[_prio(way.tags['highway'], True) % len(col)]
 
         osm_nodes = np.array([(self.nodes_dict[r].lon, self.nodes_dict[r].lat) for r in way.refs])
         a = osm_nodes
-#        a = np.array([transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
-
-#        a = np.array(way.center.coords)
-#        a = np.array([transform.toGlobal(p) for p in a])
-        #color = col[r.typ]
         plt.plot(a[:, 0], a[:, 1], ls, linewidth=lw, color=color)
         if ends_marker:
             plt.plot(a[0, 0], a[0, 1], ends_marker, linewidth=lw, color=color)
@@ -928,7 +883,7 @@ class Roads(objectlist.ObjectList):
                 logging.error("Nan encountered while probing anchor elevation")
                 continue
 
-            e = self.elev(anchor) + the_node.h_add + 1.
+            e = self.fg_elev.probe_elev(anchor) + the_node.h_add + 1.
             ac.add_label('way %i' % way.osm_id, -anchor.y, e, -anchor.x, scale=1.)
 
             # -- label first node
@@ -939,7 +894,7 @@ class Roads(objectlist.ObjectList):
                 logging.error("Nan encountered while probing anchor elevation")
                 continue
 
-            e = self.elev(anchor) + the_node.h_add + 3.
+            e = self.fg_elev.probe_elev(anchor) + the_node.h_add + 3.
             ac.add_label(' %i h=%1.1f' % (the_node.osm_id, the_node.h_add), -anchor.y, e, -anchor.x, scale=1.)
 
             # -- label last node
@@ -951,7 +906,7 @@ class Roads(objectlist.ObjectList):
                     logging.error("Nan encountered while probing anchor elevation")
                     continue
 
-                e = self.elev(anchor) + the_node.h_add + 3.
+                e = self.fg_elev.probe_elev(anchor) + the_node.h_add + 3.
                 ac.add_label(' %i h=%1.1f' % (the_node.osm_id, the_node.h_add), -anchor.y, e, -anchor.x, scale=1.)
         path_to_stg = stg_manager.add_object_static(file_name + '.ac', Vec2d(self.transform.toGlobal((0, 0))), 0, 0)
         ac.write(path_to_stg + file_name + '.ac')
@@ -980,7 +935,7 @@ class Roads(objectlist.ObjectList):
             the_object.cluster_ref = cluster_ref
 
 
-def _process_clusters(clusters, replacement_prefix, elev, stg_manager, stg_paths, is_railway):
+def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, stg_manager, stg_paths, is_railway):
     for cl in clusters:
         if len(cl.objects) < parameters.CLUSTER_MIN_OBJECTS:
             continue  # skip almost empty clusters
@@ -992,7 +947,7 @@ def _process_clusters(clusters, replacement_prefix, elev, stg_manager, stg_paths
         file_name = replacement_prefix + file_start + "%02i%02i" % (cl.I.x, cl.I.y)
         center_global = Vec2d(tools.transform.toGlobal(cl.center))
         offset_local = cl.center
-        cluster_elev = elev(center_global, True)
+        cluster_elev = fg_elev.probe_elev(center_global, True)
 
         # -- Now write cluster to disk.
         #    First create ac object. Write cluster's objects. Register stg object.
@@ -1000,7 +955,7 @@ def _process_clusters(clusters, replacement_prefix, elev, stg_manager, stg_paths
         ac = ac3d.File(stats=tools.stats, show_labels=True)
         ac3d_obj = ac.new_object(file_name, 'tex/roads.png', default_swap_uv=True)
         for rd in cl.objects:
-            rd.write_to(ac3d_obj, elev, cluster_elev, ac, offset=offset_local)  # FIXME: remove .ac, needed only for adding debug labels
+            rd.write_to(ac3d_obj, fg_elev, cluster_elev, ac, offset=offset_local)  # FIXME: remove .ac, needed only for adding debug labels
 
         suffix = ".xml"
         if is_railway:
@@ -1084,21 +1039,8 @@ def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
                     
                 plt.plot(a[:, 0], a[:, 1], color=cluster_color, linewidth=lw)
 
-    #plt.show()
-    #sys.exit(0)
-        
-    if 0:
-        for r in roads:
-            a = np.array(r.center.coords)
-            a = np.array([transform.toGlobal(p) for p in a])
-            plt.plot(a[:, 0], a[:, 1], color=col[r.typ], linewidth=lw[r.typ])
-            #plt.plot(a[:,0], a[:,1], color='w', linewidth=lw_w[r.typ], ls=":")
-
     plt.axes().set_aspect('equal')
-    #plt.show()
     plt.legend()
-#    plt.xlim(0+1.138e1, 0.04+1.138e1)
-#    plt.ylim(0+4.725e1, 0.03+4.725e1)
     plt.savefig('roads.eps')
     plt.clf()
 
@@ -1128,9 +1070,9 @@ def main():
     parameters.show()
 
     center_global = parameters.get_center_global()
-    transform = coordinates.Transformation(center_global, hdg=0)
-    tools.init(transform)
-    elev = tools.get_interpolator(fake=parameters.NO_ELEV)
+    coords_transform = coordinates.Transformation(center_global, hdg=0)
+    tools.init(coords_transform)
+    fg_elev = utilities.FGElev(coords_transform, fake=parameters.NO_ELEV)
 
     border = None
     boundary_clipping_complete_way = None
@@ -1138,7 +1080,7 @@ def main():
         boundary_clipping_complete_way = shg.Polygon(parameters.get_clipping_extent(False))
     elif parameters.BOUNDARY_CLIPPING:
         border = shg.Polygon(parameters.get_clipping_extent())
-    roads = Roads(transform, elev, boundary_clipping_complete_way)
+    roads = Roads(coords_transform, fg_elev, boundary_clipping_complete_way)
     handler = osmparser.OSMContentHandler(roads.VALID_NODE_KEYS, border=border)
     logging.info("Reading the OSM file might take some time ...")
 
@@ -1158,15 +1100,15 @@ def main():
     # -- write stg
     stg_paths = set()
 
-    _process_clusters(roads.railways_clusters, replacement_prefix, elev, stg_manager, stg_paths, True)
-    _process_clusters(roads.roads_clusters, replacement_prefix, elev, stg_manager, stg_paths, False)
+    _process_clusters(roads.railways_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, True)
+    _process_clusters(roads.roads_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, False)
 
     roads.debug_plot(show=True, plot_junctions=False, clusters=roads.clusters)
     
-    debug_create_eps(roads, roads.clusters, elev, plot_cluster_borders=1)
+    debug_create_eps(roads, roads.clusters, fg_elev, plot_cluster_borders=1)
     stg_manager.write()
 
-    troubleshoot.troubleshoot(tools.stats)
+    utilities.troubleshoot(tools.stats)
     logging.info('Done.')
     logging.debug("final " + str(roads))
 

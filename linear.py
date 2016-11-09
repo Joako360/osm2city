@@ -8,6 +8,7 @@ import numpy as np
 import parameters
 import shapely.geometry as shg
 import textures.road
+from utils.utilities import FGElev
 from utils.vec2d import Vec2d
 
 
@@ -59,13 +60,9 @@ class LinearObject(object):
           - if yes, use stored node indices
     """
     def __init__(self, transform, osm_id, tags, refs, nodes_dict, width=9, tex=textures.road.EMBANKMENT_1, AGL=0.5):
-        #self.transform = transform
-#        self.junction0 = None # these are set on create_linear_objects()
-#        self.junction1 = None
         self.width = width
         self.AGL = AGL  # drape distance above terrain
         self.osm_id = osm_id
-#        print "OSMID", osm_id
         self.refs = refs
         self.tags = tags
         self.nodes_dict = nodes_dict
@@ -78,12 +75,7 @@ class LinearObject(object):
             self.edge = self.compute_offset(self.width / 2.)
         except Warning as reason:
             logging.warning("Warning in OSM_ID %i: %s", self.osm_id, reason)
-
         self.tex = tex  # determines which part of texture we use
-
-#        if self.osm_id == 235008364:
-#            test.show_nodes(osm_id, nodes, refs, nodes_dict, self.edge[0], self.edge[1])
-#            self.plot(left=False, right=False, angle=True)
 
     def compute_offset(self, offset):
         offset += 1.
@@ -119,20 +111,14 @@ class LinearObject(object):
         c = np.array(self.center.coords)
         l = np.array(self.edge[0].coords)
         r = np.array(self.edge[1].coords)
-#        l1 = np.array(self.left1.coords)
-#        r1 = np.array(self.right1.coords)
         if clf:
             plt.clf()
-        #np.array([transform.toLocal((n.lon, n.lat)) for n in r.nodes])
         if center:
             plt.plot(c[:, 0], c[:, 1], '-o', color='k')
         if left:
             plt.plot(l[:, 0], l[:, 1], '-o', color='g')
         if right:
             plt.plot(r[:, 0], r[:, 1], '-o', color='r')
-
-#        plt.plot(l1[:,0], l1[:,1], '--.', color='g')
-#        plt.plot(r1[:,0], r1[:,1], '--.', color='r')
 
         plt.axes().set_aspect('equal')
         import random
@@ -148,12 +134,6 @@ class LinearObject(object):
         if right:
             for i, n in enumerate(r):
                 plt.text(n[0]+3, n[1], "%i" % (i), color='r')
-
- #       for i, n in enumerate(l1):
- #           plt.text(n[0]-6, n[1], "(%i)" % (i), color='g')
- #       for i, n in enumerate(r1):
- #           plt.text(n[0]+6, n[1], "(%i)" % (i), color='r')
-
         if show:
             plt.show()
             plt.savefig('roads_%i.eps' % self.osm_id)
@@ -193,19 +173,8 @@ class LinearObject(object):
         """given a LineString and z, write nodes to .ac.
            Return nodes_list         
         """
-#        if not offset:
-#            offset = Vec2d(0,0)
-        # if joint0 == 1D:
-        #     if neighbour0.already_written:
-        #         left_coords = left.coords[1:]
-        #         right_coords = left.coords[1:]
-        #     else:
-        #         nodes_l = np.arange(n_nodes) + obj.next_node_index()
-#        if join:
-#            if left:
         to_write = copy.copy(line_string.coords)
         nodes_list = []
-#        print "JUNLEN", len(self.junction0), len(self.junction1)
         assert(self.cluster_ref is not None)
         if not join:
             nodes_list += list(obj.next_node_index() + np.arange(len(to_write)))
@@ -252,13 +221,6 @@ class LinearObject(object):
         if "tunnel" in self.tags:       # FIXME: this should be caught earlier
             return None, None, None
 
-#        if joint:
-#            remove left.coords[0]
-#            remove left_z[0]
-
-        # write textured quads SURF
-                # -- write face as series of quads. Works OK, but produces more
-                #    SURFs in .ac.
         scale = 32.  # length of texture in meters
                     # 2 lanes * 4m per lane = 128 px wide. 512px long = 32 m
 #         	Autobahnen 	Andere Straßen
@@ -276,11 +238,11 @@ class LinearObject(object):
                     (right_nodes_list[i],   xl, tex_y1)]
             obj.face(face[::-1])
 
-    def probe_ground(self, elev, line_string):
+    def probe_ground(self, fg_elev: FGElev, line_string):
         """probe ground elevation along given line string, return array"""
-        return np.array([elev(the_node) for the_node in line_string.coords])
+        return np.array([fg_elev.probe_elev(the_node) for the_node in line_string.coords])
 
-    def get_h_add(self, elev, elev_offset):
+    def get_h_add(self, fg_elev):
         """
         """
         first_node = self.nodes_dict[self.refs[0]]
@@ -290,7 +252,7 @@ class LinearObject(object):
         #    nodes. So far, h_add is for center line only.
         # FIXME: when do we need this? if left_z_given is None and right_z_given is None?
 
-        center_z = np.array([elev(the_node) for the_node in self.center.coords]) + self.AGL
+        center_z = np.array([fg_elev.probe_elev(the_node) for the_node in self.center.coords]) + self.AGL
 
         EPS = 0.001
 
@@ -421,10 +383,10 @@ class LinearObject(object):
 #        
 #        return h_add
         
-    def level_out(self, elev, h_add):
+    def level_out(self, fg_elev: FGElev, h_add):
         """given h_add, adjust left_z and right_z to stay below MAX_TRANSVERSE_GRADIENT"""
-        left_z = self.probe_ground(elev, self.edge[0]) + self.AGL
-        right_z = self.probe_ground(elev, self.edge[1]) + self.AGL
+        left_z = self.probe_ground(fg_elev, self.edge[0]) + self.AGL
+        right_z = self.probe_ground(fg_elev, self.edge[1]) + self.AGL
 
         diff_elev = left_z - right_z
         for i, the_diff in enumerate(diff_elev):
@@ -448,15 +410,6 @@ class LinearObject(object):
                 else:
                     # terrain gradient negligible and h_add small
                     pass
-
-        #if left_z_given is not None: left_z = left_z_given
-        #if right_z_given is not None: right_z = right_z_given
-        # diff = (left_elev[i] - right_elev[i])
-        # if diff / self.width > max_grad: #  left > right
-        #   right_h_add = diff
-        # elif diff / self.width < -max_grad:  #   right > left
-        #   left_h_add = -diff
-        #print "h_add0,1", h_add_0, h_add_1
         return left_z, right_z, h_add
 
     # FIXME: this is really a road type of linearObject, so make it linearRoad
@@ -478,7 +431,7 @@ class LinearObject(object):
             e = z[i] - elev_offset
             ac.add_label('<' + str(self.osm_id) + '> add %5.2f' % h_add[i], -(anchor[1] - offset.y), e+0.5, -(anchor[0] - offset.x), scale=1)
         
-    def write_to(self, obj, elev, elev_offset, debug_ac=None, offset=None):
+    def write_to(self, obj, fg_elev: FGElev, elev_offset, debug_ac=None, offset=None):
         """
            assume we are a street: flat (or elevated) on terrain, left and right edges
            #need adjacency info
@@ -486,12 +439,10 @@ class LinearObject(object):
            #right:
            offset accounts for tile center
         """
-        h_add, center_z = self.get_h_add(elev, elev_offset)
-        left_z, right_z, h_add = self.level_out(elev, h_add)
+        h_add, center_z = self.get_h_add(fg_elev)
+        left_z, right_z, h_add = self.level_out(fg_elev, h_add)
 
-        #if self.debug_print_node_info(21551419, h_add):
-        #self.debug_label_nodes(self.center, left_z, debug_ac, elev_offset, offset, h_add)
-        left_nodes_list =  self.write_nodes(obj, self.edge[0], left_z, elev_offset, 
+        left_nodes_list =  self.write_nodes(obj, self.edge[0], left_z, elev_offset,
                                             offset, join=True, is_left=True)
         right_nodes_list = self.write_nodes(obj, self.edge[1], right_z, elev_offset,
                                             offset, join=True, is_left=False)
@@ -499,8 +450,8 @@ class LinearObject(object):
         if 1 and h_add is not None:
             # -- side walls of embankment
             if h_add.max() > 0.1:
-                left_ground_z  = self.probe_ground(elev, self.edge[0])
-                right_ground_z = self.probe_ground(elev, self.edge[1])
+                left_ground_z  = self.probe_ground(fg_elev, self.edge[0])
+                right_ground_z = self.probe_ground(fg_elev, self.edge[1])
 
                 left_ground_nodes  = self.write_nodes(obj, self.edge[0], left_ground_z, elev_offset, offset=offset)
                 right_ground_nodes = self.write_nodes(obj, self.edge[1], right_ground_z, elev_offset, offset=offset)
@@ -546,7 +497,7 @@ class LinearObject(object):
             # -- write OSM_ID label
             if 0:
                 anchor = self.edge[0].coords[len_left/2]
-                e = elev(Vec2d(anchor[0], anchor[1])) + self.AGL
+                e = fg_elev.probe_elev(Vec2d(anchor[0], anchor[1])) + self.AGL
                 ac.add_label('   ' + str(self.osm_id), -anchor[1], e+4.8, -anchor[0], scale=2)
 
             # -- write nodes
@@ -554,14 +505,14 @@ class LinearObject(object):
                 ni = 0
                 ofs_l = obj.next_node_index()
                 for p in self.edge[0].coords:
-                    e = elev(Vec2d(p[0], p[1])) + self.AGL
+                    e = fg_elev.probe_elev(Vec2d(p[0], p[1])) + self.AGL
                     obj.node(-p[1], e, -p[0])
 #                    ac.add_label('l'+str(ni), -p[1], e+5, -p[0], scale=5)
                     ni += 1
 
                 ofs_r = obj.next_node_index()
                 for p in self.edge[1].coords[::-1]:
-                    e = elev(Vec2d(p[0], p[1])) + self.AGL
+                    e = fg_elev.probe_elev(Vec2d(p[0], p[1])) + self.AGL
                     obj.node(-p[1], e, -p[0])
 #                    ac.add_label('r'+str(ni), -p[1], e+5, -p[0], scale=5)
                     ni += 1

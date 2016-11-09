@@ -21,6 +21,7 @@ from shapely.geometry.base import CAP_STYLE, JOIN_STYLE
 from shapely.geometry.linestring import LineString
 from utils import osmparser, coordinates, ac3d, stg_io2
 from utils.objectlist import ObjectList
+from utils.utilities import FGElev
 from utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2piers"  # Used in e.g. stg files to mark edits by osm2Piers
@@ -43,14 +44,14 @@ class Pier(object):
         self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in self.osm_nodes])
         self.anchor = Vec2d(self.nodes[0])
 
-    def calc_elevation(self, elev_interpolator):
+    def calc_elevation(self, fg_elev: FGElev) -> None:
         """Calculates the elevation (level above sea) as a minimum of all nodes.
 
         Minimum is taken because there could be residuals from shore in FlightGear scenery.
         """
         min_elevation = 99999
         for node in self.nodes:
-            node_elev = elev_interpolator(node)
+            node_elev = fg_elev.probe_elev(node)
             node_elev = max(node_elev, -9999)  # Account for elevation probing errors
             min_elevation = min(min_elevation, node_elev)
         self.elevation = min_elevation
@@ -265,7 +266,7 @@ def _write_pier_line(pier, obj, offset):
     pier.dist = np.zeros((rd_len))
     for i in range(1, rd_len):
         pier.dist[i] = pier.dist[i - 1] + pier.segment_len[i]
-# Top Surface
+    # Top Surface
     face = []
     x = 0.
     for i, n in enumerate(nodes_l):
@@ -274,18 +275,18 @@ def _write_pier_line(pier, obj, offset):
     for i, n in enumerate(nodes_r):
         face.append((n + o, x, 0.75))
     obj.face(face[::-1], mat=0)
-# Build bottom left line
+    # Build bottom left line
     idx_bottom_left = obj.next_node_index()
 
     e = pier.elevation - 1
     for p in left.coords:
         obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
-# Build bottom right line
+    # Build bottom right line
     idx_bottom_right = obj.next_node_index()
     for p in right.coords:
         obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
     idx_end = obj.next_node_index() - 1
-# Build Sides
+    # Build Sides
     for i, n in enumerate(nodes_l[1:]):
         # Start with Second point looking back
         sideface = list()
@@ -302,7 +303,7 @@ def _write_pier_line(pier, obj, offset):
         sideface.append((n + idx_right - 1, x, 0.5))
         sideface.append((n + idx_right, x, 0.5))
         obj.face(sideface, mat=0)
-# Build Front&Back
+    # Build Front&Back
     sideface = list()
     sideface.append((idx_left, x, 0.5))
     sideface.append((idx_bottom_left, x, 0.5))
@@ -319,14 +320,11 @@ def _write_pier_line(pier, obj, offset):
 
 def main():
     logging.basicConfig(level=logging.INFO)
-    # logging.basicConfig(level=logging.DEBUG)
 
     import argparse
     parser = argparse.ArgumentParser(description="piers.py reads OSM data and creates Pier models for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
-#    parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
-#    parser.add_argument("-c", dest="c", action="store_true", help="do not check for overlapping with static objects")
     parser.add_argument("-l", "--loglevel"
                         , help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL"
                         , required=False)
@@ -336,19 +334,14 @@ def main():
         parameters.read_from_file(args.filename)
     parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
 
-#    if args.e:
-#        parameters.NO_ELEV = True
-#    if args.c:
-#        parameters.OVERLAP_CHECK = False
-
     parameters.show()
 
     osm_fname = parameters.get_OSM_file_name()
     # -- prepare transformation to local coordinates
     cmin, cmax = parameters.get_extent_global()
     center_global = parameters.get_center_global()
-    transform = coordinates.Transformation(center_global, hdg=0)
-    tools.init(transform)
+    coords_transform = coordinates.Transformation(center_global, hdg=0)
+    tools.init(coords_transform)
     
     # -- create (empty) clusters
     lmin = Vec2d(tools.transform.toLocal(cmin))
@@ -361,7 +354,7 @@ def main():
         boundary_clipping_complete_way = shg.Polygon(parameters.get_clipping_extent(False))
     elif parameters.BOUNDARY_CLIPPING:
         border = shg.Polygon(parameters.get_clipping_extent())
-    piers = Piers(transform, clusters, boundary_clipping_complete_way)
+    piers = Piers(coords_transform, clusters, boundary_clipping_complete_way)
     handler = osmparser.OSMContentHandler(valid_node_keys=[], border=border)
     source = open(osm_fname, encoding="utf8")
     logging.info("Reading the OSM file might take some time ...")
@@ -373,9 +366,9 @@ def main():
         logging.info("No piers found ignoring")
         return
 
-    elev = tools.get_interpolator()
+    fg_elev = FGElev(coords_transform)
     for pier in piers.objects:
-        pier.calc_elevation(elev)
+        pier.calc_elevation(fg_elev)
 
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
@@ -388,7 +381,7 @@ def main():
     piers.write_boats(stg_manager)
     # -- write stg
     stg_manager.write()
-    elev.save_cache()
+    fg_elev.save_cache()
 
     logging.info("Done")
 

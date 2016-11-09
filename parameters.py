@@ -65,8 +65,8 @@ PATH_TO_OUTPUT = "/home/user/fgfs/scenery/osm2city"
 PATH_TO_OSM2CITY_DATA = "/home/user/osm2city-data"
 
 NO_ELEV = False             # -- skip elevation probing
-ELEV_MODE = "Fgelev"  # -- elev probing mode. Possible values are FgelevCaching (recommended), Fgelev, Manual, or Telnet
 FG_ELEV = '"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'
+PROBE_FOR_WATER = False  # only possible with FGElev version after 9th of November 2016 / FG 2016.4.1
 
 # -- Distance between raster points for elevation map. Xx is horizontal, y is
 #    vertical. Relevant only for ELEV_MODE = Manual or Telnet.

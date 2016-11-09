@@ -9,14 +9,14 @@ TODO: linear deck: limit slope
 
 import numpy as np
 import scipy.interpolate
-import matplotlib.pyplot as plt
 
 import linear
 import parameters
 import textures.road
+from utils.utilities import FGElev
 
 
-class Deck_shape_linear(object):
+class DeckShapeLinear(object):
     def __init__(self, h0, h1):
         self.h0 = h0
         self.h1 = h1
@@ -32,7 +32,8 @@ class Deck_shape_linear(object):
             return self._compute(s) 
 #        return (1-s) * self.h0 + s * self.h1
 
-class Deck_shape_poly(object):
+
+class DeckShapePoly(object):
     def __init__(self, h0, hm, h1):
         self.h0 = h0
         self.hm = hm
@@ -42,12 +43,12 @@ class Deck_shape_poly(object):
         self.a1 = h1 - h0 - self.a2
 
     def __call__(self, s):
-        #print "call", s
-        #assert(s <= 1. and s >= 0.)
         return self.a0 + self.a1*s + self.a2*s*s
 
+
 class LinearBridge(linear.LinearObject):
-    def __init__(self, transform, elev, osm_id, tags, refs, nodes_dict, width=9, tex=textures.road.EMBANKMENT_2, AGL=0.5):
+    def __init__(self, transform, fg_elev: FGElev, osm_id, tags, refs, nodes_dict, width=9,
+                 tex=textures.road.EMBANKMENT_2, AGL=0.5):
         super(LinearBridge, self).__init__(transform, osm_id, tags, refs, nodes_dict, width, tex, AGL)
         # -- prepare elevation spline
         #    probe elev at n_probes locations
@@ -56,14 +57,9 @@ class LinearBridge(linear.LinearObject):
         elevs = np.zeros(n_probes)
         for i, l in enumerate(probe_locations_nondim):
             local_point = self.center.interpolate(l, normalized=True)
-            elevs[i] = elev(local_point.coords[0]) # fixme: have elev do the transform?
-#        print "probing at", probe_coords
-#        self.elevs = probe(probe_coords)
-#        print n_probes
-#        print ">>>    ", probe_locations_nondim
-#        print ">>> got", elevs
+            elevs[i] = fg_elev.probe_elev(local_point.coords[0])  # fixme: have elev do the transform?
         self.elev_spline = scipy.interpolate.interp1d(probe_locations_nondim, elevs)
-        self.prep_height(nodes_dict, elev)
+        self.prep_height(nodes_dict, fg_elev)
 
     def elev(self, l, normalized=True):
         """given linear distance [m], interpolate and return terrain elevation"""
@@ -71,7 +67,7 @@ class LinearBridge(linear.LinearObject):
             l /= self.center.length
         return self.elev_spline(l)
 
-    def prep_height(self, nodes_dict, elev):
+    def prep_height(self, nodes_dict, fg_elev: FGElev):
         """Preliminary deck shape depending on elevation. Write required h_add to end nodes"""
         # deck slope more or less continuous!
         # d2z/dx2 limit
@@ -107,7 +103,7 @@ class LinearBridge(linear.LinearObject):
         #MSL = self.elev([0, 0.5, 1]) # FIXME: use elev interpolator instead
         MSL_mid = self.elev([0.5]) # FIXME: use elev interpolator instead?
         
-        MSL = np.array([elev(the_node) for the_node in self.center.coords])
+        MSL = np.array([fg_elev.probe_elev(the_node) for the_node in self.center.coords])
 
         deck_MSL = MSL.copy()
         deck_MSL[0] += node0.h_add
@@ -119,10 +115,7 @@ class LinearBridge(linear.LinearObject):
         else:
             hi_end = 0
             lo_end = -1
-        #mid = 1
-        #self.avg_slope = (MSL[hi_end] - MSL[lo_end])/self.center.length
-#        print "# MSL_0, MSL_m, MSL_1:", MSL_0, MSL_m, MSL_1
-        self.D = Deck_shape_linear(deck_MSL[0], deck_MSL[-1])
+        self.D = DeckShapeLinear(deck_MSL[0], deck_MSL[-1])
         try:
             required_height = parameters.BRIDGE_LAYER_HEIGHT * int(self.tags['layer'])
         except KeyError:
@@ -138,61 +131,29 @@ class LinearBridge(linear.LinearObject):
         deck_MSL_mid = MSL_mid + required_height
         if deck_MSL[hi_end] > deck_MSL_mid:
             # -- elevate lower end
-#            print "elevating lower end"
-            deck_MSL[lo_end] = max(deck_MSL[hi_end] - 2 * (deck_MSL[hi_end] - deck_MSL_mid), 
+            deck_MSL[lo_end] = max(deck_MSL[hi_end] - 2 * (deck_MSL[hi_end] - deck_MSL_mid),
                                    deck_MSL[hi_end] - dh_dx * self.center.length)
         else:
-#            print "elevating both"
-            # -- elevate both ends to same MSL
+           # -- elevate both ends to same MSL
             deck_MSL[hi_end] = deck_MSL[lo_end] = deck_MSL_mid
 
         h_add = np.maximum(deck_MSL - MSL, np.zeros_like(deck_MSL))
         
-        left_z, right_z, h_add = self.level_out(elev, h_add)
+        left_z, right_z, h_add = self.level_out(fg_elev, h_add)
         deck_MSL = MSL + h_add
             
-#        h_add = 0. # debug: no h_add at all
-        self.D = Deck_shape_linear(deck_MSL[0], deck_MSL[-1])
-        
-#        print "midh", self.D(0.5) - MSL[1], required_height
-
+        self.D = DeckShapeLinear(deck_MSL[0], deck_MSL[-1])
 
         node0.h_add = h_add[0]
         node1.h_add = h_add[-1]
-#        if self.D(0.5) - MSL_m < required_height:
-#            self.D = Deck_shape_poly(MSL_0, MSL_m+required_height, MSL_1)
-
-        if self.osm_id == 126452863:
-            print("hj", node0.h_add, node1.h_add)
-
-#        node0.h_add = h_add
-#        node1.h_add = h_add
-
-
-        if 0:
-            plt.clf()
-            X = np.linspace(0, 1, 11)
-            plt.plot(X, self.D(X), 'r-o')
-#            plt.plot(X, self.D(X) + h_add, 'r-o')
-            plt.plot(X, self.elev(X), 'g-o')
-            plt.show()
-
-        if 473886072 == node0.osm_id:
-            print(">>>0", node0.h_add)
-        if 473886072 == node1.osm_id:
-            print(">>>1", node1.h_add)
 
     def deck_height(self, l, normalized=True):
         """given linear distance [m], interpolate and return deck height"""
         if not normalized:
             l /= self.center.length
-        #return -0.5*(math.cos(4*math.pi*x)-1.)*10
-        #return -5.*((2.*x-1)**2-1.)
-        #return 10.
         return self.D(l)
 
-
-    def pillar(self, obj, x, y, h0, h1, ofs, angle):
+    def pillar(self, obj, x, y, h0, h1, angle):
         self.pillar_r0 = 1.
         self.pillar_r1 = 0.5
         self.pillar_nnodes = 8
@@ -234,7 +195,7 @@ class LinearBridge(linear.LinearObject):
 
         return ofs + 2*self.pillar_nnodes, vert, nodes_list
 
-    def write_to(self, obj, elev, elev_offset, ac=None, offset=None):
+    def write_to(self, obj, fg_elev: FGElev, elev_offset, ac=None, offset=None):
         """
         write
         - deck
@@ -279,11 +240,11 @@ class LinearBridge(linear.LinearObject):
 
         # -- end wall 1
         the_node = self.edge[0].coords[0]
-        e = elev(the_node) - elev_offset
+        e = fg_elev.probe_elev(the_node) - elev_offset
         left_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 
         the_node = self.edge[1].coords[0]
-        e = elev(the_node) - elev_offset
+        e = fg_elev.probe_elev(the_node) - elev_offset
         right_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 
         face = [ (left_top_nodes[0],    0, parameters.EMBANKMENT_TEXTURE[0]), # FIXME: texture coords
@@ -294,11 +255,11 @@ class LinearBridge(linear.LinearObject):
 
         # -- end wall 2
         the_node = self.edge[0].coords[-1]
-        e = elev(the_node) - elev_offset
+        e = fg_elev.probe_elev(the_node) - elev_offset
         left_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 
         the_node = self.edge[1].coords[-1]
-        e = elev(the_node) - elev_offset
+        e = fg_elev.probe_elev(the_node) - elev_offset
         right_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 
         face = [ (left_top_nodes[-1],    0, parameters.EMBANKMENT_TEXTURE[0]),
@@ -311,7 +272,6 @@ class LinearBridge(linear.LinearObject):
         #if len(self.refs) > 2:
         z -= elev_offset
         for i in range(1, n_nodes-1):
-            z0 = elev(self.center.coords[i]) - elev_offset - 1.
+            z0 = fg_elev.probe_elev(self.center.coords[i]) - elev_offset - 1.
             point = self.center.coords[i]
-            self.pillar(obj, point[0]-offset.x, point[1]-offset.y, z0, z[i], 0, self.angle[i])
-
+            self.pillar(obj, point[0]-offset.x, point[1]-offset.y, z0, z[i], self.angle[i])
