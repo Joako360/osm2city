@@ -17,6 +17,8 @@ import logging
 import os
 
 import numpy as np
+
+import parameters
 import tools
 import utils.utilities
 from utils.vec2d import Vec2d
@@ -41,22 +43,20 @@ def clamp(i, vmin, vmax):
 
 
 class Clusters(object):
-    def __init__(self, min: Vec2d, max: Vec2d, size: int, prefix: str,
+    def __init__(self, min_point: Vec2d, max_point: Vec2d,
                  stg_verb_type: STGVerbType=STGVerbType.object_static) -> None:
-        self.max = max
-        self.min = min
-        self.delta = max - min
-        self.size = size
-        self.n = (self.delta // size).int() + 1
+        self.max = max_point
+        self.min = min_point
+        self.delta = max_point - min_point
+        self.size = parameters.TILE_SIZE
+        self.n = (self.delta // self.size).int() + 1
         self.__len = self.n.x * self.n.y
-        self.prefix = prefix
+        self.prefix = parameters.PREFIX
         self.stg_verb_type = stg_verb_type
 
-        logging.info("Generating clusters %s %s", min, max)
+        logging.info("Generating clusters %s %s", min_point, max_point)
         self._clusters = [[self.init_cluster(Vec2d(i, j))
         for j in range(self.n.y)] for i in range(self.n.x)]
-#        for i in range(self.nx * self.ny):
-#            self.list.append([])
 
         print("cluster: ", self.n)
         print("  delta: ", self.delta)

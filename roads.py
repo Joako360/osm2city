@@ -924,8 +924,8 @@ class Roads(objectlist.ObjectList):
            Put objects in clusters based on their centroid.
         """
         lmin, lmax = [Vec2d(self.transform.toLocal(c)) for c in parameters.get_extent_global()]
-        self.roads_clusters = Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
-        self.railways_clusters = Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
+        self.roads_clusters = Clusters(lmin, lmax)
+        self.railways_clusters = Clusters(lmin, lmax)
 
         for the_object in self.bridges_list + self.roads_list + self.railway_list:
             if _is_railway(the_object):

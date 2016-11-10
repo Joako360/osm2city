@@ -346,7 +346,7 @@ def main():
     # -- create (empty) clusters
     lmin = Vec2d(tools.transform.toLocal(cmin))
     lmax = Vec2d(tools.transform.toLocal(cmax))
-    clusters = Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
+    clusters = Clusters(lmin, lmax)
    
     border = None
     boundary_clipping_complete_way = None

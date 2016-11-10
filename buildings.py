@@ -998,19 +998,18 @@ if __name__ == "__main__":
 
     handled_clusters = list()  # cluster.Clusters objects
     # cluster_non_lod is used when not using new STG verbs and for mesh_detailed when using new STG verbs
-    clusters_default = cluster.Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
+    clusters_default = cluster.Clusters(lmin, lmax)
     handled_clusters.append(clusters_default)
     clusters_building_mesh_rough = None
     # all external models go into detailed meshes. If USE_EXTERNAL_MODELS is False or just no external found
     # then clusters will be discarded because empty
-    clusters_external_models = cluster.Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX)
+    clusters_external_models = cluster.Clusters(lmin, lmax)
     handled_clusters.append(clusters_external_models)
 
     if parameters.USE_NEW_STG_VERBS:
         clusters_default.stg_verb_type = stg_io2.STGVerbType.object_building_mesh_detailed
         clusters_external_models.stg_verb_type = stg_io2.STGVerbType.object_building_mesh_detailed
-        clusters_building_mesh_rough = cluster.Clusters(lmin, lmax, parameters.TILE_SIZE, parameters.PREFIX,
-                                                        stg_io2.STGVerbType.object_building_mesh_rough)
+        clusters_building_mesh_rough = cluster.Clusters(lmin, lmax, stg_io2.STGVerbType.object_building_mesh_rough)
         handled_clusters.append(clusters_building_mesh_rough)
 
     if parameters.OVERLAP_CHECK:
