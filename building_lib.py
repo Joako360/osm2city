@@ -33,9 +33,6 @@ from utils.utilities import FGElev, progress
 from utils.vec2d import Vec2d
 from utils.stg_io2 import STGVerbType, read_stg_entries
 
-nb = 0
-out = ""
-
 
 class Building(object):
     """Central object class.
@@ -64,8 +61,6 @@ class Building(object):
         self.facade_texture = None
         self.roof_texture = None
         self.roof_complex = False
-        self.roof_separate_LOD = False # May or may not be faster
-        self.ac_name = None
         self.ceiling = 0.
         self.LOD = None  # see utils.utilities.LOD for values
         self.outer_nodes_closest = []
@@ -382,90 +377,90 @@ def _compute_roof_height(b, max_height=1e99):
     
     if b.roof_type == 'skillion':
         # get global roof_height and height for each vertex
-            if 'roof:height' in b.tags:
-                # force clean of tag if the unit is given 
-                roof_height = float(re.sub(' .*', ' ', b.tags['roof:height'].strip()))
+        if 'roof:height' in b.tags:
+            # force clean of tag if the unit is given
+            roof_height = float(re.sub(' .*', ' ', b.tags['roof:height'].strip()))
+        else:
+            if 'roof:angle' in b.tags:
+                angle = float(b.tags['roof:angle'])
             else:
-                if 'roof:angle' in b.tags:
-                    angle = float(b.tags['roof:angle'])
-                else:
-                    angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE,
-                                           parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
-            
-                while angle > 0:
-                    roof_height = tan(np.deg2rad(angle)) * (b.lenX[1]/2)
-                    if roof_height < max_height:
-                        break
-                    angle -= 1
+                angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE,
+                                       parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
 
-            if 'roof:slope:direction' in b.tags:
-                # Input angle
-                # angle are given clock wise with reference 0 as north
-                # 
-                # angle 0 north
-                # angle 90 east
-                # angle 180 south
-                # angle 270 west
-                # angle 360 north
-                #
-                # here we works with trigo angles 
-                angle00 = (pi/2. - (((float(b.tags['roof:slope:direction'])) % 360.)*pi/180.))
-            else:
-                angle00 = 0
-                
-            angle90 = angle00 + pi/2.
-            # assume that first point is on the bottom side of the roof
-            # and is a reference point (0,0)
-            # compute line slope*x
-            
-            slope = sin(angle90)
-            
-            dir1n = (cos(angle90), slope)  # (1/ndir1, slope/ndir1)
-            
-            # keep in mind direction
-            #if angle90 < 270 and angle90 >= 90 :
-            #    #dir1, dir1n = -dir1, -dir1n
-            #    dir1=(-dir1[0],-dir1[1])
-            #    dir1n=(-dir1n[0],-dir1n[1])
+            while angle > 0:
+                roof_height = tan(np.deg2rad(angle)) * (b.lenX[1]/2)
+                if roof_height < max_height:
+                    break
+                angle -= 1
 
-            # compute distance from points to line slope*x
-            X2 = list()
-            XN = list()
-            nXN = list()
-            vprods = list()
-            
-            X = b.X
-            
-            p0 = (X[0][0], X[0][1])
-            for i in range(0, len(X)):
-                # compute coord in new referentiel
-                vecA = (X[i][0]-p0[0], X[i][1]-p0[1])
-                X2.append(vecA)
-                # 
-                norm = vecA[0]*dir1n[0] + vecA[1]*dir1n[1]
-                vecN = (vecA[0] - norm*dir1n[0], vecA[1] - norm*dir1n[1])
-                nvecN = sqrt(vecN[0]**2 + vecN[1]**2)
-                # store vec and norms
-                XN.append(vecN)
-                nXN.append(nvecN)
-                # compute ^ product
-                vprod = dir1n[0]*vecN[1]-dir1n[1]*vecN[0]
-                vprods.append(vprod)
+        if 'roof:slope:direction' in b.tags:
+            # Input angle
+            # angle are given clock wise with reference 0 as north
+            #
+            # angle 0 north
+            # angle 90 east
+            # angle 180 south
+            # angle 270 west
+            # angle 360 north
+            #
+            # here we works with trigo angles
+            angle00 = (pi/2. - (((float(b.tags['roof:slope:direction'])) % 360.)*pi/180.))
+        else:
+            angle00 = 0
 
-            # if first point was not on bottom side, one must find the right point
-            # and correct distances
-            if min(vprods) < 0:
-                ibottom = vprods.index(min(vprods))
-                offset = nXN[ibottom]
-                norms_o = [nXN[i] + offset if vprods[i] >= 0 else -nXN[i] + offset for i in range(0, len(X))]  # oriented norm
-            else:
-                norms_o = nXN
+        angle90 = angle00 + pi/2.
+        # assume that first point is on the bottom side of the roof
+        # and is a reference point (0,0)
+        # compute line slope*x
 
-            # compute height for each point with thales
-            L = float(max(norms_o)) 
+        slope = sin(angle90)
 
-            b.roof_height_X = [roof_height*l/L for l in norms_o]
-            b.roof_height = roof_height
+        dir1n = (cos(angle90), slope)  # (1/ndir1, slope/ndir1)
+
+        # keep in mind direction
+        #if angle90 < 270 and angle90 >= 90 :
+        #    #dir1, dir1n = -dir1, -dir1n
+        #    dir1=(-dir1[0],-dir1[1])
+        #    dir1n=(-dir1n[0],-dir1n[1])
+
+        # compute distance from points to line slope*x
+        X2 = list()
+        XN = list()
+        nXN = list()
+        vprods = list()
+
+        X = b.X
+
+        p0 = (X[0][0], X[0][1])
+        for i in range(0, len(X)):
+            # compute coord in new referentiel
+            vecA = (X[i][0]-p0[0], X[i][1]-p0[1])
+            X2.append(vecA)
+            #
+            norm = vecA[0]*dir1n[0] + vecA[1]*dir1n[1]
+            vecN = (vecA[0] - norm*dir1n[0], vecA[1] - norm*dir1n[1])
+            nvecN = sqrt(vecN[0]**2 + vecN[1]**2)
+            # store vec and norms
+            XN.append(vecN)
+            nXN.append(nvecN)
+            # compute ^ product
+            vprod = dir1n[0]*vecN[1]-dir1n[1]*vecN[0]
+            vprods.append(vprod)
+
+        # if first point was not on bottom side, one must find the right point
+        # and correct distances
+        if min(vprods) < 0:
+            ibottom = vprods.index(min(vprods))
+            offset = nXN[ibottom]
+            norms_o = [nXN[i] + offset if vprods[i] >= 0 else -nXN[i] + offset for i in range(0, len(X))]  # oriented norm
+        else:
+            norms_o = nXN
+
+        # compute height for each point with thales
+        L = float(max(norms_o))
+
+        b.roof_height_X = [roof_height*l/L for l in norms_o]
+        b.roof_height = roof_height
 
     else:
         #
@@ -638,7 +633,6 @@ def analyse(buildings, static_objects, fg_elev: FGElev, facades, roofs) -> List[
         # -- Work on roof
         #    roof is controlled by two flags:
         #    bool b.roof_complex: flat or pitched?
-        #    bool b.roof_separate_LOD
         #      useful for
         #      - pitched roof
         #      - roof with add-ons: AC (TODO)
@@ -1087,10 +1081,10 @@ def _write_ring(out, b, ring, v0, texture, tex_y0, tex_y1):
         j = i + b.first_node
         jpp = ipp + b.first_node  
 
-        out.face([ (j, tex_x0, tex_y0),
-                   (jpp, tex_x1, tex_y0),
-                   (jpp   + b._nnodes_ground, tex_x1, tex_y11),
-                   (j +     b._nnodes_ground, tex_x0, tex_y12) ],
+        out.face([(j, tex_x0, tex_y0),
+                  (jpp, tex_x1, tex_y0),
+                  (jpp + b._nnodes_ground, tex_x1, tex_y11),
+                  (j + b._nnodes_ground, tex_x0, tex_y12)],
                  swap_uv=texture.v_can_repeat)     
     return v1
 
@@ -1102,11 +1096,11 @@ def write(ac_file_name: str, buildings, fg_elev: FGElev, tile_elev, offset) -> N
        All LOD in one file. Plus roofs. One ac3d.Object per LOD
     """
     ac = ac3d.File(stats=tools.stats)
-    LOD_objects = list()
-    LOD_objects.append(ac.new_object('LOD_rough', tm.atlas_file_name + '.png'))
-    LOD_objects.append(ac.new_object('LOD_detail', tm.atlas_file_name + '.png'))
+    lod_objects = list()
+    lod_objects.append(ac.new_object('LOD_rough', tm.atlas_file_name + '.png'))
+    lod_objects.append(ac.new_object('LOD_detail', tm.atlas_file_name + '.png'))
 
-    global nb  # FIXME: still need this?
+    number_of_buildings = 0
 
     # get local medium ground elevation for each building
     for ib, b in enumerate(buildings):
@@ -1190,15 +1184,11 @@ def write(ac_file_name: str, buildings, fg_elev: FGElev, tile_elev, offset) -> N
 
     for ib, b in enumerate(buildings):
         progress(ib, len(buildings))
-        ac_object = LOD_objects[b.LOD]
+        ac_object = lod_objects[b.LOD]
 
         _compute_roof_height(b, max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
         
         _write_and_count_vert(ac_object, b)
-
-        nb += 1
-
-        b.ac_name = "b%i" % nb
 
         tex_y0, tex_y1 = _check_height(b.height, b.facade_texture)
 
@@ -1211,66 +1201,56 @@ def write(ac_file_name: str, buildings, fg_elev: FGElev, tile_elev, offset) -> N
         if not parameters.EXPERIMENTAL_INNER and len(b.polygon.interiors) > 1:
             raise NotImplementedError("Can't yet handle relations with more than one inner way")
 
-        if not b.roof_complex:
-            if b.roof_type == 'skillion':
-                roofs.separate_skillion2(ac_object, b, b.X, max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
-            elif b.roof_type in ['pyramidal', 'dome', ]:
-                roofs.separate_pyramidal(ac_object, b, b.X)
-            else:
-                roofs.flat(ac_object, b, b.X)
-
         # -- roof
         #    We can have complex and non-complex roofs:
         #       - non-complex will be included in base object
         #         - relations with 1 inner -> special flat roof
         #         - all other -> flat roof
-        #       - complex will be separate object, go into LOD roof
+        #       - complex will be separate object
         #         - 4 nodes pitched: gable, hipped, half-hipped?, gambrel, mansard, ...
         #         - 5+ nodes: skeleton
         #         - 5+ mansard
-        #         - all will have additional flat roof for base model LOD
-        else:  # -- roof is a separate object, in LOD roof
-            # out.close_object()
-            # FIXME: put roofs again into seperate LOD
-            # -- pitched roof for > 4 ground nodes
+        if not b.roof_complex:
+            if b.roof_type == 'skillion':
+                roofs.separate_skillion(ac_object, b, b.X)
+            elif b.roof_type in ['pyramidal', 'dome', ]:
+                roofs.separate_pyramidal(ac_object, b, b.X)
+            else:
+                roofs.flat(ac_object, b, b.X)
 
+        else:  # -- roof is a separate object
+            # -- pitched roof for > 4 ground nodes
             if b._nnodes_ground > 4 and parameters.BUILDING_SKEL_ROOFS:
                 if b.roof_type == 'skillion':
-                    roofs.separate_skillion2(ac_object, b, b.X, max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
+                    roofs.separate_skillion(ac_object, b, b.X)
                 elif b.roof_type in ['pyramidal', 'dome']:
                     roofs.separate_pyramidal(ac_object, b, b.X)
                 else:
                     s = myskeleton.myskel(ac_object, b, offset_xy=offset,
                                           offset_z=b.ground_elev + b.height - b.roof_height,
-                                        max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
+                                          max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
                     if s:
                         tools.stats.have_complex_roof += 1
 
                     else:  # -- fall back to flat roof
                         roofs.flat(ac_object, b, b.X)
-                    # FIXME: move to analyse. If we fall back, don't require separate LOD
             # -- pitched roof for exactly 4 ground nodes
             else:
-                max_height = b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO
                 if b.roof_type == 'gabled' or b.roof_type == 'half-hipped':
-                    roofs.separate_gable(ac_object, b, b.X, max_height=max_height)
+                    roofs.separate_gable(ac_object, b, b.X)
                 elif b.roof_type == 'hipped':
-                    roofs.separate_hipped(ac_object, b, b.X, max_height=max_height)
+                    roofs.separate_hipped(ac_object, b, b.X)
                 elif b.roof_type in ['pyramidal', 'dome']:
                     roofs.separate_pyramidal(ac_object, b, b.X)
                 elif b.roof_type == 'skillion':
-                    roofs.separate_skillion2(ac_object, b, b.X, max_height=max_height)
+                    roofs.separate_skillion(ac_object, b, b.X)
                 elif b.roof_type == 'flat':
                     roofs.flat(ac_object, b, b.X)
                 else:
-                    logging.debug("FIXME simple rooftype %s unsupported ", b.roof_type)
+                    logging.debug("FIXME simple roof type %s unsupported ", b.roof_type)
                     roofs.flat(ac_object, b, b.X)
 
     ac.write(ac_file_name)
-    # plot on-screen using matplotlib
-    if 0:
-        ac.plot()
-        plt.show()
 
 
 def map_building_type(tags) -> str:
