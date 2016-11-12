@@ -16,7 +16,7 @@ import numpy as np
 import parameters
 import shapely.geometry as shg
 import tools
-from cluster import Clusters
+from cluster import ClusterContainer
 from shapely.geometry.base import CAP_STYLE, JOIN_STYLE
 from shapely.geometry.linestring import LineString
 from utils import osmparser, coordinates, ac3d, stg_io2
@@ -89,7 +89,7 @@ class Piers(ObjectList):
         for cl in self.clusters:
             if len(cl.objects) > 0:
                 center_tile = Vec2d(tools.transform.toGlobal(cl.center))
-                ac_fname = "%spiers%02i%02i.ac" % (replacement_prefix, cl.I.x, cl.I.y)
+                ac_fname = "%spiers%02i%02i.ac" % (replacement_prefix, cl.grid_index.ix, cl.grid_index.iy)
                 ac = ac3d.File(stats=tools.stats)
                 obj = ac.new_object('piers', "Textures/Terrain/asphalt.png")
                 for pier in cl.objects[:]:
@@ -346,7 +346,7 @@ def main():
     # -- create (empty) clusters
     lmin = Vec2d(tools.transform.toLocal(cmin))
     lmax = Vec2d(tools.transform.toLocal(cmax))
-    clusters = Clusters(lmin, lmax)
+    clusters = ClusterContainer(lmin, lmax)
    
     border = None
     boundary_clipping_complete_way = None

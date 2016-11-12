@@ -996,20 +996,20 @@ if __name__ == "__main__":
     lmin = v.Vec2d(tools.transform.toLocal(cmin))
     lmax = v.Vec2d(tools.transform.toLocal(cmax))
 
-    handled_clusters = list()  # cluster.Clusters objects
+    handled_clusters = list()  # cluster.ClusterContainer objects
     # cluster_non_lod is used when not using new STG verbs and for mesh_detailed when using new STG verbs
-    clusters_default = cluster.Clusters(lmin, lmax)
+    clusters_default = cluster.ClusterContainer(lmin, lmax)
     handled_clusters.append(clusters_default)
     clusters_building_mesh_rough = None
     # all external models go into detailed meshes. If USE_EXTERNAL_MODELS is False or just no external found
     # then clusters will be discarded because empty
-    clusters_external_models = cluster.Clusters(lmin, lmax)
+    clusters_external_models = cluster.ClusterContainer(lmin, lmax)
     handled_clusters.append(clusters_external_models)
 
     if parameters.USE_NEW_STG_VERBS:
         clusters_default.stg_verb_type = stg_io2.STGVerbType.object_building_mesh_detailed
         clusters_external_models.stg_verb_type = stg_io2.STGVerbType.object_building_mesh_detailed
-        clusters_building_mesh_rough = cluster.Clusters(lmin, lmax, stg_io2.STGVerbType.object_building_mesh_rough)
+        clusters_building_mesh_rough = cluster.ClusterContainer(lmin, lmax, stg_io2.STGVerbType.object_building_mesh_rough)
         handled_clusters.append(clusters_building_mesh_rough)
 
     if parameters.OVERLAP_CHECK:
@@ -1061,20 +1061,17 @@ if __name__ == "__main__":
         else:
             clusters_default.append(b.anchor, b)
 
-    if parameters.USE_NEW_STG_VERBS is False:
-        clusters_default.transfer_buildings()
-
     # -- write clusters
     stg_fp_dict = {}    # -- dictionary of stg file pointers
     stg = None  # stg-file object
     handled_index = 0
     total_buildings_written = 0
     for my_clusters in handled_clusters:
-        my_clusters.write_stats("cluster_%d" % handled_index)
+        my_clusters.write_statistics("cluster_%d" % handled_index)
 
         for ic, cl in enumerate(my_clusters):
-            nb = len(cl.objects)
-            if nb < parameters.CLUSTER_MIN_OBJECTS:
+            number_of_buildings = len(cl.objects)
+            if number_of_buildings < parameters.CLUSTER_MIN_OBJECTS:
                 continue  # skip almost empty clusters
 
             # -- get cluster center
@@ -1096,7 +1093,8 @@ if __name__ == "__main__":
                 continue  # skip tile with improper elev
 
             # -- in case PREFIX is a path (batch processing)
-            file_name = replacement_prefix + "city" + str(handled_index) + "%02i%02i" % (cl.I.x, cl.I.y)
+            file_name = replacement_prefix + "city" + str(handled_index) + "%02i%02i" % (cl.grid_index.ix,
+                                                                                         cl.grid_index.iy)
             logging.info("writing cluster %s with %d buildings" % (file_name, len(cl.objects)))
 
             path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, tile_elev, 0,

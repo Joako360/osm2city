@@ -13,7 +13,7 @@ import numpy as np
 import os
 import shapely.geometry as shg
 
-from cluster import Clusters
+from cluster import ClusterContainer
 from utils.objectlist import ObjectList
 import parameters
 import tools
@@ -84,7 +84,7 @@ class Platforms(ObjectList):
         for cl in self.clusters:
             if len(cl.objects) > 0:
                 center_tile = Vec2d(tools.transform.toGlobal(cl.center))
-                ac_fname = "%splatforms%02i%02i.ac" % (replacement_prefix, cl.I.x, cl.I.y)
+                ac_fname = "%splatforms%02i%02i.ac" % (replacement_prefix, cl.grid_index.ix, cl.grid_index.iy)
                 ac = ac3d.File(stats=tools.stats)
                 obj = ac.new_object('platforms', "Textures/Terrain/asphalt.png")
                 for platform in cl.objects[:]:
@@ -244,7 +244,7 @@ def main():
     # -- create (empty) clusters
     lmin = Vec2d(tools.transform.toLocal(cmin))
     lmax = Vec2d(tools.transform.toLocal(cmax))
-    clusters = Clusters(lmin, lmax)
+    clusters = ClusterContainer(lmin, lmax)
 
     border = None
     boundary_clipping_complete_way = None

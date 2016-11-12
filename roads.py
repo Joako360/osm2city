@@ -95,7 +95,7 @@ import scipy.interpolate
 import shapely.geometry as shg
 import textures.road
 import tools
-from cluster import Clusters
+from cluster import ClusterContainer
 from utils import osmparser, coordinates, ac3d, objectlist, stg_io2, utilities
 from utils.vec2d import Vec2d
 
@@ -848,7 +848,6 @@ class Roads(objectlist.ObjectList):
         self.ways_list.append(new_way)
 
     def _join_degree2_junctions(self, attached_ways_dict):
-        """bla"""
         for ref, ways_tuple_list in attached_ways_dict.items():
             if len(ways_tuple_list) == 2:
                 if _compatible_ways(ways_tuple_list[0][0], ways_tuple_list[1][0]):
@@ -870,15 +869,12 @@ class Roads(objectlist.ObjectList):
                 
     def debug_label_nodes(self, stg_manager, file_name="labels"):
         """write OSM_ID for nodes"""
-        # -- write OSM_ID label
         ac = ac3d.File(stats=tools.stats, show_labels=True)
-#        ac3d_obj = ac.new_object(file_name, '', default_swap_uv=True)
 
         for way in self.bridges_list + self.roads_list + self.railway_list:
             # -- label center with way ID
             the_node = self.nodes_dict[way.refs[len(way.refs)/2]]
             anchor = Vec2d(self.transform.toLocal(Vec2d(the_node.lon, the_node.lat)))
-#            anchor.x += random.uniform(-1,1)
             if math.isnan(anchor.lon) or math.isnan(anchor.lat):
                 logging.error("Nan encountered while probing anchor elevation")
                 continue
@@ -889,7 +885,6 @@ class Roads(objectlist.ObjectList):
             # -- label first node
             the_node = self.nodes_dict[way.refs[0]]
             anchor = Vec2d(self.transform.toLocal(Vec2d(the_node.lon, the_node.lat)))
-#            anchor.x += random.uniform(-1,1)
             if math.isnan(anchor.lon) or math.isnan(anchor.lat):
                 logging.error("Nan encountered while probing anchor elevation")
                 continue
@@ -898,16 +893,15 @@ class Roads(objectlist.ObjectList):
             ac.add_label(' %i h=%1.1f' % (the_node.osm_id, the_node.h_add), -anchor.y, e, -anchor.x, scale=1.)
 
             # -- label last node
-            if 1:
-                the_node = self.nodes_dict[way.refs[-1]]
-                anchor = Vec2d(self.transform.toLocal(Vec2d(the_node.lon, the_node.lat)))
-#                anchor.x += random.uniform(-1,1)
-                if math.isnan(anchor.lon) or math.isnan(anchor.lat):
-                    logging.error("Nan encountered while probing anchor elevation")
-                    continue
+            the_node = self.nodes_dict[way.refs[-1]]
+            anchor = Vec2d(self.transform.toLocal(Vec2d(the_node.lon, the_node.lat)))
+            if math.isnan(anchor.lon) or math.isnan(anchor.lat):
+                logging.error("Nan encountered while probing anchor elevation")
+                continue
 
-                e = self.fg_elev.probe_elev(anchor) + the_node.h_add + 3.
-                ac.add_label(' %i h=%1.1f' % (the_node.osm_id, the_node.h_add), -anchor.y, e, -anchor.x, scale=1.)
+            e = self.fg_elev.probe_elev(anchor) + the_node.h_add + 3.
+            ac.add_label(' %i h=%1.1f' % (the_node.osm_id, the_node.h_add), -anchor.y, e, -anchor.x, scale=1.)
+
         path_to_stg = stg_manager.add_object_static(file_name + '.ac', Vec2d(self.transform.toGlobal((0, 0))), 0, 0)
         ac.write(path_to_stg + file_name + '.ac')
 
@@ -924,8 +918,8 @@ class Roads(objectlist.ObjectList):
            Put objects in clusters based on their centroid.
         """
         lmin, lmax = [Vec2d(self.transform.toLocal(c)) for c in parameters.get_extent_global()]
-        self.roads_clusters = Clusters(lmin, lmax)
-        self.railways_clusters = Clusters(lmin, lmax)
+        self.roads_clusters = ClusterContainer(lmin, lmax)
+        self.railways_clusters = ClusterContainer(lmin, lmax)
 
         for the_object in self.bridges_list + self.roads_list + self.railway_list:
             if _is_railway(the_object):
@@ -944,7 +938,7 @@ def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, s
             file_start = "railways"
         else:
             file_start = "roads"
-        file_name = replacement_prefix + file_start + "%02i%02i" % (cl.I.x, cl.I.y)
+        file_name = replacement_prefix + file_start + "%02i%02i" % (cl.grid_index.ix, cl.grid_index.iy)
         center_global = Vec2d(tools.transform.toGlobal(cl.center))
         offset_local = cl.center
         cluster_elev = fg_elev.probe_elev(center_global, True)
