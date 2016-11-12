@@ -167,11 +167,9 @@ class Stats(object):
         total_written = self.LOD.sum()
         lodzero = 0
         lodone = 0
-        lodtwo = 0
         if total_written > 0:
             lodzero = 100.*self.LOD[0] / total_written
             lodone = 100.*self.LOD[1] / total_written
-            lodtwo = 100.*self.LOD[2] / total_written
         out.write(textwrap.dedent("""
             total buildings %i
             parse errors    %i
@@ -216,15 +214,13 @@ class Stats(object):
             vertices        %i
             surfaces        %i
             LOD
-                LOD bare        %i (%2.0f %%)
                 LOD rough       %i (%2.0f %%)
                 LOD detail      %i (%2.0f %%)
             """ % (self.have_complex_roof, self.roof_errors,
                    self.nodes_ground, self.nodes_simplified,
                    self.vertices, self.surfaces,
                    self.LOD[0], lodzero,
-                   self.LOD[1], lodone,
-                   self.LOD[2], lodtwo)))
+                   self.LOD[1], lodone)))
         out.write("\narea >=\n")
         max_area_above = max(1, self.area_above.max())
         for i in range(len(self.area_levels)):

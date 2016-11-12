@@ -498,7 +498,7 @@ def _compute_roof_height(b, max_height=1e99):
     return
 
 
-def decide_LOD(buildings):
+def decide_LOD(buildings) -> None:
     """Decide on the building's LOD based on area, number of levels, and some randomness."""
     for b in buildings:
         r = random.uniform(0, 1)
@@ -509,8 +509,6 @@ def decide_LOD(buildings):
 
         if b.levels > parameters.LOD_ALWAYS_ROUGH_ABOVE_LEVELS:
             lod = utils.stg_io2.LOD.rough  # tall buildings        -> rough
-        if (parameters.USE_NEW_STG_VERBS is False) and (b.levels > parameters.LOD_ALWAYS_BARE_ABOVE_LEVELS):
-            lod = utils.stg_io2.LOD.bare  # really tall buildings -> bare
         if b.levels < parameters.LOD_ALWAYS_DETAIL_BELOW_LEVELS:
             lod = utils.stg_io2.LOD.detail  # small buildings       -> detail
 
@@ -1105,7 +1103,6 @@ def write(ac_file_name: str, buildings, fg_elev: FGElev, tile_elev, offset) -> N
     """
     ac = ac3d.File(stats=tools.stats)
     LOD_objects = list()
-    LOD_objects.append(ac.new_object('LOD_bare', tm.atlas_file_name + '.png'))
     LOD_objects.append(ac.new_object('LOD_rough', tm.atlas_file_name + '.png'))
     LOD_objects.append(ac.new_object('LOD_detail', tm.atlas_file_name + '.png'))
 

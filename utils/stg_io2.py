@@ -23,9 +23,8 @@ from utils.vec2d import Vec2d
 
 @enum.unique
 class LOD(enum.IntEnum):
-    bare = 0
-    rough = 1
-    detail = 2
+    rough = 0
+    detail = 1
 
 
 @enum.unique

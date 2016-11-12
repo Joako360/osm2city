@@ -22,7 +22,7 @@ You should disable random buildings.
 # x lights
 # x read relations tag == fix empty backyards
 # x simplify buildings
-# x put tall, large buildings in LOD bare, and small buildings in LOD detail
+# x put tall, large buildings in LOD rough, and small buildings in LOD detail
 # - more complicated roof geometries
 #   x split, new roofs.py?
 # x cmd line switches
@@ -366,7 +366,6 @@ def write_xml(path: str, file_name: str, buildings: List[building_lib.Building],
     xml.write("""<?xml version="1.0"?>\n<PropertyList>\n""")
     xml.write("<path>%s.ac</path>" % file_name)
 
-    has_lod_bare = False
     has_lod_rough = False
     has_lod_detail = False
 
@@ -401,9 +400,7 @@ def write_xml(path: str, file_name: str, buildings: List[building_lib.Building],
                 </model>""" % (-yo, xo, zo)))  # -- I just don't get those coordinate systems.
 
         if b.LOD is not None:
-            if b.LOD is utils.stg_io2.LOD.bare:
-                has_lod_bare = True
-            elif b.LOD is utils.stg_io2.LOD.rough:
+            if b.LOD is utils.stg_io2.LOD.rough:
                 has_lod_rough = True
             elif b.LOD is utils.stg_io2.LOD.detail:
                 has_lod_detail = True
@@ -412,17 +409,7 @@ def write_xml(path: str, file_name: str, buildings: List[building_lib.Building],
 
     if parameters.USE_NEW_STG_VERBS is False:
         # -- LOD animation
-        #    no longer use bare (reserved for terrain)
         #    instead use rough, detail, roof
-        if has_lod_bare:
-            xml.write(textwrap.dedent("""
-            <animation>
-              <type>range</type>
-              <min-m>0</min-m>
-              <max-property>/sim/rendering/static-lod/bare</max-property>
-              <object-name>LOD_bare</object-name>
-            </animation>
-            """))
         if has_lod_rough:
             xml.write(textwrap.dedent("""
             <animation>
@@ -1001,14 +988,9 @@ if __name__ == "__main__":
     clusters_default = cluster.ClusterContainer(lmin, lmax)
     handled_clusters.append(clusters_default)
     clusters_building_mesh_rough = None
-    # all external models go into detailed meshes. If USE_EXTERNAL_MODELS is False or just no external found
-    # then clusters will be discarded because empty
-    clusters_external_models = cluster.ClusterContainer(lmin, lmax)
-    handled_clusters.append(clusters_external_models)
 
     if parameters.USE_NEW_STG_VERBS:
         clusters_default.stg_verb_type = stg_io2.STGVerbType.object_building_mesh_detailed
-        clusters_external_models.stg_verb_type = stg_io2.STGVerbType.object_building_mesh_detailed
         clusters_building_mesh_rough = cluster.ClusterContainer(lmin, lmax, stg_io2.STGVerbType.object_building_mesh_rough)
         handled_clusters.append(clusters_building_mesh_rough)
 
@@ -1056,8 +1038,6 @@ if __name__ == "__main__":
                 clusters_default.append(b.anchor, b)
             elif b.LOD is utils.stg_io2.LOD.rough:
                 clusters_building_mesh_rough.append(b.anchor, b)
-            else:
-                pass  # FIXME: to be replaced if mesh_bare would be introduced
         else:
             clusters_default.append(b.anchor, b)
 
