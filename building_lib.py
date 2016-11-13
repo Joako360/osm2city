@@ -7,23 +7,21 @@ Created on Thu Feb 28 23:18:08 2013
 
 import copy
 import logging
-import math
 import os
 import random
 import re
 from math import sin, cos, radians, tan, sqrt, pi
-from typing import List, Dict
+from typing import List, Dict, Optional
 
-import matplotlib.pyplot as plt
 import myskeleton
 import numpy as np
 from shapely import affinity
 import shapely.geometry as shg
 from shapely.geometry.base import BaseGeometry
 
-
 import parameters
 import prepare_textures as tm
+import textures.texture as tex
 import roofs
 import tools
 import utils.stg_io2
@@ -101,7 +99,6 @@ class Building(object):
                 for o in outer_nodes_avail:
                     r = node_i.distance_to(Vec2d(self.X_outer[o]))
                     if r <= min_r:
-                        closest_i = node_i
                         min_r = r
                         min_i = i
                         min_o = o
@@ -114,44 +111,36 @@ class Building(object):
         self.inner_rings_list = [x for (y, x) in yx]
         self.outer_nodes_closest = [y for (y, x) in yx]
         self._set_polygon(self.polygon.exterior, self.inner_rings_list)
-#        for o in self.outer_nodes_closest:
-#            assert(o < len(outer_ring.coords) - 1)
 
     def simplify(self, tolerance):
         original_nodes = self.nnodes_outer + len(self.X_inner)
-        #print ">> outer nodes", b.nnodes_outer
-        #print ">> inner nodes", len(b.X_inner)
-        #print "total", total_nodes
-        #print "now simply"
         self.polygon = self.polygon.simplify(tolerance)
-        #print ">> outer nodes", b.nnodes_outer
-        #print ">> inner nodes", len(b.X_inner)
         nnodes_simplified = original_nodes - (self.nnodes_outer + len(self.X_inner))
         # FIXME: simplifiy interiors
-        #print "now", simple_nodes
-        #print "--------------------"
         return nnodes_simplified
 
     def _set_polygon(self, outer, inner=list()) -> None:
         self.polygon = shg.Polygon(outer, inner)
 
-    def _set_X(self, the_offset: Vec2d) -> None:
+    def _set_X(self, cluster_offset: Vec2d) -> None:
+        """Given an cluster middle point changes all coordinates in x/y space."""
         self.X = np.array(self.X_outer + self.X_inner)
         for i in range(self._nnodes_ground):
-            self.X[i, 0] -= the_offset.x  # -- cluster coordinates. NB: this changes building coordinates!
-            self.X[i, 1] -= the_offset.y
+            self.X[i, 0] -= cluster_offset.x
+            self.X[i, 1] -= cluster_offset.y
 
-    def set_ground_elev(self, fg_elev: FGElev, tile_elev: float, the_offset: Vec2d) -> None:
-
+    def set_ground_elev_and_offset(self, fg_elev: FGElev, cluster_elev: float, cluster_offset: Vec2d) -> None:
+        """Sets the ground elevations as difference between real elevation and cluster elevation.
+        Also calls method to correct x/y coordinates"""
         def local_elev(p):
-            return fg_elev.probe_elev(p + the_offset) - tile_elev
+            return fg_elev.probe_elev(p + cluster_offset) - cluster_elev
 
-        self._set_X(the_offset)
+        self._set_X(cluster_offset)
 
-        elevs = [local_elev(Vec2d(self.X[i])) for i in range(self._nnodes_ground)]
+        elevations = [local_elev(Vec2d(self.X[i])) for i in range(self._nnodes_ground)]
 
-        self.ground_elev_min = min(elevs)
-        self.ground_elev_max = max(elevs)
+        self.ground_elev_min = min(elevations)
+        self.ground_elev_max = max(elevations)
         self.ground_elev = self.ground_elev_min
 
     @property
@@ -493,7 +482,7 @@ def _compute_roof_height(b, max_height=1e99):
     return
 
 
-def decide_LOD(buildings) -> None:
+def decide_lod(buildings: List[Building]) -> None:
     """Decide on the building's LOD based on area, number of levels, and some randomness."""
     for b in buildings:
         r = random.uniform(0, 1)
@@ -516,7 +505,8 @@ def decide_LOD(buildings) -> None:
         tools.stats.count_LOD(lod)
 
 
-def analyse(buildings, static_objects, fg_elev: FGElev, facades, roofs) -> List[Building]:
+def analyse(buildings: List[Building], static_objects: Optional[List[Building]], fg_elev: FGElev,
+            facades: tex.FacadeManager, roofs: tex.RoofManager) -> List[Building]:
     """Analyse all buildings:
     - calculate area
     - location clash with stg static models? drop building
@@ -567,14 +557,20 @@ def analyse(buildings, static_objects, fg_elev: FGElev, facades, roofs) -> List[
         # -- array of local outer coordinates
         Xo = np.array(b.X_outer)
 
-        # -- skip buildings outside elevation raster or if not solid
-        elev_is_solid_tuple = fg_elev.probe(Vec2d(Xo[0]))
-        if elev_is_solid_tuple[0] == -9999:
-            logging.debug("-9999")
-            tools.stats.skipped_no_elev += 1
-            continue
-        elif not elev_is_solid_tuple[1]:
-            logging.debug("in water")
+        elev_water_ok = True
+        for i in range(len(Xo)):
+            elev_is_solid_tuple = fg_elev.probe(Vec2d(Xo[i]))
+            b.ground_elev = elev_is_solid_tuple[0]  # temporarily set - will be overwritten later
+            if elev_is_solid_tuple[0] == -9999:
+                logging.debug("-9999")
+                tools.stats.skipped_no_elev += 1
+                elev_water_ok = False
+                break
+            elif not elev_is_solid_tuple[1]:
+                logging.debug("in water")
+                elev_water_ok = False
+                break
+        if not elev_water_ok:
             continue
 
         if b.is_external_model:
@@ -960,90 +956,6 @@ def _write_and_count_vert(ac_object: ac3d.Object, b: Building) -> None:
     b.ceiling = b.ground_elev + b.height
 
 
-def _write_ground(out, b, elev):  # not used anywhere
-    # align smallest rectangle
-    d = 0
-
-    # align x/y
-    if 1:
-        x0 = b.X[:, 0].min() - d
-        x1 = b.X[:, 0].max() + d
-        y0 = b.X[:, 1].min() - d
-        y1 = b.X[:, 1].max() + d
-
-    if 0:
-        Xo = np.array([[x0, y0], [x1, y1]])
-        angle = 1. / 57.3
-        R = np.array([[cos(angle), sin(angle)],
-                      [-sin(angle), cos(angle)]])
-        Xo_rot = np.dot(Xo, R)
-        x0 = Xo_rot[0, 0]
-        x1 = Xo_rot[1, 0]
-        y0 = Xo_rot[0, 1]
-        y1 = Xo_rot[1, 1]
-
-    # align along longest side
-    if 0:
-        # Xo = np.array(b.X_outer)
-        Xo = b.X.copy()
-        # origin = Xo[0].copy()
-        # Xo -= origin
-
-        # rotate such that longest side is parallel with x
-        i = b.lenX[:b.nnodes_outer].argmax()  # longest side
-        i1 = i + 1
-        if i1 == b.nnodes_outer:
-            i1 = 0
-        angle = math.atan2(Xo[i1, 1] - Xo[i, 1], Xo[i1, 0] - Xo[i, 0])
-
-        l = ((Xo[i1, 1] - Xo[i, 1]) ** 2 + (Xo[i1, 0] - Xo[i, 0]) ** 2) ** 0.5
-        print(l, b.lenX[i])
-        # assert (l == b.lenX[i])
-        # angle = 10./57.3
-        R = np.array([[cos(angle), sin(angle)],
-                      [-sin(angle), cos(angle)]])
-        Xo_rot = np.dot(Xo, R)
-        x0 = Xo_rot[:, 0].min() - d
-        x1 = Xo_rot[:, 0].max() + d
-        y0 = Xo_rot[:, 1].min() - d
-        y1 = Xo_rot[:, 1].max() + d
-        # rotate back
-        if 1:
-            R = np.array([[cos(angle), -sin(angle)],
-                          [sin(angle), cos(angle)]])
-            Xnew = np.array([[x0, y0], [x1, y1]])
-            Xnew_rot = np.dot(Xnew, R)
-            x0 = Xnew_rot[0, 0]
-            x1 = Xnew_rot[1, 0]
-            y0 = Xnew_rot[0, 1]
-            y1 = Xnew_rot[1, 1]
-
-            if x0 > x1:
-                x0, x1 = x1, x0
-            if y0 > y1:
-                y0, y1 = y1, y0
-
-        # print x0, y0, x1, y1
-        # print x0_, y0_, x1_, y1_
-        # bla
-
-    offset_z = 0.05
-    z0 = elev(Vec2d(x0, y0)) + offset_z
-    z1 = elev(Vec2d(x1, y0)) + offset_z
-    z2 = elev(Vec2d(x1, y1)) + offset_z
-    z3 = elev(Vec2d(x0, y1)) + offset_z
-
-    o = out.next_node_index()
-    out.node(-y0, z0, -x0)
-    out.node(-y0, z1, -x1)
-    out.node(-y1, z2, -x1)
-    out.node(-y1, z3, -x0)
-    out.face([(o, 0, 0),
-               (o + 1, 0, 0),
-               (o + 2, 0, 0),
-               (o + 3, 0, 0)], mat=1)
-
-
 def _write_ring(out, b, ring, v0, texture, tex_y0, tex_y1):
     tex_y0 = texture.y(tex_y0)  # -- to atlas coordinates
     tex_y1_input = tex_y1
@@ -1089,7 +1001,8 @@ def _write_ring(out, b, ring, v0, texture, tex_y0, tex_y1):
     return v1
 
 
-def write(ac_file_name: str, buildings, fg_elev: FGElev, tile_elev, offset) -> None:
+def write(ac_file_name: str, buildings: List[Building], fg_elev: FGElev,
+          cluster_elev: float, cluster_offset: Vec2d) -> None:
     """Write buildings across LOD for given tile.
        While writing, accumulate some statistics (totals stored in global stats object, individually also in building).
        Offset accounts for cluster center
@@ -1104,13 +1017,13 @@ def write(ac_file_name: str, buildings, fg_elev: FGElev, tile_elev, offset) -> N
 
     # get local medium ground elevation for each building
     for ib, b in enumerate(buildings):
-        b.set_ground_elev(fg_elev, tile_elev, offset)
+        b.set_ground_elev_and_offset(fg_elev, cluster_elev, cluster_offset)
     
     # Update building hierarchy information
     for ib, b in enumerate(buildings):
         if b.parent:
             if not b.parent.ground_elev:
-                b.parent.set_ground_elev(fg_elev, tile_elev, offset)
+                b.parent.set_ground_elev_and_offset(fg_elev, cluster_elev, cluster_offset)
 
             b.ground_elev_min = min(b.parent.ground_elev, b.ground_elev)
             b.ground_elev_max = max(b.parent.ground_elev, b.ground_elev)
@@ -1120,7 +1033,7 @@ def write(ac_file_name: str, buildings, fg_elev: FGElev, tile_elev, offset) -> N
             if b.parent.children:
                 for child in b.parent.children:
                     if not child.ground_elev:
-                        child.set_ground_elev(fg_elev, tile_elev, offset)
+                        child.set_ground_elev_and_offset(fg_elev, cluster_elev, cluster_offset)
                             
                 for child in b.parent.children:
                     b.ground_elev_min = min(child.ground_elev_min, b.ground_elev)
@@ -1134,7 +1047,7 @@ def write(ac_file_name: str, buildings, fg_elev: FGElev, tile_elev, offset) -> N
         if b.children:
             for child in b.parent.children:
                 if not child.ground_elev:
-                    child.set_ground_elev(fg_elev, tile_elev, offset)
+                    child.set_ground_elev_and_offset(fg_elev, cluster_elev, cluster_offset)
             
             for child in b.children:
                 b.ground_elev_min = min(child.ground_elev_min, b.ground_elev)
@@ -1226,7 +1139,7 @@ def write(ac_file_name: str, buildings, fg_elev: FGElev, tile_elev, offset) -> N
                 elif b.roof_type in ['pyramidal', 'dome']:
                     roofs.separate_pyramidal(ac_object, b, b.X)
                 else:
-                    s = myskeleton.myskel(ac_object, b, offset_xy=offset,
+                    s = myskeleton.myskel(ac_object, b, offset_xy=cluster_offset,
                                           offset_z=b.ground_elev + b.height - b.roof_height,
                                           max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
                     if s:

@@ -360,7 +360,7 @@ class Buildings(object):
 # -- write xml
 
 
-def write_xml(path: str, file_name: str, buildings: List[building_lib.Building], the_offset: v.Vec2d) -> None:
+def write_xml(path: str, file_name: str, buildings: List[building_lib.Building], cluster_offset: v.Vec2d) -> None:
     #  -- LOD animation
     xml = open(path + file_name + ".xml", "w")
     xml.write("""<?xml version="1.0"?>\n<PropertyList>\n""")
@@ -383,8 +383,8 @@ def write_xml(path: str, file_name: str, buildings: List[building_lib.Building],
         if b.levels >= parameters.OBSTRUCTION_LIGHT_MIN_LEVELS:
             Xo = np.array(b.X_outer)
             for i in np.arange(0, b.nnodes_outer, b.nnodes_outer/4.):
-                xo = Xo[int(i+0.5), 0] - the_offset.x
-                yo = Xo[int(i+0.5), 1] - the_offset.y
+                xo = Xo[int(i+0.5), 0] - cluster_offset.x
+                yo = Xo[int(i+0.5), 1] - cluster_offset.y
                 zo = b.ceiling + 1.5
                 # <path>cursor.ac</path>
                 xml.write(textwrap.dedent("""
@@ -1024,7 +1024,7 @@ if __name__ == "__main__":
     #   - set building type, roof type etc
     buildings = building_lib.analyse(buildings, static_objects, fg_elev,
                                      prepare_textures.facades, prepare_textures.roofs)
-    building_lib.decide_LOD(buildings)
+    building_lib.decide_lod(buildings)
 
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
@@ -1054,41 +1054,42 @@ if __name__ == "__main__":
             if number_of_buildings < parameters.CLUSTER_MIN_OBJECTS:
                 continue  # skip almost empty clusters
 
-            # -- get cluster center
-            offset = cl.center
-
-            # -- count roofs == separate objects
-            nroofs = 0
+            # calculate relative positions within cluster
+            min_elevation = 9999
+            max_elevation = -9999
+            min_x = 1000000000
+            min_y = 1000000000
+            max_x = -1000000000
+            max_y = -1000000000
             for b in cl.objects:
-                if b.roof_complex:
-                    nroofs += 2  # we have 2 different LOD models for each roof
+                min_elevation = min(min_elevation, b.ground_elev)
+                max_elevation = max(max_elevation, b.ground_elev)
+                min_x = min(min_x, b.anchor.x)
+                min_y = min(min_y, b.anchor.y)
+                max_x = max(max_x, b.anchor.x)
+                max_y = max(max_y, b.anchor.y)
+            cluster_elev = (max_elevation - min_elevation) / 2 + min_elevation
+            cluster_offset = v.Vec2d((max_x - min_x)/2 + min_x, (max_y - min_y)/2 + min_y)
+            center_global = v.Vec2d(tools.transform.toGlobal(cluster_offset))
+            logging.debug("Cluster center -> elevation: %d, position: %s", cluster_elev, cluster_offset)
 
-            total_buildings_written += len(cl.objects)
-
-            tile_elev = fg_elev.probe_elev(cl.center)
-            center_global = v.Vec2d(tools.transform.toGlobal(cl.center))
-            if tile_elev == -9999:
-                logging.warning("Skipping tile elev = -9999 at lat %.3f and lon %.3f",
-                                center_global.lat, center_global.lon)
-                continue  # skip tile with improper elev
-
-            # -- in case PREFIX is a path (batch processing)
             file_name = replacement_prefix + "city" + str(handled_index) + "%02i%02i" % (cl.grid_index.ix,
                                                                                          cl.grid_index.iy)
             logging.info("writing cluster %s with %d buildings" % (file_name, len(cl.objects)))
 
-            path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, tile_elev, 0,
+            path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, cluster_elev, 0,
                                                         my_clusters.stg_verb_type)
 
-            stg_manager.add_object_static('lightmap-switch.xml', center_global, tile_elev, 0, once=True)
+            stg_manager.add_object_static('lightmap-switch.xml', center_global, cluster_elev, 0, once=True)
 
             if args.uninstall:
                 files_to_remove.append(path_to_stg + file_name + ".ac")
                 files_to_remove.append(path_to_stg + file_name + ".xml")
             else:
                 # -- write .ac and .xml
-                building_lib.write(path_to_stg + file_name + ".ac", cl.objects, fg_elev, tile_elev, offset)
-                write_xml(path_to_stg, file_name, cl.objects, offset)
+                building_lib.write(path_to_stg + file_name + ".ac", cl.objects, fg_elev, cluster_elev, cluster_offset)
+                write_xml(path_to_stg, file_name, cl.objects, cluster_offset)
+            total_buildings_written += len(cl.objects)
 
         handled_index += 1
     logging.debug("Total number of buildings written to a cluster *.ac files: %d", total_buildings_written)
