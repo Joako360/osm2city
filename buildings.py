@@ -1087,7 +1087,8 @@ if __name__ == "__main__":
                 files_to_remove.append(path_to_stg + file_name + ".xml")
             else:
                 # -- write .ac and .xml
-                building_lib.write(path_to_stg + file_name + ".ac", cl.objects, fg_elev, cluster_elev, cluster_offset)
+                building_lib.write(path_to_stg + file_name + ".ac", cl.objects, fg_elev,
+                                   cluster_elev, cluster_offset, prepare_textures.roofs)
                 write_xml(path_to_stg, file_name, cl.objects, cluster_offset)
             total_buildings_written += len(cl.objects)
 

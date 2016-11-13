@@ -120,12 +120,12 @@ BUILDING_SIMPLIFY_TOLERANCE = 1.0   # -- all points in the simplified building w
 BUILDING_NEVER_SKIP_LEVELS = 6      # -- buildings that tall will never be skipped
 
 BUILDING_UNKNOWN_ROOF_TYPE = "flat" # -- If the roof type isn't given use this type
-BUILDING_COMPLEX_ROOFS = 1          # -- generate complex roofs on buildings?
-BUILDING_COMPLEX_MIN_HEIGHT = 2     # -- don't put complex roof on buildings smallers than value without roof:shape flag
+BUILDING_COMPLEX_ROOFS = True       # -- generate complex roofs on buildings?
+BUILDING_COMPLEX_MIN_HEIGHT = 2     # -- don't put complex roof on buildings smaller than value without roof:shape flag
 BUILDING_COMPLEX_ROOFS_MAX_LEVELS = 5 # -- don't put complex roofs on buildings taller than this
-BUILDING_COMPLEX_ROOFS_MAX_AREA   = 2000 # -- don't put complex roofs on buildings larger than this
+BUILDING_COMPLEX_ROOFS_MAX_AREA = 2000 # -- don't put complex roofs on buildings larger than this
 BUILDING_SKEL_ROOFS = 1             # -- generate complex roofs with pySkeleton? Used to be EXPERIMENTAL_USE_SKEL
-BUILDING_SKEL_ROOFS_MIN_ANGLE = 20  # -- pySkeleton based complex roofs will
+BUILDING_SKEL_ROOFS_MIN_ANGLE = 10  # -- pySkeleton based complex roofs will
 BUILDING_SKEL_ROOFS_MAX_ANGLE = 50  #    have a random angle between MIN and MAX
 BUILDING_SKEL_MAX_NODES = 10        # -- max number of nodes for which we generate pySkeleton roofs
 BUILDING_SKEL_MAX_HEIGHT_RATIO = 0.7 # -- skip skel roofs if ratio of roof height to base building height is larger than this

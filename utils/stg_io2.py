@@ -116,8 +116,6 @@ class STGFile(object):
             self.our_list.append(line)
             self.our_ac_file_name_list.append(ac_file_name)
             logging.debug(self.file_name + ':' + line)
-        else:
-            logging.debug(self.file_name + ': not writing (once=True) ' + line)
         self._make_path_to_stg()
         return self.path_to_stg
 

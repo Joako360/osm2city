@@ -21,8 +21,8 @@ from shapely.geometry.base import BaseGeometry
 
 import parameters
 import prepare_textures as tm
-import textures.texture as tex
 import roofs
+import textures.texture as tex
 import tools
 import utils.stg_io2
 from utils import ac3d, ac3d_fast, calc_tile
@@ -58,7 +58,9 @@ class Building(object):
         self.anchor = Vec2d(list(outer_ring.coords[0]))
         self.facade_texture = None
         self.roof_texture = None
-        self.roof_complex = False
+        self.roof_complex = False  # if False then compat:roof-flat; else compat:roof-pitched
+        self.roof_requires = list()
+        self.roof_type = roof_type  # str: flat, skillion, pyramidal, dome, gabled, half-hipped, hipped
         self.ceiling = 0.
         self.LOD = None  # see utils.utilities.LOD for values
         self.outer_nodes_closest = []
@@ -68,7 +70,6 @@ class Building(object):
             self.polygon = None
         if self.inner_rings_list: self._roll_inner_nodes()
         self.building_type = building_type
-        self.roof_type = roof_type
         self.parent = None
         self.parent_part = []
         self.parents_parts = []
@@ -359,7 +360,7 @@ def _compute_height_and_levels(b: Building) -> float:
     b.height = float(b.levels) * level_height
 
 
-def _compute_roof_height(b, max_height=1e99):
+def _compute_roof_height(b: Building, max_height: float=1e99):
     """Compute roof_height for each node"""
 
     b.roof_height = 0
@@ -451,10 +452,7 @@ def _compute_roof_height(b, max_height=1e99):
         b.roof_height_X = [roof_height*l/L for l in norms_o]
         b.roof_height = roof_height
 
-    else:
-        #
-        # others roofs type
-        #
+    else:  # roof types other than skillion
         try:
             # get roof:height given by osm
             b.roof_height = float(re.sub(' .*', ' ', b.tags['roof:height'].strip()))
@@ -463,7 +461,6 @@ def _compute_roof_height(b, max_height=1e99):
             # random roof:height
             if b.roof_type == 'flat':
                 b.roof_height = 0
-            #if b.roof_type in ['gabled', 'pyramidal','half] :
             else:
                 if 'roof:angle' in b.tags:
                     angle = float(b.tags['roof:angle'])
@@ -506,7 +503,7 @@ def decide_lod(buildings: List[Building]) -> None:
 
 
 def analyse(buildings: List[Building], static_objects: Optional[List[Building]], fg_elev: FGElev,
-            facades: tex.FacadeManager, roofs: tex.RoofManager) -> List[Building]:
+            facade_mgr: tex.FacadeManager, roof_mgr: tex.RoofManager) -> List[Building]:
     """Analyse all buildings:
     - calculate area
     - location clash with stg static models? drop building
@@ -631,10 +628,8 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
         #    bool b.roof_complex: flat or pitched?
         #      useful for
         #      - pitched roof
-        #      - roof with add-ons: AC (TODO)
         #    replace by roof_type? flat  --> no separate model
         #                          gable --> separate model
-        #                          ACs         -"-
         b.roof_complex = False
         if parameters.BUILDING_COMPLEX_ROOFS:
             # -- pitched, separate roof if we have 4 ground nodes and area below 1000m2
@@ -645,15 +640,14 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
                             b._nnodes_ground in range(4, parameters.BUILDING_SKEL_MAX_NODES)):
                     b.roof_complex = True
                 try:
-                    if str(b.tags['roof:shape']) == 'skillion' :
+                    if str(b.tags['roof:shape']) == 'skillion':
                         b.roof_complex = True
                 except:
                     pass
 
-            # -- no pitched roof on tall buildings
+            # -- no complex roof on tall buildings
             if b.levels > parameters.BUILDING_COMPLEX_ROOFS_MAX_LEVELS:
                 b.roof_complex = False
-                # FIXME: roof_ACs = True
 
             # -- no complex roof on tiny buildings
             min_height = 0
@@ -666,8 +660,7 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
                 b.roof_complex = False
 
         facade_requires = []
-        roof_requires = []
-        
+
         if b.roof_complex:
             facade_requires.append('age:old')
             facade_requires.append('compat:roof-pitched')
@@ -713,9 +706,9 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
 
                     if not (_roof_colour or _roof_material):
                         b.tags['roof:material'] = str(material_type)
-                        roof_requires.append('roof:material:' + str(material_type))
+                        b.roof_requires.append('roof:material:' + str(material_type))
                         try:
-                            roof_requires.append('roof:colour:' + str(b.tags['roof:colour']))
+                            b.roof_requires.append('roof:colour:' + str(b.tags['roof:colour']))
                         except:
                             pass
 
@@ -734,14 +727,13 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
         except KeyError:
             pass
 
-#
         # -- determine facade and roof textures
         logging.verbose("___find facade for building %i" % b.osm_id)
         #
         # -- find local texture if infos different from parent
         #
         if b.parent is None:
-            b.facade_texture = facades.find_matching_facade(facade_requires, b.tags, b.height, b.longest_edge_len)
+            b.facade_texture = facade_mgr.find_matching_facade(facade_requires, b.tags, b.height, b.longest_edge_len)
         else:
             # 1 - Check if building and building parent infos are the same
             
@@ -772,12 +764,14 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
             # 2 - If same infos use building parent facade else find new texture
             if b_color == b_parent_color and b_material == b_parent_material:
                     if b.parent.facade_texture is None:
-                        b.facade_texture = facades.find_matching_facade(facade_requires, b.parent.tags, b.height, b.longest_edge_len)
+                        b.facade_texture = facade_mgr.find_matching_facade(facade_requires, b.parent.tags,
+                                                                           b.height, b.longest_edge_len)
                         b.parent.facade_texture = b.facade_texture
                     else:
                         b.facade_texture = b.parent.facade_texture
             else:
-                b.facade_texture = facades.find_matching_facade(facade_requires, b.tags, b.height, b.longest_edge_len)
+                b.facade_texture = facade_mgr.find_matching_facade(facade_requires, b.tags,
+                                                                   b.height, b.longest_edge_len)
 
         if b.facade_texture:
             logging.verbose("__done" + str(b.facade_texture) + str(b.facade_texture.provides))
@@ -795,50 +789,46 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
         #
         # roof search
         #
-        roof_requires.extend(copy.copy(b.facade_texture.requires))
+        b.roof_requires.extend(copy.copy(b.facade_texture.requires))
         
         if b.roof_complex:
-            roof_requires.append('compat:roof-pitched')
+            b.roof_requires.append('compat:roof-pitched')
         else:
-            roof_requires.append('compat:roof-flat')
+            b.roof_requires.append('compat:roof-flat')
 
         # Try to match materials and colors defined in OSM with available roof textures
         try:
             if 'roof:material' in b.tags:
-                if str(b.tags['roof:material']) in roofs.available_materials:
-                    roof_requires.append(str('roof:material:') + str(b.tags['roof:material']))
+                if str(b.tags['roof:material']) in roof_mgr.available_materials:
+                    b.roof_requires.append(str('roof:material:') + str(b.tags['roof:material']))
         except KeyError:
             pass
         try:
-            roof_requires.append('roof:colour:' + str(b.tags['roof:colour']))
+            b.roof_requires.append('roof:colour:' + str(b.tags['roof:colour']))
         except KeyError:
             pass
 
         # force use of default roof texture, don't want too weird things
         if ('roof:material' not in b.tags) and ('roof:colour' not in b.tags):
-            roof_requires.append(str('roof:default'))
+            b.roof_requires.append(str('roof:default'))
 
-        roof_requires = list(set(roof_requires))
+        b.roof_requires = list(set(b.roof_requires))
 
-        #
-        # -- find local texture for roof if information different from parent
-        #
+        # Find roof texture
         logging.verbose("___find roof for building %i" % b.osm_id)
         if b.parent is None:
-            b.roof_texture = roofs.find_matching_roof(roof_requires)
+            b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_len)
             if not b.roof_texture:
                 tools.stats.skipped_texture += 1
-                logging.warning("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
+                logging.warning("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(b.roof_requires)))
                 continue
         else:
             # 1 - Check if building and building parent information is the same
-            
             # 1.1 Information about colour
             try:
                 r_color = b.tags['roof:colour']
             except:
                 r_color = None
-                
             try:
                 r_parent_color = b.parent.tags['roof:colour']
             except:
@@ -849,16 +839,12 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
                 r_material = b.tags['roof:material']
             except:
                 r_material = None
-                
             try:
                 r_parent_material = b.parent.tags['roof:material']
             except:
                 r_parent_material = None
 
-
-            #
             # Special for stone
-            #
             if (r_material == 'stone') and ( r_color is None):
                 # take colour of building 
                 try:
@@ -866,7 +852,6 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
                         r_color = b.tags['building:colour']
                 except:
                     pass
-                    
                 # try parent
                 if not r_color:
                     try:
@@ -874,26 +859,24 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
                             r_color = b.parent.tags['building:colour']
                     except:
                         r_color = 'white'
-                        
                 b.tags['roof:colour'] = r_color
 
-
-            # 2 - If same infos use building parent facade else find new texture
+            # 2 - If same info use building parent facade else find new texture
             if r_color == r_parent_color and r_material == r_parent_material:
                 if b.parent.roof_texture is None:
-                    b.roof_texture = roofs.find_matching_roof(roof_requires)
+                    b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_len)
                     if not b.roof_texture:
                         tools.stats.skipped_texture += 1
-                        logging.warning("WARNING: no matching texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
+                        logging.warning("WARNING: no matching texture for OsmID %d <%s>" % (b.osm_id, str(b.roof_requires)))
                         continue
                     b.parent.roof_texture = b.roof_texture
                 else:
                     b.roof_texture = b.parent.roof_texture
-            else :
-                b.roof_texture = roofs.find_matching_roof(roof_requires)
+            else:
+                b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_len)
                 if not b.roof_texture:
                     tools.stats.skipped_texture += 1
-                    logging.warning("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
+                    logging.warning("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(b.roof_requires)))
                     continue
         
         if b.roof_texture:
@@ -901,7 +884,7 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
 
         else:
             tools.stats.skipped_texture += 1
-            logging.warning("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(roof_requires)))
+            logging.warning("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(b.roof_requires)))
             continue
 
         # -- finally: append building to new list
@@ -1002,7 +985,7 @@ def _write_ring(out, b, ring, v0, texture, tex_y0, tex_y1):
 
 
 def write(ac_file_name: str, buildings: List[Building], fg_elev: FGElev,
-          cluster_elev: float, cluster_offset: Vec2d) -> None:
+          cluster_elev: float, cluster_offset: Vec2d, roof_mgr: tex.RoofManager) -> None:
     """Write buildings across LOD for given tile.
        While writing, accumulate some statistics (totals stored in global stats object, individually also in building).
        Offset accounts for cluster center
@@ -1114,30 +1097,16 @@ def write(ac_file_name: str, buildings: List[Building], fg_elev: FGElev,
         if not parameters.EXPERIMENTAL_INNER and len(b.polygon.interiors) > 1:
             raise NotImplementedError("Can't yet handle relations with more than one inner way")
 
-        # -- roof
-        #    We can have complex and non-complex roofs:
-        #       - non-complex will be included in base object
-        #         - relations with 1 inner -> special flat roof
-        #         - all other -> flat roof
-        #       - complex will be separate object
-        #         - 4 nodes pitched: gable, hipped, half-hipped?, gambrel, mansard, ...
-        #         - 5+ nodes: skeleton
-        #         - 5+ mansard
         if not b.roof_complex:
-            if b.roof_type == 'skillion':
-                roofs.separate_skillion(ac_object, b, b.X)
-            elif b.roof_type in ['pyramidal', 'dome', ]:
-                roofs.separate_pyramidal(ac_object, b, b.X)
-            else:
-                roofs.flat(ac_object, b, b.X)
+            roofs.flat(ac_object, b, roof_mgr)
 
-        else:  # -- roof is a separate object
+        else:
             # -- pitched roof for > 4 ground nodes
             if b._nnodes_ground > 4 and parameters.BUILDING_SKEL_ROOFS:
                 if b.roof_type == 'skillion':
-                    roofs.separate_skillion(ac_object, b, b.X)
+                    roofs.separate_skillion(ac_object, b)
                 elif b.roof_type in ['pyramidal', 'dome']:
-                    roofs.separate_pyramidal(ac_object, b, b.X)
+                    roofs.separate_pyramidal(ac_object, b)
                 else:
                     s = myskeleton.myskel(ac_object, b, offset_xy=cluster_offset,
                                           offset_z=b.ground_elev + b.height - b.roof_height,
@@ -1146,22 +1115,22 @@ def write(ac_file_name: str, buildings: List[Building], fg_elev: FGElev,
                         tools.stats.have_complex_roof += 1
 
                     else:  # -- fall back to flat roof
-                        roofs.flat(ac_object, b, b.X)
+                        roofs.flat(ac_object, b, roof_mgr)
             # -- pitched roof for exactly 4 ground nodes
             else:
                 if b.roof_type == 'gabled' or b.roof_type == 'half-hipped':
-                    roofs.separate_gable(ac_object, b, b.X)
+                    roofs.separate_gable(ac_object, b)
                 elif b.roof_type == 'hipped':
-                    roofs.separate_hipped(ac_object, b, b.X)
+                    roofs.separate_hipped(ac_object, b)
                 elif b.roof_type in ['pyramidal', 'dome']:
-                    roofs.separate_pyramidal(ac_object, b, b.X)
+                    roofs.separate_pyramidal(ac_object, b)
                 elif b.roof_type == 'skillion':
-                    roofs.separate_skillion(ac_object, b, b.X)
+                    roofs.separate_skillion(ac_object, b)
                 elif b.roof_type == 'flat':
-                    roofs.flat(ac_object, b, b.X)
+                    roofs.flat(ac_object, b, roof_mgr)
                 else:
                     logging.debug("FIXME simple roof type %s unsupported ", b.roof_type)
-                    roofs.flat(ac_object, b, b.X)
+                    roofs.flat(ac_object, b, roof_mgr)
 
     ac.write(ac_file_name)
 

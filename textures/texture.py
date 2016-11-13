@@ -3,7 +3,7 @@ import os
 from PIL import Image
 import random
 import re
-from typing import Dict
+from typing import Dict, List, Optional
 
 import numpy as np
 
@@ -281,18 +281,44 @@ class RoofManager(object):
                 return False
         return True
 
-    def find_matching_roof(self, requires=[]):
-        candidates = self.find_candidates(requires)
-        logging.verbose("looking for texture" + str(requires))  # @UndefinedVariable
-        for c in candidates:
-            logging.verbose("  candidate " + c.filename + " provides " + str(c.provides))  # @UndefinedVariable
+    def find_matching_roof(self, requires: List[str], max_dimension: float):
+        candidates = self.find_candidates(requires, list())
         if len(candidates) == 0:
+            logging.warning("No matching texture found for " + str(requires))
             return None
-        the_texture = candidates[random.randint(0, len(candidates)-1)]
+        if "compat:roof-flat" not in requires:
+            the_texture = candidates[random.randint(0, len(candidates) - 1)]
+        else:  # for flat roofs make sure that a candidate texture that can be found with enough length/width
+            max_dim_candidates = list()
+            for candidate in candidates:
+                if not candidate.h_can_repeat and candidate.h_size_meters < max_dimension:
+                    continue
+                if not candidate.v_can_repeat and candidate.v_size_meters < max_dimension:
+                    continue
+                max_dim_candidates.append(candidate)
+            if len(max_dim_candidates) > 0:
+                the_texture = max_dim_candidates[random.randint(0, len(max_dim_candidates)-1)]
+            else:
+                # now we do not care about colour, material etc. Just pick a
+                fallback_candidates = self.find_candidates(['compat:roof-large'], list())
+                final_candidates = list()
+                if len(fallback_candidates) == 0:
+                    logging.error("Large roof required, but no roof texture providing 'compat:roof-large' found.")
+                    exit(1)
+                for candidate in fallback_candidates:
+                    if not candidate.h_can_repeat and candidate.h_size_meters < max_dimension:
+                        continue
+                    if not candidate.v_can_repeat and candidate.v_size_meters < max_dimension:
+                        continue
+                    final_candidates.append(candidate)
+                if len(final_candidates) > 0:
+                    the_texture = final_candidates[random.randint(0, len(final_candidates) - 1)]
+                else:  # give up and live with some visual residuals instead of excluding the building
+                    the_texture = fallback_candidates[random.randint(0, len(fallback_candidates) - 1)]
         tools.stats.count_texture(the_texture)
         return the_texture
 
-    def find_candidates(self, requires=[], excludes=[]):
+    def find_candidates(self, requires: List[str], excludes: List[str]):
         candidates = []
         # replace known hex colour codes
         requires = list(_map_hex_colour(value) for value in requires)
@@ -343,7 +369,7 @@ class RoofManager(object):
                     can_material = False
                     if req_material is not None:
                         for prov_material in prov_materials:
-                            logging.verbose("Provides ", prov_material, " Requires ", requires)  # @UndefinedVariable
+                            logging.verbose("Provides ", prov_material, " Requires ", requires)
                             if prov_material in requires:
                                 can_material = True
                                 break
@@ -366,7 +392,7 @@ class RoofManager(object):
                     candidates.append(candidate)
             else:
                 logging.verbose("  unmet requires %s req %s prov %s",
-                                str(candidate.filename), str(requires), str(candidate.provides))  # @UndefinedVariable
+                                str(candidate.filename), str(requires), str(candidate.provides))
         return candidates
 
     def __str__(self):
@@ -416,11 +442,11 @@ class FacadeManager(RoofManager):
         for t in candidates:
             if height < t.height_min or height > t.height_max:
                 logging.verbose("height %.2f (%.2f-%.2f) outside bounds : %s",
-                                height, t.height_min, t.height_max, str(t.filename))  # @UndefinedVariable
+                                height, t.height_min, t.height_max, str(t.filename))
                 continue
             if width < t.width_min or width > t.width_max:
                 logging.verbose("width %.2f (%.2f-%.2f) outside bounds : %s",
-                                width, t.width_min, t.width_max, str(t.filename))  # @UndefinedVariable
+                                width, t.width_min, t.width_max, str(t.filename))
                 continue
 
             new_candidates.append(t)
