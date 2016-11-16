@@ -7,7 +7,7 @@ Parameters
 Please consider the following:
 
 * Python does not recognize operating system environment variables, please use full paths in the parameters file (no ``$HOME`` etc).
-* These parameters determine how scenery objects are generated offline as described in chapter :ref:`Scenery Generation <chapter-generation-label>`. There are no runtime parameters in FlightGear, that influence which ``osm2city`` generated scenery objects are shown — or how and how many [#]_.
+* These parameters determine how scenery objects are generated offline as described in chapter :ref:`Scenery Generation <chapter-generation-label>`. There are as of version 2016.4 no runtime parameters in FlightGear, that influence which ``osm2city`` generated scenery objects are shown — or how and how many [#]_.
 * All decimals need to be with "." - i.e. local specific decimal separators like "," are not accepted.
 * You do not have to specify all parameters in your ``params.ini`` file. Actually it is better only to specify those parameters, which you want to actively control — the rest just gets the defaults.
 
@@ -16,7 +16,7 @@ Please consider the following:
 View a List of Parameters
 =========================
 
-The final truth about parameters is stored in ``parameters.py`` — unfortunately the content in this chapter might be out of date (including default values).
+The final truth about parameters is stored in ``parameters.py`` — unfortunately the content in this chapter of the manual might be out of date (including default values).
 
 It might be easiest to read ``parameters.py`` directly. Python code is easy to read also for non-programmers. Otherwise you can run the following to see a listing:
 
@@ -81,9 +81,10 @@ NO_ELEV                                         Boolean    False     Set this to
                                                                      developers to check generated scenery objects a bit faster not caring about 
                                                                      the vertical position in the scenery.
 
-ELEV_MODE                                       String     n/a       Choose one of "FgelevCaching", "Fgelev", "Telnet", "Manual". See chapter
-                                                                     :ref:`Available Elevation Probing Mode<chapter-elev-modes-label>` for more 
-                                                                     details.
+FG_ELEV                                         String     n/a       Points to the full path of the fgelev executable. On Linux it could be
+                                                                     something like ``.../bin/fgfs_git/next/install/flightgear/bin/fgelev'``.
+                                                                     On Windows you might have to put quotes around the path due to whitespace
+                                                                     e.g. ``'"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'``.
 
 =============================================   ========   =======   ==============================================================================
 
@@ -104,8 +105,6 @@ LOD_ALWAYS_DETAIL_BELOW_AREA                    Integer    150       Below this 
 LOD_ALWAYS_ROUGH_ABOVE_AREA                     Integer    500       Above this area, buildings will always be LOD rough
 
 LOD_ALWAYS_ROUGH_ABOVE_LEVELS                   Integer    6         Above this number of levels, buildings will always be LOD rough
-
-LOD_ALWAYS_BARE_ABOVE_LEVELS                    Integer    10        Really tall buildings will be LOD bare
 
 LOD_ALWAYS_DETAIL_BELOW_LEVELS                  Integer    3         Below this number of levels, buildings will always be LOD detailed
 

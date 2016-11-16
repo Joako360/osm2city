@@ -43,32 +43,29 @@ There is also a third possibility of copying the ``tex`` directory into ``$FG_RO
 Adjusting Visibility of Scenery Objects
 =======================================
 
-The ``osm2city`` related programs and especially ``buildings.py`` are using heuristics and parameters to determine at what level of detail (LOD) scenery objects should be visible. This is done by adding the objects to one of the three FlightGear LOD schemes: "bare", "rough" and "detailed".
+The ``osm2city`` related programs and especially ``buildings.py`` are using heuristics and parameters to determine at what level of detail (LOD) scenery objects should be visible. This is done by adding the objects to one of the three FlightGear LOD schemes: "rough" and "detailed".
 
 In ``buildings.py`` you can influence into which of the three LOD ranges the objects are placed by using the following :ref:`Parameters <chapter-parameters-lod-label>`:
 
 * LOD_ALWAYS_DETAIL_BELOW_AREA
 * LOD_ALWAYS_ROUGH_ABOVE_AREA
 * LOD_ALWAYS_ROUGH_ABOVE_LEVELS
-* LOD_ALWAYS_BARE_ABOVE_LEVELS
 * LOD_ALWAYS_DETAIL_BELOW_LEVELS
 * LOD_PERCENTAGE_DETAIL
 
 In FlightGear you can influence the actual distance (in meters) for the respective ranges by one of the following ways:
 
 #. In The FlightGear user interface use menu ``View`` > menu item ``Adjust LOD Ranges`` and then change the values manually.
-#. Include command line options into your fgfsrc_ file or `Properties in FGRun`_ like follows:
+#. Include command line options into your fgfsrc_ file or `Properties in FGRun`_ like follows (adjust the values to your needs and depending on your hardware capabilities):
 
 ::
 
     --prop:double:/sim/rendering/static-lod/detailed=5000
     --prop:double:/sim/rendering/static-lod/rough=10000
-    --prop:double:/sim/rendering/static-lod/bare=15000
+    --prop:/sim/rendering/max-paged-lod=400
 
 .. _fgfsrc: http://wiki.flightgear.org/Fgfsrc
 .. _`Properties in FGRun`: http://wiki.flightgear.org/FlightGear_Launch_Control#Properties
-
-(Note: previously there was also a osm2city specific LOD range "roof", however that has been abandoned since clustering was introduced. An therefore setting ``--prop:double:/sim/rendering/static-lod/roof=2000`` is not necessary anymore.)
 
 
 =========================================
@@ -79,7 +76,7 @@ There is no point in having both OSM building scenery objects and dynamically ge
 
 There are two possibilities to disable random buildings:
 
-#. Use command line option ``--disable-random-buildings`` in your fgfsrc_ file — and while you are at it ``--disable-random-objects``.
+#. Use command line option ``--disable-random-buildings`` in your fgfsrc_ file — and while you are at it you might want to consider ``--disable-random-objects``.
 #. Use the FlightGear menu ``View``, menu item ``Rendering Options``. Tick off ``Random buildings`` and ``Random objects``.
 
 .. image:: fgfs_rendering_options.png
@@ -146,4 +143,4 @@ Although this guide hopefully helps, not everybody might be able to generate sce
 .. _Wiki: http://wiki.flightgear.org/Osm2city.py
 
 
-.. [#] As of beginning of 2016: chapters 3.1, 4.1, 4.5
+.. [#] As of November 2016: chapters 3.1 and 4.2.2

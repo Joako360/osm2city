@@ -18,6 +18,7 @@ Therefore before running ``osm2city`` related programs please either:
 * change into the working directory in your console, e.g.
 
 ::
+
   $ cd /home/pingu/fg_customscenery/projects
 
 
@@ -83,16 +84,14 @@ Remember that the paths are relative to the ``WORKING_DIRECTORY``. Alternatively
 Working in Batch Mode
 =====================
 
-As described in chapter :ref:`Getting OpenStreetMap data <chapter-getting-data-label>` FlightGear works with tiles and scenery objects should not excessively cross tiles boundaries. So in order to cover most of Switzerland you need to run ``osm2city`` related programs for 4 degrees longitude and 2 degrees latitude. Given the geographic location of Switzerland there are 4 tiles per longitude and 8 tiles per latitude. I.e. a total of 4*2*4*8 = 256 tiles. In order to make this process a bit easier, you can use ``build_tiles.py`` which creates a set of shell scripts and a suitable directory structure.
+As described in chapter :ref:`Getting OpenStreetMap data <chapter-getting-data-label>` FlightGear works with tiles and scenery objects should not excessively cross tiles boundaries. So in order to cover most of Switzerland you would need to run ``osm2city`` related programs for 4 degrees longitude and 2 degrees latitude. Given the geographic location of Switzerland there are 4 tiles per longitude and 8 tiles per latitude. I.e. a total of 4*2*4*8 = 256 tiles. In order to make this process a bit easier, you can use ``build_tiles.py``, which creates a set of shell scripts and a suitable directory structure.
 
 The default work flow is based on the sub-chapters of :ref:`Preparation <chapter-preparation-label>`:
 
-#. :ref:`Run prepare_elev.py <chapter-run-prepare_elev-label>` depending on your chosen :ref:`Elevation Probing Mode <chapter-elev-modes-label>`.
-#. Adapt ``params.ini``. This will get copied to several subdirectories as part of the next process steps. Most importantly apapt the parameter ``PATH_TO_OUTPUT`` (in the example below "/home/fg_customscenery/CH_OSM"). The ``PREFIX`` and ``BOUNDARY_*`` parameters will automatically be updated.
+#. Adapt ``params.ini``. This will get copied to several subdirectories as part of the next process steps. Most importantly adapt the parameter ``PATH_TO_OUTPUT`` (in the example below "/home/fg_customscenery/CH_OSM"). The ``PREFIX`` and ``BOUNDARY_*`` parameters will automatically be updated.
 #. :ref:`Call build_tiles.py <chapter-build-tiles-label>`. This step creates sub-directories including a set of shell / command scripts. The top directory will be created in your ``WORKING_DIRECTORY`` and have the same name as the lon/lat area specified with argument ``-t``
 #. If needed adapt the params.ini files in the sub-directories if you need to change specific characteristics within one tile (e.g. parameters for building height etc.). In most situations this will not be needed.
 #. Call the generated scripts starting with ``download_xxxxx.sh``. Make sure you are still in the correct working directory, because path names are relative.
-#. Call ``tiles_xxxxx.sh`` depending on the chosen elevation probing mode
 #. Call ``osm2city_xxxxx.sh``, ``osm2pylons_xxxxx.sh`` etc. depending on your requirements.
 #. :ref:`Copy textures, effects and other data <chapter-copy-textures-label>`
 
@@ -142,7 +141,6 @@ Calling build_tiles.py with optional argument ``-d`` could look like the followi
                     piers_e009n47.sh
                     platforms_e009n47.sh
                     roads_e009n47.sh
-                    tools_e009n47.sh
 
 
 The contents of ``osm2city_e009n47.sh`` looks like the following if argument ``-p`` was not used. Otherwise the file would start with bash instructions for parallelization.
@@ -164,4 +162,3 @@ If you used argument ``-p`` during generation of the shell / command files, then
 
 
 .. [#] you can name this file whatever you want — "params.ini" is just a convenience / convention.
-

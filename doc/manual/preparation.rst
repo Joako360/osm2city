@@ -9,7 +9,7 @@ Before ``osm2city`` related programs can be run to generate FlightGear scenery o
 #. :ref:`Creating a Directory Structure <chapter-creating-directory-structure-label>`
 #. :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>`
 #. :ref:`Setting Minimal Parameters <chapter-setting-parameters-label>`
-#. :ref:`Generating Elevation Data <chapter-generating-elevation-data-label>`
+#. :ref:`Generating elevation data <chapter-generating-elevation-data-label>`
 
 It is recommended to start with generating scenery objects for a small area around a smaller airport outside of big cities, such that manual errors are found fast. Once you are acquainted with all process steps, you can experiment with larger and denser areas.
 
@@ -121,7 +121,7 @@ Create a ``params.ini`` file with your favorite text editor. In our example it w
     BOUNDARY_NORTH = 46.54
 
     NO_ELEV = False
-    ELEV_MODE = "Manual"
+    FG_ELEV = '/home/pingu/bin/fgfs_git/next/install/flightgear/bin/fgelev'
 
 
 A few comments on the parameters:
@@ -141,8 +141,8 @@ BOUNDARY_*
     The longitude and latitude of the boundaries of the generated scenery. The boundaries should correspond to the boundaries in the ``OSM_FILE`` (open the \*.osm file in a text editor and check the data in ca. line 3). The boundaries can be different, but then you might either miss data (if the OSM boundaries are larger) or do more processing than necessary (if the OSM boundaries are more narrow).
 NO_ELEV
     Set this to ``False``. The only reason to set this to ``True`` would be for developers to check generated scenery objects a bit faster not caring about the vertical position in the scenery.
-ELEV_MODE
-    See chapter :ref:`Available Elevation Probing Mode<chapter-elev-modes-label>`.
+FG_ELEV
+    Set parameter ``FG_ELEV`` to point to the full path of the fgelev executable. On Linux it could be something like ``FG_ELEV = '/home/pingu/bin/fgfs_git/next/install/flightgear/bin/fgelev'``. On Windows you might have to put quotes around the path due to whitespace e.g. ``FG_ELEV = '"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'``.
 
 
 .. _chapter-generating-elevation-data-label:
@@ -150,10 +150,6 @@ ELEV_MODE
 =========================
 Generating Elevation Data
 =========================
-
----------
-TerraSync
----------
 
 ``osm2city`` uses existing scenery elevation data for two reasons:
 
@@ -168,300 +164,5 @@ Please be aware that the scenery data needed for your area might not have been d
 
 .. _chapter-elev-modes-label:
 
----------------------------------
-Available Elevation Probing Modes
----------------------------------
-
-There are a few different possibilities to generate elevation data, each of which is discussed in details in sub-chapters below. This is what is specified in parameter ``ELEV_MODE`` in the ``params.ini`` file:
-
-* :ref:`ELEV_MODE = "FgelevCaching" <chapter-elev-fgelevcaching-label>`: most automated and convenient
-* :ref:`ELEV_MODE = "Fgelev" <chapter-elev-fgelev-label>`: use this instead of ``FgelevCaching`` if you have memory or speed limitations
-* :ref:`ELEV_MODE = "Telnet" <chapter-elev-telnet-label>`: use this if you cannot compile C++ or use an older FlightGear version
-* :ref:`ELEV_MODE = "Manual" <chapter-elev-manual-label>`: fallback method — doing a lot of stuff manually
-
-The two methods using ``Fgelev*`` require a bit less manual setup and intervention. ``FgelevCaching`` might give the best accuracy, be fastest and most automated. However memory requirements, speed etc. might vary depending on your parameter settings (e.g. ``ELEV_RASTER_*``) and the ratio between scenery area and the number of OSM objects. In order to use one of the two ``Fgelev*`` methods, you need to have a FlightGear version 3.4 (released February 17 2015) or newer.
-
-All methods apart from ``FgelevCaching`` will generate a file ``elev.out`` to be put into your input folder. ``FgelevCaching`` can also keep data cached (in a file called ``elev.pkl`` in the input directory) — so from a caching perspective there is not much of a difference [#]_.
-
-The next chapters describe each elevation probing mode and link to a :ref:`detailed description of sub-tasks <chapter-subtasks-label>`.
-
-.. FIXME: provide runtime data for each mode for comparison
-
-
-.. _chapter-elev-fgelevcaching-label:
-
----------------------------
-ELEV_MODE = "FgelevCaching"
----------------------------
-In this mode elevation probing happens while running ``osm2city`` related scenery generation — instead of a data preparation task. There is only one pre-requisite:
-
-#. :ref:`Setting parameter FG_ELEV <chapter-set-fgelev-path-label>`
-
-
-.. _chapter-elev-fgelev-label:
-
---------------------
-ELEV_MODE = "Fgelev"
---------------------
-
-This elevation probing mode and the next modes generate a file ``elev.out``, which is put or needs to be put into your input folder. Use the following steps:
-
-#. :ref:`Setting parameter FG_ELEV <chapter-set-fgelev-path-label>`
-#. :ref:`Setting parameters ELEV_RASTER_* <chapter-set-elev-raster-label>`
-#. :ref:`Run tools.py to generate elevation data <chapter-run-tools-label>`
-
-
-.. _chapter-elev-telnet-label:
-
---------------------
-ELEV_MODE = "Telnet"
---------------------
-
-This mode requires FlightGear to be running and uses a data connection to get elevation data.
-
-#. :ref:`Hide scenery objects <chapter-hide-label>`
-#. :ref:`Setting parameters ELEV_RASTER_* <chapter-set-elev-raster-label>`
-#. :ref:`Setting parameter TELNET_PORT <chapter-set-telnet-port-label>`
-#. :ref:`Run prepare_elev.py to prepare elevation probing through Nasal <chapter-run-prepare_elev-label>`
-#. :ref:`Start FlightGear <chapter-start-fgfs-label>`
-#. :ref:`Run tools.py to generate elevation data <chapter-run-tools-label>`
-#. Exit FlightGear
-#. :ref:`Unhide scenery objects <chapter-unhide-label>`
-
-
-.. _chapter-elev-manual-label:
-
---------------------
-ELEV_MODE = "Manual"
---------------------
-
-This mode can be used with older FlightGear versions and is save, but also needs a lot of manual steps, which might be error prone. The following steps are needed:
-
-#. :ref:`Hide scenery Objects <chapter-hide-label>`
-#. :ref:`Setting parameters ELEV_RASTER_* <chapter-set-elev-raster-label>`
-#. :ref:`Adapt file elev.nas <chapter-elev.nas-label>`
-#. :ref:`Run tools.py to generate elevation input data <chapter-elev.in-label>`
-#. :ref:`Copy file elev.in <chapter-elev.in-copy-label>`
-#. :ref:`Start FlightGear <chapter-start-fgfs-label>`
-#. Execute a Nasal script (see below)
-#. Exit FlightGear
-#. :ref:`Copy file elev.out <chapter-elev.out-copy-label>`
-#. :ref:`Unhide scenery objects <chapter-unhide-label>`
-
-While FlightGear is running, open menu ``Debug/Nasal Console`` in the FlightGear user interface. Write ``elev.get_elevation()`` and hit the "Execute" button. Be patient as it might seem as nothing is happening for many minutes. At the end you might get output like the following in the ``Nasal Console``:
-
-::
-
-    Checking if tile is loaded
-    Position 46.52710817536379 9.878004489017634
-    Reading file /home/pingu/.fgfs/elev.in
-    Splitting file /home/pingu/.fgfs/elev.in
-    Read 231130 records
-    Writing 231130 records
-    Wrote 231130 records
-    Signalled Success
-
-
-
-.. _chapter-subtasks-label:
-
----------------------------------
-Detailed Description of Sub-Tasks
----------------------------------
-
-(Note: you need to follow only those sub-tasks, which were specified for the specific elevation probing mode as described above.)
-
-.. _chapter-set-fgelev-path-label:
-
-+++++++++++++++++++++++++
-Setting Parameter FG_ELEV
-+++++++++++++++++++++++++
-
-Set parameter ``FG_ELEV`` to point to the full path of the executable. On Linux it could be something like ``FG_ELEV = '/home/pingu/bin/fgfs_git/next/install/flightgear/bin/fgelev'``. On Windows you might have to put quotes around the path due to whitespace e.g. ``FG_ELEV = '"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'``.
-
-
-.. _chapter-set-elev-raster-label:
-
-++++++++++++++++++++++++++++++++
-Setting Parameters ELEV_RASTER_*
-++++++++++++++++++++++++++++++++
-
-The parameters ``ELEV_RASTER_X`` and ``ELEV_RASTER_Y`` control the spatial resolution of the generated elevation data for all other methods than ``FgelevCaching``. Most of the times it is a good idea to keep the X/Y values aligned. The smaller the values, the better the vertical alignment of generated scenery objects with the underlying scenery, but the more memory and time is used during the generation of elevation data and when using the generated elevation data in ``osm2city``. The smoother the scenery elevation is, the larger values can be chosen for ``ELEV_RASTER_*``. In Switzerland 10 is sufficiently narrow. Keep in mind that the spatial resolution of typical FlightGear elevation data [#]_ is limited and therefore setting small values here will not noticeably improve the visual alignment.
-
-
-.. _chapter-set-telnet-port-label:
-
-+++++++++++++++++++++++++++++
-Setting Parameter TELNET_PORT
-+++++++++++++++++++++++++++++
-
-You need to set parameter ``TELNET_PORT`` to the same value as specified in FlightGear parameter ``--telnet`` (e.g. 5501).
-
-
-.. _chapter-hide-label:
-
-++++++++++++++++++++
-Hide Scenery Objects
-++++++++++++++++++++
-
-This step is necessary as otherwise the elevation probing might be on top of an existing static or shared object (like an airport hangar). In chapter :ref:`Setting a Minimal Set of Parameters <chapter-setting-parameters-label>` parameter ``PATH_TO_SCENERY`` is described. Below that path is a directory ``Objects``. Rename that directory to e.g. ``Objects_hidden``. Most of the time you might want to do the same for the ``Objects`` directory in ``PATH_TO_OUTPUT`` - unless the ``Objects`` directory does not yet exist.
-
-In rare cases you might have more scenery object folders specified in the FlightGear parameter ``--fg-scenery`` — however you need only to take those into consideration, which place objects into the same area (which is very rare).
-
-PS: this step is not necessary when using mode ``FgelevCaching`` or ``Fgelev``, because data is read directly from scenery elevation information instead of "flying through the scenery".
-
-
-.. _chapter-unhide-label:
-
-++++++++++++++++++++++
-Unhide Scenery Objects
-++++++++++++++++++++++
-
-Just do the reverse of what is specified in chapter :ref:`Hide Scenery Objects <chapter-hide-label>`
-
-
-.. _chapter-start-fgfs-label:
-
-++++++++++++++++
-Start FlightGear
-++++++++++++++++
-
-Start FlightGear at an airport close to where you want to generate ``osm2city`` scenery objects. You might want to start up with an aircraft using few resources (e.g. Ufo) and a `minimal startup profile <http://wiki.flightgear.org/Troubleshooting_crashes#Minimal_startup_profile>`_ in order to speed things up a bit.
-
-If you use ``ELEV_MODE = "Telnet"` then make sure to you specify command-line parameter ``--telnet`` in FlightGear.
-
-
-.. _chapter-run-tools-label:
-
-+++++++++++++++++++++++++++++++++++++++
-Run tools.py to Generate Elevation Data
-+++++++++++++++++++++++++++++++++++++++
-
-Change the work directory to e.g. ``fg_customscenery/projects`` and then run tools.py. On Linux this might look like the following:
-
-::
-
-    $ cd fg_customscenery/projects
-    
-    $ ls LSZS
-    lszs_narrow.osm  params.ini
-    
-    $ /usr/bin/python3 /home/pingu/development/osm2city/tools.py -f LSZS/params.ini
-    ...
-    
-    $ ls LSZS
-    elev.out lszs_narrow.osm  params.ini
-
-At the end of the process there is a new file ``elev.out`` containing the elevation data. If you use command-line option ``-o``, then existing data is not overwritten.
-
-
-.. _chapter-run-prepare_elev-label:
-
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-Run prepare_elev.py to Prepare Elevation Probing through Nasal
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-Change the work directory to e.g. ``fg_customscenery/projects`` and then run prepare_elev.py. On Linux this might look like the following:
-
-::
-
-    $ cd fg_customscenery/projects
-    
-    $ /usr/bin/python3 /home/pingu/development/osm2city/prepare_elev.py  -f LSZS/params.ini
-    ...
-
-
-.. _chapter-elev.nas-label:
-
-+++++++++++++++++++
-Adapt File elev.nas
-+++++++++++++++++++
-
-The root directory of ``osm2city-data`` contains a file ``nasal/elev.nas``. First copy the file into the ``Nasal`` directory in ``$FG_ROOT`` (see also :ref:`Setting environment variable $FG_ROOT <chapter-set-fgroot-label>`).
-
-Then open ``elev.nas`` in a text editor. Change the ``in`` variable as well as the ``out`` variable to a directory with write access (e.g. $FG_HOME/Export). See IORules_ and `$FG_HOME`_.
-
-``elev.nas`` might look as follows BEFORE editing:
-
-::
-
-    var get_elevation = func {
-      #Set via prepare_elev.py
-        setprop("/osm2city/tiles", 0);
-        var in = "WILL_BE_SET_BY_PREPARE_ELEV.PY";
-        var out = "WILL_BE_SET_BY_PREPARE_ELEV.PY";
-
-        print( "Checking if tile is loaded");
-        ...
-
-AFTER editing ``elev.nas`` might look as follows on Windows:
-
-::
-
-    ...
-        var in = "C:/Users/Bill/AppData/Roaming/flightgear.org/elev.in";
-        var out = "C:/Users/Bill/AppData/Roaming/flightgear.org/Export/";
-        ...
-
-AFTER editing ``elev.nas`` might look as follows on Linux:
-
-::
-
-    ...
-        var in = "/home/pingu/.fgfs/elev.in";
-        var out = "/home/pingu/.fgfs/Export/";
-        ...
-
-
-.. _IORules: http://wiki.flightgear.org/IORules
-.. _$FG_HOME: http://wiki.flightgear.org/$FG_HOME
-
-(Note: the description in this sub-task is basically what :ref:`running prepare_elev.py <chapter-run-prepare_elev-label>` does automatically.)
-
-
-.. _chapter-elev.in-label:
-
-+++++++++++++++++++++++++++++++++++++++++++++
-Run tools.py to Generate Elevation Input Data
-+++++++++++++++++++++++++++++++++++++++++++++
-
-Change the work directory to e.g. ``fg_customscenery/projects`` and then run tools.py. On Linux this might look like the following:
-
-::
-
-    $ cd fg_customscenery/projects
-    
-    $ ls LSZS
-    lszs_narrow.osm  params.ini
-    
-    $ /usr/bin/python3 /home/pingu/development/osm2city/tools.py -f LSZS/params.ini
-    ...
-    
-    $ ls LSZS
-    elev.in  lszs_narrow.osm  params.ini
-
-
-.. _chapter-elev.in-copy-label:
-
-+++++++++++++++++
-Copy File elev.in
-+++++++++++++++++
-
-Copy file ``elev.in`` from the input directory to the path specified in the edited ``elev.nas`` file (see :ref:`Adapt File elev.nas <chapter-elev.nas-label>`).
-
-
-.. _chapter-elev.out-copy-label:
-
-++++++++++++++++++
-Copy File elev.out
-++++++++++++++++++
-
-Finally copy file ``elev.out`` from the path specified in the edited ``elev.nas`` file (see :ref:`Adapt File elev.nas <chapter-elev.nas-label>`) to the input directory (e.g. ``fg_customscenery/projects/LSZS``).
-
-
 
 .. [#] Failing to do so might result in an exception, where the stack trace might contain something like ``KeyError: 1227981870``.
-
-.. [#] It is a bit more complicated than that. The three other methods keep data in a grid — and the grid stays the same across e.g. ``buildings.py`` and ``pylons.py``. That is different for ``FgelevCaching``, because it will get the position for every object, which by nature is different between e.g. ``buildings`` and ``pylons``.
-
-.. [#] See `Using TerraGear <http://wiki.flightgear.org/Using_TerraGear#Elevation_data>`_.
