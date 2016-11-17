@@ -89,10 +89,11 @@ As described in chapter :ref:`Getting OpenStreetMap data <chapter-getting-data-l
 The default work flow is based on the sub-chapters of :ref:`Preparation <chapter-preparation-label>`:
 
 #. Adapt ``params.ini``. This will get copied to several subdirectories as part of the next process steps. Most importantly adapt the parameter ``PATH_TO_OUTPUT`` (in the example below "/home/fg_customscenery/CH_OSM"). The ``PREFIX`` and ``BOUNDARY_*`` parameters will automatically be updated.
+#. In most situations you might want to :ref:`create a texture atlas<chapter-create-texture-atlas>` first, so it corresponds to the the chosen parameters.
 #. :ref:`Call build_tiles.py <chapter-build-tiles-label>`. This step creates sub-directories including a set of shell / command scripts. The top directory will be created in your ``WORKING_DIRECTORY`` and have the same name as the lon/lat area specified with argument ``-t``
 #. If needed adapt the params.ini files in the sub-directories if you need to change specific characteristics within one tile (e.g. parameters for building height etc.). In most situations this will not be needed.
-#. Call the generated scripts starting with ``download_xxxxx.sh``. Make sure you are still in the correct working directory, because path names are relative.
-#. Call ``osm2city_xxxxx.sh``, ``osm2pylons_xxxxx.sh`` etc. depending on your requirements.
+#. It is imperative that you call ``download_xxxxx.sh`` first. Make sure you are still in the correct working directory, because path names are relative.
+#. Afterwards call ``buildings_xxxxx.sh``, ``pylons_xxxxx.sh`` etc. depending on your requirements.
 #. :ref:`Copy textures, effects and other data <chapter-copy-textures-label>`
 
 
@@ -136,14 +137,14 @@ Calling build_tiles.py with optional argument ``-d`` could look like the followi
             projects/
                 e000n40/
                     download_e009n47.sh        # If option -d was chosen, then the commands within will call Osmosis and not download stuff
-                    osm2city_e009n47.sh
-                    osm2pylon_e009n47.sh
+                    buildings_e009n47.sh
+                    pylons_e009n47.sh
                     piers_e009n47.sh
                     platforms_e009n47.sh
                     roads_e009n47.sh
 
 
-The contents of ``osm2city_e009n47.sh`` looks like the following if argument ``-p`` was not used. Otherwise the file would start with bash instructions for parallelization.
+The contents of ``buildings_e009n47.sh`` looks like the following if argument ``-p`` was not used. Otherwise the file would start with bash instructions for parallelization.
 
 ::
 
@@ -158,7 +159,7 @@ If you used argument ``-p`` during generation of the shell / command files, then
 
 ::
 
-    $ ./e000n40/osm2city_e009n47.sh 4
+    $ ./e000n40/buildings_e009n47.sh 4
 
 
 .. [#] you can name this file whatever you want — "params.ini" is just a convenience / convention.
