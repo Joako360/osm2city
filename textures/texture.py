@@ -285,7 +285,14 @@ class RoofManager(object):
         candidates = self.find_candidates(requires, list())
         if len(candidates) == 0:
             logging.warning("No matching texture found for " + str(requires))
-            return None
+            # Break down requirements to find something that matches
+            for simple_req in requires:
+                candidates = self.find_candidates([simple_req], list())
+                if len(candidates) > 0:
+                    break
+                if len(candidates) == 0:
+                    # Now we're really desperate - just find something!
+                    candidates = self.find_candidates(['compat:roof-large'], list())
         if "compat:roof-flat" not in requires:
             the_texture = candidates[random.randint(0, len(candidates) - 1)]
         else:  # for flat roofs make sure that a candidate texture that can be found with enough length/width
@@ -507,4 +514,3 @@ def screen_osm_tags_for_colour_spelling(osm_id: int, tags: Dict[str, str]) -> No
         del (tags['roof:color'])
     elif 'roof:color' in tags and 'roof:colour' in tags:
         del (tags['roof:color'])
-
