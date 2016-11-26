@@ -1206,14 +1206,18 @@ def _parse_ac_file_name(xml_string: str) -> str:
     return ac_file_name
 
 
-def _extract_boundary(ac_filename: str) -> shg.Polygon:
+def _extract_boundary(ac_filename: str, alternative_ac_filename: str=None) -> shg.Polygon:
     """Reads an ac-file and constructs a convex hull as a proxy to the real boundary.
     No attempt is made to follow rotations and translations.
-    Returns a tuple (x_min, y_min, x_max, y_max) in meters."""
+    Returns a tuple (x_min, y_min, x_max, y_max) in meters.
+    An alternative path is tried, if the first path is not successful"""
     numvert = 0
     points = list()
     try:
-        with open(ac_filename, 'r') as my_file:
+        checked_filename = ac_filename
+        if not os.path.isfile(checked_filename) and alternative_ac_filename is not None:
+            checked_filename = alternative_ac_filename
+        with open(checked_filename, 'r') as my_file:
             for my_line in my_file:
                 if 0 == my_line.find("numvert"):
                     numvert = int(my_line.split()[1])
@@ -1229,15 +1233,33 @@ def _extract_boundary(ac_filename: str) -> shg.Polygon:
     return hull_polygon
 
 
+def _extract_ac_from_xml(xml_filename: str, alternative_xml_filename: str=None) -> str:
+    """Reads the *.ac filename out of an xml-file"""
+    checked_filename = xml_filename
+    if not os.path.isfile(checked_filename) and alternative_xml_filename is not None:
+        checked_filename = alternative_xml_filename
+    with open(checked_filename, 'r') as f:
+        xml_data = f.read()
+        ac_filename = _parse_ac_file_name(xml_data)
+        return ac_filename
+
+
 def _create_static_obj_boundaries(my_coord_transformation: Transformation) -> Dict[str, shg.Polygon]:
     """
     Finds all static objects referenced in stg-files within the scenery boundaries and returns them as a list of
     Shapely polygon objects (convex hull of all points in ac-files) in the local x/y coordinate system.
     """
     boundaries = dict()
-    stg_files = calc_tile.get_stg_files_in_boundary(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH
-                                                    , parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH
-                                                    , parameters.PATH_TO_SCENERY)
+    stg_files = calc_tile.get_stg_files_in_boundary(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
+                                                    parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH,
+                                                    parameters.PATH_TO_SCENERY)
+
+    if parameters.PATH_TO_SCENERY_OPT is not None:
+        stg_files_opt = calc_tile.get_stg_files_in_boundary(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
+                                                            parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH,
+                                                            parameters.PATH_TO_SCENERY_OPT)
+        stg_files.extend(stg_files_opt)
+
     for filename in stg_files:
         stg_entries = read_stg_entries(filename, parameters.OVERLAP_CHECK_CONSIDER_SHARED)
         for entry in stg_entries:
@@ -1245,13 +1267,12 @@ def _create_static_obj_boundaries(my_coord_transformation: Transformation) -> Di
                 try:
                     ac_filename = entry.obj_filename
                     if ac_filename.endswith(".xml"):
-                        with open(entry.get_obj_path_and_name(), 'r') as f:
-                            xml_data = f.read()
-                            ac_filename = _parse_ac_file_name(xml_data)
-                            entry.overwrite_filename(ac_filename)
-                    boundary_polygon = _extract_boundary(entry.get_obj_path_and_name())
+                        entry.overwrite_filename(_extract_ac_from_xml(entry.get_obj_path_and_name(),
+                                                                      entry.get_obj_path_and_name(parameters.PATH_TO_SCENERY)))
+                    boundary_polygon = _extract_boundary(entry.get_obj_path_and_name(),
+                                                         entry.get_obj_path_and_name(parameters.PATH_TO_SCENERY))
                     rotated_polygon = affinity.rotate(boundary_polygon, entry.hdg - 90, (0, 0))
-                    x_y_point = my_coord_transformation.toLocal(Vec2d(entry.lon, entry.lat))
+                    x_y_point = my_coord_transformation.toLocal((entry.lon, entry.lat))
                     translated_polygon = affinity.translate(rotated_polygon, x_y_point[0], x_y_point[1])
                     if entry.verb_type is STGVerbType.object_static and parameters.OVERLAP_CHECK_CH_BUFFER_STATIC > 0.01:
                         boundaries[ac_filename] = translated_polygon.buffer(

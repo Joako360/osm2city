@@ -55,6 +55,10 @@ IGNORE_PKL_OVERWRITE = True # -- Ignore overwriting of Cache File
 #    likely you'll want to use your TerraSync path here.
 PATH_TO_SCENERY = "/home/user/fgfs/scenery/TerraSync"
 
+# Optional additional path to a scenery folder (e.g. project3000).
+# Only used for overlap checking for buildings against static and shared objects
+PATH_TO_SCENERY_OPT = None
+
 # -- The generated scenery (.stg, .ac, .xml) will be written to this path.
 #    If empty, we'll use the correct location in PATH_TO_SCENERY. Note that
 #    if you use TerraSync for PATH_TO_SCENERY, you MUST choose a different

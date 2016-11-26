@@ -132,9 +132,3 @@ def get_apt_dat_blocked_areas(coords_transform: coordinates.Transformation,
     for airport in airports:
         blocked_areas.extend(airport.create_blocked_areas(coords_transform))
     return blocked_areas
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
-    _read_apt_dat_gz_file('/home/vanosten/bin/fgfs_git/install/flightgear/fgdata/Airports/apt.dat.gz',
-                          7.0, 46.0, 10.0, 49.0)

@@ -2,8 +2,10 @@
 """
 shamelessly translated from calc-tile.pl
 """
-import os
 from math import floor
+import os
+from typing import List
+
 import numpy as np
 
 
@@ -139,7 +141,7 @@ def calc_y(lat):
     
 
 def get_stg_files_in_boundary(boundary_west: float, boundary_south: float, boundary_east: float, boundary_north: float,
-                              path_to_scenery: str):
+                              path_to_scenery: str) -> List[str]:
     """Based on boundary rectangle returns a list of stg-files (incl. full path) to be found within the boundary of
     the scenery"""
     stg_files = []

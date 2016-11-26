@@ -19,6 +19,7 @@ from typing import List, Optional
 
 from utils import calc_tile
 from utils.vec2d import Vec2d
+from utils.utilities import assert_trailing_slash
 
 
 @enum.unique
@@ -224,8 +225,13 @@ class STGEntry(object):
             chosen_index = max([slash_index, backslash_index])
             self.obj_filename = self.obj_filename[:chosen_index + 1] + new_name
 
-    def get_obj_path_and_name(self) -> str:
+    def get_obj_path_and_name(self, scenery_path: str=None) -> str:
+        """Parameter scenery_path is most probably parameters.SCENERY_PATH.
+        It can be useful to try a different path for shared_objects, which might be from Terrasync."""
         if self.verb_type is STGVerbType.object_shared:
+            if scenery_path is not None:
+                return assert_trailing_slash(scenery_path) + self.obj_filename
+
             p = os.path.abspath(self.stg_path + os.sep + '..' + os.sep + '..' + os.sep + '..')
             return os.path.abspath(p + os.sep + self.obj_filename)
         else:

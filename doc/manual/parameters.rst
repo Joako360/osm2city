@@ -52,7 +52,11 @@ PREFIX                                          String     n/a       Name of the
 
 PATH_TO_SCENERY                                 Path       n/a       Full path to the scenery folder without trailing slash. This is where we will
                                                                      probe elevation and check for overlap with static objects. Most likely you'll
-                                                                     want to use your TerraSync path here. 
+                                                                     want to use your TerraSync path here.
+
+PATH_TO_SCENERY_OPT                             Path       None      Optional additional path to a scenery folder (e.g. for `Project3000`_).
+                                                                     Only used for overlap checking for buildings against static and shared
+                                                                     objects.
 
 PATH_TO_OUTPUT                                  Path       n/a       The generated scenery (.stg, .ac, .xml) will be written to this path. If empty
                                                                      then the correct location in PATH_TO_SCENERY is used. Note that if you use
@@ -90,6 +94,8 @@ FG_ELEV                                         String     n/a       Points to t
 
 
 .. _chapter-parameters-lod-label:
+.. _`Project3000`: http://wiki.flightgear.org/Project3000
+.. _`OSM Extended API`: http://wiki.openstreetmap.org/wiki/Xapi
 
 ----------------
 Level of Details
