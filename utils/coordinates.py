@@ -16,8 +16,8 @@ The correct approach, though, is probably to do exactly what FG does, which I th
 Created on Sat Jun  7 22:38:59 2014
 @author: albrecht
 """
-#http://williams.best.vwh.net/avform.htm
-#Local, flat earth approximation
+# http://williams.best.vwh.net/avform.htm
+# Local, flat earth approximation
 # If you stay in the vicinity of a given fixed point (lat0,lon0), it may be a 
 # good enough approximation to consider the earth as "flat", and use a North,
 # East, Down rectangular coordinate system with origin at the fixed point. If
@@ -52,6 +52,7 @@ Created on Sat Jun  7 22:38:59 2014
 
 from math import acos, asin, atan2, sin, cos, sqrt, radians, degrees, pi
 import logging
+from typing import Tuple
 import unittest
 
 
@@ -73,8 +74,8 @@ class Transformation(object):
 
     def _update(self):
         """compute radii for local origin"""
-        a = 6378137.000 # m for WGS84
-        f=1./298.257223563
+        a = 6378137.000  # m for WGS84
+        f = 1./298.257223563
         e2 = f*(2.-f)
 
         self._coslat = cos(radians(self._lat))
@@ -82,9 +83,9 @@ class Transformation(object):
         self._R1 = a*(1.-e2)/(1.-e2*(sinlat**2))**(3./2.)
         self._R2 = a/sqrt(1-e2*sinlat**2)
 
-    def setOrigin(self, xxx_todo_changeme1):
+    def setOrigin(self, coord_tuple: Tuple[float, float]):
         """set origin to given global coordinates (lon, lat)"""
-        (lon, lat) = xxx_todo_changeme1
+        (lon, lat) = coord_tuple
         self._lon, self._lat = lon, lat
         self._update()
 
@@ -94,16 +95,16 @@ class Transformation(object):
 
     origin = property(getOrigin, setOrigin)
 
-    def toLocal(self, xxx_todo_changeme2):
+    def toLocal(self, coord_tuple: Tuple[float, float]):
         """transform global -> local coordinates"""
-        (lon, lat) = xxx_todo_changeme2
+        (lon, lat) = coord_tuple
         y = self._R1 * radians(lat - self._lat)
         x = self._R2 * radians(lon - self._lon) * self._coslat
         return x, y
 
-    def toGlobal(self, xxx_todo_changeme3):
+    def toGlobal(self, coord_tuple: Tuple[float, float]):
         """transform local -> global coordinates"""
-        (x, y) = xxx_todo_changeme3
+        (x, y) = coord_tuple
         lat = degrees(y / self._R1) + self._lat
         lon = degrees(x / (self._R2 * self._coslat)) + self._lon
         return lon, lat

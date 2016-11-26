@@ -74,7 +74,7 @@ import textures.texture as tex
 import tools
 import utils.stg_io2
 import utils.vec2d as v
-from utils import osmparser, calc_tile, coordinates, stg_io2, utilities
+from utils import aptdat_io, osmparser, calc_tile, coordinates, stg_io2, utilities
 
 buildings = []  # -- master list, holds all buildings
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
@@ -993,6 +993,15 @@ if __name__ == "__main__":
         clusters_default.stg_verb_type = stg_io2.STGVerbType.object_building_mesh_detailed
         clusters_building_mesh_rough = cluster.ClusterContainer(lmin, lmax, stg_io2.STGVerbType.object_building_mesh_rough)
         handled_clusters.append(clusters_building_mesh_rough)
+
+    # check for buildings on airport runways etc.
+
+    # get blocked areas from apt.dat airport data
+    blocked_areas = aptdat_io.get_apt_dat_blocked_areas(coords_transform,
+                                                        parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
+                                                        parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
+
+    buildings = building_lib.overlap_check_blocked_areas(buildings, blocked_areas)
 
     if parameters.OVERLAP_CHECK:
         # -- read static/shared objects in our area from .stg(s)

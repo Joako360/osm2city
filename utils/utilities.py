@@ -12,7 +12,6 @@ import pickle
 import subprocess
 import sys
 import textwrap
-import time
 from typing import Tuple
 
 import numpy as np
@@ -40,6 +39,7 @@ def get_fg_root() -> str:
     """
     my_fg_root = os.getenv("FG_ROOT")
     if my_fg_root is None:
+        logging.error("$FG_ROOT must be set as an environment variable on operating system level")
         sys.exit(1)
     return my_fg_root
 
@@ -404,51 +404,6 @@ class FGElev(object):
             if self.auto_save_every and len(self._cache) % self.auto_save_every == 0:
                 self.save_cache()
             return elev_is_solid_tuple
-
-
-def test_fgelev(cache, N):
-    """simple testing for FGElev class"""
-    fg_elev = FGElev(use_cache=cache)
-    delta = 0.3
-    check_btg = True
-    p = ve.Vec2d(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)
-    fg_elev.probe_elev(p, True, check_btg)  # -- ensure fgelev is up and running
-    #p = Vec2d(parameters.BOUNDARY_WEST+delta, parameters.BOUNDARY_SOUTH+delta)
-    # elev(p, True, check_btg) # -- ensure fgelev is up and running
-    nx = ny = N
-    ny = 1
-    # X = np.linspace(parameters.BOUNDARY_WEST, parameters.BOUNDARY_WEST+delta, nx)
-    # Y = np.linspace(parameters.BOUNDARY_SOUTH, parameters.BOUNDARY_SOUTH+delta, ny)
-    X = np.linspace(parameters.BOUNDARY_WEST, parameters.BOUNDARY_EAST, nx)
-    Y = np.linspace(parameters.BOUNDARY_SOUTH, parameters.BOUNDARY_NORTH, ny)
-
-
-    # cache? N  speed
-    # True   10 30092 records/s
-    # False  10 17914 records/s
-    # True   20 27758 records/s
-    # False  20 18010 records/s
-    # True   50 29937 records/s
-    # False  50 18481 records/s
-    # True  100 30121 records/s
-    # False 100 18230 records/s
-    # True  200 29868 records/s
-    # False 200 18271 records/s
-
-    start = time.time()
-    s = []
-    i = 0
-    for y in Y:
-        for x in X:
-            p = ve.Vec2d(x, y)
-            print(i / 2, end='')
-            e = fg_elev.probe_elev(p, True, check_btg)
-            i += 1
-            e = fg_elev.probe_elev(p, True)
-            i += 1
-    end = time.time()
-    print(cache, N, "%d records/s" % (i / (end - start)))
-    fg_elev.save_cache()
 
 
 def progress(i, max_i):

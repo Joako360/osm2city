@@ -1154,6 +1154,18 @@ def read_buildings_from_stg_entries(path: str, stg_fname: str, our_magic: str) -
     return building_objs
 
 
+def overlap_check_blocked_areas(buildings: List[Building], blocked_areas: List[shg.Polygon]) -> List[Building]:
+    cleared_buildings = list()
+    for building in buildings:
+        for blocked_area in blocked_areas:
+            if building.polygon.intersects(blocked_area):
+                logging.debug("Building osm_id=%d intersects with blocked area.", building.osm_id)
+                continue
+            else:
+                cleared_buildings.append(building)
+    return cleared_buildings
+
+
 # ======================= New overlap detection ==========================
 
 def overlap_check_convex_hull(buildings: List[Building], my_coord_transformation: Transformation) -> List[Building]:

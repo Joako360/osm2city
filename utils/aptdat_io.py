@@ -12,34 +12,89 @@ $FG_ROOT/Airports/apt.dat.gz).
 
 """
 
+from abc import ABCMeta, abstractmethod
 import gzip
 import logging
+import math
+import os
 import time
 from typing import List
 
+from shapely.geometry import CAP_STYLE, LineString, Point, Polygon
+
+from utils import coordinates
+from utils import utilities
 from utils.vec2d import Vec2d
 
 
-class LandRunway(object):
+class Runway(metaclass=ABCMeta):
+    @abstractmethod
+    def within_boundary(self, min_lon: float, min_lat: float, max_lon: float, max_lat: float) -> bool:
+        pass
+
+    @abstractmethod
+    def create_blocked_area(self, coords_transform: coordinates.Transformation) -> Polygon:
+        pass
+
+
+class LandRunway(Runway):
     def __init__(self, width: float, start: Vec2d, end: Vec2d) -> None:
         self.width = width
-        self.start = start
-        self.end = end
+        self.start = start  # global coordinates
+        self.end = end  # global coordinates
+
+    def within_boundary(self, min_lon, min_lat, max_lon, max_lat):
+        if (min_lon <= self.start.x <= max_lon) and (min_lat <= self.start.y <= max_lat):
+            return True
+        if (min_lon <= self.end.x <= max_lon) and (min_lat <= self.end.y <= max_lat):
+            return True
+        return False
+
+    def create_blocked_area(self, coords_transform):
+        line = LineString([coords_transform.toLocal((self.start.x, self.start.y)),
+                          coords_transform.toLocal((self.end.x, self.end.y))])
+        return line.buffer(self.width / 2.0, cap_style=CAP_STYLE.flat)
+
+
+class Helipad(Runway):
+    def __init__(self, length: float, width: float, center: Vec2d) -> None:
+        self.length = length
+        self.width = width
+        self.center = center  # global coordinates
+
+    def within_boundary(self, min_lon, min_lat, max_lon, max_lat):
+        if (min_lon <= self.center.x <= max_lon) and (min_lat <= self.center.y <= max_lat):
+            return True
+        return False
+
+    def create_blocked_area(self, coords_transform):
+        my_point = Point(coords_transform.toLocal((self.center.x, self.center.y)))
+        return my_point.buffer(math.sqrt(self.length + self.width) / 2)
 
 
 class Airport(object):
     def __init__(self, code: str) -> None:
         self.code = code
-        self.land_runways= list()  # of LandRunways
+        self.runways = list()  # LandRunways, Helipads
 
-    def has_runways(self) -> bool:
-        return len(self.land_runways) > 0
+    def append_runway(self, runway: Runway) -> None:
+        self.runways.append(runway)
 
-    def append_runway(self, runway: LandRunway) -> None:
-        self.land_runways.append(runway)
+    def within_boundary(self, min_lon: float, min_lat: float, max_lon: float, max_lat: float) -> bool:
+        for runway in self.runways:
+            if runway.within_boundary(min_lon, min_lat, max_lon, max_lat):
+                return True
+        return False
+
+    def create_blocked_areas(self, coords_transform: coordinates.Transformation) -> List[Polygon]:
+        blocked_areas = list()
+        for runway in self.runways:
+            blocked_areas.append(runway.create_blocked_area(coords_transform))
+        return blocked_areas
 
 
-def read_apt_dat_gz_file(file_name: str) -> List[Airport]:
+def _read_apt_dat_gz_file(file_name: str, min_lon: float, min_lat: float,
+                          max_lon: float, max_lat: float) -> List[Airport]:
     start_time = time.time()
     airports = list()
     total_airports = 0
@@ -50,7 +105,7 @@ def read_apt_dat_gz_file(file_name: str) -> List[Airport]:
             if len(parts) == 0:
                 continue
             if parts[0] in ['1', '16', '17', '99']:
-                if (my_airport is not None) and (my_airport.has_runways()):
+                if (my_airport is not None) and (my_airport.within_boundary(min_lon, min_lat, max_lon, max_lat)):
                     airports.append(my_airport)
                 if not parts[0] == '99':
                     my_airport = Airport(parts[4])
@@ -59,13 +114,27 @@ def read_apt_dat_gz_file(file_name: str) -> List[Airport]:
                 my_runway = LandRunway(float(parts[1]), Vec2d(float(parts[10]), float(parts[9])),
                                        Vec2d(float(parts[19]), float(parts[18])))
                 my_airport.append_runway(my_runway)
+            elif parts[0] == '102':
+                my_helipad = Helipad(float(parts[5]), float(parts[6]), Vec2d(float(parts[3]), float(parts[2])))
+                my_airport.append_runway(my_helipad)
 
     end_time = time.time()
-    logging.info("Read %d airports, %d having land runways", total_airports, len(airports))
+    logging.info("Read %d airports, %d having runways/helipads within the boundary", total_airports, len(airports))
     logging.info("Execution time: %f", end_time - start_time)
     return airports
 
 
+def get_apt_dat_blocked_areas(coords_transform: coordinates.Transformation,
+                              min_lon: float, min_lat: float, max_lon: float, max_lat: float) -> List[Polygon]:
+    apt_dat_gz_file = utilities.assert_trailing_slash(utilities.get_fg_root()) + 'Airports' + os.sep + 'apt.dat.gz'
+    airports = _read_apt_dat_gz_file(apt_dat_gz_file, min_lon, min_lat, max_lon, max_lat)
+    blocked_areas = list()
+    for airport in airports:
+        blocked_areas.extend(airport.create_blocked_areas(coords_transform))
+    return blocked_areas
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
-    read_apt_dat_gz_file('/home/vanosten/bin/fgfs_git/install/flightgear/fgdata/Airports/apt.dat.gz')
+    _read_apt_dat_gz_file('/home/vanosten/bin/fgfs_git/install/flightgear/fgdata/Airports/apt.dat.gz',
+                          7.0, 46.0, 10.0, 49.0)

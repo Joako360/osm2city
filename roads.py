@@ -84,6 +84,7 @@ import logging
 import math
 import random
 import textwrap
+from typing import List
 
 import graph
 import linear
@@ -96,7 +97,7 @@ import shapely.geometry as shg
 import textures.road
 import tools
 from cluster import ClusterContainer
-from utils import osmparser, coordinates, ac3d, objectlist, stg_io2, utilities
+from utils import osmparser, coordinates, ac3d, objectlist, stg_io2, utilities, aptdat_io
 from utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
@@ -390,7 +391,7 @@ class Roads(objectlist.ObjectList):
 
         self.ways_list.append(way)
 
-    def process(self):
+    def process(self, blocked_areas: List[shg.Polygon]) -> None:
         """Processes the OSM data until data can be clusterized.
 
         Needs to be called after OSM data have been processed using the store_way callback method from
@@ -399,7 +400,9 @@ class Roads(objectlist.ObjectList):
         self._remove_tunnels()
         self._replace_short_bridges_with_ways()
         self._cleanup_topology()
+        self._check_blocked_areas(blocked_areas)
         self._check_points_on_line_distance()
+
 
         self._remove_unused_nodes()
         self._probe_elev_at_nodes()
@@ -414,6 +417,42 @@ class Roads(objectlist.ObjectList):
         if parameters.CREATE_BRIDGES_ONLY:
             self._keep_only_bridges_and_embankments()
         self._clusterize()
+
+    def _check_blocked_areas(self, blocked_areas: List[shg.Polygon]) -> None:
+        """Makes sure that there are no ways, which go across a blocked area (e.g. airport runway).
+        Ways are clipped over into two ways if intersecting."""
+        if len(blocked_areas) == 0:
+            return
+        new_ways = list()
+        for way in self.ways_list:
+            my_line = self._line_string_from_way(way)
+            for blocked_area in blocked_areas:
+                if my_line.intersects(blocked_area):
+                    my_multiline = my_line.difference(blocked_area)
+                    if len(my_multiline.geoms) != 2:
+                        logging.warning("Intersection of way (osm_id=%d) with blocked area cannot be processed.",
+                                        way.osm_id)
+                        continue
+                    # last node in first line is "new" node not found in original line
+                    index = len(list(my_multiline.geoms[0].coords)) - 2
+                    original_refs = way.refs
+                    way.refs = original_refs[:index + 1]
+                    new_way = osmparser.Way(way.osm_id)
+                    new_way.tags = way.tags
+                    new_way.refs = original_refs[index + 1:]
+                    new_ways.append(new_way)
+                    # now add new nodes from intersection
+                    lon_lat = self.transform.toGlobal(list(my_multiline.geoms[0].coords)[-1])
+                    new_node = osmparser.Node(_get_next_id_nodes(), lon_lat[1], lon_lat[0])
+                    self.nodes_dict[new_node.osm_id] = new_node
+                    way.refs.append(new_node.osm_id)
+                    lon_lat = self.transform.toGlobal(list(my_multiline.geoms[1].coords)[0])
+                    new_node = osmparser.Node(_get_next_id_nodes(), lon_lat[1], lon_lat[0])
+                    self.nodes_dict[new_node.osm_id] = new_node
+                    new_way.refs.insert(0, new_node.osm_id)
+                    logging.info("Split way (osm_id=%d) into 2 ways due to blocked area.", way.osm_id)
+
+        self.ways_list.extend(new_ways)
 
     def _remove_unused_nodes(self):
         """Remove all nodes which are not used in ways in order not to do elevation probing in vane."""
@@ -467,7 +506,7 @@ class Roads(objectlist.ObjectList):
             visited = {node0, node1}
             graph.for_edges_in_bfs_call(self._propagate_h_add_over_edge, None, self.G, node0s, visited)
 
-    def _line_string_from_way(self, way):
+    def _line_string_from_way(self, way: osmparser.Way) -> shg.LineString:
         osm_nodes = [self.nodes_dict[r] for r in way.refs]
         nodes = np.array([self.transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
         return shg.LineString(nodes)
@@ -619,9 +658,6 @@ class Roads(objectlist.ObjectList):
             if the_ref not in attached_ways_dict:  # FIXME: store previous test?
                 new_list.append(new_way)
                 self.debug_plot_way(new_way, '--', lw=1)
-#            new_way.refs.append(the_way.refs[-1])
-#            self.ways_list.append(new_way)
-#            self.debug_plot_way(new_way, "--", lw=2, mark_nodes=True)
 
         self.ways_list = new_list
 
@@ -1066,6 +1102,12 @@ def main():
     center_global = parameters.get_center_global()
     coords_transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(coords_transform)
+
+    # get blocked areas from apt.dat airport data
+    blocked_areas = aptdat_io.get_apt_dat_blocked_areas(coords_transform,
+                                                        parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
+                                                        parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
+
     fg_elev = utilities.FGElev(coords_transform, fake=parameters.NO_ELEV)
 
     border = None
@@ -1086,7 +1128,7 @@ def main():
     path_to_output = parameters.get_output_path()
     logging.debug("before linear " + str(roads))
 
-    roads.process()  # does the heavy lifting based on OSM data including clustering
+    roads.process(blocked_areas)  # does the heavy lifting based on OSM data including clustering
 
     replacement_prefix = parameters.get_repl_prefix()
     stg_manager = stg_io2.STGManager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
