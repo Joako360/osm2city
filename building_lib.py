@@ -68,7 +68,7 @@ class Building(object):
             self._set_polygon(outer_ring, self.inner_rings_list)
         else:
             self.polygon = None
-        if self.inner_rings_list: self._roll_inner_nodes()
+        if self.inner_rings_list: self.roll_inner_nodes()
         self.building_type = building_type
         self.parent = None
         self.parent_part = []
@@ -85,7 +85,7 @@ class Building(object):
                 self.model3d = tags['model3d']
                 self.angle3d = tags['angle3d']
 
-    def _roll_inner_nodes(self) -> None:
+    def roll_inner_nodes(self) -> None:
         """Roll inner rings such that the node closest to an outer node goes first.
 
            Also, create a list of outer corresponding outer nodes.
@@ -531,11 +531,13 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
         # - age: old, modern
 
         # - facade raussuchen
-        #   requires: compat:flat-roof
 
-        # if len(b.inner_rings_list) < 1: continue
+        # temporarily exclude greenhouses / glasshouses
+        if b.tags['building'] in ['glasshouse', 'greenhouse'] or (
+                        'amenity' in b.tags and b.tags['amenity'] in ['glasshouse', 'greenhouse']):
+            logging.debug("Excluded greenhouse with osm_id=%d", b.osm_id)
+            continue
 
-        # mat = random.randint(1,4)
         b.mat = 0
         b.roof_mat = 0
 
@@ -546,7 +548,7 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
         if not b.is_external_model:
             try:
                 tools.stats.nodes_simplified += b.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
-                b._roll_inner_nodes()
+                b.roll_inner_nodes()
             except Exception as reason:
                 logging.warning("simplify or roll_inner_nodes failed (OSM ID %i, %s)", b.osm_id, reason)
                 continue
