@@ -1,9 +1,4 @@
-# -*- coding: utf-8 -*-
-
 """
-Experimental code.
-python -m cProfile -o prof ./roads.py -f LOWI/params-small
-python -m cProfile -s 'cumtime' ./roads.py -f LOWI/params-small
 
 Created on Sun Sep 29 10:42:12 2013
 
@@ -103,17 +98,29 @@ from utils.vec2d import Vec2d
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 
 
-PSEUDO_ID_NODES = -1  # For those nodes, which get added as part of Roads._check_points_on_line_distance()
+PSEUDO_OSM_ID = -1  # For those nodes and ways, which get added as part of processing. Not written back to OSM.
 
 
-def _get_next_id_nodes():
-    global PSEUDO_ID_NODES
-    PSEUDO_ID_NODES -= 1
-    return PSEUDO_ID_NODES
+def _get_next_pseudo_osm_id():
+    global PSEUDO_OSM_ID
+    PSEUDO_OSM_ID -= 1
+    return PSEUDO_OSM_ID
 
 
-def _is_bridge(way):
-    return "bridge" in way.tags
+BRIDGE_KEY = 'bridge'  # the original OSM tag key
+REPLACED_BRIDGE_KEY = 'replaced_bridge'  # specifies a way that was originally a bridge, but due to length was changed
+
+
+def _is_bridge(way: osmparser.Way) -> bool:
+    """Returns true if the tags for this way constains the OSM key for bridge."""
+    return BRIDGE_KEY in way.tags
+
+
+def _is_replaced_bridge(way: osmparser.Way) -> bool:
+    """Returns true is this way was originally a bridge, but was changed to a non-bridge due to lenght.
+    See method Roads._replace_short_bridges_with_ways.
+    The reason to keep a replaced_tag is because else the way might be split if a node is in the water."""
+    return REPLACED_BRIDGE_KEY in way.tags
 
 
 def _is_railway(way):
@@ -133,7 +140,7 @@ def _is_processed_railway(way):
     return False
 
 
-def _calc_railway_width(way):
+def _calc_railway_gauge(way):
     width = 1435
     if way.tags['railway'] in ['narrow_gauge']:
         width = 1000
@@ -172,14 +179,12 @@ def _compatible_ways(way1, way2):
     return True
 
 
-def _init_way_from_existing(way, ref):
+def _init_way_from_existing(way: osmparser.Way, node_references: List[int]) -> osmparser.Way:
     """Return copy of way. The copy will have same osm_id and tags, but only given refs"""
     new_way = osmparser.Way(way.osm_id)
+    new_way.pseudo_osm_id = _get_next_pseudo_osm_id()
     new_way.tags = way.tags
-    try:
-        new_way.refs += ref
-    except TypeError:
-        new_way.refs.append(ref)
+    new_way.refs.extend(node_references)
     return new_way
 
 
@@ -399,24 +404,81 @@ class Roads(objectlist.ObjectList):
         """
         self._remove_tunnels()
         self._replace_short_bridges_with_ways()
-        self._cleanup_topology()
+        self._check_ways_in_water()
         self._check_blocked_areas(blocked_areas)
+        self._cleanup_topology()
         self._check_points_on_line_distance()
-
 
         self._remove_unused_nodes()
         self._probe_elev_at_nodes()
 
-        logging.debug("before linear " + str(self))
-
         # -- no change in topology beyond create_linear_objects() !
+        logging.debug("before linear " + str(self))
         self._create_linear_objects()
         self._propagate_h_add()
         logging.debug("after linear" + str(self))
 
         if parameters.CREATE_BRIDGES_ONLY:
             self._keep_only_bridges_and_embankments()
+
         self._clusterize()
+
+    def _check_ways_in_water(self) -> None:
+        """Checks whether a way or parts of a way is in water and removes those parts.
+        Water in relation to the FlightGear scenery, not OSM data (can be different).
+        Bridges and replaced bridges needs to be kept.
+        It does performance wise not matter, that _probe_elev_at_nodes also checks the scenery as stuff is cached."""
+        extra_ways = list()  # new ways to be added based on split ways
+        removed_ways = list()  # existing ways to be removed because not more than one node outside of water
+        for way in self.ways_list:
+            if _is_bridge(way) or _is_replaced_bridge(way):
+                continue
+            current_part_refs = list()
+            list_of_parts = [current_part_refs]  # a list of "current_parts". A way is split in parts if there is water
+            node_refs_in_water = list()
+            for ref in way.refs:
+                the_node = self.nodes_dict[ref]
+                if self.fg_elev.probe_solid(Vec2d(the_node.lon, the_node.lat), is_global=True):
+                    current_part_refs.append(ref)
+                else:
+                    current_part_refs = list()
+                    list_of_parts.append(current_part_refs)
+                    node_refs_in_water.append(ref)
+
+            if len(node_refs_in_water) == 0:  # all on land - just continue
+                continue
+            elif len(node_refs_in_water) == 1 and len(way.refs) > 2:  # only 1 point
+                if way.refs[0] is not node_refs_in_water[0] and way.refs[-1] is not node_refs_in_water[0]:
+                    if logging.getLogger().isEnabledFor(logging.DEBUG):
+                        my_string = """Accepting way with only 1 point in water at odm_id = {};
+                         first node = {}, last node = {}, removed node {}"""
+                        logging.debug(my_string.format(way.osm_id, way.refs[0], way.refs[-1], node_refs_in_water[0]))
+                    continue  # only 1 point somewhere in the middle is accepted
+
+            whole_way_found = False
+            for part_refs in list_of_parts:
+                if len(part_refs) < 2:
+                    continue
+                else:
+                    if not whole_way_found:  # let us re-use the existing way
+                        whole_way_found = True
+                        way.refs = part_refs
+                        logging.debug("Shortening existing way partly in water - osm_id = {}".format(way.osm_id))
+                    else:
+                        new_way= _init_way_from_existing(way, part_refs)
+                        extra_ways.append(new_way)
+                        logging.debug("Adding new way from partly in water - osm_id = {}".format(way.osm_id))
+            if not whole_way_found:
+                removed_ways.append(way)
+                logging.debug("Removing way because in water - osm_id = {}".format(way.osm_id))
+
+        # update ways list
+        for way in removed_ways:
+            try:
+                self.ways_list.remove(way)
+            except ValueError as e:
+                logging.warning("Unable to remove way with osm_id = {}".format(way.osm_id))
+        self.ways_list.extend(extra_ways)
 
     def _check_blocked_areas(self, blocked_areas: List[shg.Polygon]) -> None:
         """Makes sure that there are no ways, which go across a blocked area (e.g. airport runway).
@@ -437,17 +499,15 @@ class Roads(objectlist.ObjectList):
                     index = len(list(my_multiline.geoms[0].coords)) - 2
                     original_refs = way.refs
                     way.refs = original_refs[:index + 1]
-                    new_way = osmparser.Way(way.osm_id)
-                    new_way.tags = way.tags
-                    new_way.refs = original_refs[index + 1:]
+                    new_way = _init_way_from_existing(way, original_refs[index + 1:])
                     new_ways.append(new_way)
                     # now add new nodes from intersection
                     lon_lat = self.transform.toGlobal(list(my_multiline.geoms[0].coords)[-1])
-                    new_node = osmparser.Node(_get_next_id_nodes(), lon_lat[1], lon_lat[0])
+                    new_node = osmparser.Node(_get_next_pseudo_osm_id(), lon_lat[1], lon_lat[0])
                     self.nodes_dict[new_node.osm_id] = new_node
                     way.refs.append(new_node.osm_id)
                     lon_lat = self.transform.toGlobal(list(my_multiline.geoms[1].coords)[0])
-                    new_node = osmparser.Node(_get_next_id_nodes(), lon_lat[1], lon_lat[0])
+                    new_node = osmparser.Node(_get_next_pseudo_osm_id(), lon_lat[1], lon_lat[0])
                     self.nodes_dict[new_node.osm_id] = new_node
                     new_way.refs.insert(0, new_node.osm_id)
                     logging.info("Split way (osm_id=%d) into 2 ways due to blocked area.", way.osm_id)
@@ -532,10 +592,11 @@ class Roads(objectlist.ObjectList):
             if _is_bridge(the_way):
                 center = self._line_string_from_way(the_way)
                 if center.length < parameters.BRIDGE_MIN_LENGTH:
-                    the_way.tags.pop('bridge')
+                    the_way.tags.pop(BRIDGE_KEY)
+                    the_way.tags[REPLACED_BRIDGE_KEY] = 'yes'
     
     def _keep_only_bridges_and_embankments(self):
-        """Remove everything that is not elevated."""
+        """Remove everything that is not elevated - for debugging purposes"""
         for the_way in self.roads_list:
             h_add = np.array([abs(self.nodes_dict[the_ref].h_add) for the_ref in the_way.refs])
             if h_add.sum() == 0:
@@ -545,7 +606,7 @@ class Roads(objectlist.ObjectList):
     def _check_points_on_line_distance(self):
         """Based on parameter makes sure that points on a line are not too long apart for elevation probing reasons.
 
-        If distance is too long, then new points are added along the line.
+        If distance is longer than the related parameter, then new points are added along the line.
         """
         for the_way in self.ways_list:
             my_new_refs = [the_way.refs[0]]
@@ -561,7 +622,7 @@ class Roads(objectlist.ObjectList):
                     additional_needed_nodes = int(my_line.length / parameters.POINTS_ON_LINE_DISTANCE_MAX)
                     for x in range(additional_needed_nodes):
                         new_point = my_line.interpolate((x + 1) * parameters.POINTS_ON_LINE_DISTANCE_MAX)
-                        osm_id = _get_next_id_nodes()
+                        osm_id = _get_next_pseudo_osm_id()
                         lon_lat = self.transform.toGlobal((new_point.x, new_point.y))
                         new_node = osmparser.Node(osm_id, lon_lat[1], lon_lat[0])
                         self.nodes_dict[osm_id] = new_node
@@ -603,7 +664,7 @@ class Roads(objectlist.ObjectList):
                 else:
                     priority = 0  # E.g. monorail, miniature
                 if priority > 0:
-                    width = _calc_railway_width(the_way)
+                    width = _calc_railway_gauge(the_way)
 
             if priority == 0:
                 continue
@@ -648,13 +709,13 @@ class Roads(objectlist.ObjectList):
             utilities.progress(i, len(self.ways_list))
             self.debug_plot_way(the_way, '-', lw=2, color='0.90', show_label=0)
 
-            new_way = _init_way_from_existing(the_way, the_way.refs[0])
+            new_way = _init_way_from_existing(the_way, [the_way.refs[0]])
             for the_ref in the_way.refs[1:]:
                 new_way.refs.append(the_ref)
                 if the_ref in attached_ways_dict:
                     new_list.append(new_way)
                     self.debug_plot_way(new_way, '-', lw=1)
-                    new_way = _init_way_from_existing(the_way, the_ref)
+                    new_way = _init_way_from_existing(the_way, [the_ref])
             if the_ref not in attached_ways_dict:  # FIXME: store previous test?
                 new_list.append(new_way)
                 self.debug_plot_way(new_way, '--', lw=1)

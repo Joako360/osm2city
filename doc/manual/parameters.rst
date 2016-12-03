@@ -90,12 +90,17 @@ FG_ELEV                                         String     n/a       Points to t
                                                                      On Windows you might have to put quotes around the path due to whitespace
                                                                      e.g. ``'"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'``.
 
+PROBE_FOR_WATER                                 Boolean    False     Checks the scenery in ``PATH_TO_SCENERY`` whether points are in the water or
+                                                                     not. The Flightgear scenery's water boundaries might be different from OSM.
+                                                                     E.g. removes buildings if at least one corner is in the water. And removes
+                                                                     or splits (parts of) roads/railways, if at least 1 point is in the water.
+                                                                     Only possible with FGElev version after 9th of November 2016 / FG 2016.4.1.
+
 =============================================   ========   =======   ==============================================================================
 
 
 .. _chapter-parameters-lod-label:
 .. _`Project3000`: http://wiki.flightgear.org/Project3000
-.. _`OSM Extended API`: http://wiki.openstreetmap.org/wiki/Xapi
 
 ----------------
 Level of Details
@@ -172,6 +177,7 @@ TRAFFIC_SHADER_ENABLE                           Boolean    False     If True the
                                                                      cars, however it only works with the default renderer — ALS/Rembrandt must be
                                                                      off.
 OBSTRUCTION_LIGHT_MIN_LEVELS                    Integer    15        Puts obstruction lights on buildings >= the specified number levels.
+
 LIGHTMAP_ENABLE                                 Boolean    True      Creates simulated light effects on buildings from street lights.
 
 =============================================   ========   =======   ==============================================================================

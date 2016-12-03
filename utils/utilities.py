@@ -337,27 +337,32 @@ class FGElev(object):
         elev_is_solid_tuple = self.probe(position, is_global, check_btg)
         return elev_is_solid_tuple[0]
 
+    def probe_solid(self, position: ve.Vec2d, is_global: bool=False, check_btg: bool=False) -> bool:
+        elev_is_solid_tuple = self.probe(position, is_global, check_btg)
+        return elev_is_solid_tuple[1]
+
     def probe(self, position: ve.Vec2d, is_global: bool=False, check_btg: bool=False) -> Tuple[float, bool]:
-        """Return elevation and ground solidness at (x,y). We try our cache first. Failing that, call fgelev.
+        """Return elevation and ground solidness at (x,y). We try our cache first. Failing that, call Fgelev.
+        Elevation is in meters as float. Solid is True, in water is False
         """
-        def really_probe(position: ve.Vec2d) -> Tuple[float, bool]:
+        def really_probe(a_position: ve.Vec2d) -> Tuple[float, bool]:
             if check_btg:
                 btg_file = parameters.PATH_TO_SCENERY + os.sep + "Terrain" \
-                           + os.sep + calc_tile.directory_name(position) + os.sep \
-                           + calc_tile.construct_btg_file_name(position)
-                print(calc_tile.construct_btg_file_name(position))
+                           + os.sep + calc_tile.directory_name(a_position) + os.sep \
+                           + calc_tile.construct_btg_file_name(a_position)
+                print(calc_tile.construct_btg_file_name(a_position))
                 if not os.path.exists(btg_file):
                     logging.error("Terrain File " + btg_file + " does not exist. Set scenery path correctly or fly there with TerraSync enabled")
                     sys.exit(2)
 
             if not self.fgelev_pipe:
                 self._open_fgelev()
-            if math.isnan(position.lon) or math.isnan(position.lat):
+            if math.isnan(a_position.lon) or math.isnan(a_position.lat):
                 logging.error("Nan encountered while probing elevation")
                 return -9999, True
 
             try:
-                self.fgelev_pipe.stdin.write("%i %1.10f %1.10f\r\n" % (self.record, position.lon, position.lat))
+                self.fgelev_pipe.stdin.write("%i %1.10f %1.10f\r\n" % (self.record, a_position.lon, a_position.lat))
             except IOError as reason:
                 logging.error(reason)
 
@@ -375,7 +380,7 @@ class FGElev(object):
                 self.save_cache()
                 if empty_lines > 1:
                     logging.fatal("Skipped %i lines" % empty_lines)
-                logging.fatal("%i %g %g" % (self.record, position.lon, position.lat))
+                logging.fatal("%i %g %g" % (self.record, a_position.lon, a_position.lat))
                 logging.fatal("fgelev returned <%s>, resulting in %s. Did fgelev start OK (Record : %i)?",
                               line, reason, self.record)
                 raise RuntimeError("fgelev errors are fatal.")

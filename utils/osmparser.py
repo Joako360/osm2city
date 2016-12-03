@@ -34,28 +34,29 @@ class Node(OSMElement):
 
 
 class Way(OSMElement):
-    def __init__(self, osm_id):
+    def __init__(self, osm_id: int) -> None:
         OSMElement.__init__(self, osm_id)
         self.refs = []
+        self.pseudo_osm_id = 0  # can be assigned if existing way gets split
 
-    def add_ref(self, ref):
+    def add_ref(self, ref: int) -> None:
         self.refs.append(ref)
 
 
-class Relation(OSMElement):
-    def __init__(self, osm_id):
-        OSMElement.__init__(self, osm_id)
-        self.members = []
-
-    def add_member(self, member):
-        self.members.append(member)
-
-
 class Member(object):
-    def __init__(self, ref, type_, role):
+    def __init__(self, ref: int, type_, role) -> None:
         self.ref = ref
         self.type_ = type_
         self.role = role
+
+
+class Relation(OSMElement):
+    def __init__(self, osm_id: int):
+        OSMElement.__init__(self, osm_id)
+        self.members = []
+
+    def add_member(self, member: Member) -> None:
+        self.members.append(member)
 
 
 class OSMContentHandler(xml.sax.ContentHandler):
