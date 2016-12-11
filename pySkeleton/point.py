@@ -6,7 +6,6 @@
 #===============================================================================
 
 from math import sqrt
-from . import line
 
 class Point:
     """
@@ -83,6 +82,7 @@ class Point:
         return (self-q).norm()
     
     def inside(self, poly):
+        from . import line
         test=True
         for p in poly:
             q=poly.get_next()
