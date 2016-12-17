@@ -22,6 +22,8 @@ import logging
 import math
 import os
 import sys
+import time
+from typing import Dict, List, Tuple
 import unittest
 import xml.sax
 
@@ -303,9 +305,10 @@ class SharedPylon(object):
         elif self.direction_type == SharedPylon.DIRECTION_TYPE_START:
             direction_correction = 180
 
+        # 90 less because arms are in x-direction in ac-file
         my_stg_mgr.add_object_shared(self.pylon_model, vec2d.Vec2d(self.lon, self.lat),
                                      self.elevation,
-                                     stg_angle(self.heading - 90 + direction_correction))  # 90 less because arms are in x-direction in ac-file
+                                     stg_angle(self.heading - 90 + direction_correction))
 
 
 class Pylon(SharedPylon):
@@ -502,49 +505,49 @@ class Line(LineWithoutCables):
                 path_to_stg = my_stg_mgr.add_object_static(cluster_filename + '.xml',
                                                            vec2d.Vec2d(start_pylon.lon, start_pylon.lat),
                                                            start_pylon.elevation, 90 + angle_difference)
-                if None is not my_files_to_remove:
-                    my_files_to_remove.append(path_to_stg + cluster_filename + ".ac")
-                    my_files_to_remove.append(path_to_stg + cluster_filename + ".xml")
-                else:
-                    ac_file_lines = list()
-                    ac_file_lines.append("AC3Db")
-                    ac_file_lines.append('MATERIAL "cable" rgb 0.3 0.3 0.3 amb 0.3 0.3 0.3 emis 0.0 0.0 0.0 spec 0.3 0.3 0.3 shi 1 trans 0')
-                    ac_file_lines.append("OBJECT world")
-                    ac_file_lines.append("kids " + str(len(cluster_segments)))
-                    cluster_segment_index = 0
-                    for cluster_segment in cluster_segments:
-                        cluster_segment_index += 1
-                        ac_file_lines.append("OBJECT group")
-                        ac_file_lines.append('name "segment%05d"' % cluster_segment_index)
-                        ac_file_lines.append("kids " + str(len(cluster_segment.cables)))
-                        for cable in cluster_segment.cables:
-                            cable.translate_vertices_relative(start_pylon.x, start_pylon.y, start_pylon.elevation)
-                            ac_file_lines.append(cable.make_ac_entry(0))  # material is 0-indexed
 
-                    xml_file_lines = list()
-                    xml_file_lines.append('<?xml version="1.0"?>')
-                    xml_file_lines.append('<PropertyList>')
-                    xml_file_lines.append('<path>' + cluster_filename + '.ac</path>')  # the ac-file is in the same directory
+                my_files_to_remove.append(path_to_stg + cluster_filename + ".ac")
+                my_files_to_remove.append(path_to_stg + cluster_filename + ".xml")
+
+                ac_file_lines = list()
+                ac_file_lines.append("AC3Db")
+                ac_file_lines.append('MATERIAL "cable" rgb 0.3 0.3 0.3 amb 0.3 0.3 0.3 emis 0.0 0.0 0.0 spec 0.3 0.3 0.3 shi 1 trans 0')
+                ac_file_lines.append("OBJECT world")
+                ac_file_lines.append("kids " + str(len(cluster_segments)))
+                cluster_segment_index = 0
+                for cluster_segment in cluster_segments:
+                    cluster_segment_index += 1
+                    ac_file_lines.append("OBJECT group")
+                    ac_file_lines.append('name "segment%05d"' % cluster_segment_index)
+                    ac_file_lines.append("kids " + str(len(cluster_segment.cables)))
+                    for cable in cluster_segment.cables:
+                        cable.translate_vertices_relative(start_pylon.x, start_pylon.y, start_pylon.elevation)
+                        ac_file_lines.append(cable.make_ac_entry(0))  # material is 0-indexed
+
+                xml_file_lines = list()
+                xml_file_lines.append('<?xml version="1.0"?>')
+                xml_file_lines.append('<PropertyList>')
+                xml_file_lines.append('<path>' + cluster_filename + '.ac</path>')  # ac-file is in same directory
+                xml_file_lines.append('<animation>')
+                xml_file_lines.append('<type>range</type>')
+                xml_file_lines.append('<min-m>0</min-m>')
+                xml_file_lines.append('<max-property>/sim/rendering/static-lod/rough</max-property>')
+                for j in range(1, len(cluster_segments) + 1):
+                    xml_file_lines.append('<object-name>segment%05d</object-name>' % j)
+                xml_file_lines.append('</animation>')
+                if parameters.C2P_CABLES_NO_SHADOW:
                     xml_file_lines.append('<animation>')
-                    xml_file_lines.append('<type>range</type>')
-                    xml_file_lines.append('<min-m>0</min-m>')
-                    xml_file_lines.append('<max-property>/sim/rendering/static-lod/rough</max-property>')
+                    xml_file_lines.append('<type>noshadow</type>')
                     for j in range(1, len(cluster_segments) + 1):
                         xml_file_lines.append('<object-name>segment%05d</object-name>' % j)
                     xml_file_lines.append('</animation>')
-                    if parameters.C2P_CABLES_NO_SHADOW:
-                        xml_file_lines.append('<animation>')
-                        xml_file_lines.append('<type>noshadow</type>')
-                        for j in range(1, len(cluster_segments) + 1):
-                            xml_file_lines.append('<object-name>segment%05d</object-name>' % j)
-                        xml_file_lines.append('</animation>')
-                    xml_file_lines.append('</PropertyList>')
+                xml_file_lines.append('</PropertyList>')
 
-                    # -- write .ac and .xml
-                    with open(path_to_stg + cluster_filename + ".ac", 'w') as f:
-                        f.write("\n".join(ac_file_lines))
-                    with open(path_to_stg + cluster_filename + ".xml", 'w') as f:
-                        f.write("\n".join(xml_file_lines))
+                # -- write .ac and .xml
+                with open(path_to_stg + cluster_filename + ".ac", 'w') as f:
+                    f.write("\n".join(ac_file_lines))
+                with open(path_to_stg + cluster_filename + ".xml", 'w') as f:
+                    f.write("\n".join(xml_file_lines))
 
                 cluster_length = 0.0
                 cluster_segments = list()
@@ -1340,22 +1343,22 @@ def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator):
 
     for way in list(ways_dict.values()):
         my_landuse = Landuse(way.osm_id)
-        valid_landuse = True
+        valid_landuse = False
         for key in way.tags:
             value = way.tags[key]
             if "landuse" == key:
                 if value == "commercial":
                     my_landuse.type_ = Landuse.TYPE_COMMERCIAL
+                    valid_landuse = True
                 elif value == "industrial":
                     my_landuse.type_ = Landuse.TYPE_INDUSTRIAL
+                    valid_landuse = True
                 elif value == "residential":
                     my_landuse.type_ = Landuse.TYPE_RESIDENTIAL
+                    valid_landuse = True
                 elif value == "retail":
                     my_landuse.type_ = Landuse.TYPE_RETAIL
-                else:
-                    valid_landuse = False
-            else:
-                valid_landuse = False
+                    valid_landuse = True
         if valid_landuse:
             # Process the Nodes
             my_coordinates = list()
@@ -1417,7 +1420,42 @@ def generate_landuse_from_buildings(osm_landuses, building_refs):
     return my_landuse_candidates
 
 
-def main():
+def fetch_osm_file_data() -> Tuple[Dict[int, osmparser.Node], Dict[int, osmparser.Way]]:
+    start_time = time.time()
+    # the lists below are in sequence: buildings references, power/aerialway, railway overhead, landuse and highway
+    valid_node_keys = ["power", "structure", "material", "height", "colour", "aerialway",
+                       "railway"]
+    valid_way_keys = ["building",
+                      "power", "aerialway", "voltage", "cables", "wires",
+                      "railway", "electrified", "tunnel",
+                      "landuse",
+                      "highway", "junction"]
+    valid_relation_keys = []
+    req_relation_keys = []
+    req_way_keys = ["building", "power", "aerialway", "railway", "landuse", "highway"]
+    handler = osmparser.OSMContentHandlerOld(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
+                                             req_relation_keys)
+    osm_file_name = parameters.get_OSM_file_name()
+    source = open(osm_file_name, encoding="utf8")
+    xml.sax.parse(source, handler)
+    logging.info("Reading OSM data from xml took {0:.4f} seconds.".format(time.time() - start_time))
+    return handler.nodes_dict, handler.ways_dict
+
+
+def fetch_osm_db_data_ways(req_keys: List[str]) -> Tuple[Dict[int, osmparser.Node], Dict[int, osmparser.Way]]:
+    start_time = time.time()
+
+    db_connection = osmparser.make_db_connection()
+    ways_dict = osmparser.fetch_db_way_data(req_keys, db_connection)
+    nodes_dict = osmparser.fetch_db_nodes_for_way(req_keys, db_connection)
+    db_connection.close()
+
+    logging.info("Reading OSM way data for {0!s} from db took {1:.4f} seconds.".format(req_keys,
+                                                                                       time.time() - start_time))
+    return nodes_dict, ways_dict
+
+
+def process():
     # Handling arguments and parameters
     parser = argparse.ArgumentParser(
         description="pylons.py reads OSM data and creates pylons, powerlines and aerialways for use with FlightGear")
@@ -1435,15 +1473,15 @@ def main():
     parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
     if args.e:
         parameters.NO_ELEV = True
-    files_to_remove = None
+
+    files_to_remove = list()
     if args.uninstall:
         logging.info("Uninstalling.")
-        files_to_remove = []
         parameters.NO_ELEV = True
 
     # Initializing tools for global/local coordinate transformations
     center_global = parameters.get_center_global()
-    osm_fname = parameters.get_OSM_file_name()
+
     coords_transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(coords_transform)
 
@@ -1453,32 +1491,33 @@ def main():
 
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
-    # the lists below are in sequence: buildings references, power/aerialway, railway overhead, landuse and highway
-    valid_node_keys = ["power", "structure", "material", "height", "colour", "aerialway",
-                       "railway"]
-    valid_way_keys = ["building",
-                      "power", "aerialway", "voltage", "cables", "wires",
-                      "railway", "electrified", "tunnel",
-                      "landuse",
-                      "highway", "junction"]
-    valid_relation_keys = []
-    req_relation_keys = []
-    req_way_keys = ["building", "power", "aerialway", "railway", "landuse", "highway"]
-    handler = osmparser.OSMContentHandlerOld(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
-                                             req_relation_keys)
-    source = open(osm_fname, encoding="utf8")
-    xml.sax.parse(source, handler)
+
+    osm_nodes_dict = dict()  # key = osm_id, value = Node
+    osm_ways_dict = dict()  # key = osm_id, value = Way
+    if not parameters.USE_DATABASE:
+        osm_nodes_dict, osm_ways_dict = fetch_osm_file_data()
+
     # References for buildings
     building_refs = {}
     if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_AERIALWAYS or parameters.C2P_PROCESS_STREETLAMPS:
-        building_refs = process_osm_building_refs(handler.nodes_dict, handler.ways_dict, coords_transform)
+        if parameters.USE_DATABASE:
+            osm_nodes_dict, osm_ways_dict = fetch_osm_db_data_ways(['building'])
+        building_refs = process_osm_building_refs(osm_nodes_dict, osm_ways_dict, coords_transform)
         logging.info('Number of reference buildings: %s', len(building_refs))
     # Power lines and aerialways
     powerlines = {}
     aerialways = {}
     if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_AERIALWAYS:
-        powerlines, aerialways = process_osm_power_aerialway(handler.nodes_dict, handler.ways_dict, fg_elev
-                                                             , coords_transform, building_refs)
+        if parameters.USE_DATABASE:
+            req_keys = list()
+            if parameters.C2P_PROCESS_POWERLINES:
+                req_keys.append("power")
+            if parameters.C2P_PROCESS_POWERLINES:
+                req_keys.append("aerialway")
+            osm_nodes_dict, osm_ways_dict = fetch_osm_db_data_ways(req_keys)
+
+        powerlines, aerialways = process_osm_power_aerialway(osm_nodes_dict, osm_ways_dict, fg_elev,
+                                                             coords_transform, building_refs)
         if not parameters.C2P_PROCESS_POWERLINES:
             powerlines.clear()
         if not parameters.C2P_PROCESS_AERIALWAYS:
@@ -1492,15 +1531,20 @@ def main():
     # railway overhead lines
     rail_lines = {}
     if parameters.C2P_PROCESS_OVERHEAD_LINES:
-        rail_lines = process_osm_rail_overhead(handler.nodes_dict, handler.ways_dict, fg_elev
-                                               , coords_transform)
+        if parameters.USE_DATABASE:
+            osm_nodes_dict, osm_ways_dict = fetch_osm_db_data_ways(['railway'])
+        rail_lines = process_osm_rail_overhead(osm_nodes_dict, osm_ways_dict, fg_elev,
+                                               coords_transform)
         logging.info('Reduced number of rail lines: %s', len(rail_lines))
         for rail_line in list(rail_lines.values()):
             rail_line.calc_and_map(fg_elev, coords_transform, list(rail_lines.values()))
     # street lamps
     streetlamp_ways = {}
     if parameters.C2P_PROCESS_STREETLAMPS:
-        landuse_refs = process_osm_landuse_refs(handler.nodes_dict, handler.ways_dict, coords_transform)
+        if parameters.USE_DATABASE:
+            osm_nodes_dict, osm_ways_dict = fetch_osm_db_data_ways(["landuse", "highway"])
+
+        landuse_refs = process_osm_landuse_refs(osm_nodes_dict, osm_ways_dict, coords_transform)
         if parameters.LU_LANDUSE_GENERATE_LANDUSE:
             generated_landuses = generate_landuse_from_buildings(landuse_refs, building_refs)
             for generated in list(generated_landuses.values()):
@@ -1508,7 +1552,7 @@ def main():
         logging.info('Number of landuse references: %s', len(landuse_refs))
         streetlamp_buffers = merge_streetlamp_buffers(landuse_refs)
         logging.info('Number of streetlamp buffers: %s', len(streetlamp_buffers))
-        highways = process_osm_highway(handler.nodes_dict, handler.ways_dict, coords_transform)
+        highways = process_osm_highway(osm_nodes_dict, osm_ways_dict, coords_transform)
         streetlamp_ways = process_highways_for_streetlamps(highways, streetlamp_buffers)
         logging.info('Reduced number of streetlamp ways: %s', len(streetlamp_ways))
         for highway in list(streetlamp_ways.values()):
@@ -1517,7 +1561,6 @@ def main():
 
     # free some memory
     del building_refs
-    del handler
 
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
@@ -1554,7 +1597,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    process()
 
 
 # ================ UNITTESTS =======================

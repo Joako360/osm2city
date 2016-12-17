@@ -304,6 +304,31 @@ After adjusted MAX_SLOPE_* and POINTS_ON_LINE_DISTANCE_MAX parameters:
 .. image:: no_elev_residuals.png
 
 
+
+.. _chapter-parameters-database:
+
+--------
+Database
+--------
+
+Instead of reading from OSM files it is possible to use a PostGIS database as OSM data storage. See also :ref:`OSM Data in Database <chapter-osm-database-label>`.
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+USE_DATABASE                                    Boolean    False     If True then the OSM data is read from a database instead of
+                                                                     PATH_TO_OSM2CITY_DATA.
+DB_HOST                                         String     n/a       The host name of the computer running PostGIS (e.g. localhost).
+DB_PORT                                         Integer    5432      The port used to connect to the host
+DB_NAME                                         String     n/a       The name of the database (e.g osmogis).
+DB_USER                                         String     n/a       The name of the user to be used to read from the database. Can be read-only.
+DB_USER_PASSWORD                                String     n/a       The password for the DB_USER.
+
+=============================================   ========   =======   ==============================================================================
+
+
+
+
 .. FIXME missing explanations for MAX_TRANSVERSE_GRADIENT = 0.1   #
    DEBUG_PLOT = 0
    CREATE_BRIDGES_ONLY = 0         # create only bridges and embankments

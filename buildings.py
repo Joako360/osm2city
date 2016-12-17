@@ -102,7 +102,7 @@ class Buildings(object):
 
     def register_callbacks_with(self, handler):
         handler.register_way_callback(self.process_way, self.req_way_keys)
-        handler.register_uncategorized_way_callback(self.store_uncategorzied_way)
+        handler.register_uncategorized_way_callback(self.store_uncategorized_way)
         handler.register_relation_callback(self.process_relation, self.req_relation_keys)
 
     def _refs_to_ring(self, refs, inner=False):
@@ -132,7 +132,7 @@ class Buildings(object):
             if tag_matches(way.tags, self.req_way_keys) and len(way.refs) > 3:
                 self._make_building_from_way(way.osm_id, way.tags, way.refs)
 
-    def _make_building_from_way(self, osm_id, tags, refs, inner_ways=list()):
+    def _make_building_from_way(self, osm_id, tags, refs, inner_ways=list()) -> None:
         """Creates a building object from a way"""
         if refs[0] == refs[-1]:
             refs = refs[0:-1]  # -- kick last ref if it coincides with first
@@ -144,13 +144,6 @@ class Buildings(object):
 
         # -- funny things might happen while parsing OSM
         try:
-            #if osm_id in parameters.SKIP_LIST :
-            #    try : 
-            #        if tags['building'] != 'no' :
-            #            logging.info("SKIPPING OSM_ID %i" % osm_id)
-            #            return False
-            #    except :
-            #        pass
             if 'name' in tags:
                 name = tags['name']
                 if name in parameters.SKIP_LIST:
@@ -182,11 +175,9 @@ class Buildings(object):
 
             # -- simple (silly?) heuristics to 'respect' layers
             if layer == 0:
-                return False
+                return
             if layer < 99 and height == 0 and levels == 0:
                 levels = layer + 2
-
-        #        if len(refs) != 4: return False# -- testing, 4 corner buildings only
 
             # -- all checks OK: accept building
 
@@ -198,11 +189,11 @@ class Buildings(object):
         except KeyError as reason:
             logging.error("Failed to parse building referenced node missing clipped?(%s) WayID %d %s Refs %s" % (reason, osm_id, tags, refs))
             tools.stats.parse_errors += 1
-            return False
+            return
         except Exception as reason:
             logging.error("Failed to parse building (%s)  WayID %d %s Refs %s" % (reason, osm_id, tags, refs))
             tools.stats.parse_errors += 1
-            return False
+            return
 
         my_building = building_lib.Building(osm_id, tags, outer_ring, name, height, levels,
                                             inner_rings_list=inner_rings_list, building_type=_building_type,
@@ -210,12 +201,8 @@ class Buildings(object):
         self.buildings.append(my_building)
 
         tools.stats.objects += 1
-        # show progress here?
-        # if tools.stats.objects % 50 == 0:
-        #    logging.info(tools.stats.objects)
-        return True
 
-    def store_uncategorzied_way(self, way, nodes_dict):
+    def store_uncategorized_way(self, way, nodes_dict):
         """We need uncategorized ways (those without tags) too. They could
            be part of a relation building."""
         self.way_list.append(way)
@@ -233,11 +220,6 @@ class Buildings(object):
 
     def process_relation(self, relation):
         """Build relation buildings right after parsing."""
-#        print "__________- got relation", relation
-#        bla = 0
-#        if int(relation.osm_id) == 5789:
-#            print "::::::::::::: name", relation.tags['name']
-#            bla = 1
         if tools.stats.objects >= parameters.MAX_OBJECTS:
             return
 
@@ -261,34 +243,20 @@ class Buildings(object):
                         for way in self.way_list:
                             if way.osm_id == m.ref: inner_ways.append(way)
 
-                #elif m.type_ == 'multipolygon':
-                #    if m.role == 'outer' :
-                #        for way in self.way_list:
-                #            if way.osm_id == m.ref:
-                #                outer_multipolygons.append(way)
-
             if outer_multipolygons:
                 all_tags = relation.tags
                 for way in outer_multipolygons:
                     logging.debug("Multipolygon " + str(way.osm_id))
                     all_tags = dict(list(way.tags.items()) + list(all_tags.items()))
-                    res=False
                     try:
                         if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
-                            res = self._make_building_from_way(way.osm_id,
-                                                               all_tags,
-                                                               way.refs, [inner_ways[0]])
+                            self._make_building_from_way(way.osm_id, all_tags, way.refs, [inner_ways[0]])
                         else:
-                            res = self._make_building_from_way(way.osm_id, 
-                                                               all_tags,
-                                                               way.refs, inner_ways)
+                            self._make_building_from_way(way.osm_id, all_tags, way.refs, inner_ways)
                     except:
-                        res = self._make_building_from_way(way.osm_id, 
-                                                                   all_tags,
-                                                                   way.refs)
+                        self._make_building_from_way(way.osm_id, all_tags, way.refs)
 
             if outer_ways:
-                #all_outer_refs = [ref for way in outer_ways for ref in way.refs]
                 # build all_outer_refs
                 list_outer_refs = [way.refs for way in outer_ways[1:]]
                 # get some order :
@@ -298,36 +266,23 @@ class Buildings(object):
                 for i in range(1, len(outer_ways)):
                     for way_refs in list_outer_refs :
                         if way_refs[0] == all_outer_refs[-1]:
-                            #first node of way is last of previous
+                            # first node of way is last of previous
                             all_outer_refs.extend(way_refs[0:])
                             continue
                         elif way_refs[-1] == all_outer_refs[-1]:
-                            #last node of way is last of previous 
+                            # last node of way is last of previous
                             all_outer_refs.extend(way_refs[::-1])
                             continue
                     list_outer_refs.remove(way_refs)
 
                 all_tags = relation.tags
                 for way in outer_ways:
-                    #print "TAG", way.tags
                     all_tags = dict(list(way.tags.items()) + list(all_tags.items()))
-                #print "all tags", all_tags
-                #all_tags = dict([way.tags for way in outer_ways]) # + tags.items())
-                #print "all outer refs", all_outer_refs
-                #dict(outer.tags.items() + tags.items())
                 if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
                     print("FIXME: ignoring all but first inner way (%i total) of ID %i" % (len(inner_ways), relation.osm_id))
-                    res = self._make_building_from_way(relation.osm_id,
-                                                       all_tags,
-                                                       all_outer_refs, [inner_ways[0]])
+                    self._make_building_from_way(relation.osm_id, all_tags, all_outer_refs, [inner_ways[0]])
                 else:
-                    res = self._make_building_from_way(relation.osm_id,
-                                                       all_tags,
-                                                       all_outer_refs, inner_ways)
-#                print ":::::mk_build returns", res,
-#                if bla:
-#                    print relation.tags['name']
-                # -- way could have a 'building' tag, too. Prevent processing this twice.
+                    self._make_building_from_way(relation.osm_id, all_tags, all_outer_refs, inner_ways)
 
             if not outer_multipolygons and not outer_ways:
                 logging.info("Skipping relation %i: no outer way." % relation.osm_id)
@@ -351,13 +306,6 @@ class Buildings(object):
                 self.maxlat = node.lat
             if node.lat < self.minlat:
                 self.minlat = node.lat
-
-#        cmin = Vec2d(self.minlon, self.minlat)
-#        cmax = Vec2d(self.maxlon, self.maxlat)
-#        logging.info("min/max coord" + str(cmin) + " " + str(cmax))
-
-# -----------------------------------------------------------------------------
-# -- write xml
 
 
 def write_xml(path: str, file_name: str, buildings: List[building_lib.Building], cluster_offset: v.Vec2d) -> None:
@@ -457,8 +405,6 @@ if __name__ == "__main__":
                         help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL", required=False)
     args = parser.parse_args()
 
-    # -- command line args override paramters
-
     if args.filename is not None:
         parameters.read_from_file(args.filename)
     parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
@@ -519,7 +465,6 @@ if __name__ == "__main__":
         logging.info("Reading the OSM file might take some time ...")
         handler.parse(source)
 
-        # tools.stats.print_summary()
         buildings.make_way_buildings()
         buildings.get_min_max_coords()
         cmin = v.Vec2d(buildings.minlon, buildings.minlat)
@@ -551,35 +496,15 @@ if __name__ == "__main__":
                         pass
                 
                 for ref in process_refs:
-                    # Store used references
-                    #if ref in used_refs :
-                    #    continue
-                    # 
-                    #if ref in self.node_way_dict :
-                    #print(" ref", ref)
-                    
-                    #if ref not in buildings.node_way_dict :
-                    #     buildings.node_way_dict=[]
-                        
                     tmp_b_cands = list({ b_cand for b_cand in buildings.node_way_dict[ref] if ((b_cand not in b_cands) and (b_cand.osm_id != building.osm_id))})
                     b_cands.extend(tmp_b_cands)
                     
                     if ref not in used_refs:
                         used_refs.append(ref) ; used_refs = list(set(used_refs))
                         for cand_building in tmp_b_cands:
-                            #if cand_building.cand_buildings and flag_init==False:
-                            #    building.cand_buildings =  cand_building.cand_buildings
-                            #    return True
-                            #else :                                
-                            add_candidates(cand_building, b_cands, used_refs, flag_init=False, recurs=recurs+1) 
-                            #        return True
-                    
-                #for b_cand in b_cands :
-                #    if b_cand not in building.cand_buildings :
-                #        building.cand_buildings.append(b_cand)
-                
-                building.cand_buildings = b_cands
+                            add_candidates(cand_building, b_cands, used_refs, flag_init=False, recurs=recurs+1)
 
+                building.cand_buildings = b_cands
                 return False
         
             def check_and_set_parent(building, cand_building, flag_search='equal'):
@@ -638,16 +563,13 @@ if __name__ == "__main__":
                                         # store parent that is itset a building:part
                                         logging.verbose("    found possible " + str(cand_building.osm_id))
                                         building.parents_parts.append(cand_building)
-                                        #building.parent_part.cand_building 
                                         return
                             except KeyError:
                                 pass
 
                             try:
                                 if cand_building.tags['building'] != 'no':
-                                    #
                                     # found building parent
-                                    #
                                     if cand_building not in buildings.remove_buildings:
                                         buildings.remove_buildings.append(cand_building)
                                         logging.info('Found Building for removing %d' % cand_building.osm_id)
@@ -684,12 +606,12 @@ if __name__ == "__main__":
                     if ref not in buildings.node_way_dict:
                         way_list_by_ref=[]
                     else:
-                        way_list_by_ref=buildings.node_way_dict[ref]
+                        way_list_by_ref = buildings.node_way_dict[ref]
                         
                     way_list_by_ref.append(building)
                     way_list_by_ref=list(set(way_list_by_ref))
                     
-                    buildings.node_way_dict[ref]=way_list_by_ref
+                    buildings.node_way_dict[ref] = way_list_by_ref
 
             #
             # First Pass search parent with buildings sharing points
@@ -797,7 +719,7 @@ if __name__ == "__main__":
             for building in buildings.buildings:
                 if not building.parent:
                     #
-                    # Search in parent of childrens
+                    # Search in parent of children
                     #
                     possible_parents = [child.parent for child in building.children if child.parent]
                     possible_parents = list(set(possible_parents))
@@ -810,7 +732,6 @@ if __name__ == "__main__":
                     elif len(possible_parents) > 1:
                         most_probable_parent = possible_parents[0]
                         area=most_probable_parent.area
-                        #print("area", area)
                         #
                         # search biggest building
                         #
@@ -881,19 +802,12 @@ if __name__ == "__main__":
             #
             # remove tagged buildings:part
             #
-            #for building in buildings.remove_buildings_parts :
-            #    try :
-            #        buildings.buildings.remove(building)
-            ##        print("Removing building part", building.osm_id)
-            #        tools.stats.objects -= 1
-            #    except :
-            #        pass       
             keep_buildings = []
             keeped = 0
             if parameters.KEEP_LIST:
                 logging.verbose(" KEEP only buildings ")
                 logging.verbose("len buildings.buildings %i"%len(buildings.buildings))
-                # keep explicitely given buildings by keep_list
+                # keep explicitly given buildings by keep_list
                 for building in buildings.buildings:
                     logging.verbose("TEST %i " % building.osm_id)
                     if building.osm_id in parameters.KEEP_LIST:

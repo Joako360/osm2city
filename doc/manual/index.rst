@@ -29,6 +29,7 @@ Before you generate your own sceneries, you might want to get familiar with the 
    generation
    using
    parameters
+   appendix
 
 
 **Indices and tables:**

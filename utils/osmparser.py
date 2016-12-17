@@ -8,18 +8,22 @@ Use a tool like Osmosis to pre-process data.
 """
 
 import logging
+from typing import Dict, List, Tuple
 import unittest
 import xml.sax
 
+import psycopg2
 import shapely.geometry as shg
+
+import parameters
 
 
 class OSMElement(object):
-    def __init__(self, osm_id):
+    def __init__(self, osm_id: int) -> None:
         self.osm_id = osm_id
         self.tags = {}
 
-    def add_tag(self, key, value):
+    def add_tag(self, key: str, value: str) -> None:
         self.tags[key] = value
 
     def __str__(self):
@@ -27,7 +31,7 @@ class OSMElement(object):
 
 
 class Node(OSMElement):
-    def __init__(self, osm_id, lat, lon):
+    def __init__(self, osm_id: int, lat: float, lon: float) -> None:
         OSMElement.__init__(self, osm_id)
         self.lat = lat  # float value
         self.lon = lon  # float value
@@ -270,7 +274,7 @@ def parse_length(str_length):
         return 0
 
 
-def is_parsable_float(str_float):
+def is_parsable_float(str_float: str) -> bool:
     try:
         float(str_float)
         return True
@@ -278,7 +282,7 @@ def is_parsable_float(str_float):
         return False
 
 
-def is_parsable_int(str_int):
+def is_parsable_int(str_int: str) -> bool:
     try:
         int(str_int)
         return True
@@ -286,8 +290,118 @@ def is_parsable_int(str_int):
         return False
 
 
-# ================ UNITTESTS =======================
+def parse_hstore_tags(tags_string: str, osm_id: int) -> Dict[str, str]:
+    """Parses the content of a string representation of a PostGIS hstore content for tags.
+    Returns a dict of key value pairs as string."""
+    tags_dict = dict()
+    if len(tags_string.strip()) > 0:  # else we return the empty dict as is
+        elements = tags_string.strip().split('", "')
+        for element in elements:
+            if len(element.strip()) > 0:
+                sub_elements = element.strip().split("=>")
+                if len(sub_elements) == 2 and len(sub_elements[0].strip()) > 1 and len(sub_elements[1].strip()) > 1:
+                    key = sub_elements[0].strip().strip('"')
+                    if key not in tags_dict:
+                        tags_dict[key] = sub_elements[1].strip().strip('"')
+                    else:
+                        message = "hstore for osm_id={} has same key twice: key={}, tags='{}'.".format(osm_id,
+                                                                                                       key,
+                                                                                                       tags_string)
+                        logging.warning(message)
+                else:
+                    message = "hstore for osm_id={} has not valid key/value pair: '{}' in '{}'.".format(osm_id,
+                                                                                                        sub_elements,
+                                                                                                        tags_string)
+                    logging.warning(message)
+    return tags_dict
 
+
+def fetch_db_way_data(req_way_keys: List[str], db_connection: psycopg2.extensions.connection) -> Dict[int, Way]:
+    """Fetches Way objects out of database given required tag keys and boundary in parameters."""
+    query = """SELECT id, tags, nodes
+    FROM ways AS w
+    WHERE
+    """
+    query += construct_tags_query(req_way_keys)
+    query += " AND "
+    query += construct_intersect_bbox_query()
+    query += ";"
+
+    result_tuples = fetch_all_query_into_tuple(query, db_connection)
+
+    ways_dict = dict()
+    for result in result_tuples:
+        my_way = Way(result[0])
+        my_way.tags = parse_hstore_tags(result[1], my_way.osm_id)
+        my_way.refs = result[2]
+        ways_dict[my_way.osm_id] = my_way
+
+    return ways_dict
+
+
+def fetch_db_nodes_for_way(req_way_keys: List[str], db_connection: psycopg2.extensions.connection) -> Dict[int, Node]:
+    """Fetches Node objects for ways out of database given same constraints as for Way.
+    Constraints for way: see fetch_db_way_data"""
+    query = """SELECT n.id, ST_X(n.geom) as lon, ST_Y(n.geom) as lat
+    FROM ways AS w, way_nodes AS r, nodes AS n
+    WHERE
+    r.way_id = w.id
+    AND r.node_id = n.id
+    AND """
+    query += construct_tags_query(req_way_keys)
+    query += " AND "
+    query += construct_intersect_bbox_query()
+    query += ";"
+
+    result_tuples = fetch_all_query_into_tuple(query, db_connection)
+
+    nodes_dict = dict()
+    for result in result_tuples:
+        my_node = Node(result[0], result[2], result[1])
+        nodes_dict[my_node.osm_id] = my_node
+
+    return nodes_dict
+
+
+def fetch_all_query_into_tuple(query: str, db_connection: psycopg2.extensions.connection) -> List[Tuple]:
+    """Given a query string and a db connection execute fetch all and return the result as a list of tuples"""
+    cur = db_connection.cursor()
+    logging.debug("Query string for execution in database: " + query)
+    cur.execute(query)
+    return cur.fetchall()
+
+
+def make_db_connection() -> psycopg2.extensions.connection:
+    """"Create connection to the database based on parameters."""
+    return psycopg2.connect(database=parameters.DB_NAME, host=parameters.DB_HOST, port=parameters.DB_PORT,
+                            user=parameters.DB_USER, password=parameters.DB_USER)
+
+
+def construct_intersect_bbox_query() -> str:
+    """Constructs the part of a sql where clause, which constrains to bounding box."""
+    query_part = "ST_Intersects(w.bbox, ST_SetSRID(ST_MakeBox2D(ST_Point({}, {}), ST_Point({}, {})), 4326))"
+    return query_part.format(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
+                             parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
+
+
+def construct_tags_query(req_tag_keys: List[str]) -> str:
+    """Constructs the part of a sql where clause, which constrains the result based on required tag keys."""
+    if len(req_tag_keys) == 1:
+        return "w.tags ? '" + req_tag_keys[0] + "'"
+    else:
+        is_first = True
+        query = "w.tags ?| ARRAY["
+        for key in req_tag_keys:
+            if is_first:
+                is_first = False
+            else:
+                query += ", "
+            query += "'" + key + "'"
+        query += "]"
+        return query
+
+
+# ================ UNITTESTS =======================
 
 class TestOSMParser(unittest.TestCase):
     def test_parse_length(self):
@@ -309,4 +423,24 @@ class TestOSMParser(unittest.TestCase):
     def test_is_parsable_int(self):
         self.assertFalse(is_parsable_int('1.2'))
         self.assertFalse(is_parsable_int('x'))
-        self.assertTrue(is_parsable_int(1))
+        self.assertTrue(is_parsable_int('1'))
+
+    def test_parse_hstore_tags(self):
+        self.assertEqual(0, len(parse_hstore_tags('', 1)), "Empty string")
+        self.assertEqual(0, len(parse_hstore_tags('  ', 1)), "Empty truncated string")
+        my_dict = parse_hstore_tags('"foo"=>"goo"', 1)
+        self.assertEqual(1, len(my_dict), "One element tags")
+        self.assertEqual("goo", my_dict["foo"], "One element tags validate value")
+        my_dict = parse_hstore_tags('"foo"=>"goo", "alpha"=> "1"', 1)
+        self.assertEqual(2, len(my_dict), "Two element tags")
+        self.assertEqual("1", my_dict["alpha"])
+        my_dict = parse_hstore_tags('"foo"=>"goo", "alpha"=> "1", ', 1)
+        self.assertEqual(2, len(my_dict), "Last element empty")
+        my_dict = parse_hstore_tags('"foo"=>"goo", "foo"=> "1"', 1)
+        self.assertEqual(1, len(my_dict), "Repeated key ignored")
+        my_dict = parse_hstore_tags('"foo"=>"goo", "foo"=> ""', 1)
+        self.assertEqual(1, len(my_dict), "Invalid value ignored")
+        my_dict = parse_hstore_tags('"foo"=>"go,o", "ho,o"=>"i,"', 1)
+        self.assertEqual(2, len(my_dict), "Keys and values with comma")
+        self.assertEqual("go,o", my_dict["foo"], "Keys and values with comma validate first value")
+        self.assertEqual("i,", my_dict["ho,o"], "Keys and values with comma validate first value")

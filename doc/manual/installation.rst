@@ -32,8 +32,9 @@ osm2city uses the following Python extension packages, which must be installed o
 * pil
 * scipy
 * shapely
+* psycopg2
 
-Please make sure to use Python 3.5 compatible extensions. Often Python 3 compatible packages have a "3" in their name. Most Linux distributions come by default with the necessary packages — often they are prefixed with ``python-`` (e.g. ``python-numpy``). On Windows WinPython (https://winpython.github.io/) together with Christoph Gohlke's unofficial Windows binaries for Python extension packages (http://www.lfd.uci.edu/~gohlke/pythonlibs/) works well.
+Please make sure to use Python 3.5+ compatible extensions. Often Python 3 compatible packages have a "3" in their name. Most Linux distributions come by default with the necessary packages — often they are prefixed with ``python-`` (e.g. ``python-numpy``). On Windows WinPython (https://winpython.github.io/) together with Christoph Gohlke's unofficial Windows binaries for Python extension packages (http://www.lfd.uci.edu/~gohlke/pythonlibs/) works well.
 
 
 .. _chapter-osm2city-install:

@@ -66,7 +66,15 @@ PATH_TO_SCENERY_OPT = None
 #    Also make sure PATH_TO_OUTPUT is included in your $FG_SCENERY.
 PATH_TO_OUTPUT = "/home/user/fgfs/scenery/osm2city"
 
+# OSM DATA is either stored in a file pointed to by PATH_TO_OSM2CITY_DATA (USE_DATABASE = False) or in a database.
+# If using the database then set USE_DATABASE = True and set the DB_* parameters according to your PostGIS instance.
 PATH_TO_OSM2CITY_DATA = "/home/user/osm2city-data"
+USE_DATABASE = False  # If True then the OSM data is read from a database instead of PATH_TO_OSM2CITY_DATA.
+DB_HOST = "localhost"  # The host name of the computer running PostGIS.
+DB_PORT = 5432  # The port used to connect to the host
+DB_NAME = "osmgis"  # The name of the database.
+DB_USER = "gisuser"  # The name of the user to be used to read from the database.
+DB_USER_PASSWORD = "n/a"  # The password for the DB_USER.
 
 NO_ELEV = False             # -- skip elevation probing
 FG_ELEV = '"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'
