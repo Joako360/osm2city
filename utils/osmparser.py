@@ -189,11 +189,12 @@ class OSMContentHandlerOld(xml.sax.ContentHandler):
     The valid_??_keys and req_??_keys are a primitive way to save memory and reduce the number of further processed
     elements. A better way is to have the input file processed by e.g. Osmosis first.
     """
-    def __init__(self, valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys):
+    def __init__(self, valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys,
+                 border=None):
         super(OSMContentHandlerOld, self).__init__()
         self.valid_way_keys = valid_way_keys
         self.valid_relation_keys = valid_relation_keys
-        self._handler = OSMContentHandler(valid_node_keys)
+        self._handler = OSMContentHandler(valid_node_keys, border)
         self._handler.register_way_callback(self.process_way, req_way_keys)
         self._handler.register_relation_callback(self.process_relation, req_relation_keys)
         self.nodes_dict = None
@@ -316,13 +317,14 @@ def parse_hstore_tags(tags_string: str, osm_id: int) -> Dict[str, str]:
     return tags_dict
 
 
-def fetch_db_way_data(req_way_keys: List[str], db_connection: psycopg2.extensions.connection) -> Dict[int, Way]:
+def fetch_db_way_data(req_way_keys: List[str], req_way_key_values: List[str],
+                      db_connection: psycopg2.extensions.connection) -> Dict[int, Way]:
     """Fetches Way objects out of database given required tag keys and boundary in parameters."""
     query = """SELECT id, tags, nodes
     FROM ways AS w
     WHERE
     """
-    query += construct_tags_query(req_way_keys)
+    query += construct_tags_query(req_way_keys, req_way_key_values)
     query += " AND "
     query += construct_intersect_bbox_query()
     query += ";"
@@ -339,7 +341,8 @@ def fetch_db_way_data(req_way_keys: List[str], db_connection: psycopg2.extension
     return ways_dict
 
 
-def fetch_db_nodes_for_way(req_way_keys: List[str], db_connection: psycopg2.extensions.connection) -> Dict[int, Node]:
+def fetch_db_nodes_for_way(req_way_keys: List[str], req_way_key_values: List[str],
+                           db_connection: psycopg2.extensions.connection) -> Dict[int, Node]:
     """Fetches Node objects for ways out of database given same constraints as for Way.
     Constraints for way: see fetch_db_way_data"""
     query = """SELECT n.id, ST_X(n.geom) as lon, ST_Y(n.geom) as lat
@@ -348,7 +351,7 @@ def fetch_db_nodes_for_way(req_way_keys: List[str], db_connection: psycopg2.exte
     r.way_id = w.id
     AND r.node_id = n.id
     AND """
-    query += construct_tags_query(req_way_keys)
+    query += construct_tags_query(req_way_keys, req_way_key_values)
     query += " AND "
     query += construct_intersect_bbox_query()
     query += ";"
@@ -384,21 +387,42 @@ def construct_intersect_bbox_query() -> str:
                              parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
 
 
-def construct_tags_query(req_tag_keys: List[str]) -> str:
-    """Constructs the part of a sql where clause, which constrains the result based on required tag keys."""
+def construct_tags_query(req_tag_keys: List[str], req_tag_key_values: List[str]) -> str:
+    """Constructs the part of a sql where clause, which constrains the result based on required tag keys.
+    In req_tag_keys at least one of the key needs to be present in the tags of a given record.
+    In req_tag_key_values at least one key/value pair must be present (e.g. 'railway=>platform') - the key
+    must be separated without blanks from the value by a '=>'."""
+    tags_query = ""
     if len(req_tag_keys) == 1:
-        return "w.tags ? '" + req_tag_keys[0] + "'"
-    else:
+        tags_query += "w.tags ? '" + req_tag_keys[0] + "'"
+    elif len(req_tag_keys) > 1:
         is_first = True
-        query = "w.tags ?| ARRAY["
+        tags_query += "w.tags ?| ARRAY["
         for key in req_tag_keys:
             if is_first:
                 is_first = False
             else:
-                query += ", "
-            query += "'" + key + "'"
-        query += "]"
-        return query
+                tags_query += ", "
+            tags_query += "'" + key + "'"
+        tags_query += "]"
+
+    if len(req_tag_key_values) > 0:
+        if len(tags_query) > 0:
+            tags_query += " AND "
+        if len(req_tag_key_values) == 1:
+            tags_query += "w.tags @> '" + req_tag_key_values[0] + "'"
+        else:
+            tags_query += "("
+            is_first = True
+            for key_value in req_tag_key_values:
+                if is_first:
+                    is_first = False
+                else:
+                    tags_query += " OR "
+                tags_query += "w.tags @> '" + key_value + "'"
+            tags_query += ")"
+
+    return tags_query
 
 
 # ================ UNITTESTS =======================

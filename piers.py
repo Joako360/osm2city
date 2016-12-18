@@ -123,7 +123,7 @@ def _write_boat_area(pier, stg_manager):
     # Guess a possible position for realistic boat placement
     linear_ring = shg.LinearRing(pier.nodes)
     centroid = linear_ring.centroid
-    # Simplyfy
+    # Simplify
     ring = linear_ring.convex_hull.buffer(40, cap_style=CAP_STYLE.square, join_style=JOIN_STYLE.bevel).simplify(20)
     for p in ring.exterior.coords:
         coord = Vec2d(p[0], p[1])
@@ -376,14 +376,13 @@ def main():
     stg_manager = stg_io2.STGManager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
 
     piers.write_piers(stg_manager, replacement_prefix)
-    logging.info("done.")
 
     piers.write_boats(stg_manager)
     # -- write stg
     stg_manager.write()
     fg_elev.save_cache()
 
-    logging.info("Done")
+    logging.info("******* Finished *******")
 
 
 if __name__ == "__main__":

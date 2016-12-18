@@ -1446,8 +1446,8 @@ def fetch_osm_db_data_ways(req_keys: List[str]) -> Tuple[Dict[int, osmparser.Nod
     start_time = time.time()
 
     db_connection = osmparser.make_db_connection()
-    ways_dict = osmparser.fetch_db_way_data(req_keys, db_connection)
-    nodes_dict = osmparser.fetch_db_nodes_for_way(req_keys, db_connection)
+    ways_dict = osmparser.fetch_db_way_data(req_keys, list(), db_connection)
+    nodes_dict = osmparser.fetch_db_nodes_for_way(req_keys, list(), db_connection)
     db_connection.close()
 
     logging.info("Reading OSM way data for {0!s} from db took {1:.4f} seconds.".format(req_keys,
@@ -1478,6 +1478,8 @@ def process():
     if args.uninstall:
         logging.info("Uninstalling.")
         parameters.NO_ELEV = True
+
+    parameters.show()
 
     # Initializing tools for global/local coordinate transformations
     center_global = parameters.get_center_global()
