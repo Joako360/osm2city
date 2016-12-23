@@ -11,6 +11,7 @@ import logging
 import math
 import os
 from random import randint
+from typing import List
 
 import numpy as np
 import parameters
@@ -20,7 +21,6 @@ from cluster import ClusterContainer
 from shapely.geometry.base import CAP_STYLE, JOIN_STYLE
 from shapely.geometry.linestring import LineString
 from utils import osmparser, coordinates, ac3d, stg_io2
-from utils.objectlist import ObjectList
 from utils.utilities import FGElev
 from utils.vec2d import Vec2d
 
@@ -57,64 +57,55 @@ class Pier(object):
         self.elevation = min_elevation
 
 
-class Piers(ObjectList):
-    valid_node_keys = []
-    req_keys = ['man_made']
-    valid_keys = ['area']
+def process_osm_piers(nodes_dict, ways_dict, my_coord_transformator, clipping_border: shg.Polygon) -> List[Pier]:
+    my_piers = list()
 
-    def __init__(self, transform, clusters, boundary_clipping_complete_way):
-        ObjectList.__init__(self, transform, clusters, boundary_clipping_complete_way)
+    for key, way in ways_dict.items():
+        if not ('man_made' in way.tags and way.tags['man_made'] == 'pier'):
+            continue
 
-    def create_from_way(self, way, nodes_dict):
-        if not self.min_max_scanned:
-            self._process_nodes(nodes_dict)
-
-        col = None
-        if 'man_made' in way.tags:
-            if way.tags['man_made'] == 'pier':
-                col = 6
-        if col is None:
-            return
-
-        if self.boundary_clipping_complete_way is not None:
+        if clipping_border is not None:
             first_node = nodes_dict[way.refs[0]]
-            if not self.boundary_clipping_complete_way.contains(shg.Point(first_node.lon, first_node.lat)):
-                return
+            if not clipping_border.contains(shg.Point(first_node.lon, first_node.lat)):
+                continue
 
-        pier = Pier(self.transform, way.osm_id, way.tags, way.refs, nodes_dict)
-        self.objects.append(pier)
-        self.clusters.append(pier.anchor, pier)
+        pier = Pier(my_coord_transformator, way.osm_id, way.tags, way.refs, nodes_dict)
+        my_piers.append(pier)
 
-    def write_piers(self, stg_manager, replacement_prefix):
-        for cl in self.clusters:
-            if len(cl.objects) > 0:
-                center_tile = Vec2d(tools.transform.toGlobal(cl.center))
-                ac_fname = "%spiers%02i%02i.ac" % (replacement_prefix, cl.grid_index.ix, cl.grid_index.iy)
-                ac = ac3d.File(stats=tools.stats)
-                obj = ac.new_object('piers', "Textures/Terrain/asphalt.png")
-                for pier in cl.objects[:]:
-                    length = len(pier.nodes)
-                    if length > 3 \
-                            and pier.nodes[0][0] == pier.nodes[(length - 1)][0] \
-                            and pier.nodes[0][1] == pier.nodes[(length - 1)][1]:
-                        _write_pier_area(pier, obj, cl.center)
-                    else:
-                        _write_pier_line(pier, obj, cl.center)
-                path = stg_manager.add_object_static(ac_fname, center_tile, 0, 0)
-                fname = path + os.sep + ac_fname
-                f = open(fname, 'w')
-                f.write(str(ac))
-                f.close()                
+    return my_piers
 
-    def write_boats(self, stg_manager):
-        for pier in self.objects[:]:
-            length = len(pier.nodes)
-            if length > 3 \
-                    and pier.nodes[0][0] == pier.nodes[(length - 1)][0] \
-                    and pier.nodes[0][1] == pier.nodes[(length - 1)][1]:
-                _write_boat_area(pier, stg_manager)
-            else:
-                _write_boat_line(pier, stg_manager)
+
+def write_piers(stg_manager, replacement_prefix, clusters):
+    for cl in clusters:
+        if len(cl.objects) > 0:
+            center_tile = Vec2d(tools.transform.toGlobal(cl.center))
+            ac_file_name = "%spiers%02i%02i.ac" % (replacement_prefix, cl.grid_index.ix, cl.grid_index.iy)
+            ac = ac3d.File(stats=tools.stats)
+            obj = ac.new_object('piers', "Textures/Terrain/asphalt.png")
+            for pier in cl.objects[:]:
+                length = len(pier.nodes)
+                if length > 3 \
+                        and pier.nodes[0][0] == pier.nodes[(length - 1)][0] \
+                        and pier.nodes[0][1] == pier.nodes[(length - 1)][1]:
+                    _write_pier_area(pier, obj, cl.center)
+                else:
+                    _write_pier_line(pier, obj, cl.center)
+            path = stg_manager.add_object_static(ac_file_name, center_tile, 0, 0)
+            file_name = path + os.sep + ac_file_name
+            f = open(file_name, 'w')
+            f.write(str(ac))
+            f.close()
+
+
+def write_boats(stg_manager, piers: List[Pier]):
+    for pier in piers:
+        length = len(pier.nodes)
+        if length > 3 \
+                and pier.nodes[0][0] == pier.nodes[(length - 1)][0] \
+                and pier.nodes[0][1] == pier.nodes[(length - 1)][1]:
+            _write_boat_area(pier, stg_manager)
+        else:
+            _write_boat_line(pier, stg_manager)
 
 
 def _write_boat_area(pier, stg_manager):
@@ -126,12 +117,9 @@ def _write_boat_area(pier, stg_manager):
     # Simplify
     ring = linear_ring.convex_hull.buffer(40, cap_style=CAP_STYLE.square, join_style=JOIN_STYLE.bevel).simplify(20)
     for p in ring.exterior.coords:
-        coord = Vec2d(p[0], p[1])
         line_coords = [[centroid.x, centroid.y], p]
         target_vector = shg.LineString(line_coords)
-        boat_position = linear_ring.intersection(target_vector)
         coords = linear_ring.coords
-        direction = None
         for i in range(len(coords) - 1):
             segment = LineString(coords[i:i + 2])
             if segment.length > 20 and segment.intersects(target_vector):
@@ -155,8 +143,8 @@ def _write_boat_line(pier, stg_manager):
         boat_position = segment.interpolate(segment.length / 2)
         try:
             pos_global = tools.transform.toGlobal((boat_position.x, boat_position.y))
-            direction = math.degrees(math.atan2(segment.coords[0][0] - segment.coords[1][0]
-                                                , segment.coords[0][1] - segment.coords[1][1]))
+            direction = math.degrees(math.atan2(segment.coords[0][0] - segment.coords[1][0],
+                                                segment.coords[0][1] - segment.coords[1][1]))
             if segment.length > 5:
                 _write_model(segment.length, stg_manager, pos_global, direction, pier.elevation)
         except AttributeError as reason:
@@ -184,7 +172,6 @@ def _write_model(length, stg_manager, pos_global, direction, my_elev):
         choice = randint(0, len(models) - 1)
         model = models[choice]
     elif length < 250:
-        #('Models/Maritime/Civilian/Trawler.xml', 300),
         models = [('Models/Maritime/Civilian/MediumFerry.xml', 10)]
         choice = randint(0, len(models) - 1)
         model = models[choice]
@@ -227,15 +214,15 @@ def _write_pier_area(pier, obj, offset):
     face = []
     x = 0.
     # reversed(list(enumerate(a)))
-# Top Face
+    # Top Face
     for i, n in enumerate(top_nodes):
         face.append((n + o, x, 0.5))
     obj.face(face, mat=0)
-# Build bottom ring
+    # Build bottom ring
     e = pier.elevation - 5
     for p in pier.nodes:
         obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
-# Build Sides
+    # Build Sides
     for i, n in enumerate(top_nodes[1:]):
         sideface = list()
         sideface.append((n + o + rd_len - 1, x, 0.5))
@@ -318,16 +305,16 @@ def _write_pier_line(pier, obj, offset):
     obj.face(sideface, mat=0)
 
 
-def main():
+def process():
     logging.basicConfig(level=logging.INFO)
 
     import argparse
     parser = argparse.ArgumentParser(description="piers.py reads OSM data and creates Pier models for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
-    parser.add_argument("-l", "--loglevel"
-                        , help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL"
-                        , required=False)
+    parser.add_argument("-l", "--loglevel",
+                        help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL",
+                        required=False)
     args = parser.parse_args()
 
     if args.filename is not None:
@@ -336,7 +323,6 @@ def main():
 
     parameters.show()
 
-    osm_fname = parameters.get_OSM_file_name()
     # -- prepare transformation to local coordinates
     cmin, cmax = parameters.get_extent_global()
     center_global = parameters.get_center_global()
@@ -347,27 +333,27 @@ def main():
     lmin = Vec2d(tools.transform.toLocal(cmin))
     lmax = Vec2d(tools.transform.toLocal(cmax))
     clusters = ClusterContainer(lmin, lmax)
-   
-    border = None
-    boundary_clipping_complete_way = None
-    if parameters.BOUNDARY_CLIPPING_COMPLETE_WAYS:
-        boundary_clipping_complete_way = shg.Polygon(parameters.get_clipping_extent(False))
-    elif parameters.BOUNDARY_CLIPPING:
-        border = shg.Polygon(parameters.get_clipping_extent())
-    piers = Piers(coords_transform, clusters, boundary_clipping_complete_way)
-    handler = osmparser.OSMContentHandler(valid_node_keys=[], border=border)
-    source = open(osm_fname, encoding="utf8")
-    logging.info("Reading the OSM file might take some time ...")
 
-    handler.register_way_callback(piers.create_from_way, req_keys=piers.req_keys)
-    handler.parse(source)
+    if not parameters.USE_DATABASE:
+        osm_nodes_dict, osm_ways_dict = osmparser.fetch_osm_file_data(["man_made", "area"], ["man_made"])
+    else:
+        osm_nodes_dict, osm_ways_dict = osmparser.fetch_osm_db_data_ways(["man_made=>pier"])
+
+    clipping_border = None
+    if parameters.BOUNDARY_CLIPPING_COMPLETE_WAYS:
+        clipping_border = shg.Polygon(parameters.get_clipping_extent(False))
+
+    piers = process_osm_piers(osm_nodes_dict, osm_ways_dict, coords_transform, clipping_border)
     logging.info("ways: %i", len(piers))
     if len(piers) == 0:
-        logging.info("No piers found ignoring")
+        logging.info("No platforms found ignoring")
         return
 
+    for pier in piers:
+        clusters.append(pier.anchor, pier)
+
     fg_elev = FGElev(coords_transform)
-    for pier in piers.objects:
+    for pier in piers:
         pier.calc_elevation(fg_elev)
 
     # -- initialize STGManager
@@ -375,9 +361,9 @@ def main():
     replacement_prefix = parameters.get_repl_prefix()
     stg_manager = stg_io2.STGManager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
 
-    piers.write_piers(stg_manager, replacement_prefix)
+    write_piers(stg_manager, replacement_prefix, clusters)
+    write_boats(stg_manager, piers)
 
-    piers.write_boats(stg_manager)
     # -- write stg
     stg_manager.write()
     fg_elev.save_cache()
@@ -386,4 +372,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    process()

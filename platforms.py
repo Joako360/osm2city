@@ -10,9 +10,7 @@ import argparse
 import logging
 import numpy as np
 import os
-import time
-from typing import Dict, List, Tuple
-import xml.sax
+from typing import List
 
 import shapely.geometry as shg
 
@@ -160,12 +158,12 @@ def _write_line(platform, elev, obj, offset):
     idx_bottom_left = obj.next_node_index()
     for p in left.coords:
         e = elev(Vec2d(p[0], p[1]))[0] - 1
-        obj.node(-p[1]+ offset.y, e, -p[0]+ offset.x)
+        obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
     # Build bottom right line
     idx_bottom_right = obj.next_node_index()
     for p in right.coords:
         e = elev(Vec2d(p[0], p[1]))[0] - 1
-        obj.node(-p[1]+ offset.y, e, -p[0]+ offset.x)
+        obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
     idx_end = obj.next_node_index() - 1
     # Build Sides
     for i, n in enumerate(nodes_l[1:]):
@@ -199,45 +197,10 @@ def _write_line(platform, elev, obj, offset):
     obj.face(sideface, mat=0)
 
 
-def fetch_osm_file_data() -> Tuple[Dict[int, osmparser.Node], Dict[int, osmparser.Way]]:
-    start_time = time.time()
-    valid_node_keys = []
-    valid_way_keys = ['railway', 'area', 'layer']
-    valid_relation_keys = []
-    req_relation_keys = []
-    req_way_keys = ["railway"]
-
-    border = None
-    if parameters.BOUNDARY_CLIPPING_COMPLETE_WAYS is False and parameters.BOUNDARY_CLIPPING:
-        border = shg.Polygon(parameters.get_clipping_extent())
-
-    handler = osmparser.OSMContentHandlerOld(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
-                                             req_relation_keys, border)
-    osm_file_name = parameters.get_OSM_file_name()
-    source = open(osm_file_name, encoding="utf8")
-    xml.sax.parse(source, handler)
-    logging.info("Reading OSM data from xml took {0:.4f} seconds.".format(time.time() - start_time))
-    return handler.nodes_dict, handler.ways_dict
-
-
-def fetch_osm_db_data_ways() -> Tuple[Dict[int, osmparser.Node], Dict[int, osmparser.Way]]:
-    start_time = time.time()
-
-    req_key_values = ["railway=>platform"]
-    db_connection = osmparser.make_db_connection()
-    ways_dict = osmparser.fetch_db_way_data(list(), req_key_values, db_connection)
-    nodes_dict = osmparser.fetch_db_nodes_for_way(list(), req_key_values, db_connection)
-    db_connection.close()
-
-    logging.info("Reading OSM way data for {0!s} from db took {1:.4f} seconds.".format(req_key_values,
-                                                                                       time.time() - start_time))
-    return nodes_dict, ways_dict
-
-
 def process():
     parser = argparse.ArgumentParser(description="platforms.py reads OSM data and creates platform models for use with FlightGear")
-    parser.add_argument("-f", "--file", dest="filename"
-                        , help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
+    parser.add_argument("-f", "--file", dest="filename",
+                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
     parser.add_argument("-l", "--loglevel",
                         help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL",
                         required=False)
@@ -261,9 +224,9 @@ def process():
     clusters = ClusterContainer(lmin, lmax)
 
     if not parameters.USE_DATABASE:
-        osm_nodes_dict, osm_ways_dict = fetch_osm_file_data()
+        osm_nodes_dict, osm_ways_dict = osmparser.fetch_osm_file_data(['railway', 'area', 'layer'], ["railway"])
     else:
-        osm_nodes_dict, osm_ways_dict = fetch_osm_db_data_ways()
+        osm_nodes_dict, osm_ways_dict = osmparser.fetch_osm_db_data_ways(["railway=>platform"])
 
     clipping_border = None
     if parameters.BOUNDARY_CLIPPING_COMPLETE_WAYS:

@@ -9,6 +9,7 @@ Use a tool like Osmosis to pre-process data.
 
 import logging
 from typing import Dict, List, Tuple
+import time
 import unittest
 import xml.sax
 
@@ -372,6 +373,40 @@ def fetch_all_query_into_tuple(query: str, db_connection: psycopg2.extensions.co
     logging.debug("Query string for execution in database: " + query)
     cur.execute(query)
     return cur.fetchall()
+
+
+def fetch_osm_db_data_ways(req_key_values: List[str]) -> Tuple[Dict[int, Node], Dict[int, Way]]:
+    """Given a list of required key/value pairs get the ways plus the linked nodes from an OSM database."""
+    start_time = time.time()
+
+    db_connection = make_db_connection()
+    ways_dict = fetch_db_way_data(list(), req_key_values, db_connection)
+    nodes_dict = fetch_db_nodes_for_way(list(), req_key_values, db_connection)
+    db_connection.close()
+
+    logging.info("Reading OSM way data for {0!s} from db took {1:.4f} seconds.".format(req_key_values,
+                                                                                       time.time() - start_time))
+    return nodes_dict, ways_dict
+
+
+def fetch_osm_file_data(valid_way_keys: List[str], req_way_keys: List[str]) -> Tuple[Dict[int, Node], Dict[int, Way]]:
+    """Given a list of valid keys and a list of required keys get the ways plus the linked nodes from an OSM file."""
+    start_time = time.time()
+    valid_node_keys = []
+    valid_relation_keys = []
+    req_relation_keys = []
+
+    border = None
+    if parameters.BOUNDARY_CLIPPING_COMPLETE_WAYS is False and parameters.BOUNDARY_CLIPPING:
+        border = shg.Polygon(parameters.get_clipping_extent())
+
+    handler = OSMContentHandlerOld(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
+                                   req_relation_keys, border)
+    osm_file_name = parameters.get_OSM_file_name()
+    source = open(osm_file_name, encoding="utf8")
+    xml.sax.parse(source, handler)
+    logging.info("Reading OSM data from xml took {0:.4f} seconds.".format(time.time() - start_time))
+    return handler.nodes_dict, handler.ways_dict
 
 
 def make_db_connection() -> psycopg2.extensions.connection:

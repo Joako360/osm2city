@@ -36,7 +36,7 @@ On Ubuntu 16.04 the following packages have amongst others been installed (not e
 * postgis
 * python-psycopg2
 
-On top of that you also nee a 0.6+ version of Osmosis_. Please be aware of the fact that you also need a related version of Java and that e.g. in Ubuntu 16.04 Osmosis is out of date.
+On top of that you also need a 0.6+ version of Osmosis_. Please be aware of the fact that you also need a related version of Java and that e.g. in Ubuntu 16.04 Osmosis is out of date.
 
 
 --------------------------
@@ -60,4 +60,16 @@ You might want to index the tags in hstore to get some more query speed after lo
 .. _PostGIS setup: http://wiki.openstreetmap.org/wiki/Osmosis/PostGIS_Setup
 
 
+--------------------------------
+Importing Data into the Database
+--------------------------------
 
+The following is an example of executing the import of an xml-file with OSM data in a setup, where connections with the local user are trusted in PostgreSQL. See also `PostGIS Tasks (Snapshot Schema)`_:
+
+::
+
+    /home/pingu/bin/osmosis-latest/bin/osmosis --read-xml /media/sf_fg_customscenery/projects/LSMP/lsmp.osm --log-progress --write-pgsql database=osmogis
+
+I have not found out how to add an additional region to an already populated database. Therefore you might need to run ``/home/pingu/bin/osmosis-latest/bin/osmosis --truncate-pgsql database=osmogis`` before getting a new region into the database.
+
+.. _PostGIS Tasks (Snapshot Schema): http://wiki.openstreetmap.org/wiki/Osmosis/Detailed_Usage_0.45#PostGIS_Tasks_.28Snapshot_Schema.29
