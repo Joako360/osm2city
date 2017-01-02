@@ -43,7 +43,8 @@ class Platform(object):
         self.anchor = Vec2d(self.nodes[0])
 
 
-def process_osm_platform(nodes_dict, ways_dict, my_coord_transformator, clipping_border: shg.Polygon) -> List[Platform]:
+def _process_osm_platform(nodes_dict, ways_dict, my_coord_transformator,
+                          clipping_border: shg.Polygon) -> List[Platform]:
     my_platforms = list()
 
     for key, way in ways_dict.items():
@@ -65,7 +66,7 @@ def process_osm_platform(nodes_dict, ways_dict, my_coord_transformator, clipping
     return my_platforms
 
 
-def write(fg_elev: FGElev, stg_manager, replacement_prefix, clusters):
+def _write(fg_elev: FGElev, stg_manager, replacement_prefix, clusters):
     for cl in clusters:
         if len(cl.objects) > 0:
             center_tile = Vec2d(tools.transform.toGlobal(cl.center))
@@ -125,18 +126,18 @@ def _write_area(platform, fg_elev: FGElev, obj, offset):
         obj.face(sideface, mat=0)
 
 
-def _write_line(platform, elev, obj, offset):
+def _write_line(platform, fg_elev: FGElev, obj, offset):
     """Writes a platform as a area which only is mapped as a line"""
     o = obj.next_node_index()
     left = platform.line_string.parallel_offset(2, 'left', resolution=8, join_style=1, mitre_limit=10.0)
     right = platform.line_string.parallel_offset(2, 'right', resolution=8, join_style=1, mitre_limit=10.0)
     idx_left = obj.next_node_index()
     for p in left.coords:
-        e = elev(Vec2d(p[0], p[1]))[0] + 1
+        e = fg_elev.probe_elev(Vec2d(p[0], p[1])) + 1
         obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
     idx_right = obj.next_node_index()
     for p in right.coords:
-        e = elev(Vec2d(p[0], p[1]))[0] + 1
+        e = fg_elev.probe_elev(Vec2d(p[0], p[1])) + 1
         obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
     nodes_l = np.arange(len(left.coords))
     nodes_r = np.arange(len(right.coords))
@@ -157,12 +158,12 @@ def _write_line(platform, elev, obj, offset):
     # Build bottom left line
     idx_bottom_left = obj.next_node_index()
     for p in left.coords:
-        e = elev(Vec2d(p[0], p[1]))[0] - 1
+        e = fg_elev.probe_elev(Vec2d(p[0], p[1])) + 1
         obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
     # Build bottom right line
     idx_bottom_right = obj.next_node_index()
     for p in right.coords:
-        e = elev(Vec2d(p[0], p[1]))[0] - 1
+        e = fg_elev.probe_elev(Vec2d(p[0], p[1])) + 1
         obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
     idx_end = obj.next_node_index() - 1
     # Build Sides
@@ -224,15 +225,17 @@ def process():
     clusters = ClusterContainer(lmin, lmax)
 
     if not parameters.USE_DATABASE:
-        osm_nodes_dict, osm_ways_dict = osmparser.fetch_osm_file_data(['railway', 'area', 'layer'], ["railway"])
+        osm_way_result = osmparser.fetch_osm_file_data(['railway', 'area', 'layer'], ["railway"])
     else:
-        osm_nodes_dict, osm_ways_dict = osmparser.fetch_osm_db_data_ways(["railway=>platform"])
+        osm_way_result = osmparser.fetch_osm_db_data_ways_key_values(["railway=>platform"])
+    osm_nodes_dict = osm_way_result.nodes_dict
+    osm_ways_dict = osm_way_result.ways_dict
 
     clipping_border = None
     if parameters.BOUNDARY_CLIPPING_COMPLETE_WAYS:
         clipping_border = shg.Polygon(parameters.get_clipping_extent(False))
 
-    platforms = process_osm_platform(osm_nodes_dict, osm_ways_dict, coords_transform, clipping_border)
+    platforms = _process_osm_platform(osm_nodes_dict, osm_ways_dict, coords_transform, clipping_border)
     logging.info("ways: %i", len(platforms))
     if len(platforms) == 0:
         logging.info("No platforms found ignoring")
@@ -248,7 +251,7 @@ def process():
     replacement_prefix = parameters.get_repl_prefix()
     stg_manager = stg_io2.STGManager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
 
-    write(fg_elev, stg_manager, replacement_prefix, clusters)
+    _write(fg_elev, stg_manager, replacement_prefix, clusters)
 
     # -- write stg
     stg_manager.write()

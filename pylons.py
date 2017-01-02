@@ -23,7 +23,7 @@ import math
 import os
 import sys
 import time
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 import unittest
 import xml.sax
 
@@ -1442,19 +1442,6 @@ def fetch_osm_file_data() -> Tuple[Dict[int, osmparser.Node], Dict[int, osmparse
     return handler.nodes_dict, handler.ways_dict
 
 
-def fetch_osm_db_data_ways(req_keys: List[str]) -> Tuple[Dict[int, osmparser.Node], Dict[int, osmparser.Way]]:
-    start_time = time.time()
-
-    db_connection = osmparser.make_db_connection()
-    ways_dict = osmparser.fetch_db_way_data(req_keys, list(), db_connection)
-    nodes_dict = osmparser.fetch_db_nodes_for_way(req_keys, list(), db_connection)
-    db_connection.close()
-
-    logging.info("Reading OSM way data for {0!s} from db took {1:.4f} seconds.".format(req_keys,
-                                                                                       time.time() - start_time))
-    return nodes_dict, ways_dict
-
-
 def process():
     # Handling arguments and parameters
     parser = argparse.ArgumentParser(
@@ -1503,7 +1490,9 @@ def process():
     building_refs = {}
     if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_AERIALWAYS or parameters.C2P_PROCESS_STREETLAMPS:
         if parameters.USE_DATABASE:
-            osm_nodes_dict, osm_ways_dict = fetch_osm_db_data_ways(['building'])
+            osm_way_result = osmparser.fetch_osm_db_data_ways_keys(['building'])
+            osm_nodes_dict = osm_way_result.nodes_dict
+            osm_ways_dict = osm_way_result.ways_dict
         building_refs = process_osm_building_refs(osm_nodes_dict, osm_ways_dict, coords_transform)
         logging.info('Number of reference buildings: %s', len(building_refs))
     # Power lines and aerialways
@@ -1516,7 +1505,9 @@ def process():
                 req_keys.append("power")
             if parameters.C2P_PROCESS_POWERLINES:
                 req_keys.append("aerialway")
-            osm_nodes_dict, osm_ways_dict = fetch_osm_db_data_ways(req_keys)
+            osm_way_result = osmparser.fetch_osm_db_data_ways_keys(req_keys)
+            osm_nodes_dict = osm_way_result.nodes_dict
+            osm_ways_dict = osm_way_result.ways_dict
 
         powerlines, aerialways = process_osm_power_aerialway(osm_nodes_dict, osm_ways_dict, fg_elev,
                                                              coords_transform, building_refs)
@@ -1534,7 +1525,9 @@ def process():
     rail_lines = {}
     if parameters.C2P_PROCESS_OVERHEAD_LINES:
         if parameters.USE_DATABASE:
-            osm_nodes_dict, osm_ways_dict = fetch_osm_db_data_ways(['railway'])
+            osm_way_result = osmparser.fetch_osm_db_data_ways_keys(['railway'])
+            osm_nodes_dict = osm_way_result.nodes_dict
+            osm_ways_dict = osm_way_result.ways_dict
         rail_lines = process_osm_rail_overhead(osm_nodes_dict, osm_ways_dict, fg_elev,
                                                coords_transform)
         logging.info('Reduced number of rail lines: %s', len(rail_lines))
@@ -1544,7 +1537,9 @@ def process():
     streetlamp_ways = {}
     if parameters.C2P_PROCESS_STREETLAMPS:
         if parameters.USE_DATABASE:
-            osm_nodes_dict, osm_ways_dict = fetch_osm_db_data_ways(["landuse", "highway"])
+            osm_way_result = osmparser.fetch_osm_db_data_ways_keys(["landuse", "highway"])
+            osm_nodes_dict = osm_way_result.nodes_dict
+            osm_ways_dict = osm_way_result.ways_dict
 
         landuse_refs = process_osm_landuse_refs(osm_nodes_dict, osm_ways_dict, coords_transform)
         if parameters.LU_LANDUSE_GENERATE_LANDUSE:

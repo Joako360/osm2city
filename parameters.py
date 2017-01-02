@@ -46,9 +46,7 @@ BOUNDARY_CLIPPING = True
 BOUNDARY_CLIPPING_BORDER_SIZE = 0.25
 BOUNDARY_CLIPPING_COMPLETE_WAYS = False
 
-OSM_FILE = "buildings.osm"  # -- file name of the file with OSM data. Should reside in $PREFIX. No path components allowed.
-USE_PKL = False             # -- instead of parsing the OSM file, read a previously created cache file $PREFIX/buildings.pkl
-IGNORE_PKL_OVERWRITE = True # -- Ignore overwriting of Cache File
+OSM_FILE = "buildings.osm"  # -- file name of file with OSM data. Should reside in $PREFIX. No path components allowed.
 
 # -- Full path to the scenery folder without trailing slash. This is where we
 #    will probe elevation and check for overlap with static objects. Most
@@ -102,9 +100,6 @@ OVERLAP_RADIUS = 5
 BUILDING_REMOVE_WITH_PARTS = False
 
 TILE_SIZE = 2000            # -- tile size in meters for clustering of buildings
-
-MAX_OBJECTS = 50000         # -- maximum number of buildings to read from OSM data
-CONCURRENCY = 1             # -- number of parallel OSM parsing threads. Unused ATM.
 
 # -- skip buildings based on their OSM name tag or OSM ID, in case there's already
 #    a static model for these, and the overlap check fails.

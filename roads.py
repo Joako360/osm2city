@@ -369,9 +369,6 @@ class Roads(objectlist.ObjectList):
 
         Take one osm way, store it. A linear object is created later."""
 
-        if len(self.ways_list) >= parameters.MAX_OBJECTS:
-            return
-
         if way.osm_id in parameters.SKIP_LIST:
             logging.info("SKIPPING OSM_ID %i", way.osm_id)
             return

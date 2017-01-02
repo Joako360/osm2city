@@ -7,8 +7,10 @@ Use a tool like Osmosis to pre-process data.
 @author: vanosten
 """
 
+import copy
+from collections import namedtuple
 import logging
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 import time
 import unittest
 import xml.sax
@@ -49,7 +51,7 @@ class Way(OSMElement):
 
 
 class Member(object):
-    def __init__(self, ref: int, type_, role) -> None:
+    def __init__(self, ref: int, type_: str, role: str) -> None:
         self.ref = ref
         self.type_ = type_
         self.role = role
@@ -62,6 +64,9 @@ class Relation(OSMElement):
 
     def add_member(self, member: Member) -> None:
         self.members.append(member)
+
+
+OSMReadResult = namedtuple("OSMReadResult", "nodes_dict, ways_dict, relations_dict, rel_nodes_dict, rel_ways_dict")
 
 
 class OSMContentHandler(xml.sax.ContentHandler):
@@ -156,11 +161,10 @@ class OSMContentHandler(xml.sax.ContentHandler):
             # no longer filter valid_way_keys here. That's up to the callback.
             if cb is not None:
                 cb(self._current_way, self.nodes_dict)
-            else:
-                try:
-                    self._uncategorized_way_callback(self._current_way, self.nodes_dict)
-                except TypeError:
-                    pass
+            try:
+                self._uncategorized_way_callback(self._current_way, self.nodes_dict)
+            except TypeError:
+                pass
         elif name == "relation":
             cb = find_callback_for(self._current_relation.tags, self._relation_callbacks)
             if cb is not None:
@@ -197,10 +201,14 @@ class OSMContentHandlerOld(xml.sax.ContentHandler):
         self.valid_relation_keys = valid_relation_keys
         self._handler = OSMContentHandler(valid_node_keys, border)
         self._handler.register_way_callback(self.process_way, req_way_keys)
-        self._handler.register_relation_callback(self.process_relation, req_relation_keys)
+        if req_relation_keys is not None:
+            self._handler.register_relation_callback(self.process_relation, req_relation_keys)
+            self._handler.register_uncategorized_way_callback(self.process_relation_way)
         self.nodes_dict = None
         self.ways_dict = {}
         self.relations_dict = {}
+        self.rel_ways_dict = {}
+        self.rel_nodes_dict = None
 
     def parse(self, source):
         xml.sax.parse(source, self)
@@ -228,6 +236,17 @@ class OSMContentHandlerOld(xml.sax.ContentHandler):
             if key in self.valid_way_keys:
                 current_relation.add_tag(key, all_tags[key])
         self.relations_dict[current_relation.osm_id] = current_relation
+
+    def process_relation_way(self, uncategorized_way, nodes_dict):
+        """Only used in buildings for ways in relations.
+        This method adds way too many due to linear processing of xml-file instead of relational DB access.
+        Taking copies because original nodes and ways might get changed / deleted before relations get processed
+        in the consuming processes."""
+        if not self.rel_nodes_dict:
+            self.rel_nodes_dict = copy.deepcopy(nodes_dict)
+        my_rel_way = Way(uncategorized_way.osm_id)
+        my_rel_way.refs = copy.deepcopy(uncategorized_way.refs)
+        self.rel_ways_dict[my_rel_way.osm_id] = my_rel_way
 
 
 def has_required_tag_keys(my_tags, my_required_keys):
@@ -375,38 +394,132 @@ def fetch_all_query_into_tuple(query: str, db_connection: psycopg2.extensions.co
     return cur.fetchall()
 
 
-def fetch_osm_db_data_ways(req_key_values: List[str]) -> Tuple[Dict[int, Node], Dict[int, Way]]:
-    """Given a list of required key/value pairs get the ways plus the linked nodes from an OSM database."""
+def fetch_osm_db_data_ways(required: List[str], is_key_values: bool=False) -> OSMReadResult:
+    """Given a list of required keys or key/value pairs get the ways plus the linked nodes from an OSM database."""
     start_time = time.time()
 
     db_connection = make_db_connection()
-    ways_dict = fetch_db_way_data(list(), req_key_values, db_connection)
-    nodes_dict = fetch_db_nodes_for_way(list(), req_key_values, db_connection)
+    if is_key_values:
+        ways_dict = fetch_db_way_data(list(), required, db_connection)
+        nodes_dict = fetch_db_nodes_for_way(list(), required, db_connection)
+    else:
+        ways_dict = fetch_db_way_data(required, list(), db_connection)
+        nodes_dict = fetch_db_nodes_for_way(required, list(), db_connection)
     db_connection.close()
 
-    logging.info("Reading OSM way data for {0!s} from db took {1:.4f} seconds.".format(req_key_values,
+    logging.info("Reading OSM way data for {0!s} from db took {1:.4f} seconds.".format(required,
                                                                                        time.time() - start_time))
-    return nodes_dict, ways_dict
+    return OSMReadResult(nodes_dict=nodes_dict, ways_dict=ways_dict,
+                         relations_dict=None, rel_nodes_dict=None, rel_ways_dict=None)
 
 
-def fetch_osm_file_data(valid_way_keys: List[str], req_way_keys: List[str]) -> Tuple[Dict[int, Node], Dict[int, Way]]:
+def fetch_osm_db_data_ways_key_values(req_key_values: List[str]) -> OSMReadResult:
+    """Given a list of required key/value pairs get the ways plus the linked nodes from an OSM database."""
+    return fetch_osm_db_data_ways(req_key_values, True)
+
+
+def fetch_osm_db_data_ways_keys(req_keys: List[str]) -> OSMReadResult:
+    """Given a list of required keys get the ways plus the linked nodes from an OSM database."""
+    return fetch_osm_db_data_ways(req_keys, False)
+
+
+def fetch_osm_db_data_relations_keys(req_keys: List[str], input_read_result: OSMReadResult) -> OSMReadResult:
+    """Updates an OSMReadResult with relation data based on required keys"""
+    start_time = time.time()
+
+    db_connection = make_db_connection()
+
+    # == Relations and members and ways
+    # Getting related way data might add a bit of  volume, but reduces number of queries and might be seldom that
+    # same way is in different relations for buildings.
+    query = """SELECT r.id, r.tags, rm.member_id, rm.member_role, w.nodes, w.tags
+    FROM relations AS r, relation_members AS rm, ways AS w
+    WHERE
+    """
+    query += "r.tags @> 'type=>multipolygon'"
+    query += " AND " + construct_tags_query(req_keys, list(), "r")
+    query += " AND r.id = rm.relation_id"
+    query += " AND rm.member_type = 'W'"
+    query += " AND rm.member_id = w.id"
+    query += " AND "
+    query += construct_intersect_bbox_query()
+    query += " ORDER BY rm.relation_id, rm.sequence_id"
+    query += ";"
+
+    result_tuples = fetch_all_query_into_tuple(query, db_connection)
+
+    relations_dict = dict()
+    rel_ways_dict = dict()
+
+    for result in result_tuples:
+        relation_id = result[0]
+        member_id = result[2]
+        if relation_id not in relations_dict:
+            relation = Relation(relation_id)
+            relation.tags = parse_hstore_tags(result[1], relation_id)
+            relations_dict[relation_id] = relation
+        else:
+            relation = relations_dict[relation_id]
+
+        my_member = Member(member_id, "way", result[3])
+        relation.add_member(my_member)
+
+        if member_id not in rel_ways_dict:
+            my_way = Way(member_id)
+            my_way.refs = result[4]
+            my_way.tags = parse_hstore_tags(result[5], my_way.osm_id)
+            rel_ways_dict[my_way.osm_id] = my_way
+
+    # == Nodes for the ways
+    query = """SELECT n.id, ST_X(n.geom) as lon, ST_Y(n.geom) as lat
+    FROM relations AS r, relation_members AS rm, ways AS w, way_nodes AS wn, nodes AS n
+    WHERE
+    """
+    query += "r.tags @> 'type=>multipolygon'"
+    query += " AND " + construct_tags_query(req_keys, list(), "r")
+    query += " AND r.id = rm.relation_id"
+    query += " AND rm.member_type = 'W'"
+    query += " AND rm.member_id = w.id"
+    query += " AND "
+    query += construct_intersect_bbox_query()
+    query += " AND wn.way_id = w.id"
+    query += " AND wn.node_id = n.id"
+    query += ";"
+
+    result_tuples = fetch_all_query_into_tuple(query, db_connection)
+
+    rel_nodes_dict = dict()
+    for result in result_tuples:
+        my_node = Node(result[0], result[2], result[1])
+        rel_nodes_dict[my_node.osm_id] = my_node
+
+    logging.info("Reading OSM relation data for {0!s} from db took {1:.4f} seconds.".format(req_keys,
+                                                                                            time.time() - start_time))
+
+    return OSMReadResult(nodes_dict=input_read_result.nodes_dict, ways_dict=input_read_result.ways_dict,
+                         relations_dict=relations_dict, rel_nodes_dict=rel_nodes_dict, rel_ways_dict=rel_ways_dict)
+
+
+def fetch_osm_file_data(valid_way_keys: List[str], req_way_keys: List[str], req_rel_keys: Optional[List[str]]=None) \
+        -> OSMReadResult:
     """Given a list of valid keys and a list of required keys get the ways plus the linked nodes from an OSM file."""
     start_time = time.time()
     valid_node_keys = []
     valid_relation_keys = []
-    req_relation_keys = []
 
     border = None
     if parameters.BOUNDARY_CLIPPING_COMPLETE_WAYS is False and parameters.BOUNDARY_CLIPPING:
         border = shg.Polygon(parameters.get_clipping_extent())
 
     handler = OSMContentHandlerOld(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
-                                   req_relation_keys, border)
+                                   req_rel_keys, border)
     osm_file_name = parameters.get_OSM_file_name()
     source = open(osm_file_name, encoding="utf8")
     xml.sax.parse(source, handler)
     logging.info("Reading OSM data from xml took {0:.4f} seconds.".format(time.time() - start_time))
-    return handler.nodes_dict, handler.ways_dict
+    return OSMReadResult(nodes_dict=handler.nodes_dict, ways_dict=handler.ways_dict,
+                         relations_dict=handler.relations_dict,
+                         rel_nodes_dict=handler.rel_nodes_dict, rel_ways_dict=handler.rel_ways_dict)
 
 
 def make_db_connection() -> psycopg2.extensions.connection:
@@ -422,17 +535,17 @@ def construct_intersect_bbox_query() -> str:
                              parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
 
 
-def construct_tags_query(req_tag_keys: List[str], req_tag_key_values: List[str]) -> str:
+def construct_tags_query(req_tag_keys: List[str], req_tag_key_values: List[str], table_alias: str="w") -> str:
     """Constructs the part of a sql where clause, which constrains the result based on required tag keys.
     In req_tag_keys at least one of the key needs to be present in the tags of a given record.
     In req_tag_key_values at least one key/value pair must be present (e.g. 'railway=>platform') - the key
     must be separated without blanks from the value by a '=>'."""
     tags_query = ""
     if len(req_tag_keys) == 1:
-        tags_query += "w.tags ? '" + req_tag_keys[0] + "'"
+        tags_query += table_alias + ".tags ? '" + req_tag_keys[0] + "'"
     elif len(req_tag_keys) > 1:
         is_first = True
-        tags_query += "w.tags ?| ARRAY["
+        tags_query += table_alias + ".tags ?| ARRAY["
         for key in req_tag_keys:
             if is_first:
                 is_first = False
@@ -445,7 +558,7 @@ def construct_tags_query(req_tag_keys: List[str], req_tag_key_values: List[str])
         if len(tags_query) > 0:
             tags_query += " AND "
         if len(req_tag_key_values) == 1:
-            tags_query += "w.tags @> '" + req_tag_key_values[0] + "'"
+            tags_query += table_alias + ".tags @> '" + req_tag_key_values[0] + "'"
         else:
             tags_query += "("
             is_first = True
@@ -454,7 +567,7 @@ def construct_tags_query(req_tag_keys: List[str], req_tag_key_values: List[str])
                     is_first = False
                 else:
                     tags_query += " OR "
-                tags_query += "w.tags @> '" + key_value + "'"
+                tags_query += table_alias + ".tags @> '" + key_value + "'"
             tags_query += ")"
 
     return tags_query

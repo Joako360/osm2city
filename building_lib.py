@@ -533,10 +533,11 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
         # - facade raussuchen
 
         # temporarily exclude greenhouses / glasshouses
-        if b.tags['building'] in ['glasshouse', 'greenhouse'] or (
-                        'amenity' in b.tags and b.tags['amenity'] in ['glasshouse', 'greenhouse']):
-            logging.debug("Excluded greenhouse with osm_id=%d", b.osm_id)
-            continue
+        if 'building' in b.tags:  # not if 'building:part'
+            if b.tags['building'] in ['glasshouse', 'greenhouse'] or (
+                            'amenity' in b.tags and b.tags['amenity'] in ['glasshouse', 'greenhouse']):
+                logging.debug("Excluded greenhouse with osm_id=%d", b.osm_id)
+                continue
 
         b.mat = 0
         b.roof_mat = 0

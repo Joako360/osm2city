@@ -57,7 +57,7 @@ class Pier(object):
         self.elevation = min_elevation
 
 
-def process_osm_piers(nodes_dict, ways_dict, my_coord_transformator, clipping_border: shg.Polygon) -> List[Pier]:
+def _process_osm_piers(nodes_dict, ways_dict, my_coord_transformator, clipping_border: shg.Polygon) -> List[Pier]:
     my_piers = list()
 
     for key, way in ways_dict.items():
@@ -75,7 +75,7 @@ def process_osm_piers(nodes_dict, ways_dict, my_coord_transformator, clipping_bo
     return my_piers
 
 
-def write_piers(stg_manager, replacement_prefix, clusters):
+def _write_piers(stg_manager, replacement_prefix, clusters):
     for cl in clusters:
         if len(cl.objects) > 0:
             center_tile = Vec2d(tools.transform.toGlobal(cl.center))
@@ -97,7 +97,7 @@ def write_piers(stg_manager, replacement_prefix, clusters):
             f.close()
 
 
-def write_boats(stg_manager, piers: List[Pier]):
+def _write_boats(stg_manager, piers: List[Pier]):
     for pier in piers:
         length = len(pier.nodes)
         if length > 3 \
@@ -123,8 +123,8 @@ def _write_boat_area(pier, stg_manager):
         for i in range(len(coords) - 1):
             segment = LineString(coords[i:i + 2])
             if segment.length > 20 and segment.intersects(target_vector):
-                direction = math.degrees(math.atan2(segment.coords[0][0] - segment.coords[1][0]
-                                                    , segment.coords[0][1] - segment.coords[1][1]))
+                direction = math.degrees(math.atan2(segment.coords[0][0] - segment.coords[1][0],
+                                                    segment.coords[0][1] - segment.coords[1][1]))
                 parallel = segment.parallel_offset(10, 'right')
                 boat_position = parallel.interpolate(segment.length / 2)
                 try:
@@ -335,15 +335,17 @@ def process():
     clusters = ClusterContainer(lmin, lmax)
 
     if not parameters.USE_DATABASE:
-        osm_nodes_dict, osm_ways_dict = osmparser.fetch_osm_file_data(["man_made", "area"], ["man_made"])
+        osm_way_result = osmparser.fetch_osm_file_data(["man_made", "area"], ["man_made"])
     else:
-        osm_nodes_dict, osm_ways_dict = osmparser.fetch_osm_db_data_ways(["man_made=>pier"])
+        osm_way_result = osmparser.fetch_osm_db_data_ways_key_values(["man_made=>pier"])
+    osm_nodes_dict = osm_way_result.nodes_dict
+    osm_ways_dict = osm_way_result.ways_dict
 
     clipping_border = None
     if parameters.BOUNDARY_CLIPPING_COMPLETE_WAYS:
         clipping_border = shg.Polygon(parameters.get_clipping_extent(False))
 
-    piers = process_osm_piers(osm_nodes_dict, osm_ways_dict, coords_transform, clipping_border)
+    piers = _process_osm_piers(osm_nodes_dict, osm_ways_dict, coords_transform, clipping_border)
     logging.info("ways: %i", len(piers))
     if len(piers) == 0:
         logging.info("No platforms found ignoring")
@@ -361,8 +363,8 @@ def process():
     replacement_prefix = parameters.get_repl_prefix()
     stg_manager = stg_io2.STGManager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
 
-    write_piers(stg_manager, replacement_prefix, clusters)
-    write_boats(stg_manager, piers)
+    _write_piers(stg_manager, replacement_prefix, clusters)
+    _write_boats(stg_manager, piers)
 
     # -- write stg
     stg_manager.write()
