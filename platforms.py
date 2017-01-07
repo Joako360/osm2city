@@ -238,7 +238,7 @@ def process():
     platforms = _process_osm_platform(osm_nodes_dict, osm_ways_dict, coords_transform, clipping_border)
     logging.info("ways: %i", len(platforms))
     if len(platforms) == 0:
-        logging.info("No platforms found ignoring")
+        logging.info("No platforms found -> aborting")
         return
 
     for platform in platforms:

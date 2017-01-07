@@ -79,7 +79,7 @@ import logging
 import math
 import random
 import textwrap
-from typing import List
+from typing import Dict, List
 
 import graph
 import linear
@@ -92,7 +92,7 @@ import shapely.geometry as shg
 import textures.road
 import tools
 from cluster import ClusterContainer
-from utils import osmparser, coordinates, ac3d, objectlist, stg_io2, utilities, aptdat_io
+from utils import osmparser, coordinates, ac3d, stg_io2, utilities, aptdat_io
 from utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
@@ -338,60 +338,26 @@ def _attached_ways_dict_append(attached_ways_dict, the_ref, the_way, is_first, i
     attached_ways_dict[the_ref].append((the_way, is_first))
 
 
-class Roads(objectlist.ObjectList):
+class Roads(object):
     VALID_NODE_KEYS = []
     REQ_KEYS = ['highway', 'railway']
 
-    def __init__(self, transform, fg_elev: utilities.FGElev, boundary_clipping_complete_way) -> None:
-        super(Roads, self).__init__(transform, None, boundary_clipping_complete_way)
+    def __init__(self, raw_osm_ways: List[osmparser.Way], nodes_dict: Dict[int, osmparser.Node],
+                 coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev) -> None:
+        self.transform = coords_transform
         self.fg_elev = fg_elev
-        self.ways_list = list()
+        self.ways_list = raw_osm_ways  # raw ways from OSM
         self.bridges_list = list()
         self.railway_list = list()
-        self.roads_list = self.objects  # alias FIXME: why do we need objectlist.ObjectList at all?
-        self.nodes_dict = {}
+        self.roads_list = list()
+        self.nodes_dict = nodes_dict
         self.graph = None  # network graph of ways
         self.roads_clusters = None
         self.railways_clusters = None
 
     def __str__(self):
-        return "%i ways, %i roads, %i railways, %i bridges" % (len(self.ways_list), len(self.roads_list)
-                                                               , len(self.railway_list), len(self.bridges_list))
-
-    def store_uncategorized(self, way, nodes_dict):
-        """OSMContentHandler uncategorized_way callback method.
-
-        Nothing to do."""
-        pass
-
-    def store_way(self, way, nodes_dict):
-        """OSMContentHandler way callback method.
-
-        Take one osm way, store it. A linear object is created later."""
-
-        if way.osm_id in parameters.SKIP_LIST:
-            logging.info("SKIPPING OSM_ID %i", way.osm_id)
-            return
-
-        if _is_highway(way):
-            highway_type = highway_type_from_osm_tags(way.tags["highway"])
-            if highway_type is None:
-                return
-            elif highway_type.value < parameters.HIGHWAY_TYPE_MIN:
-                return
-        elif _is_railway(way):
-            if not _is_processed_railway(way):
-                return
-
-        if self.boundary_clipping_complete_way is not None:
-            first_node = nodes_dict[way.refs[0]]
-            if not self.boundary_clipping_complete_way.contains(shg.Point(first_node.lon, first_node.lat)):
-                return
-
-        if not self.min_max_scanned:
-            self._process_nodes(nodes_dict)
-
-        self.ways_list.append(way)
+        return "%i ways, %i roads, %i railways, %i bridges" % (len(self.ways_list), len(self.roads_list),
+                                                               len(self.railway_list), len(self.bridges_list))
 
     def process(self, blocked_areas: List[shg.Polygon]) -> None:
         """Processes the OSM data until data can be clusterized.
@@ -462,7 +428,7 @@ class Roads(objectlist.ObjectList):
                         way.refs = part_refs
                         logging.debug("Shortening existing way partly in water - osm_id = {}".format(way.osm_id))
                     else:
-                        new_way= _init_way_from_existing(way, part_refs)
+                        new_way = _init_way_from_existing(way, part_refs)
                         extra_ways.append(new_way)
                         logging.debug("Adding new way from partly in water - osm_id = {}".format(way.osm_id))
             if not whole_way_found:
@@ -610,8 +576,8 @@ class Roads(objectlist.ObjectList):
             for index in range(1, len(the_way.refs)):
                 node0 = self.nodes_dict[the_way.refs[index - 1]]
                 node1 = self.nodes_dict[the_way.refs[index]]
-                my_line = shg.LineString([self.transform.toLocal((node0.lon, node0.lat))
-                                         , self.transform.toLocal((node1.lon, node1.lat))])
+                my_line = shg.LineString([self.transform.toLocal((node0.lon, node0.lat)),
+                                         self.transform.toLocal((node1.lon, node1.lat))])
                 if my_line.length <= parameters.POINTS_ON_LINE_DISTANCE_MAX:
                     my_new_refs.append(the_way.refs[index])
                     continue
@@ -674,15 +640,15 @@ class Roads(objectlist.ObjectList):
 
             try:
                 if _is_bridge(the_way):
-                    obj = linear_bridge.LinearBridge(self.transform, self.fg_elev, the_way.osm_id
-                                                     , the_way.tags, the_way.refs, self.nodes_dict
-                                                     , width=width, tex=tex, AGL=above_ground_level)
+                    obj = linear_bridge.LinearBridge(self.transform, self.fg_elev, the_way.osm_id,
+                                                     the_way.tags, the_way.refs, self.nodes_dict,
+                                                     width=width, tex=tex, AGL=above_ground_level)
                     obj.typ = priority  # FIXME: can this be deleted. does not seem to be used at all
                     self.bridges_list.append(obj)
                 else:
-                    obj = linear.LinearObject(self.transform, the_way.osm_id
-                                              , the_way.tags, the_way.refs
-                                              , self.nodes_dict, width=width, tex=tex, AGL=above_ground_level)
+                    obj = linear.LinearObject(self.transform, the_way.osm_id,
+                                              the_way.tags, the_way.refs,
+                                              self.nodes_dict, width=width, tex=tex, AGL=above_ground_level)
                     obj.typ = priority
                     if _is_railway(the_way):
                         self.railway_list.append(obj)
@@ -734,7 +700,8 @@ class Roads(objectlist.ObjectList):
                 angle = lin_obj.angle[0]
             else:
                 angle = lin_obj.angle[-1] + np.pi
-                if angle > np.pi: angle -= np.pi * 2
+                if angle > np.pi:
+                    angle -= np.pi * 2
             return angle
 
         for the_ref, ways_list in list(self.attached_ways_dict.items()):
@@ -828,7 +795,6 @@ class Roads(objectlist.ObjectList):
         for ref in self.attached_ways_dict:
             node = self.nodes_dict[ref]
             plt.plot(node.lon, node.lat, style, mfc='None')
-            #plt.text(node.lon, node.lat, node.osm_id, color='r')
 
     def debug_label_node(self, ref, text=""):
         if not parameters.DEBUG_PLOT:
@@ -922,10 +888,10 @@ class Roads(objectlist.ObjectList):
         _attached_ways_dict_remove(attached_ways_dict, way2.refs[0], way2, ignore_missing_ref=True)
         _attached_ways_dict_remove(attached_ways_dict, way2.refs[-1], way2, ignore_missing_ref=True)
 
-        _attached_ways_dict_append(attached_ways_dict, new_way.refs[0], new_way
-                                   , is_first=True, ignore_missing_ref=True)
-        _attached_ways_dict_append(attached_ways_dict, new_way.refs[-1], new_way
-                                   , is_first=False, ignore_missing_ref=True)
+        _attached_ways_dict_append(attached_ways_dict, new_way.refs[0], new_way,
+                                   is_first=True, ignore_missing_ref=True)
+        _attached_ways_dict_append(attached_ways_dict, new_way.refs[-1], new_way,
+                                   is_first=False, ignore_missing_ref=True)
 
         try:
             self.ways_list.remove(way1)
@@ -1021,6 +987,35 @@ class Roads(objectlist.ObjectList):
             else:
                 cluster_ref = self.roads_clusters.append(Vec2d(the_object.center.centroid.coords[0]), the_object)
             the_object.cluster_ref = cluster_ref
+
+
+def process_osm_ways(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int, osmparser.Way],
+                     clipping_border: shg.Polygon) -> List[osmparser.Way]:
+    """Processes the values returned from OSM and does a bit of filtering.
+    Transformation to roads, railways and bridges is only done later in Roads.process()."""
+    my_ways = list()
+    for key, way in ways_dict.items():
+        if way.osm_id in parameters.SKIP_LIST:
+            logging.info("SKIPPING OSM_ID %i", way.osm_id)
+            continue
+
+        if _is_highway(way):
+            highway_type = highway_type_from_osm_tags(way.tags["highway"])
+            if highway_type is None:
+                continue
+            elif highway_type.value < parameters.HIGHWAY_TYPE_MIN:
+                continue
+        elif _is_railway(way):
+            if not _is_processed_railway(way):
+                continue
+
+        if clipping_border is not None:
+            first_node = nodes_dict[way.refs[0]]
+            if not clipping_border.contains(shg.Point(first_node.lon, first_node.lat)):
+                continue
+        my_ways.append(way)
+
+    return my_ways
 
 
 def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, stg_manager, stg_paths, is_railway):
@@ -1133,17 +1128,17 @@ def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
     plt.clf()
 
 
-def main():
+def process():
     random.seed(42)
-    parser = argparse.ArgumentParser(description="bridge.py reads OSM data and creates bridge models for use with FlightGear")
+    parser = argparse.ArgumentParser(description="roads.py reads OSM data and creates road, railway and bridge models for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
-    parser.add_argument("-e", dest="e", action="store_true"
-                        , help="skip elevation interpolation", required=False)
-    parser.add_argument("-b", "--bridges-only", action="store_true"
-                        , help="create only bridges and embankments", required=False)
-    parser.add_argument("-l", "--loglevel"
-                        , help="set loglevel. Valid levels are DEBUG, INFO, WARNING, ERROR, CRITICAL", required=False)
+    parser.add_argument("-e", dest="e", action="store_true",
+                        help="skip elevation interpolation", required=False)
+    parser.add_argument("-b", "--bridges-only", action="store_true",
+                        help="create only bridges and embankments", required=False)
+    parser.add_argument("-l", "--loglevel",
+                        help="set loglevel. Valid levels are DEBUG, INFO, WARNING, ERROR, CRITICAL", required=False)
 
     args = parser.parse_args()
     # -- command line args override parameters
@@ -1161,28 +1156,32 @@ def main():
     coords_transform = coordinates.Transformation(center_global, hdg=0)
     tools.init(coords_transform)
 
+    if not parameters.USE_DATABASE:
+        osm_way_result = osmparser.fetch_osm_file_data(['highway', 'railway', "tunnel", "bridge", "gauge", "access"],
+                                                       ['highway', 'railway'])
+    else:
+        osm_way_result = osmparser.fetch_osm_db_data_ways_keys(["highway", "railway"])
+    osm_nodes_dict = osm_way_result.nodes_dict
+    osm_ways_dict = osm_way_result.ways_dict
+
+    clipping_border = None
+    if parameters.BOUNDARY_CLIPPING_COMPLETE_WAYS:
+        clipping_border = shg.Polygon(parameters.get_clipping_extent(False))
+
     # get blocked areas from apt.dat airport data
     blocked_areas = aptdat_io.get_apt_dat_blocked_areas(coords_transform,
                                                         parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
                                                         parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
 
+    filtered_osm_ways_list = process_osm_ways(osm_nodes_dict, osm_ways_dict, clipping_border)
+    logging.info("ways: %i", len(filtered_osm_ways_list))
+    if len(filtered_osm_ways_list) == 0:
+        logging.info("No roads and railways found -> aborting")
+        return
+
     fg_elev = utilities.FGElev(coords_transform, fake=parameters.NO_ELEV)
+    roads = Roads(filtered_osm_ways_list, osm_nodes_dict, coords_transform, fg_elev)
 
-    border = None
-    boundary_clipping_complete_way = None
-    if parameters.BOUNDARY_CLIPPING_COMPLETE_WAYS:
-        boundary_clipping_complete_way = shg.Polygon(parameters.get_clipping_extent(False))
-    elif parameters.BOUNDARY_CLIPPING:
-        border = shg.Polygon(parameters.get_clipping_extent())
-    roads = Roads(coords_transform, fg_elev, boundary_clipping_complete_way)
-    handler = osmparser.OSMContentHandler(roads.VALID_NODE_KEYS, border=border)
-    logging.info("Reading the OSM file might take some time ...")
-
-    handler.register_way_callback(roads.store_way, req_keys=roads.REQ_KEYS)
-    handler.register_uncategorized_way_callback(roads.store_uncategorized)
-    handler.parse(parameters.get_OSM_file_name())
-    logging.info("ways: %i", len(roads))
-        
     path_to_output = parameters.get_output_path()
     logging.debug("before linear " + str(roads))
 
@@ -1197,9 +1196,9 @@ def main():
     _process_clusters(roads.railways_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, True)
     _process_clusters(roads.roads_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, False)
 
-    roads.debug_plot(show=True, plot_junctions=False, clusters=roads.clusters)
+    roads.debug_plot(show=True, plot_junctions=False, clusters=roads.roads_clusters)
     
-    debug_create_eps(roads, roads.clusters, fg_elev, plot_cluster_borders=1)
+    debug_create_eps(roads, roads.roads_clusters, fg_elev, plot_cluster_borders=1)
     stg_manager.write()
 
     utilities.troubleshoot(tools.stats)
@@ -1207,4 +1206,4 @@ def main():
     logging.debug("final " + str(roads))
 
 if __name__ == "__main__":
-    main()
+    process()

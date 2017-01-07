@@ -348,7 +348,7 @@ def process():
     piers = _process_osm_piers(osm_nodes_dict, osm_ways_dict, coords_transform, clipping_border)
     logging.info("ways: %i", len(piers))
     if len(piers) == 0:
-        logging.info("No platforms found ignoring")
+        logging.info("No piers found -> aborting")
         return
 
     for pier in piers:
