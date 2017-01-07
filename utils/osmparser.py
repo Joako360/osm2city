@@ -225,7 +225,10 @@ class OSMContentHandlerOld(xml.sax.ContentHandler):
         all_tags = current_way.tags
         current_way.tags = {}
         for key in list(all_tags.keys()):
-            if key in self.valid_way_keys:
+            if len(self.valid_way_keys) > 0:
+                if key in self.valid_way_keys:
+                    current_way.add_tag(key, all_tags[key])
+            else:
                 current_way.add_tag(key, all_tags[key])
         self.ways_dict[current_way.osm_id] = current_way
 
@@ -233,8 +236,12 @@ class OSMContentHandlerOld(xml.sax.ContentHandler):
         all_tags = current_relation.tags
         current_relation.tags = {}
         for key in list(all_tags.keys()):
-            if key in self.valid_way_keys:
-                current_relation.add_tag(key, all_tags[key])
+            if len(self.valid_way_keys) > 0:
+                if key in self.valid_way_keys:
+                    current_relation.add_tag(key, all_tags[key])
+            else:
+                if key in self.valid_way_keys:
+                    current_relation.add_tag(key, all_tags[key])
         self.relations_dict[current_relation.osm_id] = current_relation
 
     def process_relation_way(self, uncategorized_way, nodes_dict):

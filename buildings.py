@@ -430,7 +430,7 @@ def process():
         clipping_border = None
 
     if not parameters.USE_DATABASE:
-        osm_read_results = osmparser.fetch_osm_file_data(["building", "building:part"], ["building", "building:part"],
+        osm_read_results = osmparser.fetch_osm_file_data(list(), ["building", "building:part"],
                                                          ["building", "building:part"])
     else:
         osm_read_results = osmparser.fetch_osm_db_data_ways_keys(["building", "building:part"])
