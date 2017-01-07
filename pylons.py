@@ -1442,31 +1442,11 @@ def fetch_osm_file_data() -> Tuple[Dict[int, osmparser.Node], Dict[int, osmparse
     return handler.nodes_dict, handler.ways_dict
 
 
-def process():
-    # Handling arguments and parameters
-    parser = argparse.ArgumentParser(
-        description="pylons.py reads OSM data and creates pylons, powerlines and aerialways for use with FlightGear")
-    parser.add_argument("-f", "--file", dest="filename",
-                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
-    parser.add_argument("-e", dest="e", action="store_true",
-                        help="skip elevation interpolation", required=False)
-    parser.add_argument("-u", dest="uninstall", action="store_true",
-                        help="uninstall ours from .stg", required=False)
-    parser.add_argument("-l", "--loglevel",
-                        help="Set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL", required=False)
-    args = parser.parse_args()
-    if args.filename is not None:
-        parameters.read_from_file(args.filename)
-    parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
-    if args.e:
-        parameters.NO_ELEV = True
-
+def process(uninstall: bool=False) -> None:
     files_to_remove = list()
-    if args.uninstall:
+    if uninstall:
         logging.info("Uninstalling.")
         parameters.NO_ELEV = True
-
-    parameters.show()
 
     # Initializing tools for global/local coordinate transformations
     center_global = parameters.get_center_global()
@@ -1594,7 +1574,24 @@ def process():
 
 
 if __name__ == "__main__":
-    process()
+    parser = argparse.ArgumentParser(
+        description="pylons.py reads OSM data and creates pylons, powerlines and aerialways for use with FlightGear")
+    parser.add_argument("-f", "--file", dest="filename",
+                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
+    parser.add_argument("-e", dest="skip_elev", action="store_true",
+                        help="skip elevation interpolation", required=False)
+    parser.add_argument("-u", dest="uninstall", action="store_true",
+                        help="uninstall ours from .stg", required=False)
+    parser.add_argument("-l", "--loglevel", dest="loglevel",
+                        help="Set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL", required=False)
+    args = parser.parse_args()
+    parameters.read_from_file(args.filename)
+    parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
+    if args.skip_elev:
+        parameters.NO_ELEV = True
+    parameters.show()
+
+    process(args.uninstall)
 
 
 # ================ UNITTESTS =======================

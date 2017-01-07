@@ -381,48 +381,21 @@ def _write_xml(path: str, file_name: str, the_buildings: List[building_lib.Build
     xml.close()
 
 
-def process():
+def process(uninstall: bool=False, create_atlas: bool=False) -> None:
     random.seed(42)
-    # -- Parse arguments. Command line overrides config file.
-    parser = argparse.ArgumentParser(description="buildings.py reads OSM data and creates buildings for use with FlightGear")
-    parser.add_argument("-f", "--file", dest="filename",
-                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
-    parser.add_argument("-e", dest="e", action="store_true",
-                        help="skip elevation interpolation", required=False)
-    parser.add_argument("-c", dest="c", action="store_true",
-                        help="do not check for overlapping with static objects", required=False)
-    parser.add_argument("-a", "--create-atlas", action="store_true",
-                        help="create texture atlas", required=False)
-    parser.add_argument("-u", dest="uninstall", action="store_true",
-                        help="uninstall ours from .stg", required=False)
-    parser.add_argument("-l", "--loglevel",
-                        help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL",
-                        required=False)
-    args = parser.parse_args()
 
-    if args.filename is not None:
-        parameters.read_from_file(args.filename)
-    parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
-    
-    if args.e:
-        parameters.NO_ELEV = True
-    if args.c:
-        parameters.OVERLAP_CHECK = False
-
-    if args.uninstall:
+    files_to_remove = list()
+    if uninstall:
         logging.info("Uninstalling.")
-        files_to_remove = []
         parameters.NO_ELEV = True
         parameters.OVERLAP_CHECK = False
-
-    parameters.show()
 
     # -- prepare transformation to local coordinates
     center = parameters.get_center_global()
     coords_transform = coordinates.Transformation(center, hdg=0)
     tools.init(coords_transform)
 
-    prepare_textures.init(args.create_atlas)
+    prepare_textures.init(create_atlas)
 
     if parameters.BOUNDARY_CLIPPING:
         clipping_border = shgm.Polygon(parameters.get_clipping_extent())
@@ -565,7 +538,7 @@ def process():
 
             stg_manager.add_object_static('lightmap-switch.xml', center_global, cluster_elev, 0, once=True)
 
-            if args.uninstall:
+            if uninstall:
                 files_to_remove.append(path_to_stg + file_name + ".ac")
                 files_to_remove.append(path_to_stg + file_name + ".xml")
             else:
@@ -578,7 +551,7 @@ def process():
         handled_index += 1
     logging.debug("Total number of buildings written to a cluster *.ac files: %d", total_buildings_written)
 
-    if args.uninstall:
+    if uninstall:
         for f in files_to_remove:
             try:
                 os.remove(f)
@@ -597,4 +570,32 @@ def process():
     sys.exit(0)
 
 if __name__ == "__main__":
-    process()
+    # -- Parse arguments. Command line overrides config file.
+    parser = argparse.ArgumentParser(
+        description="buildings.py reads OSM data and creates buildings for use with FlightGear")
+    parser.add_argument("-f", "--file", dest="filename",
+                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
+    parser.add_argument("-e", dest="skip_elev", action="store_true",
+                        help="skip elevation interpolation", required=False)
+    parser.add_argument("-c", dest="skip_overlap_check", action="store_true",
+                        help="do not check for overlapping with static objects", required=False)
+    parser.add_argument("-a", "--create-atlas", dest="create_atlas", action="store_true",
+                        help="create texture atlas", required=False)
+    parser.add_argument("-u", dest="uninstall", action="store_true",
+                        help="uninstall ours from .stg", required=False)
+    parser.add_argument("-l", "--loglevel",
+                        help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL",
+                        required=False)
+    args = parser.parse_args()
+    parameters.read_from_file(args.filename)
+    parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
+    if args.skip_elev:
+        parameters.NO_ELEV = True
+    parameters.show()
+
+    if args.skip_elev:
+        parameters.NO_ELEV = True
+    if args.skip_overlap_check:
+        parameters.OVERLAP_CHECK = False
+
+    process(args.uninstall, args.create_atlas)

@@ -10,7 +10,7 @@ import argparse
 import logging
 import numpy as np
 import os
-from typing import List
+from typing import List, Optional
 
 import shapely.geometry as shg
 
@@ -198,21 +198,7 @@ def _write_line(platform, fg_elev: FGElev, obj, offset):
     obj.face(sideface, mat=0)
 
 
-def process():
-    parser = argparse.ArgumentParser(description="platforms.py reads OSM data and creates platform models for use with FlightGear")
-    parser.add_argument("-f", "--file", dest="filename",
-                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
-    parser.add_argument("-l", "--loglevel",
-                        help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL",
-                        required=False)
-    args = parser.parse_args()
-
-    if args.filename is not None:
-        parameters.read_from_file(args.filename)
-    parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
-
-    parameters.show()
-
+def process() -> None:
     # -- prepare transformation to local coordinates
     cmin, cmax = parameters.get_extent_global()
     center_global = parameters.get_center_global()
@@ -261,4 +247,15 @@ def process():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="platforms.py reads OSM data and creates platform models for use with FlightGear")
+    parser.add_argument("-f", "--file", dest="filename",
+                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
+    parser.add_argument("-l", "--loglevel", dest="loglevel",
+                        help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL",
+                        required=False)
+    args = parser.parse_args()
+    parameters.read_from_file(args.filename)
+    parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
+    parameters.show()
+
     process()

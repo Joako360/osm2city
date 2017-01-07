@@ -1130,27 +1130,6 @@ def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
 
 def process():
     random.seed(42)
-    parser = argparse.ArgumentParser(description="roads.py reads OSM data and creates road, railway and bridge models for use with FlightGear")
-    parser.add_argument("-f", "--file", dest="filename",
-                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
-    parser.add_argument("-e", dest="e", action="store_true",
-                        help="skip elevation interpolation", required=False)
-    parser.add_argument("-b", "--bridges-only", action="store_true",
-                        help="create only bridges and embankments", required=False)
-    parser.add_argument("-l", "--loglevel",
-                        help="set loglevel. Valid levels are DEBUG, INFO, WARNING, ERROR, CRITICAL", required=False)
-
-    args = parser.parse_args()
-    # -- command line args override parameters
-    if args.filename is not None:
-        parameters.read_from_file(args.filename)
-    parameters.set_loglevel(args.loglevel)
-
-    if args.e:
-        parameters.NO_ELEV = True
-    if args.bridges_only:
-        parameters.CREATE_BRIDGES_ONLY = True
-    parameters.show()
 
     center_global = parameters.get_center_global()
     coords_transform = coordinates.Transformation(center_global, hdg=0)
@@ -1206,4 +1185,22 @@ def process():
     logging.debug("final " + str(roads))
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="roads.py reads OSM data and creates road, railway and bridge models for use with FlightGear")
+    parser.add_argument("-f", "--file", dest="filename",
+                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
+    parser.add_argument("-e", dest="skip_elev", action="store_true",
+                        help="skip elevation interpolation", required=False)
+    parser.add_argument("-b", "--bridges-only", dest="bridges_only", action="store_true",
+                        help="create only bridges and embankments", required=False)
+    parser.add_argument("-l", "--loglevel",
+                        help="set loglevel. Valid levels are DEBUG, INFO, WARNING, ERROR, CRITICAL", required=False)
+    args = parser.parse_args()
+    parameters.read_from_file(args.filename)
+    parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
+    if args.skip_elev:
+        parameters.NO_ELEV = True
+    if args.bridges_only:
+        parameters.CREATE_BRIDGES_ONLY = True
+    parameters.show()
+
     process()

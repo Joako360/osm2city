@@ -372,7 +372,33 @@ def show_default():
             print(line, end='')
 
 
-def set_loglevel(args_loglevel=None):
+def set_boundary(boundary_west: float, boundary_south: float,
+                 boundary_east: float, boundary_north: float) -> None:
+    """Overrides the geographical boundary values (either default values or read from file).
+    In most situations should be called after method read_from_file().
+    """
+    boundary_ok = True
+    if boundary_west >= boundary_east:
+        boundary_ok = False
+        logging.error("Boundary West {} must be smaller than East {} -> aborting!".format(boundary_west,
+                                                                                          boundary_east))
+    if boundary_south >= boundary_north:
+        boundary_ok = False
+        logging.error("Boundary -south {} must be smaller than North {} -> aborting!".format(boundary_south,
+                                                                                             boundary_north))
+    if not boundary_ok:
+        sys.exit(1)
+    global BOUNDARY_WEST
+    BOUNDARY_WEST = boundary_west
+    global BOUNDARY_SOUTH
+    BOUNDARY_SOUTH = boundary_south
+    global BOUNDARY_EAST
+    BOUNDARY_EAST = boundary_east
+    global BOUNDARY_NORTH
+    BOUNDARY_NORTH = boundary_north
+
+
+def set_loglevel(args_loglevel=None) -> None:
     """Set loglevel from parameters or command line."""
     global LOGLEVEL
     if args_loglevel is not None:
