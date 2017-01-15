@@ -44,8 +44,8 @@ class STGFile(object):
     def __init__(self, lon_lat: Vec2d, tile_index: int, path_to_scenery: str, magic: str, prefix: str) -> None:
         """Read all lines from stg to memory.
            Store our/other lines in two separate lists."""
-        self.path_to_stg = calc_tile.construct_path_to_stg(path_to_scenery, lon_lat)
-        self.file_name = self.path_to_stg + "%07i.stg" % tile_index
+        self.path_to_stg = calc_tile.construct_path_to_stg(path_to_scenery, (lon_lat.lon, lon_lat.lat))
+        self.file_name = self.path_to_stg + calc_tile.construct_stg_file_name_from_tile_index(tile_index)
         self.other_list = []
         self.our_list = []
         self.our_ac_file_name_list = []
@@ -161,9 +161,9 @@ class STGManager(object):
         self.magic = magic
         self.prefix = prefix
 
-    def __call__(self, lon_lat, overwrite=None):
+    def __call__(self, lon_lat: Vec2d, overwrite=None) -> STGFile:
         """return STG object. If overwrite is given, it overrides default"""
-        tile_index = calc_tile.tile_index(lon_lat)
+        tile_index = calc_tile.tile_index((lon_lat.lon, lon_lat.lat))
         try:
             return self.stg_dict[tile_index]
         except KeyError:
@@ -176,7 +176,7 @@ class STGManager(object):
                 the_stg.drop_ours()
         return the_stg
 
-    def add_object_static(self, ac_file_name, lon_lat, elev, hdg,
+    def add_object_static(self, ac_file_name, lon_lat: Vec2d, elev, hdg,
                           stg_verb_type: STGVerbType=STGVerbType.object_static, once=False):
         """Adds OBJECT_STATIC line. Returns path to stg."""
         the_stg = self(lon_lat)
@@ -322,27 +322,3 @@ def quick_stg_line(path_to_scenery, ac_fname, position, elevation, heading, show
         print(stg_line)
 #        print "%s\n%s" % (stg_path + stg_fname, stg_line)
     return stg_path, stg_fname, stg_line
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
-    OUR_MAGIC = "osm2test"
-    center_global = Vec2d(13.7, 51)
-
-    # 1. Init STGManager
-    stg_manager = STGManager("/home/albrecht/fgfs/my/osm2city/EDDC", OUR_MAGIC, overwrite=True)
-
-    # 2. add object(s) to it, will return path_to_stg. If the .stg in question
-    #    is encountered for the first time, read it into an STGFile object and
-    #    separate "our" lines from "other" lines.
-    path_to_stg = stg_manager.add_object_static("test.ac", center_global, 0, 0)
-
-    # 3. write your .ac to path_to_stg + ac_file_name (then add more objects)
-
-    # 4. finally write all cached lines to .stg files.
-    stg_manager.write()
-
-    # 5. If you want to uninstall, do 1. - 3. Then remove our lines from cache:l
-    #   stg_manager.drop_ours()
-    # And write other lines to disk:
-    #   stg_manager.write()

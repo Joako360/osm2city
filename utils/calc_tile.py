@@ -4,7 +4,8 @@ shamelessly translated from calc-tile.pl
 """
 from math import floor
 import os
-from typing import List
+from typing import List, Tuple
+import unittest
 
 import numpy as np
 
@@ -45,27 +46,27 @@ def format_lat(lat):
         return "n%02d" % int(lat)
 
 
-def root_directory_name(xxx_todo_changeme):
+def root_directory_name(lon_lat: Tuple[float, float]) -> str:
     """Generate the directory name for a location."""
-    (lon, lat) = xxx_todo_changeme
+    (lon, lat) = lon_lat
     lon_chunk = floor(lon/10.0) * 10
     lat_chunk = floor(lat/10.0) * 10
     return format_lon(lon_chunk) + format_lat(lat_chunk) + os.sep 
 
 
-def directory_name(xxx_todo_changeme1):
+def directory_name(lon_lat: Tuple[float, float]) -> str:
     """Generate the directory name for a location."""
-    (lon, lat) = xxx_todo_changeme1
+    (lon, lat) = lon_lat
     lon_floor = floor(lon)
     lat_floor = floor(lat)
     lon_chunk = floor(lon/10.0) * 10
     lat_chunk = floor(lat/10.0) * 10
-    return format_lon(lon_chunk) + format_lat(lat_chunk) + os.sep \
-         + format_lon(lon_floor) + format_lat(lat_floor)
+    return format_lon(lon_chunk) + format_lat(lat_chunk) + os.sep + format_lon(lon_floor) + format_lat(lat_floor)
 
 
-def tile_index(xxx_todo_changeme2, x=0, y=0):
-    (lon, lat) = xxx_todo_changeme2
+def tile_index(lon_lat: Tuple[float, float], x: int=0, y: int=0) -> int:
+    """See  http://wiki.flightgear.org/Tile_Index_Scheme"""
+    (lon, lat) = lon_lat
     if x == 0 and y == 0:
         y = calc_y(lat)
         x = calc_x(lon, lat)
@@ -77,19 +78,23 @@ def tile_index(xxx_todo_changeme2, x=0, y=0):
     return index
 
 
-def construct_path_to_stg(base_directory, center_global):
+def construct_path_to_stg(base_directory: str, center_global: Tuple[float, float]) -> str:
     """Returns the path to the stg-files in a FG scenery directory hierarchy at a given global lat/lon location"""
     return base_directory + os.sep + 'Objects' + os.sep + directory_name(center_global) + os.sep
 
 
-def construct_stg_file_name(center_global):
+def construct_stg_file_name(center_global: Tuple[float, float]) -> str:
     """Returns the file name of the stg-file at a given global lat/lon location"""
-    return "%07i.stg" % tile_index(center_global)
+    return construct_stg_file_name_from_tile_index(tile_index(center_global))
 
 
-def construct_btg_file_name(center_global):
+def construct_stg_file_name_from_tile_index(tile_idx: int) -> str:
+    return str(tile_idx) + ".stg"
+
+
+def construct_btg_file_name(center_global: Tuple[float, float]) -> str:
     """Returns the file name of the stg-file at a given global lat/lon location"""
-    return "%07i.btg.gz" % tile_index(center_global)
+    return str(tile_index(center_global)) + ".btg.gz"
 
 
 def get_north_lat(lat, y):
@@ -114,14 +119,13 @@ def get_east_lon(lon, lat, x):
         return float(floor(lon)) + x * (bucket_span(lat)) + (bucket_span(lat))
 
 
-def calc_x(lon, lat):
+def calc_x(lon: float, lat: float) -> int:
     """
     FIXME: is this correct? Also: some returns do not take calculations into account.
-    According to http://wiki.flightgear.org/Tile_Index_Scheme it would be calculated differently
     """
-    EPSILON = 0.0000001
+    epsilon = 0.0000001
     span = bucket_span(lat)
-    if span < EPSILON:
+    if span < epsilon:
         lon = 0
         return 0
     elif span <= 1.0:
@@ -136,7 +140,7 @@ def calc_x(lon, lat):
         return 0
 
 
-def calc_y(lat):
+def calc_y(lat: float) -> int:
     return int((lat - floor(lat)) * 8)
     
 
@@ -152,11 +156,17 @@ def get_stg_files_in_boundary(boundary_west: float, boundary_south: float, bound
     return stg_files
 
 
-if __name__ == "__main__":
-    for lon, lat, idx in ((13.687944, 51.074664, 3171138),
-                          (13.9041667, 51.1072222, 3171139),
-                          (13.775, 51.9638889, 3171195),
-                          (0.258094, 29.226081, 2956745),
-                          (-2.216667, 30.008333, 2907651)):
-        print(tile_index([lon, lat]) - idx)
-        print(directory_name([lon, lat]))
+# ================ UNITTESTS =======================
+
+
+class TestCalcTiles(unittest.TestCase):
+    def test_calc_tiles(self):
+        self.assertEqual(5760, tile_index((-179.9, 0.1)))
+        self.assertEqual(5752, tile_index((-179.9, -0.1)))
+        self.assertEqual(5887623, tile_index((179.9, 0.1)))
+        self.assertEqual(5887615, tile_index((179.9, -0.1)))
+        self.assertEqual(2954880, tile_index((0.0, 0.0)))
+        self.assertEqual(2938495, tile_index((-0.1, -0.1)))
+
+    def test_file_name(self):
+        self.assertEqual("3088961.stg", construct_stg_file_name((8.29, 47.08)))
