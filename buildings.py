@@ -448,7 +448,8 @@ def process(uninstall: bool=False, create_atlas: bool=False) -> None:
                                                         parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
                                                         parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
 
-    the_buildings = building_lib.overlap_check_blocked_areas(the_buildings, blocked_areas)
+    if len(blocked_areas) > 0:
+        the_buildings = building_lib.overlap_check_blocked_areas(the_buildings, blocked_areas)
 
     if parameters.OVERLAP_CHECK:
         # -- read static/shared objects in our area from .stg(s)
