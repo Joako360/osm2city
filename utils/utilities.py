@@ -41,6 +41,8 @@ def get_fg_root() -> str:
     if my_fg_root is None:
         logging.error("$FG_ROOT must be set as an environment variable on operating system level")
         sys.exit(1)
+    my_fg_root = my_fg_root.strip()
+    logging.debug("FG_ROOT is set to value '{}'".format(my_fg_root))
     return my_fg_root
 
 
