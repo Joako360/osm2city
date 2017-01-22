@@ -26,6 +26,7 @@ from utils.utilities import FGElev
 from utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2piers"  # Used in e.g. stg files to mark edits by osm2Piers
+SCENERY_TYPE = "Buildings"  # yes, not "Piers"
 
 
 class Pier(object):
@@ -345,7 +346,7 @@ def process() -> None:
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
     replacement_prefix = parameters.get_repl_prefix()
-    stg_manager = stg_io2.STGManager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
+    stg_manager = stg_io2.STGManager(path_to_output, SCENERY_TYPE, OUR_MAGIC, replacement_prefix, overwrite=True)
 
     _write_piers(stg_manager, replacement_prefix, clusters)
     _write_boats(stg_manager, piers)

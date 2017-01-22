@@ -35,6 +35,7 @@ from utils import osmparser, vec2d, coordinates, stg_io2
 from utils.utilities import FGElev
 
 OUR_MAGIC = "osm2pylon"  # Used in e.g. stg files to mark edits by osm2pylon
+SCENERY_TYPE = "Pylons"
 
 
 class Cable(object):
@@ -1541,7 +1542,8 @@ def process(uninstall: bool=False) -> None:
 
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
-    stg_manager = stg_io2.STGManager(path_to_output, OUR_MAGIC, parameters.get_repl_prefix(), overwrite=True)
+    stg_manager = stg_io2.STGManager(path_to_output, SCENERY_TYPE, OUR_MAGIC, parameters.get_repl_prefix(),
+                                     overwrite=True)
 
     # Write to Flightgear
     if parameters.C2P_PROCESS_POWERLINES:

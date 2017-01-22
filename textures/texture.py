@@ -3,7 +3,7 @@ import os
 from PIL import Image
 import random
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import numpy as np
 
@@ -419,28 +419,21 @@ class FacadeManager(RoofManager):
             exclusions.append("%s:%s" % ('roof:colour', tags['roof:colour']))
         candidates = self.find_facade_candidates(requires, exclusions, height, width)
         if len(candidates) == 0:
-            logging.warning("no matching facade texture for %1.f m x %1.1f m <%s>", height, width, str(requires))
-            return None
-        ranked_list = self.rank_candidates(candidates, tags)
+            # Break down requirements to something that matches
+            for simple_req in requires:
+                candidates = self.find_facade_candidates([simple_req], exclusions, height, width)
+                if len(candidates) > 0:
+                    break
+            if len(candidates) == 0:
+                # Now we're really desperate - just find something!
+                candidates = self.find_facade_candidates(['compat:roof-flat'], exclusions, height, width)
+            if len(candidates) == 0:
+                logging.warning("no matching facade texture for %1.f m x %1.1f m <%s>", height, width, str(requires))
+                return None
+        ranked_list = _rank_candidates(candidates, tags)
         the_texture = ranked_list[random.randint(0, len(ranked_list) - 1)]
         tools.stats.count_texture(the_texture)
         return the_texture
-
-    def rank_candidates(self, candidates, tags):
-        ranked_list = []
-        for t in candidates:
-            match = 0
-            if 'building:material' in tags:
-                val = tags['building:material']
-                new_key = "facade:building:material:%s" % val
-                if new_key in t.provides:
-                    match += 1
-            ranked_list.append([match, t])
-        ranked_list.sort(key=lambda tup: tup[0], reverse=True)
-        max_val = ranked_list[0][0]
-        if max_val > 0:
-            logging.info("Max Rank %d" % max_val)
-        return [t[1] for t in ranked_list if t[0] >= max_val]
 
     def find_facade_candidates(self, requires, excludes, height, width):
         candidates = RoofManager.find_candidates(self, requires, excludes)
@@ -458,6 +451,23 @@ class FacadeManager(RoofManager):
 
             new_candidates.append(t)
         return new_candidates
+
+
+def _rank_candidates(candidates, tags):
+    ranked_list = []
+    for t in candidates:
+        match = 0
+        if 'building:material' in tags:
+            val = tags['building:material']
+            new_key = "facade:building:material:%s" % val
+            if new_key in t.provides:
+                match += 1
+        ranked_list.append([match, t])
+    ranked_list.sort(key=lambda tup: tup[0], reverse=True)
+    max_val = ranked_list[0][0]
+    if max_val > 0:
+        logging.info("Max Rank %d" % max_val)
+    return [t[1] for t in ranked_list if t[0] >= max_val]
 
 
 def _map_hex_colour(value):

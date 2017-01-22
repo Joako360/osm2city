@@ -1255,12 +1255,12 @@ def _create_static_obj_boundaries(my_coord_transformation: Transformation) -> Di
     boundaries = dict()
     stg_files = calc_tile.get_stg_files_in_boundary(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
                                                     parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH,
-                                                    parameters.PATH_TO_SCENERY)
+                                                    parameters.PATH_TO_SCENERY, "Objects")
 
     if parameters.PATH_TO_SCENERY_OPT is not None:
         stg_files_opt = calc_tile.get_stg_files_in_boundary(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
                                                             parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH,
-                                                            parameters.PATH_TO_SCENERY_OPT)
+                                                            parameters.PATH_TO_SCENERY_OPT, "Objects")
         stg_files.extend(stg_files_opt)
 
     for filename in stg_files:

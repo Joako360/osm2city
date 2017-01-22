@@ -13,10 +13,10 @@ import parameters
 import utils.utilities as util
 
 
-def main(copy_fg_data: bool) -> None:
+def main(copy_fg_data: bool, scenery_type: str) -> None:
     scenery_path = parameters.get_output_path()
 
-    scenery_path += os.sep + "Objects"
+    scenery_path += os.sep + scenery_type
     if os.path.exists(scenery_path):
         level_one_dirs = os.listdir(scenery_path)
         level_two_dirs = list()
@@ -63,7 +63,6 @@ def main(copy_fg_data: bool) -> None:
                 source_dir = data_dir + "fgdata"
                 copy_tree(source_dir, fg_root_dir)
 
-
     else:
         logging.error("The scenery path must include a directory 'Objects' like %s", scenery_path)
         sys.exit(1)
@@ -75,10 +74,13 @@ if __name__ == "__main__":
     into the scenery folders.")
     parser.add_argument("-f", "--file", dest="filename",
                         help="Mandatory: read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
+    parser.add_argument("-t", "--type", dest="scenery_type",
+                        help="Mandatory: Scenery type - typically 'Objects', 'Buildings', 'Roads', 'Pylons' ",
+                        metavar="STRING", required=True)
     parser.add_argument("-a", action="store_true",
                         help="also copy effects etc. in fgdata to $FG_ROOT", required=False)
     args = parser.parse_args()
 
     parameters.read_from_file(args.filename)
 
-    main(args.a)
+    main(args.a, args.scenery_type)

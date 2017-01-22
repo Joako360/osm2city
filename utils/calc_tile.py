@@ -78,9 +78,9 @@ def tile_index(lon_lat: Tuple[float, float], x: int=0, y: int=0) -> int:
     return index
 
 
-def construct_path_to_stg(base_directory: str, center_global: Tuple[float, float]) -> str:
+def construct_path_to_stg(base_directory: str, scenery_type: str, center_global: Tuple[float, float]) -> str:
     """Returns the path to the stg-files in a FG scenery directory hierarchy at a given global lat/lon location"""
-    return base_directory + os.sep + 'Objects' + os.sep + directory_name(center_global) + os.sep
+    return base_directory + os.sep + scenery_type + os.sep + directory_name(center_global) + os.sep
 
 
 def construct_stg_file_name(center_global: Tuple[float, float]) -> str:
@@ -145,14 +145,15 @@ def calc_y(lat: float) -> int:
     
 
 def get_stg_files_in_boundary(boundary_west: float, boundary_south: float, boundary_east: float, boundary_north: float,
-                              path_to_scenery: str) -> List[str]:
+                              path_to_scenery: str, scenery_type: str) -> List[str]:
     """Based on boundary rectangle returns a list of stg-files (incl. full path) to be found within the boundary of
     the scenery"""
     stg_files = []
     for my_lat in np.arange(boundary_south, boundary_north, 0.125):  # latitude; FIXME: why use a factor?
         for my_lon in np.arange(boundary_west, boundary_east, bucket_span(my_lat)):  # longitude
             coords = (my_lon, my_lat)
-            stg_files.append(construct_path_to_stg(path_to_scenery, coords) + construct_stg_file_name(coords))
+            stg_files.append(construct_path_to_stg(path_to_scenery, scenery_type, coords)
+                             + construct_stg_file_name(coords))
     return stg_files
 
 

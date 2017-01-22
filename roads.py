@@ -96,6 +96,7 @@ from utils import osmparser, coordinates, ac3d, stg_io2, utilities, aptdat_io
 from utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
+SCENERY_TYPE = "Roads"
 
 
 PSEUDO_OSM_ID = -1  # For those nodes and ways, which get added as part of processing. Not written back to OSM.
@@ -1167,7 +1168,7 @@ def process():
     roads.process(blocked_areas)  # does the heavy lifting based on OSM data including clustering
 
     replacement_prefix = parameters.get_repl_prefix()
-    stg_manager = stg_io2.STGManager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
+    stg_manager = stg_io2.STGManager(path_to_output, SCENERY_TYPE, OUR_MAGIC, replacement_prefix, overwrite=True)
 
     # -- write stg
     stg_paths = set()

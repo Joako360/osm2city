@@ -76,6 +76,7 @@ import utils.vec2d as v
 from utils import aptdat_io, osmparser, calc_tile, coordinates, stg_io2, utilities
 
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
+SCENERY_TYPE = "Buildings"
 
 
 def _process_osm_relation(rel_nodes_dict: Dict[int, osmparser.Node], rel_ways_dict: Dict[int, osmparser.Way],
@@ -460,7 +461,7 @@ def process(uninstall: bool=False, create_atlas: bool=False) -> None:
         static_objects = []
         for cl in clusters_default:
             center_global = tools.transform.toGlobal(cl.center)
-            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, center_global)
+            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, "Objects", center_global)
             stg_file_name = calc_tile.construct_stg_file_name(center_global)
 
             if stg_file_name not in stgs:
@@ -488,7 +489,8 @@ def process(uninstall: bool=False, create_atlas: bool=False) -> None:
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
     replacement_prefix = parameters.get_repl_prefix()
-    stg_manager = stg_io2.STGManager(path_to_output, OUR_MAGIC, replacement_prefix, overwrite=True)
+    stg_manager = stg_io2.STGManager(path_to_output, SCENERY_TYPE, OUR_MAGIC, replacement_prefix,
+                                     overwrite=True)
 
     # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
     for b in the_buildings:

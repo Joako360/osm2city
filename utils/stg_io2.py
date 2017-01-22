@@ -17,6 +17,7 @@ import os
 import time
 from typing import List, Optional
 
+import parameters
 from utils import calc_tile
 from utils.vec2d import Vec2d
 from utils.utilities import assert_trailing_slash
@@ -41,10 +42,11 @@ class STGFile(object):
        takes care of writing/reading/uninstalling OBJECT_* lines
     """
     
-    def __init__(self, lon_lat: Vec2d, tile_index: int, path_to_scenery: str, magic: str, prefix: str) -> None:
+    def __init__(self, lon_lat: Vec2d, tile_index: int, path_to_scenery: str, scenery_type: str,
+                 magic: str, prefix: str) -> None:
         """Read all lines from stg to memory.
            Store our/other lines in two separate lists."""
-        self.path_to_stg = calc_tile.construct_path_to_stg(path_to_scenery, (lon_lat.lon, lon_lat.lat))
+        self.path_to_stg = calc_tile.construct_path_to_stg(path_to_scenery, scenery_type, (lon_lat.lon, lon_lat.lat))
         self.file_name = self.path_to_stg + calc_tile.construct_stg_file_name_from_tile_index(tile_index)
         self.other_list = []
         self.our_list = []
@@ -154,12 +156,16 @@ class STGManager(object):
     """manages STG objects. Knows about scenery path.
        prefix separates different writers to work around two PREFIX areas interleaving 
     """
-    def __init__(self, path_to_scenery: str, magic: str, prefix=None, overwrite=False) -> None:
+    def __init__(self, path_to_scenery: str, scenery_type: str, magic: str, prefix=None, overwrite=False) -> None:
         self.stg_dict = dict()  # maps tile index to stg object
         self.path_to_scenery = path_to_scenery
         self.overwrite = overwrite
         self.magic = magic
         self.prefix = prefix
+        if parameters.USE_NEW_STG_VERBS:
+            self.scenery_type = scenery_type
+        else:
+            self.scenery_type = "Objects"
 
     def __call__(self, lon_lat: Vec2d, overwrite=None) -> STGFile:
         """return STG object. If overwrite is given, it overrides default"""
@@ -167,7 +173,7 @@ class STGManager(object):
         try:
             return self.stg_dict[tile_index]
         except KeyError:
-            the_stg = STGFile(lon_lat, tile_index, self.path_to_scenery, self.magic, self.prefix)
+            the_stg = STGFile(lon_lat, tile_index, self.path_to_scenery, self.scenery_type, self.magic, self.prefix)
             self.stg_dict[tile_index] = the_stg
             if overwrite is None:
                 overwrite = self.overwrite
@@ -309,16 +315,3 @@ def _make_delimiter_string(our_magic: Optional[str], prefix: Optional[str], is_s
         return delimiter + magic + '\n'
     else:
         return delimiter + magic + '_' + prefix + '\n'
-
-
-def quick_stg_line(path_to_scenery, ac_fname, position, elevation, heading, show=True):
-    """debug."""
-    stg_path = calc_tile.construct_path_to_stg(path_to_scenery, position)
-    stg_fname = calc_tile.construct_stg_file_name(position)
-    stg_line = "OBJECT_STATIC %s %1.7f %1.7f %1.2f %g\n" % (ac_fname, position.lon, position.lat, elevation, heading)
-    if show == 1 or show == 3:
-        print(stg_path + stg_fname)
-    if show == 2 or show == 3:
-        print(stg_line)
-#        print "%s\n%s" % (stg_path + stg_fname, stg_line)
-    return stg_path, stg_fname, stg_line
