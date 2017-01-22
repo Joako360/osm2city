@@ -3,6 +3,11 @@ import logging
 import parameters
 import sys
 
+import buildings
+import platforms
+import pylons
+import roads
+import utils.calc_tile as calc_tile
 from utils.utilities import BoundaryError, parse_boundary
 
 
@@ -30,3 +35,61 @@ if __name__ == '__main__':
     except BoundaryError as be:
         logging.error(be.message)
         sys.exit(1)
+    boundary_west = boundary_floats[0]
+    boundary_south = boundary_floats[1]
+    boundary_east = boundary_floats[2]
+    boundary_north = boundary_floats[3]
+    logging.info("Overall boundary {}, {}, {}, {}".format(boundary_west, boundary_south, boundary_east, boundary_north))
+
+    # list of sceneries tiles (might have smaller boundaries). Each entry has a list with the 4 boundary points
+    scenery_tiles_list = list()
+
+    # loop west-east and south north on full degrees
+    epsilon = 0.00000001  # to make sure that top right boundary not x.0
+    for full_lon in range(int(boundary_west), int(boundary_east - epsilon) + 1):
+        for full_lat in range(int(boundary_south), int(boundary_north - epsilon) + 1):
+            logging.debug("lon: {}, lat:{}".format(full_lon, full_lat))
+            if calc_tile.bucket_span(full_lat) > 1:
+                num_lon_parts = 1
+            else:
+                num_lon_parts = int(1 / calc_tile.bucket_span(full_lat))
+            num_lat_parts = 8  # always the same no matter the lon
+            for lon_index in range(num_lon_parts):
+                for lat_index in range(num_lat_parts):
+                    tile_boundary_west = full_lon + lon_index / num_lon_parts
+                    tile_boundary_east = full_lon + (lon_index + 1) / num_lon_parts
+                    tile_boundary_south = full_lat + lat_index / num_lat_parts
+                    tile_boundary_north = full_lat + (lat_index + 1) / num_lat_parts
+                    if tile_boundary_east <= boundary_west or tile_boundary_west > boundary_east:
+                        continue
+                    if tile_boundary_north <= boundary_south or tile_boundary_south > boundary_north:
+                        continue
+                    if boundary_west > tile_boundary_west:
+                        tile_boundary_west = boundary_west
+                    if tile_boundary_east > boundary_east:
+                        tile_boundary_east = boundary_east
+                    if boundary_south > tile_boundary_south:
+                        tile_boundary_south = boundary_south
+                    if tile_boundary_north > boundary_north:
+                        tile_boundary_north = boundary_north
+
+                    tile_index = calc_tile.tile_index((tile_boundary_west,tile_boundary_south))
+                    scenery_tiles_list.append([tile_boundary_west, tile_boundary_south,
+                                               tile_boundary_east, tile_boundary_north])
+                    logging.info("Added scenery tile {} with boundary {}, {}, {}, {}".format(tile_index,
+                                                                                             tile_boundary_west,
+                                                                                             tile_boundary_south,
+                                                                                             tile_boundary_east,
+                                                                                             tile_boundary_north))
+
+    for scenery_tile in scenery_tiles_list:
+        # adapt boundary
+        parameters.BOUNDARY_WEST = scenery_tile[0]
+        parameters.BOUNDARY_SOUTH = scenery_tile[1]
+        parameters.BOUNDARY_EAST = scenery_tile[2]
+        parameters.BOUNDARY_NORTH = scenery_tile[3]
+        # run programs
+        buildings.process()
+        roads.process()
+        pylons.process()
+        platforms.process()

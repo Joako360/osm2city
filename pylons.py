@@ -1558,7 +1558,7 @@ def process(uninstall: bool=False) -> None:
     if parameters.C2P_PROCESS_STREETLAMPS:
         write_stg_entries(stg_manager, files_to_remove, streetlamp_ways, None, None)
 
-    if args.uninstall:
+    if uninstall:
         for f in files_to_remove:
             try:
                 os.remove(f)

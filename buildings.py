@@ -570,7 +570,7 @@ def process(uninstall: bool=False, create_atlas: bool=False) -> None:
     tools.stats.print_summary()
     utilities.troubleshoot(tools.stats)
     logging.info("done.")
-    sys.exit(0)
+
 
 if __name__ == "__main__":
     # -- Parse arguments. Command line overrides config file.
