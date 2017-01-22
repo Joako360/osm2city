@@ -12,7 +12,8 @@ import pickle
 import subprocess
 import sys
 import textwrap
-from typing import Tuple
+from typing import List, Optional, Tuple
+import unittest
 
 import numpy as np
 import parameters
@@ -424,3 +425,74 @@ def progress(i, max_i):
         print("%i %i %5.1f%%     \r" % (i+1, max_i, (float(i+1)/max_i) * 100), end='')
         if i > max_i - 2:
             print()
+
+
+class BoundaryError(Exception):
+    """Indicates wrong values to define the boundary of the scenery."""
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
+def parse_boundary(boundary_string: str) -> Optional[List[float]]:
+    """Parses the boundary argument provided as an underscore delimited string into 4 floats for lon/lat.
+
+    Raises BoundaryError if cannot be parsed into 4 floats.
+    """
+    boundary_parts = boundary_string.split("_")
+    if len(boundary_parts) != 4:
+        message = "Boundary must have four elements separated by '_': {} has only {} element(s) \
+        -> aborting!".format(boundary_string, len(boundary_parts))
+        raise BoundaryError(message)
+
+    boundary_float_list = list()
+    for i in range(len(boundary_parts)):
+        try:
+            boundary_float_list.append(float(boundary_parts[i]))
+        except ValueError as my_value_error:
+            message = "Boundary part {} cannot be parsed as float (decimal)".format(boundary_parts[i])
+            raise BoundaryError(message) from my_value_error
+    return boundary_float_list
+
+
+def check_boundary(boundary_west: float, boundary_south: float,
+                   boundary_east: float, boundary_north: float) -> None:
+    """Check whether the boundary values actually make sense.
+
+    Raise BoundaryError if there is a problem.
+    """
+    if boundary_west >= boundary_east:
+        raise BoundaryError("Boundary West {} must be smaller than East {} -> aborting!".format(boundary_west,
+                                                                                                boundary_east))
+    if boundary_south >= boundary_north:
+        raise BoundaryError("Boundary South {} must be smaller than North {} -> aborting!".format(boundary_south,
+                                                                                                  boundary_north))
+
+
+# ================ UNITTESTS =======================
+
+class TestUtilities(unittest.TestCase):
+    def test_parse_boundary_empty_string(self):
+        with self.assertRaises(BoundaryError):
+            parse_boundary("")
+
+    def test_parse_boundary_three_floats(self):
+        with self.assertRaises(BoundaryError):
+            parse_boundary("1.1_1.2_1.2")
+
+    def test_parse_boundary_one_not_float(self):
+        with self.assertRaises(BoundaryError):
+            parse_boundary("1.1_1.2_1.2_a")
+
+    def test_parse_boundary_pass(self):
+        self.assertEqual(parse_boundary("1.1_1.2_1.2_-1.2"), [1.1, 1.2, 1.2, -1.2])
+
+    def check_boundary_east_west_wrong(self):
+        with self.assertRaises(BoundaryError):
+            check_boundary(2, 1, 1, 2)
+
+    def check_boundary_south_north_wrong(self):
+        with self.assertRaises(BoundaryError):
+            check_boundary(-2, 1, 1, -2)
+
+    def check_boundary_pass(self):
+        self.assertEqual(None, check_boundary(-2, -3, 1, -2))

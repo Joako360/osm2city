@@ -22,6 +22,7 @@ import types
 
 import textures.road
 from utils import vec2d as v
+import utils.utilities as utils
 
 # default_args_start # DO NOT MODIFY THIS LINE
 # -*- coding: utf-8 -*-
@@ -377,17 +378,12 @@ def set_boundary(boundary_west: float, boundary_south: float,
     """Overrides the geographical boundary values (either default values or read from file).
     In most situations should be called after method read_from_file().
     """
-    boundary_ok = True
-    if boundary_west >= boundary_east:
-        boundary_ok = False
-        logging.error("Boundary West {} must be smaller than East {} -> aborting!".format(boundary_west,
-                                                                                          boundary_east))
-    if boundary_south >= boundary_north:
-        boundary_ok = False
-        logging.error("Boundary -south {} must be smaller than North {} -> aborting!".format(boundary_south,
-                                                                                             boundary_north))
-    if not boundary_ok:
+    try:
+        utils.check_boundary(boundary_west, boundary_south, boundary_east, boundary_north)
+    except utils.BoundaryError as be:
+        logging.error(be.message)
         sys.exit(1)
+
     global BOUNDARY_WEST
     BOUNDARY_WEST = boundary_west
     global BOUNDARY_SOUTH
