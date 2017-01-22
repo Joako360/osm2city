@@ -76,11 +76,15 @@ if __name__ == "__main__":
                         help="Mandatory: read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
     parser.add_argument("-t", "--type", dest="scenery_type",
                         help="Mandatory: Scenery type - typically 'Objects', 'Buildings', 'Roads', 'Pylons' ",
-                        metavar="STRING", required=True)
+                        metavar="STRING", required=False)
     parser.add_argument("-a", action="store_true",
                         help="also copy effects etc. in fgdata to $FG_ROOT", required=False)
     args = parser.parse_args()
 
     parameters.read_from_file(args.filename)
+    if args.scenery_type:
+        scenery_type = args.scenery_type
+    else:
+        scenery_type = "Objects"
 
-    main(args.a, args.scenery_type)
+    main(args.a, scenery_type)
