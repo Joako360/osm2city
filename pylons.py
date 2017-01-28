@@ -1570,7 +1570,7 @@ def process(uninstall: bool=False) -> None:
         sys.exit(0)
 
     stg_manager.write()
-    fg_elev.save_cache()
+    fg_elev.close()
 
     logging.info("******* Finished *******")
 

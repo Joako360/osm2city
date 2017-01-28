@@ -9,6 +9,7 @@ import math
 import os
 import os.path as osp
 import pickle
+import signal
 import subprocess
 import sys
 import textwrap
@@ -325,11 +326,28 @@ class FGElev(object):
             fgelev_cmd += ' --print-solidness'
         fgelev_cmd += ' --expire 1000000 --fg-scenery ' + parameters.PATH_TO_SCENERY
         logging.info("cmd line: " + fgelev_cmd)
-        self.fgelev_pipe = subprocess.Popen(fgelev_cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                            bufsize=1, universal_newlines=True)
 
-    def save_cache(self) -> None:
-        """save cache to disk"""
+        # see also https://pymotw.com/2/subprocess/ regarding preexec_fn=os.setsid
+        self.fgelev_pipe = subprocess.Popen(fgelev_cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                            bufsize=1, universal_newlines=True, preexec_fn=os.setsid)
+
+    def close(self) -> None:
+        """Close subprocess and save cache to disk"""
+        if self.fgelev_pipe is not None:
+            term_code = self.fgelev_pipe.poll()
+            if term_code is None:
+                logging.info("FGElev subprocess not yet terminated.")
+                try:
+                    self.fgelev_pipe.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    logging.warning("Needed to kill FGElev subprocess.")
+                    self.fgelev_pipe.kill()
+
+            # now kill the
+            os.killpg(self.fgelev_pipe.pid, signal.SIGUSR1)
+        self._save_cache()
+
+    def _save_cache(self) -> None:
         if self.fake:
             return
         fpickle = open(self.pkl_fname, 'wb')
@@ -353,7 +371,6 @@ class FGElev(object):
                 btg_file = parameters.PATH_TO_SCENERY + os.sep + "Terrain" \
                            + os.sep + calc_tile.directory_name(a_position) + os.sep \
                            + calc_tile.construct_btg_file_name(a_position)
-                print(calc_tile.construct_btg_file_name(a_position))
                 if not os.path.exists(btg_file):
                     logging.error("Terrain File " + btg_file + " does not exist. Set scenery path correctly or fly there with TerraSync enabled")
                     sys.exit(2)
@@ -380,7 +397,7 @@ class FGElev(object):
                 if parameters.PROBE_FOR_WATER and line.split()[2] == '-':
                     is_solid = False
             except IndexError as reason:
-                self.save_cache()
+                self.close()
                 if empty_lines > 1:
                     logging.fatal("Skipped %i lines" % empty_lines)
                 logging.fatal("%i %g %g" % (self.record, a_position.lon, a_position.lat))
@@ -410,7 +427,7 @@ class FGElev(object):
             self._cache[key] = elev_is_solid_tuple
 
             if self.auto_save_every and len(self._cache) % self.auto_save_every == 0:
-                self.save_cache()
+                self._save_cache()
             return elev_is_solid_tuple
 
 

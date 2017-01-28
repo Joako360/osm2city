@@ -500,8 +500,7 @@ class Roads(object):
                 continue
             the_node.MSL = self.fg_elev.probe_elev(Vec2d(the_node.lon, the_node.lat), is_global=True)
             the_node.h_add = 0.
-        self.fg_elev.save_cache()
-    
+
     def _propagate_h_add_over_edge(self, ref0, ref1, args):
         """propagate h_add over edges of graph"""
         obj = self.G[ref0][ref1]['obj']
@@ -1180,6 +1179,7 @@ def process():
     
     debug_create_eps(roads, roads.roads_clusters, fg_elev, plot_cluster_borders=1)
     stg_manager.write()
+    fg_elev.close()
 
     utilities.troubleshoot(tools.stats)
     logging.info('Done.')

@@ -565,7 +565,7 @@ def process(uninstall: bool=False, create_atlas: bool=False) -> None:
         logging.info("uninstall done.")
         sys.exit(0)
 
-    fg_elev.save_cache()
+    fg_elev.close()
     stg_manager.write()
     tools.stats.print_summary()
     utilities.troubleshoot(tools.stats)
