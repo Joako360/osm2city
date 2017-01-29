@@ -98,9 +98,10 @@ PROBE_FOR_WATER                                 Boolean    False     Checks the 
 
 =============================================   ========   =======   ==============================================================================
 
+.. _`Project3000`: http://wiki.flightgear.org/Project3000
+
 
 .. _chapter-parameters-lod-label:
-.. _`Project3000`: http://wiki.flightgear.org/Project3000
 
 ----------------
 Level of Details

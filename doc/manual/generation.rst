@@ -83,7 +83,37 @@ Remember that the paths are relative to the ``WORKING_DIRECTORY``. Alternatively
 Working in Batch Mode
 =====================
 
-As described in chapter :ref:`Getting OpenStreetMap data <chapter-getting-data-label>` FlightGear works with tiles and scenery objects should not excessively cross tiles boundaries. So in order to cover most of Switzerland you would need to run ``osm2city`` related programs for 4 degrees longitude and 2 degrees latitude. Given the geographic location of Switzerland there are 4 tiles per longitude and 8 tiles per latitude. I.e. a total of 4*2*4*8 = 256 tiles. In order to make this process a bit easier, you can use ``build_tiles.py``, which creates a set of shell scripts and a suitable directory structure.
+As described in chapter :ref:`Getting OpenStreetMap data <chapter-getting-data-label>` FlightGear works with tiles and scenery objects should not excessively cross tiles boundaries. So in order to cover most of Switzerland you would need to run ``osm2city`` related programs for 4 degrees longitude and 2 degrees latitude. Given the geographic location of Switzerland there are 4 tiles per longitude and 8 tiles per latitude. I.e. a total of 4*2*4*8 = 256 tiles. In order to make this process a bit easier, you can use 2 types of batch modes:
+
+* ``build_tiles.py``, which creates a set of shell scripts and a suitable directory structure
+* ``build_tiles_db``, which works on top of data in a database
+
+Working with a database requires additional steps in setting up data in a database, however all subsequent steps require much less work - especially if working across several degrees of latitude or longitude.
+
+
+---------------------------------------------
+Database Based Batches with build_tiles_db.py
+---------------------------------------------
+
+As a first step you must :ref:`prepare OSM data in a database<chapter-osm-database-label>`. Be sure that the data in the database covers the whole area for batch processing.
+
+Calling the batch process is then pretty easy in just one step:
+
+::
+
+    $ /usr/bin/python3 /home/pingu/develop_vcs/osm2city/batch_processing/build_tiles_db.py -f TEST/params.ini -b 8.25_47_8.5_47.2
+
+Mandatory command line arguments:
+
+* -b: the boundary as an underscore delimitted string WEST_SOUTH_EAST_NORTH like 9.1_47.0_11_48.8 (use '.' as decimal separator).
+* -f: the relative path to the main params.ini file, which is the template copied to all sub-directories.
+
+You need to have set parameter ``USE_DATABASE`` to ``True`` and might want to consider setting parameter ``FG_ELEV_CACHE`` to ``False`` in case you build a huge area due to disk usage.
+
+
+--------------------------------------
+File Based Batches with build_tiles.py
+--------------------------------------
 
 The default work flow is based on the sub-chapters of :ref:`Preparation <chapter-preparation-label>`:
 
@@ -98,9 +128,9 @@ The default work flow is based on the sub-chapters of :ref:`Preparation <chapter
 
 .. _chapter-build-tiles-label:
 
-----------------------
+......................
 Calling build_tiles.py
-----------------------
+......................
 
 ::
 
