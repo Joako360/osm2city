@@ -56,13 +56,11 @@ You should disable random buildings.
 
 import argparse
 import logging
-import os
 import random
-import sys
 import textwrap
 from typing import Dict, List, Optional
 
-import shapely.geometry as shgm
+import shapely.geometry as shg
 
 import building_lib
 import cluster
@@ -70,7 +68,6 @@ import numpy as np
 import parameters
 import prepare_textures
 import textures.texture as tex
-import tools
 import utils.stg_io2
 import utils.vec2d as v
 from utils import aptdat_io, osmparser, calc_tile, coordinates, stg_io2, utilities
@@ -81,7 +78,9 @@ SCENERY_TYPE = "Buildings"
 
 def _process_osm_relation(rel_nodes_dict: Dict[int, osmparser.Node], rel_ways_dict: Dict[int, osmparser.Way],
                           relations_dict: Dict[int, osmparser.Relation],
-                          my_buildings: List[building_lib.Building]) -> None:
+                          my_buildings: List[building_lib.Building],
+                          coords_transform: coordinates.Transformation,
+                          stats: utilities.Stats) -> None:
     """Adds buildings based on relation tags. There are two scenarios: multipolygon buildings and 3D tagging.
     Only multipolygon are implemented currently. The added buildings go into parameter my_buildings
 
@@ -154,11 +153,14 @@ def _process_osm_relation(rel_nodes_dict: Dict[int, osmparser.Node], rel_ways_di
                     all_tags = dict(list(way.tags.items()) + list(all_tags.items()))
                     try:
                         if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
-                            a_building = _make_building_from_way(rel_nodes_dict, all_tags, way, [inner_ways[0]])
+                            a_building = _make_building_from_way(rel_nodes_dict, all_tags, way, coords_transform,
+                                                                 stats, [inner_ways[0]])
                         else:
-                            a_building = _make_building_from_way(rel_nodes_dict, all_tags, way, inner_ways)
+                            a_building = _make_building_from_way(rel_nodes_dict, all_tags, way, coords_transform,
+                                                                 stats, inner_ways)
                     except:
-                        a_building = _make_building_from_way(rel_nodes_dict, all_tags, way, way.refs)
+                        a_building = _make_building_from_way(rel_nodes_dict, all_tags, way, coords_transform,
+                                                             stats, way.refs)
                     if a_building is not None:
                         my_buildings.append(a_building)
 
@@ -189,9 +191,11 @@ def _process_osm_relation(rel_nodes_dict: Dict[int, osmparser.Node], rel_ways_di
                 if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
                     logging.info("FIXME: ignoring all but first inner way (%i total) of ID %i" % (len(inner_ways),
                                                                                                   relation.osm_id))
-                    a_building = _make_building_from_way(rel_nodes_dict, all_tags, pseudo_way, [inner_ways[0]])
+                    a_building = _make_building_from_way(rel_nodes_dict, all_tags, pseudo_way, coords_transform,
+                                                         stats, [inner_ways[0]])
                 else:
-                    a_building = _make_building_from_way(rel_nodes_dict, all_tags, pseudo_way, inner_ways)
+                    a_building = _make_building_from_way(rel_nodes_dict, all_tags, pseudo_way, coords_transform,
+                                                         stats, inner_ways)
                 if a_building is not None:
                     my_buildings.append(a_building)
 
@@ -202,7 +206,9 @@ def _process_osm_relation(rel_nodes_dict: Dict[int, osmparser.Node], rel_ways_di
 
 
 def _process_osm_building(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int, osmparser.Way],
-                          clipping_border: shgm.Polygon) -> List[building_lib.Building]:
+                          clipping_border: shg.Polygon,
+                          coords_transform: coordinates.Transformation,
+                          stats: utilities.Stats) -> List[building_lib.Building]:
     my_buildings = list()
 
     for key, way in ways_dict.items():
@@ -211,19 +217,20 @@ def _process_osm_building(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict
 
         if clipping_border is not None:
             first_node = nodes_dict[way.refs[0]]
-            if not clipping_border.contains(shgm.Point(first_node.lon, first_node.lat)):
+            if not clipping_border.contains(shg.Point(first_node.lon, first_node.lat)):
                 continue
 
-        my_building = _make_building_from_way(nodes_dict, way.tags, way, list())
+        my_building = _make_building_from_way(nodes_dict, way.tags, way, coords_transform, stats)
         if my_building is not None:
             my_buildings.append(my_building)
 
-        tools.stats.objects += 1
+        stats.objects += 1
 
     return my_buildings
 
 
 def _make_building_from_way(nodes_dict: Dict[int, osmparser.Node], all_tags: Dict[str, str], way: osmparser.Way,
+                            coords_transform: coordinates.Transformation, stats: utilities.Stats,
                             inner_ways=list()) -> Optional[building_lib.Building]:
     if way.refs[0] == way.refs[-1]:
         way.refs = way.refs[0:-1]  # -- kick last ref if it coincides with first
@@ -271,19 +278,19 @@ def _make_building_from_way(nodes_dict: Dict[int, osmparser.Node], all_tags: Dic
             levels = layer + 2
 
         # -- make outer and inner rings from refs
-        outer_ring = _refs_to_ring(way.refs, nodes_dict)
+        outer_ring = _refs_to_ring(coords_transform, way.refs, nodes_dict)
         inner_rings_list = []
         for _way in inner_ways:
-            inner_rings_list.append(_refs_to_ring(_way.refs, nodes_dict, inner=True))
+            inner_rings_list.append(_refs_to_ring(coords_transform, _way.refs, nodes_dict, inner=True))
     except KeyError as reason:
         logging.error("Failed to parse building referenced node missing clipped?(%s) WayID %d %s Refs %s" % (
             reason, way.osm_id, all_tags, way.refs))
-        tools.stats.parse_errors += 1
+        stats.parse_errors += 1
         return None
     except Exception as reason:
         logging.error("Failed to parse building (%s)  WayID %d %s Refs %s" % (reason, way.osm_id, all_tags,
                                                                               way.refs))
-        tools.stats.parse_errors += 1
+        stats.parse_errors += 1
         return None
 
     return building_lib.Building(way.osm_id, all_tags, outer_ring, name, height, levels,
@@ -291,16 +298,17 @@ def _make_building_from_way(nodes_dict: Dict[int, osmparser.Node], all_tags: Dic
                                  roof_type=_roof_type, roof_height=_roof_height, refs=way.refs)
 
 
-def _refs_to_ring(refs, nodes_dict: Dict[int, osmparser.Node], inner=False):
+def _refs_to_ring(coords_transform: coordinates.Transformation, refs, nodes_dict: Dict[int, osmparser.Node],
+                  inner=False):
     """Accept a list of OSM refs, return a linear ring. Also
        fixes face orientation, depending on inner/outer.
     """
     coords = []
     for ref in refs:
         c = nodes_dict[ref]
-        coords.append(tools.transform.toLocal((c.lon, c.lat)))
+        coords.append(coords_transform.toLocal((c.lon, c.lat)))
 
-    ring = shgm.polygon.LinearRing(coords)
+    ring = shg.polygon.LinearRing(coords)
     # -- outer -> CCW, inner -> not CCW
     if ring.is_ccw == inner:
         ring.coords = list(ring.coords)[::-1]
@@ -382,24 +390,15 @@ def _write_xml(path: str, file_name: str, the_buildings: List[building_lib.Build
     xml.close()
 
 
-def process(uninstall: bool=False, create_atlas: bool=False) -> None:
+def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
+            blocked_areas: List[shg.Polygon]) -> None:
     random.seed(42)
+    stats = utilities.Stats()
 
-    files_to_remove = list()
-    if uninstall:
-        logging.info("Uninstalling.")
-        parameters.NO_ELEV = True
-        parameters.OVERLAP_CHECK = False
-
-    # -- prepare transformation to local coordinates
-    center = parameters.get_center_global()
-    coords_transform = coordinates.Transformation(center, hdg=0)
-    tools.init(coords_transform)
-
-    prepare_textures.init(create_atlas)
+    prepare_textures.init(stats, False)
 
     if parameters.BOUNDARY_CLIPPING:
-        clipping_border = shgm.Polygon(parameters.get_clipping_extent())
+        clipping_border = shg.Polygon(parameters.get_clipping_extent())
     else:
         clipping_border = None
 
@@ -415,8 +414,9 @@ def process(uninstall: bool=False, create_atlas: bool=False) -> None:
     osm_rel_nodes_dict = osm_read_results.rel_nodes_dict
     osm_rel_ways_dict = osm_read_results.rel_ways_dict
 
-    the_buildings = _process_osm_building(osm_nodes_dict, osm_ways_dict, clipping_border)
-    _process_osm_relation(osm_rel_nodes_dict, osm_rel_ways_dict, osm_relations_dict, the_buildings)
+    the_buildings = _process_osm_building(osm_nodes_dict, osm_ways_dict, clipping_border, coords_transform, stats)
+    _process_osm_relation(osm_rel_nodes_dict, osm_rel_ways_dict, osm_relations_dict, the_buildings, coords_transform,
+                          stats)
 
     cmin, cmax = parameters.get_extent_global()
     logging.info("min/max " + str(cmin) + " " + str(cmax))
@@ -428,8 +428,8 @@ def process(uninstall: bool=False, create_atlas: bool=False) -> None:
         tex.screen_osm_tags_for_colour_spelling(b.osm_id, b.tags)
 
     # -- create (empty) clusters
-    lmin = v.Vec2d(tools.transform.toLocal(cmin))
-    lmax = v.Vec2d(tools.transform.toLocal(cmax))
+    lmin = v.Vec2d(coords_transform.toLocal(cmin))
+    lmax = v.Vec2d(coords_transform.toLocal(cmax))
 
     handled_clusters = list()  # cluster.ClusterContainer objects
     # cluster_non_lod is used when not using new STG verbs and for mesh_detailed when using new STG verbs
@@ -444,11 +444,6 @@ def process(uninstall: bool=False, create_atlas: bool=False) -> None:
         handled_clusters.append(clusters_building_mesh_rough)
 
     # check for buildings on airport runways etc.
-    # get blocked areas from apt.dat airport data
-    blocked_areas = aptdat_io.get_apt_dat_blocked_areas(coords_transform,
-                                                        parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
-                                                        parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
-
     if len(blocked_areas) > 0:
         the_buildings = building_lib.overlap_check_blocked_areas(the_buildings, blocked_areas)
 
@@ -460,31 +455,31 @@ def process(uninstall: bool=False, create_atlas: bool=False) -> None:
         stgs = []
         static_objects = []
         for cl in clusters_default:
-            center_global = tools.transform.toGlobal(cl.center)
+            center_global = coords_transform.toGlobal(cl.center)
             path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, "Objects", center_global)
             stg_file_name = calc_tile.construct_stg_file_name(center_global)
 
             if stg_file_name not in stgs:
                 stgs.append(stg_file_name)
-                static_objects.extend(building_lib.read_buildings_from_stg_entries(path, stg_file_name, OUR_MAGIC))
+                static_objects.extend(building_lib.read_buildings_from_stg_entries(path, stg_file_name, OUR_MAGIC,
+                                                                                   coords_transform))
 
         logging.info("read %i objects from %i tiles", len(static_objects), len(stgs))
     else:
         static_objects = None
 
     if parameters.OVERLAP_CHECK_CONVEX_HULL:  # needs to be before building_lib.analyse to catch more at first hit
-        the_buildings = building_lib.overlap_check_convex_hull(the_buildings, tools.transform)
+        the_buildings = building_lib.overlap_check_convex_hull(the_buildings, coords_transform, stats)
 
     # - analyze buildings
     #   - calculate area
     #   - location clash with stg static models? drop building
     #   - TODO: analyze surrounding: similar shaped buildings nearby? will get same texture
     #   - set building type, roof type etc
-    fg_elev = utilities.FGElev(coords_transform, fake=parameters.NO_ELEV)
 
     the_buildings = building_lib.analyse(the_buildings, static_objects, fg_elev,
-                                         prepare_textures.facades, prepare_textures.roofs)
-    building_lib.decide_lod(the_buildings)
+                                         prepare_textures.facades, prepare_textures.roofs, stats)
+    building_lib.decide_lod(the_buildings, stats)
 
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
@@ -496,11 +491,11 @@ def process(uninstall: bool=False, create_atlas: bool=False) -> None:
     for b in the_buildings:
         if parameters.USE_NEW_STG_VERBS:
             if b.LOD is utils.stg_io2.LOD.detail:
-                clusters_default.append(b.anchor, b)
+                clusters_default.append(b.anchor, b, stats)
             elif b.LOD is utils.stg_io2.LOD.rough:
-                clusters_building_mesh_rough.append(b.anchor, b)
+                clusters_building_mesh_rough.append(b.anchor, b, stats)
         else:
-            clusters_default.append(b.anchor, b)
+            clusters_default.append(b.anchor, b, stats)
 
     # -- write clusters
     handled_index = 0
@@ -529,7 +524,7 @@ def process(uninstall: bool=False, create_atlas: bool=False) -> None:
                 max_y = max(max_y, b.anchor.y)
             cluster_elev = (max_elevation - min_elevation) / 2 + min_elevation
             cluster_offset = v.Vec2d((max_x - min_x)/2 + min_x, (max_y - min_y)/2 + min_y)
-            center_global = v.Vec2d(tools.transform.toGlobal(cluster_offset))
+            center_global = v.Vec2d(coords_transform.toGlobal(cluster_offset))
             logging.debug("Cluster center -> elevation: %d, position: %s", cluster_elev, cluster_offset)
 
             file_name = replacement_prefix + "city" + str(handled_index) + "%02i%02i" % (cl.grid_index.ix,
@@ -541,35 +536,18 @@ def process(uninstall: bool=False, create_atlas: bool=False) -> None:
 
             stg_manager.add_object_static('lightmap-switch.xml', center_global, cluster_elev, 0, once=True)
 
-            if uninstall:
-                files_to_remove.append(path_to_stg + file_name + ".ac")
-                files_to_remove.append(path_to_stg + file_name + ".xml")
-            else:
-                # -- write .ac and .xml
-                building_lib.write(path_to_stg + file_name + ".ac", cl.objects, fg_elev,
-                                   cluster_elev, cluster_offset, prepare_textures.roofs)
-                _write_xml(path_to_stg, file_name, cl.objects, cluster_offset)
+            # -- write .ac and .xml
+            building_lib.write(path_to_stg + file_name + ".ac", cl.objects, fg_elev,
+                               cluster_elev, cluster_offset, prepare_textures.roofs, stats)
+            _write_xml(path_to_stg, file_name, cl.objects, cluster_offset)
             total_buildings_written += len(cl.objects)
 
         handled_index += 1
     logging.debug("Total number of buildings written to a cluster *.ac files: %d", total_buildings_written)
 
-    if uninstall:
-        for f in files_to_remove:
-            try:
-                os.remove(f)
-            except:
-                pass
-        stg_manager.drop_ours()
-        stg_manager.write()
-        logging.info("uninstall done.")
-        sys.exit(0)
-
-    fg_elev.close()
     stg_manager.write()
-    tools.stats.print_summary()
-    utilities.troubleshoot(tools.stats)
-    logging.info("done.")
+    stats.print_summary()
+    utilities.troubleshoot(stats)
 
 
 if __name__ == "__main__":
@@ -578,17 +556,13 @@ if __name__ == "__main__":
         description="buildings.py reads OSM data and creates buildings for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
+    parser.add_argument("-l", "--loglevel",
+                        help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL",
+                        required=False)
     parser.add_argument("-e", dest="skip_elev", action="store_true",
                         help="skip elevation interpolation", required=False)
     parser.add_argument("-c", dest="skip_overlap_check", action="store_true",
                         help="do not check for overlapping with static objects", required=False)
-    parser.add_argument("-a", "--create-atlas", dest="create_atlas", action="store_true",
-                        help="create texture atlas", required=False)
-    parser.add_argument("-u", dest="uninstall", action="store_true",
-                        help="uninstall ours from .stg", required=False)
-    parser.add_argument("-l", "--loglevel",
-                        help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL",
-                        required=False)
     args = parser.parse_args()
     parameters.read_from_file(args.filename)
     parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
@@ -601,4 +575,14 @@ if __name__ == "__main__":
     if args.skip_overlap_check:
         parameters.OVERLAP_CHECK = False
 
-    process(args.uninstall, args.create_atlas)
+    my_coords_transform = coordinates.Transformation(parameters.get_center_global())
+    my_fg_elev = utilities.FGElev(my_coords_transform)
+    my_blocked_areas = aptdat_io.get_apt_dat_blocked_areas(my_coords_transform,
+                                                           parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
+                                                           parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
+
+    process(my_coords_transform, my_fg_elev, my_blocked_areas)
+
+    my_fg_elev.close()
+
+    logging.info("******* Finished *******")

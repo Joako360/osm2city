@@ -1,14 +1,18 @@
 import argparse
 import logging
+import os
 import parameters
 import sys
 
 import buildings
+import copy_data_stuff
 import platforms
 import pylons
 import roads
+import utils.aptdat_io as aptdat_io
 import utils.calc_tile as calc_tile
-from utils.utilities import BoundaryError, parse_boundary
+import utils.coordinates as coordinates
+from utils.utilities import BoundaryError, FGElev, parse_boundary
 
 
 if __name__ == '__main__':
@@ -60,9 +64,9 @@ if __name__ == '__main__':
                     tile_boundary_east = full_lon + (lon_index + 1) / num_lon_parts
                     tile_boundary_south = full_lat + lat_index / num_lat_parts
                     tile_boundary_north = full_lat + (lat_index + 1) / num_lat_parts
-                    if tile_boundary_east <= boundary_west or tile_boundary_west > boundary_east:
+                    if tile_boundary_east <= boundary_west or tile_boundary_west >= boundary_east:
                         continue
-                    if tile_boundary_north <= boundary_south or tile_boundary_south > boundary_north:
+                    if tile_boundary_north <= boundary_south or tile_boundary_south >= boundary_north:
                         continue
                     if boundary_west > tile_boundary_west:
                         tile_boundary_west = boundary_west
@@ -73,9 +77,11 @@ if __name__ == '__main__':
                     if tile_boundary_north > boundary_north:
                         tile_boundary_north = boundary_north
 
-                    tile_index = calc_tile.tile_index((tile_boundary_west,tile_boundary_south))
+                    tile_index = calc_tile.tile_index((tile_boundary_west, tile_boundary_south))
+                    tile_prefix = ("%s%s%s" % (calc_tile.directory_name((full_lon, full_lat)), os.sep, tile_index))
                     scenery_tiles_list.append([tile_boundary_west, tile_boundary_south,
-                                               tile_boundary_east, tile_boundary_north])
+                                               tile_boundary_east, tile_boundary_north,
+                                               tile_prefix])
                     logging.info("Added scenery tile {} with boundary {}, {}, {}, {}".format(tile_index,
                                                                                              tile_boundary_west,
                                                                                              tile_boundary_south,
@@ -88,8 +94,29 @@ if __name__ == '__main__':
         parameters.BOUNDARY_SOUTH = scenery_tile[1]
         parameters.BOUNDARY_EAST = scenery_tile[2]
         parameters.BOUNDARY_NORTH = scenery_tile[3]
+        parameters.PREFIX = scenery_tile[4]
+
+        # prepare shared resources
+        my_coords_transform = coordinates.Transformation(parameters.get_center_global())
+        my_fg_elev = FGElev(my_coords_transform)
+        my_blocked_areas = aptdat_io.get_apt_dat_blocked_areas(my_coords_transform,
+                                                               parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
+                                                               parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
+
         # run programs
-        buildings.process()
-        roads.process()
-        pylons.process()
-        platforms.process()
+        buildings.process(my_coords_transform, my_fg_elev, my_blocked_areas)
+        roads.process(my_coords_transform, my_fg_elev, my_blocked_areas)
+        pylons.process(my_coords_transform, my_fg_elev)
+        platforms.process(my_coords_transform, my_fg_elev)
+
+        # clean-up
+        my_fg_elev.close()
+
+        logging.info("******* Finished one tile *******")
+
+    if parameters.USE_NEW_STG_VERBS:
+        copy_data_stuff.process(False, "Buildings")
+        copy_data_stuff.process(False, "Roads")
+        copy_data_stuff.process(False, "Pylons")
+    else:
+        copy_data_stuff.process(False, "Objects")

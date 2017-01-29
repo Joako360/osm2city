@@ -13,7 +13,7 @@ import parameters
 import utils.utilities as util
 
 
-def main(copy_fg_data: bool, scenery_type: str) -> None:
+def process(copy_fg_data: bool, scenery_type: str) -> None:
     scenery_path = parameters.get_output_path()
 
     scenery_path += os.sep + scenery_type
@@ -75,7 +75,7 @@ if __name__ == "__main__":
     parser.add_argument("-f", "--file", dest="filename",
                         help="Mandatory: read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
     parser.add_argument("-t", "--type", dest="scenery_type",
-                        help="Mandatory: Scenery type - typically 'Objects', 'Buildings', 'Roads', 'Pylons' ",
+                        help="Mandatory: Scenery type - typically 'Objects', 'Buildings', 'Roads', 'Pylons'",
                         metavar="STRING", required=False)
     parser.add_argument("-a", action="store_true",
                         help="also copy effects etc. in fgdata to $FG_ROOT", required=False)
@@ -83,8 +83,8 @@ if __name__ == "__main__":
 
     parameters.read_from_file(args.filename)
     if args.scenery_type:
-        scenery_type = args.scenery_type
+        my_scenery_type = args.scenery_type
     else:
-        scenery_type = "Objects"
+        my_scenery_type = "Objects"
 
-    main(args.a, scenery_type)
+    process(args.a, my_scenery_type)

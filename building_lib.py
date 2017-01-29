@@ -23,11 +23,10 @@ import parameters
 import prepare_textures as tm
 import roofs
 import textures.texture as tex
-import tools
 import utils.stg_io2
 from utils import ac3d, ac3d_fast, calc_tile
 from utils.coordinates import Transformation
-from utils.utilities import FGElev, progress
+from utils.utilities import FGElev, progress, Stats
 from utils.vec2d import Vec2d
 from utils.stg_io2 import STGVerbType, read_stg_entries
 
@@ -479,7 +478,7 @@ def _compute_roof_height(b: Building, max_height: float=1e99):
     return
 
 
-def decide_lod(buildings: List[Building]) -> None:
+def decide_lod(buildings: List[Building], stats: Stats) -> None:
     """Decide on the building's LOD based on area, number of levels, and some randomness."""
     for b in buildings:
         r = random.uniform(0, 1)
@@ -499,11 +498,11 @@ def decide_lod(buildings: List[Building]) -> None:
             lod = utils.stg_io2.LOD.rough
 
         b.LOD = lod
-        tools.stats.count_LOD(lod)
+        stats.count_LOD(lod)
 
 
 def analyse(buildings: List[Building], static_objects: Optional[List[Building]], fg_elev: FGElev,
-            facade_mgr: tex.FacadeManager, roof_mgr: tex.RoofManager) -> List[Building]:
+            facade_mgr: tex.FacadeManager, roof_mgr: tex.RoofManager, stats: Stats) -> List[Building]:
     """Analyse all buildings:
     - calculate area
     - location clash with stg static models? drop building
@@ -548,7 +547,7 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
 
         if not b.is_external_model:
             try:
-                tools.stats.nodes_simplified += b.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
+                stats.nodes_simplified += b.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
                 b.roll_inner_nodes()
             except Exception as reason:
                 logging.warning("simplify or roll_inner_nodes failed (OSM ID %i, %s)", b.osm_id, reason)
@@ -563,7 +562,7 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
             b.ground_elev = elev_is_solid_tuple[0]  # temporarily set - will be overwritten later
             if elev_is_solid_tuple[0] == -9999:
                 logging.debug("-9999")
-                tools.stats.skipped_no_elev += 1
+                stats.skipped_no_elev += 1
                 elev_water_ok = False
                 break
             elif not elev_is_solid_tuple[1]:
@@ -577,7 +576,7 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
             new_buildings.append(b)
             continue
 
-        tools.stats.nodes_ground += b._nnodes_ground
+        stats.nodes_ground += b._nnodes_ground
 
         # -- compute edge length
         b.lenX = np.zeros((b._nnodes_ground))
@@ -609,7 +608,7 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
 
         # -- check for nearby static objects
         if static_objects and _is_static_object_nearby(b, Xo, static_tree):
-            tools.stats.skipped_nearby += 1
+            stats.skipped_nearby += 1
             continue
 
         # -- work on height and levels
@@ -618,12 +617,12 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
 
         # -- check area
         if not _is_large_enough(b):
-            tools.stats.skipped_small += 1
+            stats.skipped_small += 1
             continue
 
         if b.height < parameters.BUILDING_MIN_HEIGHT:
             logging.verbose("Skipping small building with height < building_min_height parameter")
-            tools.stats.skipped_small += 1
+            stats.skipped_small += 1
             continue
 
         # -- Work on roof
@@ -736,7 +735,8 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
         # -- find local texture if infos different from parent
         #
         if b.parent is None:
-            b.facade_texture = facade_mgr.find_matching_facade(facade_requires, b.tags, b.height, b.longest_edge_len)
+            b.facade_texture = facade_mgr.find_matching_facade(facade_requires, b.tags, b.height, b.longest_edge_len,
+                                                               stats)
         else:
             # 1 - Check if building and building parent infos are the same
             
@@ -768,13 +768,13 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
             if b_color == b_parent_color and b_material == b_parent_material:
                     if b.parent.facade_texture is None:
                         b.facade_texture = facade_mgr.find_matching_facade(facade_requires, b.parent.tags,
-                                                                           b.height, b.longest_edge_len)
+                                                                           b.height, b.longest_edge_len, stats)
                         b.parent.facade_texture = b.facade_texture
                     else:
                         b.facade_texture = b.parent.facade_texture
             else:
                 b.facade_texture = facade_mgr.find_matching_facade(facade_requires, b.tags,
-                                                                   b.height, b.longest_edge_len)
+                                                                   b.height, b.longest_edge_len, stats)
 
         if b.facade_texture:
             logging.verbose("__done" + str(b.facade_texture) + str(b.facade_texture.provides))
@@ -782,8 +782,8 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
             logging.verbose("__done None")
         
         if not b.facade_texture:
-            tools.stats.skipped_texture += 1
-            logging.info("Skipping building OsmID %d (no matching facade texture)" % b.osm_id)
+            stats.skipped_texture += 1
+            logging.debug("Skipping building OsmID %d (no matching facade texture)" % b.osm_id)
             continue
         if b.longest_edge_len > b.facade_texture.width_max:
             logging.error("OsmID : %d b.longest_edge_len <= b.facade_texture.width_max" % b.osm_id)
@@ -820,10 +820,10 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
         # Find roof texture
         logging.verbose("___find roof for building %i" % b.osm_id)
         if b.parent is None:
-            b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_len)
+            b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_len, stats)
             if not b.roof_texture:
-                tools.stats.skipped_texture += 1
-                logging.warning("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(b.roof_requires)))
+                stats.skipped_texture += 1
+                logging.debug("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(b.roof_requires)))
                 continue
         else:
             # 1 - Check if building and building parent information is the same
@@ -867,27 +867,27 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
             # 2 - If same info use building parent facade else find new texture
             if r_color == r_parent_color and r_material == r_parent_material:
                 if b.parent.roof_texture is None:
-                    b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_len)
+                    b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_len, stats)
                     if not b.roof_texture:
-                        tools.stats.skipped_texture += 1
-                        logging.warning("WARNING: no matching texture for OsmID %d <%s>" % (b.osm_id, str(b.roof_requires)))
+                        stats.skipped_texture += 1
+                        logging.debug("WARNING: no matching texture for OsmID %d <%s>" % (b.osm_id, str(b.roof_requires)))
                         continue
                     b.parent.roof_texture = b.roof_texture
                 else:
                     b.roof_texture = b.parent.roof_texture
             else:
-                b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_len)
+                b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_len, stats)
                 if not b.roof_texture:
-                    tools.stats.skipped_texture += 1
-                    logging.warning("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(b.roof_requires)))
+                    stats.skipped_texture += 1
+                    logging.debug("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(b.roof_requires)))
                     continue
         
         if b.roof_texture:
             logging.verbose("__done" + str(b.roof_texture) + str(b.roof_texture.provides))
 
         else:
-            tools.stats.skipped_texture += 1
-            logging.warning("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(b.roof_requires)))
+            stats.skipped_texture += 1
+            logging.debug("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(b.roof_requires)))
             continue
 
         # -- finally: append building to new list
@@ -988,13 +988,13 @@ def _write_ring(out, b, ring, v0, texture, tex_y0, tex_y1):
 
 
 def write(ac_file_name: str, buildings: List[Building], fg_elev: FGElev,
-          cluster_elev: float, cluster_offset: Vec2d, roof_mgr: tex.RoofManager) -> None:
+          cluster_elev: float, cluster_offset: Vec2d, roof_mgr: tex.RoofManager, stats: Stats) -> None:
     """Write buildings across LOD for given tile.
        While writing, accumulate some statistics (totals stored in global stats object, individually also in building).
        Offset accounts for cluster center
        All LOD in one file. Plus roofs. One ac3d.Object per LOD
     """
-    ac = ac3d.File(stats=tools.stats)
+    ac = ac3d.File(stats=stats)
     lod_objects = list()
     lod_objects.append(ac.new_object('LOD_rough', tm.atlas_file_name + '.png'))
     lod_objects.append(ac.new_object('LOD_detail', tm.atlas_file_name + '.png'))
@@ -1101,7 +1101,7 @@ def write(ac_file_name: str, buildings: List[Building], fg_elev: FGElev,
             raise NotImplementedError("Can't yet handle relations with more than one inner way")
 
         if not b.roof_complex:
-            roofs.flat(ac_object, b, roof_mgr)
+            roofs.flat(ac_object, b, roof_mgr, stats)
 
         else:
             # -- pitched roof for > 4 ground nodes
@@ -1111,14 +1111,14 @@ def write(ac_file_name: str, buildings: List[Building], fg_elev: FGElev,
                 elif b.roof_type in ['pyramidal', 'dome']:
                     roofs.separate_pyramidal(ac_object, b)
                 else:
-                    s = myskeleton.myskel(ac_object, b, offset_xy=cluster_offset,
+                    s = myskeleton.myskel(ac_object, b, stats, offset_xy=cluster_offset,
                                           offset_z=b.ground_elev + b.height - b.roof_height,
                                           max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
                     if s:
-                        tools.stats.have_complex_roof += 1
+                        stats.have_complex_roof += 1
 
                     else:  # -- fall back to flat roof
-                        roofs.flat(ac_object, b, roof_mgr)
+                        roofs.flat(ac_object, b, roof_mgr, stats)
             # -- pitched roof for exactly 4 ground nodes
             else:
                 if b.roof_type == 'gabled' or b.roof_type == 'half-hipped':
@@ -1130,10 +1130,10 @@ def write(ac_file_name: str, buildings: List[Building], fg_elev: FGElev,
                 elif b.roof_type == 'skillion':
                     roofs.separate_skillion(ac_object, b)
                 elif b.roof_type == 'flat':
-                    roofs.flat(ac_object, b, roof_mgr)
+                    roofs.flat(ac_object, b, roof_mgr, stats)
                 else:
                     logging.debug("FIXME simple roof type %s unsupported ", b.roof_type)
-                    roofs.flat(ac_object, b, roof_mgr)
+                    roofs.flat(ac_object, b, roof_mgr, stats)
 
     ac.write(ac_file_name)
 
@@ -1144,12 +1144,13 @@ def map_building_type(tags) -> str:
     return 'unknown'
 
 
-def read_buildings_from_stg_entries(path: str, stg_fname: str, our_magic: str) -> List[Building]:
+def read_buildings_from_stg_entries(path: str, stg_fname: str, our_magic: str,
+                                    coords_transform: Transformation) -> List[Building]:
     """Same as read_stg_entries, but returns osm2city.Building objects"""
     stg_entries = read_stg_entries(path + stg_fname, parameters.OVERLAP_CHECK_CONSIDER_SHARED, our_magic)
     building_objs = list()
     for entry in stg_entries:
-        point = shg.Point(tools.transform.toLocal((entry.lon, entry.lat)))
+        point = shg.Point(coords_transform.toLocal((entry.lon, entry.lat)))
         building_objs.append(Building(osm_id=-1, tags=dict(), outer_ring=point,
                                       name=entry.get_obj_path_and_name(),
                                       height=0, levels=0, stg_typ=entry.verb_type,
@@ -1171,7 +1172,8 @@ def overlap_check_blocked_areas(buildings: List[Building], blocked_areas: List[s
 
 # ======================= New overlap detection ==========================
 
-def overlap_check_convex_hull(buildings: List[Building], my_coord_transformation: Transformation) -> List[Building]:
+def overlap_check_convex_hull(buildings: List[Building], my_coord_transformation: Transformation,
+                              stats: Stats) -> List[Building]:
     """Checks for all buildings whether their polygon intersects with a static or shared object's convex hull.
     Be aware that method 'analyse' also makes overlap checks based on circles around static/shared
     object's anchor point.
@@ -1185,7 +1187,7 @@ def overlap_check_convex_hull(buildings: List[Building], my_coord_transformation
         for key, value in boundaries.items():
             if value.intersects(building.polygon):
                 is_intersecting = True
-                tools.stats.skipped_nearby += 1
+                stats.skipped_nearby += 1
                 if building.name is None or len(building.name) == 0:
                     logging.info("Convex hull of object '%s' is intersecting. Skipping building with osm_id %d",
                                  key, building.osm_id)

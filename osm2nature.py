@@ -9,12 +9,9 @@ Script part of osm2city which takes OpenStreetMap data as input and generates da
 import argparse
 import logging
 import math
-import os
-import sys
 import xml.sax
 
 import parameters
-import tools
 from utils import osmparser, vec2d, coordinates, stg_io2
 from utils.utilities import FGElev
 
@@ -129,7 +126,6 @@ def main():
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
     parser.add_argument("-e", dest="e", action="store_true", help="skip elevation interpolation")
-    parser.add_argument("-u", dest="uninstall", action="store_true", help="uninstall ours from .stg")
     parser.add_argument("-l", "--loglevel", help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL")
     args = parser.parse_args()
     if args.filename is not None:
@@ -137,21 +133,15 @@ def main():
     parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
     if args.e:
         parameters.NO_ELEV = True
-    files_to_remove = None
-    if args.uninstall:
-        logging.info("Uninstalling.")
-        files_to_remove = []
-        parameters.NO_ELEV = True
 
     # Initializing tools for global/local coordinate transformations
     center_global = parameters.get_center_global()
     osm_fname = parameters.get_OSM_file_name()
     coords_transform = coordinates.Transformation(center_global, hdg=0)
-    tools.init(coords_transform)
 
     # Reading elevation data
     logging.info("Reading ground elevation data might take some time ...")
-    fg_elev = FGElev(coords_transform, fake=parameters.NO_ELEV)
+    fg_elev = FGElev(coords_transform)
 
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
@@ -187,18 +177,6 @@ def main():
     for forest_tree in list(forest_trees.values()) :
         print((forest_tree.elevation))
         forest_tree.make_stg_entry(stg_manager)
-
-    # -- initialize STGManager
-    if args.uninstall:
-        for f in files_to_remove:
-            try:
-                os.remove(f)
-            except IOError:
-                pass
-        stg_manager.drop_ours()
-        stg_manager.write()
-        logging.info("uninstall done.")
-        sys.exit(0)
 
     stg_manager.write()
     fg_elev.close()

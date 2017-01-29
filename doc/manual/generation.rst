@@ -36,7 +36,6 @@ In most situations it is enough to call the following command once and then only
 
   /usr/bin/python3 /home/pingu/develop_vcs/osm2city/prepare_textures.py -f LSZS/params.ini
 
-Alternatively `buildings.py` can be called with the ``-a`` option.
 
 Chapter :ref:`Textures <chapter-parameters-textures>` has an overview of how roof and facade textures can be filtered to suit a given scenery's needs by means of parameters.
 

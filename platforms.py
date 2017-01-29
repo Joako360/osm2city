@@ -16,9 +16,7 @@ import shapely.geometry as shg
 
 from cluster import ClusterContainer
 import parameters
-import tools
-from utils import osmparser, coordinates, ac3d, stg_io2
-from utils.utilities import FGElev
+from utils import osmparser, coordinates, ac3d, stg_io2, utilities
 from utils.vec2d import Vec2d
 
 
@@ -67,12 +65,13 @@ def _process_osm_platform(nodes_dict, ways_dict, my_coord_transformator,
     return my_platforms
 
 
-def _write(fg_elev: FGElev, stg_manager, replacement_prefix, clusters):
+def _write(fg_elev: utilities.FGElev, stg_manager, replacement_prefix, clusters,
+           coords_transform: coordinates.Transformation, stats: utilities.Stats):
     for cl in clusters:
         if len(cl.objects) > 0:
-            center_tile = Vec2d(tools.transform.toGlobal(cl.center))
+            center_tile = Vec2d(coords_transform.toGlobal(cl.center))
             ac_file_name = "%splatforms%02i%02i.ac" % (replacement_prefix, cl.grid_index.ix, cl.grid_index.iy)
-            ac = ac3d.File(stats=tools.stats)
+            ac = ac3d.File(stats=stats)
             obj = ac.new_object('platforms', "Textures/Terrain/asphalt.png")
             for platform in cl.objects[:]:
                 if platform.is_area:
@@ -88,7 +87,7 @@ def _write(fg_elev: FGElev, stg_manager, replacement_prefix, clusters):
             f.close()
 
 
-def _write_area(platform, fg_elev: FGElev, obj, offset):
+def _write_area(platform, fg_elev: utilities.FGElev, obj, offset):
     """Writes a platform mapped as an area"""
     linear_ring = shg.LinearRing(platform.nodes)
 
@@ -127,7 +126,7 @@ def _write_area(platform, fg_elev: FGElev, obj, offset):
         obj.face(sideface, mat=0)
 
 
-def _write_line(platform, fg_elev: FGElev, obj, offset):
+def _write_line(platform, fg_elev: utilities.FGElev, obj, offset):
     """Writes a platform as a area which only is mapped as a line"""
     o = obj.next_node_index()
     left = platform.line_string.parallel_offset(2, 'left', resolution=8, join_style=1, mitre_limit=10.0)
@@ -199,16 +198,14 @@ def _write_line(platform, fg_elev: FGElev, obj, offset):
     obj.face(sideface, mat=0)
 
 
-def process() -> None:
+def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev) -> None:
+    stats = utilities.Stats()
     # -- prepare transformation to local coordinates
     cmin, cmax = parameters.get_extent_global()
-    center_global = parameters.get_center_global()
-    coords_transform = coordinates.Transformation(center_global, hdg=0)
-    tools.init(coords_transform)
-    
+
     # -- create (empty) clusters
-    lmin = Vec2d(tools.transform.toLocal(cmin))
-    lmax = Vec2d(tools.transform.toLocal(cmax))
+    lmin = Vec2d(coords_transform.toLocal(cmin))
+    lmax = Vec2d(coords_transform.toLocal(cmax))
     clusters = ClusterContainer(lmin, lmax)
 
     if not parameters.USE_DATABASE:
@@ -229,9 +226,7 @@ def process() -> None:
         return
 
     for platform in platforms:
-        clusters.append(platform.anchor, platform)
-
-    fg_elev = FGElev(coords_transform, fake=parameters.NO_ELEV)
+        clusters.append(platform.anchor, platform, stats)
 
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
@@ -239,13 +234,10 @@ def process() -> None:
     stg_manager = stg_io2.STGManager(path_to_output, SCENERY_TYPE, OUR_MAGIC, replacement_prefix,
                                      overwrite=True)
 
-    _write(fg_elev, stg_manager, replacement_prefix, clusters)
+    _write(fg_elev, stg_manager, replacement_prefix, clusters, coords_transform, stats)
 
     # -- write stg
     stg_manager.write()
-    fg_elev.close()
-
-    logging.info("******* Finished *******")
 
 
 if __name__ == "__main__":
@@ -260,4 +252,11 @@ if __name__ == "__main__":
     parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
     parameters.show()
 
-    process()
+    my_coords_transform = coordinates.Transformation(parameters.get_center_global())
+    my_fg_elev = utilities.FGElev(my_coords_transform)
+
+    process(my_coords_transform, my_fg_elev)
+
+    my_fg_elev.close()
+
+    logging.info("******* Finished *******")

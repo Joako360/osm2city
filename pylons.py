@@ -20,8 +20,6 @@ TODO:
 import argparse
 import logging
 import math
-import os
-import sys
 import time
 from typing import Dict, Tuple
 import unittest
@@ -30,9 +28,7 @@ import xml.sax
 import parameters
 import roads
 import shapely.geometry as shg
-import tools
-from utils import osmparser, vec2d, coordinates, stg_io2
-from utils.utilities import FGElev
+from utils import osmparser, vec2d, coordinates, stg_io2, utilities
 
 OUR_MAGIC = "osm2pylon"  # Used in e.g. stg files to mark edits by osm2pylon
 SCENERY_TYPE = "Pylons"
@@ -286,7 +282,7 @@ class SharedPylon(object):
         self.needs_stg_entry = True
         self.direction_type = SharedPylon.DIRECTION_TYPE_NORMAL  # correction for which direction mast looks at
 
-    def calc_global_coordinates(self, fg_elev: FGElev, my_coord_transformator) -> None:
+    def calc_global_coordinates(self, fg_elev: utilities.FGElev, my_coord_transformator) -> None:
         self.lon, self.lat = my_coord_transformator.toGlobal((self.x, self.y))
         self.elevation = fg_elev.probe_elev(vec2d.Vec2d(self.lon, self.lat), True)
 
@@ -378,7 +374,7 @@ class StreetlampWay(LineWithoutCables):
             return False
         return True
 
-    def calc_and_map(self, fg_elev: FGElev, my_coord_transformator):
+    def calc_and_map(self, fg_elev: utilities.FGElev, my_coord_transformator):
         if self.highway.is_roundabout:
             shared_pylon = SharedPylon()
             shared_pylon.pylon_model = "Models/StreetFurniture/Streetlamp3.xml"
@@ -472,14 +468,12 @@ class Line(LineWithoutCables):
                               catenary_a, segment.length)
                 segment.cables.append(cable)
 
-    def make_cables_ac_xml_stg_entries(self, my_stg_mgr, line_index, wayname, cluster_max_length, my_files_to_remove):
+    def make_cables_ac_xml_stg_entries(self, my_stg_mgr, line_index, wayname, cluster_max_length):
         """
         Writes the stg entries for the cables of this WayLine in a string separated by linebreaks
         E.g. OBJECT_STATIC LSZSpylons1901.xml 9.75516 46.4135 2000.48 0
         After this it creates the xml-file and ac-file containing the cables.
         Each WaySegment is represented as an object group in ac with each cable of the WaySegment as a child
-
-        files_to_remove is used if the whole operation is only to uninstall
 
         In order to reduce rounding errors clusters of WaySegments are used instead of a whole WayLine per file.
         """
@@ -506,9 +500,6 @@ class Line(LineWithoutCables):
                 path_to_stg = my_stg_mgr.add_object_static(cluster_filename + '.xml',
                                                            vec2d.Vec2d(start_pylon.lon, start_pylon.lat),
                                                            start_pylon.elevation, 90 + angle_difference)
-
-                my_files_to_remove.append(path_to_stg + cluster_filename + ".ac")
-                my_files_to_remove.append(path_to_stg + cluster_filename + ".xml")
 
                 ac_file_lines = list()
                 ac_file_lines.append("AC3Db")
@@ -715,7 +706,7 @@ class RailLine(Line):
         self.nodes = []  # RailNodes
         self.linear = None  # The LineaString of the line
 
-    def calc_and_map(self, fg_elev: FGElev, my_coord_transformator, rail_lines_list):
+    def calc_and_map(self, fg_elev: utilities.FGElev, my_coord_transformator, rail_lines_list):
         self.shared_pylons = []  # array of RailMasts
         current_distance = 0  # the distance from the origin of the current mast
         my_length = self.linear.length  # omit recalculating length all the time
@@ -831,7 +822,7 @@ class RailLine(Line):
         return is_right
 
 
-def process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: FGElev, my_coord_transformator):
+def process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev, my_coord_transformator):
     my_railways = {}  # osm_id as key, RailLine
     my_shared_nodes = {}  # node osm_id as key, list of WayLine objects as value
 
@@ -989,7 +980,8 @@ def merge_streetlamp_buffers(landuse_refs):
     return landuse_buffers
 
 
-def process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: FGElev, my_coord_transformator, building_refs):
+def process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGElev, my_coord_transformator,
+                                building_refs):
     """
     Transforms a dict of Node and a dict of Way OSMElements from osmparser.py to a dict of WayLine objects for
     electrical power lines and a dict of WayLine objects for aerialways. Nodes are transformed to Pylons.
@@ -1188,13 +1180,13 @@ def merge_lines(osm_id, line0, line1, shared_nodes):
                 shared_node.append(line0)
 
 
-def write_stg_entries(my_stg_mgr, my_files_to_remove, lines_dict, wayname, cluster_max_length):
+def _write_stg_entries(my_stg_mgr, lines_dict, wayname, cluster_max_length):
     line_index = 0
     for line in list(lines_dict.values()):
         line_index += 1
         line.make_shared_pylons_stg_entries(my_stg_mgr)
         if None is not wayname:
-            line.make_cables_ac_xml_stg_entries(my_stg_mgr, line_index, wayname, cluster_max_length, my_files_to_remove)
+            line.make_cables_ac_xml_stg_entries(my_stg_mgr, line_index, wayname, cluster_max_length)
 
 
 def calc_heading_nodes(nodes_array):
@@ -1443,22 +1435,7 @@ def fetch_osm_file_data() -> Tuple[Dict[int, osmparser.Node], Dict[int, osmparse
     return handler.nodes_dict, handler.ways_dict
 
 
-def process(uninstall: bool=False) -> None:
-    files_to_remove = list()
-    if uninstall:
-        logging.info("Uninstalling.")
-        parameters.NO_ELEV = True
-
-    # Initializing tools for global/local coordinate transformations
-    center_global = parameters.get_center_global()
-
-    coords_transform = coordinates.Transformation(center_global, hdg=0)
-    tools.init(coords_transform)
-
-    # Reading elevation data
-    logging.info("Reading ground elevation data might take some time ...")
-    fg_elev = FGElev(coords_transform, fake=parameters.NO_ELEV)
-
+def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev) -> None:
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
 
@@ -1547,32 +1524,18 @@ def process(uninstall: bool=False) -> None:
 
     # Write to Flightgear
     if parameters.C2P_PROCESS_POWERLINES:
-        write_stg_entries(stg_manager, files_to_remove, powerlines,
+        _write_stg_entries(stg_manager, powerlines,
                           "powerline", parameters.C2P_CLUSTER_POWER_LINE_MAX_LENGTH)
     if parameters.C2P_PROCESS_AERIALWAYS:
-        write_stg_entries(stg_manager, files_to_remove, aerialways,
+        _write_stg_entries(stg_manager, aerialways,
                           "aerialway", parameters.C2P_CLUSTER_AERIALWAY_MAX_LENGTH)
     if parameters.C2P_PROCESS_OVERHEAD_LINES:
-        write_stg_entries(stg_manager, files_to_remove, rail_lines,
+        _write_stg_entries(stg_manager, rail_lines,
                           "overhead", parameters.C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH)
     if parameters.C2P_PROCESS_STREETLAMPS:
-        write_stg_entries(stg_manager, files_to_remove, streetlamp_ways, None, None)
-
-    if uninstall:
-        for f in files_to_remove:
-            try:
-                os.remove(f)
-            except IOError:
-                pass
-        stg_manager.drop_ours()
-        stg_manager.write()
-        logging.info("uninstall done.")
-        sys.exit(0)
+        _write_stg_entries(stg_manager, streetlamp_ways, None, None)
 
     stg_manager.write()
-    fg_elev.close()
-
-    logging.info("******* Finished *******")
 
 
 if __name__ == "__main__":
@@ -1580,12 +1543,11 @@ if __name__ == "__main__":
         description="pylons.py reads OSM data and creates pylons, powerlines and aerialways for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
+    parser.add_argument("-l", "--loglevel", dest="loglevel",
+                        help="Set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL",
+                        required=False)
     parser.add_argument("-e", dest="skip_elev", action="store_true",
                         help="skip elevation interpolation", required=False)
-    parser.add_argument("-u", dest="uninstall", action="store_true",
-                        help="uninstall ours from .stg", required=False)
-    parser.add_argument("-l", "--loglevel", dest="loglevel",
-                        help="Set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL", required=False)
     args = parser.parse_args()
     parameters.read_from_file(args.filename)
     parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
@@ -1593,7 +1555,14 @@ if __name__ == "__main__":
         parameters.NO_ELEV = True
     parameters.show()
 
-    process(args.uninstall)
+    my_coords_transform = coordinates.Transformation(parameters.get_center_global())
+    my_fg_elev = utilities.FGElev(my_coords_transform)
+
+    process(my_coords_transform, my_fg_elev)
+
+    my_fg_elev.close()
+
+    logging.info("******* Finished *******")
 
 
 # ================ UNITTESTS =======================

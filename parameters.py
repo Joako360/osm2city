@@ -77,6 +77,7 @@ DB_USER_PASSWORD = "n/a"  # The password for the DB_USER.
 
 NO_ELEV = False             # -- skip elevation probing
 FG_ELEV = '"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'
+FG_ELEV_CACHE = True  # saves the elevation probing results to a file, so next rerun is faster (but uses disk space!)
 PROBE_FOR_WATER = False  # only possible with FGElev version after 9th of November 2016 / FG 2016.4.1
 
 USE_NEW_STG_VERBS = False
@@ -167,9 +168,9 @@ CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if too little objects
 # =============================================================================
 
 C2P_PROCESS_POWERLINES = True
-C2P_PROCESS_AERIALWAYS = True
+C2P_PROCESS_AERIALWAYS = False
 C2P_PROCESS_OVERHEAD_LINES = True
-C2P_PROCESS_STREETLAMPS = True
+C2P_PROCESS_STREETLAMPS = False
 
 # Each powerline and aerialway has segments delimited by pylons. The longer the value the better clustering and
 # the better the performance. However due to rounding errors the longer the length per cluster the larger the
@@ -280,7 +281,7 @@ def get_OSM_file_name():
 
 
 def get_repl_prefix():
-    """FIXME: what does the REGEXP actually mean?"""
+    """If the PREFIX contains '/' or '\' characters due to batch processing, then they get replaced with underscore."""
     return re.sub('[\/]', '_', PREFIX)
 
 

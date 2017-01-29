@@ -110,6 +110,41 @@ def replace_with_os_separator(path: str) -> str:
     return my_string
 
 
+def write_one_gp(b, filename):
+    npv = np.array(b.X_outer)
+    minx = min(npv[:, 0])
+    maxx = max(npv[:, 0])
+    miny = min(npv[:, 1])
+    maxy = max(npv[:, 1])
+    dx = 0.1 * (maxx - minx)
+    minx -= dx
+    maxx += dx
+    dy = 0.1 * (maxy - miny)
+    miny -= dy
+    maxy += dy
+
+    gp = open(filename + '.gp', 'w')
+    term = "png"
+    ext = "png"
+    gp.write(textwrap.dedent("""
+    set term %s
+    set out '%s.%s'
+    set xrange [%g:%g]
+    set yrange [%g:%g]
+    set title "%s"
+    unset key
+    """ % (term, filename, ext, minx, maxx, miny, maxy, b.osm_id)))
+    i = 0
+    for v in b.X_outer:
+        i += 1
+        gp.write('set label "%i" at %g, %g\n' % (i, v[0], v[1]))
+
+    gp.write("plot '-' w lp\n")
+    for v in b.X_outer:
+        gp.write('%g %g\n' % (v[0], v[1]))
+    gp.close()
+
+
 class Stats(object):
     def __init__(self):
         self.objects = 0
@@ -283,20 +318,12 @@ class FGElev(object):
        By default, queries are cached. Call save_cache() to
        save the cache to disk before freeing the object.
     """
-    def __init__(self, coords_transform: coordinates.Transformation,
-                 fake: bool=False, use_cache: bool=True, auto_save_every: int=50000) -> None:
+    def __init__(self, coords_transform: coordinates.Transformation, auto_save_every: int=50000) -> None:
         """Open pipe to fgelev.
            Unless disabled by cache=False, initialize the cache and try to read
            it from disk. Automatically save the cache to disk every auto_save_every misses.
            If fake=True, never do any probing and return 0 on all queries.
         """
-        if fake:
-            self.h = fake
-            self.fake = True
-            return
-        else:
-            self.fake = False
-
         self.auto_save_every = auto_save_every
         self.h_offset = 0
         self.fgelev_pipe = None
@@ -305,7 +332,8 @@ class FGElev(object):
 
         self._cache = None  # dictionary of tuple of float for elevation and boolean for is_solid
 
-        if use_cache:
+        self.pkl_fname = None
+        if parameters.FG_ELEV_CACHE and not parameters.NO_ELEV:
             self.pkl_fname = parameters.PREFIX + os.sep + 'elev.pkl'
             try:
                 logging.info("Loading %s", self.pkl_fname)
@@ -348,7 +376,7 @@ class FGElev(object):
         self._save_cache()
 
     def _save_cache(self) -> None:
-        if self.fake:
+        if parameters.NO_ELEV or not parameters.FG_ELEV_CACHE:
             return
         fpickle = open(self.pkl_fname, 'wb')
         pickle.dump(self._cache, fpickle, -1)
@@ -406,8 +434,8 @@ class FGElev(object):
                 raise RuntimeError("fgelev errors are fatal.")
             return elev, is_solid
 
-        if self.fake:
-            return self.h, True
+        if parameters.NO_ELEV:
+            return 0, True
 
         if not is_global:
             position = ve.Vec2d(self.coords_transform.toGlobal(position))

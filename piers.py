@@ -17,12 +17,10 @@ from typing import List
 import numpy as np
 import parameters
 import shapely.geometry as shg
-import tools
 from cluster import ClusterContainer
 from shapely.geometry.base import CAP_STYLE, JOIN_STYLE
 from shapely.geometry.linestring import LineString
-from utils import osmparser, coordinates, ac3d, stg_io2
-from utils.utilities import FGElev
+from utils import osmparser, coordinates, ac3d, stg_io2, utilities
 from utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2piers"  # Used in e.g. stg files to mark edits by osm2Piers
@@ -46,7 +44,7 @@ class Pier(object):
         self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in self.osm_nodes])
         self.anchor = Vec2d(self.nodes[0])
 
-    def calc_elevation(self, fg_elev: FGElev) -> None:
+    def calc_elevation(self, fg_elev: utilities.FGElev) -> None:
         """Calculates the elevation (level above sea) as a minimum of all nodes.
 
         Minimum is taken because there could be residuals from shore in FlightGear scenery.
@@ -77,12 +75,13 @@ def _process_osm_piers(nodes_dict, ways_dict, my_coord_transformator, clipping_b
     return my_piers
 
 
-def _write_piers(stg_manager, replacement_prefix, clusters):
+def _write_piers(stg_manager, replacement_prefix, clusters, coords_transform: coordinates.Transformation,
+                 stats: utilities.Stats):
     for cl in clusters:
         if len(cl.objects) > 0:
-            center_tile = Vec2d(tools.transform.toGlobal(cl.center))
+            center_tile = Vec2d(coords_transform.toGlobal(cl.center))
             ac_file_name = "%spiers%02i%02i.ac" % (replacement_prefix, cl.grid_index.ix, cl.grid_index.iy)
-            ac = ac3d.File(stats=tools.stats)
+            ac = ac3d.File(stats=stats)
             obj = ac.new_object('piers', "Textures/Terrain/asphalt.png")
             for pier in cl.objects[:]:
                 length = len(pier.nodes)
@@ -99,18 +98,18 @@ def _write_piers(stg_manager, replacement_prefix, clusters):
             f.close()
 
 
-def _write_boats(stg_manager, piers: List[Pier]):
+def _write_boats(stg_manager, piers: List[Pier], coords_transform: coordinates.Transformation):
     for pier in piers:
         length = len(pier.nodes)
         if length > 3 \
                 and pier.nodes[0][0] == pier.nodes[(length - 1)][0] \
                 and pier.nodes[0][1] == pier.nodes[(length - 1)][1]:
-            _write_boat_area(pier, stg_manager)
+            _write_boat_area(pier, stg_manager, coords_transform)
         else:
-            _write_boat_line(pier, stg_manager)
+            _write_boat_line(pier, stg_manager, coords_transform)
 
 
-def _write_boat_area(pier, stg_manager):
+def _write_boat_area(pier, stg_manager, coords_transform: coordinates.Transformation):
     if len(pier.nodes) < 3:
         return
     # Guess a possible position for realistic boat placement
@@ -130,13 +129,13 @@ def _write_boat_area(pier, stg_manager):
                 parallel = segment.parallel_offset(10, 'right')
                 boat_position = parallel.interpolate(segment.length / 2)
                 try:
-                    pos_global = tools.transform.toGlobal((boat_position.x, boat_position.y))
+                    pos_global = coords_transform.toGlobal((boat_position.x, boat_position.y))
                     _write_model(segment.length, stg_manager, pos_global, direction, pier.elevation)
                 except AttributeError as reason:
                     logging.error(reason)
 
 
-def _write_boat_line(pier, stg_manager):
+def _write_boat_line(pier, stg_manager, coords_transform: coordinates.Transformation):
     line_string = LineString(pier.nodes)
     right_line = line_string.parallel_offset(4, 'left', resolution=8, join_style=1, mitre_limit=10.0)
     coords = right_line.coords
@@ -144,7 +143,7 @@ def _write_boat_line(pier, stg_manager):
         segment = LineString(coords[i:i + 2])
         boat_position = segment.interpolate(segment.length / 2)
         try:
-            pos_global = tools.transform.toGlobal((boat_position.x, boat_position.y))
+            pos_global = coords_transform.toGlobal((boat_position.x, boat_position.y))
             direction = math.degrees(math.atan2(segment.coords[0][0] - segment.coords[1][0],
                                                 segment.coords[0][1] - segment.coords[1][1]))
             if segment.length > 5:
@@ -307,16 +306,14 @@ def _write_pier_line(pier, obj, offset):
     obj.face(sideface, mat=0)
 
 
-def process() -> None:
+def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev) -> None:
+    stats = utilities.Stats()
     # -- prepare transformation to local coordinates
     cmin, cmax = parameters.get_extent_global()
-    center_global = parameters.get_center_global()
-    coords_transform = coordinates.Transformation(center_global, hdg=0)
-    tools.init(coords_transform)
-    
+
     # -- create (empty) clusters
-    lmin = Vec2d(tools.transform.toLocal(cmin))
-    lmax = Vec2d(tools.transform.toLocal(cmax))
+    lmin = Vec2d(coords_transform.toLocal(cmin))
+    lmax = Vec2d(coords_transform.toLocal(cmax))
     clusters = ClusterContainer(lmin, lmax)
 
     if not parameters.USE_DATABASE:
@@ -337,9 +334,8 @@ def process() -> None:
         return
 
     for pier in piers:
-        clusters.append(pier.anchor, pier)
+        clusters.append(pier.anchor, pier, stats)
 
-    fg_elev = FGElev(coords_transform)
     for pier in piers:
         pier.calc_elevation(fg_elev)
 
@@ -348,14 +344,11 @@ def process() -> None:
     replacement_prefix = parameters.get_repl_prefix()
     stg_manager = stg_io2.STGManager(path_to_output, SCENERY_TYPE, OUR_MAGIC, replacement_prefix, overwrite=True)
 
-    _write_piers(stg_manager, replacement_prefix, clusters)
-    _write_boats(stg_manager, piers)
+    _write_piers(stg_manager, replacement_prefix, clusters, coords_transform, stats)
+    _write_boats(stg_manager, piers, coords_transform)
 
     # -- write stg
     stg_manager.write()
-    fg_elev.close()
-
-    logging.info("******* Finished *******")
 
 
 if __name__ == "__main__":
@@ -370,4 +363,11 @@ if __name__ == "__main__":
     parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
     parameters.show()
 
-    process()
+    my_coords_transform = coordinates.Transformation(parameters.get_center_global())
+    my_fg_elev = utilities.FGElev(my_coords_transform)
+
+    process(my_coords_transform, my_fg_elev)
+
+    my_fg_elev.close()
+
+    logging.info("******* Finished *******")

@@ -6,10 +6,11 @@ from typing import List
 import numpy as np
 
 import utils.ac3d as ac
+from utils.utilities import Stats
 from textures.texture import Texture, RoofManager
 
 
-def flat(ac_object: ac.Object, b, roof_mgr: RoofManager) -> None:
+def flat(ac_object: ac.Object, b, roof_mgr: RoofManager, stats: Stats) -> None:
     """Flat roof. Also works for relations."""
     #   3-----------------2  Outer is CCW: 0 1 2 3
     #   |                /|  Inner[0] is CW: 4 5 6 7
@@ -27,7 +28,7 @@ def flat(ac_object: ac.Object, b, roof_mgr: RoofManager) -> None:
         if "compat:roof-pitched" in b.roof_requires:
             b.roof_requires.remove("compat:roof-pitched")
         b.roof_requires.append("compat:roof-flat")
-        b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_len)
+        b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_len, stats)
 
     if len(b.polygon.interiors):
         outer_closest = copy.copy(b.outer_nodes_closest)

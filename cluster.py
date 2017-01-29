@@ -15,7 +15,6 @@ import logging
 import os
 
 import parameters
-import tools
 import utils.utilities
 from utils.vec2d import Vec2d
 from utils.stg_io2 import STGVerbType
@@ -57,7 +56,6 @@ class ClusterContainer(object):
         max_grid_y = int(delta.y // self.size + 1)
         self.max_grid = GridIndex(max_grid_x, max_grid_y)
         self.__len = self.max_grid.ix * self.max_grid.iy
-        self.prefix = parameters.PREFIX
         self.stg_verb_type = stg_verb_type
 
         logging.info("Generating clusters %s %s", min_point, max_point)
@@ -103,7 +101,7 @@ class ClusterContainer(object):
             for item in each_list:
                 yield item
 
-    def append(self, anchor: Vec2d, obj) -> Cluster:
+    def append(self, anchor: Vec2d, obj, stats: utils.utilities.Stats) -> Cluster:
         """Finds the cluster within the cluster grid where a given object's anchor point is situated and then
         adds the object to that cluster."""
         the_cluster = self(anchor)
@@ -112,13 +110,13 @@ class ClusterContainer(object):
             # Local stats
             self(anchor).stats.count(obj)
             # Global stats
-            tools.stats.count(obj)
+            stats.count(obj)
         except AttributeError:
             pass
         return the_cluster
 
     def write_statistics(self, clusters_name: str) -> None:
-        my_file = open(self.prefix + os.sep + clusters_name + ".dat", "w")
+        my_file = open(parameters.PREFIX + os.sep + clusters_name + ".dat", "w")
         for j in range(self.max_grid.iy):
             for i in range(self.max_grid.ix):
                 cl = self._clusters[i][j]

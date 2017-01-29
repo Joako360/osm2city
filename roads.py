@@ -90,7 +90,6 @@ import parameters
 import scipy.interpolate
 import shapely.geometry as shg
 import textures.road
-import tools
 from cluster import ClusterContainer
 from utils import osmparser, coordinates, ac3d, stg_io2, utilities, aptdat_io
 from utils.vec2d import Vec2d
@@ -360,7 +359,7 @@ class Roads(object):
         return "%i ways, %i roads, %i railways, %i bridges" % (len(self.ways_list), len(self.roads_list),
                                                                len(self.railway_list), len(self.bridges_list))
 
-    def process(self, blocked_areas: List[shg.Polygon]) -> None:
+    def process(self, blocked_areas: List[shg.Polygon], stats: utilities.Stats) -> None:
         """Processes the OSM data until data can be clusterized.
 
         Needs to be called after OSM data have been processed using the store_way callback method from
@@ -385,7 +384,7 @@ class Roads(object):
         if parameters.CREATE_BRIDGES_ONLY:
             self._keep_only_bridges_and_embankments()
 
-        self._clusterize()
+        self._clusterize(stats)
 
     def _check_ways_in_water(self) -> None:
         """Checks whether a way or parts of a way is in water and removes those parts.
@@ -927,9 +926,9 @@ class Roads(object):
                     new_nodes_dict[the_ref] = self.nodes_dict[the_ref]
         self.nodes_dict = new_nodes_dict
                 
-    def debug_label_nodes(self, stg_manager, file_name="labels"):
+    def debug_label_nodes(self, stg_manager, stats: utilities.Stats, file_name="labels"):
         """write OSM_ID for nodes"""
-        ac = ac3d.File(stats=tools.stats, show_labels=True)
+        ac = ac3d.File(stats=stats, show_labels=True)
 
         for way in self.bridges_list + self.roads_list + self.railway_list:
             # -- label center with way ID
@@ -973,7 +972,7 @@ class Roads(object):
                 for the_ref in the_way.refs:
                     print("+", the_ref)
 
-    def _clusterize(self):
+    def _clusterize(self, stats: utilities.Stats):
         """Create cluster.
            Put objects in clusters based on their centroid.
         """
@@ -983,9 +982,11 @@ class Roads(object):
 
         for the_object in self.bridges_list + self.roads_list + self.railway_list:
             if _is_railway(the_object):
-                cluster_ref = self.railways_clusters.append(Vec2d(the_object.center.centroid.coords[0]), the_object)
+                cluster_ref = self.railways_clusters.append(Vec2d(the_object.center.centroid.coords[0]), the_object,
+                                                            stats)
             else:
-                cluster_ref = self.roads_clusters.append(Vec2d(the_object.center.centroid.coords[0]), the_object)
+                cluster_ref = self.roads_clusters.append(Vec2d(the_object.center.centroid.coords[0]), the_object,
+                                                         stats)
             the_object.cluster_ref = cluster_ref
 
 
@@ -1018,7 +1019,8 @@ def process_osm_ways(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int,
     return my_ways
 
 
-def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, stg_manager, stg_paths, is_railway):
+def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, stg_manager, stg_paths, is_railway,
+                      coords_transform: coordinates.Transformation, stats: utilities.Stats):
     for cl in clusters:
         if len(cl.objects) < parameters.CLUSTER_MIN_OBJECTS:
             continue  # skip almost empty clusters
@@ -1028,14 +1030,14 @@ def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, s
         else:
             file_start = "roads"
         file_name = replacement_prefix + file_start + "%02i%02i" % (cl.grid_index.ix, cl.grid_index.iy)
-        center_global = Vec2d(tools.transform.toGlobal(cl.center))
+        center_global = Vec2d(coords_transform.toGlobal(cl.center))
         offset_local = cl.center
         cluster_elev = fg_elev.probe_elev(center_global, True)
 
         # -- Now write cluster to disk.
         #    First create ac object. Write cluster's objects. Register stg object.
         #    Write ac to file.
-        ac = ac3d.File(stats=tools.stats, show_labels=True)
+        ac = ac3d.File(stats=stats, show_labels=True)
         ac3d_obj = ac.new_object(file_name, 'tex/roads.png', default_swap_uv=True)
         for rd in cl.objects:
             rd.write_to(ac3d_obj, fg_elev, cluster_elev, ac, offset=offset_local)  # FIXME: remove .ac, needed only for adding debug labels
@@ -1078,12 +1080,11 @@ def _write_xml(path_to_stg, file_name, object_name):
     """ % (file_name, shader_str, object_name)))
 
 
-def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
+def debug_create_eps(roads, clusters, elev, coords_transform: coordinates.Transformation, plot_cluster_borders=0):
     """debug: plot roads map to .eps"""
     if not parameters.DEBUG_PLOT:
         return
     plt.clf()
-    transform = tools.transform
     if 0:
         c = np.array([[elev.min.x, elev.min.y], 
                       [elev.max.x, elev.min.y], 
@@ -1107,13 +1108,13 @@ def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
                               [cl.max.x, cl.max.y], 
                               [cl.min.x, cl.max.y],
                               [cl.min.x, cl.min.y]])
-                c = np.array([transform.toGlobal(p) for p in c])
+                c = np.array([coords_transform.toGlobal(p) for p in c])
                 plt.plot(c[:, 0], c[:, 1], '-', color=cluster_color)
             for r in cl.objects:
                 random_color = col[random.randint(0, len(col)-1)]
                 osmid_color = col[(r.osm_id + len(r.refs)) % len(col)]                
                 a = np.array(r.center.coords)
-                a = np.array([transform.toGlobal(p) for p in a])
+                a = np.array([coords_transform.toGlobal(p) for p in a])
                 #color = col[r.typ]
                 try:
                     lw = lw_w[r.typ]
@@ -1128,12 +1129,10 @@ def debug_create_eps(roads, clusters, elev, plot_cluster_borders=0):
     plt.clf()
 
 
-def process():
+def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
+            blocked_areas: List[shg.Polygon]) -> None:
     random.seed(42)
-
-    center_global = parameters.get_center_global()
-    coords_transform = coordinates.Transformation(center_global, hdg=0)
-    tools.init(coords_transform)
+    stats = utilities.Stats()
 
     if not parameters.USE_DATABASE:
         osm_way_result = osmparser.fetch_osm_file_data(['highway', 'railway', "tunnel", "bridge", "gauge", "access"],
@@ -1147,24 +1146,18 @@ def process():
     if parameters.BOUNDARY_CLIPPING_COMPLETE_WAYS:
         clipping_border = shg.Polygon(parameters.get_clipping_extent(False))
 
-    # get blocked areas from apt.dat airport data
-    blocked_areas = aptdat_io.get_apt_dat_blocked_areas(coords_transform,
-                                                        parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
-                                                        parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
-
     filtered_osm_ways_list = process_osm_ways(osm_nodes_dict, osm_ways_dict, clipping_border)
     logging.info("ways: %i", len(filtered_osm_ways_list))
     if len(filtered_osm_ways_list) == 0:
         logging.info("No roads and railways found -> aborting")
         return
 
-    fg_elev = utilities.FGElev(coords_transform, fake=parameters.NO_ELEV)
     roads = Roads(filtered_osm_ways_list, osm_nodes_dict, coords_transform, fg_elev)
 
     path_to_output = parameters.get_output_path()
     logging.debug("before linear " + str(roads))
 
-    roads.process(blocked_areas)  # does the heavy lifting based on OSM data including clustering
+    roads.process(blocked_areas, stats)  # does the heavy lifting based on OSM data including clustering
 
     replacement_prefix = parameters.get_repl_prefix()
     stg_manager = stg_io2.STGManager(path_to_output, SCENERY_TYPE, OUR_MAGIC, replacement_prefix, overwrite=True)
@@ -1172,29 +1165,29 @@ def process():
     # -- write stg
     stg_paths = set()
 
-    _process_clusters(roads.railways_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, True)
-    _process_clusters(roads.roads_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, False)
+    _process_clusters(roads.railways_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, True,
+                      coords_transform, stats)
+    _process_clusters(roads.roads_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, False,
+                      coords_transform, stats)
 
     roads.debug_plot(show=True, plot_junctions=False, clusters=roads.roads_clusters)
     
-    debug_create_eps(roads, roads.roads_clusters, fg_elev, plot_cluster_borders=1)
+    debug_create_eps(roads, roads.roads_clusters, fg_elev, coords_transform, plot_cluster_borders=1)
     stg_manager.write()
-    fg_elev.close()
 
-    utilities.troubleshoot(tools.stats)
-    logging.info('Done.')
+    utilities.troubleshoot(stats)
     logging.debug("final " + str(roads))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="roads.py reads OSM data and creates road, railway and bridge models for use with FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
+    parser.add_argument("-l", "--loglevel",
+                        help="set loglevel. Valid levels are DEBUG, INFO, WARNING, ERROR, CRITICAL", required=False)
     parser.add_argument("-e", dest="skip_elev", action="store_true",
                         help="skip elevation interpolation", required=False)
     parser.add_argument("-b", "--bridges-only", dest="bridges_only", action="store_true",
                         help="create only bridges and embankments", required=False)
-    parser.add_argument("-l", "--loglevel",
-                        help="set loglevel. Valid levels are DEBUG, INFO, WARNING, ERROR, CRITICAL", required=False)
     args = parser.parse_args()
     parameters.read_from_file(args.filename)
     parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
@@ -1204,4 +1197,14 @@ if __name__ == "__main__":
         parameters.CREATE_BRIDGES_ONLY = True
     parameters.show()
 
-    process()
+    my_coords_transform = coordinates.Transformation(parameters.get_center_global())
+    my_fg_elev = utilities.FGElev(my_coords_transform)
+    my_blocked_areas = aptdat_io.get_apt_dat_blocked_areas(my_coords_transform,
+                                                           parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
+                                                           parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
+
+    process(my_coords_transform, my_fg_elev, my_blocked_areas)
+
+    my_fg_elev.close()
+
+    logging.info("******* Finished *******")

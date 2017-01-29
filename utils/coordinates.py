@@ -63,8 +63,8 @@ class Transformation(object):
     """global <-> local coordinate system transformation, using flat earth approximation
        http://williams.best.vwh.net/avform.htm#flat
     """
-    def __init__(self, xxx_todo_changeme=(0, 0), hdg=0):
-        (lon, lat) = xxx_todo_changeme
+    def __init__(self, lon_lat=(0, 0), hdg=0):
+        (lon, lat) = lon_lat
         if hdg != 0.:
             logging.error("heading != 0 not yet implemented.")
             raise NotImplemented

@@ -7,9 +7,8 @@ from typing import Dict, List
 
 import numpy as np
 
-import tools
 import parameters
-from utils.utilities import replace_with_os_separator
+from utils.utilities import replace_with_os_separator, Stats
 
 
 class Texture(object):
@@ -186,9 +185,10 @@ Please set either h_can_repeat or v_can_repeat to False.' % self.filename
 
 
 class RoofManager(object):
-    def __init__(self, cls):
+    def __init__(self, cls, stats: Stats):
         self.__l = []
         self.__cls = cls  # -- class (roof, facade, ...)
+        self.stats = stats
         self.current_registered_in = ""
         self.available_materials = set()
 
@@ -241,7 +241,7 @@ class RoofManager(object):
         self.available_materials.update(my_available_materials)
         texture.cls = self.__cls
 
-        tools.stats.textures_total[texture.filename] = None
+        self.stats.textures_total[texture.filename] = None
         self.__l.append(texture)
         return True
 
@@ -281,7 +281,7 @@ class RoofManager(object):
                 return False
         return True
 
-    def find_matching_roof(self, requires: List[str], max_dimension: float):
+    def find_matching_roof(self, requires: List[str], max_dimension: float, stats: Stats):
         candidates = self.find_candidates(requires, list())
         if len(candidates) == 0:
             logging.warning("No matching texture found for " + str(requires))
@@ -322,7 +322,7 @@ class RoofManager(object):
                     the_texture = final_candidates[random.randint(0, len(final_candidates) - 1)]
                 else:  # give up and live with some visual residuals instead of excluding the building
                     the_texture = fallback_candidates[random.randint(0, len(fallback_candidates) - 1)]
-        tools.stats.count_texture(the_texture)
+        stats.count_texture(the_texture)
         return the_texture
 
     def find_candidates(self, requires: List[str], excludes: List[str]):
@@ -413,7 +413,7 @@ class RoofManager(object):
 
 
 class FacadeManager(RoofManager):
-    def find_matching_facade(self, requires, tags, height, width):
+    def find_matching_facade(self, requires, tags, height, width, stats: Stats):
         exclusions = []
         if 'roof:colour' in tags:
             exclusions.append("%s:%s" % ('roof:colour', tags['roof:colour']))
@@ -432,7 +432,7 @@ class FacadeManager(RoofManager):
                 return None
         ranked_list = _rank_candidates(candidates, tags)
         the_texture = ranked_list[random.randint(0, len(ranked_list) - 1)]
-        tools.stats.count_texture(the_texture)
+        stats.count_texture(the_texture)
         return the_texture
 
     def find_facade_candidates(self, requires, excludes, height, width):

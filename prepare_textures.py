@@ -27,7 +27,6 @@ from typing import List
 import img2np
 import numpy as np
 import parameters
-import tools
 import utils.utilities as util
 from PIL import Image
 from textures import atlas
@@ -238,14 +237,11 @@ def _dump_all_provides_across_textures(texture_list: List[Texture]) -> None:
     logging.debug("4th level provides: %s", provided_features_level_four)
 
 
-def init(create_atlas: bool=True) -> None:
+def init(stats: util.Stats, create_atlas: bool=True) -> None:
     logging.debug("textures: init")
     global facades
     global roofs
     global atlas_file_name
-
-    if tools.stats is None:  # if e.g. manager.init is called from osm2city, then tools.init does not need to be called
-        tools.init(None)
 
     my_tex_prefix = util.assert_trailing_slash(parameters.PATH_TO_OSM2CITY_DATA)
     atlas_file_name = "tex" + os.sep + "atlas_facades"
@@ -255,8 +251,8 @@ def init(create_atlas: bool=True) -> None:
     pkl_file_name = my_tex_prefix + "tex" + os.sep + "atlas_facades.pkl"
     
     if create_atlas:
-        facades = FacadeManager('facade')
-        roofs = RoofManager('roof')
+        facades = FacadeManager('facade', stats)
+        roofs = RoofManager('roof', stats)
 
         # read registrations
         _append_roofs(roofs, my_tex_prefix_src)
@@ -295,8 +291,8 @@ def init(create_atlas: bool=True) -> None:
         pickle_file.close()
 
     logging.debug(facades)
-    tools.stats.textures_total = dict((filename, 0) for filename in map((lambda x: x.filename), facades.get_list()))
-    tools.stats.textures_total.update(dict((filename, 0) for filename in map((lambda x: x.filename), roofs.get_list())))
+    stats.textures_total = dict((filename, 0) for filename in map((lambda x: x.filename), facades.get_list()))
+    stats.textures_total.update(dict((filename, 0) for filename in map((lambda x: x.filename), roofs.get_list())))
 
 
 if __name__ == "__main__":
@@ -312,4 +308,5 @@ if __name__ == "__main__":
         parameters.read_from_file(args.filename)
     parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
 
-    init()
+    my_stats = util.Stats()
+    init(my_stats)
