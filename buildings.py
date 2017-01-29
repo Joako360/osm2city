@@ -246,7 +246,7 @@ def _make_building_from_way(nodes_dict: Dict[int, osmparser.Node], all_tags: Dic
             name = all_tags['name']
             if name in parameters.SKIP_LIST:
                 logging.info("SKIPPING " + name)
-                return False
+                return None
         if 'height' in all_tags:
             height = osmparser.parse_length(all_tags['height'])
         elif 'building:height' in all_tags:
