@@ -9,7 +9,6 @@ import math
 import os
 import os.path as osp
 import pickle
-import signal
 import subprocess
 import sys
 import textwrap
@@ -347,32 +346,19 @@ class FGElev(object):
 
     def _open_fgelev(self) -> None:
         logging.info("Spawning fgelev")
-        path_to_fgelev = parameters.FG_ELEV
-
-        fgelev_cmd = path_to_fgelev
+        fgelev_args = [parameters.FG_ELEV]
         if parameters.PROBE_FOR_WATER:
-            fgelev_cmd += ' --print-solidness'
-        fgelev_cmd += ' --expire 1000000 --fg-scenery ' + parameters.PATH_TO_SCENERY
-        logging.info("cmd line: " + fgelev_cmd)
-
-        # see also https://pymotw.com/2/subprocess/ regarding preexec_fn=os.setsid
-        self.fgelev_pipe = subprocess.Popen(fgelev_cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                            bufsize=1, universal_newlines=True, preexec_fn=os.setsid)
+            fgelev_args.append('--print-solidness')
+        fgelev_args.append('--expire')
+        fgelev_args.append(str(1000000))
+        fgelev_args.append('--fg-scenery')
+        fgelev_args.append(parameters.PATH_TO_SCENERY)
+        self.fgelev_pipe = subprocess.Popen(fgelev_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                            bufsize=1, universal_newlines=True)
 
     def close(self) -> None:
-        """Close subprocess and save cache to disk"""
         if self.fgelev_pipe is not None:
-            term_code = self.fgelev_pipe.poll()
-            if term_code is None:
-                logging.info("FGElev subprocess not yet terminated.")
-                try:
-                    self.fgelev_pipe.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    logging.warning("Needed to kill FGElev subprocess.")
-                    self.fgelev_pipe.kill()
-
-            # now kill the
-            os.killpg(self.fgelev_pipe.pid, signal.SIGUSR1)
+            self.fgelev_pipe.kill()
         self._save_cache()
 
     def _save_cache(self) -> None:

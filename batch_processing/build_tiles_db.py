@@ -3,6 +3,7 @@ import logging
 import os
 import parameters
 import sys
+import time
 
 import buildings
 import copy_data_stuff
@@ -88,6 +89,7 @@ if __name__ == '__main__':
                                                                                              tile_boundary_east,
                                                                                              tile_boundary_north))
 
+    start_time = time.time()
     for scenery_tile in scenery_tiles_list:
         # adapt boundary
         parameters.BOUNDARY_WEST = scenery_tile[0]
@@ -120,3 +122,5 @@ if __name__ == '__main__':
         copy_data_stuff.process(False, "Pylons")
     else:
         copy_data_stuff.process(False, "Objects")
+
+    logging.info("Total time used {}".format(time.time() - start_time))
