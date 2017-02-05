@@ -283,12 +283,12 @@ def _make_building_from_way(nodes_dict: Dict[int, osmparser.Node], all_tags: Dic
         for _way in inner_ways:
             inner_rings_list.append(_refs_to_ring(coords_transform, _way.refs, nodes_dict, inner=True))
     except KeyError as reason:
-        logging.error("Failed to parse building referenced node missing clipped?(%s) WayID %d %s Refs %s" % (
+        logging.debug("ERROR: Failed to parse building referenced node missing clipped?(%s) WayID %d %s Refs %s" % (
             reason, way.osm_id, all_tags, way.refs))
         stats.parse_errors += 1
         return None
     except Exception as reason:
-        logging.error("Failed to parse building (%s)  WayID %d %s Refs %s" % (reason, way.osm_id, all_tags,
+        logging.debug("ERROR: Failed to parse building (%s)  WayID %d %s Refs %s" % (reason, way.osm_id, all_tags,
                                                                               way.refs))
         stats.parse_errors += 1
         return None

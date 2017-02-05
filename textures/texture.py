@@ -284,7 +284,7 @@ class RoofManager(object):
     def find_matching_roof(self, requires: List[str], max_dimension: float, stats: Stats):
         candidates = self.find_candidates(requires, list())
         if len(candidates) == 0:
-            logging.warning("No matching texture found for " + str(requires))
+            logging.debug("WARNING: No matching texture found for " + str(requires))
             # Break down requirements to find something that matches
             for simple_req in requires:
                 candidates = self.find_candidates([simple_req], list())
@@ -428,7 +428,7 @@ class FacadeManager(RoofManager):
                 # Now we're really desperate - just find something!
                 candidates = self.find_facade_candidates(['compat:roof-flat'], exclusions, height, width)
             if len(candidates) == 0:
-                logging.warning("no matching facade texture for %1.f m x %1.1f m <%s>", height, width, str(requires))
+                logging.debug("WARNING: no matching facade texture for %1.f m x %1.1f m <%s>", height, width, str(requires))
                 return None
         ranked_list = _rank_candidates(candidates, tags)
         the_texture = ranked_list[random.randint(0, len(ranked_list) - 1)]
