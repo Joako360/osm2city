@@ -170,6 +170,7 @@ CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if too little objects
 C2P_PROCESS_POWERLINES = True
 C2P_PROCESS_AERIALWAYS = False
 C2P_PROCESS_OVERHEAD_LINES = True
+C2P_PROCESS_WIND_TURBINES = True
 C2P_PROCESS_STREETLAMPS = False
 
 # Each powerline and aerialway has segments delimited by pylons. The longer the value the better clustering and
@@ -223,6 +224,8 @@ C2P_STREETLAMPS_MAX_DISTANCE_LANDUSE = 100
 C2P_STREETLAMPS_RESIDENTIAL_DISTANCE = 40
 C2P_STREETLAMPS_OTHER_DISTANCE = 70
 C2P_STREETLAMPS_MIN_STREET_LENGTH = 20
+
+C2P_WIND_TURBINE_MAX_DISTANCE_FARM = 700
 
 # =============================================================================
 # PARAMETERS RELATED TO landuse.py - might be replaced by another library

@@ -125,7 +125,7 @@ def calc_angle_of_line_local(x1, y1, x2, y2):
 
 
 def calc_distance_local(x1, y1, x2, y2):
-    """Returns the distance between two points based on local coordindates (x,y)."""
+    """Returns the distance between two points based on local coordinates (x,y)."""
     return sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2))
 
 

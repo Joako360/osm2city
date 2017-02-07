@@ -264,7 +264,7 @@ def has_required_tag_keys(my_tags, my_required_keys):
     return False
 
 
-def parse_length(str_length):
+def parse_length(str_length) -> float:
     """
     Transform length to meters if not yet default. Input is a string, output is a float.
     If the string cannot be parsed, then 0 is returned.
@@ -296,10 +296,36 @@ def parse_length(str_length):
     else:  # assumed that no unit characters are in the string
         _factor = 1
     if is_parsable_float(_processed):
-        return float(_processed)*_factor
+        return float(_processed) * _factor
     else:
         logging.warning('Unable to parse for length from value: %s', str_length)
         return 0
+
+
+def parse_generator_output(str_output: str) -> float:
+    """Transforms energy output from generators to a float value of Watt.
+    See https://wiki.openstreetmap.org/wiki/Key:generator:output"""
+    _processed = str_output.strip().lower()
+    if _processed == "yes":
+        return 0
+    _factor = 0.
+    if _processed.endswith("gw"):
+        _processed = _processed.rstrip("gw").strip()
+        _factor = 1000000000
+    elif _processed.endswith("mw"):
+        _processed = _processed.rstrip("mw").strip()
+        _factor = 1000000
+    elif _processed.endswith("kw"):
+        _processed = _processed.rstrip("kw").strip()
+        _factor = 1000
+    elif _processed.endswith("w"):
+        _processed = _processed.rstrip("w").strip()
+        _factor = 1.
+    if is_parsable_float(_processed):
+        return float(_processed) * _factor
+    else:
+        logging.warning('Unable to parse for generator output from value: %s', str_output)
+        return 0.
 
 
 def is_parsable_float(str_float: str) -> bool:
@@ -389,6 +415,35 @@ def fetch_db_nodes_for_way(req_way_keys: List[str], req_way_key_values: List[str
     for result in result_tuples:
         my_node = Node(result[0], result[2], result[1])
         nodes_dict[my_node.osm_id] = my_node
+
+    return nodes_dict
+
+
+def fetch_db_nodes_isolated(req_node_key_values: List[str]) -> Dict[int, Node]:
+    """Fetches Node objects isolated without relation to way etc."""
+    start_time = time.time()
+
+    db_connection = make_db_connection()
+
+    query = """SELECT n.id, ST_X(n.geom) as lon, ST_Y(n.geom) as lat, n.tags
+    FROM nodes AS n
+    WHERE """
+    query += construct_tags_query(list(), req_node_key_values, table_alias="n")
+    query += " AND "
+    query += construct_intersect_bbox_query(is_way=False)
+    query += ";"
+
+    result_tuples = fetch_all_query_into_tuple(query, db_connection)
+
+    nodes_dict = dict()
+    for result in result_tuples:
+        my_node = Node(result[0], result[2], result[1])
+        my_node.tags = parse_hstore_tags(result[3], my_node.osm_id)
+        nodes_dict[my_node.osm_id] = my_node
+    db_connection.close()
+
+    logging.info("Reading OSM node data for {0!s} from db took {1:.4f} seconds.".format(req_node_key_values,
+                                                                                        time.time() - start_time))
 
     return nodes_dict
 
@@ -535,9 +590,14 @@ def make_db_connection() -> psycopg2.extensions.connection:
                             user=parameters.DB_USER, password=parameters.DB_USER)
 
 
-def construct_intersect_bbox_query() -> str:
+def construct_intersect_bbox_query(is_way: bool=True) -> str:
     """Constructs the part of a sql where clause, which constrains to bounding box."""
-    query_part = "ST_Intersects(w.bbox, ST_SetSRID(ST_MakeBox2D(ST_Point({}, {}), ST_Point({}, {})), 4326))"
+    query_part = "ST_Intersects("
+    if is_way:
+        query_part += "w.bbox"
+    else:
+        query_part += "n.geom"
+    query_part += ", ST_SetSRID(ST_MakeBox2D(ST_Point({}, {}), ST_Point({}, {})), 4326))"
     return query_part.format(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
                              parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
 
@@ -593,6 +653,15 @@ class TestOSMParser(unittest.TestCase):
         self.assertAlmostEqual(3.073, parse_length('10\'1"'), 2, "Correct number with feet unit without space")
         self.assertEqual(0, parse_length('m'), "Only valid unit")
         self.assertEqual(0, parse_length('"'), "Only inches, no feet")
+
+    def test_parse_generator_output(self):
+        self.assertAlmostEqual(0, parse_generator_output(' 2.3 '), 2, "Correct number with trailing spaces")
+        self.assertAlmostEqual(2.3, parse_generator_output(' 2.3 W'), 2, "Correct number with Watt unit incl. space")
+        self.assertAlmostEqual(2.3, parse_generator_output('2.3W'), 2, "Correct number with Watt unit without space")
+        self.assertAlmostEqual(2300, parse_generator_output(' 2.3 kW'), 2, "Correct number with kW unit incl. space")
+        self.assertAlmostEqual(2300000, parse_generator_output(' 2.3 MW'), 2, "Correct number with MW unit incl. space")
+        self.assertAlmostEqual(300000000, parse_generator_output(' 0.3GW'), 2, "Correct number with GW unit w/o space")
+        self.assertAlmostEqual(0, parse_generator_output(' 0.3 XW'), 2, "Correct number with unknown unit")
 
     def test_is_parsable_float(self):
         self.assertFalse(is_parsable_float('1,2'))

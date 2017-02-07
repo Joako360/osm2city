@@ -21,7 +21,7 @@ import argparse
 import logging
 import math
 import time
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 import unittest
 import xml.sax
 
@@ -306,6 +306,179 @@ class SharedPylon(object):
         my_stg_mgr.add_object_shared(self.pylon_model, vec2d.Vec2d(self.lon, self.lat),
                                      self.elevation,
                                      stg_angle(self.heading - 90 + direction_correction))
+
+
+class WindTurbine(SharedPylon):
+    def __init__(self, osm_id: int, lon: float, lat: float, generator_output: float, tags: Dict[str, str]) -> None:
+        super(WindTurbine, self).__init__()
+        self.osm_id = osm_id
+        self.lon = lon
+        self.lat = lat
+        self.generator_output = generator_output
+        self.generator_type_horizontal = True
+        if "generator:type" in tags and tags["generator:type"].lower() == "vertical_axis":
+            self.generator_type_horizontal = False
+        self.offshore = "offshore" in tags and tags["offshore"].lower() == "yes"
+        self.height = 0.
+        if "height" in tags:
+            self.height = osmparser.parse_length(tags["height"])
+        elif "seamark:landmark:height" in tags:
+            self.height = osmparser.parse_length(tags["seamark:landmark:height"])
+        self.rotor_diameter = 0.0
+        if "rotor_diameter" in tags:
+            self.rotor_diameter = osmparser.parse_length(tags["rotor_diameter"])
+        self.manufacturer = None
+        if "manufacturer" in tags:
+            self.manufacturer = tags["manufacturer"]
+        self.manufacturer_type = None
+        if "manufacturer_type" in tags:
+            self.manufacturer_type = tags["manufacturer_type"]
+        # illumination
+        self.illuminated = "seamark:landmark:status" in tags and tags["seamark:landmark:status"] == "illuminated"
+        if not self.illuminated:
+            self.illuminated = "seamark:status" in tags and tags["seamark:status"] == "illuminated"
+        # wind farm id (artificial - see process_osm_wind_turbines)
+        self.wind_farm = None
+
+    def set_offshore_from_probe(self, is_solid: bool):
+        """Offshore can be set from OSM tags and be challenged through elevation/water probing."""
+        if self.offshore and is_solid:
+            logging.debug("Overriding offshore to onshore based on probing for osm_id = {}.".format(self.osm_id))
+            self.offshore = False
+        if not self.offshore and not is_solid:
+            logging.debug("Overriding onshore to offshore based on probing for osm_id = {}.".format(self.osm_id))
+            self.offshore = True
+
+    @staticmethod
+    def determine_shared_model(height: float, generator_output: float, is_offshore: bool, is_illuminated: bool) -> str:
+        """The relation between height and generator_output are pure guesses and some randomness.
+        More intelligent heuristics could also take into account distance between turbines in a farm as indicator."""
+        common_path = "Models/Power/"
+        if is_offshore:
+            shared_model = "vestas-v80-sea.xml"
+            if height > 70 or generator_output > 3000000:
+                shared_model = "Vestas_Off_Shore140M.xml"
+
+        else:
+            if height == 0 and generator_output == 0:
+                if is_illuminated:
+                    shared_model = "windturbine_flash.xml"
+                else:
+                    shared_model = "windturbine.xml"
+            elif height > 50 or generator_output > 1000000:
+                shared_model = "windturbine_e82_78m.xml"
+                if height > 84 or generator_output > 3000000:
+                    shared_model = "windturbine_e82_85m.xml"
+                if height > 97 or generator_output > 3200000:
+                    shared_model = "windturbine_e82_98m.xml"
+                if height > 107 or generator_output > 3500000:
+                    shared_model = "windturbine_e82_98m.xml"
+                if height > 137 or generator_output > 4000000:
+                    shared_model = "windturbine_e82_98m.xml"
+            else:
+                shared_model = "18m"
+                if height >= 24 or generator_output > 20000:
+                    shared_model = "24m"
+                if height >= 30 or generator_output > 30000:
+                    shared_model = "30m"
+                if height >= 39 or generator_output > 40000:
+                    shared_model = "39m"
+                if is_illuminated:
+                    shared_model += "_obst"
+                shared_model = "windturbine_LAG18_" + shared_model
+        logging.debug("Wind turbine shared model chosen: {}".format(shared_model))
+        return common_path + shared_model
+
+    def make_stg_entry(self, my_stg_mgr) -> None:
+        # special for Vestas_Off_Shore140M.xml
+        if self.pylon_model.endswith("140M.xml"):
+            my_stg_mgr.add_object_shared("Models/Power/Vestas_Base.ac", vec2d.Vec2d(self.lon, self.lat),
+                                         self.elevation, 0)
+            # no need to add 12m to elevation for Vestas_Off_Shore140M.xml - ac-model already takes care
+        my_stg_mgr.add_object_shared(self.pylon_model, vec2d.Vec2d(self.lon, self.lat), self.elevation, 0)
+
+
+class WindFarm(object):
+    def __init__(self) -> None:
+        self.turbines = set()
+
+    def add_turbine(self, turbine: WindTurbine) -> None:
+        self.turbines.add(turbine)
+
+    def determine_shared_model(self):
+        """Stupidly assumes that all turbines actually belong to same farm and have same type.
+        In the end assignes shared model to all turbines in the farm"""
+
+        # first do some statistics
+        max_height = 0
+        max_generator_output = 0
+        number_offshore = 0
+        number_illuminated = 0
+        for turbine in self.turbines:
+            max_height = max(max_height, turbine.height)
+            max_generator_output = max(max_generator_output, turbine.generator_output)
+            if turbine.offshore:
+                number_offshore += 1
+            if turbine.illuminated:
+                number_illuminated += 1
+        is_offshore = number_offshore > len(self.turbines) / 2
+        is_illuminated = number_illuminated > 0
+
+        # then determine model based on "average"
+        shared_model = WindTurbine.determine_shared_model(max_height, max_generator_output, is_offshore, is_illuminated)
+        for turbine in self.turbines:
+            turbine.pylon_model = shared_model
+
+
+def process_osm_wind_turbines(osm_nodes_dict: Dict[int, osmparser.Node], coords_transform: coordinates.Transformation,
+                              fg_elev: utilities.FGElev) -> Dict[int, WindTurbine]:
+    my_wind_turbines = list()
+    wind_farms = list()
+
+    # find relevant / valid wind turbines
+    for key, node in osm_nodes_dict.items():
+        if "generator:source" in node.tags and node.tags["generator:source"] == "wind":
+            if "generator:output:electricity" in node.tags:
+                generator_output = osmparser.parse_generator_output(node.tags["generator:output:electricity"])
+                turbine = WindTurbine(key, node.lon, node.lat, generator_output, node.tags)
+                turbine.x, turbine.y = coords_transform.toLocal((node.lon, node.lat))
+                probe_tuple = fg_elev.probe(vec2d.Vec2d(node.lon, node.lat), True)
+                turbine.elevation = probe_tuple[0]
+                turbine.set_offshore_from_probe(probe_tuple[1])
+                my_wind_turbines.append(turbine)
+            else:
+                logging.debug("Skipped wind turbine osm_id = {}: need tag 'generator:output:electricity'".format(key))
+                continue
+
+    # Create wind farms to help determine model, illumination etc.
+    # http://wiki.openstreetmap.org/wiki/Relations/Proposed/Site site=wind_farm is not used a lot
+    # Therefore brute force based on distance
+    for i in range(1, len(my_wind_turbines)):
+        for j in range (i + 1, len(my_wind_turbines)):
+            if coordinates.calc_distance_local(my_wind_turbines[i].x, my_wind_turbines[i].y,
+                                               my_wind_turbines[j].x, my_wind_turbines[j].y) \
+                    <= parameters.C2P_WIND_TURBINE_MAX_DISTANCE_FARM:
+                my_wind_farm = my_wind_turbines[i].wind_farm
+                if my_wind_farm is None:
+                    my_wind_farm = WindFarm()
+                    wind_farms.append(my_wind_farm)
+                    my_wind_farm.add_turbine(my_wind_turbines[i])
+                    my_wind_turbines[i].wind_farm = my_wind_farm
+                my_wind_farm.add_turbine(my_wind_turbines[j])
+                my_wind_turbines[j].wind_farm = my_wind_farm
+
+    logging.debug("Found {} wind farms".format(len(wind_farms)))
+
+    # assign models in farms
+    for farm in wind_farms:
+        farm.determine_shared_model()
+    # assign to those outside of a farm
+    for turbine in my_wind_turbines:
+        if turbine.wind_farm is None:
+            turbine.pylon_model = WindTurbine.determine_shared_model(turbine.height, turbine.generator_output,
+                                                                      turbine.offshore, turbine.illuminated)
+
+    return my_wind_turbines
 
 
 class Pylon(SharedPylon):
@@ -822,13 +995,14 @@ class RailLine(Line):
         return is_right
 
 
-def process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev, my_coord_transformator):
-    my_railways = {}  # osm_id as key, RailLine
+def process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev, my_coord_transformator) \
+        -> List[RailLine]:
+    my_railways = list()
     my_shared_nodes = {}  # node osm_id as key, list of WayLine objects as value
 
     # First reduce to electrified narrow_gauge or rail, no tunnels and no abandoned
-    for way in list(ways_dict.values()):
-        my_line = RailLine(way.osm_id)
+    for way_key, way in ways_dict.items():
+        my_line = RailLine(way_key)
         is_railway = False
         is_electrified = False
         is_challenged = False
@@ -869,7 +1043,7 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev, 
                     else:
                         logging.debug('Node outside of boundaries and therefore ignored: osm_id = %s ', my_node.osm_id)
             if len(my_line.nodes) > 1:
-                my_railways[my_line.osm_id] = my_line
+                my_railways.append(my_line)
                 if my_line.nodes[0].osm_id in list(my_shared_nodes.keys()):
                     my_shared_nodes[my_line.nodes[0].osm_id].append(my_line)
                 else:
@@ -897,7 +1071,7 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev, 
                     logging.error(e)
 
     # get LineStrings and remove those lines, which are less than the minimal requirement
-    for the_railway in list(my_railways.values()):
+    for the_railway in my_railways:
         my_coordinates = list()
         for node in the_railway.nodes:
             my_coordinates.append((node.x, node.y))
@@ -907,14 +1081,14 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev, 
     return my_railways
 
 
-def process_highways_for_streetlamps(my_highways, landuse_buffers):
+def process_highways_for_streetlamps(my_highways, landuse_buffers) -> List[StreetlampWay]:
     """
     Test whether the highway is within appropriate land use or intersects with appropriate land use
     No attempt to merge lines because most probably the lines are split at crossing.
     No attempt to guess whether there there is a division in the center, where a street lamp with two lamps could be
     placed - e.g. using a combination of highway type, one-way, number of lanes etc
     """
-    my_streetlamps = {}
+    my_streetlamps = dict()
     for key in list(my_highways.keys()):
         my_highway = my_highways[key]
         if not StreetlampWay.has_lamps(my_highway.type_):
@@ -957,7 +1131,7 @@ def process_highways_for_streetlamps(my_highways, landuse_buffers):
         elif my_streetlamp.highway.linear.length < parameters.C2P_STREETLAMPS_MIN_STREET_LENGTH:
             del my_streetlamps[key]
 
-    return my_streetlamps
+    return my_streetlamps.values()
 
 
 def merge_streetlamp_buffers(landuse_refs):
@@ -981,7 +1155,7 @@ def merge_streetlamp_buffers(landuse_refs):
 
 
 def process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGElev, my_coord_transformator,
-                                building_refs):
+                                building_refs: List[shg.Polygon]) -> Tuple[List[WayLine], List[WayLine]]:
     """
     Transforms a dict of Node and a dict of Way OSMElements from osmparser.py to a dict of WayLine objects for
     electrical power lines and a dict of WayLine objects for aerialways. Nodes are transformed to Pylons.
@@ -1043,8 +1217,7 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGElev
                             elif "station" == value:
                                 my_pylon.type_ = Pylon.TYPE_AERIALWAY_STATION
                                 my_point = shg.Point(my_pylon.x, my_pylon.y)
-                                for osm_id in list(building_refs.keys()):
-                                    building_ref = building_refs[osm_id]
+                                for building_ref in building_refs:
                                     if building_ref.contains(my_point):
                                         my_pylon.in_osm_building = True
                                         logging.debug('Station with osm_id = %s found within building reference',
@@ -1092,9 +1265,9 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGElev
             except Exception as e:
                 logging.error(e)
         elif len(shared_node) > 2:
-            logging.warning("A node is referenced in more than two ways. Most likely OSM problem. Node osm_id: %s", key)
+            logging.debug("WARNING: A node is referenced in more than two ways. Most likely OSM problem. Node osm_id: %s", key)
 
-    return my_powerlines, my_aerialways
+    return my_powerlines.values(), my_aerialways.values()
 
 
 def find_connecting_line(key, lines, max_allowed_angle=360):
@@ -1180,9 +1353,9 @@ def merge_lines(osm_id, line0, line1, shared_nodes):
                 shared_node.append(line0)
 
 
-def _write_stg_entries(my_stg_mgr, lines_dict, wayname, cluster_max_length):
+def _write_stg_entries(my_stg_mgr, lines_list, wayname: str, cluster_max_length):
     line_index = 0
-    for line in list(lines_dict.values()):
+    for line in lines_list:
         line_index += 1
         line.make_shared_pylons_stg_entries(my_stg_mgr)
         if None is not wayname:
@@ -1245,8 +1418,8 @@ def optimize_catenary(half_distance_pylons, max_value, sag, max_variation):
     return -1, -1
 
 
-def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator):
-    my_buildings = dict()  # osm_id as key, Polygon
+def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator) -> List[shg.Polygon]:
+    my_buildings = list()
     for way in list(ways_dict.values()):
         for key in way.tags:
             if "building" == key:
@@ -1258,7 +1431,7 @@ def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator):
                 if 2 < len(my_coordinates):
                     my_polygon = shg.Polygon(my_coordinates)
                     if my_polygon.is_valid and not my_polygon.is_empty:
-                        my_buildings[way.osm_id] = my_polygon.convex_hull
+                        my_buildings.append(my_polygon.convex_hull)
     return my_buildings
 
 
@@ -1369,11 +1542,11 @@ def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator):
     return my_landuses
 
 
-def generate_landuse_from_buildings(osm_landuses, building_refs):
+def generate_landuse_from_buildings(osm_landuses, building_refs: List[shg.Polygon]):
     """Adds "missing" landuses based on building clusters"""
     my_landuse_candidates = dict()
     index = 10000000000
-    for my_building in list(building_refs.values()):
+    for my_building in building_refs:
         # check whether the building already is in a land use
         within_existing_landuse = False
         for osm_landuse in list(osm_landuses.values()):
@@ -1417,7 +1590,10 @@ def fetch_osm_file_data() -> Tuple[Dict[int, osmparser.Node], Dict[int, osmparse
     start_time = time.time()
     # the lists below are in sequence: buildings references, power/aerialway, railway overhead, landuse and highway
     valid_node_keys = ["power", "structure", "material", "height", "colour", "aerialway",
-                       "railway"]
+                       "railway",
+                       "power=generator", "generator:output:electricity", "generator:type", "generator:source",
+                       "offshore", "rotor:diameter", "manufacturer", "manufacturer:type",
+                       "seamark:landmark:height", "seamark:landmark:status", "seamark:status"]
     valid_way_keys = ["building",
                       "power", "aerialway", "voltage", "cables", "wires",
                       "railway", "electrified", "tunnel",
@@ -1445,7 +1621,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
         osm_nodes_dict, osm_ways_dict = fetch_osm_file_data()
 
     # References for buildings
-    building_refs = {}
+    building_refs = list()
     if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_AERIALWAYS or parameters.C2P_PROCESS_STREETLAMPS:
         if parameters.USE_DATABASE:
             osm_way_result = osmparser.fetch_osm_db_data_ways_keys(['building'])
@@ -1454,8 +1630,8 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
         building_refs = process_osm_building_refs(osm_nodes_dict, osm_ways_dict, coords_transform)
         logging.info('Number of reference buildings: %s', len(building_refs))
     # Power lines and aerialways
-    powerlines = {}
-    aerialways = {}
+    powerlines = list()
+    aerialways = list()
     if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_AERIALWAYS:
         if parameters.USE_DATABASE:
             req_keys = list()
@@ -1475,12 +1651,12 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
             aerialways.clear()
         logging.info('Number of power lines to process: %s', len(powerlines))
         logging.info('Number of aerialways to process: %s', len(aerialways))
-        for wayline in list(powerlines.values()):
+        for wayline in powerlines:
             wayline.calc_and_map()
-        for wayline in list(aerialways.values()):
+        for wayline in aerialways:
             wayline.calc_and_map()
     # railway overhead lines
-    rail_lines = {}
+    rail_lines = list()
     if parameters.C2P_PROCESS_OVERHEAD_LINES:
         if parameters.USE_DATABASE:
             osm_way_result = osmparser.fetch_osm_db_data_ways_keys(['railway'])
@@ -1489,10 +1665,10 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
         rail_lines = process_osm_rail_overhead(osm_nodes_dict, osm_ways_dict, fg_elev,
                                                coords_transform)
         logging.info('Reduced number of rail lines: %s', len(rail_lines))
-        for rail_line in list(rail_lines.values()):
-            rail_line.calc_and_map(fg_elev, coords_transform, list(rail_lines.values()))
+        for rail_line in rail_lines:
+            rail_line.calc_and_map(fg_elev, coords_transform, rail_lines)
     # street lamps
-    streetlamp_ways = {}
+    streetlamp_ways = list()
     if parameters.C2P_PROCESS_STREETLAMPS:
         if parameters.USE_DATABASE:
             osm_way_result = osmparser.fetch_osm_db_data_ways_keys(["landuse", "highway"])
@@ -1510,9 +1686,16 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
         highways = process_osm_highway(osm_nodes_dict, osm_ways_dict, coords_transform)
         streetlamp_ways = process_highways_for_streetlamps(highways, streetlamp_buffers)
         logging.info('Reduced number of streetlamp ways: %s', len(streetlamp_ways))
-        for highway in list(streetlamp_ways.values()):
+        for highway in streetlamp_ways:
             highway.calc_and_map(fg_elev, coords_transform)
         del landuse_refs
+    # wind turbines
+    wind_turbines = list()
+    if parameters.C2P_PROCESS_WIND_TURBINES:
+        if parameters.USE_DATABASE:
+            osm_nodes_dict = osmparser.fetch_db_nodes_isolated(["generator:source=>wind"])
+        wind_turbines = process_osm_wind_turbines(osm_nodes_dict, coords_transform, fg_elev)
+        logging.info("Number of valid wind turbines found: {}".format(len(wind_turbines)))
 
     # free some memory
     del building_refs
@@ -1533,7 +1716,10 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
         _write_stg_entries(stg_manager, rail_lines,
                           "overhead", parameters.C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH)
     if parameters.C2P_PROCESS_STREETLAMPS:
-        _write_stg_entries(stg_manager, streetlamp_ways, None, None)
+        _write_stg_entries(stg_manager, streetlamp_ways, "streetlamps", None)
+    if parameters.C2P_PROCESS_WIND_TURBINES:
+        for turbine in wind_turbines:
+            turbine.make_stg_entry(stg_manager)
 
     stg_manager.write()
 
