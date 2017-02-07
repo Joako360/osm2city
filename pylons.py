@@ -435,10 +435,23 @@ def process_osm_wind_turbines(osm_nodes_dict: Dict[int, osmparser.Node], coords_
     my_wind_turbines = list()
     wind_farms = list()
 
+    # make sure no existing shared objects are duplicated. Do not care what shared obejct within distance
+    stg_entries = stg_io2.read_stg_entries_in_boundary()
+
     # find relevant / valid wind turbines
     for key, node in osm_nodes_dict.items():
         if "generator:source" in node.tags and node.tags["generator:source"] == "wind":
             if "generator:output:electricity" in node.tags:
+                # first check against existing
+                shared_within_distance = False
+                for entry in stg_entries:
+                    if entry.verb_type is stg_io2.STGVerbType.object_shared:
+                        if coordinates.calc_distance_global(entry.lon, entry.lat, node.lon, node.lat) < parameters.C2P_WIND_TURBINE_MIN_DISTANCE_SHARED_OBJECT:
+                            logging.debug("Excluding turbine osm_id = {} due to overlap shared object.".format(node.osm_id))
+                            shared_within_distance = True
+                            break
+                if shared_within_distance:
+                    continue
                 generator_output = osmparser.parse_generator_output(node.tags["generator:output:electricity"])
                 turbine = WindTurbine(key, node.lon, node.lat, generator_output, node.tags)
                 turbine.x, turbine.y = coords_transform.toLocal((node.lon, node.lat))
@@ -457,7 +470,7 @@ def process_osm_wind_turbines(osm_nodes_dict: Dict[int, osmparser.Node], coords_
         for j in range (i + 1, len(my_wind_turbines)):
             if coordinates.calc_distance_local(my_wind_turbines[i].x, my_wind_turbines[i].y,
                                                my_wind_turbines[j].x, my_wind_turbines[j].y) \
-                    <= parameters.C2P_WIND_TURBINE_MAX_DISTANCE_FARM:
+                    <= parameters.C2P_WIND_TURBINE_MAX_DISTANCE_WITHIN_WIND_FARM:
                 my_wind_farm = my_wind_turbines[i].wind_farm
                 if my_wind_farm is None:
                     my_wind_farm = WindFarm()

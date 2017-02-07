@@ -28,7 +28,7 @@ from utils import ac3d, ac3d_fast, calc_tile
 from utils.coordinates import Transformation
 from utils.utilities import FGElev, progress, Stats
 from utils.vec2d import Vec2d
-from utils.stg_io2 import STGVerbType, read_stg_entries
+from utils.stg_io2 import STGVerbType, read_stg_entries, read_stg_entries_in_boundary
 
 
 class Building(object):
@@ -1255,39 +1255,28 @@ def _create_static_obj_boundaries(my_coord_transformation: Transformation) -> Di
     Shapely polygon objects (convex hull of all points in ac-files) in the local x/y coordinate system.
     """
     boundaries = dict()
-    stg_files = calc_tile.get_stg_files_in_boundary(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
-                                                    parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH,
-                                                    parameters.PATH_TO_SCENERY, "Objects")
-
-    if parameters.PATH_TO_SCENERY_OPT is not None:
-        stg_files_opt = calc_tile.get_stg_files_in_boundary(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
-                                                            parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH,
-                                                            parameters.PATH_TO_SCENERY_OPT, "Objects")
-        stg_files.extend(stg_files_opt)
-
-    for filename in stg_files:
-        stg_entries = read_stg_entries(filename, parameters.OVERLAP_CHECK_CONSIDER_SHARED)
-        for entry in stg_entries:
-            if entry.verb_type in [STGVerbType.object_static, STGVerbType.object_shared]:
-                try:
-                    ac_filename = entry.obj_filename
-                    if ac_filename.endswith(".xml"):
-                        entry.overwrite_filename(_extract_ac_from_xml(entry.get_obj_path_and_name(),
-                                                                      entry.get_obj_path_and_name(parameters.PATH_TO_SCENERY)))
-                    boundary_polygon = _extract_boundary(entry.get_obj_path_and_name(),
-                                                         entry.get_obj_path_and_name(parameters.PATH_TO_SCENERY))
-                    rotated_polygon = affinity.rotate(boundary_polygon, entry.hdg - 90, (0, 0))
-                    x_y_point = my_coord_transformation.toLocal((entry.lon, entry.lat))
-                    translated_polygon = affinity.translate(rotated_polygon, x_y_point[0], x_y_point[1])
-                    if entry.verb_type is STGVerbType.object_static and parameters.OVERLAP_CHECK_CH_BUFFER_STATIC > 0.01:
-                        boundaries[ac_filename] = translated_polygon.buffer(
-                            parameters.OVERLAP_CHECK_CH_BUFFER_STATIC, shg.CAP_STYLE.square)
-                    elif entry.verb_type is STGVerbType.object_shared and parameters.OVERLAP_CHECK_CH_BUFFER_SHARED > 0.01:
-                        boundaries[ac_filename] = translated_polygon.buffer(
-                            parameters.OVERLAP_CHECK_CH_BUFFER_SHARED, shg.CAP_STYLE.square)
-                    else:
-                        boundaries[ac_filename] = translated_polygon
-                except IOError as reason:
-                    logging.warning("Ignoring unreadable stg_entry %s", reason)
+    stg_entries = read_stg_entries_in_boundary(parameters.OVERLAP_CHECK_CONSIDER_SHARED)
+    for entry in stg_entries:
+        if entry.verb_type in [STGVerbType.object_static, STGVerbType.object_shared]:
+            try:
+                ac_filename = entry.obj_filename
+                if ac_filename.endswith(".xml"):
+                    entry.overwrite_filename(_extract_ac_from_xml(entry.get_obj_path_and_name(),
+                                                                  entry.get_obj_path_and_name(parameters.PATH_TO_SCENERY)))
+                boundary_polygon = _extract_boundary(entry.get_obj_path_and_name(),
+                                                     entry.get_obj_path_and_name(parameters.PATH_TO_SCENERY))
+                rotated_polygon = affinity.rotate(boundary_polygon, entry.hdg - 90, (0, 0))
+                x_y_point = my_coord_transformation.toLocal((entry.lon, entry.lat))
+                translated_polygon = affinity.translate(rotated_polygon, x_y_point[0], x_y_point[1])
+                if entry.verb_type is STGVerbType.object_static and parameters.OVERLAP_CHECK_CH_BUFFER_STATIC > 0.01:
+                    boundaries[ac_filename] = translated_polygon.buffer(
+                        parameters.OVERLAP_CHECK_CH_BUFFER_STATIC, shg.CAP_STYLE.square)
+                elif entry.verb_type is STGVerbType.object_shared and parameters.OVERLAP_CHECK_CH_BUFFER_SHARED > 0.01:
+                    boundaries[ac_filename] = translated_polygon.buffer(
+                        parameters.OVERLAP_CHECK_CH_BUFFER_SHARED, shg.CAP_STYLE.square)
+                else:
+                    boundaries[ac_filename] = translated_polygon
+            except IOError as reason:
+                logging.warning("Ignoring unreadable stg_entry %s", reason)
 
     return boundaries

@@ -282,7 +282,6 @@ def read_stg_entries(stg_path_and_name: str, consider_shared: bool = True, our_m
                     hdg = float(splitted[5])
                     entry = STGEntry(type_, obj_filename, path, lon, lat, elev, hdg)
                     entries.append(entry)                
-                    logging.debug("stg: %s %s", type_, entry.get_obj_path_and_name())
                 except ValueError as reason:
                     if not ignore_bad_lines:
                         logging.warning("stg_io:read: Damaged file %s", reason)
@@ -301,6 +300,24 @@ def read_stg_entries(stg_path_and_name: str, consider_shared: bool = True, our_m
         logging.warning("stg_io:read: Ignoring unreadable file %s", reason)
         return []
     return entries
+
+
+def read_stg_entries_in_boundary(consider_shared: bool = True) -> List[STGEntry]:
+    """Returns a list of all STGEntries within the boundary according to parameters."""
+    stg_entries = list()
+    stg_files = calc_tile.get_stg_files_in_boundary(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
+                                                    parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH,
+                                                    parameters.PATH_TO_SCENERY, "Objects")
+
+    if parameters.PATH_TO_SCENERY_OPT is not None:
+        stg_files_opt = calc_tile.get_stg_files_in_boundary(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
+                                                            parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH,
+                                                            parameters.PATH_TO_SCENERY_OPT, "Objects")
+        stg_files.extend(stg_files_opt)
+
+    for filename in stg_files:
+        stg_entries.extend(read_stg_entries(filename, consider_shared))
+    return stg_entries
 
 
 def _make_delimiter_string(our_magic: Optional[str], prefix: Optional[str], is_start: bool) -> str:
