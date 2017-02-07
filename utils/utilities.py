@@ -368,27 +368,19 @@ class FGElev(object):
         pickle.dump(self._cache, fpickle, -1)
         fpickle.close()
 
-    def probe_elev(self, position: ve.Vec2d, is_global: bool=False, check_btg: bool=False) -> float:
-        elev_is_solid_tuple = self.probe(position, is_global, check_btg)
+    def probe_elev(self, position: ve.Vec2d, is_global: bool=False) -> float:
+        elev_is_solid_tuple = self.probe(position, is_global)
         return elev_is_solid_tuple[0]
 
-    def probe_solid(self, position: ve.Vec2d, is_global: bool=False, check_btg: bool=False) -> bool:
-        elev_is_solid_tuple = self.probe(position, is_global, check_btg)
+    def probe_solid(self, position: ve.Vec2d, is_global: bool=False) -> bool:
+        elev_is_solid_tuple = self.probe(position, is_global)
         return elev_is_solid_tuple[1]
 
-    def probe(self, position: ve.Vec2d, is_global: bool=False, check_btg: bool=False) -> Tuple[float, bool]:
+    def probe(self, position: ve.Vec2d, is_global: bool=False) -> Tuple[float, bool]:
         """Return elevation and ground solidness at (x,y). We try our cache first. Failing that, call Fgelev.
         Elevation is in meters as float. Solid is True, in water is False
         """
         def really_probe(a_position: ve.Vec2d) -> Tuple[float, bool]:
-            if check_btg:
-                btg_file = parameters.PATH_TO_SCENERY + os.sep + "Terrain" \
-                           + os.sep + calc_tile.directory_name(a_position) + os.sep \
-                           + calc_tile.construct_btg_file_name(a_position)
-                if not os.path.exists(btg_file):
-                    logging.error("Terrain File " + btg_file + " does not exist. Set scenery path correctly or fly there with TerraSync enabled")
-                    sys.exit(2)
-
             if not self.fgelev_pipe:
                 self._open_fgelev()
             if math.isnan(a_position.lon) or math.isnan(a_position.lat):
