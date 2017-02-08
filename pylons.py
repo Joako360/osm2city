@@ -308,6 +308,59 @@ class SharedPylon(object):
                                      stg_angle(self.heading - 90 + direction_correction))
 
 
+class StorageTank(SharedPylon):
+    def __init__(self, osm_id: int, lon: float, lat: float, tags: Dict[str, str], radius: float,
+                 elevation: float) -> None:
+        super(StorageTank, self).__init__()
+        self.osm_id = osm_id
+        self.lon = lon
+        self.lat = lat
+        self.elevation = elevation
+        diameter = radius * 2
+
+        # try to guess a suitable shared model
+        # in general we take the .ac models, even though some small detail ight be shown from far away
+        if 'content' in tags and tags['content'] == 'gas':
+            self.pylon_model = 'GenericPressureVessel10m.ac'
+            if 15 <= diameter < 25:
+                self.pylon_model = 'GenericPressureVessel20m.ac'
+            if 25 <= diameter < 35:
+                self.pylon_model = 'GenericPressureVessel30m.ac'
+            if 35 <= diameter < 41:
+                self.pylon_model = 'GenericPressureVessel40m.ac'
+            if 41 <= diameter < 75:
+                self.pylon_model = 'Gasometer.ac'
+            if diameter >= 75:
+                self.pylon_model = 'HC-Tank.ac'
+        else:  # assuming fuel or oil
+            if diameter < 11:
+                self.pylon_model = 'KOFF_Tank_10M.ac'
+            if 11 <= diameter < 13:
+                self.pylon_model = 'KOFF_Tank_12M.ac'
+            if 13 <= diameter < 18:
+                self.pylon_model = 'KOFF_Tank_13M.ac'
+            if 18 <= diameter < 25:
+                self.pylon_model = 'KOFF_Tank_20M.ac'
+            if 25 <= diameter < 35:
+                self.pylon_model = 'KOFF_Tank_30M.ac'
+            if 35 <= diameter < 45:
+                self.pylon_model = 'generic_tank_040m_grey.ac'
+                self.elevation -= 73
+            if 45 <= diameter < 70:
+                self.pylon_model = 'generic_tank_050m_grey.ac'
+                self.elevation -= 70
+            if 70 <= diameter < 95:
+                self.pylon_model = 'generic_tank_075m_grey.ac'
+                self.elevation -= 65
+            if diameter >= 95:
+                self.pylon_model = 'GenericStorageTank100m.ac'
+                self.elevation -= 62
+        self.pylon_model = 'Models/Industrial/' + self.pylon_model
+
+    def make_stg_entry(self, my_stg_mgr) -> None:
+        my_stg_mgr.add_object_shared(self.pylon_model, vec2d.Vec2d(self.lon, self.lat), self.elevation, 0)
+
+
 class WindTurbine(SharedPylon):
     def __init__(self, osm_id: int, lon: float, lat: float, generator_output: float, tags: Dict[str, str]) -> None:
         super(WindTurbine, self).__init__()
@@ -467,7 +520,7 @@ def process_osm_wind_turbines(osm_nodes_dict: Dict[int, osmparser.Node], coords_
     # http://wiki.openstreetmap.org/wiki/Relations/Proposed/Site site=wind_farm is not used a lot
     # Therefore brute force based on distance
     for i in range(1, len(my_wind_turbines)):
-        for j in range (i + 1, len(my_wind_turbines)):
+        for j in range(i + 1, len(my_wind_turbines)):
             if coordinates.calc_distance_local(my_wind_turbines[i].x, my_wind_turbines[i].y,
                                                my_wind_turbines[j].x, my_wind_turbines[j].y) \
                     <= parameters.C2P_WIND_TURBINE_MAX_DISTANCE_WITHIN_WIND_FARM:
@@ -1431,7 +1484,13 @@ def optimize_catenary(half_distance_pylons, max_value, sag, max_variation):
     return -1, -1
 
 
-def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator) -> List[shg.Polygon]:
+def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator, fg_elev: utilities.FGElev,
+                              storage_tanks: List[StorageTank]) -> List[shg.Polygon]:
+    """Takes all buildings to be used as potential blocking areas. At the same time processes storage tanks.
+    Storage tanks are in OSM mapped as buildings, but with special tags. In FG use shared model.
+    Storage tanks get updated by passed as reference list.
+    http://wiki.openstreetmap.org/wiki/Tag:man%20made=storage%20tank?uselang=en-US.
+    """
     my_buildings = list()
     for way in list(ways_dict.values()):
         for key in way.tags:
@@ -1445,6 +1504,17 @@ def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator) -> 
                     my_polygon = shg.Polygon(my_coordinates)
                     if my_polygon.is_valid and not my_polygon.is_empty:
                         my_buildings.append(my_polygon.convex_hull)
+                        # process storage tanks
+                        if way.tags['building'] in ['storage_tank', 'tank'] or (
+                                    'man_made' in way.tags and way.tags['man_made'] in ['storage_tank', 'tank']):
+                            my_centroid = my_polygon.centroid
+                            lon, lat = my_coord_transformator.toGlobal((my_centroid.x, my_centroid.y))
+                            radius = coordinates.calc_distance_global(lon, lat, my_node.lon, my_node.lat)
+                            if radius < 5:  # do not want very small objects
+                                continue
+                            elev = fg_elev.probe_elev(vec2d.Vec2d(lon, lat), True)
+                            storage_tanks.append(StorageTank(way.osm_id, lon, lat, way.tags, radius, elev))
+    logging.info("Found {} storage tanks".format(len(storage_tanks)))
     return my_buildings
 
 
@@ -1635,12 +1705,15 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
 
     # References for buildings
     building_refs = list()
-    if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_AERIALWAYS or parameters.C2P_PROCESS_STREETLAMPS:
+    storage_tanks = list()
+    if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_AERIALWAYS or parameters.C2P_PROCESS_STREETLAMPS \
+            or parameters.C2P_PROCESS_STORAGE_TANKS:
         if parameters.USE_DATABASE:
             osm_way_result = osmparser.fetch_osm_db_data_ways_keys(['building'])
             osm_nodes_dict = osm_way_result.nodes_dict
             osm_ways_dict = osm_way_result.ways_dict
-        building_refs = process_osm_building_refs(osm_nodes_dict, osm_ways_dict, coords_transform)
+        building_refs = process_osm_building_refs(osm_nodes_dict, osm_ways_dict, coords_transform, fg_elev,
+                                                  storage_tanks)
         logging.info('Number of reference buildings: %s', len(building_refs))
     # Power lines and aerialways
     powerlines = list()
@@ -1721,18 +1794,21 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     # Write to Flightgear
     if parameters.C2P_PROCESS_POWERLINES:
         _write_stg_entries(stg_manager, powerlines,
-                          "powerline", parameters.C2P_CLUSTER_POWER_LINE_MAX_LENGTH)
+                           "powerline", parameters.C2P_CLUSTER_POWER_LINE_MAX_LENGTH)
     if parameters.C2P_PROCESS_AERIALWAYS:
         _write_stg_entries(stg_manager, aerialways,
-                          "aerialway", parameters.C2P_CLUSTER_AERIALWAY_MAX_LENGTH)
+                           "aerialway", parameters.C2P_CLUSTER_AERIALWAY_MAX_LENGTH)
     if parameters.C2P_PROCESS_OVERHEAD_LINES:
         _write_stg_entries(stg_manager, rail_lines,
-                          "overhead", parameters.C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH)
+                           "overhead", parameters.C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH)
     if parameters.C2P_PROCESS_STREETLAMPS:
         _write_stg_entries(stg_manager, streetlamp_ways, "streetlamps", None)
     if parameters.C2P_PROCESS_WIND_TURBINES:
         for turbine in wind_turbines:
             turbine.make_stg_entry(stg_manager)
+    if parameters.C2P_PROCESS_STORAGE_TANKS:
+        for tank in storage_tanks:
+            tank.make_stg_entry(stg_manager)
 
     stg_manager.write()
 

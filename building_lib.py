@@ -522,7 +522,7 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
 
     new_buildings = []
     for b in buildings:
-        # am anfang geometrieanalyse
+        # am Anfang Geometrieanalyse
         # - ort: urban, residential, rural
         # - region: europe, asia...
         # - levels: 1-2, 3-5, hi-rise
@@ -531,13 +531,17 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
 
         # - facade raussuchen
 
-        # temporarily exclude greenhouses / glasshouses
         if 'building' in b.tags:  # not if 'building:part'
+            # temporarily exclude greenhouses / glasshouses
             if b.tags['building'] in ['glasshouse', 'greenhouse'] or (
                             'amenity' in b.tags and b.tags['amenity'] in ['glasshouse', 'greenhouse']):
-                logging.debug("Excluded greenhouse with osm_id=%d", b.osm_id)
+                logging.debug("Excluded greenhouse with osm_id={}".format(b.osm_id))
                 continue
-
+            # exclude storage tanks -> pylons.py
+            if b.tags['building'] in ['storage_tank', 'tank'] or (
+                    'man_made' in b.tags and b.tags['man_made'] in ['storage_tank', 'tank']):
+                logging.debug("Excluded storage tank with osm_id={}".format(b.osm_id))
+                continue
         b.mat = 0
         b.roof_mat = 0
 

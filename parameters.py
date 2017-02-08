@@ -172,6 +172,7 @@ C2P_PROCESS_AERIALWAYS = False
 C2P_PROCESS_OVERHEAD_LINES = True
 C2P_PROCESS_WIND_TURBINES = True
 C2P_PROCESS_STREETLAMPS = False
+C2P_PROCESS_STORAGE_TANKS = True
 
 # Each powerline and aerialway has segments delimited by pylons. The longer the value the better clustering and
 # the better the performance. However due to rounding errors the longer the length per cluster the larger the
