@@ -18,7 +18,6 @@ import unittest
 import numpy as np
 import parameters
 
-from utils import calc_tile
 from utils import coordinates
 import utils.vec2d as ve
 

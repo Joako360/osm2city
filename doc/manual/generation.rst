@@ -101,12 +101,13 @@ Calling the batch process is then pretty easy in just one step:
 
 ::
 
-    $ /usr/bin/python3 /home/pingu/develop_vcs/osm2city/batch_processing/build_tiles_db.py -f TEST/params.ini -b 8.25_47_8.5_47.2
+    $ /usr/bin/python3 /home/pingu/develop_vcs/osm2city/batch_processing/build_tiles_db.py -f TEST/params.ini -b 8.25_47_8.5_47.2 -p 3
 
 Mandatory command line arguments:
 
 * -b: the boundary as an underscore delimitted string WEST_SOUTH_EAST_NORTH like 9.1_47.0_11_48.8 (use '.' as decimal separator).
 * -f: the relative path to the main params.ini file, which is the template copied to all sub-directories.
+* -p: number of parallel processes (should not be more than the number of cores/CPUs) and might be constrained by memory
 
 You need to have set parameter ``USE_DATABASE`` to ``True`` and might want to consider setting parameter ``FG_ELEV_CACHE`` to ``False`` in case you build a huge area due to disk usage.
 
