@@ -206,19 +206,18 @@ def _process_osm_relation(rel_nodes_dict: Dict[int, osmparser.Node], rel_ways_di
 
 
 def _process_osm_building(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int, osmparser.Way],
-                          clipping_border: shg.Polygon,
                           coords_transform: coordinates.Transformation,
                           stats: utilities.Stats) -> List[building_lib.Building]:
     my_buildings = list()
+    clipping_border = shg.Polygon(parameters.get_clipping_border())
 
     for key, way in ways_dict.items():
         if not ('building' in way.tags or 'building:part' in way.tags):
             continue
 
-        if clipping_border is not None:
-            first_node = nodes_dict[way.refs[0]]
-            if not clipping_border.contains(shg.Point(first_node.lon, first_node.lat)):
-                continue
+        first_node = nodes_dict[way.refs[0]]
+        if not clipping_border.contains(shg.Point(first_node.lon, first_node.lat)):
+            continue
 
         my_building = _make_building_from_way(nodes_dict, way.tags, way, coords_transform, stats)
         if my_building is not None:
@@ -289,7 +288,7 @@ def _make_building_from_way(nodes_dict: Dict[int, osmparser.Node], all_tags: Dic
         return None
     except Exception as reason:
         logging.debug("ERROR: Failed to parse building (%s)  WayID %d %s Refs %s" % (reason, way.osm_id, all_tags,
-                                                                              way.refs))
+                                                                                     way.refs))
         stats.parse_errors += 1
         return None
 
@@ -397,11 +396,6 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
 
     prepare_textures.init(stats, False)
 
-    if parameters.BOUNDARY_CLIPPING:
-        clipping_border = shg.Polygon(parameters.get_clipping_extent())
-    else:
-        clipping_border = None
-
     if not parameters.USE_DATABASE:
         osm_read_results = osmparser.fetch_osm_file_data(list(), ["building", "building:part"],
                                                          ["building", "building:part"])
@@ -414,7 +408,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     osm_rel_nodes_dict = osm_read_results.rel_nodes_dict
     osm_rel_ways_dict = osm_read_results.rel_ways_dict
 
-    the_buildings = _process_osm_building(osm_nodes_dict, osm_ways_dict, clipping_border, coords_transform, stats)
+    the_buildings = _process_osm_building(osm_nodes_dict, osm_ways_dict, coords_transform, stats)
     _process_osm_relation(osm_rel_nodes_dict, osm_rel_ways_dict, osm_relations_dict, the_buildings, coords_transform,
                           stats)
 

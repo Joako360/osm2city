@@ -8,7 +8,7 @@ Please consider the following:
 
 * Python does not recognize operating system environment variables, please use full paths in the parameters file (no ``$HOME`` etc).
 * These parameters determine how scenery objects are generated offline as described in chapter :ref:`Scenery Generation <chapter-generation-label>`. There are as of version 2016.4 no runtime parameters in FlightGear, that influence which ``osm2city`` generated scenery objects are shown — or how and how many [#]_.
-* All decimals need to be with "." - i.e. local specific decimal separators like "," are not accepted.
+* All decimals need to be with "." — i.e. local specific decimal separators like "," are not accepted.
 * You do not have to specify all parameters in your ``params.ini`` file. Actually it is better only to specify those parameters, which you want to actively control — the rest just gets the defaults.
 
 
@@ -225,14 +225,30 @@ TEXTURES_REGIONS_EXPLICIT                       List       []        Explicit li
 Clipping Region
 ---------------
 
-The boundary of a scenery as specified by the parameters ``BOUNDARY_*`` is not necessarily sharp. As described in :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>` it is recommended to use ``completeWays=yes``, when manipulating/getting OSM data - this happens also to be the case when using the `OSM Extended API`_ to retrieve data e.g. as part of :ref:`working in batch mode <chapter-batch-mode>`. The parameters below give the possibility to influence, which data outside of the boundary is processed.
+The boundary of a scenery as specified by the parameters ``BOUNDARY_*`` is not necessarily sharp. As described in :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>` it is recommended to use ``completeWays=yes``, when manipulating/getting OSM data - this happens also to be the case when using the `OSM Extended API`_ to retrieve data e.g. as part of :ref:`working in batch mode <chapter-batch-mode>`. However there are no parameters to influence the processing of OSM nodes and OSM ways depending on whether they are inside / outside the boundary or intersecting.
+
+NB: in most situations the boundary should correspond to FG tiles or be entirely inside a tile boundary.
+
+The processing is as follows:
+
+* buildings.py: if the first node is inside the boundary, then the whole building is processed — otherwise not
+* roads.py: if not entirely inside then split at boundary, such that the first node is always inside and the last is either inside by default or the first node outside for splitting.
+* piers.py: as above for piers
+* platforms.py: as above for platforms
+* pylons.py
+
+  * storage tanks: if the centroid is inside the boundary, then the whole storage tank is processed — otherwise not
+  * wind turbines: no checking because the source data for OSM should already be extracted correctly
+  * aerial ways: if the first node is inside the boundary, then the whole aerial way is processed — otherwise not (assuming that aerial ways are short)
+  * power lines and railway overhead lines: as for roads. If the last node was split, then no shared model is placed assuming it is continued in another tile (i.e. optimized for batch processing across tiles)
+
 
 .. _`OSM Extended API`: http://wiki.openstreetmap.org/wiki/Xapi
 
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
-BOUNDARY_CLIPPING                               Boolean    True      If True the everything outside the boundary is clipped away. This clipping
+BOUNDARY_CLIPPING                               Boolean    True      If True then everything outside the boundary is clipped away. This clipping
                                                                      includes ways (e.g. roads, buildings), where nodes outside the boundary
                                                                      are removed.
                                                                      If both this parameter and ``BOUNDARY_CLIPPING_COMPLETE_WAYS`` are set to 

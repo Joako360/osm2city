@@ -21,6 +21,15 @@ import shapely.geometry as shg
 import parameters
 
 
+PSEUDO_OSM_ID = -1  # For those nodes and ways, which get added as part of processing. Not written back to OSM.
+
+
+def get_next_pseudo_osm_id() -> int:
+    global PSEUDO_OSM_ID
+    PSEUDO_OSM_ID -= 1
+    return PSEUDO_OSM_ID
+
+
 class OSMElement(object):
     def __init__(self, osm_id: int) -> None:
         self.osm_id = osm_id
@@ -45,6 +54,9 @@ class Way(OSMElement):
         OSMElement.__init__(self, osm_id)
         self.refs = []
         self.pseudo_osm_id = 0  # can be assigned if existing way gets split
+        # if this way was split at the end - important for power lines, railway lines etc.
+        # see also method split_way_at_boundary
+        self.was_split_at_end = False
 
     def add_ref(self, ref: int) -> None:
         self.refs.append(ref)
@@ -87,9 +99,8 @@ class OSMContentHandler(xml.sax.ContentHandler):
     the input file processed by e.g. Osmosis first.
     """
 
-    def __init__(self, valid_node_keys, border=None):
+    def __init__(self, valid_node_keys):
         xml.sax.ContentHandler.__init__(self)
-        self.border = border
         self._way_callbacks = []
         self._relation_callbacks = []
         self._uncategorized_way_callback = None
@@ -152,10 +163,7 @@ class OSMContentHandler(xml.sax.ContentHandler):
 
     def endElement(self, name):
         if name == "node":
-            if self.border is None or self.border.contains(shg.Point(self._current_node.lon, self._current_node.lat)):        
-                self.nodes_dict[self._current_node.osm_id] = self._current_node
-            else:
-                logging.debug("Ignored Osmid %d outside clipping", self._current_node.osm_id)
+            self.nodes_dict[self._current_node.osm_id] = self._current_node
         elif name == "way":
             cb = find_callback_for(self._current_way.tags, self._way_callbacks)
             # no longer filter valid_way_keys here. That's up to the callback.
@@ -194,12 +202,11 @@ class OSMContentHandlerOld(xml.sax.ContentHandler):
     The valid_??_keys and req_??_keys are a primitive way to save memory and reduce the number of further processed
     elements. A better way is to have the input file processed by e.g. Osmosis first.
     """
-    def __init__(self, valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys,
-                 border=None):
+    def __init__(self, valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys):
         super(OSMContentHandlerOld, self).__init__()
         self.valid_way_keys = valid_way_keys
         self.valid_relation_keys = valid_relation_keys
-        self._handler = OSMContentHandler(valid_node_keys, border)
+        self._handler = OSMContentHandler(valid_node_keys)
         self._handler.register_way_callback(self.process_way, req_way_keys)
         if req_relation_keys is not None:
             self._handler.register_relation_callback(self.process_relation, req_relation_keys)
@@ -569,12 +576,7 @@ def fetch_osm_file_data(valid_way_keys: List[str], req_way_keys: List[str], req_
     valid_node_keys = []
     valid_relation_keys = []
 
-    border = None
-    if parameters.BOUNDARY_CLIPPING_COMPLETE_WAYS is False and parameters.BOUNDARY_CLIPPING:
-        border = shg.Polygon(parameters.get_clipping_extent())
-
-    handler = OSMContentHandlerOld(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
-                                   req_rel_keys, border)
+    handler = OSMContentHandlerOld(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_rel_keys)
     osm_file_name = parameters.get_OSM_file_name()
     source = open(osm_file_name, encoding="utf8")
     xml.sax.parse(source, handler)
@@ -638,6 +640,38 @@ def construct_tags_query(req_tag_keys: List[str], req_tag_key_values: List[str],
             tags_query += ")"
 
     return tags_query
+
+
+def split_way_at_boundary(nodes_dict: Dict[int, Node], complete_way: Way, clipping_border: shg.Polygon) -> List[Way]:
+    """Splits a way (e.g. road) at the clipping border into 0 to n ways.
+    A way can be totally inside a boundary, totally outside a boundary, intersect once or several times.
+    Splitting is tested at existing nodes of the way. A split way's first node is always inside the boundary.
+    A split way's last point can be inside the boundary (the last node of the original way) or
+    the first node outside of the boundary (such that across tile boundaries there is a continuation)."""
+    split_ways = list()
+    current_way = Way(complete_way.osm_id)  # the first (and maybe only) does not get a pseudo_id
+    current_way.tags = complete_way.tags
+    previous_inside = False
+    for node_ref in complete_way.refs:
+        current_node = nodes_dict[node_ref]
+        if clipping_border.contains(shg.Point(current_node.lon, current_node.lat)):
+            current_way.refs.append(node_ref)
+            previous_inside = True
+        else:
+            if previous_inside:
+                current_way.refs.append(node_ref)
+                current_way.was_split_at_end = True
+                if len(current_way.refs) >= 2:
+                    split_ways.append(current_way)
+                current_way = Way(complete_way.osm_id)
+                current_way.tags = complete_way.tags
+                current_way.pseudo_osm_id = get_next_pseudo_osm_id()
+                previous_inside = False
+            # nothing to do if previous also outside
+
+    if len(current_way.refs) >= 2:
+        split_ways.append(current_way)
+    return split_ways
 
 
 # ================ UNITTESTS =======================

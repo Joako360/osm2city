@@ -42,10 +42,6 @@ BOUNDARY_WEST = 9.54
 BOUNDARY_SOUTH = 47.48
 BOUNDARY_EAST = 9.58
 BOUNDARY_NORTH = 47.50
-# Clip all nodes outside the bounding box
-BOUNDARY_CLIPPING = True
-BOUNDARY_CLIPPING_BORDER_SIZE = 0.25
-BOUNDARY_CLIPPING_COMPLETE_WAYS = False
 
 OSM_FILE = "buildings.osm"  # -- file name of file with OSM data. Should reside in $PREFIX. No path components allowed.
 
@@ -302,17 +298,11 @@ def get_extent_global():
     return cmin, cmax
 
 
-def get_clipping_extent(use_border=True):
-    if use_border:
-        rect = [(BOUNDARY_WEST-BOUNDARY_CLIPPING_BORDER_SIZE, BOUNDARY_SOUTH-BOUNDARY_CLIPPING_BORDER_SIZE),
-                (BOUNDARY_EAST+BOUNDARY_CLIPPING_BORDER_SIZE, BOUNDARY_SOUTH-BOUNDARY_CLIPPING_BORDER_SIZE),
-                (BOUNDARY_EAST+BOUNDARY_CLIPPING_BORDER_SIZE, BOUNDARY_NORTH+BOUNDARY_CLIPPING_BORDER_SIZE),
-                (BOUNDARY_WEST-BOUNDARY_CLIPPING_BORDER_SIZE, BOUNDARY_NORTH+BOUNDARY_CLIPPING_BORDER_SIZE)]
-    else:
-        rect = [(BOUNDARY_WEST, BOUNDARY_SOUTH),
-                (BOUNDARY_EAST, BOUNDARY_SOUTH),
-                (BOUNDARY_EAST, BOUNDARY_NORTH),
-                (BOUNDARY_WEST, BOUNDARY_NORTH)]
+def get_clipping_border():
+    rect = [(BOUNDARY_WEST, BOUNDARY_SOUTH),
+            (BOUNDARY_EAST, BOUNDARY_SOUTH),
+            (BOUNDARY_EAST, BOUNDARY_NORTH),
+            (BOUNDARY_WEST, BOUNDARY_NORTH)]
     return rect
 
 

@@ -98,15 +98,6 @@ OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 SCENERY_TYPE = "Roads"
 
 
-PSEUDO_OSM_ID = -1  # For those nodes and ways, which get added as part of processing. Not written back to OSM.
-
-
-def _get_next_pseudo_osm_id():
-    global PSEUDO_OSM_ID
-    PSEUDO_OSM_ID -= 1
-    return PSEUDO_OSM_ID
-
-
 BRIDGE_KEY = 'bridge'  # the original OSM tag key
 REPLACED_BRIDGE_KEY = 'replaced_bridge'  # specifies a way that was originally a bridge, but due to length was changed
 
@@ -182,7 +173,7 @@ def _compatible_ways(way1, way2):
 def _init_way_from_existing(way: osmparser.Way, node_references: List[int]) -> osmparser.Way:
     """Return copy of way. The copy will have same osm_id and tags, but only given refs"""
     new_way = osmparser.Way(way.osm_id)
-    new_way.pseudo_osm_id = _get_next_pseudo_osm_id()
+    new_way.pseudo_osm_id = osmparser.get_next_pseudo_osm_id()
     new_way.tags = way.tags
     new_way.refs.extend(node_references)
     return new_way
@@ -379,7 +370,7 @@ class Roads(object):
         logging.debug("before linear " + str(self))
         self._create_linear_objects()
         self._propagate_h_add()
-        logging.debug("after linear" + str(self))
+        logging.debug("after linear " + str(self))
 
         if parameters.CREATE_BRIDGES_ONLY:
             self._keep_only_bridges_and_embankments()
@@ -466,11 +457,11 @@ class Roads(object):
                     new_ways.append(new_way)
                     # now add new nodes from intersection
                     lon_lat = self.transform.toGlobal(list(my_multiline.geoms[0].coords)[-1])
-                    new_node = osmparser.Node(_get_next_pseudo_osm_id(), lon_lat[1], lon_lat[0])
+                    new_node = osmparser.Node(osmparser.get_next_pseudo_osm_id(), lon_lat[1], lon_lat[0])
                     self.nodes_dict[new_node.osm_id] = new_node
                     way.refs.append(new_node.osm_id)
                     lon_lat = self.transform.toGlobal(list(my_multiline.geoms[1].coords)[0])
-                    new_node = osmparser.Node(_get_next_pseudo_osm_id(), lon_lat[1], lon_lat[0])
+                    new_node = osmparser.Node(osmparser.get_next_pseudo_osm_id(), lon_lat[1], lon_lat[0])
                     self.nodes_dict[new_node.osm_id] = new_node
                     new_way.refs.insert(0, new_node.osm_id)
                     logging.info("Split way (osm_id=%d) into 2 ways due to blocked area.", way.osm_id)
@@ -584,7 +575,7 @@ class Roads(object):
                     additional_needed_nodes = int(my_line.length / parameters.POINTS_ON_LINE_DISTANCE_MAX)
                     for x in range(additional_needed_nodes):
                         new_point = my_line.interpolate((x + 1) * parameters.POINTS_ON_LINE_DISTANCE_MAX)
-                        osm_id = _get_next_pseudo_osm_id()
+                        osm_id = osmparser.get_next_pseudo_osm_id()
                         lon_lat = self.transform.toGlobal((new_point.x, new_point.y))
                         new_node = osmparser.Node(osm_id, lon_lat[1], lon_lat[0])
                         self.nodes_dict[osm_id] = new_node
@@ -865,7 +856,7 @@ class Roads(object):
         """
         logging.debug("Joining %i and %i", way1.osm_id, way2.osm_id)
         if way1.osm_id == way2.osm_id:
-            logging.warning("Not joining way %i with itself", way1.osm_id)
+            logging.debug("WARNING: Not joining way %i with itself", way1.osm_id)
             return
         if way1.refs[0] == way2.refs[0]:
             new_refs = way1.refs[::-1] + way2.refs[1:]
@@ -876,7 +867,7 @@ class Roads(object):
         elif way1.refs[-1] == way2.refs[-1]:
             new_refs = way1.refs[:-1] + way2.refs[::-1]
         else:
-            logging.warning("Not joining ways that share no endpoint %i %i", way1.osm_id, way2.osm_id)
+            logging.debug("WARNING: Not joining ways that share no endpoint %i %i", way1.osm_id, way2.osm_id)
             return
             
         new_way = _init_way_from_existing(way1, new_refs)
@@ -990,11 +981,12 @@ class Roads(object):
             the_object.cluster_ref = cluster_ref
 
 
-def process_osm_ways(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int, osmparser.Way],
-                     clipping_border: shg.Polygon) -> List[osmparser.Way]:
+def process_osm_ways(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int, osmparser.Way]) -> List[osmparser.Way]:
     """Processes the values returned from OSM and does a bit of filtering.
     Transformation to roads, railways and bridges is only done later in Roads.process()."""
     my_ways = list()
+    clipping_border = shg.Polygon(parameters.get_clipping_border())
+
     for key, way in ways_dict.items():
         if way.osm_id in parameters.SKIP_LIST:
             logging.info("SKIPPING OSM_ID %i", way.osm_id)
@@ -1010,11 +1002,9 @@ def process_osm_ways(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int,
             if not _is_processed_railway(way):
                 continue
 
-        if clipping_border is not None:
-            first_node = nodes_dict[way.refs[0]]
-            if not clipping_border.contains(shg.Point(first_node.lon, first_node.lat)):
-                continue
-        my_ways.append(way)
+        split_ways = osmparser.split_way_at_boundary(nodes_dict, way, clipping_border)
+        if len(split_ways) > 0:
+            my_ways.extend(split_ways)
 
     return my_ways
 
@@ -1142,12 +1132,9 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     osm_nodes_dict = osm_way_result.nodes_dict
     osm_ways_dict = osm_way_result.ways_dict
 
-    clipping_border = None
-    if parameters.BOUNDARY_CLIPPING_COMPLETE_WAYS:
-        clipping_border = shg.Polygon(parameters.get_clipping_extent(False))
-
-    filtered_osm_ways_list = process_osm_ways(osm_nodes_dict, osm_ways_dict, clipping_border)
-    logging.info("ways: %i", len(filtered_osm_ways_list))
+    logging.info("Number of ways before basic processing: %i", len(osm_ways_dict))
+    filtered_osm_ways_list = process_osm_ways(osm_nodes_dict, osm_ways_dict)
+    logging.info("Number of ways after basic processing: %i", len(filtered_osm_ways_list))
     if len(filtered_osm_ways_list) == 0:
         logging.info("No roads and railways found -> aborting")
         return

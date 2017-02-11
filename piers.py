@@ -57,17 +57,17 @@ class Pier(object):
         self.elevation = min_elevation
 
 
-def _process_osm_piers(nodes_dict, ways_dict, my_coord_transformator, clipping_border: shg.Polygon) -> List[Pier]:
+def _process_osm_piers(nodes_dict, ways_dict, my_coord_transformator) -> List[Pier]:
     my_piers = list()
+    clipping_border = shg.Polygon(parameters.get_clipping_border())
 
     for key, way in ways_dict.items():
         if not ('man_made' in way.tags and way.tags['man_made'] == 'pier'):
             continue
 
-        if clipping_border is not None:
-            first_node = nodes_dict[way.refs[0]]
-            if not clipping_border.contains(shg.Point(first_node.lon, first_node.lat)):
-                continue
+        first_node = nodes_dict[way.refs[0]]
+        if not clipping_border.contains(shg.Point(first_node.lon, first_node.lat)):
+            continue
 
         pier = Pier(my_coord_transformator, way.osm_id, way.tags, way.refs, nodes_dict)
         my_piers.append(pier)
@@ -323,11 +323,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     osm_nodes_dict = osm_way_result.nodes_dict
     osm_ways_dict = osm_way_result.ways_dict
 
-    clipping_border = None
-    if parameters.BOUNDARY_CLIPPING_COMPLETE_WAYS:
-        clipping_border = shg.Polygon(parameters.get_clipping_extent(False))
-
-    piers = _process_osm_piers(osm_nodes_dict, osm_ways_dict, coords_transform, clipping_border)
+    piers = _process_osm_piers(osm_nodes_dict, osm_ways_dict, coords_transform)
     logging.info("ways: %i", len(piers))
     if len(piers) == 0:
         logging.info("No piers found -> aborting")

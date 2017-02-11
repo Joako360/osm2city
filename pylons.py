@@ -665,6 +665,7 @@ class Line(LineWithoutCables):
         super(Line, self).__init__(osm_id)
         self.way_segments = []
         self.length = 0.0  # the total length of all segments
+        self.original_osm_way = None
 
     def _calc_segments(self):
         """Creates the segments of this WayLine and calculates the total length.
@@ -1065,10 +1066,17 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev, 
         -> List[RailLine]:
     my_railways = list()
     my_shared_nodes = {}  # node osm_id as key, list of WayLine objects as value
+    clipping_border = shg.Polygon(parameters.get_clipping_border())
 
-    # First reduce to electrified narrow_gauge or rail, no tunnels and no abandoned
+    railway_candidates = list()
     for way_key, way in ways_dict.items():
-        my_line = RailLine(way_key)
+        if "railway" in way.tags:
+            split_ways = osmparser.split_way_at_boundary(nodes_dict, way, clipping_border)
+            if len(split_ways) > 0:
+                railway_candidates.extend(split_ways)
+
+    for way in railway_candidates:
+        my_line = RailLine(way.osm_id)
         is_railway = False
         is_electrified = False
         is_challenged = False
@@ -1126,11 +1134,11 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev, 
         shared_node = my_shared_nodes[key]
         if len(shared_node) >= 2:
             pos1, pos2 = find_connecting_line(key, shared_node, 60)
+            second_line = shared_node[pos2]
             if pos1 >= 0:
-                my_osm_id = shared_node[pos2].osm_id
                 try:
                     merge_lines(key, shared_node[pos1], shared_node[pos2], my_shared_nodes)
-                    del my_railways[my_osm_id]
+                    my_railways.remove(second_line)
                     del my_shared_nodes[key]
                     logging.debug("Merged two lines with node osm_id: %s", key)
                 except Exception as e:
@@ -1230,6 +1238,10 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGElev
     my_powerlines = {}  # osm_id as key, WayLine object as value
     my_aerialways = {}  # osm_id as key, WayLine object as value
     my_shared_nodes = {}  # node osm_id as key, list of WayLine objects as value
+    clipping_border = shg.Polygon(parameters.get_clipping_border())
+
+    way_lines = list()
+
     for way in list(ways_dict.values()):
         my_line = WayLine(way.osm_id)
         for key in way.tags:
@@ -1260,72 +1272,97 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGElev
                     pass  # principally only substations may have values like "100000;25000", but only principally ...
             elif "wires" == key:
                 my_line.wires = value
-        if 0 != my_line.type_:
-            prev_pylon = None
-            for ref in way.refs:
-                if ref in nodes_dict:
-                    my_node = nodes_dict[ref]
-                    my_pylon = Pylon(my_node.osm_id)
-                    my_pylon.lat = my_node.lat
-                    my_pylon.lon = my_node.lon
-                    my_pylon.x, my_pylon.y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
-                    my_pylon.elevation = fg_elev.probe_elev(vec2d.Vec2d(my_pylon.lon, my_pylon.lat), True)
-                    for key in my_node.tags:
-                        value = my_node.tags[key]
-                        if "power" == key:
-                            if "tower" == value:
-                                my_pylon.type_ = Pylon.TYPE_POWER_TOWER
-                            elif "pole" == value:
-                                my_pylon.type_ = Pylon.TYPE_POWER_POLE
-                        elif "aerialway" == key:
-                            if "pylon" == value:
-                                my_pylon.type_ = Pylon.TYPE_AERIALWAY_PYLON
-                            elif "station" == value:
-                                my_pylon.type_ = Pylon.TYPE_AERIALWAY_STATION
-                                my_point = shg.Point(my_pylon.x, my_pylon.y)
-                                for building_ref in building_refs:
-                                    if building_ref.contains(my_point):
-                                        my_pylon.in_osm_building = True
-                                        logging.debug('Station with osm_id = %s found within building reference',
-                                                      my_pylon.osm_id)
-                                        break
-                        elif "height" == key:
-                            my_pylon.height = osmparser.parse_length(value)
-                        elif "structure" == key:
-                            my_pylon.structure = value
-                        elif "material" == key:
-                            my_pylon.material = value
-                    if my_pylon.elevation != -9999:  # if elevation is -9999, then point is outside of boundaries
-                        my_line.shared_pylons.append(my_pylon)
-                    else:
-                        logging.debug('Node outside of boundaries and therefore ignored: osm_id = %s', my_node.osm_id)
-                    if prev_pylon is not None:
-                        prev_pylon.next_pylon = my_pylon
-                        my_pylon.prev_pylon = prev_pylon
-                    prev_pylon = my_pylon
-            if len(my_line.shared_pylons) > 1:
-                for the_node in [my_line.shared_pylons[0], my_line.shared_pylons[-1]]:
-                    if the_node.osm_id in list(my_shared_nodes.keys()):
-                        my_shared_nodes[the_node.osm_id].append(my_line)
-                    else:
-                        my_shared_nodes[the_node.osm_id] = [my_line]
-                if my_line.is_aerialway():
-                    my_aerialways[my_line.osm_id] = my_line
-                else:
-                    my_powerlines[my_line.osm_id] = my_line
+        if my_line.type_ == 0:
+            continue
+        if my_line.is_aerialway():
+            first_node = nodes_dict[way.refs[0]]
+            if not clipping_border.contains(shg.Point(first_node.lon, first_node.lat)):
+                continue
             else:
-                logging.warning('Line could not be validated or corrected. osm_id = %s', my_line.osm_id)
+                my_line.original_osm_way = way
+                way_lines.append(my_line)
+        else:
+            split_ways = osmparser.split_way_at_boundary(nodes_dict, way, clipping_border)
+            if len(split_ways) == 0:
+                continue
+            else:
+                for split_way in split_ways:
+                    split_line = WayLine(way.osm_id)
+                    if split_way.pseudo_osm_id != 0:
+                        split_line.osm_id = way.pseudo_osm_id
+                    split_line.original_osm_way = split_way
+                    split_line.type_ = my_line.type_
+                    split_line.cables = my_line.cables
+                    split_line.voltage = my_line.voltage
+                    if my_line.wires is not None:
+                        split_line.wires = my_line.wires
+                    way_lines.append(split_line)
+
+    for my_line in way_lines:
+        prev_pylon = None
+        for ref in my_line.original_osm_way.refs:
+            if ref in nodes_dict:
+                my_node = nodes_dict[ref]
+                my_pylon = Pylon(my_node.osm_id)
+                my_pylon.lat = my_node.lat
+                my_pylon.lon = my_node.lon
+                my_pylon.x, my_pylon.y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
+                my_pylon.elevation = fg_elev.probe_elev(vec2d.Vec2d(my_pylon.lon, my_pylon.lat), True)
+                for key in my_node.tags:
+                    value = my_node.tags[key]
+                    if "power" == key:
+                        if "tower" == value:
+                            my_pylon.type_ = Pylon.TYPE_POWER_TOWER
+                        elif "pole" == value:
+                            my_pylon.type_ = Pylon.TYPE_POWER_POLE
+                    elif "aerialway" == key:
+                        if "pylon" == value:
+                            my_pylon.type_ = Pylon.TYPE_AERIALWAY_PYLON
+                        elif "station" == value:
+                            my_pylon.type_ = Pylon.TYPE_AERIALWAY_STATION
+                            my_point = shg.Point(my_pylon.x, my_pylon.y)
+                            for building_ref in building_refs:
+                                if building_ref.contains(my_point):
+                                    my_pylon.in_osm_building = True
+                                    logging.debug('Station with osm_id = %s found within building reference',
+                                                  my_pylon.osm_id)
+                                    break
+                    elif "height" == key:
+                        my_pylon.height = osmparser.parse_length(value)
+                    elif "structure" == key:
+                        my_pylon.structure = value
+                    elif "material" == key:
+                        my_pylon.material = value
+                if my_pylon.elevation != -9999:  # if elevation is -9999, then point is outside of boundaries
+                    my_line.shared_pylons.append(my_pylon)
+                else:
+                    logging.debug('Node outside of boundaries and therefore ignored: osm_id = %s', my_node.osm_id)
+                if prev_pylon is not None:
+                    prev_pylon.next_pylon = my_pylon
+                    my_pylon.prev_pylon = prev_pylon
+                prev_pylon = my_pylon
+        if len(my_line.shared_pylons) > 1:
+            for the_node in [my_line.shared_pylons[0], my_line.shared_pylons[-1]]:
+                if the_node.osm_id in list(my_shared_nodes.keys()):
+                    my_shared_nodes[the_node.osm_id].append(my_line)
+                else:
+                    my_shared_nodes[the_node.osm_id] = [my_line]
+            if my_line.is_aerialway():
+                my_aerialways[my_line.osm_id] = my_line
+            else:
+                my_powerlines[my_line.osm_id] = my_line
+        else:
+            logging.warning('Line could not be validated or corrected. osm_id = %s', my_line.osm_id)
 
     for key in list(my_shared_nodes.keys()):
         shared_node = my_shared_nodes[key]
+        if shared_node[0].is_aerialway():  # only attempt to merge power lines
+            continue
         if (len(shared_node) == 2) and (shared_node[0].type_ == shared_node[1].type_):
             my_osm_id = shared_node[1].osm_id
             try:
                 merge_lines(key, shared_node[0], shared_node[1], my_shared_nodes)
-                if shared_node[0].is_aerialway():
-                    del my_aerialways[my_osm_id]
-                else:
-                    del my_powerlines[my_osm_id]
+                del my_powerlines[my_osm_id]
                 del my_shared_nodes[key]
                 logging.debug("Merged two lines with node osm_id: %s", key)
             except Exception as e:
@@ -1377,32 +1414,47 @@ def merge_lines(osm_id, line0, line1, shared_nodes):
     Makes sure that line1 is replaced by line0 in shared_nodes.
     Raises Exception if the referenced node is not at beginning or end of the two lines.
     """
-    if line0.nodes[0].osm_id == osm_id:
+    # Little trick to work with both WayLines and RailLines
+    line0_nodes = line0.shared_pylons
+    line1_nodes = line1.shared_pylons
+    if isinstance(line0, RailLine):
+        line0_nodes = line0.nodes
+        line1_nodes = line1.nodes
+
+    if line0_nodes[0].osm_id == osm_id:
         line0_first = True
-    elif line0.nodes[-1].osm_id == osm_id:
+    elif line0_nodes[-1].osm_id == osm_id:
         line0_first = False
     else:
         raise Exception("The referenced node is not at the beginning or end of line0")
-    if line1.nodes[0].osm_id == osm_id:
+    if line1_nodes[0].osm_id == osm_id:
         line1_first = True
-    elif line1.nodes[-1].osm_id == osm_id:
+    elif line1_nodes[-1].osm_id == osm_id:
         line1_first = False
     else:
         raise Exception("The referenced node is not at the beginning or end of line1")
 
     # combine line1 into line0 in correct sequence (e.g. line0(A,B) + line1(C,B) -> line0(A,B,C)
     if (line0_first is False) and (line1_first is True):
-        for x in range(1, len(line1.nodes)):
-            line0.nodes.append(line1.nodes[x])
+        for x in range(1, len(line1_nodes)):
+            line0_nodes.append(line1_nodes[x])
     elif (line0_first is False) and (line1_first is False):
-        for x in range(0, len(line1.nodes) - 1):
-            line0.nodes.append(line1.nodes[len(line1.nodes) - x - 2])
+        for x in range(0, len(line1_nodes) - 1):
+            line0_nodes.append(line1_nodes[len(line1_nodes) - x - 2])
     elif (line0_first is True) and (line1_first is True):
-        for x in range(1, len(line1.nodes)):
-            line0.nodes.insert(0, line1.nodes[x])
+        for x in range(1, len(line1_nodes)):
+            line0_nodes.insert(0, line1_nodes[x])
     else:
-        for x in range(0, len(line1.nodes) - 1):
-            line0.nodes.insert(0, line1.nodes[len(line1.nodes) - x - 2])
+        for x in range(0, len(line1_nodes) - 1):
+            line0_nodes.insert(0, line1_nodes[len(line1_nodes) - x - 2])
+
+    # set back little trick
+    if isinstance(line0, RailLine):
+        line0.nodes = line0_nodes
+        line1.nodes = line1_nodes
+    else:
+        line0.shared_pylons = line0_nodes
+        line1.shared_pylons = line1_nodes
 
     # in shared_nodes replace line1 with line2
     for shared_node in list(shared_nodes.values()):
@@ -1492,6 +1544,8 @@ def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator, fg_
     http://wiki.openstreetmap.org/wiki/Tag:man%20made=storage%20tank?uselang=en-US.
     """
     my_buildings = list()
+    clipping_border = shg.Polygon(parameters.get_clipping_border())
+
     for way in list(ways_dict.values()):
         for key in way.tags:
             if "building" == key:
@@ -1509,6 +1563,8 @@ def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator, fg_
                                     'man_made' in way.tags and way.tags['man_made'] in ['storage_tank', 'tank']):
                             my_centroid = my_polygon.centroid
                             lon, lat = my_coord_transformator.toGlobal((my_centroid.x, my_centroid.y))
+                            if not clipping_border.contains(shg.Point(lon, lat)):
+                                continue
                             radius = coordinates.calc_distance_global(lon, lat, my_node.lon, my_node.lat)
                             if radius < 5:  # do not want very small objects
                                 continue
