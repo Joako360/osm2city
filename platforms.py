@@ -231,8 +231,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
     replacement_prefix = parameters.get_repl_prefix()
-    stg_manager = stg_io2.STGManager(path_to_output, SCENERY_TYPE, OUR_MAGIC, replacement_prefix,
-                                     overwrite=True)
+    stg_manager = stg_io2.STGManager(path_to_output, SCENERY_TYPE, OUR_MAGIC, replacement_prefix)
 
     _write(fg_elev, stg_manager, replacement_prefix, clusters, coords_transform, stats)
 

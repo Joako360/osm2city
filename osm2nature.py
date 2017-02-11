@@ -166,8 +166,7 @@ def main():
     #    logging.info('Number of forest to process: %s', len(trees))
     #    # -- initialize STGManager
     path_to_output = parameters.get_output_path()
-    stg_manager = stg_io2.STGManager(path_to_output, TERRASYNC_DIR_NATURE, OUR_MAGIC, parameters.get_repl_prefix(),
-                                     overwrite=True)
+    stg_manager = stg_io2.STGManager(path_to_output, TERRASYNC_DIR_NATURE, OUR_MAGIC, parameters.get_repl_prefix())
 
     #write_stg_entries(stg_manager, files_to_remove, trees, "trees", 2000)
     for tree in list(trees.values()) :

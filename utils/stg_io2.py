@@ -131,8 +131,6 @@ class STGFile(object):
 
     def write(self) -> None:
         """write others and ours to file"""
-        # read directly before write to
-        self.read()
         self._make_path_to_stg()
         stg = open(self.file_name, 'w')
         logging.info("Writing %d other lines" % len(self.other_list))
@@ -156,10 +154,9 @@ class STGManager(object):
     """manages STG objects. Knows about scenery path.
        prefix separates different writers to work around two PREFIX areas interleaving 
     """
-    def __init__(self, path_to_scenery: str, scenery_type: str, magic: str, prefix=None, overwrite=False) -> None:
+    def __init__(self, path_to_scenery: str, scenery_type: str, magic: str, prefix=None) -> None:
         self.stg_dict = dict()  # maps tile index to stg object
         self.path_to_scenery = path_to_scenery
-        self.overwrite = overwrite
         self.magic = magic
         self.prefix = prefix
         if parameters.USE_NEW_STG_VERBS:
@@ -167,20 +164,17 @@ class STGManager(object):
         else:
             self.scenery_type = "Objects"
 
-    def __call__(self, lon_lat: Vec2d, overwrite=None) -> STGFile:
+    def __call__(self, lon_lat: Vec2d) -> STGFile:
         """return STG object. If overwrite is given, it overrides default"""
         tile_index = calc_tile.tile_index((lon_lat.lon, lon_lat.lat))
         try:
             return self.stg_dict[tile_index]
         except KeyError:
-            the_stg = STGFile(lon_lat, tile_index, self.path_to_scenery, self.scenery_type, self.magic, self.prefix)
-            self.stg_dict[tile_index] = the_stg
-            if overwrite is None:
-                overwrite = self.overwrite
-            if overwrite:
-                # this will only drop the section we previously wrote ()
-                the_stg.drop_ours()
-        return the_stg
+            the_stg_file = STGFile(lon_lat, tile_index, self.path_to_scenery, self.scenery_type, self.magic, self.prefix)
+            self.stg_dict[tile_index] = the_stg_file
+            # this will only drop the section we previously wrote ()
+            the_stg_file.drop_ours()
+        return the_stg_file
 
     def add_object_static(self, ac_file_name, lon_lat: Vec2d, elev, hdg,
                           stg_verb_type: STGVerbType=STGVerbType.object_static, once=False):
@@ -192,10 +186,6 @@ class STGManager(object):
         """Adds OBJECT_SHARED line. Returns path to stg it was added to."""
         the_stg = self(lon_lat)
         return the_stg.add_object('OBJECT_SHARED', ac_file_name, lon_lat, elev, hdg)
-
-    def drop_ours(self):
-        for the_stg in list(self.stg_dict.values()):
-            the_stg.drop_ours()
 
     def write(self):
         for the_stg in list(self.stg_dict.values()):

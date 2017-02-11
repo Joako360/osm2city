@@ -1732,9 +1732,9 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
         powerlines, aerialways = process_osm_power_aerialway(osm_nodes_dict, osm_ways_dict, fg_elev,
                                                              coords_transform, building_refs)
         if not parameters.C2P_PROCESS_POWERLINES:
-            powerlines.clear()
+            powerlines = list()
         if not parameters.C2P_PROCESS_AERIALWAYS:
-            aerialways.clear()
+            aerialways = list()
         logging.info('Number of power lines to process: %s', len(powerlines))
         logging.info('Number of aerialways to process: %s', len(aerialways))
         for wayline in powerlines:
@@ -1788,8 +1788,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
 
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
-    stg_manager = stg_io2.STGManager(path_to_output, SCENERY_TYPE, OUR_MAGIC, parameters.get_repl_prefix(),
-                                     overwrite=True)
+    stg_manager = stg_io2.STGManager(path_to_output, SCENERY_TYPE, OUR_MAGIC, parameters.get_repl_prefix())
 
     # Write to Flightgear
     if parameters.C2P_PROCESS_POWERLINES:
