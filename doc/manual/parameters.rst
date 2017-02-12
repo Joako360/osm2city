@@ -245,27 +245,6 @@ The processing is as follows:
 
 .. _`OSM Extended API`: http://wiki.openstreetmap.org/wiki/Xapi
 
-=============================================   ========   =======   ==============================================================================
-Parameter                                       Type       Default   Description / Example
-=============================================   ========   =======   ==============================================================================
-BOUNDARY_CLIPPING                               Boolean    True      If True then everything outside the boundary is clipped away. This clipping
-                                                                     includes ways (e.g. roads, buildings), where nodes outside the boundary
-                                                                     are removed.
-                                                                     If both this parameter and ``BOUNDARY_CLIPPING_COMPLETE_WAYS`` are set to 
-                                                                     False, then make sure that the ``OSM_FILE`` only contain the necessary data
-                                                                     (which in most situations is recommended).
-BOUNDARY_CLIPPING_BORDER_SIZE                   Decimal    0.25      Additional border in meters to catch OSM data just at the edge. Used together
-                                                                     with ``BOUNDARY_CLIPPING=True``.
-
-BOUNDARY_CLIPPING_COMPLETE_WAYS                 Boolean    False     If True it overrides ``BOUNDARY_CLIPPING`` and keeps all those ways, where the
-                                                                     first referenced node is within the boundary as specified by ``BOUNDARY_*``.
-                                                                     This leads to a more graceful handling when different adjacent sceneries are
-                                                                     created (e.g. batch processing), such that e.g. roads not just stop on either
-                                                                     side of the boundary. However this comes with the cost of more needed 
-                                                                     processing. Do not use if just one scenery area in one pass is created.
-
-=============================================   ========   =======   ==============================================================================
-
 
 .. _chapter-parameters-roads:
 
