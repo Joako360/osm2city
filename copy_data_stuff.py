@@ -64,8 +64,8 @@ def process(copy_fg_data: bool, scenery_type: str) -> None:
                 copy_tree(source_dir, fg_root_dir)
 
     else:
-        logging.error("The scenery path must include a directory 'Objects' like %s", scenery_path)
-        sys.exit(1)
+        logging.info("ERROR: The scenery path must include a directory 'Objects' like %s - maybe no objects written",
+                     scenery_path)
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
