@@ -67,7 +67,7 @@ The directory ``development`` contains the ``osm2city`` programs and data after 
 
 In the example directory structure above the directory ``fg_customscenery`` hosts the input and output information — here two sceneries for airports LSZS and LSMM (however there is no need to structure sceneries by airports). The output of ``osm2city`` scenery generation goes into e.g. ``fg_customscenery/LSZS`` while the input to the scenery generation is situated in e.g. ``fg_customscenery/projects/LSZS`` (how to get the input files in this folder is discussed in the following chapters).
 
-The directory structure in the output folders (e.g. `fg_customscenery/LSZS``) is created by ``osm2city`` related programs, i.e. you do not need to create it manually.
+The directory structure in the output folders (e.g. ``fg_customscenery/LSZS``) is created by ``osm2city`` related programs, i.e. you do not need to create it manually.
 
 The directory ``.../fg_customscenery/projects`` will be called ``WORKING_DIRECTORY`` in the following. This is important because ``osm2city`` related programs will have assumptions about this.
 
@@ -158,7 +158,7 @@ Generating Elevation Data
 
 This comes at the cost that elevation data must be obtained by "flying" through the scenery, which can be a time consuming process for larger areas — especially if you need a good spatial resolution e.g. in mountain areas like Switzerland. The good part is that you only need to do this once and then only whenever the underlying scenery's elevation data changes (which is quite seldom in the case of scenery from TerraSync_).
 
-Please be aware that the scenery data needed for your area might not have been downloaded yet by TerraSync, e.g. if you have not yet "visited" a specific tile. An easy way to download large areas of data is by using TerraMaster_.
+Please be aware that the scenery data needed for your area might not have been downloaded yet by TerraSync, e.g. if you have not yet "visited" a specific tile. An easy way to download large areas of data is by using TerraMaster_. If you are exclusively using TerraMaster_ to download data, then make sure that you in TerraMaster also use button "Synchronise shared models".
 
 .. _TerraMaster: http://wiki.flightgear.org/TerraMaster
 

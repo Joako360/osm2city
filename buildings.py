@@ -394,8 +394,6 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     random.seed(42)
     stats = utilities.Stats()
 
-    prepare_textures.init(stats, False)
-
     if not parameters.USE_DATABASE:
         osm_read_results = osmparser.fetch_osm_file_data(list(), ["building", "building:part"],
                                                          ["building", "building:part"])
@@ -414,6 +412,10 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
 
     cmin, cmax = parameters.get_extent_global()
     logging.info("min/max " + str(cmin) + " " + str(cmax))
+
+    if len(the_buildings) == 0:
+        logging.info("No buildings found in OSM data. Stopping further processing.")
+        return
 
     logging.info("Created %i buildings." % len(the_buildings))
 
@@ -470,6 +472,12 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     #   - location clash with stg static models? drop building
     #   - TODO: analyze surrounding: similar shaped buildings nearby? will get same texture
     #   - set building type, roof type etc
+
+    if len(the_buildings) == 0:
+        logging.info("No buildings after overlap check etc. Stopping further processing.")
+        return
+
+    prepare_textures.init(stats, False)
 
     the_buildings = building_lib.analyse(the_buildings, static_objects, fg_elev,
                                          prepare_textures.facades, prepare_textures.roofs, stats)
