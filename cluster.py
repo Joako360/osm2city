@@ -116,10 +116,11 @@ class ClusterContainer(object):
         return the_cluster
 
     def write_statistics(self, clusters_name: str) -> None:
-        my_file = open(parameters.PREFIX + os.sep + clusters_name + ".dat", "w")
-        for j in range(self.max_grid.iy):
-            for i in range(self.max_grid.ix):
-                cl = self._clusters[i][j]
-                my_file.write("%i %i %i\n" % (i, j, len(cl.objects)))
-            my_file.write("\n")
-        my_file.close()
+        if parameters.log_level_debug_or_lower() and parameters.WRITE_CLUSTER_STATS:
+            my_file = open(parameters.PREFIX + os.sep + clusters_name + ".dat", "w")
+            for j in range(self.max_grid.iy):
+                for i in range(self.max_grid.ix):
+                    cl = self._clusters[i][j]
+                    my_file.write("%i %i %i\n" % (i, j, len(cl.objects)))
+                my_file.write("\n")
+            my_file.close()

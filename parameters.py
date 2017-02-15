@@ -80,6 +80,8 @@ USE_NEW_STG_VERBS = False
 
 USE_EXTERNAL_MODELS = False
 
+WRITE_CLUSTER_STATS = False
+
 # =============================================================================
 # PARAMETERS RELATED TO BUILDINGS IN osm2city
 # =============================================================================
