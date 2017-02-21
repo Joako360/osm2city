@@ -247,12 +247,12 @@ class RoofManager(object):
 
     def _screen_exclude_texture_by_name(self, texture: Texture) -> bool:
         if isinstance(self, FacadeManager):
-            if len(parameters.TEXTURES_FACADES_NAME_EXCLUDE) > 0:
+            if parameters.TEXTURES_FACADES_NAME_EXCLUDE:
                 for a_facade_path in parameters.TEXTURES_FACADES_NAME_EXCLUDE:
                     if texture.filename.rfind(a_facade_path) >= 0:
                         return False
         else:
-            if len(parameters.TEXTURES_ROOFS_NAME_EXCLUDE) > 0:
+            if parameters.TEXTURES_ROOFS_NAME_EXCLUDE:
                 for a_roof_path in parameters.TEXTURES_ROOFS_NAME_EXCLUDE:
                     if texture.filename.rfind(a_roof_path) >= 0:
                         return False
@@ -260,12 +260,12 @@ class RoofManager(object):
 
     def _screen_exclude_texture_by_provides(self, provided_feature: str) -> bool:
         if isinstance(self, FacadeManager):
-            if len(parameters.TEXTURES_FACADES_PROVIDE_EXCLUDE) > 0:
+            if parameters.TEXTURES_FACADES_PROVIDE_EXCLUDE:
                 for a_feature in parameters.TEXTURES_FACADES_PROVIDE_EXCLUDE:
                     if screen_texture_tags_for_colour_spelling(a_feature) == provided_feature:
                         return False
         else:
-            if len(parameters.TEXTURES_ROOFS_PROVIDE_EXCLUDE) > 0:
+            if parameters.TEXTURES_ROOFS_PROVIDE_EXCLUDE:
                 for a_feature in parameters.TEXTURES_ROOFS_PROVIDE_EXCLUDE:
                     if screen_texture_tags_for_colour_spelling(a_feature) == provided_feature:
                         return False
@@ -273,7 +273,7 @@ class RoofManager(object):
 
     def _screen_exclude_texture_by_region(self, texture: Texture) -> bool:
         if isinstance(self, FacadeManager):
-            if len(parameters.TEXTURES_REGIONS_EXPLICIT) > 0:
+            if parameters.TEXTURES_REGIONS_EXPLICIT:
                 for feature in texture.provides:
                     for region in parameters.TEXTURES_REGIONS_EXPLICIT:
                         if len(feature) > 7 and feature[7:] == region:  # [:7] because "region:gb" in texture.provides
@@ -283,14 +283,14 @@ class RoofManager(object):
 
     def find_matching_roof(self, requires: List[str], max_dimension: float, stats: Stats):
         candidates = self.find_candidates(requires, list())
-        if len(candidates) == 0:
+        if not candidates:
             logging.debug("WARNING: No matching texture found for " + str(requires))
             # Break down requirements to find something that matches
             for simple_req in requires:
                 candidates = self.find_candidates([simple_req], list())
-                if len(candidates) > 0:
+                if candidates:
                     break
-                if len(candidates) == 0:
+                if not candidates:
                     # Now we're really desperate - just find something!
                     candidates = self.find_candidates(['compat:roof-large'], list())
         if "compat:roof-flat" not in requires:
@@ -303,13 +303,13 @@ class RoofManager(object):
                 if not candidate.v_can_repeat and candidate.v_size_meters < max_dimension:
                     continue
                 max_dim_candidates.append(candidate)
-            if len(max_dim_candidates) > 0:
+            if max_dim_candidates:
                 the_texture = max_dim_candidates[random.randint(0, len(max_dim_candidates)-1)]
             else:
                 # now we do not care about colour, material etc. Just pick a
                 fallback_candidates = self.find_candidates(['compat:roof-large'], list())
                 final_candidates = list()
-                if len(fallback_candidates) == 0:
+                if not fallback_candidates:
                     logging.error("Large roof required, but no roof texture providing 'compat:roof-large' found.")
                     exit(1)
                 for candidate in fallback_candidates:
@@ -318,7 +318,7 @@ class RoofManager(object):
                     if not candidate.v_can_repeat and candidate.v_size_meters < max_dimension:
                         continue
                     final_candidates.append(candidate)
-                if len(final_candidates) > 0:
+                if final_candidates:
                     the_texture = final_candidates[random.randint(0, len(final_candidates) - 1)]
                 else:  # give up and live with some visual residuals instead of excluding the building
                     the_texture = fallback_candidates[random.randint(0, len(fallback_candidates) - 1)]
@@ -418,16 +418,16 @@ class FacadeManager(RoofManager):
         if 'roof:colour' in tags:
             exclusions.append("%s:%s" % ('roof:colour', tags['roof:colour']))
         candidates = self.find_facade_candidates(requires, exclusions, height, width)
-        if len(candidates) == 0:
+        if not candidates:
             # Break down requirements to something that matches
             for simple_req in requires:
                 candidates = self.find_facade_candidates([simple_req], exclusions, height, width)
-                if len(candidates) > 0:
+                if candidates:
                     break
-            if len(candidates) == 0:
+            if not candidates:
                 # Now we're really desperate - just find something!
                 candidates = self.find_facade_candidates(['compat:roof-flat'], exclusions, height, width)
-            if len(candidates) == 0:
+            if not candidates:
                 logging.debug("WARNING: no matching facade texture for %1.f m x %1.1f m <%s>", height, width, str(requires))
                 return None
         ranked_list = _rank_candidates(candidates, tags)

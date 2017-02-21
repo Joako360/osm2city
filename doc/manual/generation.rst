@@ -46,11 +46,11 @@ Overview of Programs
 
 ``osm2city`` contains the following programs to generate scenery objects based on OSM data:
 
-* ``buildings.py``: generates buildings. See also the related `Wiki osm2city article <http://wiki.flightgear.org/Osm2city.py>`_.
-* ``pylons.py``: generates pylons and cables between them for power lines, aerial ways, railway overhead lines as well as street-lamps. See also the related `Wiki osm2pylon article <http://wiki.flightgear.org/Osm2pylons.py>`_.
-* ``roads.py``: generates different types of roads. See also the related `Wiki roads article <http://wiki.flightgear.org/Osm2roads.py>`_.
-* ``piers.py``: generates piers and boats. See also the related `Wiki piers article <http://wiki.flightgear.org/OsmPiers.py>`_.
-* ``platforms.py``: generates (railway) platforms. See also the related `Wiki platforms article <http://wiki.flightgear.org/OsmPlatforms.py>`_.
+* ``buildings.py``: generates buildings.
+* ``pylons.py``: generates pylons and cables between them for power lines, aerial ways, railway overhead lines as well as street-lamps.
+* ``roads.py``: generates different types of roads.
+* ``piers.py``: generates piers and boats.
+* ``platforms.py``: generates (railway) platforms.
 
 Calling one of these programs only with command line option ``--help`` or ``-h`` will present all available parameters. E.g.
 

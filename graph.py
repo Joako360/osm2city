@@ -25,7 +25,7 @@ def for_edges_in_bfs_call(func, args, G, node0_set, visited_set):
                 if func(n0, n1, args):
                     node0_set.add(n1)
                 visited_set.add(n1)
-        if len(node0_set) == 0:
+        if not node0_set:
             break
 
 
@@ -106,7 +106,7 @@ class Graph(nx.Graph):
         return self.node[the_ref]['obj']
 
     def add_node(self, the_ref, obj):
-        super(Graph, self).add_node(the_ref, obj=obj)
+        super().add_node(the_ref, obj=obj)
         
     def add_edge(self, way):
         ref0 = way.refs[0]
@@ -117,7 +117,7 @@ class Graph(nx.Graph):
         except KeyError:
             #assert(the_ref1 == the_way.refs[0] and the_ref2 == the_way.refs[-1] )
             junction0 = Junction(way, is_first=True) # IS_FIRST
-            super(Graph, self).add_node(ref0, obj=junction0)
+            super().add_node(ref0, obj=junction0)
 
         try:
             junction1 = self.junction(ref1)
@@ -125,9 +125,9 @@ class Graph(nx.Graph):
         except KeyError:
             #assert(the_ref1 == the_way.refs[0] and the_ref2 == the_way.refs[-1] )
             junction1 = Junction(way, is_first=False)
-            super(Graph, self).add_node(ref1, obj=junction1)
+            super().add_node(ref1, obj=junction1)
             
-        super(Graph, self).add_edge(ref0, ref1, obj=way)
+        super().add_edge(ref0, ref1, obj=way)
 
         way.junction0 = junction0
         way.junction1 = junction1

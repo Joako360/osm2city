@@ -28,7 +28,7 @@ def process(copy_fg_data: bool, scenery_type: str) -> None:
                     if os.path.isdir(sub_dir_path + os.sep + level_two_dir):
                         level_two_dirs.append(sub_dir_path + os.sep + level_two_dir)
 
-        if len(level_two_dirs) == 0:
+        if not level_two_dirs:
             logging.info("ERROR: The scenery path does not seem to have necessary sub-directories in %s", scenery_path)
         else:
             data_dir = util.assert_trailing_slash(parameters.PATH_TO_OSM2CITY_DATA)

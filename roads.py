@@ -399,7 +399,7 @@ class Roads(object):
                     list_of_parts.append(current_part_refs)
                     node_refs_in_water.append(ref)
 
-            if len(node_refs_in_water) == 0:  # all on land - just continue
+            if not node_refs_in_water:  # all on land - just continue
                 continue
             elif len(node_refs_in_water) == 1 and len(way.refs) > 2:  # only 1 point
                 if way.refs[0] is not node_refs_in_water[0] and way.refs[-1] is not node_refs_in_water[0]:
@@ -437,7 +437,7 @@ class Roads(object):
     def _check_blocked_areas(self, blocked_areas: List[shg.Polygon]) -> None:
         """Makes sure that there are no ways, which go across a blocked area (e.g. airport runway).
         Ways are clipped over into two ways if intersecting."""
-        if len(blocked_areas) == 0:
+        if not blocked_areas:
             return
         new_ways = list()
         for way in self.ways_list:
@@ -707,17 +707,10 @@ class Roads(object):
             # testing            
             if 1:
                 pref_an = -999
-    #            print the_ref, " : ",
                 for way, is_first in ways_list:
                     an = angle_from(way, is_first)
-    
-    #                print " (%i)" % way.osm_id, is_first,
-    #                pr_angle(an)
                     assert(an > pref_an)
                     pref_an = an
-                    
-    #            if len(ways_list) > 3: bla
-                #if the_ref == 290863179: bla
 
             our_node = np.array(ways_list[0][0].center.coords[-1 + ways_list[0][1]])
             for i, (way_a, is_first_a) in enumerate(ways_list):
@@ -808,7 +801,7 @@ class Roads(object):
 
         if clusters:
             for i, cl in enumerate(clusters):
-                if len(cl.objects): 
+                if cl.objects:
                     cluster_color = col[random.randint(0, len(col)-1)]
                     c = np.array([[cl.min.x, cl.min.y], 
                                   [cl.max.x, cl.min.y], 
@@ -1003,7 +996,7 @@ def process_osm_ways(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int,
                 continue
 
         split_ways = osmparser.split_way_at_boundary(nodes_dict, way, clipping_border)
-        if len(split_ways) > 0:
+        if split_ways:
             my_ways.extend(split_ways)
 
     return my_ways
@@ -1135,7 +1128,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     logging.info("Number of ways before basic processing: %i", len(osm_ways_dict))
     filtered_osm_ways_list = process_osm_ways(osm_nodes_dict, osm_ways_dict)
     logging.info("Number of ways after basic processing: %i", len(filtered_osm_ways_list))
-    if len(filtered_osm_ways_list) == 0:
+    if not filtered_osm_ways_list:
         logging.info("No roads and railways found -> aborting")
         return
 

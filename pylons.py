@@ -311,7 +311,7 @@ class SharedPylon(object):
 class StorageTank(SharedPylon):
     def __init__(self, osm_id: int, lon: float, lat: float, tags: Dict[str, str], radius: float,
                  elevation: float) -> None:
-        super(StorageTank, self).__init__()
+        super().__init__()
         self.osm_id = osm_id
         self.lon = lon
         self.lat = lat
@@ -363,7 +363,7 @@ class StorageTank(SharedPylon):
 
 class WindTurbine(SharedPylon):
     def __init__(self, osm_id: int, lon: float, lat: float, generator_output: float, tags: Dict[str, str]) -> None:
-        super(WindTurbine, self).__init__()
+        super().__init__()
         self.osm_id = osm_id
         self.lon = lon
         self.lat = lat
@@ -554,7 +554,7 @@ class Pylon(SharedPylon):
     TYPE_AERIALWAY_STATION = 22  # OSM-key = "aerialway", value = "station"
 
     def __init__(self, osm_id):
-        super(Pylon, self).__init__()
+        super().__init__()
         self.osm_id = osm_id
         self.height = 0.0  # parsed as float
         self.structure = None
@@ -592,7 +592,7 @@ class LineWithoutCables(object):
 
     def get_center_coordinates(self):
         """Returns the lon/lat coordinates of the line"""
-        if len(self.shared_pylons) == 0:  # FIXME
+        if not self.shared_pylons:  # FIXME
             return 0, 0
         else:  # FIXME: needs to be calculated more properly with shapely
             if len(self.shared_pylons) == 1:
@@ -604,7 +604,7 @@ class LineWithoutCables(object):
 
 class StreetlampWay(LineWithoutCables):
     def __init__(self, osm_id, highway):
-        super(StreetlampWay, self).__init__(osm_id)
+        super().__init__(osm_id)
         self.highway = highway
 
     @staticmethod
@@ -662,7 +662,7 @@ class StreetlampWay(LineWithoutCables):
 
 class Line(LineWithoutCables):
     def __init__(self, osm_id):
-        super(Line, self).__init__(osm_id)
+        super().__init__(osm_id)
         self.way_segments = []
         self.length = 0.0  # the total length of all segments
         self.original_osm_way = None
@@ -797,7 +797,7 @@ class WayLine(Line):  # The name "Line" is also used in e.g. SymPy
     TYPE_AERIALWAY_GOODS = 25  # OSM-key = "aerialway", value = "goods"
 
     def __init__(self, osm_id):
-        super(WayLine, self).__init__(osm_id)
+        super().__init__(osm_id)
         self.type_ = 0  # cf. class constants TYPE_*
         self.voltage = 0  # from osm-tag "voltage"
         self.cables = 0  # from osm-tag "cables"
@@ -918,7 +918,7 @@ class RailMast(SharedPylon):
     TYPE_STOP_MAST = 20
 
     def __init__(self, type_, point_on_line, mast_point, direction_type):
-        super(RailMast, self).__init__()
+        super().__init__()
         self.type_ = type_
         self.point_on_line = point_on_line
         self.x = mast_point.x
@@ -941,7 +941,7 @@ class RailLine(Line):
     MAST_BUFFER = 3.0
 
     def __init__(self, osm_id):
-        super(RailLine, self).__init__(osm_id)
+        super().__init__(osm_id)
         self.type_ = 0
         self.nodes = []  # RailNodes
         self.linear = None  # The LineaString of the line
@@ -1072,7 +1072,7 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev, 
     for way_key, way in ways_dict.items():
         if "railway" in way.tags:
             split_ways = osmparser.split_way_at_boundary(nodes_dict, way, clipping_border)
-            if len(split_ways) > 0:
+            if split_ways:
                 railway_candidates.extend(split_ways)
 
     for way in railway_candidates:
@@ -1178,7 +1178,7 @@ def process_highways_for_streetlamps(my_highways, landuse_buffers) -> List[Stree
         if is_within:
             my_streetlamps[my_highway.osm_id] = StreetlampWay(my_highway.osm_id, my_highway)
         else:
-            if len(intersections) > 0:
+            if intersections:
                 index = 10000000000
                 for intersection in intersections:
                     if isinstance(intersection, shg.MultiLineString):
@@ -1283,7 +1283,7 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGElev
                 way_lines.append(my_line)
         else:
             split_ways = osmparser.split_way_at_boundary(nodes_dict, way, clipping_border)
-            if len(split_ways) == 0:
+            if not split_ways:
                 continue
             else:
                 for split_way in split_ways:
@@ -1588,7 +1588,7 @@ class LinearOSMFeature(object):
 class Highway(LinearOSMFeature):
 
     def __init__(self, osm_id):
-        super(Highway, self).__init__(osm_id)
+        super().__init__(osm_id)
         self.is_roundabout = False
 
     def get_width(self):

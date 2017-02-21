@@ -67,7 +67,7 @@ def _process_osm_platform(nodes_dict, ways_dict, my_coord_transformator) -> List
 def _write(fg_elev: utilities.FGElev, stg_manager, replacement_prefix, clusters,
            coords_transform: coordinates.Transformation, stats: utilities.Stats):
     for cl in clusters:
-        if len(cl.objects) > 0:
+        if cl.objects:
             center_tile = Vec2d(coords_transform.toGlobal(cl.center))
             ac_file_name = "%splatforms%02i%02i.ac" % (replacement_prefix, cl.grid_index.ix, cl.grid_index.iy)
             ac = ac3d.File(stats=stats)
@@ -216,7 +216,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
 
     platforms = _process_osm_platform(osm_nodes_dict, osm_ways_dict, coords_transform)
     logging.info("ways: %i", len(platforms))
-    if len(platforms) == 0:
+    if not platforms:
         logging.info("No platforms found -> aborting")
         return
 

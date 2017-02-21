@@ -291,7 +291,7 @@ def _is_static_object_nearby(b: Building, X, static_tree) -> bool:  # X is ndarr
     nearby = list(set(nearby))
     d = static_tree.data
 
-    if len(nearby):
+    if nearby:
         if parameters.OVERLAP_CHECK_INSIDE:
             inside = False
             for i in nearby:

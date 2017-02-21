@@ -164,7 +164,7 @@ def _process_osm_relation(rel_nodes_dict: Dict[int, osmparser.Node], rel_ways_di
                     if a_building is not None:
                         my_buildings.append(a_building)
 
-            if len(outer_ways) > 0:
+            if outer_ways:
                 # build all_outer_refs
                 list_outer_refs = [way.refs for way in outer_ways[1:]]
                 # get some order :
@@ -413,7 +413,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     cmin, cmax = parameters.get_extent_global()
     logging.info("min/max " + str(cmin) + " " + str(cmax))
 
-    if len(the_buildings) == 0:
+    if not the_buildings:
         logging.info("No buildings found in OSM data. Stopping further processing.")
         return
 
@@ -440,7 +440,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
         handled_clusters.append(clusters_building_mesh_rough)
 
     # check for buildings on airport runways etc.
-    if len(blocked_areas) > 0:
+    if blocked_areas:
         the_buildings = building_lib.overlap_check_blocked_areas(the_buildings, blocked_areas)
 
     if parameters.OVERLAP_CHECK:
@@ -473,7 +473,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     #   - TODO: analyze surrounding: similar shaped buildings nearby? will get same texture
     #   - set building type, roof type etc
 
-    if len(the_buildings) == 0:
+    if not the_buildings:
         logging.info("No buildings after overlap check etc. Stopping further processing.")
         return
 

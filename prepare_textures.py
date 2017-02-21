@@ -222,7 +222,7 @@ def _dump_all_provides_across_textures(texture_list: List[Texture]) -> None:
     for texture in texture_list:
         for feature in texture.provides:
             parts = feature.split(":")
-            if len(parts) > 0:
+            if parts:
                 provided_features_level_one.add(parts[0])
             if len(parts) > 1:
                 provided_features_level_two.add(parts[1])

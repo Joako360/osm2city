@@ -149,7 +149,7 @@ class Object(object):
 
 class Label(Object):
     def __init__(self):
-        super(Label, self).__init__('label', texture='tex/ascii.png')
+        super().__init__('label', texture='tex/ascii.png')
         self.char_w = 1.
         self.char_h = 1.
 

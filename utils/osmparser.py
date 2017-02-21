@@ -31,6 +31,8 @@ def get_next_pseudo_osm_id() -> int:
 
 
 class OSMElement(object):
+    __slots__ = ('osm_id', 'tags')
+
     def __init__(self, osm_id: int) -> None:
         self.osm_id = osm_id
         self.tags = {}
@@ -43,6 +45,8 @@ class OSMElement(object):
 
 
 class Node(OSMElement):
+    __slots__ = ('lat', 'lon')
+
     def __init__(self, osm_id: int, lat: float, lon: float) -> None:
         OSMElement.__init__(self, osm_id)
         self.lat = lat  # float value
@@ -50,6 +54,8 @@ class Node(OSMElement):
 
 
 class Way(OSMElement):
+    __slots__ = ('refs', 'pseudo_osm_id', 'was_split_at_end')
+
     def __init__(self, osm_id: int) -> None:
         OSMElement.__init__(self, osm_id)
         self.refs = []
@@ -63,6 +69,8 @@ class Way(OSMElement):
 
 
 class Member(object):
+    __slots__ = ('ref', 'type_', 'role')
+
     def __init__(self, ref: int, type_: str, role: str) -> None:
         self.ref = ref
         self.type_ = type_
@@ -70,6 +78,8 @@ class Member(object):
 
 
 class Relation(OSMElement):
+    __slots__ = ('members')
+
     def __init__(self, osm_id: int):
         OSMElement.__init__(self, osm_id)
         self.members = []
@@ -203,7 +213,7 @@ class OSMContentHandlerOld(xml.sax.ContentHandler):
     elements. A better way is to have the input file processed by e.g. Osmosis first.
     """
     def __init__(self, valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys):
-        super(OSMContentHandlerOld, self).__init__()
+        super().__init__()
         self.valid_way_keys = valid_way_keys
         self.valid_relation_keys = valid_relation_keys
         self._handler = OSMContentHandler(valid_node_keys)
@@ -232,7 +242,7 @@ class OSMContentHandlerOld(xml.sax.ContentHandler):
         all_tags = current_way.tags
         current_way.tags = {}
         for key in list(all_tags.keys()):
-            if len(self.valid_way_keys) > 0:
+            if self.valid_way_keys:
                 if key in self.valid_way_keys:
                     current_way.add_tag(key, all_tags[key])
             else:
@@ -243,7 +253,7 @@ class OSMContentHandlerOld(xml.sax.ContentHandler):
         all_tags = current_relation.tags
         current_relation.tags = {}
         for key in list(all_tags.keys()):
-            if len(self.valid_way_keys) > 0:
+            if self.valid_way_keys:
                 if key in self.valid_way_keys:
                     current_relation.add_tag(key, all_tags[key])
             else:
@@ -355,10 +365,10 @@ def parse_hstore_tags(tags_string: str, osm_id: int) -> Dict[str, str]:
     """Parses the content of a string representation of a PostGIS hstore content for tags.
     Returns a dict of key value pairs as string."""
     tags_dict = dict()
-    if len(tags_string.strip()) > 0:  # else we return the empty dict as is
+    if tags_string.strip():  # else we return the empty dict as is
         elements = tags_string.strip().split('", "')
         for element in elements:
-            if len(element.strip()) > 0:
+            if element.strip():
                 sub_elements = element.strip().split("=>")
                 if len(sub_elements) == 2 and len(sub_elements[0].strip()) > 1 and len(sub_elements[1].strip()) > 1:
                     key = sub_elements[0].strip().strip('"')
@@ -623,8 +633,8 @@ def construct_tags_query(req_tag_keys: List[str], req_tag_key_values: List[str],
             tags_query += "'" + key + "'"
         tags_query += "]"
 
-    if len(req_tag_key_values) > 0:
-        if len(tags_query) > 0:
+    if req_tag_key_values:
+        if tags_query:
             tags_query += " AND "
         if len(req_tag_key_values) == 1:
             tags_query += table_alias + ".tags @> '" + req_tag_key_values[0] + "'"

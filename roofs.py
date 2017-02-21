@@ -30,7 +30,7 @@ def flat(ac_object: ac.Object, b, roof_mgr: RoofManager, stats: Stats) -> None:
         b.roof_requires.append("compat:roof-flat")
         b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_len, stats)
 
-    if len(b.polygon.interiors):
+    if b.polygon.interiors:
         outer_closest = copy.copy(b.outer_nodes_closest)
         i = b.nnodes_outer
         inner_ring = 0
@@ -212,7 +212,7 @@ def separate_skillion(ac_object: ac.Object, b):
         ac_object.node(-x[1], b.ground_elev + b.height - b.roof_height + b.roof_height_X[i], -x[0])
         i += 1
 
-    if len(b.polygon.interiors):
+    if b.polygon.interiors:
         print(" len(b.polygon.interiors)")
         outer_closest = copy.copy(b.outer_nodes_closest)
         print(("outer_closest = copy.copy(b.outer_nodes_closest)", outer_closest))

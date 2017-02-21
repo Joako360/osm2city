@@ -19,7 +19,7 @@ class Region(object):
 
 class Atlas(Region):
     def __init__(self, x, y, width, height, name):
-        super(Atlas, self).__init__(x, y, width, height)
+        super().__init__(x, y, width, height)
         self.regions = [Region(x, y, width, height)]
         self._textures = []  # Type atlas.Texture
         self.min_width = 1

@@ -102,7 +102,7 @@ def _read_apt_dat_gz_file(file_name: str, min_lon: float, min_lat: float,
         my_airport = None
         for line in f:
             parts = line.split()
-            if len(parts) == 0:
+            if not parts:
                 continue
             if parts[0] in ['1', '16', '17', '99']:
                 if (my_airport is not None) and (my_airport.within_boundary(min_lon, min_lat, max_lon, max_lat)):

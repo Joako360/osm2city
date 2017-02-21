@@ -78,7 +78,7 @@ def _process_osm_piers(nodes_dict, ways_dict, my_coord_transformator) -> List[Pi
 def _write_piers(stg_manager, replacement_prefix, clusters, coords_transform: coordinates.Transformation,
                  stats: utilities.Stats):
     for cl in clusters:
-        if len(cl.objects) > 0:
+        if cl.objects:
             center_tile = Vec2d(coords_transform.toGlobal(cl.center))
             ac_file_name = "%spiers%02i%02i.ac" % (replacement_prefix, cl.grid_index.ix, cl.grid_index.iy)
             ac = ac3d.File(stats=stats)
@@ -325,7 +325,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
 
     piers = _process_osm_piers(osm_nodes_dict, osm_ways_dict, coords_transform)
     logging.info("ways: %i", len(piers))
-    if len(piers) == 0:
+    if not piers:
         logging.info("No piers found -> aborting")
         return
 
