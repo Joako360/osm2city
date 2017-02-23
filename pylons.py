@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Script part of osm2city which takes OpenStreetMap data as input and generates data to be used in FlightGear
    * overground power lines
@@ -18,6 +17,7 @@ TODO:
 """
 
 import argparse
+from enum import IntEnum, unique
 import logging
 import math
 import time
@@ -34,8 +34,34 @@ OUR_MAGIC = "osm2pylon"  # Used in e.g. stg files to mark edits by osm2pylon
 SCENERY_TYPE = "Pylons"
 
 
+class CableVertex(object):
+    __slots__ = ('out', 'height', 'top_cable', 'no_catenary', 'x', 'y', 'elevation')
+
+    def __init__(self, out: float, height: float, top_cable: bool=False, no_catenary: bool=False) -> None:
+        self.out = out  # the distance from the middle vertical line of the pylon
+        self.height = height  # the distance above ground relative to the pylon's ground level (y-axis in ac-file)
+        self.top_cable = top_cable  # for the cables at the top, which are not executing the main task
+        self.no_catenary = no_catenary  # for cables which should not bend, e.g. lower cable of rail overhead line
+        self.x = 0.0  # local position x
+        self.y = 0.0  # local position y
+        self.elevation = 0.0  # elevation above sea level in meters
+
+    def calc_position(self, pylon_x: float, pylon_y: float, pylon_elevation: float, pylon_heading: float) -> None:
+        self.elevation = pylon_elevation + self.height
+        self.x = pylon_x + math.sin(math.radians(pylon_heading + 90))*self.out
+        self.y = pylon_y + math.cos(math.radians(pylon_heading + 90))*self.out
+
+    def set_position(self, x: float, y: float, elevation: float) -> None:
+        self.x = x
+        self.y = y
+        self.elevation = elevation
+
+
 class Cable(object):
-    def __init__(self, start_cable_vertex, end_cable_vertex, radius, number_extra_vertices, catenary_a, distance):
+    __slots__ = ('start_cable_vertex', 'end_cable_vertex', 'vertices', 'radius', 'heading')
+
+    def __init__(self, start_cable_vertex: CableVertex, end_cable_vertex: CableVertex, radius: float,
+                 number_extra_vertices: int, catenary_a: int, distance: float) -> None:
         """
         A Cable between two vertices. The radius is approximated with a triangle with sides of length 2*radius.
         If both the number of extra_vertices and the catenary_a are > 0, then the Cable gets a sag based on
@@ -51,7 +77,7 @@ class Cable(object):
         if (number_extra_vertices > 0) and (catenary_a > 0) and (distance >= parameters.C2P_CATENARY_MIN_DISTANCE):
             self._make_catenary_cable(number_extra_vertices, catenary_a)
 
-    def _make_catenary_cable(self, number_extra_vertices, catenary_a):
+    def _make_catenary_cable(self, number_extra_vertices: int, catenary_a: int) -> None:
         """
         Transforms the cable into one with more vertices and some sagging based on a catenary function.
         If there is a considerable difference in elevation between the two pylons, then gravity would have to
@@ -75,7 +101,7 @@ class Cable(object):
             v.set_position(x, y, elevation)
             self.vertices.insert(i, v)
 
-    def translate_vertices_relative(self, rel_x, rel_y, rel_elevation):
+    def translate_vertices_relative(self, rel_x: float, rel_y: float, rel_elevation: float) -> None:
         """
         Translates the CableVertices relatively to a reference position
         """
@@ -84,7 +110,7 @@ class Cable(object):
             cable_vertex.y -= rel_y
             cable_vertex.elevation -= rel_elevation
 
-    def _create_numvert_lines(self, cable_vertex):
+    def _create_numvert_lines(self, cable_vertex: CableVertex) -> str:
         """
         In the map-data x-axis is towards East and y-axis is towards North and z-axis is elevation.
         In ac-files the y-axis is pointing upwards and the z-axis points to South -
@@ -101,7 +127,7 @@ class Cable(object):
         numvert_lines += " " + str(-1*cable_vertex.y)
         return numvert_lines
 
-    def make_ac_entry(self, material):
+    def make_ac_entry(self, material: int) -> str:
         """
         Returns an ac entry for this cable.
         """
@@ -137,27 +163,6 @@ class Cable(object):
             lines.append("5 0 0")
             lines.append("kids 0")
         return "\n".join(lines)
-
-
-class CableVertex(object):
-    def __init__(self, out, height, top_cable=False, no_catenary=False):
-        self.out = out  # the distance from the middle vertical line of the pylon
-        self.height = height  # the distance above ground relative to the pylon's ground level (y-axis in ac-file)
-        self.top_cable = top_cable  # for the cables at the top, which are not executing the main task
-        self.no_catenary = no_catenary  # for cables which should not bend, e.g. lower cable of rail overhead line
-        self.x = 0.0  # local position x
-        self.y = 0.0  # local position y
-        self.elevation = 0.0  # elevation above sea level in meters
-
-    def calc_position(self, pylon_x, pylon_y, pylon_elevation, pylon_heading):
-        self.elevation = pylon_elevation + self.height
-        self.x = pylon_x + math.sin(math.radians(pylon_heading + 90))*self.out
-        self.y = pylon_y + math.cos(math.radians(pylon_heading + 90))*self.out
-
-    def set_position(self, x, y, elevation):
-        self.x = x
-        self.y = y
-        self.elevation = elevation
 
 
 def create_generic_pylon_25_vertices():
@@ -216,7 +221,7 @@ def create_drag_lift_in_osm_building():
 
 
 def create_rail_power_vertices(direction_type):
-    if direction_type == SharedPylon.DIRECTION_TYPE_MIRROR:
+    if direction_type is PylonDirectionType.mirror:
         vertices = [CableVertex(-1.95, 5.85),
                     CableVertex(-1.95, 4.95, no_catenary=True)]
     else:
@@ -254,6 +259,7 @@ def get_cable_vertices(pylon_model, direction_type):
 
 class WaySegment(object):
     """Represents the part between the pylons and is a container for the cables"""
+    __slots__ = ('start_pylon', 'end_pylon', 'cables', 'length', 'heading')
 
     def __init__(self, start_pylon, end_pylon):
         self.start_pylon = start_pylon
@@ -264,14 +270,32 @@ class WaySegment(object):
                                                             end_pylon.x, end_pylon.y)
 
 
-class SharedPylon(object):
-    DIRECTION_TYPE_NORMAL = 0  # in ac-file mast is on left side, stuff on right side along x-axis
-    DIRECTION_TYPE_MIRROR = 1
-    DIRECTION_TYPE_START = 2
-    DIRECTION_TYPE_END = 3
+@unique
+class PylonDirectionType(IntEnum):
+    normal = 0  # in ac-file mast is on left side, stuff on right side along x-axis
+    mirror = 1
+    start = 2
+    end = 3
 
+
+@unique
+class PylonType(IntEnum):
+    unspecified = 0
+    power_tower = 11  # OSM-key = "power", value = "tower"
+    power_pole = 12  # OSM-key = "power", value = "pole"
+    aerialway_pylon = 21  # OSM-key = "aerialway", value = "pylon"
+    aerialway_station = 22  # OSM-key = "aerialway", value = "station"
+
+    railway_virtual = 30  # only used at endpoints of RailLine for calcs - not used for visual masts
+    railway_single = 31
+    railway_double = 32
+    railway_stop = 33
+
+
+class SharedPylon(object):
     def __init__(self):
-        self.type_ = 0  # cf. class constants TYPE_*
+        self.osm_id = 0
+        self.type_ = PylonType.unspecified
         self.lon = 0.0  # longitude coordinate in decimal as a float
         self.lat = 0.0  # latitude coordinate in decimal as a float
         self.x = 0.0  # local position x
@@ -280,7 +304,7 @@ class SharedPylon(object):
         self.heading = 0.0  # heading of pylon in degrees
         self.pylon_model = None  # the path to the ac/xml model
         self.needs_stg_entry = True
-        self.direction_type = SharedPylon.DIRECTION_TYPE_NORMAL  # correction for which direction mast looks at
+        self.direction_type = PylonDirectionType.normal  # correction for which direction mast looks at
 
     def calc_global_coordinates(self, fg_elev: utilities.FGElev, my_coord_transformator) -> None:
         self.lon, self.lat = my_coord_transformator.toGlobal((self.x, self.y))
@@ -295,11 +319,11 @@ class SharedPylon(object):
             return " "  # no need to write a shared object
 
         direction_correction = 0
-        if self.direction_type == SharedPylon.DIRECTION_TYPE_MIRROR:
+        if self.direction_type is PylonDirectionType.mirror:
             direction_correction = 180
-        elif self.direction_type == SharedPylon.DIRECTION_TYPE_END:
+        elif self.direction_type is PylonDirectionType.end:
             direction_correction = 0
-        elif self.direction_type == SharedPylon.DIRECTION_TYPE_START:
+        elif self.direction_type is PylonDirectionType.start:
             direction_correction = 180
 
         # 90 less because arms are in x-direction in ac-file
@@ -484,7 +508,7 @@ class WindFarm(object):
 
 
 def process_osm_wind_turbines(osm_nodes_dict: Dict[int, osmparser.Node], coords_transform: coordinates.Transformation,
-                              fg_elev: utilities.FGElev) -> Dict[int, WindTurbine]:
+                              fg_elev: utilities.FGElev) -> List[WindTurbine]:
     my_wind_turbines = list()
     wind_farms = list()
 
@@ -542,17 +566,12 @@ def process_osm_wind_turbines(osm_nodes_dict: Dict[int, osmparser.Node], coords_
     for turbine in my_wind_turbines:
         if turbine.wind_farm is None:
             turbine.pylon_model = WindTurbine.determine_shared_model(turbine.height, turbine.generator_output,
-                                                                      turbine.offshore, turbine.illuminated)
+                                                                     turbine.offshore, turbine.illuminated)
 
     return my_wind_turbines
 
 
 class Pylon(SharedPylon):
-    TYPE_POWER_TOWER = 11  # OSM-key = "power", value = "tower"
-    TYPE_POWER_POLE = 12  # OSM-key = "power", value = "pole"
-    TYPE_AERIALWAY_PYLON = 21  # OSM-key = "aerialway", value = "pylon"
-    TYPE_AERIALWAY_STATION = 22  # OSM-key = "aerialway", value = "station"
-
     def __init__(self, osm_id):
         super().__init__()
         self.osm_id = osm_id
@@ -565,7 +584,7 @@ class Pylon(SharedPylon):
         self.in_osm_building = False  # a pylon can be in a OSM Way/building, in which case it should not be drawn
 
     def calc_pylon_model(self, pylon_model):
-        if self.type_ == Pylon.TYPE_AERIALWAY_STATION:
+        if self.type_ is PylonType.aerialway_station:
             if self.in_osm_building:
                 self.needs_stg_entry = False
                 self.pylon_model = pylon_model + "_in_osm_building"
@@ -651,7 +670,7 @@ class StreetlampWay(LineWithoutCables):
                 shared_pylon.x = point_on_line.x
                 shared_pylon.y = point_on_line.y
                 shared_pylon.pylon_model = model
-                shared_pylon.direction_type = SharedPylon.DIRECTION_TYPE_MIRROR
+                shared_pylon.direction_type = PylonDirectionType.mirror
                 shared_pylon.calc_global_coordinates(fg_elev, my_coord_transformator)
                 self.shared_pylons.append(shared_pylon)
                 current_distance += default_distance
@@ -787,24 +806,29 @@ class Line(LineWithoutCables):
                 start_pylon = None
 
 
+@unique
+class WayLineType(IntEnum):
+    unspecified = 0
+    power_line = 11  # OSM-key = "power", value = "line"
+    power_minor = 12  # OSM-key = "power", value = "minor_line"
+    aerialway_cable_car = 21  # OSM-key = "aerialway", value = "cable_car"
+    aerialway_chair_lift = 22  # OSM-key = "aerialway", value = "chair_lift" or "mixed_lift"
+    aerialway_drag_lift = 23  # OSM-key = "aerialway", value = "drag_lift" or "t-bar" or "j-bar" or "platter"
+    aerialway_gondola = 24  # OSM-key = "aerialway", value = "gondola"
+    aerialway_goods = 25  # OSM-key = "aerialway", value = "goods"
+
+
 class WayLine(Line):  # The name "Line" is also used in e.g. SymPy
-    TYPE_POWER_LINE = 11  # OSM-key = "power", value = "line"
-    TYPE_POWER_MINOR_LINE = 12  # OSM-key = "power", value = "minor_line"
-    TYPE_AERIALWAY_CABLE_CAR = 21  # OSM-key = "aerialway", value = "cable_car"
-    TYPE_AERIALWAY_CHAIR_LIFT = 22  # OSM-key = "aerialway", value = "chair_lift" or "mixed_lift"
-    TYPE_AERIALWAY_DRAG_LIFT = 23  # OSM-key = "aerialway", value = "drag_lift" or "t-bar" or "j-bar" or "platter"
-    TYPE_AERIALWAY_GONDOLA = 24  # OSM-key = "aerialway", value = "gondola"
-    TYPE_AERIALWAY_GOODS = 25  # OSM-key = "aerialway", value = "goods"
 
     def __init__(self, osm_id):
         super().__init__(osm_id)
-        self.type_ = 0  # cf. class constants TYPE_*
+        self.type_ = WayLineType.unspecified  # cf. class constants TYPE_*
         self.voltage = 0  # from osm-tag "voltage"
         self.cables = 0  # from osm-tag "cables"
         self.wires = None  # from osm-tag "wires"
 
     def is_aerialway(self):
-        return (self.type_ != self.TYPE_POWER_LINE) and (self.type_ != self.TYPE_POWER_MINOR_LINE)
+        return self.type_ not in (WayLineType.power_line, WayLineType.power_minor)
 
     def calc_and_map(self):
         """Calculates various aspects of the line and its nodes and attempt to correct if needed. """
@@ -822,27 +846,27 @@ class WayLine(Line):  # The name "Line" is also used in e.g. SymPy
         radius = parameters.C2P_RADIUS_POWER_LINE
         number_extra_vertices = parameters.C2P_EXTRA_VERTICES_POWER_LINE
         catenary_a = parameters.C2P_CATENARY_A_POWER_LINE
-        if self.type_ == self.TYPE_POWER_MINOR_LINE:
+        if self.type_ is WayLineType.power_minor:
             radius = parameters.C2P_RADIUS_POWER_MINOR_LINE
             number_extra_vertices = parameters.C2P_EXTRA_VERTICES_POWER_MINOR_LINE
             catenary_a = parameters.C2P_CATENARY_A_POWER_MINOR_LINE
-        elif self.type_ == self.TYPE_AERIALWAY_CABLE_CAR:
+        elif self.type_ is WayLineType.aerialway_cable_car:
             radius = parameters.C2P_RADIUS_AERIALWAY_CABLE_CAR
             number_extra_vertices = parameters.C2P_EXTRA_VERTICES_AERIALWAY_CABLE_CAR
             catenary_a = parameters.C2P_CATENARY_A_AERIALWAY_CABLE_CAR
-        elif self.type_ == self.TYPE_AERIALWAY_CHAIR_LIFT:
+        elif self.type_ is WayLineType.aerialway_chair_lift:
             radius = parameters.C2P_RADIUS_AERIALWAY_CHAIR_LIFT
             number_extra_vertices = parameters.C2P_EXTRA_VERTICES_AERIALWAY_CHAIR_LIFT
             catenary_a = parameters.C2P_CATENARY_A_AERIALWAY_CHAIR_LIFT
-        elif self.type_ == self.TYPE_AERIALWAY_DRAG_LIFT:
+        elif self.type_ is WayLineType.aerialway_drag_lift:
             radius = parameters.C2P_RADIUS_AERIALWAY_DRAG_LIFT
             number_extra_vertices = parameters.C2P_EXTRA_VERTICES_AERIALWAY_DRAG_LIFT
             catenary_a = parameters.C2P_CATENARY_A_AERIALWAY_DRAG_LIFT
-        elif self.type_ == self.TYPE_AERIALWAY_GONDOLA:
+        elif self.type_ is WayLineType.aerialway_gondola:
             radius = parameters.C2P_RADIUS_AERIALWAY_GONDOLA
             number_extra_vertices = parameters.C2P_EXTRA_VERTICES_AERIALWAY_GONDOLA
             catenary_a = parameters.C2P_CATENARY_A_AERIALWAY_GONDOLA
-        elif self.type_ == self.TYPE_AERIALWAY_GOODS:
+        elif self.type_ is WayLineType.aerialway_goods:
             radius = parameters.C2P_RADIUS_AERIALWAY_GOODS
             number_extra_vertices = parameters.C2P_EXTRA_VERTICES_AERIALWAY_GOODS
             catenary_a = parameters.C2P_CATENARY_A_AERIALWAY_GOODS
@@ -867,9 +891,9 @@ class WayLine(Line):  # The name "Line" is also used in e.g. SymPy
         nbr_poles = 0
         nbr_towers = 0
         for my_pylon in self.shared_pylons:
-            if my_pylon.type_ == Pylon.TYPE_POWER_TOWER:
+            if my_pylon.type_ is PylonType.power_tower:
                 nbr_towers += 1
-            elif my_pylon.type_ == Pylon.TYPE_POWER_POLE:
+            elif my_pylon.type_ is PylonType.power_pole:
                 nbr_poles += 1
             if my_pylon.height > 0:
                 average_height += my_pylon.height
@@ -880,13 +904,13 @@ class WayLine(Line):  # The name "Line" is also used in e.g. SymPy
             average_height /= found
 
         # use statistics to determine type_ and pylon_model
-        if (self.type_ == self.TYPE_POWER_MINOR_LINE and nbr_towers <= nbr_poles
+        if (self.type_ is WayLineType.power_minor and nbr_towers <= nbr_poles
                 and max_height <= 25.0 and max_length <= 250.0) \
-                or (self.type_ == self.TYPE_POWER_LINE and max_length <= 150):
-            self.type_ = self.TYPE_POWER_MINOR_LINE
+                or (self.type_ is WayLineType.power_line and max_length <= 150):
+            self.type_ = WayLineType.power_minor
             pylon_model = "Models/Power/wooden_pole_14m.ac"
         else:
-            self.type_ = self.TYPE_POWER_LINE
+            self.type_ = WayLineType.power_line
             if average_height < 35.0 and max_length < 300.0:
                 pylon_model = "Models/Power/generic_pylon_25m.xml"
             elif average_height < 75.0 and max_length < 500.0:
@@ -912,21 +936,16 @@ class RailNode(object):
 
 
 class RailMast(SharedPylon):
-    TYPE_VIRTUAL_MAST = 10  # only used at endpoints of RailLine for calcs - not used for visual masts
-    TYPE_SINGLE_MAST = 11
-    TYPE_DOUBLE_MAST = 12
-    TYPE_STOP_MAST = 20
-
-    def __init__(self, type_, point_on_line, mast_point, direction_type):
+    def __init__(self, type_: PylonType, point_on_line, mast_point, direction_type: PylonDirectionType):
         super().__init__()
         self.type_ = type_
         self.point_on_line = point_on_line
         self.x = mast_point.x
         self.y = mast_point.y
         self.pylon_model = "Models/StreetFurniture/RailPower.ac"
-        if self.type_ == RailMast.TYPE_VIRTUAL_MAST:
+        if self.type_ is PylonType.railway_virtual:
             self.needs_stg_entry = False
-        elif self.type_ == RailMast.TYPE_STOP_MAST:
+        elif self.type_ is PylonType.railway_stop:
             self.pylon_model = "Models/StreetFurniture/rail_stop_tension.ac"
         self.direction_type = direction_type
 
@@ -960,11 +979,11 @@ class RailLine(Line):
         point_on_line = self.linear.interpolate(0)
         mast_point = my_right_parallel.interpolate(my_right_parallel_length)
         if self.nodes[0].buffer_stop:
-            self.shared_pylons.append(RailMast(RailMast.TYPE_STOP_MAST, point_on_line, point_on_line,
-                                               SharedPylon.DIRECTION_TYPE_START))
+            self.shared_pylons.append(RailMast(PylonType.railway_stop, point_on_line, point_on_line,
+                                               PylonDirectionType.start))
         else:
-            self.shared_pylons.append(RailMast(RailMast.TYPE_VIRTUAL_MAST, point_on_line, mast_point,
-                                               SharedPylon.DIRECTION_TYPE_MIRROR))
+            self.shared_pylons.append(RailMast(PylonType.railway_virtual, point_on_line, mast_point,
+                                               PylonDirectionType.mirror))
         prev_point = point_on_line
 
         # get the first mast point
@@ -973,20 +992,23 @@ class RailLine(Line):
             point_on_line = self.linear.interpolate(current_distance)
             mast_point = my_right_parallel.interpolate(my_right_parallel_length - current_distance * (my_right_parallel_length / my_length))
             is_right = self.check_mast_left_right(mast_point, rail_lines_list)
-            if not is_right:
+            if is_right:
+                direction_type = PylonDirectionType.mirror
+            else:
+                direction_type = PylonDirectionType.normal
                 mast_point = my_left_parallel.interpolate(current_distance * (my_left_parallel_length / my_length))
-            self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point, is_right))
+            self.shared_pylons.append(RailMast(PylonType.railway_single, point_on_line, mast_point, direction_type))
         else:
             current_distance += RailLine.OFFSET
             point_on_line = self.linear.interpolate(current_distance)
             mast_point = my_right_parallel.interpolate(my_right_parallel_length - current_distance * (my_right_parallel_length / my_length))
             is_right = self.check_mast_left_right(mast_point, rail_lines_list)
             if is_right:
-                direction_type = SharedPylon.DIRECTION_TYPE_MIRROR
+                direction_type = PylonDirectionType.mirror
             else:
-                direction_type = SharedPylon.DIRECTION_TYPE_NORMAL
+                direction_type = PylonDirectionType.normal
                 mast_point = my_left_parallel.interpolate(current_distance * (my_left_parallel_length / my_length))
-            self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point, direction_type))
+            self.shared_pylons.append(RailMast(PylonType.railway_single, point_on_line, mast_point, direction_type))
             prev_angle = coordinates.calc_angle_of_line_local(prev_point.x, prev_point.y, point_on_line.x, point_on_line.y)
             prev_point = point_on_line
             # find new masts along the line with a simple approximation for less distance between masts
@@ -1019,11 +1041,11 @@ class RailLine(Line):
                 mast_point = my_right_parallel.interpolate(my_right_parallel_length - current_distance * (my_right_parallel_length / my_length))
                 is_right = self.check_mast_left_right(mast_point, rail_lines_list)
                 if is_right:
-                    direction_type = SharedPylon.DIRECTION_TYPE_MIRROR
+                    direction_type = PylonDirectionType.mirror
                 else:
-                    direction_type = SharedPylon.DIRECTION_TYPE_NORMAL
+                    direction_type = PylonDirectionType.normal
                     mast_point = my_left_parallel.interpolate(current_distance * (my_left_parallel_length / my_length))
-                self.shared_pylons.append(RailMast(RailMast.TYPE_SINGLE_MAST, point_on_line, mast_point, direction_type))
+                self.shared_pylons.append(RailMast(PylonType.railway_single, point_on_line, mast_point, direction_type))
                 prev_angle = coordinates.calc_angle_of_line_local(prev_point.x, prev_point.y,
                                                                   point_on_line.x, point_on_line.y)
                 prev_point = point_on_line
@@ -1032,11 +1054,11 @@ class RailLine(Line):
         point_on_line = self.linear.interpolate(my_length)
         mast_point = my_right_parallel.interpolate(0)
         if self.nodes[-1].buffer_stop:
-            self.shared_pylons.append(RailMast(RailMast.TYPE_STOP_MAST, point_on_line, point_on_line,
-                                               SharedPylon.DIRECTION_TYPE_END))
+            self.shared_pylons.append(RailMast(PylonType.railway_stop, point_on_line, point_on_line,
+                                               PylonDirectionType.end))
         else:
-            self.shared_pylons.append(RailMast(RailMast.TYPE_VIRTUAL_MAST, point_on_line, mast_point,
-                                               SharedPylon.DIRECTION_TYPE_MIRROR))
+            self.shared_pylons.append(RailMast(PylonType.railway_virtual, point_on_line, mast_point,
+                                               PylonDirectionType.mirror))
 
         # calculate heading
         calc_heading_nodes(self.shared_pylons)
@@ -1205,7 +1227,7 @@ def process_highways_for_streetlamps(my_highways, landuse_buffers) -> List[Stree
         elif my_streetlamp.highway.linear.length < parameters.C2P_STREETLAMPS_MIN_STREET_LENGTH:
             del my_streetlamps[key]
 
-    return my_streetlamps.values()
+    return list(my_streetlamps.values())
 
 
 def merge_streetlamp_buffers(landuse_refs):
@@ -1248,20 +1270,20 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGElev
             value = way.tags[key]
             if "power" == key:
                 if "line" == value:
-                    my_line.type_ = WayLine.TYPE_POWER_LINE
+                    my_line.type_ = WayLineType.power_line
                 elif "minor_line" == value:
-                    my_line.type_ = WayLine.TYPE_POWER_MINOR_LINE
+                    my_line.type_ = WayLineType.power_minor
             elif "aerialway" == key:
                 if "cable_car" == value:
-                    my_line.type_ = WayLine.TYPE_AERIALWAY_CABLE_CAR
+                    my_line.type_ = WayLineType.aerialway_cable_car
                 elif value in ["chair_lift", "mixed_lift"]:
-                    my_line.type_ = WayLine.TYPE_AERIALWAY_CHAIR_LIFT
+                    my_line.type_ = WayLineType.aerialway_chair_lift
                 elif value in ["drag_lift", "t-bar", "j-bar", "platter"]:
-                    my_line.type_ = WayLine.TYPE_AERIALWAY_DRAG_LIFT
+                    my_line.type_ = WayLineType.aerialway_drag_lift
                 elif "gondola" == value:
-                    my_line.type_ = WayLine.TYPE_AERIALWAY_GONDOLA
+                    my_line.type_ = WayLineType.aerialway_gondola
                 elif "goods" == value:
-                    my_line.type_ = WayLine.TYPE_AERIALWAY_GOODS
+                    my_line.type_ = WayLineType.aerialway_goods
             #  special values
             elif "cables" == key:
                 my_line.cables = int(value)
@@ -1312,14 +1334,14 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGElev
                     value = my_node.tags[key]
                     if "power" == key:
                         if "tower" == value:
-                            my_pylon.type_ = Pylon.TYPE_POWER_TOWER
+                            my_pylon.type_ = PylonType.power_tower
                         elif "pole" == value:
-                            my_pylon.type_ = Pylon.TYPE_POWER_POLE
+                            my_pylon.type_ = PylonType.power_pole
                     elif "aerialway" == key:
                         if "pylon" == value:
-                            my_pylon.type_ = Pylon.TYPE_AERIALWAY_PYLON
+                            my_pylon.type_ = PylonType.aerialway_pylon
                         elif "station" == value:
-                            my_pylon.type_ = Pylon.TYPE_AERIALWAY_STATION
+                            my_pylon.type_ = PylonType.aerialway_station
                             my_point = shg.Point(my_pylon.x, my_pylon.y)
                             for building_ref in building_refs:
                                 if building_ref.contains(my_point):
@@ -1370,7 +1392,7 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGElev
         elif len(shared_node) > 2:
             logging.debug("WARNING: A node is referenced in more than two ways. Most likely OSM problem. Node osm_id: %s", key)
 
-    return my_powerlines.values(), my_aerialways.values()
+    return list(my_powerlines.values()), list(my_aerialways.values())
 
 
 def find_connecting_line(key, lines, max_allowed_angle=360):
@@ -1916,7 +1938,7 @@ class TestOSMPylons(unittest.TestCase):
         pylon2.x = 100
         pylon2.y = 100
         wayline1 = WayLine(100)
-        wayline1.type_ = WayLine.TYPE_POWER_LINE
+        wayline1.type_ = WayLineType.power_line
         wayline1.shared_pylons.append(pylon1)
         wayline1.shared_pylons.append(pylon2)
         wayline1.calc_and_map()
