@@ -76,8 +76,6 @@ FG_ELEV = '"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'
 FG_ELEV_CACHE = True  # saves the elevation probing results to a file, so next rerun is faster (but uses disk space!)
 PROBE_FOR_WATER = False  # only possible with FGElev version after 9th of November 2016 / FG 2016.4.1
 
-USE_NEW_STG_VERBS = False
-
 USE_EXTERNAL_MODELS = False
 
 WRITE_CLUSTER_STATS = False

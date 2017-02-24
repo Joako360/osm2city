@@ -30,11 +30,11 @@ If you are using ``buildings.py`` to generate buildings or ``roads.py`` to gener
 
 ::
 
-    /usr/bin/python3 /home/pingu/development/osm2city/copy_data_stuff.py -f LSZS/params.ini
+    /usr/bin/python3 /home/pingu/development/osm2city/copy_data_stuff.py -f LSZS/params.ini -t Buildings
 
 If ``copy_data_stuff.py`` is called with the optional ``-a`` argument, then also the effects and shaders in directory ``fgdata`` in  ``osm2city-data`` are copied to ``$FG_ROOT``. This is necessary if you set parameter ``TRAFFIC_SHADER_ENABLE`` to ``True`` (see chapter :ref:`Light Effects <chapter-parameters-light>`).
 
-There is an optional ``-t`` argument, which can be used to write the data to another Terrasync folder instead of the default "Objects". This is only useful if you at the same time set parameter ``USE_NEW_STG_VERBS`` to True.
+The mandatory ``-t`` argument is used to write the data to a specific Terrasync folder.
 
 There is also a third possibility of copying the ``tex`` directory into ``$FG_ROOT``. However you would not be able to distribute the generated scenery objects and it might interfere with other scenery objects using a potentially different texture map.
 

@@ -63,7 +63,7 @@ def process(copy_fg_data: bool, scenery_type: str) -> None:
                 copy_tree(source_dir, fg_root_dir)
 
     else:
-        logging.info("ERROR: The scenery path must include a directory 'Objects' like %s - maybe no objects written",
+        logging.info("ERROR: The scenery path must include a directory '%s' - maybe no objects written",
                      scenery_path)
 
 if __name__ == "__main__":
@@ -74,16 +74,12 @@ if __name__ == "__main__":
     parser.add_argument("-f", "--file", dest="filename",
                         help="Mandatory: read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
     parser.add_argument("-t", "--type", dest="scenery_type",
-                        help="Mandatory: Scenery type - typically 'Objects', 'Buildings', 'Roads', 'Pylons'",
-                        metavar="STRING", required=False)
+                        help="Mandatory: Scenery type - typically 'Buildings', 'Roads', 'Pylons'",
+                        metavar="STRING", required=True)
     parser.add_argument("-a", action="store_true",
                         help="also copy effects etc. in fgdata to $FG_ROOT", required=False)
     args = parser.parse_args()
 
     parameters.read_from_file(args.filename)
-    if args.scenery_type:
-        my_scenery_type = args.scenery_type
-    else:
-        my_scenery_type = "Objects"
 
-    process(args.a, my_scenery_type)
+    process(args.a, args.scenery_type)

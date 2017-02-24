@@ -21,7 +21,7 @@ from enum import IntEnum, unique
 import logging
 import math
 import time
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 import unittest
 import xml.sax
 
@@ -680,13 +680,13 @@ class StreetlampWay(LineWithoutCables):
 
 
 class Line(LineWithoutCables):
-    def __init__(self, osm_id):
+    def __init__(self, osm_id: int) -> None:
         super().__init__(osm_id)
         self.way_segments = []
         self.length = 0.0  # the total length of all segments
         self.original_osm_way = None
 
-    def _calc_segments(self):
+    def _calc_segments(self) -> float:
         """Creates the segments of this WayLine and calculates the total length.
         Returns the maximum length of segments"""
         max_length = 0.0
@@ -701,7 +701,7 @@ class Line(LineWithoutCables):
         self.length = total_length
         return max_length
 
-    def _calc_cables(self, radius, number_extra_vertices, catenary_a):
+    def _calc_cables(self, radius: float, number_extra_vertices: int, catenary_a: int) -> None:
         """
         Creates the cables per WaySegment. First find the start and end points depending on pylon model.
         Then calculate the local positions of all start and end points.
@@ -820,17 +820,17 @@ class WayLineType(IntEnum):
 
 class WayLine(Line):  # The name "Line" is also used in e.g. SymPy
 
-    def __init__(self, osm_id):
+    def __init__(self, osm_id: int) -> None:
         super().__init__(osm_id)
         self.type_ = WayLineType.unspecified  # cf. class constants TYPE_*
         self.voltage = 0  # from osm-tag "voltage"
         self.cables = 0  # from osm-tag "cables"
         self.wires = None  # from osm-tag "wires"
 
-    def is_aerialway(self):
+    def is_aerialway(self) -> bool:
         return self.type_ not in (WayLineType.power_line, WayLineType.power_minor)
 
-    def calc_and_map(self):
+    def calc_and_map(self) -> None:
         """Calculates various aspects of the line and its nodes and attempt to correct if needed. """
         max_length = self._calc_segments()
         if self.is_aerialway():
@@ -872,11 +872,11 @@ class WayLine(Line):  # The name "Line" is also used in e.g. SymPy
             catenary_a = parameters.C2P_CATENARY_A_AERIALWAY_GOODS
         self._calc_cables(radius, number_extra_vertices, catenary_a)
 
-    def _calc_and_map_aerialway(self):
+    def _calc_and_map_aerialway(self) -> str:
         pylon_model = "Models/Transport/drag_lift_pylon.xml"  # FIXME: make real implementation
         return pylon_model
 
-    def _calc_and_map_powerline(self, max_length):
+    def _calc_and_map_powerline(self, max_length: float) -> str:
         """
         Danish rules of thumb:
         400KV: height 30-42 meter, distance 200-420 meter, sagging 4.5-13 meter, a_value 1110-1698
@@ -1493,16 +1493,16 @@ def merge_lines(osm_id, line0, line1, shared_nodes):
                 shared_node.append(line0)
 
 
-def _write_stg_entries(my_stg_mgr, lines_list, wayname: str, cluster_max_length):
+def _write_stg_entries(my_stg_mgr, lines_list: List[Line], way_name: Optional[str], cluster_max_length: int) -> None:
     line_index = 0
     for line in lines_list:
         line_index += 1
         line.make_shared_pylons_stg_entries(my_stg_mgr)
-        if None is not wayname:
-            line.make_cables_ac_xml_stg_entries(my_stg_mgr, line_index, wayname, cluster_max_length)
+        if None is not way_name:
+            line.make_cables_ac_xml_stg_entries(my_stg_mgr, line_index, way_name, cluster_max_length)
 
 
-def calc_heading_nodes(nodes_array):
+def calc_heading_nodes(nodes_array: List[SharedPylon]) -> None:
     """Calculates the headings of nodes in a line based on medium angle. nodes must have a heading, x and y attribute"""
     current_pylon = nodes_array[0]
     next_pylon = nodes_array[1]

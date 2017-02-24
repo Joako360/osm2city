@@ -353,35 +353,6 @@ def _write_xml(path: str, file_name: str, the_buildings: List[building_lib.Build
                   </offsets>
                 </model>""" % (-yo, xo, zo)))  # -- I just don't get those coordinate systems.
 
-        if b.LOD is not None:
-            if b.LOD is utils.stg_io2.LOD.rough:
-                has_lod_rough = True
-            elif b.LOD is utils.stg_io2.LOD.detail:
-                has_lod_detail = True
-            else:
-                logging.warning("Building %s with unknown LOD level %i", b.osm_id, b.LOD)
-
-    if parameters.USE_NEW_STG_VERBS is False:
-        # -- LOD animation
-        #    instead use rough, detail, roof
-        if has_lod_rough:
-            xml.write(textwrap.dedent("""
-            <animation>
-              <type>range</type>
-              <min-m>0</min-m>
-              <max-property>/sim/rendering/static-lod/rough</max-property>
-              <object-name>LOD_rough</object-name>
-            </animation>
-            """))
-        if has_lod_detail:
-            xml.write(textwrap.dedent("""
-            <animation>
-              <type>range</type>
-              <min-m>0</min-m>
-              <max-property>/sim/rendering/static-lod/detailed</max-property>
-              <object-name>LOD_detail</object-name>
-            </animation>
-            """))
     xml.write(textwrap.dedent("""
 
     </PropertyList>
@@ -428,16 +399,12 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     lmax = v.Vec2d(coords_transform.toLocal(cmax))
 
     handled_clusters = list()  # cluster.ClusterContainer objects
-    # cluster_non_lod is used when not using new STG verbs and for mesh_detailed when using new STG verbs
-    clusters_default = cluster.ClusterContainer(lmin, lmax)
-    handled_clusters.append(clusters_default)
-    clusters_building_mesh_rough = None
-
-    if parameters.USE_NEW_STG_VERBS:
-        clusters_default.stg_verb_type = stg_io2.STGVerbType.object_building_mesh_detailed
-        clusters_building_mesh_rough = cluster.ClusterContainer(lmin, lmax,
-                                                                stg_io2.STGVerbType.object_building_mesh_rough)
-        handled_clusters.append(clusters_building_mesh_rough)
+    clusters_building_mesh_detailed = cluster.ClusterContainer(lmin, lmax)
+    clusters_building_mesh_detailed.stg_verb_type = stg_io2.STGVerbType.object_building_mesh_detailed
+    handled_clusters.append(clusters_building_mesh_detailed)
+    clusters_building_mesh_rough = cluster.ClusterContainer(lmin, lmax,
+                                                            stg_io2.STGVerbType.object_building_mesh_rough)
+    handled_clusters.append(clusters_building_mesh_rough)
 
     # check for buildings on airport runways etc.
     if blocked_areas:
@@ -450,7 +417,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
         #    Then read objects from .stg.
         stgs = []
         static_objects = []
-        for cl in clusters_default:
+        for cl in clusters_building_mesh_detailed:
             center_global = coords_transform.toGlobal(cl.center)
             path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, "Objects", center_global)
             stg_file_name = calc_tile.construct_stg_file_name(center_global)
@@ -490,13 +457,10 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
 
     # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
     for b in the_buildings:
-        if parameters.USE_NEW_STG_VERBS:
-            if b.LOD is utils.stg_io2.LOD.detail:
-                clusters_default.append(b.anchor, b, stats)
-            elif b.LOD is utils.stg_io2.LOD.rough:
-                clusters_building_mesh_rough.append(b.anchor, b, stats)
-        else:
-            clusters_default.append(b.anchor, b, stats)
+        if b.LOD is utils.stg_io2.LOD.detail:
+            clusters_building_mesh_detailed.append(b.anchor, b, stats)
+        elif b.LOD is utils.stg_io2.LOD.rough:
+            clusters_building_mesh_rough.append(b.anchor, b, stats)
 
     # -- write clusters
     handled_index = 0

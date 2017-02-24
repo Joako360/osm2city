@@ -159,10 +159,7 @@ class STGManager(object):
         self.path_to_scenery = path_to_scenery
         self.magic = magic
         self.prefix = prefix
-        if parameters.USE_NEW_STG_VERBS:
-            self.scenery_type = scenery_type
-        else:
-            self.scenery_type = "Objects"
+        self.scenery_type = scenery_type
 
     def __call__(self, lon_lat: Vec2d) -> STGFile:
         """return STG object. If overwrite is given, it overrides default"""

@@ -151,11 +151,8 @@ if __name__ == '__main__':
     pool.close()
     pool.join()
 
-    if parameters.USE_NEW_STG_VERBS:
-        copy_data_stuff.process(False, "Buildings")
-        copy_data_stuff.process(False, "Roads")
-        copy_data_stuff.process(False, "Pylons")
-    else:
-        copy_data_stuff.process(False, "Objects")
+    copy_data_stuff.process(False, "Buildings")
+    copy_data_stuff.process(False, "Roads")
+    copy_data_stuff.process(False, "Pylons")
 
     logging.info("Total time used {}".format(time.time() - start_time))
