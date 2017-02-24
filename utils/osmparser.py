@@ -45,7 +45,7 @@ class OSMElement(object):
 
 
 class Node(OSMElement):
-    __slots__ = ('lat', 'lon')
+    __slots__ = ('lat', 'lon', 'MSL', 'h_add')  # the last two are written from roads.py
 
     def __init__(self, osm_id: int, lat: float, lon: float) -> None:
         OSMElement.__init__(self, osm_id)
