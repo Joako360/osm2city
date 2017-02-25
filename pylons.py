@@ -21,10 +21,11 @@ from enum import IntEnum, unique
 import logging
 import math
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 import unittest
 import xml.sax
 
+import cluster
 import parameters
 import roads
 import shapely.geometry as shg
@@ -165,7 +166,7 @@ class Cable(object):
         return "\n".join(lines)
 
 
-def create_generic_pylon_25_vertices():
+def _create_generic_pylon_25_vertices():
     vertices = [CableVertex(5.0, 12.6),
                 CableVertex(-5.0, 12.6),
                 CableVertex(5.0, 16.8),
@@ -176,7 +177,7 @@ def create_generic_pylon_25_vertices():
     return vertices
 
 
-def create_generic_pylon_50_vertices():
+def _create_generic_pylon_50_vertices():
     vertices = [CableVertex(10.0, 25.2),
                 CableVertex(-10.0, 25.2),
                 CableVertex(10.0, 33.6),
@@ -187,7 +188,7 @@ def create_generic_pylon_50_vertices():
     return vertices
 
 
-def create_generic_pylon_100_vertices():
+def _create_generic_pylon_100_vertices():
     vertices = [CableVertex(20.0, 50.4),
                 CableVertex(-20.0, 50.4),
                 CableVertex(20.0, 67.2),
@@ -198,7 +199,7 @@ def create_generic_pylon_100_vertices():
     return vertices
 
 
-def create_wooden_pole_14m_vertices():
+def _create_wooden_pole_14m_vertices():
     vertices = [CableVertex(1.7, 14.4),
                 CableVertex(-1.7, 14.4),
                 CableVertex(2.7, 12.6),
@@ -208,19 +209,19 @@ def create_wooden_pole_14m_vertices():
     return vertices
 
 
-def create_drag_lift_pylon():
+def _create_drag_lift_pylon():
     vertices = [CableVertex(2.8, 8.1),
                 CableVertex(-0.8, 8.1)]
     return vertices
 
 
-def create_drag_lift_in_osm_building():
+def _create_drag_lift_in_osm_building():
     vertices = [CableVertex(2.8, 3.0),
                 CableVertex(-0.8, 3.0)]
     return vertices
 
 
-def create_rail_power_vertices(direction_type):
+def _create_rail_power_vertices(direction_type):
     if direction_type is PylonDirectionType.mirror:
         vertices = [CableVertex(-1.95, 5.85),
                     CableVertex(-1.95, 4.95, no_catenary=True)]
@@ -230,44 +231,31 @@ def create_rail_power_vertices(direction_type):
     return vertices
 
 
-def create_rail_stop_tension():
+def _create_rail_stop_tension():
     vertices = [CableVertex(0, 5.35),
                 CableVertex(0, 4.95, no_catenary=True)]
     return vertices
 
 
-def get_cable_vertices(pylon_model, direction_type):
+def _get_cable_vertices(pylon_model, direction_type):
     if "generic_pylon_25m" in pylon_model:
-        return create_generic_pylon_25_vertices()
+        return _create_generic_pylon_25_vertices()
     if "generic_pylon_50m" in pylon_model:
-        return create_generic_pylon_50_vertices()
+        return _create_generic_pylon_50_vertices()
     if "generic_pylon_100m" in pylon_model:
-        return create_generic_pylon_100_vertices()
+        return _create_generic_pylon_100_vertices()
     elif "drag_lift_pylon" in pylon_model:
-        return create_drag_lift_pylon()
+        return _create_drag_lift_pylon()
     elif "create_drag_lift_in_osm_building" in pylon_model:
-        return create_drag_lift_in_osm_building()
+        return _create_drag_lift_in_osm_building()
     elif "wooden_pole_14m" in pylon_model:
-        return create_wooden_pole_14m_vertices()
+        return _create_wooden_pole_14m_vertices()
     elif "RailPower" in pylon_model:
-        return create_rail_power_vertices(direction_type)
+        return _create_rail_power_vertices(direction_type)
     elif "tension" in pylon_model:
-        return create_rail_stop_tension()
+        return _create_rail_stop_tension()
     else:
         return None
-
-
-class WaySegment(object):
-    """Represents the part between the pylons and is a container for the cables"""
-    __slots__ = ('start_pylon', 'end_pylon', 'cables', 'length', 'heading')
-
-    def __init__(self, start_pylon, end_pylon):
-        self.start_pylon = start_pylon
-        self.end_pylon = end_pylon
-        self.cables = []
-        self.length = coordinates.calc_distance_local(start_pylon.x, start_pylon.y, end_pylon.x, end_pylon.y)
-        self.heading = coordinates.calc_angle_of_line_local(start_pylon.x, start_pylon.y,
-                                                            end_pylon.x, end_pylon.y)
 
 
 @unique
@@ -329,7 +317,7 @@ class SharedPylon(object):
         # 90 less because arms are in x-direction in ac-file
         my_stg_mgr.add_object_shared(self.pylon_model, vec2d.Vec2d(self.lon, self.lat),
                                      self.elevation,
-                                     stg_angle(self.heading - 90 + direction_correction))
+                                     _stg_angle(self.heading - 90 + direction_correction))
 
 
 class StorageTank(SharedPylon):
@@ -507,8 +495,8 @@ class WindFarm(object):
             turbine.pylon_model = shared_model
 
 
-def process_osm_wind_turbines(osm_nodes_dict: Dict[int, osmparser.Node], coords_transform: coordinates.Transformation,
-                              fg_elev: utilities.FGElev) -> List[WindTurbine]:
+def _process_osm_wind_turbines(osm_nodes_dict: Dict[int, osmparser.Node], coords_transform: coordinates.Transformation,
+                               fg_elev: utilities.FGElev) -> List[WindTurbine]:
     my_wind_turbines = list()
     wind_farms = list()
 
@@ -676,7 +664,20 @@ class StreetlampWay(LineWithoutCables):
                 current_distance += default_distance
 
             # calculate heading
-            calc_heading_nodes(self.shared_pylons)
+            _calc_heading_nodes(self.shared_pylons)
+
+
+class WaySegment(object):
+    """Represents the part between the pylons and is a container for the cables"""
+    __slots__ = ('start_pylon', 'end_pylon', 'cables', 'length', 'heading')
+
+    def __init__(self, start_pylon: SharedPylon, end_pylon: SharedPylon):
+        self.start_pylon = start_pylon
+        self.end_pylon = end_pylon
+        self.cables = []
+        self.length = coordinates.calc_distance_local(start_pylon.x, start_pylon.y, end_pylon.x, end_pylon.y)
+        self.heading = coordinates.calc_angle_of_line_local(start_pylon.x, start_pylon.y,
+                                                            end_pylon.x, end_pylon.y)
 
 
 class Line(LineWithoutCables):
@@ -708,10 +709,10 @@ class Line(LineWithoutCables):
         Afterwards use the start and end points to create all cables for a given WaySegment
         """
         for segment in self.way_segments:
-            start_cable_vertices = get_cable_vertices(segment.start_pylon.pylon_model,
-                                                      segment.start_pylon.direction_type)
-            end_cable_vertices = get_cable_vertices(segment.end_pylon.pylon_model,
-                                                    segment.end_pylon.direction_type)
+            start_cable_vertices = _get_cable_vertices(segment.start_pylon.pylon_model,
+                                                       segment.start_pylon.direction_type)
+            end_cable_vertices = _get_cable_vertices(segment.end_pylon.pylon_model,
+                                                     segment.end_pylon.direction_type)
             for i in range(0, len(start_cable_vertices)):
                 my_radius = radius
                 my_number_extra_vertices = number_extra_vertices
@@ -726,84 +727,6 @@ class Line(LineWithoutCables):
                 cable = Cable(start_cable_vertices[i], end_cable_vertices[i], my_radius, my_number_extra_vertices,
                               catenary_a, segment.length)
                 segment.cables.append(cable)
-
-    def make_cables_ac_xml_stg_entries(self, my_stg_mgr, line_index, wayname, cluster_max_length):
-        """
-        Writes the stg entries for the cables of this WayLine in a string separated by linebreaks
-        E.g. OBJECT_STATIC LSZSpylons1901.xml 9.75516 46.4135 2000.48 0
-        After this it creates the xml-file and ac-file containing the cables.
-        Each WaySegment is represented as an object group in ac with each cable of the WaySegment as a child
-
-        In order to reduce rounding errors clusters of WaySegments are used instead of a whole WayLine per file.
-        """
-        cluster_segments = list()
-        cluster_length = 0.0
-        cluster_index = 1
-        start_pylon = None
-        for i in range(0, len(self.way_segments)):
-            way_segment = self.way_segments[i]
-            if start_pylon is None:
-                start_pylon = way_segment.start_pylon
-            cluster_segments.append(way_segment)
-            cluster_length += way_segment.length
-            if (cluster_length >= cluster_max_length) or (len(self.way_segments) - 1 == i):
-                # calculate the angle between local and global
-                end_pylon = way_segment.end_pylon
-                angle_local = coordinates.calc_angle_of_line_local(start_pylon.x, start_pylon.y,
-                                                                   end_pylon.x, end_pylon.y)
-                angle_global = coordinates.calc_angle_of_line_global(start_pylon.lon, start_pylon.lat,
-                                                                     end_pylon.lon, end_pylon.lat)
-                angle_difference = angle_local - angle_global
-                # write stuff to files
-                cluster_filename = parameters.get_repl_prefix() + wayname + "%05d_%05d" % (line_index, cluster_index)
-                path_to_stg = my_stg_mgr.add_object_static(cluster_filename + '.xml',
-                                                           vec2d.Vec2d(start_pylon.lon, start_pylon.lat),
-                                                           start_pylon.elevation, 90 + angle_difference)
-
-                ac_file_lines = list()
-                ac_file_lines.append("AC3Db")
-                ac_file_lines.append('MATERIAL "cable" rgb 0.3 0.3 0.3 amb 0.3 0.3 0.3 emis 0.0 0.0 0.0 spec 0.3 0.3 0.3 shi 1 trans 0')
-                ac_file_lines.append("OBJECT world")
-                ac_file_lines.append("kids " + str(len(cluster_segments)))
-                cluster_segment_index = 0
-                for cluster_segment in cluster_segments:
-                    cluster_segment_index += 1
-                    ac_file_lines.append("OBJECT group")
-                    ac_file_lines.append('name "segment%05d"' % cluster_segment_index)
-                    ac_file_lines.append("kids " + str(len(cluster_segment.cables)))
-                    for cable in cluster_segment.cables:
-                        cable.translate_vertices_relative(start_pylon.x, start_pylon.y, start_pylon.elevation)
-                        ac_file_lines.append(cable.make_ac_entry(0))  # material is 0-indexed
-
-                xml_file_lines = list()
-                xml_file_lines.append('<?xml version="1.0"?>')
-                xml_file_lines.append('<PropertyList>')
-                xml_file_lines.append('<path>' + cluster_filename + '.ac</path>')  # ac-file is in same directory
-                xml_file_lines.append('<animation>')
-                xml_file_lines.append('<type>range</type>')
-                xml_file_lines.append('<min-m>0</min-m>')
-                xml_file_lines.append('<max-property>/sim/rendering/static-lod/rough</max-property>')
-                for j in range(1, len(cluster_segments) + 1):
-                    xml_file_lines.append('<object-name>segment%05d</object-name>' % j)
-                xml_file_lines.append('</animation>')
-                if parameters.C2P_CABLES_NO_SHADOW:
-                    xml_file_lines.append('<animation>')
-                    xml_file_lines.append('<type>noshadow</type>')
-                    for j in range(1, len(cluster_segments) + 1):
-                        xml_file_lines.append('<object-name>segment%05d</object-name>' % j)
-                    xml_file_lines.append('</animation>')
-                xml_file_lines.append('</PropertyList>')
-
-                # -- write .ac and .xml
-                with open(path_to_stg + cluster_filename + ".ac", 'w') as f:
-                    f.write("\n".join(ac_file_lines))
-                with open(path_to_stg + cluster_filename + ".xml", 'w') as f:
-                    f.write("\n".join(xml_file_lines))
-
-                cluster_length = 0.0
-                cluster_segments = list()
-                cluster_index += 1
-                start_pylon = None
 
 
 @unique
@@ -840,7 +763,7 @@ class WayLine(Line):  # The name "Line" is also used in e.g. SymPy
         for my_pylon in self.shared_pylons:
             my_pylon.pylon_model = pylon_model
 
-        calc_heading_nodes(self.shared_pylons)
+        _calc_heading_nodes(self.shared_pylons)
 
         # calc cables
         radius = parameters.C2P_RADIUS_POWER_LINE
@@ -1061,7 +984,7 @@ class RailLine(Line):
                                                PylonDirectionType.mirror))
 
         # calculate heading
-        calc_heading_nodes(self.shared_pylons)
+        _calc_heading_nodes(self.shared_pylons)
 
         # segments
         self._calc_segments()
@@ -1084,7 +1007,7 @@ class RailLine(Line):
         return is_right
 
 
-def process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev, my_coord_transformator) \
+def _process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev, my_coord_transformator) \
         -> List[RailLine]:
     my_railways = list()
     my_shared_nodes = {}  # node osm_id as key, list of WayLine objects as value
@@ -1155,11 +1078,11 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev, 
     for key in list(my_shared_nodes.keys()):
         shared_node = my_shared_nodes[key]
         if len(shared_node) >= 2:
-            pos1, pos2 = find_connecting_line(key, shared_node, 60)
+            pos1, pos2 = _find_connecting_line(key, shared_node, 60)
             second_line = shared_node[pos2]
             if pos1 >= 0:
                 try:
-                    merge_lines(key, shared_node[pos1], shared_node[pos2], my_shared_nodes)
+                    _merge_lines(key, shared_node[pos1], shared_node[pos2], my_shared_nodes)
                     my_railways.remove(second_line)
                     del my_shared_nodes[key]
                     logging.debug("Merged two lines with node osm_id: %s", key)
@@ -1177,7 +1100,7 @@ def process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev, 
     return my_railways
 
 
-def process_highways_for_streetlamps(my_highways, landuse_buffers) -> List[StreetlampWay]:
+def _process_highways_for_streetlamps(my_highways, landuse_buffers) -> List[StreetlampWay]:
     """
     Test whether the highway is within appropriate land use or intersects with appropriate land use
     No attempt to merge lines because most probably the lines are split at crossing.
@@ -1230,7 +1153,7 @@ def process_highways_for_streetlamps(my_highways, landuse_buffers) -> List[Stree
     return list(my_streetlamps.values())
 
 
-def merge_streetlamp_buffers(landuse_refs):
+def _merge_streetlamp_buffers(landuse_refs):
     """Based on existing landuses applies extra buffer and then unions as many as possible"""
     landuse_buffers = []
     for landuse_ref in list(landuse_refs.values()):
@@ -1250,8 +1173,8 @@ def merge_streetlamp_buffers(landuse_refs):
     return landuse_buffers
 
 
-def process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGElev, my_coord_transformator,
-                                building_refs: List[shg.Polygon]) -> Tuple[List[WayLine], List[WayLine]]:
+def _process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGElev, my_coord_transformator,
+                                 building_refs: List[shg.Polygon]) -> Tuple[List[WayLine], List[WayLine]]:
     """
     Transforms a dict of Node and a dict of Way OSMElements from osmparser.py to a dict of WayLine objects for
     electrical power lines and a dict of WayLine objects for aerialways. Nodes are transformed to Pylons.
@@ -1383,7 +1306,7 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGElev
         if (len(shared_node) == 2) and (shared_node[0].type_ == shared_node[1].type_):
             my_osm_id = shared_node[1].osm_id
             try:
-                merge_lines(key, shared_node[0], shared_node[1], my_shared_nodes)
+                _merge_lines(key, shared_node[0], shared_node[1], my_shared_nodes)
                 del my_powerlines[my_osm_id]
                 del my_shared_nodes[key]
                 logging.debug("Merged two lines with node osm_id: %s", key)
@@ -1395,7 +1318,7 @@ def process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGElev
     return list(my_powerlines.values()), list(my_aerialways.values())
 
 
-def find_connecting_line(key, lines, max_allowed_angle=360):
+def _find_connecting_line(key, lines, max_allowed_angle=360):
     """
     In the array of lines checks which 2 lines have an angle closest to 180 degrees at end node key.
     Looked at second last node and end node (key).
@@ -1429,7 +1352,7 @@ def find_connecting_line(key, lines, max_allowed_angle=360):
     return pos1, pos2
 
 
-def merge_lines(osm_id, line0, line1, shared_nodes):
+def _merge_lines(osm_id, line0, line1, shared_nodes):
     """
     Takes two Line objects and attempts to merge them at a given node.
     The added/merged pylons are in line0 in correct sequence.
@@ -1493,16 +1416,74 @@ def merge_lines(osm_id, line0, line1, shared_nodes):
                 shared_node.append(line0)
 
 
-def _write_stg_entries(my_stg_mgr, lines_list: List[Line], way_name: Optional[str], cluster_max_length: int) -> None:
+def _distribute_way_segments_to_clusters(lines: List[Line], cluster_container: cluster.ClusterContainer) -> None:
+    for line in lines:
+        for way_segment in line.way_segments:
+            anchor = vec2d.Vec2d(way_segment.start_pylon.x, way_segment.start_pylon.y)
+            cluster_container.append(anchor, way_segment)
+
+
+def _write_cable_clusters(cluster_container: cluster.ClusterContainer, coords_transform: coordinates.Transformation,
+                          my_stg_mgr: stg_io2.STGManager) -> None:
+    cluster_index = 0
+    for ic, cl in enumerate(cluster_container):
+        cluster_index += 1
+        if not cl.objects:
+            continue
+
+        # first do some min/max calculation to be able to center the mesh
+        elevation_min = 10000
+        elevation_max = -10000
+        x_min = 1000000000
+        x_max = -1000000000
+        y_min = 1000000000
+        y_max = -1000000000
+        for way_segment in cl.objects:
+            elevation_min = min(elevation_min, way_segment.start_pylon.elevation, way_segment.end_pylon.elevation)
+            elevation_max = max(elevation_max, way_segment.start_pylon.elevation, way_segment.end_pylon.elevation)
+            x_min = min(x_min, way_segment.start_pylon.x, way_segment.end_pylon.x)
+            x_max = max(x_max, way_segment.start_pylon.x, way_segment.end_pylon.x)
+            y_min = min(y_min, way_segment.start_pylon.y, way_segment.end_pylon.y)
+            y_max = max(y_max, way_segment.start_pylon.y, way_segment.end_pylon.y)
+
+        # now write the mesh into files
+        cluster_x = x_max - (x_max - x_min)/2.0
+        cluster_y = y_max - (y_max - y_min)/2.0
+        cluster_elevation = elevation_max - (elevation_max - elevation_min)/2.0
+        center_global = coords_transform.toGlobal((cluster_x, cluster_y))
+        cluster_filename = parameters.get_repl_prefix() + "cables%05d" % cluster_index
+        path_to_stg = my_stg_mgr.add_object_static(cluster_filename + '.ac', vec2d.Vec2d(center_global[0],
+                                                                                         center_global[1]),
+                                                   cluster_elevation, 90, cluster_container.stg_verb_type)
+
+        ac_file_lines = list()
+        ac_file_lines.append("AC3Db")
+        ac_file_lines.append(
+            'MATERIAL "cable" rgb 0.3 0.3 0.3 amb 0.3 0.3 0.3 emis 0.0 0.0 0.0 spec 0.3 0.3 0.3 shi 1 trans 0')
+        ac_file_lines.append("OBJECT world")
+        ac_file_lines.append("kids " + str(len(cl.objects)))
+        segment_index = 0
+        for way_segment in cl.objects:
+            segment_index += 1
+            ac_file_lines.append("OBJECT group")
+            ac_file_lines.append('name "segment%05d"' % segment_index)
+            ac_file_lines.append("kids " + str(len(way_segment.cables)))
+            for cable in way_segment.cables:
+                cable.translate_vertices_relative(cluster_x, cluster_y, cluster_elevation)
+                ac_file_lines.append(cable.make_ac_entry(0))  # material is 0-indexed
+
+                with open(path_to_stg + cluster_filename + ".ac", 'w') as f:
+                    f.write("\n".join(ac_file_lines))
+
+
+def _write_stg_entries_pylons_for_line(my_stg_mgr, lines_list: List[Line]) -> None:
     line_index = 0
     for line in lines_list:
         line_index += 1
         line.make_shared_pylons_stg_entries(my_stg_mgr)
-        if None is not way_name:
-            line.make_cables_ac_xml_stg_entries(my_stg_mgr, line_index, way_name, cluster_max_length)
 
 
-def calc_heading_nodes(nodes_array: List[SharedPylon]) -> None:
+def _calc_heading_nodes(nodes_array: List[SharedPylon]) -> None:
     """Calculates the headings of nodes in a line based on medium angle. nodes must have a heading, x and y attribute"""
     current_pylon = nodes_array[0]
     next_pylon = nodes_array[1]
@@ -1514,22 +1495,22 @@ def calc_heading_nodes(nodes_array: List[SharedPylon]) -> None:
         next_pylon = nodes_array[x + 1]
         current_angle = coordinates.calc_angle_of_line_local(current_pylon.x, current_pylon.y,
                                                              next_pylon.x, next_pylon.y)
-        current_pylon.heading = calc_middle_angle(prev_angle, current_angle)
+        current_pylon.heading = _calc_middle_angle(prev_angle, current_angle)
     nodes_array[-1].heading = current_angle
 
 
-def calc_middle_angle(angle_line1, angle_line2):
+def _calc_middle_angle(angle_line1, angle_line2):
     """Returns the angle halfway between two lines"""
     if angle_line1 == angle_line2:
         middle = angle_line1
     elif angle_line1 > angle_line2:
         if 0 == angle_line2:
-            middle = calc_middle_angle(angle_line1, 360)
+            middle = _calc_middle_angle(angle_line1, 360)
         else:
             middle = angle_line1 - (angle_line1 - angle_line2) / 2
     else:
         if math.fabs(angle_line2 - angle_line1) > 180:
-            middle = calc_middle_angle(angle_line1 + 360, angle_line2)
+            middle = _calc_middle_angle(angle_line1 + 360, angle_line2)
         else:
             middle = angle_line2 - (angle_line2 - angle_line1) / 2
     if 360 <= middle:
@@ -1537,7 +1518,7 @@ def calc_middle_angle(angle_line1, angle_line2):
     return middle
 
 
-def stg_angle(angle_normal):
+def _stg_angle(angle_normal):
     """Returns the input angle in degrees to an angle for the stg-file in degrees.
     stg-files use angles counter-clockwise starting with 0 in North."""
     if 0 == angle_normal:
@@ -1546,7 +1527,7 @@ def stg_angle(angle_normal):
         return 360 - angle_normal
 
 
-def optimize_catenary(half_distance_pylons, max_value, sag, max_variation):
+def _optimize_catenary(half_distance_pylons, max_value, sag, max_variation):
     """
     Calculates the parameter _a_ for a catenary with a given sag between the pylons and a mx_variation.
     See http://www.mathdemos.org/mathdemos/catenary/catenary.html and https://en.wikipedia.org/wiki/Catenary
@@ -1558,8 +1539,8 @@ def optimize_catenary(half_distance_pylons, max_value, sag, max_variation):
     return -1, -1
 
 
-def process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator, fg_elev: utilities.FGElev,
-                              storage_tanks: List[StorageTank]) -> List[shg.Polygon]:
+def _process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator, fg_elev: utilities.FGElev,
+                               storage_tanks: List[StorageTank]) -> List[shg.Polygon]:
     """Takes all buildings to be used as potential blocking areas. At the same time processes storage tanks.
     Storage tanks are in OSM mapped as buildings, but with special tags. In FG use shared model.
     Storage tanks get updated by passed as reference list.
@@ -1618,7 +1599,7 @@ class Highway(LinearOSMFeature):
         return highway_attributes[2]
 
 
-def process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
+def _process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
     my_highways = dict()  # osm_id as key, Highway
 
     for way in list(ways_dict.values()):
@@ -1665,7 +1646,7 @@ class Landuse(object):
         self.number_of_buildings = 0  # only set for generated TYPE_NON_OSM land-uses during generation
 
 
-def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator):
+def _process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator):
     my_landuses = dict()  # osm_id as key, Landuse as value
 
     for way in list(ways_dict.values()):
@@ -1703,7 +1684,7 @@ def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator):
     return my_landuses
 
 
-def generate_landuse_from_buildings(osm_landuses, building_refs: List[shg.Polygon]):
+def _generate_landuse_from_buildings(osm_landuses, building_refs: List[shg.Polygon]):
     """Adds "missing" landuses based on building clusters"""
     my_landuse_candidates = dict()
     index = 10000000000
@@ -1747,7 +1728,7 @@ def generate_landuse_from_buildings(osm_landuses, building_refs: List[shg.Polygo
     return my_landuse_candidates
 
 
-def fetch_osm_file_data() -> Tuple[Dict[int, osmparser.Node], Dict[int, osmparser.Way]]:
+def _fetch_osm_file_data() -> Tuple[Dict[int, osmparser.Node], Dict[int, osmparser.Way]]:
     start_time = time.time()
     # the lists below are in sequence: buildings references, power/aerialway, railway overhead, landuse and highway
     valid_node_keys = ["power", "structure", "material", "height", "colour", "aerialway",
@@ -1779,7 +1760,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     osm_nodes_dict = dict()  # key = osm_id, value = Node
     osm_ways_dict = dict()  # key = osm_id, value = Way
     if not parameters.USE_DATABASE:
-        osm_nodes_dict, osm_ways_dict = fetch_osm_file_data()
+        osm_nodes_dict, osm_ways_dict = _fetch_osm_file_data()
 
     # References for buildings
     building_refs = list()
@@ -1790,8 +1771,8 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
             osm_way_result = osmparser.fetch_osm_db_data_ways_keys(['building'])
             osm_nodes_dict = osm_way_result.nodes_dict
             osm_ways_dict = osm_way_result.ways_dict
-        building_refs = process_osm_building_refs(osm_nodes_dict, osm_ways_dict, coords_transform, fg_elev,
-                                                  storage_tanks)
+        building_refs = _process_osm_building_refs(osm_nodes_dict, osm_ways_dict, coords_transform, fg_elev,
+                                                   storage_tanks)
         logging.info('Number of reference buildings: %s', len(building_refs))
     # Power lines and aerialways
     powerlines = list()
@@ -1807,16 +1788,18 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
             osm_nodes_dict = osm_way_result.nodes_dict
             osm_ways_dict = osm_way_result.ways_dict
 
-        powerlines, aerialways = process_osm_power_aerialway(osm_nodes_dict, osm_ways_dict, fg_elev,
-                                                             coords_transform, building_refs)
+        powerlines, aerialways = _process_osm_power_aerialway(osm_nodes_dict, osm_ways_dict, fg_elev,
+                                                              coords_transform, building_refs)
         if not parameters.C2P_PROCESS_POWERLINES:
             powerlines = list()
         if not parameters.C2P_PROCESS_AERIALWAYS:
             aerialways = list()
         logging.info('Number of power lines to process: %s', len(powerlines))
         logging.info('Number of aerialways to process: %s', len(aerialways))
-        for wayline in powerlines:
+        for wayline in reversed(powerlines):
             wayline.calc_and_map()
+            if (wayline.type_ is WayLineType.power_minor) and (not parameters.C2P_PROCESS_POWERLINES_MINOR):
+                powerlines.remove(wayline)
         for wayline in aerialways:
             wayline.calc_and_map()
     # railway overhead lines
@@ -1826,8 +1809,8 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
             osm_way_result = osmparser.fetch_osm_db_data_ways_keys(['railway'])
             osm_nodes_dict = osm_way_result.nodes_dict
             osm_ways_dict = osm_way_result.ways_dict
-        rail_lines = process_osm_rail_overhead(osm_nodes_dict, osm_ways_dict, fg_elev,
-                                               coords_transform)
+        rail_lines = _process_osm_rail_overhead(osm_nodes_dict, osm_ways_dict, fg_elev,
+                                                coords_transform)
         logging.info('Reduced number of rail lines: %s', len(rail_lines))
         for rail_line in rail_lines:
             rail_line.calc_and_map(fg_elev, coords_transform, rail_lines)
@@ -1839,16 +1822,16 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
             osm_nodes_dict = osm_way_result.nodes_dict
             osm_ways_dict = osm_way_result.ways_dict
 
-        landuse_refs = process_osm_landuse_refs(osm_nodes_dict, osm_ways_dict, coords_transform)
+        landuse_refs = _process_osm_landuse_refs(osm_nodes_dict, osm_ways_dict, coords_transform)
         if parameters.LU_LANDUSE_GENERATE_LANDUSE:
-            generated_landuses = generate_landuse_from_buildings(landuse_refs, building_refs)
+            generated_landuses = _generate_landuse_from_buildings(landuse_refs, building_refs)
             for generated in list(generated_landuses.values()):
                 landuse_refs[generated.osm_id] = generated
         logging.info('Number of landuse references: %s', len(landuse_refs))
-        streetlamp_buffers = merge_streetlamp_buffers(landuse_refs)
+        streetlamp_buffers = _merge_streetlamp_buffers(landuse_refs)
         logging.info('Number of streetlamp buffers: %s', len(streetlamp_buffers))
-        highways = process_osm_highway(osm_nodes_dict, osm_ways_dict, coords_transform)
-        streetlamp_ways = process_highways_for_streetlamps(highways, streetlamp_buffers)
+        highways = _process_osm_highway(osm_nodes_dict, osm_ways_dict, coords_transform)
+        streetlamp_ways = _process_highways_for_streetlamps(highways, streetlamp_buffers)
         logging.info('Reduced number of streetlamp ways: %s', len(streetlamp_ways))
         for highway in streetlamp_ways:
             highway.calc_and_map(fg_elev, coords_transform)
@@ -1858,7 +1841,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     if parameters.C2P_PROCESS_WIND_TURBINES:
         if parameters.USE_DATABASE:
             osm_nodes_dict = osmparser.fetch_db_nodes_isolated(["generator:source=>wind"])
-        wind_turbines = process_osm_wind_turbines(osm_nodes_dict, coords_transform, fg_elev)
+        wind_turbines = _process_osm_wind_turbines(osm_nodes_dict, coords_transform, fg_elev)
         logging.info("Number of valid wind turbines found: {}".format(len(wind_turbines)))
 
     # free some memory
@@ -1869,17 +1852,26 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     stg_manager = stg_io2.STGManager(path_to_output, SCENERY_TYPE, OUR_MAGIC, parameters.get_repl_prefix())
 
     # Write to Flightgear
+    cmin, cmax = parameters.get_extent_global()
+    logging.info("min/max " + str(cmin) + " " + str(cmax))
+    lmin = vec2d.Vec2d(coords_transform.toLocal(cmin))
+    lmax = vec2d.Vec2d(coords_transform.toLocal(cmax))
+    cluster_container = cluster.ClusterContainer(lmin, lmax, stg_io2.STGVerbType.object_building_mesh_detailed)
+
     if parameters.C2P_PROCESS_POWERLINES:
-        _write_stg_entries(stg_manager, powerlines,
-                           "powerline", parameters.C2P_CLUSTER_POWER_LINE_MAX_LENGTH)
+        _distribute_way_segments_to_clusters(powerlines, cluster_container)
+        _write_stg_entries_pylons_for_line(stg_manager, powerlines)
     if parameters.C2P_PROCESS_AERIALWAYS:
-        _write_stg_entries(stg_manager, aerialways,
-                           "aerialway", parameters.C2P_CLUSTER_AERIALWAY_MAX_LENGTH)
+        _distribute_way_segments_to_clusters(aerialways, cluster_container)
+        _write_stg_entries_pylons_for_line(stg_manager, aerialways)
     if parameters.C2P_PROCESS_OVERHEAD_LINES:
-        _write_stg_entries(stg_manager, rail_lines,
-                           "overhead", parameters.C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH)
+        _distribute_way_segments_to_clusters(rail_lines, cluster_container)
+        _write_stg_entries_pylons_for_line(stg_manager, rail_lines)
+
+    _write_cable_clusters(cluster_container, coords_transform, stg_manager)
+
     if parameters.C2P_PROCESS_STREETLAMPS:
-        _write_stg_entries(stg_manager, streetlamp_ways, "streetlamps", None)
+        _write_stg_entries_pylons_for_line(stg_manager, streetlamp_ways)
     if parameters.C2P_PROCESS_WIND_TURBINES:
         for turbine in wind_turbines:
             turbine.make_stg_entry(stg_manager)
@@ -1922,12 +1914,12 @@ if __name__ == "__main__":
 
 class TestOSMPylons(unittest.TestCase):
     def test_middle_angle(self):
-        self.assertEqual(0, calc_middle_angle(0, 0), "North North")
-        self.assertEqual(45, calc_middle_angle(0, 90), "North East")
-        self.assertEqual(130, calc_middle_angle(90, 170), "East Almost_South")
-        self.assertEqual(90, calc_middle_angle(135, 45), "South_East North_East")
-        self.assertEqual(0, calc_middle_angle(45, 315), "South_East North_East")
-        self.assertEqual(260, calc_middle_angle(170, 350), "Almost_South Almost_North")
+        self.assertEqual(0, _calc_middle_angle(0, 0), "North North")
+        self.assertEqual(45, _calc_middle_angle(0, 90), "North East")
+        self.assertEqual(130, _calc_middle_angle(90, 170), "East Almost_South")
+        self.assertEqual(90, _calc_middle_angle(135, 45), "South_East North_East")
+        self.assertEqual(0, _calc_middle_angle(45, 315), "South_East North_East")
+        self.assertEqual(260, _calc_middle_angle(170, 350), "Almost_South Almost_North")
 
     def test_wayline_calculate_and_map(self):
         # first test headings
@@ -1984,7 +1976,7 @@ class TestOSMPylons(unittest.TestCase):
 
     def test_catenary(self):
         #  Values taken form example 2 in http://www.mathdemos.org/mathdemos/catenary/catenary.html
-        a, value = optimize_catenary(170, 5000, 14, 0.01)
+        a, value = _optimize_catenary(170, 5000, 14, 0.01)
         print(a, value)
         self.assertAlmostEqual(1034/100, a/100, 2)
 
@@ -2007,20 +1999,20 @@ class TestOSMPylons(unittest.TestCase):
         line_u.nodes.append(node2)
         line_v.nodes.append(node2)
         line_v.nodes.append(node3)
-        merge_lines("2", line_u, line_v, shared_nodes)
+        _merge_lines("2", line_u, line_v, shared_nodes)
         self.assertEqual(3, len(line_u.nodes))
         line_w.nodes.append(node1)
         line_w.nodes.append(node4)
-        merge_lines("1", line_u, line_w, shared_nodes)
+        _merge_lines("1", line_u, line_w, shared_nodes)
         self.assertEqual(4, len(line_u.nodes))
         line_x.nodes.append(node5)
         line_x.nodes.append(node3)
-        merge_lines("3", line_u, line_x, shared_nodes)
+        _merge_lines("3", line_u, line_x, shared_nodes)
         self.assertEqual(5, len(line_u.nodes))
         line_y.nodes.append(node7)
         line_y.nodes.append(node6)
         line_y.nodes.append(node4)
-        merge_lines("4", line_u, line_y, shared_nodes)
+        _merge_lines("4", line_u, line_y, shared_nodes)
         self.assertEqual(7, len(line_u.nodes))
 
     def find_connecting_line(self):
@@ -2048,6 +2040,6 @@ class TestOSMPylons(unittest.TestCase):
         line_w.nodes.append(node2)
 
         lines = [line_u, line_v, line_w]
-        pos1, pos2 = find_connecting_line("2", lines)
+        pos1, pos2 = _find_connecting_line("2", lines)
         self.assertEqual(0, pos1)
         self.assertEqual(1, pos2)

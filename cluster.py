@@ -101,21 +101,22 @@ class ClusterContainer(object):
             for item in each_list:
                 yield item
 
-    def append(self, anchor: Vec2d, obj, stats: utils.utilities.Stats) -> Cluster:
+    def append(self, anchor: Vec2d, obj, stats: utils.utilities.Stats=None) -> Cluster:
         """Finds the cluster within the cluster grid where a given object's anchor point is situated and then
         adds the object to that cluster."""
         the_cluster = self(anchor)
         the_cluster.objects.append(obj)
-        try:
-            # Local stats
-            self(anchor).stats.count(obj)
-            # Global stats
-            stats.count(obj)
-        except AttributeError:
-            pass
+        if stats is not None:
+            try:
+                # Local stats
+                self(anchor).stats.count(obj)
+                # Global stats
+                stats.count(obj)
+            except AttributeError:
+                pass
         return the_cluster
 
-    def write_statistics(self, clusters_name: str) -> None:
+    def write_statistics_for_buildings(self, clusters_name: str) -> None:
         if parameters.log_level_debug_or_lower() and parameters.WRITE_CLUSTER_STATS:
             my_file = open(parameters.PREFIX + os.sep + clusters_name + ".dat", "w")
             for j in range(self.max_grid.iy):

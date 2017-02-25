@@ -164,19 +164,12 @@ CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if too little objects
 # =============================================================================
 
 C2P_PROCESS_POWERLINES = True
+C2P_PROCESS_POWERLINES_MINOR = False  # only considered of C2P_PROCESS_POWERLINES is True
 C2P_PROCESS_AERIALWAYS = False
-C2P_PROCESS_OVERHEAD_LINES = True
+C2P_PROCESS_OVERHEAD_LINES = False
 C2P_PROCESS_WIND_TURBINES = True
 C2P_PROCESS_STREETLAMPS = False
 C2P_PROCESS_STORAGE_TANKS = True
-
-# Each powerline and aerialway has segments delimited by pylons. The longer the value the better clustering and
-# the better the performance. However due to rounding errors the longer the length per cluster the larger the
-# error.
-C2P_CLUSTER_POWER_LINE_MAX_LENGTH = 300
-C2P_CLUSTER_AERIALWAY_MAX_LENGTH = 300
-C2P_CLUSTER_OVERHEAD_LINE_MAX_LENGTH = 130
-C2P_CABLES_NO_SHADOW = True
 
 # The radius for the cable. The cable will be a triangle with side length 2*radius.
 # In order to be better visible the radius might be chosen larger than in real life

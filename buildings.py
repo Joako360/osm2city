@@ -399,8 +399,8 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     lmax = v.Vec2d(coords_transform.toLocal(cmax))
 
     handled_clusters = list()  # cluster.ClusterContainer objects
-    clusters_building_mesh_detailed = cluster.ClusterContainer(lmin, lmax)
-    clusters_building_mesh_detailed.stg_verb_type = stg_io2.STGVerbType.object_building_mesh_detailed
+    clusters_building_mesh_detailed = cluster.ClusterContainer(lmin, lmax,
+                                                               stg_io2.STGVerbType.object_building_mesh_detailed)
     handled_clusters.append(clusters_building_mesh_detailed)
     clusters_building_mesh_rough = cluster.ClusterContainer(lmin, lmax,
                                                             stg_io2.STGVerbType.object_building_mesh_rough)
@@ -466,7 +466,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     handled_index = 0
     total_buildings_written = 0
     for my_clusters in handled_clusters:
-        my_clusters.write_statistics("cluster_%d" % handled_index)
+        my_clusters.write_statistics_for_buildings("cluster_%d" % handled_index)
 
         for ic, cl in enumerate(my_clusters):
             number_of_buildings = len(cl.objects)
