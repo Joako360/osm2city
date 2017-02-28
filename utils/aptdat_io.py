@@ -93,12 +93,13 @@ class Airport(object):
         return blocked_areas
 
 
-def _read_apt_dat_gz_file(file_name: str, min_lon: float, min_lat: float,
+def read_apt_dat_gz_file(min_lon: float, min_lat: float,
                           max_lon: float, max_lat: float) -> List[Airport]:
+    apt_dat_gz_file = utilities.assert_trailing_slash(utilities.get_fg_root()) + 'Airports' + os.sep + 'apt.dat.gz'
     start_time = time.time()
     airports = list()
     total_airports = 0
-    with gzip.open(file_name, 'rt', encoding="latin-1") as f:
+    with gzip.open(apt_dat_gz_file, 'rt', encoding="latin-1") as f:
         my_airport = None
         for line in f:
             parts = line.split()
@@ -124,11 +125,15 @@ def _read_apt_dat_gz_file(file_name: str, min_lon: float, min_lat: float,
     return airports
 
 
-def get_apt_dat_blocked_areas(coords_transform: coordinates.Transformation,
-                              min_lon: float, min_lat: float, max_lon: float, max_lat: float) -> List[Polygon]:
-    apt_dat_gz_file = utilities.assert_trailing_slash(utilities.get_fg_root()) + 'Airports' + os.sep + 'apt.dat.gz'
-    airports = _read_apt_dat_gz_file(apt_dat_gz_file, min_lon, min_lat, max_lon, max_lat)
+def get_apt_dat_blocked_areas_from_airports(coords_transform: coordinates.Transformation,
+                                            airports: List[Airport]) -> List[Polygon]:
     blocked_areas = list()
     for airport in airports:
         blocked_areas.extend(airport.create_blocked_areas(coords_transform))
     return blocked_areas
+
+
+def get_apt_dat_blocked_areas(coords_transform: coordinates.Transformation,
+                              min_lon: float, min_lat: float, max_lon: float, max_lat: float) -> List[Polygon]:
+    airports = read_apt_dat_gz_file(min_lon, min_lat, max_lon, max_lat)
+    return get_apt_dat_blocked_areas_from_airports(coords_transform, airports)

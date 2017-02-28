@@ -1,10 +1,13 @@
 import argparse
+from enum import IntEnum, unique
 import logging
 import multiprocessing as mp
 import os
 import parameters
 import sys
 import time
+from typing import List
+import unittest
 
 import buildings
 import copy_data_stuff
@@ -38,7 +41,24 @@ class SceneryTile(object):
         return my_string
 
 
-def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_level: str) -> None:
+@unique
+class Procedures(IntEnum):
+    all = 0
+    buildings = 1
+    piers = 2
+    platforms = 3
+    pylons = 4
+    roads = 5
+
+
+def _parse_exec_for_procedure(exec_argument: str) -> Procedures:
+    """Parses a command line argument to determine which osm2city procedure to run.
+    Returns KeyError if mapping cannot be done"""
+    return Procedures.__members__[exec_argument.lower()]
+
+
+def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_level: str,
+                         exec_argument: Procedures, airports: List[aptdat_io.Airport]) -> None:
     parameters.read_from_file(params_file_name)
     parameters.set_loglevel(log_level)
     parameters.USE_DATABASE = True  # just to be sure
@@ -55,15 +75,30 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_l
     # prepare shared resources
     the_coords_transform = coordinates.Transformation(parameters.get_center_global())
     my_fg_elev = FGElev(the_coords_transform)
-    my_blocked_areas = aptdat_io.get_apt_dat_blocked_areas(the_coords_transform,
-                                                           parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
-                                                           parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
+
+    # cannot be read once for all
+    my_blocked_areas = None
+    if exec_argument in (Procedures.all, Procedures.buildings, Procedures.roads):
+        my_blocked_areas = aptdat_io.get_apt_dat_blocked_areas_from_airports(the_coords_transform, airports)
 
     # run programs
-    buildings.process(the_coords_transform, my_fg_elev, my_blocked_areas)
-    roads.process(the_coords_transform, my_fg_elev, my_blocked_areas)
-    pylons.process(the_coords_transform, my_fg_elev)
-    platforms.process(the_coords_transform, my_fg_elev)
+    if exec_argument is Procedures.all:
+        buildings.process(the_coords_transform, my_fg_elev, my_blocked_areas)
+        roads.process(the_coords_transform, my_fg_elev, my_blocked_areas)
+        pylons.process(the_coords_transform, my_fg_elev)
+        platforms.process(the_coords_transform, my_fg_elev)
+        # piers.process(the_coords_transform, my_fg_elev)
+    elif exec_argument is Procedures.buildings:
+        buildings.process(the_coords_transform, my_fg_elev, my_blocked_areas)
+    elif exec_argument is Procedures.roads:
+        roads.process(the_coords_transform, my_fg_elev, my_blocked_areas)
+    elif exec_argument is Procedures.pylons:
+        pylons.process(the_coords_transform, my_fg_elev)
+    elif exec_argument is Procedures.platforms:
+        platforms.process(the_coords_transform, my_fg_elev)
+    elif exec_argument is Procedures.piers:
+        # piers.process(the_coords_transform, my_fg_elev)
+        pass
 
     # clean-up
     my_fg_elev.close()
@@ -77,26 +112,38 @@ if __name__ == '__main__':
     based on a lon/lat defined area")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
-    parser.add_argument("-l", "--loglevel", dest="loglevel",
-                        help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL",
-                        required=False)
     parser.add_argument("-b", "--boundary", dest="boundary",
                         help="set the boundary as WEST_SOUTH_EAST_NORTH like 9.1_47.0_11_48.8 (. as decimal)",
                         required=True)
     parser.add_argument("-p", "--processes", dest="processes", type=int,
                         help="number of parallel processes (should not be more than number of cores/CPUs)",
                         required=True, )
+    parser.add_argument("-e", "--execute", dest="exec",
+                        help="execute only the given osm2city procedure (buildings, piers, platforms, pylons, roads)",
+                        required=False)
+    parser.add_argument("-l", "--loglevel", dest="loglevel",
+                        help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL",
+                        required=False)
 
     args = parser.parse_args()
 
     parameters.read_from_file(args.filename)
     parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
 
+    exec_procedure = Procedures.all
+    if (args.exec):
+        try:
+            exec_procedure = _parse_exec_for_procedure(args.exec)
+        except KeyError:
+            logging.error('Cannot parse --execute argument: {}'.format(args.exec))
+            sys.exit(1)
+
     try:
         boundary_floats = parse_boundary(args.boundary)
     except BoundaryError as be:
         logging.error(be.message)
         sys.exit(1)
+
     boundary_west = boundary_floats[0]
     boundary_south = boundary_floats[1]
     boundary_east = boundary_floats[2]
@@ -143,16 +190,39 @@ if __name__ == '__main__':
                     scenery_tiles_list.append(a_scenery_tile)
                     logging.info("Added new scenery tile: {}".format(a_scenery_tile))
 
+    # get airports from apt_dat. Transformation to blocked areas can only be done in sub-process due to local
+    # coordinate system
+    airports = aptdat_io.read_apt_dat_gz_file(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
+                                              parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
+
     start_time = time.time()
     mp.set_start_method('spawn')  # use safe approach to make sure e.g. parameters module is initialized separately
     pool = mp.Pool(processes=args.processes, maxtasksperchild=1)
     for my_scenery_tile in scenery_tiles_list:
-        pool.apply_async(process_scenery_tile, (my_scenery_tile, args.filename, args.loglevel))
+        pool.apply_async(process_scenery_tile, (my_scenery_tile, args.filename, args.loglevel,
+                                                exec_procedure, airports))
     pool.close()
     pool.join()
 
-    copy_data_stuff.process(False, "Buildings")
-    copy_data_stuff.process(False, "Roads")
-    copy_data_stuff.process(False, "Pylons")
+    # At the very end copy static data stuff in one process
+    if exec_procedure is Procedures.all:
+        copy_data_stuff.process(False, "Buildings")
+        copy_data_stuff.process(False, "Roads")
+        copy_data_stuff.process(False, "Pylons")
+    elif exec_procedure is Procedures.pylons:
+        copy_data_stuff.process(False, "Pylons")
+    elif exec_procedure is Procedures.roads:
+        copy_data_stuff.process(False, "Roads")
+    else:
+        copy_data_stuff.process(False, "Buildings")
 
     logging.info("Total time used {}".format(time.time() - start_time))
+
+
+# ================ UNITTESTS =======================
+
+
+class TestProcedures(unittest.TestCase):
+    def test_middle_angle(self):
+        self.assertTrue(_parse_exec_for_procedure('PyloNs') is Procedures.pylons)
+        self.assertRaises(KeyError, _parse_exec_for_procedure, 'Hello')
