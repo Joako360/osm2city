@@ -103,9 +103,9 @@ PROBE_FOR_WATER                                 Boolean    False     Checks the 
 
 .. _chapter-parameters-lod-label:
 
-----------------
-Level of Details
-----------------
+-----------------------------
+Level of Details of Buildings
+-----------------------------
 
 The more buildings you have in LOD detailed, the less resources for rendering are used. However you might find it "irritating" the more buildings suddenly appear. Experiment with the settings in FlightGear, see also :ref:`Adjusting Visibility of Scenery Objects <chapter-lod-label>`. 
 
@@ -132,7 +132,9 @@ LOD_PERCENTAGE_DETAIL                           Decimal    0.5       Of the rema
 Overlap Check for Buildings
 ---------------------------
 
-Overlap checks try to omit overlap of buildings generated based on OSM data with static and shared objects in the default scenery (defined by PATH_TO_SCENERY).
+Overlap checks try to omit overlap of buildings generated based on OSM data with static object as well as shared objects (depending on parameter ``OVERLAP_CHECK_CONSIDER_SHARED``) in the default scenery (defined by ``PATH_TO_SCENERY``).
+
+If parameter ``PATH_TO_SCENERY_OPT`` is not None, then also object from that path are considered (e.g. for Project3000).
 
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example

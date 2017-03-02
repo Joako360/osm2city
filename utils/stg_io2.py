@@ -122,7 +122,7 @@ class STGFile(object):
         self._make_path_to_stg()
         return self.path_to_stg
 
-    def _make_path_to_stg(self) -> str:
+    def _make_path_to_stg(self) -> None:
         try:
             os.makedirs(self.path_to_stg)
         except OSError as e:
@@ -167,7 +167,8 @@ class STGManager(object):
         try:
             return self.stg_dict[tile_index]
         except KeyError:
-            the_stg_file = STGFile(lon_lat, tile_index, self.path_to_scenery, self.scenery_type, self.magic, self.prefix)
+            the_stg_file = STGFile(lon_lat, tile_index, self.path_to_scenery, self.scenery_type, self.magic,
+                                   self.prefix)
             self.stg_dict[tile_index] = the_stg_file
             # this will only drop the section we previously wrote ()
             the_stg_file.drop_ours()

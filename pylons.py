@@ -62,7 +62,7 @@ class Cable(object):
     __slots__ = ('start_cable_vertex', 'end_cable_vertex', 'vertices', 'radius', 'heading')
 
     def __init__(self, start_cable_vertex: CableVertex, end_cable_vertex: CableVertex, radius: float,
-                 number_extra_vertices: int, catenary_a: int, distance: float) -> None:
+                 number_extra_vertices: int, catenary_a: int, distance: float, max_sagging: float) -> None:
         """
         A Cable between two vertices. The radius is approximated with a triangle with sides of length 2*radius.
         If both the number of extra_vertices and the catenary_a are > 0, then the Cable gets a sag based on
@@ -76,14 +76,15 @@ class Cable(object):
                                                             end_cable_vertex.x, end_cable_vertex.y)
 
         if (number_extra_vertices > 0) and (catenary_a > 0) and (distance >= parameters.C2P_CATENARY_MIN_DISTANCE):
-            self._make_catenary_cable(number_extra_vertices, catenary_a)
+            self._make_catenary_cable(number_extra_vertices, catenary_a, max_sagging)
 
-    def _make_catenary_cable(self, number_extra_vertices: int, catenary_a: int) -> None:
+    def _make_catenary_cable(self, number_extra_vertices: int, catenary_a: int, max_sagging: float) -> None:
         """
         Transforms the cable into one with more vertices and some sagging based on a catenary function.
         If there is a considerable difference in elevation between the two pylons, then gravity would have to
         be taken into account https://en.wikipedia.org/wiki/File:Catenary-tension.png.
         However the elevation correction actually already helps quite a bit, because the x/y are kept constant.
+        Max sagging makes sure that probability of touching the ground is lower for long distances
         """
         cable_distance = coordinates.calc_distance_local(self.start_cable_vertex.x, self.start_cable_vertex.y,
                                                          self.end_cable_vertex.x, self.end_cable_vertex.y)
@@ -166,7 +167,15 @@ class Cable(object):
         return "\n".join(lines)
 
 
-def _create_generic_pylon_25_vertices():
+@unique
+class PylonDirectionType(IntEnum):
+    normal = 0  # in ac-file mast is on left side, stuff on right side along x-axis
+    mirror = 1
+    start = 2
+    end = 3
+
+
+def _create_generic_pylon_25_vertices() -> List[CableVertex]:
     vertices = [CableVertex(5.0, 12.6),
                 CableVertex(-5.0, 12.6),
                 CableVertex(5.0, 16.8),
@@ -177,7 +186,7 @@ def _create_generic_pylon_25_vertices():
     return vertices
 
 
-def _create_generic_pylon_50_vertices():
+def _create_generic_pylon_50_vertices() -> List[CableVertex]:
     vertices = [CableVertex(10.0, 25.2),
                 CableVertex(-10.0, 25.2),
                 CableVertex(10.0, 33.6),
@@ -188,7 +197,7 @@ def _create_generic_pylon_50_vertices():
     return vertices
 
 
-def _create_generic_pylon_100_vertices():
+def _create_generic_pylon_100_vertices() -> List[CableVertex]:
     vertices = [CableVertex(20.0, 50.4),
                 CableVertex(-20.0, 50.4),
                 CableVertex(20.0, 67.2),
@@ -199,7 +208,7 @@ def _create_generic_pylon_100_vertices():
     return vertices
 
 
-def _create_wooden_pole_14m_vertices():
+def _create_wooden_pole_14m_vertices() -> List[CableVertex]:
     vertices = [CableVertex(1.7, 14.4),
                 CableVertex(-1.7, 14.4),
                 CableVertex(2.7, 12.6),
@@ -209,19 +218,19 @@ def _create_wooden_pole_14m_vertices():
     return vertices
 
 
-def _create_drag_lift_pylon():
+def _create_drag_lift_pylon() -> List[CableVertex]:
     vertices = [CableVertex(2.8, 8.1),
                 CableVertex(-0.8, 8.1)]
     return vertices
 
 
-def _create_drag_lift_in_osm_building():
+def _create_drag_lift_in_osm_building() -> List[CableVertex]:
     vertices = [CableVertex(2.8, 3.0),
                 CableVertex(-0.8, 3.0)]
     return vertices
 
 
-def _create_rail_power_vertices(direction_type):
+def _create_rail_power_vertices(direction_type) -> List[CableVertex]:
     if direction_type is PylonDirectionType.mirror:
         vertices = [CableVertex(-1.95, 5.85),
                     CableVertex(-1.95, 4.95, no_catenary=True)]
@@ -231,13 +240,13 @@ def _create_rail_power_vertices(direction_type):
     return vertices
 
 
-def _create_rail_stop_tension():
+def _create_rail_stop_tension() -> List[CableVertex]:
     vertices = [CableVertex(0, 5.35),
                 CableVertex(0, 4.95, no_catenary=True)]
     return vertices
 
 
-def _get_cable_vertices(pylon_model, direction_type):
+def _get_cable_vertices(pylon_model: str, direction_type: PylonDirectionType) -> List[CableVertex]:
     if "generic_pylon_25m" in pylon_model:
         return _create_generic_pylon_25_vertices()
     if "generic_pylon_50m" in pylon_model:
@@ -255,15 +264,7 @@ def _get_cable_vertices(pylon_model, direction_type):
     elif "tension" in pylon_model:
         return _create_rail_stop_tension()
     else:
-        return None
-
-
-@unique
-class PylonDirectionType(IntEnum):
-    normal = 0  # in ac-file mast is on left side, stuff on right side along x-axis
-    mirror = 1
-    start = 2
-    end = 3
+        raise Exception(msg='Pylon model not found for creating cable vertices: {}'.format(pylon_model))
 
 
 @unique
@@ -713,6 +714,21 @@ class Line(LineWithoutCables):
                                                        segment.start_pylon.direction_type)
             end_cable_vertices = _get_cable_vertices(segment.end_pylon.pylon_model,
                                                      segment.end_pylon.direction_type)
+
+            # make sure sagging is not too much -> correct catenary_a if needed
+            min_cable_height = 9999
+            max_sagging = 1
+            for vertex in start_cable_vertices:
+                min_cable_height = min(min_cable_height, vertex.height)
+                max_sagging = parameters.C2P_CATENARY_A_MAX_SAGGING * min_cable_height
+
+            max_sagging_catenary_a, b = _optimize_catenary(segment.length/2, 100 * catenary_a, max_sagging, 0.01)
+            corrected_catenary_a = catenary_a
+            if max_sagging_catenary_a > catenary_a:  # the larger the catenary_a, the less sagging
+                corrected_catenary_a = max_sagging_catenary_a
+                logging.debug("Changed catenary_a from {} to {}".format(catenary_a, max_sagging_catenary_a))
+
+            # now create cables with acceptable sagging
             for i in range(0, len(start_cable_vertices)):
                 my_radius = radius
                 my_number_extra_vertices = number_extra_vertices
@@ -725,7 +741,7 @@ class Line(LineWithoutCables):
                 if start_cable_vertices[i].no_catenary:
                     my_number_extra_vertices = 0
                 cable = Cable(start_cable_vertices[i], end_cable_vertices[i], my_radius, my_number_extra_vertices,
-                              catenary_a, segment.length)
+                              corrected_catenary_a, segment.length, max_sagging)
                 segment.cables.append(cable)
 
 
@@ -1527,14 +1543,16 @@ def _stg_angle(angle_normal):
         return 360 - angle_normal
 
 
-def _optimize_catenary(half_distance_pylons, max_value, sag, max_variation):
+def _optimize_catenary(half_distance_pylons: float, max_value: float, sag: float, max_variation: float):
     """
-    Calculates the parameter _a_ for a catenary with a given sag between the pylons and a mx_variation.
+    Calculates the parameter _a_ for a catenary with a given sag between the pylons and a max_variation.
     See http://www.mathdemos.org/mathdemos/catenary/catenary.html and https://en.wikipedia.org/wiki/Catenary
+    Max variation is factor applied to sag.
     """
+    my_variation = sag * max_variation
     for a in range(1, max_value):
         value = a * math.cosh(float(half_distance_pylons)/a) - a  # float() needed to make sure result is float
-        if (value >= (sag - max_variation)) and (value <= (sag + max_variation)):
+        if (value >= (sag - my_variation)) and (value <= (sag + my_variation)):
             return a, value
     return -1, -1
 
@@ -1976,7 +1994,7 @@ class TestOSMPylons(unittest.TestCase):
 
     def test_catenary(self):
         #  Values taken form example 2 in http://www.mathdemos.org/mathdemos/catenary/catenary.html
-        a, value = _optimize_catenary(170, 5000, 14, 0.01)
+        a, value = _optimize_catenary(170, 5000, 14, 0.001)
         print(a, value)
         self.assertAlmostEqual(1034/100, a/100, 2)
 
