@@ -17,8 +17,12 @@ import os
 import time
 from typing import List, Optional
 
+from shapely import affinity
+import shapely.geometry as shg
+
 import parameters
 from utils import calc_tile
+from utils.coordinates import Transformation
 from utils.vec2d import Vec2d
 from utils.utilities import assert_trailing_slash
 
@@ -66,8 +70,8 @@ class STGFile(object):
             stg = open(self.file_name, 'r')
             lines = stg.readlines()
             stg.close()
-        except IOError as reason:
-            logging.info("Error reading %s as it might not exist yet: %s", self.file_name, reason)
+        except IOError as ioe:
+            logging.info("Error reading %s as it might not exist yet: %s", self.file_name, ioe)
             return
 
         temp_other_list = []
@@ -201,6 +205,7 @@ class STGEntry(object):
         self.lat = lat
         self.elev = elev
         self.hdg = hdg
+        self.convex_hull = None  # a Polygon object set by parse_stg_entries_for_convex_hull(...) in local coordinates
 
     def _translate_verb_type(self, type_string: str) -> None:
         """Translates from a string in FGFS to an enumeration.
@@ -290,8 +295,9 @@ def read_stg_entries(stg_path_and_name: str, consider_shared: bool = True, our_m
     return entries
 
 
-def read_stg_entries_in_boundary(consider_shared: bool = True) -> List[STGEntry]:
-    """Returns a list of all STGEntries within the boundary according to parameters."""
+def read_stg_entries_in_boundary(consider_shared: bool=True, my_coord_transform: Transformation=None) -> List[STGEntry]:
+    """Returns a list of all STGEntries within the boundary according to parameters.
+    If my_cord_transform is set, then for each entry the convex hull is calculated in local coordinates."""
     stg_entries = list()
     stg_files = calc_tile.get_stg_files_in_boundary(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
                                                     parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH,
@@ -305,7 +311,89 @@ def read_stg_entries_in_boundary(consider_shared: bool = True) -> List[STGEntry]
 
     for filename in stg_files:
         stg_entries.extend(read_stg_entries(filename, consider_shared))
+
+    if my_coord_transform is not None:
+        _parse_stg_entries_for_convex_hull(stg_entries, my_coord_transform)
     return stg_entries
+
+
+def _parse_stg_entries_for_convex_hull(stg_entries: List[STGEntry], my_coord_transformation: Transformation) -> None:
+    """
+    Parses the ac-file content for a set of STGEntry objects and sets their boundary attribute
+    to be the convex hull of all points in the ac-file in the specified local coordinate system.
+    """
+    for entry in stg_entries:
+        if entry.verb_type in [STGVerbType.object_static, STGVerbType.object_shared]:
+            try:
+                ac_filename = entry.obj_filename
+                if ac_filename.endswith(".xml"):
+                    entry.overwrite_filename(_extract_ac_from_xml(entry.get_obj_path_and_name(),
+                                                                  entry.get_obj_path_and_name(
+                                                                      parameters.PATH_TO_SCENERY)))
+                boundary_polygon = _extract_boundary(entry.get_obj_path_and_name(),
+                                                     entry.get_obj_path_and_name(parameters.PATH_TO_SCENERY))
+                rotated_polygon = affinity.rotate(boundary_polygon, entry.hdg - 90, (0, 0))
+                x_y_point = my_coord_transformation.toLocal((entry.lon, entry.lat))
+                translated_polygon = affinity.translate(rotated_polygon, x_y_point[0], x_y_point[1])
+                if entry.verb_type is STGVerbType.object_static and parameters.OVERLAP_CHECK_CH_BUFFER_STATIC > 0.01:
+                    entry.convex_hull = translated_polygon.buffer(
+                        parameters.OVERLAP_CHECK_CH_BUFFER_STATIC, shg.CAP_STYLE.square)
+                elif entry.verb_type is STGVerbType.object_shared and parameters.OVERLAP_CHECK_CH_BUFFER_SHARED > 0.01:
+                    entry.convex_hull = translated_polygon.buffer(
+                        parameters.OVERLAP_CHECK_CH_BUFFER_SHARED, shg.CAP_STYLE.square)
+                else:
+                    entry.convex_hull = translated_polygon
+            except IOError as reason:
+                logging.warning("Ignoring unreadable stg_entry %s", reason)
+
+
+def _extract_boundary(ac_filename: str, alternative_ac_filename: str=None) -> shg.Polygon:
+    """Reads an ac-file and constructs a convex hull as a proxy to the real boundary.
+    No attempt is made to follow rotations and translations.
+    Returns a tuple (x_min, y_min, x_max, y_max) in meters.
+    An alternative path is tried, if the first path is not successful"""
+    numvert = 0
+    points = list()
+    try:
+        checked_filename = ac_filename
+        if not os.path.isfile(checked_filename) and alternative_ac_filename is not None:
+            checked_filename = alternative_ac_filename
+        with open(checked_filename, 'r') as my_file:
+            for my_line in my_file:
+                if 0 == my_line.find("numvert"):
+                    numvert = int(my_line.split()[1])
+                elif numvert > 0:
+                    vertex_values = my_line.split()
+                    # minus factor in y-axis due to ac3d coordinate system. Switch of y_min and y_max for same reason
+                    points.append((float(vertex_values[0]), -1 * float(vertex_values[2])))
+                    numvert -= 1
+    except IOError as e:
+        raise e
+
+    hull_polygon = shg.MultiPoint(points).convex_hull
+    return hull_polygon
+
+
+def _parse_ac_file_name(xml_string: str) -> str:
+    """Finds the corresponding ac-file in an xml-file"""
+    try:
+        x1 = xml_string.index("<path>")
+        x2 = xml_string.index("</path>", x1)
+    except ValueError as e:
+        raise e
+    ac_file_name = (xml_string[x1+6:x2]).strip()
+    return ac_file_name
+
+
+def _extract_ac_from_xml(xml_filename: str, alternative_xml_filename: str=None) -> str:
+    """Reads the *.ac filename out of an xml-file"""
+    checked_filename = xml_filename
+    if not os.path.isfile(checked_filename) and alternative_xml_filename is not None:
+        checked_filename = alternative_xml_filename
+    with open(checked_filename, 'r') as f:
+        xml_data = f.read()
+        ac_filename = _parse_ac_file_name(xml_data)
+        return ac_filename
 
 
 def _make_delimiter_string(our_magic: Optional[str], prefix: Optional[str], is_start: bool) -> str:

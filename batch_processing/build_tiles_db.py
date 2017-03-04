@@ -17,6 +17,7 @@ import roads
 import utils.aptdat_io as aptdat_io
 import utils.calc_tile as calc_tile
 import utils.coordinates as coordinates
+import utils.stg_io2
 from utils.utilities import BoundaryError, FGElev, parse_boundary
 
 
@@ -58,7 +59,7 @@ def _parse_exec_for_procedure(exec_argument: str) -> Procedures:
 
 
 def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_level: str,
-                         exec_argument: Procedures, airports: List[aptdat_io.Airport]) -> None:
+                         exec_argument: Procedures, my_airports: List[aptdat_io.Airport]) -> None:
     parameters.read_from_file(params_file_name)
     parameters.set_loglevel(log_level)
     parameters.USE_DATABASE = True  # just to be sure
@@ -71,37 +72,40 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_l
     logging.info("Processing tile {} in prefix {} with process id = {}".format(scenery_tile.tile_index,
                                                                                parameters.PREFIX,
                                                                                os.getpid()))
+    try:
+        # prepare shared resources
+        the_coords_transform = coordinates.Transformation(parameters.get_center_global())
+        my_fg_elev = FGElev(the_coords_transform)
+        my_stg_entries = utils.stg_io2.read_stg_entries_in_boundary(True, the_coords_transform)
 
-    # prepare shared resources
-    the_coords_transform = coordinates.Transformation(parameters.get_center_global())
-    my_fg_elev = FGElev(the_coords_transform)
+        # cannot be read once for all
+        my_blocked_areas = None
+        if exec_argument in (Procedures.all, Procedures.buildings, Procedures.roads):
+            my_blocked_areas = aptdat_io.get_apt_dat_blocked_areas_from_airports(the_coords_transform, my_airports)
 
-    # cannot be read once for all
-    my_blocked_areas = None
-    if exec_argument in (Procedures.all, Procedures.buildings, Procedures.roads):
-        my_blocked_areas = aptdat_io.get_apt_dat_blocked_areas_from_airports(the_coords_transform, airports)
+        # run programs
+        if exec_argument is Procedures.all:
+            buildings.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries)
+            roads.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries)
+            pylons.process(the_coords_transform, my_fg_elev, my_stg_entries)
+            platforms.process(the_coords_transform, my_fg_elev)
+            # piers.process(the_coords_transform, my_fg_elev)
+        elif exec_argument is Procedures.buildings:
+            buildings.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries)
+        elif exec_argument is Procedures.roads:
+            roads.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries)
+        elif exec_argument is Procedures.pylons:
+            pylons.process(the_coords_transform, my_fg_elev, my_stg_entries)
+        elif exec_argument is Procedures.platforms:
+            platforms.process(the_coords_transform, my_fg_elev)
+        elif exec_argument is Procedures.piers:
+            # piers.process(the_coords_transform, my_fg_elev)
+            pass
 
-    # run programs
-    if exec_argument is Procedures.all:
-        buildings.process(the_coords_transform, my_fg_elev, my_blocked_areas)
-        roads.process(the_coords_transform, my_fg_elev, my_blocked_areas)
-        pylons.process(the_coords_transform, my_fg_elev)
-        platforms.process(the_coords_transform, my_fg_elev)
-        # piers.process(the_coords_transform, my_fg_elev)
-    elif exec_argument is Procedures.buildings:
-        buildings.process(the_coords_transform, my_fg_elev, my_blocked_areas)
-    elif exec_argument is Procedures.roads:
-        roads.process(the_coords_transform, my_fg_elev, my_blocked_areas)
-    elif exec_argument is Procedures.pylons:
-        pylons.process(the_coords_transform, my_fg_elev)
-    elif exec_argument is Procedures.platforms:
-        platforms.process(the_coords_transform, my_fg_elev)
-    elif exec_argument is Procedures.piers:
-        # piers.process(the_coords_transform, my_fg_elev)
-        pass
-
-    # clean-up
-    my_fg_elev.close()
+        # clean-up
+        my_fg_elev.close()
+    except Exception:
+        logging.exception('Exception occured while processing tile {}.'.format(scenery_tile.tile_index))
 
     logging.info("******* Finished tile {} *******".format(scenery_tile.tile_index))
 

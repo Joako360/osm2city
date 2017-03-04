@@ -7,15 +7,13 @@ Created on Thu Feb 28 23:18:08 2013
 
 import copy
 import logging
-import os
 import random
 import re
-from math import sin, cos, radians, tan, sqrt, pi
-from typing import List, Dict, Optional
+from math import sin, cos, tan, sqrt, pi
+from typing import List, Dict
 
 import myskeleton
 import numpy as np
-from shapely import affinity
 import shapely.geometry as shg
 from shapely.geometry.base import BaseGeometry
 
@@ -24,11 +22,11 @@ import prepare_textures as tm
 import roofs
 import textures.texture as tex
 import utils.stg_io2
-from utils import ac3d, ac3d_fast, calc_tile
-from utils.coordinates import Transformation
+from utils import ac3d
+import utils.osmparser
 from utils.utilities import FGElev, progress, Stats
 from utils.vec2d import Vec2d
-from utils.stg_io2 import STGVerbType, read_stg_entries, read_stg_entries_in_boundary
+from utils.stg_io2 import STGVerbType
 
 
 class Building(object):
@@ -67,7 +65,8 @@ class Building(object):
             self._set_polygon(outer_ring, self.inner_rings_list)
         else:
             self.polygon = None
-        if self.inner_rings_list: self.roll_inner_nodes()
+        if self.inner_rings_list:
+            self.roll_inner_nodes()
         self.building_type = building_type
         self.parent = None
         self.parent_part = []
@@ -116,7 +115,7 @@ class Building(object):
         original_nodes = self.nnodes_outer + len(self.X_inner)
         self.polygon = self.polygon.simplify(tolerance)
         nnodes_simplified = original_nodes - (self.nnodes_outer + len(self.X_inner))
-        # FIXME: simplifiy interiors
+        # FIXME: simplify interiors
         return nnodes_simplified
 
     def _set_polygon(self, outer, inner=list()) -> None:
@@ -170,17 +169,17 @@ class Building(object):
 def _random_level_height() -> float:
     """ Calculates the height for each level of a building based on place and random factor"""
     # FIXME: other places (e.g. village)
-    return random.triangular(parameters.BUILDING_CITY_LEVEL_HEIGHT_LOW
-                          , parameters.BUILDING_CITY_LEVEL_HEIGHT_HEIGH
-                          , parameters.BUILDING_CITY_LEVEL_HEIGHT_MODE)
+    return random.triangular(parameters.BUILDING_CITY_LEVEL_HEIGHT_LOW,
+                             parameters.BUILDING_CITY_LEVEL_HEIGHT_HEIGH,
+                             parameters.BUILDING_CITY_LEVEL_HEIGHT_MODE)
 
 
 def _random_levels() -> int:
     """ Calculates the number of building levels based on place and random factor"""
     # FIXME: other places
-    return int(round(random.triangular(parameters.BUILDING_CITY_LEVELS_LOW
-                          , parameters.BUILDING_CITY_LEVELS_HEIGH
-                          , parameters.BUILDING_CITY_LEVELS_MODE)))
+    return int(round(random.triangular(parameters.BUILDING_CITY_LEVELS_LOW,
+                                       parameters.BUILDING_CITY_LEVELS_HEIGH,
+                                       parameters.BUILDING_CITY_LEVELS_MODE)))
 
 
 def _check_height(building_height, t):
@@ -225,94 +224,6 @@ def _check_height(building_height, t):
             return 0, 0
 
 
-def _get_nodes_from_acs(objs, own_prefix):
-    """load all .ac and .xml, extract nodes, skipping own .ac starting with own_prefix"""
-    # FIXME: don't skip .xml
-    # skip own .ac city-*.xml
-
-    all_nodes = np.array([[0, 0]])
-    
-    read_objects = {}
-
-    for b in objs:
-        fname = b.name
-        if fname.endswith(".xml"):
-            if fname.startswith(own_prefix):
-                continue
-            if os.path.exists(fname.replace(".xml", ".ac")):
-                fname = fname.replace(".xml", ".ac")
-            else:
-                if not os.path.exists(fname):
-                    continue
-                with open(fname) as f:
-                    content = f.readlines()
-                    for line in content:
-                        if "<path>" in line:
-                            path = os.path.dirname(fname)
-                            fname = path + os.sep + re.split("</?path>", line)[1]
-                            break
-        # print "now <%s> %s" % (fname, b.stg_typ)
-
-        # Path to shared objects is built elsewhere
-        if fname.endswith(".ac"):
-            try:
-                if fname in read_objects:
-                    logging.verbose("CACHED_AC %s" % fname)
-                    ac = read_objects[fname]
-                else:
-                    logging.debug("READ_AC %s" % fname)
-                    ac = ac3d_fast.File(file_name=fname)
-                    read_objects[fname] = ac
-                                
-                angle = radians(b.stg_hdg)
-                rotation_matrix = np.array([[cos(angle), -sin(angle)],
-                                    [sin(angle), cos(angle)]])
-    
-                transposed_ac_nodes = -np.delete(ac.nodes_as_array().transpose(), 1, 0)[::-1]
-                transposed_ac_nodes = np.dot(rotation_matrix, transposed_ac_nodes)
-                transposed_ac_nodes += b.anchor.as_array().reshape(2, 1)
-                all_nodes = np.append(all_nodes, transposed_ac_nodes.transpose(), 0)
-            except Exception as e:
-                logging.error("Error reading %s %s" % (fname, e))
-
-    return all_nodes
-
-
-def _is_static_object_nearby(b: Building, X, static_tree) -> bool:  # X is ndarray, static_tree is KDTree
-    """check for static/shared objects close to given building"""
-    # FIXME: which radius? Or use centroid point? make radius a parameter
-    radius = parameters.OVERLAP_RADIUS  # alternative: radius = max(lenX)
-
-    # -- query_ball_point may return funny lists [[], [], .. ]
-    #    filter these
-    nearby = static_tree.query_ball_point(X, radius)
-    nearby = [x for x in nearby if x]
-    nearby = [item for sublist in nearby for item in sublist]
-    nearby = list(set(nearby))
-    d = static_tree.data
-
-    if nearby:
-        if parameters.OVERLAP_CHECK_INSIDE:
-            inside = False
-            for i in nearby:
-                inside = b.polygon.contains(shg.Point(d[i]))
-                if inside:
-                    break        
-            if not inside:
-                return False
-        try:
-            if b.name is None or len(b.name) == 0:
-                logging.info("Static objects nearby. Skipping %d is near %d building nodes",
-                             b.osm_id, len(nearby))
-            else:
-                logging.info("Static objects nearby. Skipping %s (%d) is near %d building nodes",
-                             b.name, b.osm_id, len(nearby))
-        except RuntimeError as e:
-            logging.error("FIXME: %s %s ID %d", e, b.name.encode('ascii', 'ignore'), b.osm_id)
-        return True
-    return False
-
-
 def _is_large_enough(b: Building) -> bool:
     """Checks whether a given building's area is too small for inclusion.
     Never drop tall buildings.
@@ -329,7 +240,7 @@ def _is_large_enough(b: Building) -> bool:
     return True
 
 
-def _compute_height_and_levels(b: Building) -> float:
+def _compute_height_and_levels(b: Building) -> None:
     """Determines total height (and number of levels) of a building based on
        OSM values and other logic"""
     try:
@@ -368,7 +279,7 @@ def _compute_roof_height(b: Building, max_height: float=1e99):
         # get global roof_height and height for each vertex
         if 'roof:height' in b.tags:
             # force clean of tag if the unit is given
-            roof_height = float(re.sub(' .*', ' ', b.tags['roof:height'].strip()))
+            roof_height = utils.osmparser.parse_length(b.tags['roof:height'])
         else:
             if 'roof:angle' in b.tags:
                 angle = float(b.tags['roof:angle'])
@@ -454,7 +365,7 @@ def _compute_roof_height(b: Building, max_height: float=1e99):
     else:  # roof types other than skillion
         try:
             # get roof:height given by osm
-            b.roof_height = float(re.sub(' .*', ' ', b.tags['roof:height'].strip()))
+            b.roof_height = utils.osmparser.parse_length(b.tags['roof:height'])
             
         except:
             # random roof:height
@@ -501,7 +412,7 @@ def decide_lod(buildings: List[Building], stats: Stats) -> None:
         stats.count_LOD(lod)
 
 
-def analyse(buildings: List[Building], static_objects: Optional[List[Building]], fg_elev: FGElev,
+def analyse(buildings: List[Building], fg_elev: FGElev,
             facade_mgr: tex.FacadeManager, roof_mgr: tex.RoofManager, stats: Stats) -> List[Building]:
     """Analyse all buildings:
     - calculate area
@@ -511,15 +422,6 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
 
     On entry, we're in global coordinates. Change to local coordinates.
     """
-    # -- build KDtree for static models
-    from scipy.spatial import KDTree
-
-    if static_objects:
-        s = _get_nodes_from_acs(static_objects, parameters.PREFIX + "city")
-
-        np.savetxt(parameters.PREFIX + os.sep + "nodes.dat", s)
-        static_tree = KDTree(s, leafsize=10)  # -- switch to brute force at 10
-
     new_buildings = []
     for b in buildings:
         # am Anfang Geometrieanalyse
@@ -607,13 +509,7 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
                 b.lenX = np.roll(b.lenX, 1)
                 b._set_polygon(Xo, b.inner_rings_list)
 
-        b.lenX = b.lenX  # FIXME: compute on the fly, or on set_polygon()?
-                        #        Or is there a shapely equivalent?
-
-        # -- check for nearby static objects
-        if static_objects and _is_static_object_nearby(b, Xo, static_tree):
-            stats.skipped_nearby += 1
-            continue
+        b.lenX = b.lenX  # FIXME: compute on the fly, or on set_polygon()? Or is there a shapely equivalent?
 
         # -- work on height and levels
 
@@ -659,7 +555,7 @@ def analyse(buildings: List[Building], static_objects: Optional[List[Building]],
             min_height = 0
             if "min_height" in b.tags:
                 try:
-                    min_height = float(b.tags['min_height'])
+                    min_height = utils.osmparser.parse_length(b.tags['min_height'])
                 except:
                     min_height = 0
             if b.height - min_height < parameters.BUILDING_COMPLEX_MIN_HEIGHT and 'roof:shape' not in b.tags:
@@ -913,10 +809,10 @@ def _write_and_count_vert(ac_object: ac3d.Object, b: Building) -> None:
     
     try:
         if 'min_height' in b.tags:
-            min_height = float(b.tags['min_height'])
+            min_height = utils.osmparser.parse_length(b.tags['min_height'])
             z = b.ground_elev + min_height
     except:
-        logging.warning("Error reading min_height for building" + b.osm_id)
+        logging.warning("Error reading min_height for building %d", b.osm_id)
         pass
 
     # ground nodes        
@@ -1002,8 +898,6 @@ def write(ac_file_name: str, buildings: List[Building], fg_elev: FGElev,
     lod_objects = list()
     lod_objects.append(ac.new_object('LOD_rough', tm.atlas_file_name + '.png'))
     lod_objects.append(ac.new_object('LOD_detail', tm.atlas_file_name + '.png'))
-
-    number_of_buildings = 0
 
     # get local medium ground elevation for each building
     for ib, b in enumerate(buildings):
@@ -1148,20 +1042,6 @@ def map_building_type(tags) -> str:
     return 'unknown'
 
 
-def read_buildings_from_stg_entries(path: str, stg_fname: str, our_magic: str,
-                                    coords_transform: Transformation) -> List[Building]:
-    """Same as read_stg_entries, but returns osm2city.Building objects"""
-    stg_entries = read_stg_entries(path + stg_fname, parameters.OVERLAP_CHECK_CONSIDER_SHARED, our_magic)
-    building_objs = list()
-    for entry in stg_entries:
-        point = shg.Point(coords_transform.toLocal((entry.lon, entry.lat)))
-        building_objs.append(Building(osm_id=-1, tags=dict(), outer_ring=point,
-                                      name=entry.get_obj_path_and_name(),
-                                      height=0, levels=0, stg_typ=entry.verb_type,
-                                      stg_hdg=entry.hdg))
-    return building_objs
-
-
 def overlap_check_blocked_areas(buildings: List[Building], blocked_areas: List[shg.Polygon]) -> List[Building]:
     cleared_buildings = list()
     for building in buildings:
@@ -1174,113 +1054,25 @@ def overlap_check_blocked_areas(buildings: List[Building], blocked_areas: List[s
     return cleared_buildings
 
 
-# ======================= New overlap detection ==========================
-
-def overlap_check_convex_hull(buildings: List[Building], my_coord_transformation: Transformation,
+def overlap_check_convex_hull(buildings: List[Building], stg_entries: List[utils.stg_io2.STGEntry],
                               stats: Stats) -> List[Building]:
     """Checks for all buildings whether their polygon intersects with a static or shared object's convex hull.
-    Be aware that method 'analyse' also makes overlap checks based on circles around static/shared
-    object's anchor point.
     """
-    boundaries = _create_static_obj_boundaries(my_coord_transformation)
-
     cleared_buildings = list()
 
     for building in buildings:
         is_intersecting = False
-        for key, value in boundaries.items():
-            if value.intersects(building.polygon):
+        for entry in stg_entries:
+            if entry.convex_hull is not None and entry.convex_hull.intersects(building.polygon):
                 is_intersecting = True
                 stats.skipped_nearby += 1
                 if building.name is None or len(building.name) == 0:
-                    logging.info("Convex hull of object '%s' is intersecting. Skipping building with osm_id %d",
-                                 key, building.osm_id)
+                    logging.debug("Convex hull of object '%s' is intersecting. Skipping building with osm_id %d",
+                                  entry.obj_filename, building.osm_id)
                 else:
-                    logging.info("Convex hull of object '%s' is intersecting. Skipping building '%s' (osm_id %d)",
-                                 key, building.name, building.osm_id)
+                    logging.debug("Convex hull of object '%s' is intersecting. Skipping building '%s' (osm_id %d)",
+                                  entry.obj_filename, building.name, building.osm_id)
                 break
         if not is_intersecting:
             cleared_buildings.append(building)
     return cleared_buildings
-
-
-def _parse_ac_file_name(xml_string: str) -> str:
-    """Finds the corresponding ac-file in an xml-file"""
-    try:
-        x1 = xml_string.index("<path>")
-        x2 = xml_string.index("</path>", x1)
-    except ValueError as e:
-        raise e
-    ac_file_name = (xml_string[x1+6:x2]).strip()
-    return ac_file_name
-
-
-def _extract_boundary(ac_filename: str, alternative_ac_filename: str=None) -> shg.Polygon:
-    """Reads an ac-file and constructs a convex hull as a proxy to the real boundary.
-    No attempt is made to follow rotations and translations.
-    Returns a tuple (x_min, y_min, x_max, y_max) in meters.
-    An alternative path is tried, if the first path is not successful"""
-    numvert = 0
-    points = list()
-    try:
-        checked_filename = ac_filename
-        if not os.path.isfile(checked_filename) and alternative_ac_filename is not None:
-            checked_filename = alternative_ac_filename
-        with open(checked_filename, 'r') as my_file:
-            for my_line in my_file:
-                if 0 == my_line.find("numvert"):
-                    numvert = int(my_line.split()[1])
-                elif numvert > 0:
-                    vertex_values = my_line.split()
-                    # minus factor in y-axis due to ac3d coordinate system. Switch of y_min and y_max for same reason
-                    points.append((float(vertex_values[0]), -1 * float(vertex_values[2])))
-                    numvert -= 1
-    except IOError as e:
-        raise e
-
-    hull_polygon = shg.MultiPoint(points).convex_hull
-    return hull_polygon
-
-
-def _extract_ac_from_xml(xml_filename: str, alternative_xml_filename: str=None) -> str:
-    """Reads the *.ac filename out of an xml-file"""
-    checked_filename = xml_filename
-    if not os.path.isfile(checked_filename) and alternative_xml_filename is not None:
-        checked_filename = alternative_xml_filename
-    with open(checked_filename, 'r') as f:
-        xml_data = f.read()
-        ac_filename = _parse_ac_file_name(xml_data)
-        return ac_filename
-
-
-def _create_static_obj_boundaries(my_coord_transformation: Transformation) -> Dict[str, shg.Polygon]:
-    """
-    Finds all static objects referenced in stg-files within the scenery boundaries and returns them as a list of
-    Shapely polygon objects (convex hull of all points in ac-files) in the local x/y coordinate system.
-    """
-    boundaries = dict()
-    stg_entries = read_stg_entries_in_boundary(parameters.OVERLAP_CHECK_CONSIDER_SHARED)
-    for entry in stg_entries:
-        if entry.verb_type in [STGVerbType.object_static, STGVerbType.object_shared]:
-            try:
-                ac_filename = entry.obj_filename
-                if ac_filename.endswith(".xml"):
-                    entry.overwrite_filename(_extract_ac_from_xml(entry.get_obj_path_and_name(),
-                                                                  entry.get_obj_path_and_name(parameters.PATH_TO_SCENERY)))
-                boundary_polygon = _extract_boundary(entry.get_obj_path_and_name(),
-                                                     entry.get_obj_path_and_name(parameters.PATH_TO_SCENERY))
-                rotated_polygon = affinity.rotate(boundary_polygon, entry.hdg - 90, (0, 0))
-                x_y_point = my_coord_transformation.toLocal((entry.lon, entry.lat))
-                translated_polygon = affinity.translate(rotated_polygon, x_y_point[0], x_y_point[1])
-                if entry.verb_type is STGVerbType.object_static and parameters.OVERLAP_CHECK_CH_BUFFER_STATIC > 0.01:
-                    boundaries[ac_filename] = translated_polygon.buffer(
-                        parameters.OVERLAP_CHECK_CH_BUFFER_STATIC, shg.CAP_STYLE.square)
-                elif entry.verb_type is STGVerbType.object_shared and parameters.OVERLAP_CHECK_CH_BUFFER_SHARED > 0.01:
-                    boundaries[ac_filename] = translated_polygon.buffer(
-                        parameters.OVERLAP_CHECK_CH_BUFFER_SHARED, shg.CAP_STYLE.square)
-                else:
-                    boundaries[ac_filename] = translated_polygon
-            except IOError as reason:
-                logging.warning("Ignoring unreadable stg_entry %s", reason)
-
-    return boundaries

@@ -76,6 +76,8 @@ FG_ELEV = '"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'
 FG_ELEV_CACHE = True  # saves the elevation probing results to a file, so next rerun is faster (but uses disk space!)
 PROBE_FOR_WATER = False  # only possible with FGElev version after 9th of November 2016 / FG 2016.4.1
 
+TILE_SIZE = 2000            # -- tile size in meters for clustering of buildings, roads, ...
+
 USE_EXTERNAL_MODELS = False
 
 WRITE_CLUSTER_STATS = False
@@ -92,12 +94,8 @@ OVERLAP_CHECK_CH_BUFFER_SHARED = 0.0
 # -- Check for overlap with static and shared models. The scenery folder must contain an "Objects" folder
 OVERLAP_CHECK = True
 OVERLAP_CHECK_CONSIDER_SHARED = True
-# -- Additionally check if one of the near nodes is actually inside the building
-OVERLAP_CHECK_INSIDE = False
-OVERLAP_RADIUS = 5
-BUILDING_REMOVE_WITH_PARTS = False
-
-TILE_SIZE = 2000            # -- tile size in meters for clustering of buildings
+# when a static bridge model intersect with a way, how much must at least be left so the way is kept after intersection
+OVERLAP_CHECK_BRIDGE_MIN_REMAINING = 10
 
 # -- skip buildings based on their OSM name tag or OSM ID, in case there's already
 #    a static model for these, and the overlap check fails.
@@ -244,6 +242,7 @@ BRIDGE_BODY_HEIGHT = 0.9         # height of bridge body
 EMBANKMENT_TEXTURE = textures.road.EMBANKMENT_1  # Texture for the embankment
 MIN_ABOVE_GROUND_LEVEL = 0.01    # how much a highway / railway is at least hovering above ground
 HIGHWAY_TYPE_MIN = 4  # The lower the number, the more ways are added. See roads.HighwayType
+HIGHWAY_TYPE_MIN_ROUGH_LOD = 6  # the minimum type tobe added to the rough LOD clusters
 POINTS_ON_LINE_DISTANCE_MAX = 1000  # the maximum distance between two points on a line. If longer, then new points are added
 
 

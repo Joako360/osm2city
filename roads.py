@@ -79,16 +79,17 @@ import logging
 import math
 import random
 import textwrap
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import graph
-import linear
-import linear_bridge
 import matplotlib.pyplot as plt
 import numpy as np
-import parameters
 import scipy.interpolate
 import shapely.geometry as shg
+
+import linear
+import linear_bridge
+import parameters
 import textures.road
 from cluster import ClusterContainer
 from utils import osmparser, coordinates, ac3d, stg_io2, utilities, aptdat_io
@@ -99,12 +100,23 @@ SCENERY_TYPE = "Roads"
 
 
 BRIDGE_KEY = 'bridge'  # the original OSM tag key
+MAN_MADE_KEY = 'man_made'
 REPLACED_BRIDGE_KEY = 'replaced_bridge'  # specifies a way that was originally a bridge, but due to length was changed
 
 
 def _is_bridge(way: osmparser.Way) -> bool:
-    """Returns true if the tags for this way constains the OSM key for bridge."""
+    """Returns true if the tags for this way contains the OSM key for bridge."""
+    if MAN_MADE_KEY in way.tags and way.tags[MAN_MADE_KEY] == BRIDGE_KEY:
+        return True
     return BRIDGE_KEY in way.tags
+
+
+def _replace_bridge_tags(tags: Dict[str, str]) -> None:
+    if BRIDGE_KEY in tags:
+        tags.pop(BRIDGE_KEY)
+    if MAN_MADE_KEY in tags and tags[MAN_MADE_KEY] == BRIDGE_KEY:
+        tags.pop(MAN_MADE_KEY)
+    tags[REPLACED_BRIDGE_KEY] = 'yes'
 
 
 def _is_replaced_bridge(way: osmparser.Way) -> bool:
@@ -230,7 +242,7 @@ def get_highway_attributes(highway_type):
     return priority, tex, width
 
 
-def highway_type_from_osm_tags(value):
+def highway_type_from_osm_tags(value: str) -> Optional[HighwayType]:
     """Based on OSM tags deducts the HighWayType.
     Returns None if not a highway are unknown value.
 
@@ -344,13 +356,15 @@ class Roads(object):
         self.nodes_dict = nodes_dict
         self.graph = None  # network graph of ways
         self.roads_clusters = None
+        self.roads_rough_clusters = None
         self.railways_clusters = None
 
     def __str__(self):
         return "%i ways, %i roads, %i railways, %i bridges" % (len(self.ways_list), len(self.roads_list),
                                                                len(self.railway_list), len(self.bridges_list))
 
-    def process(self, blocked_areas: List[shg.Polygon], stats: utilities.Stats) -> None:
+    def process(self, blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
+                stats: utilities.Stats) -> None:
         """Processes the OSM data until data can be clusterized.
 
         Needs to be called after OSM data have been processed using the store_way callback method from
@@ -359,7 +373,8 @@ class Roads(object):
         self._remove_tunnels()
         self._replace_short_bridges_with_ways()
         self._check_ways_in_water()
-        self._check_blocked_areas(blocked_areas)
+        self._check_against_blocked_areas(blocked_areas)
+        self._check_against_stg_entries(stg_entries)
         self._cleanup_topology()
         self._check_points_on_line_distance()
 
@@ -434,7 +449,7 @@ class Roads(object):
                 logging.warning("Unable to remove way with osm_id = {}".format(way.osm_id))
         self.ways_list.extend(extra_ways)
 
-    def _check_blocked_areas(self, blocked_areas: List[shg.Polygon]) -> None:
+    def _check_against_blocked_areas(self, blocked_areas: List[shg.Polygon]) -> None:
         """Makes sure that there are no ways, which go across a blocked area (e.g. airport runway).
         Ways are clipped over into two ways if intersecting."""
         if not blocked_areas:
@@ -449,24 +464,66 @@ class Roads(object):
                         logging.warning("Intersection of way (osm_id=%d) with blocked area cannot be processed.",
                                         way.osm_id)
                         continue
-                    # last node in first line is "new" node not found in original line
-                    index = len(list(my_multiline.geoms[0].coords)) - 2
-                    original_refs = way.refs
-                    way.refs = original_refs[:index + 1]
-                    new_way = _init_way_from_existing(way, original_refs[index + 1:])
-                    new_ways.append(new_way)
-                    # now add new nodes from intersection
-                    lon_lat = self.transform.toGlobal(list(my_multiline.geoms[0].coords)[-1])
-                    new_node = osmparser.Node(osmparser.get_next_pseudo_osm_id(), lon_lat[1], lon_lat[0])
-                    self.nodes_dict[new_node.osm_id] = new_node
-                    way.refs.append(new_node.osm_id)
-                    lon_lat = self.transform.toGlobal(list(my_multiline.geoms[1].coords)[0])
-                    new_node = osmparser.Node(osmparser.get_next_pseudo_osm_id(), lon_lat[1], lon_lat[0])
-                    self.nodes_dict[new_node.osm_id] = new_node
-                    new_way.refs.insert(0, new_node.osm_id)
-                    logging.info("Split way (osm_id=%d) into 2 ways due to blocked area.", way.osm_id)
+                    new_ways.append(self._split_way_for_object(my_multiline, way))
 
         self.ways_list.extend(new_ways)
+
+    def _check_against_stg_entries(self, stg_entries: List[stg_io2.STGEntry]) -> None:
+        """Makes sure that there are no ways tagged as bridges, which go across a STGEntry.
+        Ways are clipped over into two ways if intersecting."""
+        if not stg_entries:
+            return
+        new_ways = list()
+        for way in reversed(self.ways_list):
+            if not _is_bridge(way):
+                continue
+            my_line = self._line_string_from_way(way)
+            for stg_entry in stg_entries:
+                if stg_entry.verb_type is not stg_io2.STGVerbType.object_static:
+                    continue
+                if my_line.intersects(stg_entry.convex_hull):
+                    my_line_difference = my_line.difference(stg_entry.convex_hull)
+                    if isinstance(my_line_difference, shg.GeometryCollection) and my_line_difference.is_empty:
+                        self.ways_list.remove(way)
+                        logging.debug("Remove way (osm_id=%d) due to static object.", way.osm_id)
+                        continue
+                    if isinstance(my_line_difference, shg.LineString):
+                        if my_line_difference.length < parameters.OVERLAP_CHECK_BRIDGE_MIN_REMAINING:
+                            self.ways_list.remove(way)
+                            logging.debug("Remove way (osm_id=%d) due to static object.", way.osm_id)
+                            continue
+                        way.refs = list()
+                        the_coordinates = list(my_line_difference.coords)
+                        for coords in the_coordinates:
+                            lon_lat = self.transform.toGlobal(coords)
+                            new_node = osmparser.Node(osmparser.get_next_pseudo_osm_id(), lon_lat[1], lon_lat[0])
+                            self.nodes_dict[new_node.osm_id] = new_node
+                            way.refs.append(new_node.osm_id)
+                        logging.debug("Reduced way length (osm_id=%d) due to static object.", way.osm_id)
+                        continue
+                    if isinstance(my_line_difference, shg.MultiLineString) and my_line_difference.geoms == 2:
+                        new_ways.append(self._split_way_for_object(my_line_difference, way))
+
+        self.ways_list.extend(new_ways)
+
+    def _split_way_for_object(self, my_multiline: shg.MultiLineString, original_way: osmparser.Way) -> osmparser.Way:
+        """Processes an original way split by an object (blocked area, stg_entry) and creates additional way"""
+        # last node in first line is "new" node not found in original line
+        index = len(list(my_multiline.geoms[0].coords)) - 2
+        original_refs = original_way.refs
+        original_way.refs = original_refs[:index + 1]
+        new_way = _init_way_from_existing(original_way, original_refs[index + 1:])
+        # now add new nodes from intersection
+        lon_lat = self.transform.toGlobal(list(my_multiline.geoms[0].coords)[-1])
+        new_node = osmparser.Node(osmparser.get_next_pseudo_osm_id(), lon_lat[1], lon_lat[0])
+        self.nodes_dict[new_node.osm_id] = new_node
+        original_way.refs.append(new_node.osm_id)
+        lon_lat = self.transform.toGlobal(list(my_multiline.geoms[1].coords)[0])
+        new_node = osmparser.Node(osmparser.get_next_pseudo_osm_id(), lon_lat[1], lon_lat[0])
+        self.nodes_dict[new_node.osm_id] = new_node
+        new_way.refs.insert(0, new_node.osm_id)
+        logging.debug("Split way (osm_id=%d) into 2 ways due to blocked area.", original_way.osm_id)
+        return new_way
 
     def _remove_unused_nodes(self):
         """Remove all nodes which are not used in ways in order not to do elevation probing in vane."""
@@ -545,9 +602,8 @@ class Roads(object):
             if _is_bridge(the_way):
                 center = self._line_string_from_way(the_way)
                 if center.length < parameters.BRIDGE_MIN_LENGTH:
-                    the_way.tags.pop(BRIDGE_KEY)
-                    the_way.tags[REPLACED_BRIDGE_KEY] = 'yes'
-    
+                    _replace_bridge_tags(the_way.tags)
+
     def _keep_only_bridges_and_embankments(self):
         """Remove everything that is not elevated - for debugging purposes"""
         for the_way in self.roads_list:
@@ -962,15 +1018,24 @@ class Roads(object):
         """
         lmin, lmax = [Vec2d(self.transform.toLocal(c)) for c in parameters.get_extent_global()]
         self.roads_clusters = ClusterContainer(lmin, lmax)
+        self.roads_rough_clusters = ClusterContainer(lmin, lmax)
         self.railways_clusters = ClusterContainer(lmin, lmax)
 
         for the_object in self.bridges_list + self.roads_list + self.railway_list:
             if _is_railway(the_object):
-                cluster_ref = self.railways_clusters.append(Vec2d(the_object.center.centroid.coords[0]), the_object,
-                                                            stats)
+                cluster_ref = self.railways_clusters.append(Vec2d(the_object.center.centroid.coords[0]),
+                                                            the_object, stats)
             else:
-                cluster_ref = self.roads_clusters.append(Vec2d(the_object.center.centroid.coords[0]), the_object,
-                                                         stats)
+                if _is_highway(the_object):
+                    if highway_type_from_osm_tags(the_object.tags["highway"]).value < parameters.HIGHWAY_TYPE_MIN_ROUGH_LOD:
+                        cluster_ref = self.roads_clusters.append(Vec2d(the_object.center.centroid.coords[0]),
+                                                                 the_object, stats)
+                    else:
+                        cluster_ref = self.roads_rough_clusters.append(Vec2d(the_object.center.centroid.coords[0]),
+                                                                       the_object, stats)
+                else:
+                    cluster_ref = self.roads_clusters.append(Vec2d(the_object.center.centroid.coords[0]), the_object,
+                                                             stats)
             the_object.cluster_ref = cluster_ref
 
 
@@ -982,7 +1047,7 @@ def process_osm_ways(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int,
 
     for key, way in ways_dict.items():
         if way.osm_id in parameters.SKIP_LIST:
-            logging.info("SKIPPING OSM_ID %i", way.osm_id)
+            logging.debug("SKIPPING OSM_ID %i", way.osm_id)
             continue
 
         if _is_highway(way):
@@ -1003,7 +1068,7 @@ def process_osm_ways(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int,
 
 
 def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, stg_manager, stg_paths, is_railway,
-                      coords_transform: coordinates.Transformation, stats: utilities.Stats):
+                      coords_transform: coordinates.Transformation, stats: utilities.Stats, is_rough_LOD: bool):
     for cl in clusters:
         if len(cl.objects) < parameters.CLUSTER_MIN_OBJECTS:
             continue  # skip almost empty clusters
@@ -1012,6 +1077,8 @@ def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, s
             file_start = "railways"
         else:
             file_start = "roads"
+        if is_rough_LOD:
+            file_start += "_rough"
         file_name = replacement_prefix + file_start + "%02i%02i" % (cl.grid_index.ix, cl.grid_index.iy)
         center_global = Vec2d(coords_transform.toGlobal(cl.center))
         offset_local = cl.center
@@ -1028,7 +1095,11 @@ def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, s
         suffix = ".xml"
         if is_railway:
             suffix = ".ac"
-        path_to_stg = stg_manager.add_object_static(file_name + suffix, center_global, cluster_elev, 0)
+        stg_verb_type = stg_io2.STGVerbType.object_building_mesh_detailed
+        if is_rough_LOD:
+            stg_verb_type = stg_io2.STGVerbType.object_building_mesh_rough
+        path_to_stg = stg_manager.add_object_static(file_name + suffix, center_global, cluster_elev, 0,
+                                                    stg_verb_type)
         stg_paths.add(path_to_stg)
         ac.write(path_to_stg + file_name + '.ac')
 
@@ -1113,7 +1184,7 @@ def debug_create_eps(roads, clusters, elev, coords_transform: coordinates.Transf
 
 
 def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
-            blocked_areas: List[shg.Polygon]) -> None:
+            blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry]) -> None:
     random.seed(42)
     stats = utilities.Stats()
 
@@ -1137,7 +1208,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     path_to_output = parameters.get_output_path()
     logging.debug("before linear " + str(roads))
 
-    roads.process(blocked_areas, stats)  # does the heavy lifting based on OSM data including clustering
+    roads.process(blocked_areas, stg_entries, stats)  # does the heavy lifting based on OSM data including clustering
 
     replacement_prefix = parameters.get_repl_prefix()
     stg_manager = stg_io2.STGManager(path_to_output, SCENERY_TYPE, OUR_MAGIC, replacement_prefix)
@@ -1146,9 +1217,11 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     stg_paths = set()
 
     _process_clusters(roads.railways_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, True,
-                      coords_transform, stats)
+                      coords_transform, stats, True)
     _process_clusters(roads.roads_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, False,
-                      coords_transform, stats)
+                      coords_transform, stats, False)
+    _process_clusters(roads.roads_rough_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, False,
+                      coords_transform, stats, True)
 
     roads.debug_plot(show=True, plot_junctions=False, clusters=roads.roads_clusters)
     
@@ -1182,8 +1255,9 @@ if __name__ == "__main__":
     my_blocked_areas = aptdat_io.get_apt_dat_blocked_areas(my_coords_transform,
                                                            parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
                                                            parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
+    my_stg_entries = stg_io2.read_stg_entries_in_boundary(True, my_coords_transform)
 
-    process(my_coords_transform, my_fg_elev, my_blocked_areas)
+    process(my_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries)
 
     my_fg_elev.close()
 

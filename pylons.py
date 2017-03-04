@@ -497,13 +497,11 @@ class WindFarm(object):
 
 
 def _process_osm_wind_turbines(osm_nodes_dict: Dict[int, osmparser.Node], coords_transform: coordinates.Transformation,
-                               fg_elev: utilities.FGElev) -> List[WindTurbine]:
+                               fg_elev: utilities.FGElev, stg_entries: List[stg_io2.STGEntry]) -> List[WindTurbine]:
     my_wind_turbines = list()
     wind_farms = list()
 
-    # make sure no existing shared objects are duplicated. Do not care what shared obejct within distance
-    stg_entries = stg_io2.read_stg_entries_in_boundary()
-
+    # make sure no existing shared objects are duplicated. Do not care what shared object within distance
     # find relevant / valid wind turbines
     for key, node in osm_nodes_dict.items():
         if "generator:source" in node.tags and node.tags["generator:source"] == "wind":
@@ -1550,10 +1548,13 @@ def _optimize_catenary(half_distance_pylons: float, max_value: float, sag: float
     Max variation is factor applied to sag.
     """
     my_variation = sag * max_variation
-    for a in range(1, max_value):
-        value = a * math.cosh(float(half_distance_pylons)/a) - a  # float() needed to make sure result is float
-        if (value >= (sag - my_variation)) and (value <= (sag + my_variation)):
-            return a, value
+    try:
+        for a in range(1, max_value):
+            value = a * math.cosh(float(half_distance_pylons)/a) - a  # float() needed to make sure result is float
+            if (value >= (sag - my_variation)) and (value <= (sag + my_variation)):
+                return a, value
+    except OverflowError:
+        return -1, -1
     return -1, -1
 
 
@@ -1771,7 +1772,8 @@ def _fetch_osm_file_data() -> Tuple[Dict[int, osmparser.Node], Dict[int, osmpars
     return handler.nodes_dict, handler.ways_dict
 
 
-def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev) -> None:
+def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
+            stg_entries: List[stg_io2.STGEntry]) -> None:
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
 
@@ -1859,7 +1861,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     if parameters.C2P_PROCESS_WIND_TURBINES:
         if parameters.USE_DATABASE:
             osm_nodes_dict = osmparser.fetch_db_nodes_isolated(["generator:source=>wind"])
-        wind_turbines = _process_osm_wind_turbines(osm_nodes_dict, coords_transform, fg_elev)
+        wind_turbines = _process_osm_wind_turbines(osm_nodes_dict, coords_transform, fg_elev, stg_entries)
         logging.info("Number of valid wind turbines found: {}".format(len(wind_turbines)))
 
     # free some memory
@@ -1919,8 +1921,9 @@ if __name__ == "__main__":
 
     my_coords_transform = coordinates.Transformation(parameters.get_center_global())
     my_fg_elev = utilities.FGElev(my_coords_transform)
+    my_stg_entries = stg_io2.read_stg_entries_in_boundary()
 
-    process(my_coords_transform, my_fg_elev)
+    process(my_coords_transform, my_fg_elev, my_stg_entries)
 
     my_fg_elev.close()
 
@@ -1993,7 +1996,7 @@ class TestOSMPylons(unittest.TestCase):
         self.assertAlmostEqual(50, vertex.y, 2)
 
     def test_catenary(self):
-        #  Values taken form example 2 in http://www.mathdemos.org/mathdemos/catenary/catenary.html
+        #  Values taken from example 2 in http://www.mathdemos.org/mathdemos/catenary/catenary.html
         a, value = _optimize_catenary(170, 5000, 14, 0.001)
         print(a, value)
         self.assertAlmostEqual(1034/100, a/100, 2)

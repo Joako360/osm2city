@@ -202,8 +202,6 @@ def separate_skillion(ac_object: ac.Object, b):
     for x in b.X:
         ac_object.node(-x[1], b.ground_elev + b.height - b.roof_height, -x[0])
 
-    print(('SKILLION ', b.osm_id, ' ', b.tags))
-
     # We don't want the hipped part to be greater than the height, which is 45 deg
 
     # FLAT PART

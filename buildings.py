@@ -70,7 +70,7 @@ import prepare_textures
 import textures.texture as tex
 import utils.stg_io2
 import utils.vec2d as v
-from utils import aptdat_io, osmparser, calc_tile, coordinates, stg_io2, utilities
+from utils import aptdat_io, osmparser, coordinates, stg_io2, utilities
 
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
 SCENERY_TYPE = "Buildings"
@@ -200,7 +200,7 @@ def _process_osm_relation(rel_nodes_dict: Dict[int, osmparser.Node], rel_ways_di
                     my_buildings.append(a_building)
 
             if not outer_multipolygons and not outer_ways:
-                logging.info("Skipping relation %i: no outer way." % relation.osm_id)
+                logging.debug("Skipping relation %i: no outer way." % relation.osm_id)
     additional_buildings = len(my_buildings) - number_of_buildings_before
     logging.info("Added {} buildings based on relations.".format(additional_buildings))
 
@@ -244,7 +244,7 @@ def _make_building_from_way(nodes_dict: Dict[int, osmparser.Node], all_tags: Dic
         if 'name' in all_tags:
             name = all_tags['name']
             if name in parameters.SKIP_LIST:
-                logging.info("SKIPPING " + name)
+                logging.debug("SKIPPING " + name)
                 return None
         if 'height' in all_tags:
             height = osmparser.parse_length(all_tags['height'])
@@ -361,7 +361,7 @@ def _write_xml(path: str, file_name: str, the_buildings: List[building_lib.Build
 
 
 def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
-            blocked_areas: List[shg.Polygon]) -> None:
+            blocked_areas: List[shg.Polygon], stg_entries: List[utils.stg_io2.STGEntry]) -> None:
     random.seed(42)
     stats = utilities.Stats()
 
@@ -410,29 +410,8 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     if blocked_areas:
         the_buildings = building_lib.overlap_check_blocked_areas(the_buildings, blocked_areas)
 
-    if parameters.OVERLAP_CHECK:
-        # -- read static/shared objects in our area from .stg(s)
-        #    FG tiles are assumed to be much larger than our clusters.
-        #    Loop all clusters, find relevant tile by checking tile_index at center of each cluster.
-        #    Then read objects from .stg.
-        stgs = []
-        static_objects = []
-        for cl in clusters_building_mesh_detailed:
-            center_global = coords_transform.toGlobal(cl.center)
-            path = calc_tile.construct_path_to_stg(parameters.PATH_TO_SCENERY, "Objects", center_global)
-            stg_file_name = calc_tile.construct_stg_file_name(center_global)
-
-            if stg_file_name not in stgs:
-                stgs.append(stg_file_name)
-                static_objects.extend(building_lib.read_buildings_from_stg_entries(path, stg_file_name, OUR_MAGIC,
-                                                                                   coords_transform))
-
-        logging.info("read %i objects from %i tiles", len(static_objects), len(stgs))
-    else:
-        static_objects = None
-
     if parameters.OVERLAP_CHECK_CONVEX_HULL:  # needs to be before building_lib.analyse to catch more at first hit
-        the_buildings = building_lib.overlap_check_convex_hull(the_buildings, coords_transform, stats)
+        the_buildings = building_lib.overlap_check_convex_hull(the_buildings, stg_entries, stats)
 
     # - analyze buildings
     #   - calculate area
@@ -446,7 +425,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
 
     prepare_textures.init(stats, False)
 
-    the_buildings = building_lib.analyse(the_buildings, static_objects, fg_elev,
+    the_buildings = building_lib.analyse(the_buildings, fg_elev,
                                          prepare_textures.facades, prepare_textures.roofs, stats)
     building_lib.decide_lod(the_buildings, stats)
 
@@ -546,7 +525,9 @@ if __name__ == "__main__":
                                                            parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
                                                            parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
 
-    process(my_coords_transform, my_fg_elev, my_blocked_areas)
+    my_stg_entries = utils.stg_io2.read_stg_entries_in_boundary(True, my_coords_transform)
+
+    process(my_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries)
 
     my_fg_elev.close()
 
