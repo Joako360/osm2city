@@ -304,7 +304,7 @@ def _compute_roof_height(b: Building, max_height: float=1e99):
             # angle 360 north
             #
             # here we works with trigo angles
-            angle00 = (pi/2. - (((float(b.tags['roof:slope:direction'])) % 360.)*pi/180.))
+            angle00 = pi/2. - (((utils.osmparser.parse_direction(b.tags['roof:slope:direction'])) % 360.) * pi / 180.)
         else:
             angle00 = 0
 

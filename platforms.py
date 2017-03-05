@@ -125,11 +125,14 @@ def _write_area(platform, fg_elev: utilities.FGElev, obj, offset):
         obj.face(sideface, mat=0)
 
 
-def _write_line(platform, fg_elev: utilities.FGElev, obj, offset):
+def _write_line(platform, fg_elev: utilities.FGElev, obj, offset) -> None:
     """Writes a platform as a area which only is mapped as a line"""
     o = obj.next_node_index()
     left = platform.line_string.parallel_offset(2, 'left', resolution=8, join_style=1, mitre_limit=10.0)
     right = platform.line_string.parallel_offset(2, 'right', resolution=8, join_style=1, mitre_limit=10.0)
+    if not isinstance(left, shg.LineString) or not isinstance(right, shg.LineString):
+        logging.debug("ERROR: platform with osm_id=%d cannot be created due to geometry constraints", platform.osm_id)
+        return
     idx_left = obj.next_node_index()
     for p in left.coords:
         e = fg_elev.probe_elev(Vec2d(p[0], p[1])) + 1

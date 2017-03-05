@@ -281,7 +281,7 @@ def has_required_tag_keys(my_tags, my_required_keys):
     return False
 
 
-def parse_length(str_length) -> float:
+def parse_length(str_length: str) -> float:
     """
     Transform length to meters if not yet default. Input is a string, output is a float.
     If the string cannot be parsed, then 0 is returned.
@@ -311,12 +311,37 @@ def parse_length(str_length) -> float:
                 if is_parsable_float(_split[1]):
                     _processed = str(_f_length + float(_split[1]))
     else:  # assumed that no unit characters are in the string
-        _factor = 1
+        _factor = 1.0
     if is_parsable_float(_processed):
         return float(_processed) * _factor
     else:
         logging.warning('Unable to parse for length from value: %s', str_length)
-        return 0
+        return 0.0
+
+
+def parse_direction(str_dir: str) -> float:
+    _processed = str_dir.strip().lower()
+    if _processed == 'n':
+        _processed = 0
+    elif _processed == 'ne':
+        _processed = 45
+    elif _processed == 'e':
+        _processed = 90
+    elif _processed == 'se':
+        _processed = 135
+    elif _processed == 's':
+        _processed = 180
+    elif _processed == 'sw':
+        _processed = 225
+    elif _processed == 'w':
+        _processed = 270
+    elif _processed == 'nv':
+        _processed = 315
+    if is_parsable_float(_processed):
+        return float(_processed)
+    else:
+        logging.warning('Unable to parse for direction from value: %s', str_dir)
+        return 0.0
 
 
 def parse_generator_output(str_output: str) -> float:
@@ -697,6 +722,11 @@ class TestOSMParser(unittest.TestCase):
         self.assertAlmostEqual(3.073, parse_length('10\'1"'), 2, "Correct number with feet unit without space")
         self.assertEqual(0, parse_length('m'), "Only valid unit")
         self.assertEqual(0, parse_length('"'), "Only inches, no feet")
+
+    def test_parse_direction(self):
+        self.assertAlmostEqual(180.0, parse_direction('s '), 2)
+        self.assertAlmostEqual(125.5, parse_direction(' 125.5 '), 2)
+        self.assertAlmostEqual(0.0, parse_direction(' foo '), 2)
 
     def test_parse_generator_output(self):
         self.assertAlmostEqual(0, parse_generator_output(' 2.3 '), 2, "Correct number with trailing spaces")

@@ -105,7 +105,7 @@ Calling the batch process is then pretty easy in just one step:
 
 Mandatory command line arguments:
 
-* -b: the boundary as an underscore delimitted string WEST_SOUTH_EAST_NORTH like 9.1_47.0_11_48.8 (use '.' as decimal separator).
+* -b: the boundary as an underscore delimitted string WEST_SOUTH_EAST_NORTH like 9.1_47.0_11_48.8 (use '.' as decimal separator). If the Western longitude is negative (e.g. in Americas), then use a ``'`` in front (e.g. -b '-71.25_42.25_-70.75_42.5 for the Boston Logan ariport KBOS).
 * -f: the relative path to the main params.ini file, which is the template copied to all sub-directories.
 * -p: number of parallel processes (should not be more than the number of cores/CPUs) and might be constrained by memory
 

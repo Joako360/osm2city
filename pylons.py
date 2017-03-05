@@ -1091,17 +1091,17 @@ def _process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev,
     # Attempt to merge lines
     for key in list(my_shared_nodes.keys()):
         shared_node = my_shared_nodes[key]
-        if len(shared_node) >= 2:
-            pos1, pos2 = _find_connecting_line(key, shared_node, 60)
-            second_line = shared_node[pos2]
-            if pos1 >= 0:
-                try:
+        try:
+            if len(shared_node) >= 2:
+                pos1, pos2 = _find_connecting_line(key, shared_node, 60)
+                second_line = shared_node[pos2]
+                if pos1 >= 0:
                     _merge_lines(key, shared_node[pos1], shared_node[pos2], my_shared_nodes)
                     my_railways.remove(second_line)
                     del my_shared_nodes[key]
                     logging.debug("Merged two lines with node osm_id: %s", key)
-                except Exception as e:
-                    logging.error(e)
+        except Exception as e:
+            logging.error(e)
 
     # get LineStrings and remove those lines, which are less than the minimal requirement
     for the_railway in my_railways:
@@ -1302,7 +1302,7 @@ def _process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGEle
                 prev_pylon = my_pylon
         if len(my_line.shared_pylons) > 1:
             for the_node in [my_line.shared_pylons[0], my_line.shared_pylons[-1]]:
-                if the_node.osm_id in list(my_shared_nodes.keys()):
+                if the_node.osm_id in my_shared_nodes:
                     my_shared_nodes[the_node.osm_id].append(my_line)
                 else:
                     my_shared_nodes[the_node.osm_id] = [my_line]
@@ -1313,8 +1313,10 @@ def _process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGEle
         else:
             logging.warning('Line could not be validated or corrected. osm_id = %s', my_line.osm_id)
 
-    for key in list(my_shared_nodes.keys()):
+    for key in list(my_shared_nodes.keys()):  # cannot iterate over .items() because changing dict content
         shared_node = my_shared_nodes[key]
+        if not shared_node:
+            continue
         if shared_node[0].is_aerialway():  # only attempt to merge power lines
             continue
         if (len(shared_node) == 2) and (shared_node[0].type_ == shared_node[1].type_):

@@ -159,8 +159,8 @@ if __name__ == '__main__':
 
     # loop west-east and south north on full degrees
     epsilon = 0.00000001  # to make sure that top right boundary not x.0
-    for full_lon in range(int(boundary_west), int(boundary_east - epsilon) + 1):
-        for full_lat in range(int(boundary_south), int(boundary_north - epsilon) + 1):
+    for full_lon in range(int(boundary_west) - 1, int(boundary_east - epsilon) + 1):  # -1 for west if negative west
+        for full_lat in range(int(boundary_south) - 1, int(boundary_north - epsilon) + 1):
             logging.debug("lon: {}, lat:{}".format(full_lon, full_lat))
             if calc_tile.bucket_span(full_lat) > 1:
                 num_lon_parts = 1
