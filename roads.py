@@ -484,12 +484,18 @@ class Roads(object):
                 if my_line.intersects(stg_entry.convex_hull):
                     my_line_difference = my_line.difference(stg_entry.convex_hull)
                     if isinstance(my_line_difference, shg.GeometryCollection) and my_line_difference.is_empty:
-                        self.ways_list.remove(way)
-                        logging.debug("Remove way (osm_id=%d) due to static object.", way.osm_id)
+                        try:
+                            self.ways_list.remove(way)
+                            logging.debug("Remove way (osm_id=%d) due to static object.", way.osm_id)
+                        except ValueError:
+                            pass
                         continue
                     if isinstance(my_line_difference, shg.LineString):
                         if my_line_difference.length < parameters.OVERLAP_CHECK_BRIDGE_MIN_REMAINING:
-                            self.ways_list.remove(way)
+                            try:
+                                self.ways_list.remove(way)
+                            except ValueError:
+                                pass
                             logging.debug("Remove way (osm_id=%d) due to static object.", way.osm_id)
                             continue
                         way.refs = list()
