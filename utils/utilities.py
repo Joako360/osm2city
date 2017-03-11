@@ -46,7 +46,7 @@ def get_fg_root() -> str:
     return my_fg_root
 
 
-def get_fg_home() -> str:
+def get_fg_home() -> Optional[str]:
     """Constructs the path to FGHome.
 
     See also http://wiki.flightgear.org/$FG_HOME
@@ -397,10 +397,14 @@ class FGElev(object):
                 while line == "" and empty_lines < 20:
                     empty_lines += 1
                     line = self.fgelev_pipe.stdout.readline().strip()
-                elev = float(line.split()[1]) + self.h_offset
+                parts = line.split()
+                elev = float(parts[1]) + self.h_offset
                 is_solid = True
-                if parameters.PROBE_FOR_WATER and line.split()[2] == '-':
-                    is_solid = False
+                if parameters.PROBE_FOR_WATER:
+                    if len(parts) == 3 and parts[2] == '-':
+                        is_solid = False
+                    else:
+                        logging.debug('ERROR: Probing for water with fgelev missed to return value for water: %', line)
             except IndexError as reason:
                 self.close()
                 if empty_lines > 1:
