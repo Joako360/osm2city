@@ -6,6 +6,7 @@ import os
 import parameters
 import sys
 import time
+import traceback
 from typing import List
 import unittest
 
@@ -104,8 +105,21 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_l
 
         # clean-up
         my_fg_elev.close()
-    except Exception:
-        logging.exception('Exception occured while processing tile {}.'.format(scenery_tile.tile_index))
+
+    except:
+        logging.exception('Exception occurred while processing tile {}.'.format(scenery_tile.tile_index))
+        msg = "******* Exception with tile {} to reprocess use boundaries: {}_{}_{}_{} *******".format(
+            scenery_tile.tile_index, scenery_tile.boundary_west, scenery_tile.boundary_south,
+            scenery_tile.boundary_east, scenery_tile.boundary_north)
+        logging.exception(msg)
+
+        f = open("osm2city-exceptions.log", "a")
+        # print info
+        print(msg, file=f)
+        # print exception
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        print(''.join(traceback.format_exception(exc_type, exc_value, exc_traceback)), file=f)
+        f.close()
 
     logging.info("******* Finished tile {} *******".format(scenery_tile.tile_index))
 
