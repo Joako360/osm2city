@@ -31,13 +31,15 @@ class Platform(object):
         self.refs = refs
         self.typ = 0
         self.nodes = []
-        self.is_area = 'area' in tags
 
         self.osm_nodes = list()
         for r in refs:  # safe way instead of [nodes_dict[r] for r in refs] if ref would be missing
             if r in nodes_dict:
                 self.osm_nodes.append(nodes_dict[r])
         self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in self.osm_nodes])
+        self.is_area = False
+        if 'area' in tags and tags['area'] == 'yes' and len(self.nodes) > 2:
+            self.is_area = True
         self.line_string = shg.LineString(self.nodes)
         self.anchor = Vec2d(self.nodes[0])
 
@@ -86,8 +88,11 @@ def _write(fg_elev: utilities.FGElev, stg_manager, replacement_prefix, clusters,
             f.close()
 
 
-def _write_area(platform, fg_elev: utilities.FGElev, obj, offset):
+def _write_area(platform: Platform, fg_elev: utilities.FGElev, obj: ac3d.Object, offset) -> None:
     """Writes a platform mapped as an area"""
+    if len(platform.nodes) < 3:
+        logging.debug('ERROR: platform with osm_id=%d cannot created due to less then 3 nodes', platform.osm_id)
+        return
     linear_ring = shg.LinearRing(platform.nodes)
 
     o = obj.next_node_index()

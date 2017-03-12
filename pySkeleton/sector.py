@@ -13,6 +13,7 @@ from . import segment
 from . import line
 from . import events
 
+
 class Sector:
     """
     A sector of an edge from a polygon is the space where the edge can move in the polygon, going parallel to it's original location,
@@ -77,7 +78,7 @@ class Sector:
                      
         #now we have a list of split events (possibly empty), take the one with minimal distance
         for ev in candidates:
-            if ev<free:
+            if ev < free:
                 free = ev
         
         if free < self.event:
@@ -93,42 +94,12 @@ class Sector:
         #compute the reflex events between them
         
         #keep the minimum
-        
-    
+
     def move_first_point(self, d):
         """ move the first point along the first half line with respect to its speed """
-        
         cosAlpha = self.edge.u*self.h1.d
-        alpha = math.acos(cosAlpha)
+        alpha = 0  # if cosAlpha outside allowed range, then assume max value (= 1) and therefore acos(1) = 0
+        if -1. <= cosAlpha <= .1:
+            alpha = math.acos(cosAlpha)
         s = d*float(self.edge.w)/math.sin(alpha)
         return self.h1.getPoint(s)        
-        
-    
-    #def display(self,viewer):
-        #self.h1.display(viewer)
-        #self.h2.display(viewer)
-        #if self.reflex:
-            #self.edge.display(viewer,color = 'red')
-        #else:
-            #self.edge.display(viewer,color='blue')
-            
-        ##display the freedom
-        #if viewer.show_info:
-            #middle      = (self.edge.pI+self.edge.pF).scale(0.5)
-            #direction   = (self.h1.d + self.h2.d).scale(0.5)
-            #toDraw      = middle + direction.scale(50)
-            
-            #if self.event.isEdgeEvent():
-                #color   = "orange"
-            #else:
-                #color   = "brown"
-                
-            #viewer.canvas.create_text(toDraw.x,
-                                      #toDraw.y,
-                                      #text="%f" %(self.event.shrinking_distance),
-                                      #fill=color,font=("Helvectica", "14"))
-            
-        #if self.event.isSplitEvent():
-            #self.event.splitted_edge.display(viewer,color='yellow')
-            #self.event.reflex_vertex.display(viewer,color='black',radius=6)
-            

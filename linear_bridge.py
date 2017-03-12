@@ -25,12 +25,10 @@ class DeckShapeLinear(object):
         return (1-x) * self.h0 + x * self.h1
 
     def __call__(self, s):
-        #assert(s <= 1. and s >= 0.)
         try:
             return [self._compute(x) for x in s]
         except TypeError:
             return self._compute(s) 
-#        return (1-s) * self.h0 + s * self.h1
 
 
 class DeckShapePoly(object):
@@ -61,7 +59,13 @@ class LinearBridge(linear.LinearObject):
         self.elev_spline = scipy.interpolate.interp1d(probe_locations_nondim, elevs)
         self.prep_height(nodes_dict, fg_elev)
 
-    def elev(self, l, normalized=True):
+        # properties
+        self.pillar_r0 = 0.
+        self.pillar_r1 = 0.
+        self.pillar_nnodes = 0
+        # self.deck_shape_poly = None
+
+    def elev(self, l, normalized: bool=True):
         """given linear distance [m], interpolate and return terrain elevation"""
         if not normalized:
             l /= self.center.length
@@ -96,12 +100,7 @@ class LinearBridge(linear.LinearObject):
         node0 = nodes_dict[self.refs[0]]
         node1 = nodes_dict[self.refs[-1]]
 
-        if 473886072 == node1.osm_id:
-            pass
-
-        #MSL = np.zeros_like(self.normals)
-        #MSL = self.elev([0, 0.5, 1]) # FIXME: use elev interpolator instead
-        MSL_mid = self.elev([0.5]) # FIXME: use elev interpolator instead?
+        MSL_mid = self.elev([0.5])  # FIXME: use elev interpolator instead?
         
         MSL = np.array([fg_elev.probe_elev(the_node) for the_node in self.center.coords])
 
@@ -115,13 +114,13 @@ class LinearBridge(linear.LinearObject):
         else:
             hi_end = 0
             lo_end = -1
-        self.D = DeckShapeLinear(deck_MSL[0], deck_MSL[-1])
+        self.deck_shape_poly = DeckShapeLinear(deck_MSL[0], deck_MSL[-1])
         try:
             required_height = parameters.BRIDGE_LAYER_HEIGHT * int(self.tags['layer'])
         except KeyError:
             required_height = parameters.BRIDGE_LAYER_HEIGHT
             
-        if (self.D(0.5) - MSL_mid) > required_height:
+        if (self.deck_shape_poly(0.5) - MSL_mid) > required_height:
             return
 
         import roads  # late import due to circular dependency
@@ -134,7 +133,7 @@ class LinearBridge(linear.LinearObject):
             deck_MSL[lo_end] = max(deck_MSL[hi_end] - 2 * (deck_MSL[hi_end] - deck_MSL_mid),
                                    deck_MSL[hi_end] - dh_dx * self.center.length)
         else:
-           # -- elevate both ends to same MSL
+            # -- elevate both ends to same MSL
             deck_MSL[hi_end] = deck_MSL[lo_end] = deck_MSL_mid
 
         h_add = np.maximum(deck_MSL - MSL, np.zeros_like(deck_MSL))
@@ -142,16 +141,16 @@ class LinearBridge(linear.LinearObject):
         left_z, right_z, h_add = self.level_out(fg_elev, h_add)
         deck_MSL = MSL + h_add
             
-        self.D = DeckShapeLinear(deck_MSL[0], deck_MSL[-1])
+        self.deck_shape_poly = DeckShapeLinear(deck_MSL[0], deck_MSL[-1])
 
         node0.h_add = h_add[0]
         node1.h_add = h_add[-1]
 
-    def deck_height(self, l, normalized=True):
+    def deck_height(self, l: float, normalized: bool=True):
         """given linear distance [m], interpolate and return deck height"""
-        if not normalized:
+        if not normalized and self.center.length != 0:
             l /= self.center.length
-        return self.D(l)
+        return self.deck_shape_poly(l)
 
     def pillar(self, obj, x, y, h0, h1, angle):
         self.pillar_r0 = 1.
@@ -166,12 +165,12 @@ class LinearBridge(linear.LinearObject):
         vert = ""
         R = np.array([[np.cos(-angle), -np.sin(-angle)],
                       [np.sin(-angle),  np.cos(-angle)]])
-        for a in np.linspace(0, 2*np.pi, self.pillar_nnodes, endpoint = False):
+        for a in np.linspace(0, 2*np.pi, self.pillar_nnodes, endpoint=False):
             a += np.pi/self.pillar_nnodes
             node = np.array([rx*np.cos(a), ry*np.sin(a)])
             node = np.dot(R, node)
             obj.node(-(y+node[0]), h1, -(x+node[1]))
-        for a in np.linspace(0, 2*np.pi, self.pillar_nnodes, endpoint = False):
+        for a in np.linspace(0, 2*np.pi, self.pillar_nnodes, endpoint=False):
             a += np.pi/self.pillar_nnodes
             node = np.array([rx*np.cos(a), ry*np.sin(a)])
             node = np.dot(R, node)
@@ -216,27 +215,30 @@ class LinearBridge(linear.LinearObject):
             z[i] = self.deck_height(l, normalized=False) + self.AGL
             l += self.segment_len[i]
             
-        left_top_nodes =  self.write_nodes(obj, self.edge[0], z, elev_offset,
-                                           offset, join=True, is_left=True)
+        left_top_nodes = self.write_nodes(obj, self.edge[0], z, elev_offset,
+                                          offset, join=True, is_left=True)
         right_top_nodes = self.write_nodes(obj, self.edge[1], z, elev_offset,
                                            offset, join=True, is_left=False)
                                            
         left_bottom_edge, right_bottom_edge = self.compute_offset(self.width/2 * 0.85)
-        left_bottom_nodes =  self.write_nodes(obj, left_bottom_edge, z-parameters.BRIDGE_BODY_HEIGHT,
-                                              elev_offset, offset)
+        left_bottom_nodes = self.write_nodes(obj, left_bottom_edge, z-parameters.BRIDGE_BODY_HEIGHT,
+                                             elev_offset, offset)
         right_bottom_nodes = self.write_nodes(obj, right_bottom_edge, z-parameters.BRIDGE_BODY_HEIGHT, 
                                               elev_offset, offset)
         # -- top
         self.write_quads(obj, left_top_nodes, right_top_nodes, self.tex[0], self.tex[1], debug_ac=None)
         
         # -- right
-        self.write_quads(obj, right_top_nodes, right_bottom_nodes, textures.road.BRIDGE_1[1], textures.road.BRIDGE_1[0], debug_ac=None)
+        self.write_quads(obj, right_top_nodes, right_bottom_nodes, textures.road.BRIDGE_1[1], textures.road.BRIDGE_1[0],
+                         debug_ac=None)
         
         # -- left
-        self.write_quads(obj, left_bottom_nodes, left_top_nodes, textures.road.BRIDGE_1[0], textures.road.BRIDGE_1[1], debug_ac=None)
+        self.write_quads(obj, left_bottom_nodes, left_top_nodes, textures.road.BRIDGE_1[0], textures.road.BRIDGE_1[1],
+                         debug_ac=None)
 
         # -- bottom
-        self.write_quads(obj, right_bottom_nodes, left_bottom_nodes, textures.road.BOTTOM[0], textures.road.BOTTOM[1], debug_ac=None)
+        self.write_quads(obj, right_bottom_nodes, left_bottom_nodes, textures.road.BOTTOM[0], textures.road.BOTTOM[1],
+                         debug_ac=None)
 
         # -- end wall 1
         the_node = self.edge[0].coords[0]
@@ -247,10 +249,10 @@ class LinearBridge(linear.LinearObject):
         e = fg_elev.probe_elev(the_node) - elev_offset
         right_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 
-        face = [ (left_top_nodes[0],    0, parameters.EMBANKMENT_TEXTURE[0]), # FIXME: texture coords
-                 (right_top_nodes[0],   0, parameters.EMBANKMENT_TEXTURE[1]),
-                 (right_bottom_node,    1, parameters.EMBANKMENT_TEXTURE[1]),
-                 (left_bottom_node,     1, parameters.EMBANKMENT_TEXTURE[0]) ]
+        face = [(left_top_nodes[0],    0, parameters.EMBANKMENT_TEXTURE[0]),  # FIXME: texture coords
+                (right_top_nodes[0],   0, parameters.EMBANKMENT_TEXTURE[1]),
+                (right_bottom_node,    1, parameters.EMBANKMENT_TEXTURE[1]),
+                (left_bottom_node,     1, parameters.EMBANKMENT_TEXTURE[0])]
         obj.face(face)
 
         # -- end wall 2
@@ -262,10 +264,10 @@ class LinearBridge(linear.LinearObject):
         e = fg_elev.probe_elev(the_node) - elev_offset
         right_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 
-        face = [ (left_top_nodes[-1],    0, parameters.EMBANKMENT_TEXTURE[0]),
-                 (right_top_nodes[-1],   0, parameters.EMBANKMENT_TEXTURE[1]),
-                 (right_bottom_node,    1, parameters.EMBANKMENT_TEXTURE[1]),
-                 (left_bottom_node,     1, parameters.EMBANKMENT_TEXTURE[0]) ]
+        face = [(left_top_nodes[-1],    0, parameters.EMBANKMENT_TEXTURE[0]),
+                (right_top_nodes[-1],   0, parameters.EMBANKMENT_TEXTURE[1]),
+                (right_bottom_node,    1, parameters.EMBANKMENT_TEXTURE[1]),
+                (left_bottom_node,     1, parameters.EMBANKMENT_TEXTURE[0])]
         obj.face(face[::-1])
         
         # pillars

@@ -291,6 +291,7 @@ def parse_length(str_length: str) -> float:
     Theoretically there is a blank between the number and the unit, practically there might not be.
     """
     _processed = str_length.strip().lower()
+    _processed = _processed.replace(',', '.')  # decimals are sometimes with comma (e.g. in European languages)
     if _processed.endswith("km"):
         _processed = _processed.rstrip("km").strip()
         _factor = 1000
@@ -300,6 +301,12 @@ def parse_length(str_length: str) -> float:
     elif _processed.endswith("mi"):
         _processed = _processed.rstrip("mi").strip()
         _factor = 1609.344
+    elif _processed.endswith('ft'):
+        _processed = _processed.rstrip('ft').strip()
+        _factor = 0.3048
+    elif _processed.endswith('yrd'):
+        _processed = _processed.rstrip('yrd').strip()
+        _factor = 0.9144
     elif "'" in _processed:
         _processed = _processed.replace('"', '')
         _split = _processed.split("'", 1)
@@ -368,6 +375,22 @@ def parse_generator_output(str_output: str) -> float:
     else:
         logging.warning('Unable to parse for generator output from value: %s', str_output)
         return 0.
+
+
+def parse_cable_stuff(str_value: str) -> int:
+    """Parse values for tags 'cables' and 'voltage' for power cables, which can have multiple values.
+    If only one value is present, then that value is used, otherwise the max value as int.
+    Separator for multiple values is ';'.
+    If it cannot be parsed, then 0 is returned.
+    For 'cables' it is assumed that if several values are submitted, then the largest number are the real cables
+    and not other stuff - see http://wiki.openstreetmap.org/wiki/Key:cables how this tag should be used (never multi!).
+    For 'voltage it is assumed that the highest value determines the type of pylons etc."""
+    sub_values = str_value.split(';')
+    return_value = 0.0
+    for sub_value in sub_values:
+        if is_parsable_float(sub_value.strip()):
+            return_value = max(return_value, float(sub_value.strip()))
+    return int(return_value)
 
 
 def is_parsable_float(str_float: str) -> bool:
@@ -714,6 +737,7 @@ def split_way_at_boundary(nodes_dict: Dict[int, Node], complete_way: Way, clippi
 class TestOSMParser(unittest.TestCase):
     def test_parse_length(self):
         self.assertAlmostEqual(1.2, parse_length(' 1.2 '), 2, "Correct number with trailing spaces")
+        self.assertAlmostEqual(1.2, parse_length(' 1,2 '), 2, "Correct number with comma as decimal separator")
         self.assertAlmostEqual(1.2, parse_length(' 1.2 m'), 2, "Correct number with meter unit incl. space")
         self.assertAlmostEqual(1.2, parse_length(' 1.2m'), 2, "Correct number with meter unit without space")
         self.assertAlmostEqual(1200, parse_length(' 1.2 km'), 2, "Correct number with km unit incl. space")
@@ -736,6 +760,14 @@ class TestOSMParser(unittest.TestCase):
         self.assertAlmostEqual(2300000, parse_generator_output(' 2.3 MW'), 2, "Correct number with MW unit incl. space")
         self.assertAlmostEqual(300000000, parse_generator_output(' 0.3GW'), 2, "Correct number with GW unit w/o space")
         self.assertAlmostEqual(0, parse_generator_output(' 0.3 XW'), 2, "Correct number with unknown unit")
+
+    def test_parse_cable_stuff(self):
+        self.assertEqual(99, parse_cable_stuff(' 99 '), 'Correct value to start with')
+        self.assertEqual(0, parse_cable_stuff(' a'), 'Not a number')
+        self.assertEqual(0, parse_cable_stuff(' ;'), 'Empty')
+        self.assertEqual(99, parse_cable_stuff(' 99.1'), 'Float')
+        self.assertEqual(88, parse_cable_stuff(' 88; 4'), 'Two valid numbers')
+
 
     def test_is_parsable_float(self):
         self.assertFalse(is_parsable_float('1,2'))

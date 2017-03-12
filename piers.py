@@ -34,13 +34,15 @@ class Pier(object):
         self.refs = refs
         self.typ = 0
         self.nodes = []
-        self.is_area = 'area' in tags
         self.elevation = 0
 
         self.osm_nodes = list()
         for r in refs:  # safe way instead of [nodes_dict[r] for r in refs] if ref would be missing
             if r in nodes_dict:
                 self.osm_nodes.append(nodes_dict[r])
+        self.is_area = False
+        if 'area' in tags and tags['area'] == 'yes' and len(self.nodes) > 2:
+            self.is_area = True
         self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in self.osm_nodes])
         self.anchor = Vec2d(self.nodes[0])
 
@@ -190,10 +192,12 @@ def _write_model(length, stg_manager, pos_global, direction, my_elev):
     stg_manager.add_object_shared(model[0], Vec2d(pos_global), my_elev, direction + model[1])
 
 
-def _write_pier_area(pier, obj, offset):
+def _write_pier_area(pier: Pier, obj: ac3d.Object, offset) -> None:
     """Writes a Pier mapped as an area"""
+    if len(pier.nodes) < 3:
+        logging.debug('ERROR: platform with osm_id=%d cannot created due to less then 3 nodes', pier.osm_id)
+        return
     linear_ring = shg.LinearRing(pier.nodes)
-#         print ring_lat_lon
     # TODO shg.LinearRing().is_ccw
     o = obj.next_node_index()
     if linear_ring.is_ccw:
@@ -239,6 +243,9 @@ def _write_pier_line(pier, obj, offset):
     o = obj.next_node_index()
     left = line_string.parallel_offset(1, 'left', resolution=8, join_style=1, mitre_limit=10.0)
     right = line_string.parallel_offset(1, 'right', resolution=8, join_style=1, mitre_limit=10.0)
+    if not isinstance(left, shg.LineString) or not isinstance(right, shg.LineString):
+        logging.debug("ERROR: pier with osm_id=%d cannot be created due to geometry constraints", pier.osm_id)
+        return
     idx_left = obj.next_node_index()
 
     e = pier.elevation + 1
