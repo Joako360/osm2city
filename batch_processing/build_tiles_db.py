@@ -12,7 +12,7 @@ import unittest
 
 import buildings
 import copy_data_stuff
-import piers
+# import piers
 import platforms
 import pylons
 import roads
@@ -91,7 +91,7 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_l
             roads.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries)
             pylons.process(the_coords_transform, my_fg_elev, my_stg_entries)
             platforms.process(the_coords_transform, my_fg_elev)
-            piers.process(the_coords_transform, my_fg_elev)
+            # piers.process(the_coords_transform, my_fg_elev)
         elif exec_argument is Procedures.buildings:
             buildings.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries)
         elif exec_argument is Procedures.roads:
