@@ -8,12 +8,60 @@ import logging
 import os
 import shutil
 import sys
+import textwrap
 
 import parameters
 import utils.utilities as util
 
 
-def process(copy_fg_data: bool, scenery_type: str) -> None:
+def _write_roads_eff(path_to_dir: str) -> None:
+    eff = open(path_to_dir + 'roads.eff', 'w')
+    eff.write(textwrap.dedent("""<?xml version="1.0" encoding="utf-8"?>
+<PropertyList>
+        <name>roadsLM</name>
+        <inherits-from>Effects/road</inherits-from>
+        <parameters>
+                <!-- Light Map -->
+                <lightmap-enabled type="int">1</lightmap-enabled>
+                <lightmap-multi type="int">0</lightmap-multi>
+                <lightmap-color type="vec3d" n="0"> 0.941 0.682 0.086 </lightmap-color>
+                <texture n="3">
+                    <image>tex/roads_LM.png</image>
+                    <wrap-s>repeat</wrap-s>
+                    <wrap-t>repeat</wrap-t>
+                </texture>
+        </parameters>
+</PropertyList>
+    """))
+
+
+def _write_citylm_eff(path_to_dir: str) -> None:
+    eff = open(path_to_dir + 'cityLM.eff', 'w')
+    eff.write(textwrap.dedent("""<?xml version="1.0" encoding="utf-8"?>
+<PropertyList>
+        <name>cityLM</name>
+        <inherits-from>/Effects/model-combined-deferred</inherits-from>
+        <parameters>
+                <!-- Light Map -->
+                <lightmap-enabled type="int">1</lightmap-enabled>
+                <lightmap-multi type="int">1</lightmap-multi>
+                <texture n="3">
+                  <image>tex/atlas_facades_LM.png</image>
+                  <wrap-s>repeat</wrap-s>
+                  <wrap-t>repeat</wrap-t>
+                </texture>
+                <lightmap-factor type="float" n="0"><use>/environment/lightmap-factor</use></lightmap-factor>
+                <lightmap-color type="vec3d" n="0"> 1. 0.88 0.6 </lightmap-color>
+                <lightmap-factor type="float" n="1"><use>/environment/lightmap-factor</use></lightmap-factor>
+                <lightmap-color type="vec3d" n="1"> 0.564 0.409 0.172 </lightmap-color>
+                <lightmap-factor type="float" n="2">0</lightmap-factor>
+                <lightmap-factor type="float" n="3">0</lightmap-factor>
+        </parameters>
+</PropertyList>
+    """))
+
+
+def process(scenery_type: str) -> None:
     scenery_path = parameters.get_output_path()
 
     scenery_path += os.sep + scenery_type
@@ -45,18 +93,25 @@ def process(copy_fg_data: bool, scenery_type: str) -> None:
                 logging.info("Copying texture stuff to sub-directory %s", tex_dir)
                 for content in content_list:
                     shutil.copy(source_dir + os.sep + content, tex_dir)
-            # light-map effects
-            source_dir = data_dir + "lightmap"
-            if not os.path.exists(source_dir):
-                logging.error("The original lightmap dir seems to be missing: %s", source_dir)
-                sys.exit(1)
-            for level_two_dir in level_two_dirs:
-                logging.info("Copying lightmap stuff directory %s", level_two_dir)
-                content_list = os.listdir(source_dir)
-                for content in content_list:
-                    shutil.copy(source_dir + os.sep + content, level_two_dir)
+            if parameters.FLAG_2017_2:
+                for level_two_dir in level_two_dirs:
+                    if scenery_type == 'Roads':
+                        _write_roads_eff(level_two_dir + os.sep)
+                    elif scenery_type == 'Buildings':
+                        _write_citylm_eff(level_two_dir + os.sep)
+            else:
+                # light-map effects
+                source_dir = data_dir + "lightmap"
+                if not os.path.exists(source_dir):
+                    logging.error("The original lightmap dir seems to be missing: %s", source_dir)
+                    sys.exit(1)
+                for level_two_dir in level_two_dirs:
+                    logging.info("Copying lightmap stuff directory %s", level_two_dir)
+                    content_list = os.listdir(source_dir)
+                    for content in content_list:
+                        shutil.copy(source_dir + os.sep + content, level_two_dir)
 
-            if copy_fg_data:
+            if parameters.TRAFFIC_SHADER_ENABLE and not parameters.FLAG_2017_2:
                 fg_root_dir = util.get_fg_root()
                 logging.info("Copying fgdata directory into $FG_ROOT (%s)", fg_root_dir)
                 source_dir = data_dir + "fgdata"
@@ -76,10 +131,8 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--type", dest="scenery_type",
                         help="Mandatory: Scenery type - typically 'Buildings', 'Roads', 'Pylons'",
                         metavar="STRING", required=True)
-    parser.add_argument("-a", action="store_true",
-                        help="also copy effects etc. in fgdata to $FG_ROOT", required=False)
     args = parser.parse_args()
 
     parameters.read_from_file(args.filename)
 
-    process(args.a, args.scenery_type)
+    process(args.scenery_type)

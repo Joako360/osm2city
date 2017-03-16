@@ -1119,21 +1119,15 @@ def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, s
 
 def _write_xml(path_to_stg, file_name, object_name):
     xml = open(path_to_stg + file_name + '.xml', "w")
-    if parameters.TRAFFIC_SHADER_ENABLE:
-        shader_str = "<inherits-from>Effects/road-high</inherits-from>"
+    if parameters.TRAFFIC_SHADER_ENABLE and not parameters.FLAG_2017_2:
+        shader_str = "Effects/road-high"
     else:
-        shader_str = "<inherits-from>roads</inherits-from>"
+        shader_str = "roads"
     xml.write(textwrap.dedent("""        <?xml version="1.0"?>
         <PropertyList>
         <path>%s.ac</path>
         <effect>
-        <!--
-            EITHER enable the traffic shader
-                <inherits-from>Effects/road-high</inherits-from>
-            OR the lightmap shader
-                <inherits-from>roads</inherits-from>
-        -->
-                %s
+                <inherits-from>%s</inherits-from>
                 <object-name>%s</object-name>
         </effect>
         </PropertyList>

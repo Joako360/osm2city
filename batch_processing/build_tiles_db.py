@@ -225,15 +225,15 @@ if __name__ == '__main__':
 
     # At the very end copy static data stuff in one process
     if exec_procedure is Procedures.all:
-        copy_data_stuff.process(False, "Buildings")
-        copy_data_stuff.process(False, "Roads")
-        copy_data_stuff.process(False, "Pylons")
+        copy_data_stuff.process("Buildings")
+        copy_data_stuff.process("Roads")
+        copy_data_stuff.process("Pylons")
     elif exec_procedure is Procedures.pylons:
-        copy_data_stuff.process(False, "Pylons")
+        copy_data_stuff.process("Pylons")
     elif exec_procedure is Procedures.roads:
-        copy_data_stuff.process(False, "Roads")
+        copy_data_stuff.process("Roads")
     else:
-        copy_data_stuff.process(False, "Buildings")
+        copy_data_stuff.process("Buildings")
 
     logging.info("Total time used {}".format(time.time() - start_time))
 
