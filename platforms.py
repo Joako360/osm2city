@@ -21,7 +21,6 @@ from utils.vec2d import Vec2d
 
 
 OUR_MAGIC = "osm2platforms"  # Used in e.g. stg files to mark edits by osm2platforms
-SCENERY_TYPE = "Buildings"  # yes, not "Platforms"
 
 
 class Platform(object):
@@ -234,7 +233,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
     replacement_prefix = parameters.get_repl_prefix()
-    stg_manager = stg_io2.STGManager(path_to_output, SCENERY_TYPE, OUR_MAGIC, replacement_prefix)
+    stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.buildings, OUR_MAGIC, replacement_prefix)
 
     _write(fg_elev, stg_manager, replacement_prefix, clusters, coords_transform, stats)
 

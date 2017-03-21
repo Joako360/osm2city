@@ -73,7 +73,6 @@ import utils.vec2d as v
 from utils import aptdat_io, osmparser, coordinates, stg_io2, utilities
 
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
-SCENERY_TYPE = "Buildings"
 
 
 def _process_osm_relation(rel_nodes_dict: Dict[int, osmparser.Node], rel_ways_dict: Dict[int, osmparser.Way],
@@ -432,7 +431,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
     replacement_prefix = parameters.get_repl_prefix()
-    stg_manager = stg_io2.STGManager(path_to_output, SCENERY_TYPE, OUR_MAGIC, replacement_prefix)
+    stg_manager = stg_io2.STGManager(path_to_output, utils.stg_io2.SceneryType.buildings, OUR_MAGIC, replacement_prefix)
 
     # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
     for b in the_buildings:

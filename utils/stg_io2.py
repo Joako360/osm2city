@@ -41,16 +41,35 @@ class STGVerbType(enum.IntEnum):  # must be the same as actual string in lowerca
     object_building_mesh_detailed = 4
 
 
+@enum.unique
+class SceneryType(enum.IntEnum):
+    buildings = 1
+    roads = 2
+    pylons = 3
+
+
+def scenery_directory_name(scenery_type: SceneryType) -> str:
+    """Return a capitalized version to be used in directory naming"""
+    return scenery_type.name.title()
+
+
+def parse_for_scenery_type(type_argument: str) -> SceneryType:
+    """Parses a command line argument to determine which osm2city procedure to run.
+    Returns KeyError if mapping cannot be done"""
+    return SceneryType.__members__[type_argument.lower()]
+
+
 class STGFile(object):
     """represents an .stg file.
        takes care of writing/reading/uninstalling OBJECT_* lines
     """
     
-    def __init__(self, lon_lat: Vec2d, tile_index: int, path_to_scenery: str, scenery_type: str,
+    def __init__(self, lon_lat: Vec2d, tile_index: int, path_to_scenery: str, scenery_type: SceneryType,
                  magic: str, prefix: str) -> None:
         """Read all lines from stg to memory.
            Store our/other lines in two separate lists."""
-        self.path_to_stg = calc_tile.construct_path_to_stg(path_to_scenery, scenery_type, (lon_lat.lon, lon_lat.lat))
+        scenery_name = scenery_directory_name(scenery_type)
+        self.path_to_stg = calc_tile.construct_path_to_stg(path_to_scenery, scenery_name, (lon_lat.lon, lon_lat.lat))
         self.file_name = self.path_to_stg + calc_tile.construct_stg_file_name_from_tile_index(tile_index)
         self.other_list = []
         self.our_list = []
@@ -158,7 +177,7 @@ class STGManager(object):
     """manages STG objects. Knows about scenery path.
        prefix separates different writers to work around two PREFIX areas interleaving 
     """
-    def __init__(self, path_to_scenery: str, scenery_type: str, magic: str, prefix=None) -> None:
+    def __init__(self, path_to_scenery: str, scenery_type: SceneryType, magic: str, prefix=None) -> None:
         self.stg_dict = dict()  # maps tile index to stg object
         self.path_to_scenery = path_to_scenery
         self.magic = magic

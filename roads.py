@@ -96,7 +96,6 @@ from utils import osmparser, coordinates, ac3d, stg_io2, utilities, aptdat_io
 from utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
-SCENERY_TYPE = "Roads"
 
 
 BRIDGE_KEY = 'bridge'  # the original OSM tag key
@@ -1211,7 +1210,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     roads.process(blocked_areas, stg_entries, stats)  # does the heavy lifting based on OSM data including clustering
 
     replacement_prefix = parameters.get_repl_prefix()
-    stg_manager = stg_io2.STGManager(path_to_output, SCENERY_TYPE, OUR_MAGIC, replacement_prefix)
+    stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.roads, OUR_MAGIC, replacement_prefix)
 
     # -- write stg
     stg_paths = set()

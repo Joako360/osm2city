@@ -12,6 +12,7 @@ import textwrap
 
 import parameters
 import utils.utilities as util
+import utils.stg_io2 as stg
 
 
 def _write_roads_eff(path_to_dir: str) -> None:
@@ -61,10 +62,10 @@ def _write_citylm_eff(path_to_dir: str) -> None:
     """))
 
 
-def process(scenery_type: str) -> None:
+def process(scenery_type: stg.SceneryType) -> None:
     scenery_path = parameters.get_output_path()
 
-    scenery_path += os.sep + scenery_type
+    scenery_path += os.sep + stg.scenery_directory_name(scenery_type)
     if os.path.exists(scenery_path):
         level_one_dirs = os.listdir(scenery_path)
         level_two_dirs = list()
@@ -87,17 +88,24 @@ def process(scenery_type: str) -> None:
                 logging.error("The original tex dir seems to be missing: %s", source_dir)
                 sys.exit(1)
             for level_two_dir in level_two_dirs:
-                tex_dir = level_two_dir + os.sep + "tex"
-                if not os.path.exists(tex_dir):
-                    os.mkdir(tex_dir)
-                logging.info("Copying texture stuff to sub-directory %s", tex_dir)
-                for content in content_list:
-                    shutil.copy(source_dir + os.sep + content, tex_dir)
+                if scenery_type in [stg.SceneryType.roads, stg.SceneryType.buildings]:
+                    tex_dir = level_two_dir + os.sep + "tex"
+                    if not os.path.exists(tex_dir):
+                        os.mkdir(tex_dir)
+                    logging.info("Copying texture stuff to sub-directory %s", tex_dir)
+                    for content in content_list:
+                        if scenery_type is stg.SceneryType.roads and content.startswith('road') \
+                                and content.endswith('.png'):
+                            shutil.copy(source_dir + os.sep + content, tex_dir)
+                        if scenery_type is stg.SceneryType.buildings and content.startswith('atlas') \
+                                and content.endswith('.png'):
+                            shutil.copy(source_dir + os.sep + content, tex_dir)
+
             if parameters.FLAG_2017_2:
                 for level_two_dir in level_two_dirs:
-                    if scenery_type == 'Roads':
+                    if scenery_type is stg.SceneryType.roads:
                         _write_roads_eff(level_two_dir + os.sep)
-                    elif scenery_type == 'Buildings':
+                    elif scenery_type is stg.SceneryType.buildings:
                         _write_citylm_eff(level_two_dir + os.sep)
             else:
                 # light-map effects
@@ -134,5 +142,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     parameters.read_from_file(args.filename)
-
-    process(args.scenery_type)
+    try:
+        process(stg.parse_for_scenery_type(args.scenery_type))
+    except KeyError:
+        logging.error('Scenery type cannot be recognized: %s', args.scenery_type)

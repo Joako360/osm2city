@@ -32,7 +32,6 @@ import shapely.geometry as shg
 from utils import osmparser, vec2d, coordinates, stg_io2, utilities
 
 OUR_MAGIC = "osm2pylon"  # Used in e.g. stg files to mark edits by osm2pylon
-SCENERY_TYPE = "Pylons"
 
 
 class CableVertex(object):
@@ -1868,7 +1867,8 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
 
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
-    stg_manager = stg_io2.STGManager(path_to_output, SCENERY_TYPE, OUR_MAGIC, parameters.get_repl_prefix())
+    stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.pylons, OUR_MAGIC,
+                                     parameters.get_repl_prefix())
 
     # Write to Flightgear
     cmin, cmax = parameters.get_extent_global()

@@ -150,7 +150,7 @@ if __name__ == '__main__':
     parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
 
     exec_procedure = Procedures.all
-    if (args.exec):
+    if args.exec:
         try:
             exec_procedure = _parse_exec_for_procedure(args.exec)
         except KeyError:
@@ -225,15 +225,15 @@ if __name__ == '__main__':
 
     # At the very end copy static data stuff in one process
     if exec_procedure is Procedures.all:
-        copy_data_stuff.process("Buildings")
-        copy_data_stuff.process("Roads")
-        copy_data_stuff.process("Pylons")
+        copy_data_stuff.process(utils.stg_io2.SceneryType.buildings)
+        copy_data_stuff.process(utils.stg_io2.SceneryType.roads)
+        copy_data_stuff.process(utils.stg_io2.SceneryType.pylons)
     elif exec_procedure is Procedures.pylons:
-        copy_data_stuff.process("Pylons")
+        copy_data_stuff.process(utils.stg_io2.SceneryType.pylons)
     elif exec_procedure is Procedures.roads:
-        copy_data_stuff.process("Roads")
+        copy_data_stuff.process(utils.stg_io2.SceneryType.roads)
     else:
-        copy_data_stuff.process("Buildings")
+        copy_data_stuff.process(utils.stg_io2.SceneryType.buildings)
 
     logging.info("Total time used {}".format(time.time() - start_time))
 
