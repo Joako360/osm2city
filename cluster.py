@@ -58,7 +58,7 @@ class ClusterContainer(object):
         self.__len = self.max_grid.ix * self.max_grid.iy
         self.stg_verb_type = stg_verb_type
 
-        logging.info("Generating clusters %s %s", min_point, max_point)
+        logging.info("Generating clusters %s %s for %s", min_point, max_point, stg_verb_type.name)
         self._clusters = [[self._init_cluster(GridIndex(i, j)) for j in range(self.max_grid.iy)] for i in
                           range(self.max_grid.ix)]
 
@@ -118,7 +118,7 @@ class ClusterContainer(object):
 
     def write_statistics_for_buildings(self, clusters_name: str) -> None:
         if parameters.log_level_debug_or_lower() and parameters.WRITE_CLUSTER_STATS:
-            my_file = open(parameters.PREFIX + os.sep + clusters_name + ".dat", "w")
+            my_file = open(os.path.join(parameters.PREFIX, clusters_name + ".dat"), "w")
             for j in range(self.max_grid.iy):
                 for i in range(self.max_grid.ix):
                     cl = self._clusters[i][j]

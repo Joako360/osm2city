@@ -95,7 +95,7 @@ class Airport(object):
 
 def read_apt_dat_gz_file(min_lon: float, min_lat: float,
                           max_lon: float, max_lat: float) -> List[Airport]:
-    apt_dat_gz_file = utilities.assert_trailing_slash(utilities.get_fg_root()) + 'Airports' + os.sep + 'apt.dat.gz'
+    apt_dat_gz_file = os.path.join(utilities.get_fg_root(), 'Airports', 'apt.dat.gz')
     start_time = time.time()
     airports = list()
     total_airports = 0

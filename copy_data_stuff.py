@@ -16,7 +16,7 @@ import utils.stg_io2 as stg
 
 
 def _write_roads_eff(path_to_dir: str) -> None:
-    eff = open(path_to_dir + 'roads.eff', 'w')
+    eff = open(os.path.join(path_to_dir, 'roads.eff'), 'w')
     eff.write(textwrap.dedent("""<?xml version="1.0" encoding="utf-8"?>
 <PropertyList>
         <name>roadsLM</name>
@@ -37,7 +37,7 @@ def _write_roads_eff(path_to_dir: str) -> None:
 
 
 def _write_citylm_eff(path_to_dir: str) -> None:
-    eff = open(path_to_dir + 'cityLM.eff', 'w')
+    eff = open(os.path.join(path_to_dir, 'cityLM.eff'), 'w')
     eff.write(textwrap.dedent("""<?xml version="1.0" encoding="utf-8"?>
 <PropertyList>
         <name>cityLM</name>
@@ -63,53 +63,51 @@ def _write_citylm_eff(path_to_dir: str) -> None:
 
 
 def process(scenery_type: stg.SceneryType) -> None:
-    scenery_path = parameters.get_output_path()
+    scenery_path = os.path.join(parameters.get_output_path(), stg.scenery_directory_name(scenery_type))
 
-    scenery_path += os.sep + stg.scenery_directory_name(scenery_type)
     if os.path.exists(scenery_path):
         level_one_dirs = os.listdir(scenery_path)
         level_two_dirs = list()
         for level_one_dir in level_one_dirs:
-            sub_dir_path = scenery_path + os.sep + level_one_dir
+            sub_dir_path = os.path.join(scenery_path, level_one_dir)
             if os.path.isdir(sub_dir_path):
                 level_two_dir_list = os.listdir(sub_dir_path)
                 for level_two_dir in level_two_dir_list:
-                    if os.path.isdir(sub_dir_path + os.sep + level_two_dir):
-                        level_two_dirs.append(sub_dir_path + os.sep + level_two_dir)
+                    if os.path.isdir(os.path.join(sub_dir_path, level_two_dir)):
+                        level_two_dirs.append(os.path.join(sub_dir_path, level_two_dir))
 
         if not level_two_dirs:
             logging.info("ERROR: The scenery path does not seem to have necessary sub-directories in %s", scenery_path)
         else:
-            data_dir = util.assert_trailing_slash(parameters.PATH_TO_OSM2CITY_DATA)
             # textures
-            source_dir = data_dir + "tex"
+            source_dir = os.path.join(parameters.PATH_TO_OSM2CITY_DATA, "tex")
             content_list = os.listdir(source_dir)
             if not os.path.exists(source_dir):
                 logging.error("The original tex dir seems to be missing: %s", source_dir)
                 sys.exit(1)
             for level_two_dir in level_two_dirs:
                 if scenery_type in [stg.SceneryType.roads, stg.SceneryType.buildings]:
-                    tex_dir = level_two_dir + os.sep + "tex"
+                    tex_dir = os.path.join(level_two_dir, "tex")
                     if not os.path.exists(tex_dir):
                         os.mkdir(tex_dir)
                     logging.info("Copying texture stuff to sub-directory %s", tex_dir)
                     for content in content_list:
                         if scenery_type is stg.SceneryType.roads and content.startswith('road') \
                                 and content.endswith('.png'):
-                            shutil.copy(source_dir + os.sep + content, tex_dir)
+                            shutil.copy(os.path.join(source_dir, content), tex_dir)
                         if scenery_type is stg.SceneryType.buildings and content.startswith('atlas') \
                                 and content.endswith('.png'):
-                            shutil.copy(source_dir + os.sep + content, tex_dir)
+                            shutil.copy(os.path.join(source_dir, content), tex_dir)
 
             if parameters.FLAG_2017_2:
                 for level_two_dir in level_two_dirs:
                     if scenery_type is stg.SceneryType.roads:
-                        _write_roads_eff(level_two_dir + os.sep)
+                        _write_roads_eff(level_two_dir)
                     elif scenery_type is stg.SceneryType.buildings:
-                        _write_citylm_eff(level_two_dir + os.sep)
+                        _write_citylm_eff(level_two_dir)
             else:
                 # light-map effects
-                source_dir = data_dir + "lightmap"
+                source_dir = os.path.join(parameters.PATH_TO_OSM2CITY_DATA, "lightmap")
                 if not os.path.exists(source_dir):
                     logging.error("The original lightmap dir seems to be missing: %s", source_dir)
                     sys.exit(1)
@@ -117,12 +115,12 @@ def process(scenery_type: stg.SceneryType) -> None:
                     logging.info("Copying lightmap stuff directory %s", level_two_dir)
                     content_list = os.listdir(source_dir)
                     for content in content_list:
-                        shutil.copy(source_dir + os.sep + content, level_two_dir)
+                        shutil.copy(os.path.join(source_dir, content), level_two_dir)
 
             if parameters.TRAFFIC_SHADER_ENABLE and not parameters.FLAG_2017_2:
                 fg_root_dir = util.get_fg_root()
                 logging.info("Copying fgdata directory into $FG_ROOT (%s)", fg_root_dir)
-                source_dir = data_dir + "fgdata"
+                source_dir = os.path.join(parameters.PATH_TO_OSM2CITY_DATA, "fgdata")
                 copy_tree(source_dir, fg_root_dir)
 
     else:

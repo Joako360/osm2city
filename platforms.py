@@ -8,6 +8,7 @@ Created on Sun Sep 29 10:42:12 2013
 """
 import argparse
 import logging
+import multiprocessing as mp
 import numpy as np
 import os
 from typing import List
@@ -81,7 +82,7 @@ def _write(fg_elev: utilities.FGElev, stg_manager, replacement_prefix, clusters,
 
             # using 0 elevation and 0 heading because ac-models already account for it
             path = stg_manager.add_object_static(ac_file_name, center_tile, 0, 0)
-            file_name = path + os.sep + ac_file_name
+            file_name = os.path.join(path, ac_file_name)
             f = open(file_name, 'w')
             f.write(str(ac))
             f.close()
@@ -204,7 +205,7 @@ def _write_line(platform, fg_elev: utilities.FGElev, obj, offset) -> None:
     obj.face(sideface, mat=0)
 
 
-def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev) -> None:
+def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev, file_lock: mp.Lock=None) -> None:
     stats = utilities.Stats()
     # -- prepare transformation to local coordinates
     cmin, cmax = parameters.get_extent_global()
@@ -238,7 +239,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     _write(fg_elev, stg_manager, replacement_prefix, clusters, coords_transform, stats)
 
     # -- write stg
-    stg_manager.write()
+    stg_manager.write(file_lock)
 
 
 if __name__ == "__main__":

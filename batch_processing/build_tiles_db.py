@@ -1,4 +1,5 @@
 import argparse
+import datetime
 from enum import IntEnum, unique
 import logging
 import multiprocessing as mp
@@ -12,7 +13,7 @@ import unittest
 
 import buildings
 import copy_data_stuff
-# import piers
+import piers
 import platforms
 import pylons
 import roads
@@ -61,20 +62,22 @@ def _parse_exec_for_procedure(exec_argument: str) -> Procedures:
 
 
 def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_level: str,
-                         exec_argument: Procedures, my_airports: List[aptdat_io.Airport]) -> None:
-    parameters.read_from_file(params_file_name)
-    parameters.set_loglevel(log_level)
-    parameters.USE_DATABASE = True  # just to be sure
-    # adapt boundary
-    parameters.BOUNDARY_WEST = scenery_tile.boundary_west
-    parameters.BOUNDARY_SOUTH = scenery_tile.boundary_south
-    parameters.BOUNDARY_EAST = scenery_tile.boundary_east
-    parameters.BOUNDARY_NORTH = scenery_tile.boundary_north
-    parameters.PREFIX = scenery_tile.prefix
-    logging.info("Processing tile {} in prefix {} with process id = {}".format(scenery_tile.tile_index,
-                                                                               parameters.PREFIX,
-                                                                               os.getpid()))
+                         exec_argument: Procedures, my_airports: List[aptdat_io.Airport],
+                         file_lock: mp.Lock) -> None:
     try:
+        parameters.read_from_file(params_file_name)
+        parameters.set_loglevel(log_level)
+        parameters.USE_DATABASE = True  # just to be sure
+        # adapt boundary
+        parameters.BOUNDARY_WEST = scenery_tile.boundary_west
+        parameters.BOUNDARY_SOUTH = scenery_tile.boundary_south
+        parameters.BOUNDARY_EAST = scenery_tile.boundary_east
+        parameters.BOUNDARY_NORTH = scenery_tile.boundary_north
+        parameters.PREFIX = scenery_tile.prefix
+        logging.info("Processing tile {} in prefix {} with process id = {}".format(scenery_tile.tile_index,
+                                                                                   parameters.PREFIX,
+                                                                                   os.getpid()))
+
         # prepare shared resources
         the_coords_transform = coordinates.Transformation(parameters.get_center_global())
         my_fg_elev = FGElev(the_coords_transform)
@@ -87,21 +90,21 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_l
 
         # run programs
         if exec_argument is Procedures.all:
-            buildings.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries)
-            roads.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries)
-            pylons.process(the_coords_transform, my_fg_elev, my_stg_entries)
-            platforms.process(the_coords_transform, my_fg_elev)
-            # piers.process(the_coords_transform, my_fg_elev)
+            buildings.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries, file_lock)
+            roads.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries, file_lock)
+            pylons.process(the_coords_transform, my_fg_elev, my_stg_entries, file_lock)
+            platforms.process(the_coords_transform, my_fg_elev, file_lock)
+            piers.process(the_coords_transform, my_fg_elev, file_lock)
         elif exec_argument is Procedures.buildings:
-            buildings.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries)
+            buildings.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries, file_lock)
         elif exec_argument is Procedures.roads:
-            roads.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries)
+            roads.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries, file_lock)
         elif exec_argument is Procedures.pylons:
-            pylons.process(the_coords_transform, my_fg_elev, my_stg_entries)
+            pylons.process(the_coords_transform, my_fg_elev, my_stg_entries, file_lock)
         elif exec_argument is Procedures.platforms:
-            platforms.process(the_coords_transform, my_fg_elev)
+            platforms.process(the_coords_transform, my_fg_elev, file_lock)
         elif exec_argument is Procedures.piers:
-            # piers.process(the_coords_transform, my_fg_elev)
+            piers.process(the_coords_transform, my_fg_elev, file_lock)
             pass
 
         # clean-up
@@ -114,13 +117,14 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_l
             scenery_tile.boundary_east, scenery_tile.boundary_north)
         logging.exception(msg)
 
-        f = open("osm2city-exceptions.log", "a")
-        # print info
-        print(msg, file=f)
-        # print exception
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        print(''.join(traceback.format_exception(exc_type, exc_value, exc_traceback)), file=f)
-        f.close()
+        time_now = datetime.datetime.now().strftime('%Y%m%d_%H:%M:%S - ')
+
+        with open("osm2city-exceptions.log", "a") as f:
+            # print info
+            f.write(msg + ' at ' + time_now + os.linesep)
+            # print exception
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            f.write(''.join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
 
     logging.info("******* Finished tile {} *******".format(scenery_tile.tile_index))
 
@@ -136,7 +140,7 @@ if __name__ == '__main__':
                         required=True)
     parser.add_argument("-p", "--processes", dest="processes", type=int,
                         help="number of parallel processes (should not be more than number of cores/CPUs)",
-                        required=True, )
+                        required=True)
     parser.add_argument("-e", "--execute", dest="exec",
                         help="execute only the given osm2city procedure (buildings, piers, platforms, pylons, roads)",
                         required=False)
@@ -217,9 +221,10 @@ if __name__ == '__main__':
     start_time = time.time()
     mp.set_start_method('spawn')  # use safe approach to make sure e.g. parameters module is initialized separately
     pool = mp.Pool(processes=args.processes, maxtasksperchild=1)
+    the_file_lock = mp.Manager().Lock()
     for my_scenery_tile in scenery_tiles_list:
         pool.apply_async(process_scenery_tile, (my_scenery_tile, args.filename, args.loglevel,
-                                                exec_procedure, airports))
+                                                exec_procedure, airports, the_file_lock))
     pool.close()
     pool.join()
 

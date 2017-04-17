@@ -56,6 +56,8 @@ You should disable random buildings.
 
 import argparse
 import logging
+import multiprocessing as mp
+import os
 import random
 import textwrap
 from typing import Dict, List, Optional
@@ -211,7 +213,7 @@ def _process_osm_building(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict
     clipping_border = shg.Polygon(parameters.get_clipping_border())
 
     for key, way in ways_dict.items():
-        if not ('building' in way.tags or 'building:part' in way.tags):
+        if not ('building' in way.tags or 'building:part' in way.tags) or len(way.refs) == 0:
             continue
 
         first_node = nodes_dict[way.refs[0]]
@@ -263,9 +265,9 @@ def _make_building_from_way(nodes_dict: Dict[int, osmparser.Node], all_tags: Dic
         _roof_height = 0
         if 'roof:height' in all_tags:
             try:
-                _roof_height = float(all_tags['roof:height'])
+                _roof_height = utils.osmparser.parse_length(all_tags['roof:height'])
             except:
-                _roof_height = 0
+                _roof_height = 0.
 
         _building_type = building_lib.map_building_type(all_tags)
 
@@ -315,7 +317,7 @@ def _refs_to_ring(coords_transform: coordinates.Transformation, refs, nodes_dict
 
 def _write_xml(path: str, file_name: str, the_buildings: List[building_lib.Building], cluster_offset: v.Vec2d) -> None:
     #  -- LOD animation
-    xml = open(path + file_name + ".xml", "w")
+    xml = open(os.path.join(path, file_name + ".xml"), "w")
     xml.write("""<?xml version="1.0"?>\n<PropertyList>\n""")
     xml.write("<path>%s.ac</path>" % file_name)
 
@@ -360,7 +362,8 @@ def _write_xml(path: str, file_name: str, the_buildings: List[building_lib.Build
 
 
 def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
-            blocked_areas: List[shg.Polygon], stg_entries: List[utils.stg_io2.STGEntry]) -> None:
+            blocked_areas: List[shg.Polygon], stg_entries: List[utils.stg_io2.STGEntry],
+            file_lock: mp.Lock=None) -> None:
     random.seed(42)
     stats = utilities.Stats()
 
@@ -480,7 +483,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
             stg_manager.add_object_static('lightmap-switch.xml', center_global, cluster_elev, 0, once=True)
 
             # -- write .ac and .xml
-            building_lib.write(path_to_stg + file_name + ".ac", cl.objects, fg_elev,
+            building_lib.write(os.path.join(path_to_stg, file_name + ".ac"), cl.objects, fg_elev,
                                cluster_elev, cluster_offset, prepare_textures.roofs, stats)
             _write_xml(path_to_stg, file_name, cl.objects, cluster_offset)
             total_buildings_written += len(cl.objects)
@@ -488,7 +491,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
         handled_index += 1
     logging.debug("Total number of buildings written to a cluster *.ac files: %d", total_buildings_written)
 
-    stg_manager.write()
+    stg_manager.write(file_lock)
     stats.print_summary()
     utilities.troubleshoot(stats)
 

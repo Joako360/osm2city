@@ -13,6 +13,7 @@ STG_file represents an .stg file. Usually you don't deal with them directly,
 """
 import enum
 import logging
+import multiprocessing as mp
 import os
 import time
 from typing import List, Optional
@@ -24,7 +25,6 @@ import parameters
 from utils import calc_tile
 from utils.coordinates import Transformation
 from utils.vec2d import Vec2d
-from utils.utilities import assert_trailing_slash
 
 
 @enum.unique
@@ -70,69 +70,44 @@ class STGFile(object):
            Store our/other lines in two separate lists."""
         scenery_name = scenery_directory_name(scenery_type)
         self.path_to_stg = calc_tile.construct_path_to_stg(path_to_scenery, scenery_name, (lon_lat.lon, lon_lat.lat))
-        self.file_name = self.path_to_stg + calc_tile.construct_stg_file_name_from_tile_index(tile_index)
+        self.file_name = os.path.join(self.path_to_stg, calc_tile.construct_stg_file_name_from_tile_index(tile_index))
         self.other_list = []
         self.our_list = []
         self.our_ac_file_name_list = []
-        self.magic = magic
         self.prefix = prefix
-        # deprecated usage
-        self.our_magic_start = _make_delimiter_string(self.magic, None, True)
-        self.our_magic_end = _make_delimiter_string(self.magic, None, False)
-        self.our_magic_start_new = _make_delimiter_string(self.magic, prefix, True)
-        self.our_magic_end_new = _make_delimiter_string(self.magic, prefix, False)
-        self.read()
+        self.our_magic_start = _make_delimiter_string(magic, prefix, True)
+        self.our_magic_end = _make_delimiter_string(magic, prefix, False)
 
-    def read(self) -> None:
+    def _read(self) -> None:
         """read others and ours from file"""
         try:
             stg = open(self.file_name, 'r')
             lines = stg.readlines()
             stg.close()
         except IOError as ioe:
-            logging.info("Error reading %s as it might not exist yet: %s", self.file_name, ioe)
+            logging.debug("Error reading %s as it might not exist yet: %s", self.file_name, ioe)
             return
 
-        temp_other_list = []
-        # deal with broken files containing several sections (old version)
+        self.other_list = []
+        # if our magic is not present, then use the whole file content
+        if lines.count(self.our_magic_start) == 0:
+            self.other_list = lines
+            return
+        # otherwise handle the possibility for several sections
         while lines.count(self.our_magic_start) > 0:
             try:
                 ours_start = lines.index(self.our_magic_start)
             except ValueError:
-                temp_other_list = lines
+                self.other_list = lines
                 break
-    
+
             try:
                 ours_end = lines.index(self.our_magic_end)
             except ValueError:
                 ours_end = len(lines)
 
-            temp_other_list = temp_other_list + lines[:ours_start]
-            lines = lines[ours_end+1:]
-        temp_other_list = temp_other_list + lines
-        
-        self.other_list = []
-        # deal with broken files containing several sections (new version)
-        while temp_other_list.count(self.our_magic_start_new) > 0:
-            try:
-                ours_start = temp_other_list.index(self.our_magic_start_new)
-            except ValueError:
-                self.other_list = temp_other_list
-                return
-    
-            try:
-                ours_end = temp_other_list.index(self.our_magic_end_new)
-            except ValueError:
-                ours_end = len(temp_other_list)
-
             self.other_list = self.other_list + lines[:ours_start]
-            temp_other_list = temp_other_list[ours_end+1:]
-        self.other_list = self.other_list + temp_other_list
-
-    def drop_ours(self) -> None:
-        """Clear our list. Call write() afterwards to finish uninstall"""
-        self.our_list = []
-        self.our_ac_file_name_list = []
+            lines = lines[ours_end + 1:]
 
     def add_object(self, stg_verb: str, ac_file_name: str, lon_lat, elev: float, hdg: float, once=False) -> str:
         """add OBJECT_XXXXX line to our_list. Returns path to stg."""
@@ -142,19 +117,18 @@ class STGFile(object):
             self.our_list.append(line)
             self.our_ac_file_name_list.append(ac_file_name)
             logging.debug(self.file_name + ':' + line)
-        self._make_path_to_stg()
+        # Make sure the path exists. Needs to be done already now, because e.g. ac-files might be written to the path
+        _make_path_to_stg(self.path_to_stg)
         return self.path_to_stg
 
-    def _make_path_to_stg(self) -> None:
-        try:
-            os.makedirs(self.path_to_stg)
-        except OSError as e:
-            if e.errno != 17:
-                logging.exception("Unable to create path to output %s", self.path_to_stg)
-
     def write(self) -> None:
-        """write others and ours to file"""
-        self._make_path_to_stg()
+        """write stg-objects from other procedures (e.g. piers.py) and our procedure (e.g. pylons.py) to file.
+        Other stuff is read if the file already exists.
+        Our stuff was added through the add_object(...) method.
+        """
+        # Read the current content if it already exists
+        self._read()
+        # Write the content
         stg = open(self.file_name, 'w')
         logging.info("Writing %d other lines" % len(self.other_list))
         for line in self.other_list:
@@ -162,30 +136,39 @@ class STGFile(object):
 
         if self.our_list:
             logging.info("Writing %d lines" % len(self.our_list))
-            stg.write(self.our_magic_start_new)
+            stg.write(self.our_magic_start)
             stg.write("# do not edit below this line\n")
             stg.write("# Last Written %s\n#\n" % time.strftime("%c"))
             for line in self.our_list:
                 logging.debug(line.strip())
                 stg.write(line)
-            stg.write(self.our_magic_end_new)
+            stg.write(self.our_magic_end)
 
         stg.close()
+
+
+def _make_path_to_stg(path_to_stg: str) -> None:
+    try:
+        os.makedirs(path_to_stg)
+    except OSError as e:
+        if e.errno != 17:
+            logging.exception('Unable to create path to output %s', path_to_stg)
+            raise e
 
 
 class STGManager(object):
     """manages STG objects. Knows about scenery path.
        prefix separates different writers to work around two PREFIX areas interleaving 
     """
-    def __init__(self, path_to_scenery: str, scenery_type: SceneryType, magic: str, prefix=None) -> None:
-        self.stg_dict = dict()  # maps tile index to stg object
+    def __init__(self, path_to_scenery: str, scenery_type: SceneryType, magic: str, prefix: str=None) -> None:
+        self.stg_dict = dict()  # key: tile index, value: STGFile
         self.path_to_scenery = path_to_scenery
         self.magic = magic
         self.prefix = prefix
         self.scenery_type = scenery_type
 
-    def __call__(self, lon_lat: Vec2d) -> STGFile:
-        """return STG object. If overwrite is given, it overrides default"""
+    def _find_create_stg_file(self, lon_lat: Vec2d) -> STGFile:
+        """Finds an STGFile for a given coordinate. If not yet registered, then new one created."""
         tile_index = calc_tile.tile_index((lon_lat.lon, lon_lat.lat))
         try:
             return self.stg_dict[tile_index]
@@ -193,24 +176,30 @@ class STGManager(object):
             the_stg_file = STGFile(lon_lat, tile_index, self.path_to_scenery, self.scenery_type, self.magic,
                                    self.prefix)
             self.stg_dict[tile_index] = the_stg_file
-            # this will only drop the section we previously wrote ()
-            the_stg_file.drop_ours()
         return the_stg_file
 
     def add_object_static(self, ac_file_name, lon_lat: Vec2d, elev, hdg,
                           stg_verb_type: STGVerbType=STGVerbType.object_static, once=False):
         """Adds OBJECT_STATIC line. Returns path to stg."""
-        the_stg = self(lon_lat)
-        return the_stg.add_object(stg_verb_type.name.upper(), ac_file_name, lon_lat, elev, hdg, once)
+        the_stg_file = self._find_create_stg_file(lon_lat)
+        return the_stg_file.add_object(stg_verb_type.name.upper(), ac_file_name, lon_lat, elev, hdg, once)
 
     def add_object_shared(self, ac_file_name, lon_lat, elev, hdg):
         """Adds OBJECT_SHARED line. Returns path to stg it was added to."""
-        the_stg = self(lon_lat)
-        return the_stg.add_object('OBJECT_SHARED', ac_file_name, lon_lat, elev, hdg)
+        the_stg_file = self._find_create_stg_file(lon_lat)
+        return the_stg_file.add_object('OBJECT_SHARED', ac_file_name, lon_lat, elev, hdg)
 
-    def write(self):
-        for the_stg in list(self.stg_dict.values()):
+    def write(self, file_lock: mp.Lock=None):
+        """Writes all new scenery objects including the already existing back to stg-files.
+        The file_lock object makes sure that only the current process is reading and writing stg-files in order
+        to avoid conflicts.
+        """
+        if file_lock is not None:
+            file_lock.acquire()
+        for key, the_stg in self.stg_dict.items():
             the_stg.write()
+        if file_lock is not None:
+            file_lock.release()
 
 
 class STGEntry(object):
@@ -248,12 +237,12 @@ class STGEntry(object):
         It can be useful to try a different path for shared_objects, which might be from Terrasync."""
         if self.verb_type is STGVerbType.object_shared:
             if scenery_path is not None:
-                return assert_trailing_slash(scenery_path) + self.obj_filename
+                return os.path.join(scenery_path, self.obj_filename)
 
             p = os.path.abspath(self.stg_path + os.sep + '..' + os.sep + '..' + os.sep + '..')
-            return os.path.abspath(p + os.sep + self.obj_filename)
+            return os.path.abspath(os.path.join(p, self.obj_filename))
         else:
-            return self.stg_path + os.sep + self.obj_filename
+            return os.path.join(self.stg_path, self.obj_filename)
 
 
 def read_stg_entries(stg_path_and_name: str, consider_shared: bool = True, our_magic: str = "",
@@ -316,7 +305,9 @@ def read_stg_entries(stg_path_and_name: str, consider_shared: bool = True, our_m
 
 def read_stg_entries_in_boundary(consider_shared: bool=True, my_coord_transform: Transformation=None) -> List[STGEntry]:
     """Returns a list of all STGEntries within the boundary according to parameters.
-    If my_cord_transform is set, then for each entry the convex hull is calculated in local coordinates."""
+    It uses the PATH_TO_SCENERY and PATH_TO_SCENERY_OPT (which are static), not PATH_TO_OUTPUT.
+    If my_cord_transform is set, then for each entry the convex hull is calculated in local coordinates.
+    """
     stg_entries = list()
     stg_files = calc_tile.get_stg_files_in_boundary(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
                                                     parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH,

@@ -1045,12 +1045,14 @@ def map_building_type(tags) -> str:
 def overlap_check_blocked_areas(buildings: List[Building], blocked_areas: List[shg.Polygon]) -> List[Building]:
     cleared_buildings = list()
     for building in buildings:
+        is_intersected = False
         for blocked_area in blocked_areas:
             if building.polygon.intersects(blocked_area):
                 logging.debug("Building osm_id=%d intersects with blocked area.", building.osm_id)
-                continue
-            else:
-                cleared_buildings.append(building)
+                is_intersected = True
+                break
+        if not is_intersected:
+            cleared_buildings.append(building)
     return cleared_buildings
 
 

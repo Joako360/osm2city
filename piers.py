@@ -10,6 +10,7 @@ Created on Sun Sep 29 10:42:12 2013
 import argparse
 import logging
 import math
+import multiprocessing as mp
 import os
 from random import randint
 from typing import List
@@ -93,7 +94,7 @@ def _write_piers(stg_manager, replacement_prefix, clusters, coords_transform: co
                 else:
                     _write_pier_line(pier, obj, cl.center)
             path = stg_manager.add_object_static(ac_file_name, center_tile, 0, 0)
-            file_name = path + os.sep + ac_file_name
+            file_name = os.path.join(path, ac_file_name)
             f = open(file_name, 'w')
             f.write(str(ac))
             f.close()
@@ -312,7 +313,7 @@ def _write_pier_line(pier, obj, offset):
     obj.face(sideface, mat=0)
 
 
-def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev) -> None:
+def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev, file_lock: mp.Lock=None) -> None:
     stats = utilities.Stats()
     # -- prepare transformation to local coordinates
     cmin, cmax = parameters.get_extent_global()
@@ -350,7 +351,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     _write_boats(stg_manager, piers, coords_transform)
 
     # -- write stg
-    stg_manager.write()
+    stg_manager.write(file_lock)
 
 
 if __name__ == "__main__":

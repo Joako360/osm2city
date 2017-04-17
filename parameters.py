@@ -273,7 +273,7 @@ def get_OSM_file_name():
     """
     Returns the path to the OSM File
     """
-    return PREFIX + os.sep + OSM_FILE
+    return os.path.join(PREFIX, OSM_FILE)
 
 
 def get_repl_prefix():

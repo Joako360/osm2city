@@ -169,7 +169,7 @@ def _check_missed_input_textures(tex_prefix: str, registered_textures: List[Text
             if filename[-4:] in [".jpg", ".png"]:
                 if filename[-7:-4] in ["_LM", "_MA"]:
                     continue
-                my_path = subdir + os.sep + filename
+                my_path = os.path.join(subdir, filename)
                 found = False
                 for registered in registered_textures:
                     if registered.filename == my_path:
@@ -190,7 +190,7 @@ def _append_dynamic(facade_manager: FacadeManager, tex_prefix: str) -> None:
             elif filename == ROOFS_DEFAULT_FILE_NAME:
                 continue
 
-            my_path = subdir + os.sep + filename
+            my_path = os.path.join(subdir, filename)
             logging.info("Executing %s ", my_path)
             try:
                 facade_manager.current_registered_in = my_path
@@ -205,7 +205,7 @@ def _append_roofs(roof_manager: RoofManager, tex_prefix: str) -> None:
     Argument roof_manager is used dynamically in execfile
     ."""
     try:
-        file_name = tex_prefix + os.sep + ROOFS_DEFAULT_FILE_NAME
+        file_name = os.path.join(tex_prefix, ROOFS_DEFAULT_FILE_NAME)
         roof_manager.current_registered_in = file_name
         exec(compile(open(file_name).read(), file_name, 'exec'))
     except Exception as e:
@@ -243,12 +243,11 @@ def init(stats: util.Stats, create_atlas: bool=True) -> None:
     global roofs
     global atlas_file_name
 
-    my_tex_prefix = util.assert_trailing_slash(parameters.PATH_TO_OSM2CITY_DATA)
-    atlas_file_name = "tex" + os.sep + "atlas_facades"
-    my_tex_prefix_src = my_tex_prefix + 'tex.src'
+    atlas_file_name = os.path.join("tex", "atlas_facades")
+    my_tex_prefix_src = os.path.join(parameters.PATH_TO_OSM2CITY_DATA, 'tex.src')
     Texture.tex_prefix = my_tex_prefix_src  # need to set static variable so managers get full path
 
-    pkl_file_name = my_tex_prefix + "tex" + os.sep + "atlas_facades.pkl"
+    pkl_file_name = os.path.join(parameters.PATH_TO_OSM2CITY_DATA, "tex", "atlas_facades.pkl")
     
     if create_atlas:
         facades = FacadeManager('facade', stats)
@@ -260,7 +259,6 @@ def init(stats: util.Stats, create_atlas: bool=True) -> None:
 
         texture_list = facades.get_list() + roofs.get_list()
 
-
         # warn for missed out textures
         _check_missed_input_textures(my_tex_prefix_src, texture_list)
 
@@ -269,7 +267,7 @@ def init(stats: util.Stats, create_atlas: bool=True) -> None:
             now = datetime.datetime.now()
             atlas_file_name += "_%04i%02i%02i" % (now.year, now.month, now.day)
 
-        _make_texture_atlas(texture_list, my_tex_prefix + atlas_file_name, '.png',
+        _make_texture_atlas(texture_list, os.path.join(parameters.PATH_TO_OSM2CITY_DATA, atlas_file_name), '.png',
                             lightmap=True, ambient_occlusion=parameters.BUILDING_FAKE_AMBIENT_OCCLUSION)
         
         params = dict()

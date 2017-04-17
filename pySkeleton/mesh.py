@@ -1,9 +1,9 @@
-#===============================================================================
+# ===============================================================================
 #   File :      mesh.py
 #   Author :    Olivier Teboul, olivier.teboul@ecp.fr
 #   Date :      31 july 2008, 14:03
 #   Class :     Mesh
-#===============================================================================
+# ===============================================================================
 
 import numpy as np
 import roofs
@@ -24,7 +24,7 @@ class Mesh:
         * save and load (with a internal format)
     """
 
-    def __init__(self,vertices = [], faces = []):
+    def __init__(self,vertices=list(), faces=list()):
         self.vertices   = vertices
         self.faces      = faces
         self.nv         = len(self.vertices)
@@ -114,24 +114,14 @@ class Mesh:
 
         X = []
         for p in self.vertices:
-#            s += "%f %f %f\n" % (p.x, p.y, p.z)
             x = -(p.x - offset_xy.x)
             y = -(p.y - offset_xy.y)
             X.append([x, y])
             s += "%f %f %f\n" % (y, p.z + offset_z, x)
 
-#        for p in self.vertices:
-##            s += "%f %f %f\n" % (p.x, p.y, p.z)
-#            x = -(p.x - offset_xy.x)
-#            y = -(p.y - offset_xy.y)
-#            print "nod ", x, y
-#
-#        print "tot", X
-#        print "---"
-
         s += "numsurf %i\n" % len(self.faces)
         for face in self.faces:
-            face = np.roll(face[::-1], 1) # -- make outer edge the first
+            face = np.roll(face[::-1], 1)  # -- make outer edge the first
             s += "SURF 0x0\n"
             s += "mat %i\n" % b.roof_mat
             s += "refs %i\n" % len(face)
@@ -139,13 +129,11 @@ class Mesh:
             i = 0
             for index in face:
                 s += "%i %1.3g %1.3g\n" % (index, uv[i, 0], uv[i, 1])
-                #print "UV coord", uv[i,0], uv[i,1]
-#                print "z=%g %g %g" % (self.vertices[index].z, uv[i,0], uv[i,1])
                 i += 1
 
         return s
 
-    def to_out(self, out, b, offset_xy = Vec2d(0, 0), offset_z = 0., header = False):
+    def to_out(self, out, b, offset_xy=Vec2d(0, 0), offset_z=0., header = False) -> bool:
         """create 3d object"""
         if header:
             out.new_object(b.roof_ac_name, b.roof_texture.filename + '.png')
@@ -153,21 +141,18 @@ class Mesh:
         X = []
         o = out.next_node_index()
         for p in self.vertices:
-#            s += "%f %f %f\n" % (p.x, p.y, p.z)
             x = -(p.x - offset_xy.x)
             y = -(p.y - offset_xy.y)
             X.append([x, y])
             out.node(y, p.z + offset_z, x)
 
         for face in self.faces:
-            face = np.roll(face[::-1], 1) # -- make outer edge the first
+            face = np.roll(face[::-1], 1)  # -- make outer edge the first
             uv = roofs.face_uv(face, np.array(X), b.roof_texture)
             i = 0
             l = []
             for index in face:
                 l.append((o + index, uv[i, 0], uv[i, 1]))
-                #print "UV coord", uv[i,0], uv[i,1]
-#                print "z=%g %g %g" % (self.vertices[index].z, uv[i,0], uv[i,1])
                 i += 1
             out.face(l)
 

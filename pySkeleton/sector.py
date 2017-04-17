@@ -98,8 +98,8 @@ class Sector:
     def move_first_point(self, d):
         """ move the first point along the first half line with respect to its speed """
         cosAlpha = self.edge.u*self.h1.d
-        alpha = 0  # if cosAlpha outside allowed range, then assume max value (= 1) and therefore acos(1) = 0
-        if -1. <= cosAlpha <= .1:
+        alpha = 0.0000001  # if cosAlpha outside allowed range, then assume max value (= 1) and therefore acos(1) = 0
+        if -1. <= cosAlpha <= 1.:
             alpha = math.acos(cosAlpha)
         s = d*float(self.edge.w)/math.sin(alpha)
         return self.h1.getPoint(s)        

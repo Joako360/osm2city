@@ -186,7 +186,7 @@ done
             # Manipulate the properties file and write to new destination
             with open(args.properties, "r") as sources:
                 lines = sources.readlines()
-            with open(path + os.sep + params_out_file_name, "w") as sources:
+            with open(os.path.join(path, params_out_file_name), "w") as sources:
                 replacement = '\\1 "' + replacement_path + '"'
                 for line in lines:
                     line = re.sub('^\s*(PREFIX\s*=)(.*)', replacement, line)
@@ -209,7 +209,7 @@ done
                                                        calc_tile.get_west_lon(lon, lat, dx),
                                                        calc_tile.get_south_lat(lat, dy),
                                                        calc_tile.get_east_lon(lon, lat, dx),
-                                                       replacement_path + os.sep + OSM_FILE_NAME))
+                                                       os.path.join(replacement_path, OSM_FILE_NAME)))
             else:
                 download_command = 'curl -f --retry 6 --proxy-ntlm -o %s/%s -g %s*[bbox=%f,%f,%f,%f]   '
                 if BASH_PARALLEL_PROCESS:
@@ -223,14 +223,16 @@ done
                                                         calc_tile.get_east_lon(lon, lat, dx),
                                                         calc_tile.get_north_lat(lat, dy)))
             for command in files:
-                _write_to_file(command[0], command[1], python_exe, replacement_path + os.sep + params_out_file_name)
+                _write_to_file(command[0], command[1], python_exe,
+                               os.path.join(replacement_path, params_out_file_name))
     for command in files:
         command[1].close()
 
     # chmod u+x on created scripts for linux
     if is_linux_or_mac:
         for util in utils + ['download', ]:
-            f = calc_tile.root_directory_name((lon, lat)) + os.sep + _get_file_name(util + "_", args.tile_name)
+            f = os.path.join(calc_tile.root_directory_name((lon, lat)),
+                             _get_file_name(util + "_", args.tile_name))
             try:
                 st = os.stat(f)
                 os.chmod(f, st.st_mode | stat.S_IEXEC)

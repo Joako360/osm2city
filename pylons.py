@@ -20,6 +20,8 @@ import argparse
 from enum import IntEnum, unique
 import logging
 import math
+import multiprocessing as mp
+import os
 import time
 from typing import Dict, List, Tuple
 import unittest
@@ -263,7 +265,8 @@ def _get_cable_vertices(pylon_model: str, direction_type: PylonDirectionType) ->
     elif "tension" in pylon_model:
         return _create_rail_stop_tension()
     else:
-        raise Exception(msg='Pylon model not found for creating cable vertices: {}'.format(pylon_model))
+        text = 'Pylon model not found for creating cable vertices: {}'.format(pylon_model)
+        raise Exception(text)
 
 
 @unique
@@ -1484,7 +1487,7 @@ def _write_cable_clusters(cluster_container: cluster.ClusterContainer, coords_tr
                 cable.translate_vertices_relative(cluster_x, cluster_y, cluster_elevation)
                 ac_file_lines.append(cable.make_ac_entry(0))  # material is 0-indexed
 
-                with open(path_to_stg + cluster_filename + ".ac", 'w') as f:
+                with open(os.path.join(path_to_stg, cluster_filename + ".ac"), 'w') as f:
                     f.write("\n".join(ac_file_lines))
 
 
@@ -1547,7 +1550,7 @@ def _optimize_catenary(half_distance_pylons: float, max_value: float, sag: float
     """
     my_variation = sag * max_variation
     try:
-        for a in range(1, max_value):
+        for a in range(1, int(max_value)):
             value = a * math.cosh(float(half_distance_pylons)/a) - a  # float() needed to make sure result is float
             if (value >= (sag - my_variation)) and (value <= (sag + my_variation)):
                 return a, value
@@ -1771,7 +1774,7 @@ def _fetch_osm_file_data() -> Tuple[Dict[int, osmparser.Node], Dict[int, osmpars
 
 
 def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
-            stg_entries: List[stg_io2.STGEntry]) -> None:
+            stg_entries: List[stg_io2.STGEntry], file_lock: mp.Lock=None) -> None:
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
 
@@ -1898,7 +1901,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
         for tank in storage_tanks:
             tank.make_stg_entry(stg_manager)
 
-    stg_manager.write()
+    stg_manager.write(file_lock)
 
 
 if __name__ == "__main__":

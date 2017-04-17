@@ -92,15 +92,6 @@ def is_linux_or_mac() -> bool:
     return False
 
 
-def assert_trailing_slash(path: str) -> str:
-    """Takes a path and makes sure it has an os_specific trailing slash unless the path is empty."""
-    my_path = path
-    if len(my_path) > 0:
-        if not my_path.endswith(os.sep):
-            my_path += os.sep
-    return my_path
-
-
 def replace_with_os_separator(path: str) -> str:
     """Switches forward and backward slash depending on os."""
     my_string = path.replace("/", os.sep)
@@ -332,7 +323,7 @@ class FGElev(object):
 
         self.pkl_fname = None
         if parameters.FG_ELEV_CACHE and not parameters.NO_ELEV:
-            self.pkl_fname = parameters.PREFIX + os.sep + 'elev.pkl'
+            self.pkl_fname = os.path.join(parameters.PREFIX, 'elev.pkl')
             try:
                 logging.info("Loading %s", self.pkl_fname)
                 fpickle = open(self.pkl_fname, 'rb')
@@ -401,10 +392,11 @@ class FGElev(object):
                 elev = float(parts[1]) + self.h_offset
                 is_solid = True
                 if parameters.PROBE_FOR_WATER:
-                    if len(parts) == 3 and parts[2] == '-':
-                        is_solid = False
+                    if len(parts) == 3:
+                        if parts[2] == '-':
+                            is_solid = False
                     else:
-                        logging.debug('ERROR: Probing for water with fgelev missed to return value for water: %', line)
+                        logging.debug('ERROR: Probing for water with fgelev missed to return value for water: %s', line)
             except IndexError as reason:
                 self.close()
                 if empty_lines > 1:

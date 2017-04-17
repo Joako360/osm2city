@@ -51,7 +51,7 @@ class Texture(object):
                  height_min=0, height_max=9999,
                  v_align_bottom: bool=False,
                  provides=list(), requires=list(), levels=None) -> None:
-        self.filename = Texture.tex_prefix + os.sep + replace_with_os_separator(filename)
+        self.filename = os.path.join(Texture.tex_prefix, replace_with_os_separator(filename))
         self.x0 = self.x1 = self.y0 = self.y1 = 0
         self.sy = self.sx = 0
         self.rotated = False
@@ -193,8 +193,8 @@ class RoofManager(object):
         self.available_materials = set()
 
     def append(self, texture: Texture) -> None:
-        """Appends a texture to the catalog if the referenced file exists, in which case True is returned.
-        Otherwise False is returned and the texture is not added.
+        """Appends a texture to the catalog if the referenced file exists and other tests pass.
+        
 
         Prepend each item in t.provides with class name, except for class-independent keywords: age, region, compat
         """
@@ -202,23 +202,23 @@ class RoofManager(object):
         if texture.validation_message:
             logging.warning("Error during initialization. Defined in registration file %s: %s",
                             self.current_registered_in, texture.validation_message)
-            return False
+            return
 
         texture.registered_in = self.current_registered_in
 
         # check whether the texture should be excluded based on parameter for name
         if not self._screen_exclude_texture_by_name(texture):
-            return False
+            return
 
         if not self._screen_exclude_texture_by_region(texture):
-            return False
+            return
 
         # check whether the same texture already has been referenced in an existing entry
         for existing in self.__l:
             if existing.filename == texture.filename:
                 logging.warning("Double registration. Defined in registration file %s: %s is already referenced in %s",
                                 self.current_registered_in, texture.filename, existing.registered_in)
-                return False
+                return
 
         new_provides = list()
         my_available_materials = list()
@@ -226,7 +226,7 @@ class RoofManager(object):
         for item in texture.provides:
             screened_item = screen_texture_tags_for_colour_spelling(item)
             if not self._screen_exclude_texture_by_provides(screened_item):
-                return False
+                return
             if screened_item.split(':')[0] in ('age', 'region', 'compat'):
                 new_provides.append(screened_item)
             else:
@@ -243,7 +243,7 @@ class RoofManager(object):
 
         self.stats.textures_total[texture.filename] = None
         self.__l.append(texture)
-        return True
+        return
 
     def _screen_exclude_texture_by_name(self, texture: Texture) -> bool:
         if isinstance(self, FacadeManager):
@@ -284,7 +284,7 @@ class RoofManager(object):
     def find_matching_roof(self, requires: List[str], max_dimension: float, stats: Stats):
         candidates = self.find_candidates(requires, list())
         if not candidates:
-            logging.debug("WARNING: No matching texture found for " + str(requires))
+            logging.debug("WARNING: No matching texture found for %s with max_dim %d", str(requires), max_dimension)
             # Break down requirements to find something that matches
             for simple_req in requires:
                 candidates = self.find_candidates([simple_req], list())

@@ -77,6 +77,8 @@ import argparse
 import enum
 import logging
 import math
+import multiprocessing as mp
+import os
 import random
 import textwrap
 from typing import Dict, List, Optional
@@ -1007,7 +1009,7 @@ class Roads(object):
             ac.add_label(' %i h=%1.1f' % (the_node.osm_id, the_node.h_add), -anchor.y, e, -anchor.x, scale=1.)
 
         path_to_stg = stg_manager.add_object_static(file_name + '.ac', Vec2d(self.transform.toGlobal((0, 0))), 0, 0)
-        ac.write(path_to_stg + file_name + '.ac')
+        ac.write(os.path.join(path_to_stg, file_name + '.ac'))
 
     def debug_print_refs_of_way(self, way_osm_id):
         """print refs of given way"""
@@ -1106,7 +1108,7 @@ def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, s
         path_to_stg = stg_manager.add_object_static(file_name + suffix, center_global, cluster_elev, 0,
                                                     stg_verb_type)
         stg_paths.add(path_to_stg)
-        ac.write(path_to_stg + file_name + '.ac')
+        ac.write(os.path.join(path_to_stg, file_name + '.ac'))
 
         if not is_railway:
             _write_xml(path_to_stg, file_name, file_name)
@@ -1117,7 +1119,7 @@ def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, s
 
 
 def _write_xml(path_to_stg, file_name, object_name):
-    xml = open(path_to_stg + file_name + '.xml', "w")
+    xml = open(os.path.join(path_to_stg, file_name + '.xml'), "w")
     if parameters.TRAFFIC_SHADER_ENABLE and not parameters.FLAG_2017_2:
         shader_str = "Effects/road-high"
     else:
@@ -1183,7 +1185,8 @@ def debug_create_eps(roads, clusters, elev, coords_transform: coordinates.Transf
 
 
 def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
-            blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry]) -> None:
+            blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
+            file_lock: mp.Lock=None) -> None:
     random.seed(42)
     stats = utilities.Stats()
 
@@ -1225,7 +1228,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     roads.debug_plot(show=True, plot_junctions=False, clusters=roads.roads_clusters)
     
     debug_create_eps(roads, roads.roads_clusters, fg_elev, coords_transform, plot_cluster_borders=1)
-    stg_manager.write()
+    stg_manager.write(file_lock)
 
     utilities.troubleshoot(stats)
     logging.debug("final " + str(roads))
