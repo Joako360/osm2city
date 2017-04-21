@@ -63,7 +63,7 @@ class Cable(object):
     __slots__ = ('start_cable_vertex', 'end_cable_vertex', 'vertices', 'radius', 'heading')
 
     def __init__(self, start_cable_vertex: CableVertex, end_cable_vertex: CableVertex, radius: float,
-                 number_extra_vertices: int, catenary_a: int, distance: float, max_sagging: float) -> None:
+                 number_extra_vertices: int, catenary_a: int, distance: float) -> None:
         """
         A Cable between two vertices. The radius is approximated with a triangle with sides of length 2*radius.
         If both the number of extra_vertices and the catenary_a are > 0, then the Cable gets a sag based on
@@ -77,15 +77,14 @@ class Cable(object):
                                                             end_cable_vertex.x, end_cable_vertex.y)
 
         if (number_extra_vertices > 0) and (catenary_a > 0) and (distance >= parameters.C2P_CATENARY_MIN_DISTANCE):
-            self._make_catenary_cable(number_extra_vertices, catenary_a, max_sagging)
+            self._make_catenary_cable(number_extra_vertices, catenary_a)
 
-    def _make_catenary_cable(self, number_extra_vertices: int, catenary_a: int, max_sagging: float) -> None:
+    def _make_catenary_cable(self, number_extra_vertices: int, catenary_a: int) -> None:
         """
         Transforms the cable into one with more vertices and some sagging based on a catenary function.
         If there is a considerable difference in elevation between the two pylons, then gravity would have to
         be taken into account https://en.wikipedia.org/wiki/File:Catenary-tension.png.
         However the elevation correction actually already helps quite a bit, because the x/y are kept constant.
-        Max sagging makes sure that probability of touching the ground is lower for long distances
         """
         cable_distance = coordinates.calc_distance_local(self.start_cable_vertex.x, self.start_cable_vertex.y,
                                                          self.end_cable_vertex.x, self.end_cable_vertex.y)
@@ -741,7 +740,7 @@ class Line(LineWithoutCables):
                 if start_cable_vertices[i].no_catenary:
                     my_number_extra_vertices = 0
                 cable = Cable(start_cable_vertices[i], end_cable_vertices[i], my_radius, my_number_extra_vertices,
-                              corrected_catenary_a, segment.length, max_sagging)
+                              corrected_catenary_a, segment.length)
                 segment.cables.append(cable)
 
 
@@ -1608,15 +1607,42 @@ class LinearOSMFeature(object):
         raise NotImplementedError("Please implement this method")
 
 
+@unique
+class HighwayLightingType(IntEnum):
+    """Describes the lighting of a highway based on where information comes from. OSM key overwrites if present."""
+    undefined = 0  # no lit OSM key
+    lit_yes = 1  # OSM lit=yes
+    lit_no = 2  # OSM lit=no
+    within_buildings_area = 3  # within city / residential ... developed area with buildings
+    outside_buildings_area = 4
+
+
 class Highway(LinearOSMFeature):
 
-    def __init__(self, osm_id):
+    def __init__(self, osm_id) -> None:
         super().__init__(osm_id)
         self.is_roundabout = False
+        self._lighting_type = HighwayLightingType.undefined
 
-    def get_width(self):
+    def get_width(self) -> float:
         highway_attributes = roads.get_highway_attributes(self.type_)
         return highway_attributes[2]
+
+    @property
+    def lit(self) -> bool:
+        if self._lighting_type in [HighwayLightingType.lit_yes, HighwayLightingType.within_buildings_area]:
+            return True
+        return False
+
+    @lit.setter
+    def lit(self, lighting_type: HighwayLightingType) -> None:
+        if self._lighting_type is HighwayLightingType.undefined:
+            self._lighting_type = lighting_type
+        elif lighting_type in [HighwayLightingType.lit_yes, HighwayLightingType.lit_no, HighwayLightingType.undefined]:
+            self._lighting_type = lighting_type
+        else:  # *_buildings_area may not overwrite OSM tagging
+            if self._lighting_type not in [HighwayLightingType.lit_yes, HighwayLightingType.lit_no]:
+                self._lighting_type = lighting_type
 
 
 def _process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
@@ -1637,6 +1663,11 @@ def _process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
                 is_challenged = True
             elif ("junction" == key) and ("roundabout" == value):
                 my_highway.is_roundabout = True
+            elif 'lit' == key:
+                if 'yes' == value:
+                    my_highway.lit = HighwayLightingType.lit_yes
+                else:
+                    my_highway.lit = HighwayLightingType.lit_no
         if valid_highway and not is_challenged:
             # Process the Nodes
             my_coordinates = list()

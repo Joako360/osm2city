@@ -81,7 +81,7 @@ import multiprocessing as mp
 import os
 import random
 import textwrap
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import graph
 import matplotlib.pyplot as plt
@@ -144,14 +144,15 @@ def _is_processed_railway(way):
     return False
 
 
-def _calc_railway_gauge(way):
-    width = 1435
+def _calc_railway_gauge(way) -> float:
+    """Based on railway tags determine the width in meters (3.18 meters for normal gauge)."""
+    width = 1435  # millimeters
     if way.tags['railway'] in ['narrow_gauge']:
         width = 1000
     if "gauge" in way.tags:
         if osmparser.is_parsable_float(way.tags['gauge']):
             width = float(way.tags['gauge'])
-    return width / 1000 * 126 / 57  # in the texture the track uses 57 out of 126 pixels
+    return width / 1000 * 126 / 57  # in the texture roads.png the track uses 57 out of 126 pixels
 
 
 def _is_highway(way):
@@ -214,32 +215,32 @@ class HighwayType(enum.IntEnum):
     slow = 1  # cycle ways, tracks, footpaths etc
 
 
-def get_highway_attributes(highway_type):
+def get_highway_attributes(highway_type: HighwayType) -> Tuple[int, Tuple[float, float], float]:
     """This must be aligned with HighwayType as well as textures.road and Roads.create_linear_objects."""
     if highway_type in [HighwayType.motorway]:
         priority = 6  # highest of all, but should be 1 less than for railway
         tex = textures.road.ROAD_3
-        width = 6
+        width = 6.
     elif highway_type in [HighwayType.primary, HighwayType.trunk]:
         priority = 5
         tex = textures.road.ROAD_2
-        width = 6
+        width = 6.
     elif highway_type in [HighwayType.secondary]:
         priority = 4
         tex = textures.road.ROAD_2
-        width = 6
+        width = 6.
     elif highway_type in [HighwayType.tertiary, HighwayType.unclassified, HighwayType.road]:
         priority = 3
         tex = textures.road.ROAD_1
-        width = 6
+        width = 6.
     elif highway_type in [HighwayType.residential, HighwayType.service]:
         priority = 2
         tex = textures.road.ROAD_1
-        width = 4
+        width = 4.
     else:
         priority = 1
         tex = textures.road.ROAD_1
-        width = 4
+        width = 4.
     return priority, tex, width
 
 
@@ -343,9 +344,6 @@ def _attached_ways_dict_append(attached_ways_dict, the_ref, the_way, is_first, i
 
 
 class Roads(object):
-    VALID_NODE_KEYS = []
-    REQ_KEYS = ['highway', 'railway']
-
     def __init__(self, raw_osm_ways: List[osmparser.Way], nodes_dict: Dict[int, osmparser.Node],
                  coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev) -> None:
         self.transform = coords_transform
@@ -367,9 +365,6 @@ class Roads(object):
     def process(self, blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
                 stats: utilities.Stats) -> None:
         """Processes the OSM data until data can be clusterized.
-
-        Needs to be called after OSM data have been processed using the store_way callback method from
-        OSMContentHandler.
         """
         self._remove_tunnels()
         self._replace_short_bridges_with_ways()
@@ -460,12 +455,12 @@ class Roads(object):
             my_line = self._line_string_from_way(way)
             for blocked_area in blocked_areas:
                 if my_line.intersects(blocked_area):
-                    my_multiline = my_line.difference(blocked_area)
-                    if len(my_multiline.geoms) != 2:
-                        logging.warning("Intersection of way (osm_id=%d) with blocked area cannot be processed.",
-                                        way.osm_id)
+                    my_line_difference = my_line.difference(blocked_area)
+                    if isinstance(my_line_difference, shg.LineString):
+                        self._change_way_for_object(my_line_difference, way)
                         continue
-                    new_ways.append(self._split_way_for_object(my_multiline, way))
+                    if isinstance(my_line_difference, shg.MultiLineString) and my_line_difference.geoms == 2:
+                        new_ways.append(self._split_way_for_object(my_line_difference, way))
 
         self.ways_list.extend(new_ways)
 
@@ -499,19 +494,23 @@ class Roads(object):
                                 pass
                             logging.debug("Remove way (osm_id=%d) due to static object.", way.osm_id)
                             continue
-                        way.refs = list()
-                        the_coordinates = list(my_line_difference.coords)
-                        for coords in the_coordinates:
-                            lon_lat = self.transform.toGlobal(coords)
-                            new_node = osmparser.Node(osmparser.get_next_pseudo_osm_id(), lon_lat[1], lon_lat[0])
-                            self.nodes_dict[new_node.osm_id] = new_node
-                            way.refs.append(new_node.osm_id)
+                        self._change_way_for_object(my_line_difference, way)
                         logging.debug("Reduced way length (osm_id=%d) due to static object.", way.osm_id)
                         continue
                     if isinstance(my_line_difference, shg.MultiLineString) and my_line_difference.geoms == 2:
                         new_ways.append(self._split_way_for_object(my_line_difference, way))
 
         self.ways_list.extend(new_ways)
+
+    def _change_way_for_object(self, my_line: shg.LineString, original_way: osmparser.Way) -> None:
+        """Processes an original way and replaces its coordinates with the coordinates of a LineString."""
+        original_way.refs = list()
+        the_coordinates = list(my_line.coords)
+        for coords in the_coordinates:
+            lon_lat = self.transform.toGlobal(coords)
+            new_node = osmparser.Node(osmparser.get_next_pseudo_osm_id(), lon_lat[1], lon_lat[0])
+            self.nodes_dict[new_node.osm_id] = new_node
+            original_way.refs.append(new_node.osm_id)
 
     def _split_way_for_object(self, my_multiline: shg.MultiLineString, original_way: osmparser.Way) -> osmparser.Way:
         """Processes an original way split by an object (blocked area, stg_entry) and creates additional way"""
@@ -696,13 +695,11 @@ class Roads(object):
                     obj = linear_bridge.LinearBridge(self.transform, self.fg_elev, the_way.osm_id,
                                                      the_way.tags, the_way.refs, self.nodes_dict,
                                                      width=width, tex=tex, AGL=above_ground_level)
-                    obj.typ = priority  # FIXME: can this be deleted. does not seem to be used at all
                     self.bridges_list.append(obj)
                 else:
                     obj = linear.LinearObject(self.transform, the_way.osm_id,
                                               the_way.tags, the_way.refs,
                                               self.nodes_dict, width=width, tex=tex, AGL=above_ground_level)
-                    obj.typ = priority
                     if _is_railway(the_way):
                         self.railway_list.append(obj)
                     else:
@@ -1191,7 +1188,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     stats = utilities.Stats()
 
     if not parameters.USE_DATABASE:
-        osm_way_result = osmparser.fetch_osm_file_data(['highway', 'railway', "tunnel", "bridge", "gauge", "access"],
+        osm_way_result = osmparser.fetch_osm_file_data(['highway', 'railway', "tunnel", "bridge", "gauge", "access", "lit"],
                                                        ['highway', 'railway'])
     else:
         osm_way_result = osmparser.fetch_osm_db_data_ways_keys(["highway", "railway"])

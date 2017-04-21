@@ -355,6 +355,8 @@ def _parse_stg_entries_for_convex_hull(stg_entries: List[STGEntry], my_coord_tra
                     entry.convex_hull = translated_polygon
             except IOError as reason:
                 logging.warning("Ignoring unreadable stg_entry %s", reason)
+            except ValueError as e:
+                logging.warning("Ac-filename seems to be wrong in xml-file %s", ac_filename)
 
 
 def _extract_boundary(ac_filename: str, alternative_ac_filename: str=None) -> shg.Polygon:

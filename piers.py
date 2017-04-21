@@ -140,18 +140,19 @@ def _write_boat_area(pier, stg_manager, coords_transform: coordinates.Transforma
 def _write_boat_line(pier, stg_manager, coords_transform: coordinates.Transformation):
     line_string = LineString(pier.nodes)
     right_line = line_string.parallel_offset(4, 'left', resolution=8, join_style=1, mitre_limit=10.0)
-    coords = right_line.coords
-    for i in range(len(coords) - 1):
-        segment = LineString(coords[i:i + 2])
-        boat_position = segment.interpolate(segment.length / 2)
-        try:
-            pos_global = coords_transform.toGlobal((boat_position.x, boat_position.y))
-            direction = math.degrees(math.atan2(segment.coords[0][0] - segment.coords[1][0],
-                                                segment.coords[0][1] - segment.coords[1][1]))
-            if segment.length > 5:
-                _write_model(segment.length, stg_manager, pos_global, direction, pier.elevation)
-        except AttributeError as reason:
-            logging.error(reason)
+    if isinstance(right_line, LineString):  # FIXME: what to do else?
+        coords = right_line.coords
+        for i in range(len(coords) - 1):
+            segment = LineString(coords[i:i + 2])
+            boat_position = segment.interpolate(segment.length / 2)
+            try:
+                pos_global = coords_transform.toGlobal((boat_position.x, boat_position.y))
+                direction = math.degrees(math.atan2(segment.coords[0][0] - segment.coords[1][0],
+                                                    segment.coords[0][1] - segment.coords[1][1]))
+                if segment.length > 5:
+                    _write_model(segment.length, stg_manager, pos_global, direction, pier.elevation)
+            except AttributeError as reason:
+                logging.error(reason)
 
 
 def _write_model(length, stg_manager, pos_global, direction, my_elev):
