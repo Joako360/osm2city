@@ -221,10 +221,11 @@ def _process_osm_building(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict
             continue
 
         my_building = _make_building_from_way(nodes_dict, way.tags, way, coords_transform, stats)
-        if my_building is not None:
+        if my_building is not None and my_building.polygon.is_valid:
             my_buildings.append(my_building)
-
-        stats.objects += 1
+            stats.objects += 1
+        else:
+            logging.info('Excluded building with osm_id=%d because of geometry problems', way.osm_id)
 
     return my_buildings
 

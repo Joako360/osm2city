@@ -8,7 +8,6 @@ Created on Thu Feb 28 23:18:08 2013
 import copy
 import logging
 import random
-import re
 from math import sin, cos, tan, sqrt, pi
 from typing import List, Dict
 
@@ -16,6 +15,7 @@ import myskeleton
 import numpy as np
 import shapely.geometry as shg
 from shapely.geometry.base import BaseGeometry
+from shapely.geos import TopologicalError
 
 import parameters
 import prepare_textures as tm
@@ -1065,16 +1065,21 @@ def overlap_check_convex_hull(buildings: List[Building], stg_entries: List[utils
     for building in buildings:
         is_intersecting = False
         for entry in stg_entries:
-            if entry.convex_hull is not None and entry.convex_hull.intersects(building.polygon):
-                is_intersecting = True
-                stats.skipped_nearby += 1
-                if building.name is None or len(building.name) == 0:
-                    logging.debug("Convex hull of object '%s' is intersecting. Skipping building with osm_id %d",
-                                  entry.obj_filename, building.osm_id)
-                else:
-                    logging.debug("Convex hull of object '%s' is intersecting. Skipping building '%s' (osm_id %d)",
-                                  entry.obj_filename, building.name, building.osm_id)
-                break
+            try:
+                if entry.convex_hull is not None and entry.convex_hull.intersects(building.polygon):
+                    is_intersecting = True
+                    stats.skipped_nearby += 1
+                    if building.name is None or len(building.name) == 0:
+                        logging.debug("Convex hull of object '%s' is intersecting. Skipping building with osm_id %d",
+                                      entry.obj_filename, building.osm_id)
+                    else:
+                        logging.debug("Convex hull of object '%s' is intersecting. Skipping building '%s' (osm_id %d)",
+                                      entry.obj_filename, building.name, building.osm_id)
+                    break
+            except TopologicalError as e:
+                logging.exception('Convex hull could not be checked due to topology problem - building osm_id: %d',
+                                  building.osm_id)
+
         if not is_intersecting:
             cleared_buildings.append(building)
     return cleared_buildings
