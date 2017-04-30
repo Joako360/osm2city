@@ -93,8 +93,9 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_l
             buildings.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries, file_lock)
             roads.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries, file_lock)
             pylons.process(the_coords_transform, my_fg_elev, my_stg_entries, file_lock)
-            platforms.process(the_coords_transform, my_fg_elev, file_lock)
-            piers.process(the_coords_transform, my_fg_elev, file_lock)
+            if not parameters.FLAG_2017_2:
+                platforms.process(the_coords_transform, my_fg_elev, file_lock)
+                piers.process(the_coords_transform, my_fg_elev, file_lock)
         elif exec_argument is Procedures.buildings:
             buildings.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries, file_lock)
         elif exec_argument is Procedures.roads:
@@ -151,6 +152,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     parameters.read_from_file(args.filename)
+    if parameters.FLAG_2017_2:
+        logging.info('Processing for 2017.2 version')
     parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
 
     exec_procedure = Procedures.all

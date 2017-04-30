@@ -842,7 +842,7 @@ def _write_and_count_vert(ac_object: ac3d.Object, b: Building) -> None:
     b.ceiling = b.ground_elev + b.height
 
 
-def _write_ring(out, b, ring, v0, texture, tex_y0, tex_y1):
+def _write_ring(out: ac3d.Object, b, ring, v0, texture, tex_y0, tex_y1):
     tex_y0 = texture.y(tex_y0)  # -- to atlas coordinates
     tex_y1_input = tex_y1
     tex_y1 = texture.y(tex_y1)
@@ -896,8 +896,11 @@ def write(ac_file_name: str, buildings: List[Building], fg_elev: FGElev,
     """
     ac = ac3d.File(stats=stats)
     lod_objects = list()
-    lod_objects.append(ac.new_object('LOD_rough', tm.atlas_file_name + '.png'))
-    lod_objects.append(ac.new_object('LOD_detail', tm.atlas_file_name + '.png'))
+    texture_name = tm.atlas_file_name + '.png'
+    if parameters.FLAG_2017_2:
+        texture_name = 'Textures/osm2city/atlas_facades.png'
+    lod_objects.append(ac.new_object('LOD_rough', texture_name, default_mat_idx=ac3d.MAT_IDX_LIT))
+    lod_objects.append(ac.new_object('LOD_detail', texture_name, default_mat_idx=ac3d.MAT_IDX_LIT))
 
     # get local medium ground elevation for each building
     for ib, b in enumerate(buildings):

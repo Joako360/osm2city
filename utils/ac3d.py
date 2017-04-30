@@ -1,13 +1,21 @@
-# -*- coding: utf-8 -*-
-import matplotlib.pyplot as plt
 import logging
+from typing import Optional
+
+import matplotlib.pyplot as plt
 import numpy as np
+
+import parameters
 
 from pyparsing import Literal, Word, alphas, Optional, OneOrMore, \
     Group, nums, Regex, alphanums, LineEnd, Each, ZeroOrMore
 
 fmt_node = '%g'
 fmt_surf = '%1.4g'
+
+# The index position of material with regards to lighting etc. Needs to be in sync with File.__str__
+MAT_IDX_DEFAULT = 0
+MAT_IDX_UNLIT = 0
+MAT_IDX_LIT = 1
 
 
 class Node(object):
@@ -22,7 +30,7 @@ class Node(object):
 
 class Face(object):
     """if our texture is rotated in texture_atlas, set swap_uv=True"""
-    def __init__(self, nodes_uv_list, typ, mat, swap_uv):
+    def __init__(self, nodes_uv_list, typ, mat_idx: int, swap_uv):
         assert len(nodes_uv_list) >= 2
         for n in nodes_uv_list:
             assert len(n) == 3
@@ -30,11 +38,11 @@ class Face(object):
             nodes_uv_list = [(n[0], n[2], n[1]) for n in nodes_uv_list]
         self.nodes_uv_list = nodes_uv_list
         self.typ = typ
-        self.mat = mat
+        self.mat_idx = mat_idx
 
     def __str__(self):
         s = "SURF %s\n" % self.typ
-        s += "mat %i\n" % self.mat
+        s += "mat %i\n" % self.mat_idx
         s += "refs %i\n" % len(self.nodes_uv_list)
         s += "".join([("%i " + fmt_surf + " " + fmt_surf + "\n") % (n[0], n[1], n[2]) for n in self.nodes_uv_list])
         return s
@@ -46,9 +54,10 @@ class Object(object):
          The next four bits (flags >> 4) specify the shading and back-face:  bit1 = shaded surface bit2 = two-sided.
          0x20: two-sided poly
          0x00: single-sided poly
+    The default_mat 0 is for unlit objects and 1 is for lit objects -> cf. File.__str__
     """
     def __init__(self, name=None, stats=None, texture=None, texrep=None, texoff=None, rot=None, loc=None, crease=None,
-                 url=None, default_type=0x00, default_mat=0, default_swap_uv=False, kids=0):
+                 url=None, default_type=0x00, default_mat_idx: int=MAT_IDX_DEFAULT, default_swap_uv=False, kids=0):
         self._nodes = []
         self._faces = []
         self.name = name
@@ -61,7 +70,7 @@ class Object(object):
         self.url = url
         self.crease = crease
         self.default_type = default_type
-        self.default_mat = default_mat
+        self.default_mat_ix = default_mat_idx
         self.default_swap_uv = default_swap_uv
         self.kids = kids
 
@@ -88,15 +97,15 @@ class Object(object):
     def total_faces(self):
         return len(self._faces)
 
-    def face(self, nodes_uv_list, typ=None, mat=None, swap_uv=None):
+    def face(self, nodes_uv_list, typ=None, mat_idx=None, swap_uv=None) -> int:
         """Add new face. Return its index."""
         if not typ:
             typ = self.default_type
-        if not mat:
-            mat = self.default_mat
+        if not mat_idx:
+            mat_idx = self.default_mat_ix
         if not swap_uv:
             swap_uv = self.default_swap_uv
-        self._faces.append(Face(nodes_uv_list, typ, mat, swap_uv))
+        self._faces.append(Face(nodes_uv_list, typ, mat_idx, swap_uv))
         if self.stats:
             self.stats.surfaces += 1
         return len(self._faces) - 1
@@ -181,11 +190,11 @@ class Label(Object):
 
 class File(object):
     """
-    Hold a number of 3D objects, each object consiting of nodes and faces.
+    Hold a number of 3D objects, each object consisting of nodes and faces.
     Either read objects from ac3d file or add them via new_object().
     Can write ac3d files.
 
-    When adding objects, count nodes/surfaces etc internally, thereby eliminating
+    When adding objects, File counts nodes/surfaces etc internally, thereby eliminating
     a common source of bugs. Can also add 3d labels (useful for debugging, disabled
     by default)
     """
@@ -269,7 +278,11 @@ class File(object):
         if self.materials_list:
             s += "".join(['MATERIAL %s\n' % the_mat for the_mat in self.materials_list])
         else:
-            s += 'MATERIAL "" rgb 1 1 1 amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0\n'
+            rgb_unlit = '1 1 1'
+            if parameters.FLAG_2017_2:
+                rgb_unlit = '0 0 0'
+            s += 'MATERIAL "unlit" rgb ' + rgb_unlit + ' amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0\n'
+            s += 'MATERIAL "lit" rgb 1 1 1 amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0\n'
         non_empty = [o for o in self.objects if not o.is_empty()]
         # FIXME: this doesn't handle nested kids properly
         s += 'OBJECT world\nkids %i\n' % len(non_empty)
@@ -337,7 +350,7 @@ class File(object):
             assert(tokens[0] == 'SURF')
             assert(tokens[2] == 'mat')
             assert(tokens[4] == 'refs')
-            self._current_object.face(nodes_uv_list=tokens[6], typ=tokens[1], mat=tokens[3])
+            self._current_object.face(nodes_uv_list=tokens[6], typ=tokens[1], mat_idx=tokens[3])
 
         def convertIntegers(tokens):
             return int(tokens[0])

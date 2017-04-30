@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
-""" Copies texture related data in directory 'tex' into the scenery folders.
+"""
+Copies texture related data in directory 'tex' into the scenery folders.
 """
 
 import argparse
@@ -63,6 +63,10 @@ def _write_citylm_eff(path_to_dir: str) -> None:
 
 
 def process(scenery_type: stg.SceneryType) -> None:
+    if parameters.FLAG_2017_2:
+        logging.info('Nothing to do for 2017.2 and onwards')
+        return
+
     scenery_path = os.path.join(parameters.get_output_path(), stg.scenery_directory_name(scenery_type))
 
     if os.path.exists(scenery_path):
@@ -99,14 +103,8 @@ def process(scenery_type: stg.SceneryType) -> None:
                                 and content.endswith('.png'):
                             shutil.copy(os.path.join(source_dir, content), tex_dir)
 
-            if parameters.FLAG_2017_2:
-                for level_two_dir in level_two_dirs:
-                    if scenery_type is stg.SceneryType.roads:
-                        _write_roads_eff(level_two_dir)
-                    elif scenery_type is stg.SceneryType.buildings:
-                        _write_citylm_eff(level_two_dir)
-            else:
-                # light-map effects
+            # light-map effects
+            if scenery_type in [stg.SceneryType.roads, stg.SceneryType.buildings]:
                 source_dir = os.path.join(parameters.PATH_TO_OSM2CITY_DATA, "lightmap")
                 if not os.path.exists(source_dir):
                     logging.error("The original lightmap dir seems to be missing: %s", source_dir)
@@ -117,11 +115,11 @@ def process(scenery_type: stg.SceneryType) -> None:
                     for content in content_list:
                         shutil.copy(os.path.join(source_dir, content), level_two_dir)
 
-            if parameters.TRAFFIC_SHADER_ENABLE and not parameters.FLAG_2017_2:
-                fg_root_dir = util.get_fg_root()
-                logging.info("Copying fgdata directory into $FG_ROOT (%s)", fg_root_dir)
-                source_dir = os.path.join(parameters.PATH_TO_OSM2CITY_DATA, "fgdata")
-                copy_tree(source_dir, fg_root_dir)
+                if parameters.TRAFFIC_SHADER_ENABLE:
+                    fg_root_dir = util.get_fg_root()
+                    logging.info("Copying fgdata directory into $FG_ROOT (%s)", fg_root_dir)
+                    source_dir = os.path.join(parameters.PATH_TO_OSM2CITY_DATA, "fgdata")
+                    copy_tree(source_dir, fg_root_dir)
 
     else:
         logging.info("ERROR: The scenery path must include a directory '%s' - maybe no objects written",

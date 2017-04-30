@@ -8,6 +8,7 @@
 import numpy as np
 import roofs
 from utils.vec2d import Vec2d
+import utils.ac3d
 
 
 class Mesh:
@@ -24,7 +25,7 @@ class Mesh:
         * save and load (with a internal format)
     """
 
-    def __init__(self,vertices=list(), faces=list()):
+    def __init__(self, vertices=list(), faces=list()):
         self.vertices   = vertices
         self.faces      = faces
         self.nv         = len(self.vertices)
@@ -99,7 +100,7 @@ class Mesh:
 #
 #        f.close()
 
-    def ac3d_string(self, b, offset_xy = Vec2d(0, 0), offset_z = 0., header = False):
+    def ac3d_string(self, b, offset_xy=Vec2d(0, 0), offset_z=0., header=False):
         """return mesh as string in a AC3D format. You must append kids line."""
         s = ""
         if header:
@@ -133,10 +134,10 @@ class Mesh:
 
         return s
 
-    def to_out(self, out, b, offset_xy=Vec2d(0, 0), offset_z=0., header = False) -> bool:
+    def to_out(self, out: utils.ac3d.File, b, offset_xy=Vec2d(0, 0), offset_z=0., header=False) -> bool:
         """create 3d object"""
         if header:
-            out.new_object(b.roof_ac_name, b.roof_texture.filename + '.png')
+            out.new_object(b.roof_ac_name, b.roof_texture.filename + '.png', default_mat_idx=utils.ac3d.MAT_IDX_LIT)
 
         X = []
         o = out.next_node_index()

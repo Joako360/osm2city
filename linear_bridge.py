@@ -14,6 +14,7 @@ import linear
 import parameters
 import textures.road
 from utils.utilities import FGElev
+import utils.ac3d
 
 
 class DeckShapeLinear(object):
@@ -46,8 +47,8 @@ class DeckShapePoly(object):
 
 class LinearBridge(linear.LinearObject):
     def __init__(self, transform, fg_elev: FGElev, osm_id, tags, refs, nodes_dict, width=9,
-                 tex=textures.road.EMBANKMENT_2, AGL=0.5):
-        super().__init__(transform, osm_id, tags, refs, nodes_dict, width, tex, AGL)
+                 tex=textures.road.EMBANKMENT_2, AGL=0.5, lit: bool=False):
+        super().__init__(transform, osm_id, tags, refs, nodes_dict, width, tex, AGL, lit)
         # -- prepare elevation spline
         #    probe elev at n_probes locations
         n_probes = max(int(self.center.length / 5.), 3)
@@ -152,7 +153,7 @@ class LinearBridge(linear.LinearObject):
             l /= self.center.length
         return self.deck_shape_poly(l)
 
-    def pillar(self, obj, x, y, h0, h1, angle):
+    def pillar(self, obj: utils.ac3d.Object, x, y, h0, h1, angle):
         self.pillar_r0 = 1.
         self.pillar_r1 = 0.5
         self.pillar_nnodes = 8
@@ -194,7 +195,7 @@ class LinearBridge(linear.LinearObject):
 
         return ofs + 2*self.pillar_nnodes, vert, nodes_list
 
-    def write_to(self, obj, fg_elev: FGElev, elev_offset, ac=None, offset=None):
+    def write_to(self, obj: utils.ac3d.Object, fg_elev: FGElev, elev_offset, offset=None):
         """
         write
         - deck
@@ -226,19 +227,16 @@ class LinearBridge(linear.LinearObject):
         right_bottom_nodes = self.write_nodes(obj, right_bottom_edge, z-parameters.BRIDGE_BODY_HEIGHT, 
                                               elev_offset, offset)
         # -- top
-        self.write_quads(obj, left_top_nodes, right_top_nodes, self.tex[0], self.tex[1], debug_ac=None)
+        self.write_quads(obj, left_top_nodes, right_top_nodes, self.tex[0], self.tex[1], True)
         
         # -- right
-        self.write_quads(obj, right_top_nodes, right_bottom_nodes, textures.road.BRIDGE_1[1], textures.road.BRIDGE_1[0],
-                         debug_ac=None)
+        self.write_quads(obj, right_top_nodes, right_bottom_nodes, textures.road.BRIDGE_1[1], textures.road.BRIDGE_1[0])
         
         # -- left
-        self.write_quads(obj, left_bottom_nodes, left_top_nodes, textures.road.BRIDGE_1[0], textures.road.BRIDGE_1[1],
-                         debug_ac=None)
+        self.write_quads(obj, left_bottom_nodes, left_top_nodes, textures.road.BRIDGE_1[0], textures.road.BRIDGE_1[1])
 
         # -- bottom
-        self.write_quads(obj, right_bottom_nodes, left_bottom_nodes, textures.road.BOTTOM[0], textures.road.BOTTOM[1],
-                         debug_ac=None)
+        self.write_quads(obj, right_bottom_nodes, left_bottom_nodes, textures.road.BOTTOM[0], textures.road.BOTTOM[1])
 
         # -- end wall 1
         the_node = self.edge[0].coords[0]

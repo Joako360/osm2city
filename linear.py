@@ -2,6 +2,7 @@
 import copy
 import logging
 import math
+from typing import List, Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,6 +11,12 @@ import shapely.geometry as shg
 import textures.road
 from utils.utilities import FGElev
 from utils.vec2d import Vec2d
+import utils.ac3d
+
+
+def probe_ground(fg_elev: FGElev, line_string):
+    """Probe ground elevation along given line string, return array"""
+    return np.array([fg_elev.probe_elev(the_node) for the_node in line_string.coords])
 
 
 class LinearObject(object):
@@ -59,7 +66,8 @@ class LinearObject(object):
           - if not, write our node and store node indices in junction
           - if yes, use stored node indices
     """
-    def __init__(self, transform, osm_id, tags, refs, nodes_dict, width=9, tex=textures.road.EMBANKMENT_1, AGL=0.5):
+    def __init__(self, transform, osm_id: int, tags: Dict[str, str], refs: List[int], nodes_dict, width: float=9.,
+                 tex=textures.road.EMBANKMENT_1, AGL: float=0.5, lit: bool=False):
         self.width = width
         self.AGL = AGL  # drape distance above terrain
         self.osm_id = osm_id
@@ -76,6 +84,7 @@ class LinearObject(object):
         except Warning as reason:
             logging.warning("Warning in OSM_ID %i: %s", self.osm_id, reason)
         self.tex = tex  # determines which part of texture we use
+        self.lit = lit  # whether the related road/railway is lit at night or not
 
     def compute_offset(self, offset):
         offset += 1.
@@ -171,7 +180,7 @@ class LinearObject(object):
         self.normals[-1] = self.normals[-2]
         self.angle[-1] = self.angle[-2]
 
-    def write_nodes(self, obj, line_string, z, cluster_elev, offset=None, join=False, is_left=False):
+    def write_nodes(self, obj: utils.ac3d.Object, line_string, z, cluster_elev, offset=None, join=False, is_left=False):
         """given a LineString and z, write nodes to .ac.
            Return nodes_list         
         """
@@ -214,21 +223,20 @@ class LinearObject(object):
             
         return nodes_list
 
-    def write_quads(self, obj, left_nodes_list, right_nodes_list, tex_y0, tex_y1, debug_ac=None):
+    def write_quads(self, obj: utils.ac3d.Object, left_nodes_list, right_nodes_list, tex_y0, tex_y1,
+                    accept_lit: bool=False):
+        """Write a series of quads bound by left and right. 
+        Left/right are lists of node indices which will be used to form a series of quads.
         """
-           Write a series of quads bound by left and right. 
-           Left/right are lists of node indices which will be used to form a series of quads.
-        """
-
-        if "tunnel" in self.tags:       # FIXME: this should be caught earlier
-            return None, None, None
-
         scale = 32.  # length of texture in meters
-                    # 2 lanes * 4m per lane = 128 px wide. 512px long = 32 m
-#         	Autobahnen 	Andere Straßen
-#          Schmalstrich 	0,15 m 	0,12 m
-#          Breitstrich 	0,30 m 	0,25 m
-#       Leitlinie Schmalstrich, 3m innerorts, 6m BAB. Verhältnis Strich:Lücke = 1:2
+                     # 2 lanes * 4m per lane = 128 px wide. 512px long = 32 m
+                     #                Autobahnen      Andere Straßen
+                     # Schmalstrich   0,15 m          0,12 m
+                     # Breitstrich    0,30 m          0,25 m
+                     # Leitlinie Schmalstrich, 3m innerorts, 6m BAB. Verhältnis Strich:Lücke = 1:2
+        mat_idx = utils.ac3d.MAT_IDX_UNLIT
+        if accept_lit and self.lit:
+            mat_idx = utils.ac3d.MAT_IDX_LIT
         n_nodes = len(left_nodes_list)
         assert(len(left_nodes_list) == len(right_nodes_list))
         for i in range(n_nodes-1):
@@ -238,13 +246,9 @@ class LinearObject(object):
                     (left_nodes_list[i+1],  xr, tex_y0),
                     (right_nodes_list[i+1], xr, tex_y1),
                     (right_nodes_list[i],   xl, tex_y1)]
-            obj.face(face[::-1])
+            obj.face(face[::-1], mat_idx=mat_idx)
 
-    def probe_ground(self, fg_elev: FGElev, line_string):
-        """probe ground elevation along given line string, return array"""
-        return np.array([fg_elev.probe_elev(the_node) for the_node in line_string.coords])
-
-    def get_h_add(self, fg_elev):
+    def get_h_add(self, fg_elev: FGElev):
         """
         """
         first_node = self.nodes_dict[self.refs[0]]
@@ -387,8 +391,8 @@ class LinearObject(object):
         
     def level_out(self, fg_elev: FGElev, h_add):
         """given h_add, adjust left_z and right_z to stay below MAX_TRANSVERSE_GRADIENT"""
-        left_z = self.probe_ground(fg_elev, self.edge[0]) + self.AGL
-        right_z = self.probe_ground(fg_elev, self.edge[1]) + self.AGL
+        left_z = probe_ground(fg_elev, self.edge[0]) + self.AGL
+        right_z = probe_ground(fg_elev, self.edge[1]) + self.AGL
 
         diff_elev = left_z - right_z
         for i, the_diff in enumerate(diff_elev):
@@ -433,7 +437,7 @@ class LinearObject(object):
             e = z[i] - elev_offset
             ac.add_label('<' + str(self.osm_id) + '> add %5.2f' % h_add[i], -(anchor[1] - offset.y), e+0.5, -(anchor[0] - offset.x), scale=1)
         
-    def write_to(self, obj, fg_elev: FGElev, elev_offset, debug_ac=None, offset=None):
+    def write_to(self, obj: utils.ac3d.Object, fg_elev: FGElev, elev_offset, offset=None):
         """
            assume we are a street: flat (or elevated) on terrain, left and right edges
            #need adjacency info
@@ -444,21 +448,23 @@ class LinearObject(object):
         h_add, center_z = self.get_h_add(fg_elev)
         left_z, right_z, h_add = self.level_out(fg_elev, h_add)
 
-        left_nodes_list =  self.write_nodes(obj, self.edge[0], left_z, elev_offset,
-                                            offset, join=True, is_left=True)
+        left_nodes_list = self.write_nodes(obj, self.edge[0], left_z, elev_offset,
+                                           offset, join=True, is_left=True)
         right_nodes_list = self.write_nodes(obj, self.edge[1], right_z, elev_offset,
                                             offset, join=True, is_left=False)
-        self.write_quads(obj, left_nodes_list, right_nodes_list, self.tex[0], self.tex[1], debug_ac=debug_ac)
-        if 1 and h_add is not None:
+        self.write_quads(obj, left_nodes_list, right_nodes_list, self.tex[0], self.tex[1], True)
+        if h_add is not None:
             # -- side walls of embankment
             if h_add.max() > 0.1:
-                left_ground_z  = self.probe_ground(fg_elev, self.edge[0])
-                right_ground_z = self.probe_ground(fg_elev, self.edge[1])
+                left_ground_z  = probe_ground(fg_elev, self.edge[0])
+                right_ground_z = probe_ground(fg_elev, self.edge[1])
 
-                left_ground_nodes  = self.write_nodes(obj, self.edge[0], left_ground_z, elev_offset, offset=offset)
+                left_ground_nodes = self.write_nodes(obj, self.edge[0], left_ground_z, elev_offset, offset=offset)
                 right_ground_nodes = self.write_nodes(obj, self.edge[1], right_ground_z, elev_offset, offset=offset)
-                self.write_quads(obj, left_ground_nodes, left_nodes_list, parameters.EMBANKMENT_TEXTURE[0], parameters.EMBANKMENT_TEXTURE[1], debug_ac=debug_ac)
-                self.write_quads(obj, right_nodes_list, right_ground_nodes, parameters.EMBANKMENT_TEXTURE[0], parameters.EMBANKMENT_TEXTURE[1], debug_ac=debug_ac)
+                self.write_quads(obj, left_ground_nodes, left_nodes_list, parameters.EMBANKMENT_TEXTURE[0],
+                                 parameters.EMBANKMENT_TEXTURE[1])
+                self.write_quads(obj, right_nodes_list, right_ground_nodes, parameters.EMBANKMENT_TEXTURE[0],
+                                 parameters.EMBANKMENT_TEXTURE[1])
 
         return True
         # options:

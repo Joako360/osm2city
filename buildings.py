@@ -478,7 +478,11 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
                                                                                          cl.grid_index.iy)
             logging.info("writing cluster %s with %d buildings" % (file_name, len(cl.objects)))
 
-            path_to_stg = stg_manager.add_object_static(file_name + '.xml', center_global, cluster_elev, 0,
+            file_name_in_stg = file_name + '.xml'
+            if parameters.FLAG_2017_2:
+                file_name_in_stg = file_name + '.ac'
+
+            path_to_stg = stg_manager.add_object_static(file_name_in_stg, center_global, cluster_elev, 0,
                                                         my_clusters.stg_verb_type)
 
             stg_manager.add_object_static('lightmap-switch.xml', center_global, cluster_elev, 0, once=True)
@@ -486,7 +490,8 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
             # -- write .ac and .xml
             building_lib.write(os.path.join(path_to_stg, file_name + ".ac"), cl.objects, fg_elev,
                                cluster_elev, cluster_offset, prepare_textures.roofs, stats)
-            _write_xml(path_to_stg, file_name, cl.objects, cluster_offset)
+            if not parameters.FLAG_2017_2:
+                _write_xml(path_to_stg, file_name, cl.objects, cluster_offset)
             total_buildings_written += len(cl.objects)
 
         handled_index += 1

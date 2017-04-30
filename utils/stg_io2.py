@@ -39,6 +39,10 @@ class STGVerbType(enum.IntEnum):  # must be the same as actual string in lowerca
     object_static = 2
     object_building_mesh_rough = 3
     object_building_mesh_detailed = 4
+    object_road_rough = 5
+    object_road_detailed = 6
+    object_railway_rough = 7
+    object_railway_detailed = 8
 
 
 @enum.unique

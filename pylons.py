@@ -31,7 +31,7 @@ import cluster
 import parameters
 import roads
 import shapely.geometry as shg
-from utils import osmparser, vec2d, coordinates, stg_io2, utilities
+from utils import osmparser, vec2d, coordinates, stg_io2, utilities, landuse
 
 OUR_MAGIC = "osm2pylon"  # Used in e.g. stg files to mark edits by osm2pylon
 
@@ -1683,58 +1683,6 @@ def _process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
     return my_highways
 
 
-class Landuse(object):
-    TYPE_COMMERCIAL = 10
-    TYPE_INDUSTRIAL = 20
-    TYPE_RESIDENTIAL = 30
-    TYPE_RETAIL = 40
-    TYPE_NON_OSM = 50  # used for land-uses constructed with heuristics and not in original data from OSM
-
-    def __init__(self, osm_id):
-        self.osm_id = osm_id
-        self.type_ = 0
-        self.polygon = None  # the polygon defining its outer boundary
-        self.number_of_buildings = 0  # only set for generated TYPE_NON_OSM land-uses during generation
-
-
-def _process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator):
-    my_landuses = dict()  # osm_id as key, Landuse as value
-
-    for way in list(ways_dict.values()):
-        my_landuse = Landuse(way.osm_id)
-        valid_landuse = False
-        for key in way.tags:
-            value = way.tags[key]
-            if "landuse" == key:
-                if value == "commercial":
-                    my_landuse.type_ = Landuse.TYPE_COMMERCIAL
-                    valid_landuse = True
-                elif value == "industrial":
-                    my_landuse.type_ = Landuse.TYPE_INDUSTRIAL
-                    valid_landuse = True
-                elif value == "residential":
-                    my_landuse.type_ = Landuse.TYPE_RESIDENTIAL
-                    valid_landuse = True
-                elif value == "retail":
-                    my_landuse.type_ = Landuse.TYPE_RETAIL
-                    valid_landuse = True
-        if valid_landuse:
-            # Process the Nodes
-            my_coordinates = list()
-            for ref in way.refs:
-                if ref in nodes_dict:
-                    my_node = nodes_dict[ref]
-                    x, y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
-                    my_coordinates.append((x, y))
-            if len(my_coordinates) >= 3:
-                my_landuse.polygon = shg.Polygon(my_coordinates)
-                if my_landuse.polygon.is_valid and not my_landuse.polygon.is_empty:
-                    my_landuses[my_landuse.osm_id] = my_landuse
-
-    logging.debug("OSM land-uses found: %s", len(my_landuses))
-    return my_landuses
-
-
 def _generate_landuse_from_buildings(osm_landuses, building_refs: List[shg.Polygon]):
     """Adds "missing" landuses based on building clusters"""
     my_landuse_candidates = dict()
@@ -1764,10 +1712,10 @@ def _generate_landuse_from_buildings(osm_landuses, building_refs: List[shg.Polyg
                     break
             if not within_existing_landuse:
                 index += 1
-                my_candidate = Landuse(index)
+                my_candidate = landuse.Landuse(index)
                 my_candidate.polygon = buffer_polygon
                 my_candidate.number_of_buildings = 1
-                my_candidate.type_ = Landuse.TYPE_NON_OSM
+                my_candidate.type_ = landuse.Landuse.TYPE_NON_OSM
                 my_landuse_candidates[my_candidate.osm_id] = my_candidate
     # add landuse candidates to landuses
     logging.debug("Candidate land-uses found: %s", len(my_landuse_candidates))
@@ -1874,7 +1822,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
             osm_nodes_dict = osm_way_result.nodes_dict
             osm_ways_dict = osm_way_result.ways_dict
 
-        landuse_refs = _process_osm_landuse_refs(osm_nodes_dict, osm_ways_dict, coords_transform)
+        landuse_refs = landuse.process_osm_landuse_refs(osm_nodes_dict, osm_ways_dict, coords_transform)
         if parameters.LU_LANDUSE_GENERATE_LANDUSE:
             generated_landuses = _generate_landuse_from_buildings(landuse_refs, building_refs)
             for generated in list(generated_landuses.values()):

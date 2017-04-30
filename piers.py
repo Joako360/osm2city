@@ -84,7 +84,7 @@ def _write_piers(stg_manager, replacement_prefix, clusters, coords_transform: co
             center_tile = Vec2d(coords_transform.toGlobal(cl.center))
             ac_file_name = "%spiers%02i%02i.ac" % (replacement_prefix, cl.grid_index.ix, cl.grid_index.iy)
             ac = ac3d.File(stats=stats)
-            obj = ac.new_object('piers', "Textures/Terrain/asphalt.png")
+            obj = ac.new_object('piers', 'Textures/Terrain/asphalt.png', default_mat_idx=ac3d.MAT_IDX_UNLIT)
             for pier in cl.objects[:]:
                 length = len(pier.nodes)
                 if length > 3 \
@@ -223,7 +223,7 @@ def _write_pier_area(pier: Pier, obj: ac3d.Object, offset) -> None:
     # Top Face
     for i, n in enumerate(top_nodes):
         face.append((n + o, x, 0.5))
-    obj.face(face, mat=0)
+    obj.face(face)
     # Build bottom ring
     e = pier.elevation - 5
     for p in pier.nodes:
@@ -235,7 +235,7 @@ def _write_pier_area(pier: Pier, obj: ac3d.Object, offset) -> None:
         sideface.append((n + o + rd_len, x, 0.5))
         sideface.append((n + o, x, 0.5))
         sideface.append((n + o - 1, x, 0.5))
-        obj.face(sideface, mat=0)
+        obj.face(sideface)
 
 
 def _write_pier_line(pier, obj, offset):
@@ -270,7 +270,7 @@ def _write_pier_line(pier, obj, offset):
     o += len(left.coords)
     for i, n in enumerate(nodes_r):
         face.append((n + o, x, 0.75))
-    obj.face(face[::-1], mat=0)
+    obj.face(face[::-1])
     # Build bottom left line
     idx_bottom_left = obj.next_node_index()
 
@@ -290,7 +290,7 @@ def _write_pier_line(pier, obj, offset):
         sideface.append((n + idx_bottom_left - 1, x, 0.5))
         sideface.append((n + idx_left - 1, x, 0.5))
         sideface.append((n + idx_left, x, 0.5))
-        obj.face(sideface, mat=0)
+        obj.face(sideface)
     for i, n in enumerate(nodes_r[1:]):
         # Start with Second point looking back
         sideface = list()
@@ -298,20 +298,20 @@ def _write_pier_line(pier, obj, offset):
         sideface.append((n + idx_bottom_right - 1, x, 0.5))
         sideface.append((n + idx_right - 1, x, 0.5))
         sideface.append((n + idx_right, x, 0.5))
-        obj.face(sideface, mat=0)
+        obj.face(sideface)
     # Build Front&Back
     sideface = list()
     sideface.append((idx_left, x, 0.5))
     sideface.append((idx_bottom_left, x, 0.5))
     sideface.append((idx_end, x, 0.5))
     sideface.append((idx_bottom_left - 1, x, 0.5))
-    obj.face(sideface, mat=0)
+    obj.face(sideface)
     sideface = list()
     sideface.append((idx_bottom_right, x, 0.5))
     sideface.append((idx_bottom_right - 1, x, 0.5))
     sideface.append((idx_right - 1, x, 0.5))
     sideface.append((idx_right, x, 0.5))
-    obj.face(sideface, mat=0)
+    obj.face(sideface)
 
 
 def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev, file_lock: mp.Lock=None) -> None:
