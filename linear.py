@@ -2,16 +2,18 @@
 import copy
 import logging
 import math
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
-import parameters
 import shapely.geometry as shg
+
+import parameters
 import textures.road
 from utils.utilities import FGElev
 from utils.vec2d import Vec2d
 import utils.ac3d
+from utils import osmparser
 
 
 def probe_ground(fg_elev: FGElev, line_string):
@@ -67,7 +69,7 @@ class LinearObject(object):
           - if yes, use stored node indices
     """
     def __init__(self, transform, osm_id: int, tags: Dict[str, str], refs: List[int], nodes_dict, width: float=9.,
-                 tex=textures.road.EMBANKMENT_1, AGL: float=0.5, lit: bool=False):
+                 tex=textures.road.EMBANKMENT_1, AGL: float=0.5):
         self.width = width
         self.AGL = AGL  # drape distance above terrain
         self.osm_id = osm_id
@@ -84,7 +86,6 @@ class LinearObject(object):
         except Warning as reason:
             logging.warning("Warning in OSM_ID %i: %s", self.osm_id, reason)
         self.tex = tex  # determines which part of texture we use
-        self.lit = lit  # whether the related road/railway is lit at night or not
 
     def compute_offset(self, offset):
         offset += 1.
@@ -180,7 +181,8 @@ class LinearObject(object):
         self.normals[-1] = self.normals[-2]
         self.angle[-1] = self.angle[-2]
 
-    def write_nodes(self, obj: utils.ac3d.Object, line_string, z, cluster_elev, offset=None, join=False, is_left=False):
+    def write_nodes(self, obj: utils.ac3d.Object, line_string: shg.LineString, z, cluster_elev: float,
+                    offset: Optional[Vec2d]=None, join: bool=False, is_left: bool=False) -> List[int]:
         """given a LineString and z, write nodes to .ac.
            Return nodes_list         
         """
@@ -224,9 +226,11 @@ class LinearObject(object):
         return nodes_list
 
     def write_quads(self, obj: utils.ac3d.Object, left_nodes_list, right_nodes_list, tex_y0, tex_y1,
-                    accept_lit: bool=False):
+                    lighting_nodes_list: Optional[List[bool]]) -> None:
         """Write a series of quads bound by left and right. 
         Left/right are lists of node indices which will be used to form a series of quads.
+        lighting_nodes_list tells whether a given node is lit. If the list is None or empty, then none will be lit.
+        If either the start or the end node is lit, then the face will get a lit material.
         """
         scale = 32.  # length of texture in meters
                      # 2 lanes * 4m per lane = 128 px wide. 512px long = 32 m
@@ -234,12 +238,13 @@ class LinearObject(object):
                      # Schmalstrich   0,15 m          0,12 m
                      # Breitstrich    0,30 m          0,25 m
                      # Leitlinie Schmalstrich, 3m innerorts, 6m BAB. Verhältnis Strich:Lücke = 1:2
-        mat_idx = utils.ac3d.MAT_IDX_UNLIT
-        if accept_lit and self.lit:
-            mat_idx = utils.ac3d.MAT_IDX_LIT
         n_nodes = len(left_nodes_list)
         assert(len(left_nodes_list) == len(right_nodes_list))
         for i in range(n_nodes-1):
+            mat_idx = utils.ac3d.MAT_IDX_UNLIT
+            if lighting_nodes_list:
+                if lighting_nodes_list[i] or lighting_nodes_list[i+1]:
+                    mat_idx = utils.ac3d.MAT_IDX_LIT
             xl = self.dist[i]/scale
             xr = self.dist[i+1]/scale
             face = [(left_nodes_list[i],    xl, tex_y0),
@@ -437,7 +442,8 @@ class LinearObject(object):
             e = z[i] - elev_offset
             ac.add_label('<' + str(self.osm_id) + '> add %5.2f' % h_add[i], -(anchor[1] - offset.y), e+0.5, -(anchor[0] - offset.x), scale=1)
         
-    def write_to(self, obj: utils.ac3d.Object, fg_elev: FGElev, elev_offset, offset=None):
+    def write_to(self, obj: utils.ac3d.Object, fg_elev: FGElev, elev_offset, built_up_areas: List[shg.Polygon],
+                 offset=None):
         """
            assume we are a street: flat (or elevated) on terrain, left and right edges
            #need adjacency info
@@ -452,7 +458,8 @@ class LinearObject(object):
                                            offset, join=True, is_left=True)
         right_nodes_list = self.write_nodes(obj, self.edge[1], right_z, elev_offset,
                                             offset, join=True, is_left=False)
-        self.write_quads(obj, left_nodes_list, right_nodes_list, self.tex[0], self.tex[1], True)
+        lighting_nodes_list = self.calc_lit_nodes(self.edge[0], built_up_areas)
+        self.write_quads(obj, left_nodes_list, right_nodes_list, self.tex[0], self.tex[1], lighting_nodes_list)
         if h_add is not None:
             # -- side walls of embankment
             if h_add.max() > 0.1:
@@ -462,9 +469,9 @@ class LinearObject(object):
                 left_ground_nodes = self.write_nodes(obj, self.edge[0], left_ground_z, elev_offset, offset=offset)
                 right_ground_nodes = self.write_nodes(obj, self.edge[1], right_ground_z, elev_offset, offset=offset)
                 self.write_quads(obj, left_ground_nodes, left_nodes_list, parameters.EMBANKMENT_TEXTURE[0],
-                                 parameters.EMBANKMENT_TEXTURE[1])
+                                 parameters.EMBANKMENT_TEXTURE[1], None)
                 self.write_quads(obj, right_nodes_list, right_ground_nodes, parameters.EMBANKMENT_TEXTURE[0],
-                                 parameters.EMBANKMENT_TEXTURE[1])
+                                 parameters.EMBANKMENT_TEXTURE[1], None)
 
         return True
         # options:
@@ -564,3 +571,27 @@ class LinearObject(object):
             logging.error("error in osm_id", self.osm_id)
 
         return True
+
+    def calc_lit_nodes(self, line_string: shg.LineString, built_up_areas: List[shg.Polygon]) -> List[bool]:
+        """Determines whether a given node on a line should be lit by looking at the tag and intersection.
+        Railways will always be non-lit.
+        The tag of the underlying road can contain key=lit.
+        Otherwise check whether the node is inside a built-up area.
+        """
+        # exclude railway
+        if osmparser.has_railway_tag(self.tags):
+            return [False] * len(line_string.coords)
+
+        # check tag lit
+        if 'lit' in self.tags:
+            if self.tags['lit'] == 'yes':
+                return [True] * len(line_string.coords)
+
+        # check built-up area
+        lit_nodes = [False] * len(line_string.coords)
+        for i in range(len(lit_nodes)):
+            for area in built_up_areas:
+                if area.contains(shg.Point(line_string.coords[i][0], line_string.coords[i][1])):
+                    lit_nodes[i] = True
+                    break
+        return lit_nodes

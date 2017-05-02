@@ -246,6 +246,7 @@ MIN_ABOVE_GROUND_LEVEL = 0.01    # how much a highway / railway is at least hove
 HIGHWAY_TYPE_MIN = 4  # The lower the number, the more ways are added. See roads.HighwayType
 HIGHWAY_TYPE_MIN_ROUGH_LOD = 6  # the minimum type tobe added to the rough LOD clusters
 POINTS_ON_LINE_DISTANCE_MAX = 1000  # the maximum distance between two points on a line. If longer, then new points are added
+BUILT_UP_AREA_LIT_BUFFER = 20  # the buffer around built-up land-use areas to be used for lighting of streets
 
 
 # =============================================================================

@@ -6,9 +6,12 @@ TODO: linear deck: limit slope
       limit transverse slope of road
       if h_add too high, continue/insert bridge
 """
+from typing import List
 
 import numpy as np
 import scipy.interpolate
+
+import shapely.geometry as shg
 
 import linear
 import parameters
@@ -47,8 +50,8 @@ class DeckShapePoly(object):
 
 class LinearBridge(linear.LinearObject):
     def __init__(self, transform, fg_elev: FGElev, osm_id, tags, refs, nodes_dict, width=9,
-                 tex=textures.road.EMBANKMENT_2, AGL=0.5, lit: bool=False):
-        super().__init__(transform, osm_id, tags, refs, nodes_dict, width, tex, AGL, lit)
+                 tex=textures.road.EMBANKMENT_2, AGL=0.5):
+        super().__init__(transform, osm_id, tags, refs, nodes_dict, width, tex, AGL)
         # -- prepare elevation spline
         #    probe elev at n_probes locations
         n_probes = max(int(self.center.length / 5.), 3)
@@ -195,7 +198,8 @@ class LinearBridge(linear.LinearObject):
 
         return ofs + 2*self.pillar_nnodes, vert, nodes_list
 
-    def write_to(self, obj: utils.ac3d.Object, fg_elev: FGElev, elev_offset, offset=None):
+    def write_to(self, obj: utils.ac3d.Object, fg_elev: FGElev, elev_offset, built_up_areas: List[shg.Polygon],
+                 offset=None):
         """
         write
         - deck
@@ -227,16 +231,20 @@ class LinearBridge(linear.LinearObject):
         right_bottom_nodes = self.write_nodes(obj, right_bottom_edge, z-parameters.BRIDGE_BODY_HEIGHT, 
                                               elev_offset, offset)
         # -- top
-        self.write_quads(obj, left_top_nodes, right_top_nodes, self.tex[0], self.tex[1], True)
+        lighting_nodes_list = self.calc_lit_nodes(self.edge[0], built_up_areas)
+        self.write_quads(obj, left_top_nodes, right_top_nodes, self.tex[0], self.tex[1], lighting_nodes_list)
         
         # -- right
-        self.write_quads(obj, right_top_nodes, right_bottom_nodes, textures.road.BRIDGE_1[1], textures.road.BRIDGE_1[0])
+        self.write_quads(obj, right_top_nodes, right_bottom_nodes, textures.road.BRIDGE_1[1], textures.road.BRIDGE_1[0],
+                         None)
         
         # -- left
-        self.write_quads(obj, left_bottom_nodes, left_top_nodes, textures.road.BRIDGE_1[0], textures.road.BRIDGE_1[1])
+        self.write_quads(obj, left_bottom_nodes, left_top_nodes, textures.road.BRIDGE_1[0], textures.road.BRIDGE_1[1],
+                         None)
 
         # -- bottom
-        self.write_quads(obj, right_bottom_nodes, left_bottom_nodes, textures.road.BOTTOM[0], textures.road.BOTTOM[1])
+        self.write_quads(obj, right_bottom_nodes, left_bottom_nodes, textures.road.BOTTOM[0], textures.road.BOTTOM[1],
+                         None)
 
         # -- end wall 1
         the_node = self.edge[0].coords[0]

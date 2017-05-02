@@ -3,6 +3,8 @@ from typing import Dict, List
 
 import shapely.geometry as shg
 
+import parameters
+
 
 class Landuse(object):
     TYPE_COMMERCIAL = 10
@@ -57,9 +59,9 @@ def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator) -> D
 
 
 def process_osm_landuse_as_areas(nodes_dict, ways_dict, my_coord_transformator) -> List[shg.Polygon]:
-    """Just a wrapper around process_osm_landuse_refs(...) to get the list of polygons"""
+    """Just a wrapper around process_osm_landuse_refs(...) to get the list of polygons."""
     landuse_refs = process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator)
     landuse_areas = list()
     for key, value in landuse_refs.items():
-        landuse_areas.append(value.polygon)
+        landuse_areas.append(value.polygon.buffer(parameters.BUILT_UP_AREA_LIT_BUFFER))
     return landuse_areas

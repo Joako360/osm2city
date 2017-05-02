@@ -127,17 +127,13 @@ def _is_replaced_bridge(way: osmparser.Way) -> bool:
     return REPLACED_BRIDGE_KEY in way.tags
 
 
-def _is_railway(way):
-    return "railway" in way.tags
-
-
 def _is_processed_railway(way):
     """Check whether this is not only a railway, but one that gets processed.
 
     E.g. funiculars are currently not processed.
     Must be aligned with accepted railways in Roads._create_linear_objects.
     """
-    if not _is_railway(way):
+    if not osmparser.is_railway(way):
         return False
     if way.tags['railway'] in ['rail', 'disused', 'preserved', 'subway', 'narrow_gauge', 'tram', 'light_rail']:
         return True
@@ -162,7 +158,7 @@ def _is_highway(way):
 def _compatible_ways(way1, way2):
     """Returns True if both ways are either a railway, a bridge or a highway."""
     logging.debug("trying join %i %i", way1.osm_id, way2.osm_id)
-    if _is_railway(way1) != _is_railway(way2):
+    if osmparser.is_railway(way1) != osmparser.is_railway(way2):
         logging.debug("Nope, either both or none must be railway")
         return False
     elif _is_bridge(way1) != _is_bridge(way2):
@@ -177,7 +173,7 @@ def _compatible_ways(way1, way2):
         if highway_type1 != highway_type2:
             logging.debug("Nope, both must be of same highway type")
             return False
-    elif _is_railway(way1) and _is_railway(way2):
+    elif osmparser.is_railway(way1) and osmparser.is_railway(way2):
         if way1.tags['railway'] != way2.tags['railway']:
             logging.debug("Nope, both must be of same railway type")
             return False
@@ -362,8 +358,7 @@ class Roads(object):
         return "%i ways, %i roads, %i railways, %i bridges" % (len(self.ways_list), len(self.roads_list),
                                                                len(self.railway_list), len(self.bridges_list))
 
-    def process(self, blocked_areas: List[shg.Polygon], landuse_areas: List[shg.Polygon],
-                stg_entries: List[stg_io2.STGEntry],
+    def process(self, blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
                 stats: utilities.Stats) -> None:
         """Processes the OSM data until data can be clusterized.
         """
@@ -380,7 +375,7 @@ class Roads(object):
 
         # -- no change in topology beyond create_linear_objects() !
         logging.debug("before linear " + str(self))
-        self._create_linear_objects(landuse_areas)
+        self._create_linear_objects()
         self._propagate_h_add()
         logging.debug("after linear " + str(self))
 
@@ -647,7 +642,7 @@ class Roads(object):
 
             the_way.refs = my_new_refs
 
-    def _create_linear_objects(self, landuse_areas: List[shg.Polygon]) -> None:
+    def _create_linear_objects(self) -> None:
         """Creates the linear objects, which will be created as scenery objects.
 
         Not processing parking for now (the_way.tags['amenity'] in ['parking'])
@@ -659,7 +654,6 @@ class Roads(object):
         priority = 0  # Used both to indicate whether it should be drawn and the priority when crossing
 
         for the_way in self.ways_list:
-            lit = False
             if _is_highway(the_way):
                 if "access" in the_way.tags:
                     if not (the_way.tags["access"] == 'no'):
@@ -667,19 +661,9 @@ class Roads(object):
                 highway_type = highway_type_from_osm_tags(the_way.tags["highway"])
                 # in method Roads.store_way smaller highways already got removed
 
-                # lighting
-                if 'lit' in the_way.tags:
-                    if the_way.tags['lit'] == 'yes':
-                        lit = True
-                else:  # OSM tag has precedence. Then check if within urban landuse
-                    for landuse in landuse_areas:
-                        my_line_string = self._line_string_from_way(the_way)
-                        if my_line_string.intersects(landuse):
-                            lit = True
-
                 priority, tex, width = get_highway_attributes(highway_type)
 
-            elif _is_railway(the_way):
+            elif osmparser.is_railway(the_way):
                 if the_way.tags['railway'] in ['rail', 'disused', 'preserved', 'subway']:
                     priority = 20
                     tex = textures.road.TRACK
@@ -708,14 +692,14 @@ class Roads(object):
                     obj = linear_bridge.LinearBridge(self.transform, self.fg_elev, the_way.osm_id,
                                                      the_way.tags, the_way.refs, self.nodes_dict,
                                                      width=width, tex=tex,
-                                                     AGL=above_ground_level, lit=lit)
+                                                     AGL=above_ground_level)
                     self.bridges_list.append(obj)
                 else:
                     obj = linear.LinearObject(self.transform, the_way.osm_id,
                                               the_way.tags, the_way.refs,
                                               self.nodes_dict, width=width, tex=tex,
-                                              AGL=above_ground_level, lit=lit)
-                    if _is_railway(the_way):
+                                              AGL=above_ground_level)
+                    if osmparser.is_railway(the_way):
                         self.railway_list.append(obj)
                     else:
                         self.roads_list.append(obj)
@@ -1041,7 +1025,7 @@ class Roads(object):
         self.railways_clusters = ClusterContainer(lmin, lmax)
 
         for the_object in self.bridges_list + self.roads_list + self.railway_list:
-            if _is_railway(the_object):
+            if osmparser.is_railway(the_object):
                 cluster_ref = self.railways_clusters.append(Vec2d(the_object.center.centroid.coords[0]),
                                                             the_object, stats)
             else:
@@ -1075,7 +1059,7 @@ def process_osm_ways(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int,
                 continue
             elif highway_type.value < parameters.HIGHWAY_TYPE_MIN:
                 continue
-        elif _is_railway(way):
+        elif osmparser.is_railway(way):
             if not _is_processed_railway(way):
                 continue
 
@@ -1087,7 +1071,8 @@ def process_osm_ways(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int,
 
 
 def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, stg_manager, stg_paths, is_railway,
-                      coords_transform: coordinates.Transformation, stats: utilities.Stats, is_rough_LOD: bool):
+                      coords_transform: coordinates.Transformation, built_up_areas: List[shg.Polygon],
+                      stats: utilities.Stats, is_rough_LOD: bool):
     for cl in clusters:
         if len(cl.objects) < parameters.CLUSTER_MIN_OBJECTS:
             continue  # skip almost empty clusters
@@ -1112,7 +1097,7 @@ def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, s
             texture_string = 'Textures/osm2city/roads.png'
         ac3d_obj = ac.new_object(file_name, texture_string, default_swap_uv=True, default_mat_idx=ac3d.MAT_IDX_UNLIT)
         for rd in cl.objects:
-            rd.write_to(ac3d_obj, fg_elev, cluster_elev, offset=offset_local)
+            rd.write_to(ac3d_obj, fg_elev, cluster_elev, built_up_areas, offset=offset_local)
 
         suffix = ".xml"
         if is_railway or parameters.FLAG_2017_2:
@@ -1241,13 +1226,12 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
         landuse_result = osmparser.fetch_osm_db_data_ways_keys(['landuse'])
     landuse_nodes_dict = landuse_result.nodes_dict
     landuse_ways_dict = landuse_result.ways_dict
-    landuse_areas = landuse.process_osm_landuse_as_areas(landuse_nodes_dict, landuse_ways_dict, coords_transform)
+    built_up_areas = landuse.process_osm_landuse_as_areas(landuse_nodes_dict, landuse_ways_dict, coords_transform)
 
     path_to_output = parameters.get_output_path()
     logging.debug("before linear " + str(roads))
 
-    roads.process(blocked_areas, landuse_areas,
-                  stg_entries, stats)  # does the heavy lifting based on OSM data including clustering
+    roads.process(blocked_areas, stg_entries, stats)  # does the heavy lifting based on OSM data including clustering
 
     replacement_prefix = parameters.get_repl_prefix()
     stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.roads, OUR_MAGIC, replacement_prefix)
@@ -1256,11 +1240,11 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     stg_paths = set()
 
     _process_clusters(roads.railways_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, True,
-                      coords_transform, stats, True)
+                      coords_transform, built_up_areas, stats, True)
     _process_clusters(roads.roads_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, False,
-                      coords_transform, stats, False)
+                      coords_transform, built_up_areas, stats, False)
     _process_clusters(roads.roads_rough_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, False,
-                      coords_transform, stats, True)
+                      coords_transform, built_up_areas, stats, True)
 
     roads.debug_plot(show=True, plot_junctions=False, clusters=roads.roads_clusters)
     
