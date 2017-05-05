@@ -46,7 +46,7 @@ def _make_texture_atlas(texture_list: List[Texture], atlas_filename: str, ext: s
     """
     Create texture atlas from all textures. Update all our item coordinates.
     """
-    logging.debug("Making texture atlas")
+    logging.info("Making texture atlas")
     
     if len(texture_list) < 1:
         logging.error('Got an empty texture list. Check installation of tex.src/ folder!')
@@ -87,10 +87,16 @@ def _make_texture_atlas(texture_list: List[Texture], atlas_filename: str, ext: s
 
     # FIXME: maybe auto-calc x-size here
 
-    # -- pack non_repeatables
-    # Sort textures by perimeter size in non-increasing order
     the_atlas = atlas.Atlas(0, 0, atlas_sx, 1e10, 'Facades')
 
+    # Work on not repeatable textures
+    # Sort textures by perimeter size in non-increasing order
+    non_repeat_list = sorted(non_repeat_list, key=lambda i: i.sy, reverse=True)
+    for the_texture in non_repeat_list:
+        the_texture.width_px, the_texture.height_px = the_texture.im.size
+
+        if not the_atlas.pack(the_texture):
+            logging.info("Failed to pack" + str(the_texture))
     atlas_sy = the_atlas.cur_height()
 
     # Work on repeatable textures.

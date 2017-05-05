@@ -69,6 +69,7 @@ class Texture(object):
         self.ay = 0
         self.validation_message = None
         self.registered_in = None  # filename of the .py file, where this texture has been referenced
+        self.cls = ''  # The class of the texture depends on the manager: 'roof' or 'facade'
 
         try:
             self.im = Image.open(self.filename)
@@ -185,7 +186,7 @@ Please set either h_can_repeat or v_can_repeat to False.' % self.filename
 
 
 class RoofManager(object):
-    def __init__(self, cls, stats: Stats):
+    def __init__(self, cls: str, stats: Stats):
         self.__l = []
         self.__cls = cls  # -- class (roof, facade, ...)
         self.stats = stats

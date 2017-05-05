@@ -1,7 +1,7 @@
-"""Atlas of textures, where a couple of textures are put into one file including thier attributes"""
+"""Atlas of textures, where a couple of textures are put into one file including their attributes"""
+import logging
 
 import PIL.Image as Image
-import logging
 
 
 class Region(object):
@@ -18,7 +18,7 @@ class Region(object):
 
 
 class Atlas(Region):
-    def __init__(self, x, y, width, height, name):
+    def __init__(self, x, y, width, height, name: str) -> None:
         super().__init__(x, y, width, height)
         self.regions = [Region(x, y, width, height)]
         self._textures = []  # Type atlas.Texture
@@ -48,7 +48,7 @@ class Atlas(Region):
                 logging.debug("%s : %s: Skipping an empty texture" % (self.name, the_texture.filename))
         atlas.save(filename, optimize=True)
 
-    def pack(self, the_texture):
+    def pack(self, the_texture) -> bool:
         logging.debug("packing %s (%i %i)" % 
                       (the_texture.filename, the_texture.width_px, the_texture.height_px))
         for the_region in self.regions:
