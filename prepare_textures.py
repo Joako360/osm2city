@@ -285,6 +285,9 @@ def init(stats: util.Stats, create_atlas: bool=True) -> None:
         pickle.dump(roofs, pickle_file, -1)
         pickle.dump(params, pickle_file, -1)
         pickle_file.close()
+
+        logging.info(str(facades))
+        logging.info(str(roofs))
     else:
         logging.info("Loading %s", pkl_file_name)
         pickle_file = open(pkl_file_name, 'rb')
@@ -294,9 +297,9 @@ def init(stats: util.Stats, create_atlas: bool=True) -> None:
         atlas_file_name = params['atlas_file_name']
         pickle_file.close()
 
-    logging.debug(facades)
     stats.textures_total = dict((filename, 0) for filename in map((lambda x: x.filename), facades.get_list()))
     stats.textures_total.update(dict((filename, 0) for filename in map((lambda x: x.filename), roofs.get_list())))
+    logging.info('Skipped textures: %d', stats.skipped_texture)
 
 
 if __name__ == "__main__":

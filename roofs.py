@@ -51,9 +51,9 @@ def flat(ac_object: ac.Object, b, roof_mgr: RoofManager, stats: Stats) -> None:
         nodes = list(range(b.nnodes_outer))
 
     uv = face_uv(nodes, b.X, b.roof_texture, angle=None)
-    nodes = np.array(nodes) + b._nnodes_ground
+    nodes = np.array(nodes) + b.nnodes_ground
 
-    assert(len(nodes) == b._nnodes_ground + 2 * len(b.polygon.interiors))
+    assert(len(nodes) == b.nnodes_ground + 2 * len(b.polygon.interiors))
 
     l = []
     for i, node in enumerate(nodes):
@@ -74,7 +74,7 @@ def separate_gable(ac_object, b, inward_meters=0.) -> None:
         roof_height = b.roof_height
     else:
         logging.error("no roof_height in separate_gable for building %i" % b.osm_id)
-        return False
+        return
     
     # get orientation if exits :
     try:
@@ -164,7 +164,7 @@ def separate_pyramidal(ac_object: ac.Object, b, inward_meters=0.0) -> None:
     if b.roof_height:
         roof_height = b.roof_height 
     else:
-        return False
+        return
             
     # -- ? corners
     o = ac_object.next_node_index()
@@ -234,7 +234,7 @@ def separate_skillion(ac_object: ac.Object, b):
 
     uv = face_uv(nodes, b.X, b.roof_texture, angle=None)
 
-    assert(len(nodes) == b._nnodes_ground + 2 * len(b.polygon.interiors))
+    assert(len(nodes) == b.nnodes_ground + 2 * len(b.polygon.interiors))
 
     l = []
     o = ac_object.next_node_index()

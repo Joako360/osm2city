@@ -79,11 +79,21 @@ OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
 
 def _process_osm_relation(rel_nodes_dict: Dict[int, osmparser.Node], rel_ways_dict: Dict[int, osmparser.Way],
                           relations_dict: Dict[int, osmparser.Relation],
-                          my_buildings: List[building_lib.Building],
+                          my_buildings: Dict[int, building_lib.Building],
                           coords_transform: coordinates.Transformation,
                           stats: utilities.Stats) -> None:
     """Adds buildings based on relation tags. There are two scenarios: multipolygon buildings and 3D tagging.
-    Only multipolygon are implemented currently. The added buildings go into parameter my_buildings
+    Only multipolygon and simple 3D buildings are implemented currently. 
+    The added buildings go into parameter my_buildings.
+    Multipolygons:
+        * see FIXMEs for in building_lib whether inner rings etc. actually are supported.
+        * Rings out of multiple parts are supported.
+        * Islands are removed
+    
+    3D: 
+        * only not-intersecting parts are kept.
+        * min_height and min_level are not supported: parts stay on ground.
+    
 
     See also http://wiki.openstreetmap.org/wiki/Key:building:part
     See also http://wiki.openstreetmap.org/wiki/Buildings
@@ -120,96 +130,190 @@ def _process_osm_relation(rel_nodes_dict: Dict[int, osmparser.Node], rel_ways_di
     <tag k="type" v="building"/>
     </relation>
     """
-    number_of_buildings_before = len(my_buildings)
+    number_of_created_buildings = 0
     for key, relation in relations_dict.items():
-        if 'building' in relation.tags or 'building:part' in relation.tags:
-            outer_ways = []
-            inner_ways = []
-            outer_multipolygons = []
-            for m in relation.members:
-                relation_found = False
-                if m.type_ == 'way':
-                    if m.role == 'outer':
-                        for key, way in rel_ways_dict.items():
-                            if way.osm_id == m.ref:
-                                relation_found = True
-                                if way.refs[0] == way.refs[-1]:
-                                    outer_multipolygons.append(way)
-                                    logging.debug("add way outer multipolygon " + str(way.osm_id))
-                                else:
-                                    outer_ways.append(way)
-                                    logging.debug("add way outer " + str(way.osm_id))
-                    elif m.role == 'inner':
-                        for key, way in rel_ways_dict.items():
-                            if way.osm_id == m.ref:
-                                relation_found = True
-                                inner_ways.append(way)
-                    if not relation_found:
-                        logging.debug("Way osm_id={} not found for relation osm_id={}.".format(m.ref, relation.osm_id))
+        try:
+            if 'type' in relation.tags and relation.tags['type'] == 'multipolygon':
+                added_buildings = _process_multipolygon_building(rel_nodes_dict, rel_ways_dict, relation,
+                                                                 my_buildings, coords_transform, stats)
+                number_of_created_buildings += added_buildings
+            elif 'type' in relation.tags and relation.tags['type'] == 'building':
+                added_buildings = _process_simple_3d_building(rel_nodes_dict, rel_ways_dict, relation,
+                                                              my_buildings, coords_transform, stats)
+                number_of_created_buildings += added_buildings
+        except Exception:
+            logging.exception('Unable to process building relation osm_id %d', relation.osm_id)
 
-            if outer_multipolygons:
-                all_tags = relation.tags
-                for way in outer_multipolygons:
-                    logging.debug("Multipolygon " + str(way.osm_id))
-                    all_tags = dict(list(way.tags.items()) + list(all_tags.items()))
-                    try:
-                        if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
-                            a_building = _make_building_from_way(rel_nodes_dict, all_tags, way, coords_transform,
-                                                                 stats, [inner_ways[0]])
-                        else:
-                            a_building = _make_building_from_way(rel_nodes_dict, all_tags, way, coords_transform,
-                                                                 stats, inner_ways)
-                    except:
-                        a_building = _make_building_from_way(rel_nodes_dict, all_tags, way, coords_transform,
-                                                             stats, way.refs)
-                    if a_building is not None:
-                        my_buildings.append(a_building)
+    logging.info("Added {} buildings based on relations.".format(number_of_created_buildings))
 
-            if outer_ways:
-                # build all_outer_refs
-                list_outer_refs = [way.refs for way in outer_ways[1:]]
-                # get some order :
-                all_outer_refs = []
-                all_outer_refs.extend(outer_ways[0].refs)
 
-                for foo in range(1, len(outer_ways)):  # FIXME: why loop when same thing happens without foo variable?
-                    for way_refs in list_outer_refs:
-                        if way_refs[0] == all_outer_refs[-1]:
-                            # first node of way is last of previous
-                            all_outer_refs.extend(way_refs[0:])
-                            continue
-                        elif way_refs[-1] == all_outer_refs[-1]:
-                            # last node of way is last of previous
-                            all_outer_refs.extend(way_refs[::-1])
-                            continue
-                        list_outer_refs.remove(way_refs)
+def _process_multipolygon_building(rel_nodes_dict: Dict[int, osmparser.Node], rel_ways_dict: Dict[int, osmparser.Way],
+                                   relation: osmparser.Relation, my_buildings: Dict[int, building_lib.Building],
+                                   coords_transform: coordinates.Transformation,
+                                   stats: utilities.Stats) -> int:
+    """Processes the members in a multipolygon relationship. Returns the number of buildings actually created.
+    If there are several members of type 'outer', then multiple buildings are created.
+    """
+    outer_ways = []
+    outer_ways_multiple = []  # outer ways, where multiple ways form one or more closed ring
+    inner_ways = []
+    inner_ways_multiple = []  # inner ways, where multiple ways form one or more closed ring
 
-                all_tags = relation.tags
-                for way in outer_ways:
-                    all_tags = dict(list(way.tags.items()) + list(all_tags.items()))
-                pseudo_way = osmparser.Way(relation.osm_id)
-                pseudo_way.refs = all_outer_refs
-                if not parameters.EXPERIMENTAL_INNER and len(inner_ways) > 1:
-                    logging.info("FIXME: ignoring all but first inner way (%i total) of ID %i" % (len(inner_ways),
-                                                                                                  relation.osm_id))
-                    a_building = _make_building_from_way(rel_nodes_dict, all_tags, pseudo_way, coords_transform,
-                                                         stats, [inner_ways[0]])
-                else:
-                    a_building = _make_building_from_way(rel_nodes_dict, all_tags, pseudo_way, coords_transform,
-                                                         stats, inner_ways)
-                if a_building is not None:
-                    my_buildings.append(a_building)
+    # find relationships
+    for m in relation.members:
+        relation_found = False
+        if m.type_ == 'way':
+            if m.ref in rel_ways_dict:
+                way = rel_ways_dict[m.ref]
+                # because the member way already has been processed as normal way, we need to remove
+                # otherwise we might get flickering due to two buildings on top of each other
+                my_buildings.pop(way.osm_id, None)
+                relation_found = True
+                if m.role == 'outer':
+                    if way.refs[0] == way.refs[-1]:
+                        outer_ways.append(way)
+                        logging.debug("add way outer " + str(way.osm_id))
+                    else:
+                        outer_ways_multiple.append(way)
+                        logging.debug("add way outer multiple" + str(way.osm_id))
+                elif m.role == 'inner':
+                    if way.refs[0] == way.refs[-1]:
+                        inner_ways.append(way)
+                        logging.debug("add way inner " + str(way.osm_id))
+                    else:
+                        inner_ways_multiple.append(way)
+                        logging.debug("add way inner multiple" + str(way.osm_id))
+            if not relation_found:
+                logging.debug("Way osm_id={} not found for relation osm_id={}.".format(m.ref, relation.osm_id))
 
-            if not outer_multipolygons and not outer_ways:
-                logging.debug("Skipping relation %i: no outer way." % relation.osm_id)
-    additional_buildings = len(my_buildings) - number_of_buildings_before
-    logging.info("Added {} buildings based on relations.".format(additional_buildings))
+    # Process multiple and add to outer_ways/inner_ways as whole rings
+    inner_ways.extend(osmparser.closed_ways_from_multiple_ways(inner_ways_multiple))
+    outer_ways.extend(osmparser.closed_ways_from_multiple_ways(outer_ways_multiple))
+
+    # Create polygons to allow some geometry analysis
+    polygons = dict()
+    for way in outer_ways:
+        polygons[way.osm_id] = way.polygon_from_osm_way(rel_nodes_dict, coords_transform)
+    for way in inner_ways:
+        polygons[way.osm_id] = way.polygon_from_osm_way(rel_nodes_dict, coords_transform)
+
+    # exclude inner islands
+    for way in reversed(outer_ways):
+        compared_to = outer_ways[:]
+        for compared_way in compared_to:
+            if way.osm_id != compared_way.osm_id:
+                if polygons[way.osm_id].within(polygons[compared_way.osm_id]):
+                    outer_ways.remove(way)
+                    break
+
+    # create the actual buildings
+    added_buildings = 0
+    for outer_way in outer_ways:
+        # use the tags from the relation and the member
+        all_tags = dict(list(outer_way.tags.items()) + list(relation.tags.items()))
+
+        inner_rings = list()
+        for inner_way in inner_ways:
+            if polygons[inner_way.osm_id].within(polygons[outer_way.osm_id]):
+                inner_rings.append(inner_way)
+        a_building = _make_building_from_way(rel_nodes_dict, all_tags, outer_way, coords_transform,
+                                             stats, inner_rings)
+        my_buildings[a_building.osm_id] = a_building
+        added_buildings += 1
+    return added_buildings
+
+
+def _process_simple_3d_building(rel_nodes_dict: Dict[int, osmparser.Node], rel_ways_dict: Dict[int, osmparser.Way],
+                                relation: osmparser.Relation, my_buildings: Dict[int, building_lib.Building],
+                                coords_transform: coordinates.Transformation,
+                                stats: utilities.Stats) -> int:
+    """Processes the members in a Simple3D relationship."""
+    my_buildings.pop(relation.osm_id, None)  # we do not need the outline - it will be replaced by parts
+    # find relationships
+    outline_member = None
+    parts = dict()
+    for m in relation.members:
+        relation_found = False
+        if m.type_ == 'way':
+            if m.ref in rel_ways_dict:
+                way = rel_ways_dict[m.ref]
+                # because the member way already has been processed as normal way, we need to remove
+                # otherwise we might get flickering due to two buildings on top of each other
+                my_buildings.pop(way.osm_id, None)
+                if m.role == 'outline':
+                    outline_member = way
+                elif m.role == 'part':
+                    if way.refs[0] == way.refs[-1]:
+                        parts[way.osm_id] = way
+                    else:
+                        logging.debug("removed part with osm_id=%d as it is not closed way." % way.osm_id)
+            if not relation_found:
+                logging.debug("Way osm_id=%d not found for relation osm_id=%d}." % (m.ref, relation.osm_id))
+
+    if len(parts) == 0:
+        return 0
+    if len(parts) == 1:
+        my_part = parts.popitem()[1]
+        if outline_member is not None:  # combine the tags and then this is it
+            all_tags = osmparser.combine_tags(my_part.tags, outline_member.tags)
+        else:
+            all_tags = my_part.tags
+        a_building = _make_building_from_way(rel_nodes_dict, all_tags, my_part, coords_transform, stats)
+        my_buildings[a_building.osm_id] = a_building
+        return 1
+
+    # otherwise make sure that parts only touch, not intersect
+    # Create polygons to allow some geometry analysis
+    polygons = dict()
+    validated_parts = list()
+    for key, way in parts.items():
+        polygons[way.osm_id] = way.polygon_from_osm_way(rel_nodes_dict, coords_transform)
+    for o_key, o_value in polygons.items():
+        is_intersecting = False
+        for i_key, i_value in polygons.items():
+            if o_key == i_key:
+                continue
+            if (o_value.intersects(i_value) == True) and (o_value.touches(i_value) == False):
+                is_intersecting = True
+                break
+        if not is_intersecting:
+            validated_parts.append(parts[o_key])
+
+    # check again (same logic as above)
+    if len(validated_parts) == 0:
+        return 0
+    if len(validated_parts) == 1:
+        my_part = validated_parts[0]
+        if outline_member is not None:  # combine the tags and then this is it
+            all_tags = osmparser.combine_tags(my_part.tags, outline_member.tags)
+        else:
+            all_tags = my_part.tags
+        a_building = _make_building_from_way(rel_nodes_dict, all_tags, my_part, coords_transform, stats)
+        my_buildings[a_building.osm_id] = a_building
+        return 1
+
+    parent = None
+    if outline_member is not None:
+        parent = building_lib.BuildingParent(outline_member.osm_id)
+    added_buildings = 0
+    for my_part in validated_parts:
+        if outline_member is not None:
+            all_tags = osmparser.combine_tags(my_part.tags, outline_member.tags)
+        else:
+            all_tags = my_part.tags
+        a_building = _make_building_from_way(rel_nodes_dict, all_tags, my_part, coords_transform, stats)
+        my_buildings[a_building.osm_id] = a_building
+        added_buildings += 1
+        if outline_member is not None:
+            parent.children.append(a_building)
+            a_building.parent = parent
+    return added_buildings
 
 
 def _process_osm_building(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int, osmparser.Way],
                           coords_transform: coordinates.Transformation,
-                          stats: utilities.Stats) -> List[building_lib.Building]:
-    my_buildings = list()
+                          stats: utilities.Stats) -> Dict[int, building_lib.Building]:
+    my_buildings = dict()
     clipping_border = shg.Polygon(parameters.get_clipping_border())
 
     for key, way in ways_dict.items():
@@ -222,7 +326,7 @@ def _process_osm_building(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict
 
         my_building = _make_building_from_way(nodes_dict, way.tags, way, coords_transform, stats)
         if my_building is not None and my_building.polygon.is_valid:
-            my_buildings.append(my_building)
+            my_buildings[my_building.osm_id] = my_building
             stats.objects += 1
         else:
             logging.info('Excluded building with osm_id=%d because of geometry problems', way.osm_id)
@@ -281,8 +385,10 @@ def _make_building_from_way(nodes_dict: Dict[int, osmparser.Node], all_tags: Dic
         # -- make outer and inner rings from refs
         outer_ring = _refs_to_ring(coords_transform, way.refs, nodes_dict)
         inner_rings_list = []
-        for _way in inner_ways:
-            inner_rings_list.append(_refs_to_ring(coords_transform, _way.refs, nodes_dict, inner=True))
+
+        # FIXME : inner rings does not seem to work. Therefore leave out following code
+        # for _way in inner_ways:
+        #    inner_rings_list.append(_refs_to_ring(coords_transform, _way.refs, nodes_dict, inner=True))
     except KeyError as reason:
         logging.debug("ERROR: Failed to parse building referenced node missing clipped?(%s) WayID %d %s Refs %s" % (
             reason, way.osm_id, all_tags, way.refs))
@@ -310,7 +416,7 @@ def _refs_to_ring(coords_transform: coordinates.Transformation, refs, nodes_dict
         coords.append(coords_transform.toLocal((c.lon, c.lat)))
 
     ring = shg.polygon.LinearRing(coords)
-    # -- outer -> CCW, inner -> not CCW
+    # -- outer -> CCW (counter clock wise), inner -> not CCW
     if ring.is_ccw == inner:
         ring.coords = list(ring.coords)[::-1]
     return ring
@@ -383,6 +489,9 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     the_buildings = _process_osm_building(osm_nodes_dict, osm_ways_dict, coords_transform, stats)
     _process_osm_relation(osm_rel_nodes_dict, osm_rel_ways_dict, osm_relations_dict, the_buildings, coords_transform,
                           stats)
+
+    # for convenience change to list from dict
+    the_buildings = the_buildings.values()
 
     cmin, cmax = parameters.get_extent_global()
     logging.info("min/max " + str(cmin) + " " + str(cmax))

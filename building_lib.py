@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Thu Feb 28 23:18:08 2013
 
@@ -29,10 +28,90 @@ from utils.vec2d import Vec2d
 from utils.stg_io2 import STGVerbType
 
 
+class BuildingParent(object):
+    """The parent of buildings that are part of a Simple3D building.
+    Mostly used to coordinate textures for facades and roofs.
+    The parts determine the common textures by a simple: the first to set the values wins the race.
+    """
+    def __init__(self, osm_id: int) -> None:
+        self.osm_id = osm_id
+        self.children = list()  # pointers to Building objects. Those building objects point back in self.parent
+
+    def _sanitize_children(self):
+        """Make sure all children have a reference to parent - otherwise delete them.
+        They might have been removed during building_lib.analyse(...)."""
+        for child in reversed(self.children):
+            if child.parent is None:
+                self.children.remove(child)
+        if len(self.children) == 1:
+            self.children.parent = None
+            self.children = list()
+
+    def align_textures_children(self) -> None:
+        """Aligns the facade and roof textures for all the children belonging to this parent.
+        Unless there are deviations in the use of tags, then the textures of the child with
+        the largest longest_edge_len is chosen.
+        It might be best if the one part with the most clear tags would win, but [A] it is highly probable
+        that all children have similar tags (but maybe different values), and [B] it is safest to choose
+        a texture matching the longest edge.
+        If there is at least one deviation, then all parts keep their textures.
+        """
+        self._sanitize_children()
+        if len(self.children) == 0:  # might be sanitize_children() has removed them all
+            return
+
+        default_child = None
+        difference_found = False
+        building_colour = None
+        building_material = None
+        building_facade_material = None
+        for child in self.children:
+            if default_child is None:
+                default_child = child
+                if 'building:colour' in child.tags:
+                    building_colour = child.tags['building:colour']
+                if 'building:material' in child.tags:
+                    building_material = child.tags['building:material']
+                if 'building:facade:material' in child.tags:
+                    building_facade_material = child.tags['building:facade:material']
+            else:
+                if child.longest_edge_len > default_child.longest_edge_len:
+                    default_child = child
+                if 'building:colour' in child.tags:
+                    if building_colour is None:
+                        difference_found = True
+                        break
+                    elif building_colour != child.tags['building:colour']:
+                        difference_found = True
+                        break
+                if 'building:material' in child.tags:
+                    if building_material is None:
+                        difference_found = True
+                        break
+                    elif building_material != child.tags['building:material']:
+                        difference_found = True
+                        break
+                if 'building:facade:material' in child.tags:
+                    if building_facade_material is None:
+                        difference_found = True
+                        break
+                    elif building_facade_material != child.tags['building:facade:material']:
+                        difference_found = True
+                        break
+
+        if difference_found:  # nothing to do - keep as is
+            return
+
+        # apply same textures to all children
+        for child in self.children:
+            child.facade_texture = default_child.facade_texture
+            child.roof_texture = default_child.roof_texture
+
+
 class Building(object):
     """Central object class.
-       Holds all data relevant for a building. Coordinates, type, area, ...
-       Read-only access to node coordinates via self.X[node][0|1]
+    Holds all data relevant for a building. Coordinates, type, area, ...
+    Read-only access to node coordinates via self.X[node][0|1]
     """
 
     def __init__(self, osm_id: int, tags: Dict[str, str], outer_ring: BaseGeometry, name: str,
@@ -68,11 +147,7 @@ class Building(object):
         if self.inner_rings_list:
             self.roll_inner_nodes()
         self.building_type = building_type
-        self.parent = None
-        self.parent_part = []
-        self.parents_parts = []
-        self.cand_buildings = []
-        self.children = []
+        self.parent = None  # BuildingParent if available
         self.ground_elev = None
         self.ground_elev_min = None
         self.ground_elev_max = None
@@ -118,13 +193,13 @@ class Building(object):
         # FIXME: simplify interiors
         return nnodes_simplified
 
-    def _set_polygon(self, outer, inner=list()) -> None:
+    def _set_polygon(self, outer: shg.LinearRing, inner: List[shg.LinearRing]=list()) -> None:
         self.polygon = shg.Polygon(outer, inner)
 
     def _set_X(self, cluster_offset: Vec2d) -> None:
         """Given an cluster middle point changes all coordinates in x/y space."""
         self.X = np.array(self.X_outer + self.X_inner)
-        for i in range(self._nnodes_ground):
+        for i in range(self.nnodes_ground):
             self.X[i, 0] -= cluster_offset.x
             self.X[i, 1] -= cluster_offset.y
 
@@ -136,7 +211,7 @@ class Building(object):
 
         self._set_X(cluster_offset)
 
-        elevations = [local_elev(Vec2d(self.X[i])) for i in range(self._nnodes_ground)]
+        elevations = [local_elev(Vec2d(self.X[i])) for i in range(self.nnodes_ground)]
 
         self.ground_elev_min = min(elevations)
         self.ground_elev_max = max(elevations)
@@ -151,7 +226,7 @@ class Building(object):
         return [coord for interior in self.polygon.interiors for coord in list(interior.coords)[:-1]]
 
     @property
-    def _nnodes_ground(self):  # FIXME: changed behavior. Keep _ until all bugs found
+    def nnodes_ground(self):  # FIXME: changed behavior. Keep _ until all bugs found
         n = len(self.polygon.exterior.coords) - 1
         for item in self.polygon.interiors:
             n += len(item.coords) - 1
@@ -232,8 +307,10 @@ def _is_large_enough(b: Building) -> bool:
     """
     if b.levels >= parameters.BUILDING_NEVER_SKIP_LEVELS: 
         return True
-    if b.parent is not None:  # Check parent if we're a part
-        b = b.parent
+    if b.inner_rings_list:  # never skip a building with inner rings
+        return True
+    if b.parent is not None:  # if we have a parent, then keep always
+        return True
     if b.area < parameters.BUILDING_MIN_AREA or \
        (b.area < parameters.BUILDING_REDUCE_THRESHOLD and random.uniform(0, 1) < parameters.BUILDING_REDUCE_RATE):
         return False
@@ -423,7 +500,11 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
     On entry, we're in global coordinates. Change to local coordinates.
     """
     new_buildings = []
+    building_parents = dict()
     for b in buildings:
+        building_parent = b.parent
+        b.parent = None  # will reset again if actually all is ok at end
+
         # am Anfang Geometrieanalyse
         # - ort: urban, residential, rural
         # - region: europe, asia...
@@ -453,7 +534,7 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
 
         if not b.is_external_model:
             try:
-                stats.nodes_simplified += b.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
+                # FIXME RICK stats.nodes_simplified += b.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
                 b.roll_inner_nodes()
             except Exception as reason:
                 logging.warning("simplify or roll_inner_nodes failed (OSM ID %i, %s)", b.osm_id, reason)
@@ -482,10 +563,10 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
             new_buildings.append(b)
             continue
 
-        stats.nodes_ground += b._nnodes_ground
+        stats.nodes_ground += b.nnodes_ground
 
         # -- compute edge length
-        b.lenX = np.zeros((b._nnodes_ground))
+        b.lenX = np.zeros((b.nnodes_ground))
         for i in range(b.nnodes_outer - 1):
             b.lenX[i] = ((Xo[i + 1, 0] - Xo[i, 0]) ** 2 + (Xo[i + 1, 1] - Xo[i, 1]) ** 2) ** 0.5
         n = b.nnodes_outer
@@ -536,10 +617,10 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
         if parameters.BUILDING_COMPLEX_ROOFS:
             # -- pitched, separate roof if we have 4 ground nodes and area below 1000m2
             if not b.polygon.interiors and b.area < parameters.BUILDING_COMPLEX_ROOFS_MAX_AREA:
-                if b._nnodes_ground == 4:
+                if b.nnodes_ground == 4:
                     b.roof_complex = True
                 if (parameters.BUILDING_SKEL_ROOFS and
-                            b._nnodes_ground in range(4, parameters.BUILDING_SKEL_MAX_NODES)):
+                            b.nnodes_ground in range(4, parameters.BUILDING_SKEL_MAX_NODES)):
                     b.roof_complex = True
                 try:
                     if str(b.tags['roof:shape']) == 'skillion':
@@ -629,69 +710,26 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
         except KeyError:
             pass
 
-        # -- determine facade and roof textures
+        # ****** determine facade and roof textures *******
         logging.verbose("___find facade for building %i" % b.osm_id)
-        #
-        # -- find local texture if infos different from parent
-        #
-        if b.parent is None:
-            b.facade_texture = facade_mgr.find_matching_facade(facade_requires, b.tags, b.height, b.longest_edge_len,
-                                                               stats)
-        else:
-            # 1 - Check if building and building parent infos are the same
-            
-            # 1.1 Infos about colour
-            try:
-                b_color = b.tags['building:colour']
-            except:
-                b_color = None
-                
-            try:
-                b_parent_color = b.parent.tags['building:colour']
-            except:
-                b_parent_color = None
-            
-            # 1.2 Infos about material
-            try:
-                b_material = b.tags['building:material']
-            except:
-                b_material = None
-                
-            try:
-                b_parent_material = b.parent.tags['building:material']
-            except:
-                b_parent_material = None
-               
-            # could extend to building:facade:material ?
-        
-            # 2 - If same infos use building parent facade else find new texture
-            if b_color == b_parent_color and b_material == b_parent_material:
-                    if b.parent.facade_texture is None:
-                        b.facade_texture = facade_mgr.find_matching_facade(facade_requires, b.parent.tags,
-                                                                           b.height, b.longest_edge_len, stats)
-                        b.parent.facade_texture = b.facade_texture
-                    else:
-                        b.facade_texture = b.parent.facade_texture
-            else:
-                b.facade_texture = facade_mgr.find_matching_facade(facade_requires, b.tags,
-                                                                   b.height, b.longest_edge_len, stats)
 
+        b.facade_texture = facade_mgr.find_matching_facade(facade_requires, b.tags, b.height, b.longest_edge_len, stats)
         if b.facade_texture:
             logging.verbose("__done" + str(b.facade_texture) + str(b.facade_texture.provides))
         else:
-            logging.verbose("__done None")
-        
-        if not b.facade_texture:
             stats.skipped_texture += 1
-            logging.debug("Skipping building OsmID %d (no matching facade texture)" % b.osm_id)
+            logging.debug("Skipping building with osm_id %d (no matching facade texture)" % b.osm_id)
             continue
         if b.longest_edge_len > b.facade_texture.width_max:
-            logging.error("OsmID : %d b.longest_edge_len <= b.facade_texture.width_max" % b.osm_id)
+            logging.debug("Skipping building with osm_id : %d b.longest_edge_len > b.facade_texture.width_max" % b.osm_id)
             continue
 
-        #
         # roof search
-        #
+        if building_parent is not None:
+            b.tags['roof:shape'] = 'flat'
+            b.roof_type = 'flat'
+            b.roof_complex = False
+
         b.roof_requires.extend(copy.copy(b.facade_texture.requires))
         
         if b.roof_complex:
@@ -719,69 +757,12 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
 
         # Find roof texture
         logging.verbose("___find roof for building %i" % b.osm_id)
-        if b.parent is None:
-            b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_len, stats)
-            if not b.roof_texture:
-                stats.skipped_texture += 1
-                logging.debug("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(b.roof_requires)))
-                continue
-        else:
-            # 1 - Check if building and building parent information is the same
-            # 1.1 Information about colour
-            try:
-                r_color = b.tags['roof:colour']
-            except:
-                r_color = None
-            try:
-                r_parent_color = b.parent.tags['roof:colour']
-            except:
-                r_parent_color = None
-            
-            # 1.2 Information about material
-            try:
-                r_material = b.tags['roof:material']
-            except:
-                r_material = None
-            try:
-                r_parent_material = b.parent.tags['roof:material']
-            except:
-                r_parent_material = None
+        b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_len, stats)
+        if not b.roof_texture:
+            stats.skipped_texture += 1
+            logging.debug("WARNING: no matching roof texture for osm_id %d <%s>" % (b.osm_id, str(b.roof_requires)))
+            continue
 
-            # Special for stone
-            if (r_material == 'stone') and ( r_color is None):
-                # take colour of building 
-                try:
-                    if b.tags['building:material'] == 'stone':
-                        r_color = b.tags['building:colour']
-                except:
-                    pass
-                # try parent
-                if not r_color:
-                    try:
-                        if b.parent.tags['building:material'] == 'stone':
-                            r_color = b.parent.tags['building:colour']
-                    except:
-                        r_color = 'white'
-                b.tags['roof:colour'] = r_color
-
-            # 2 - If same info use building parent facade else find new texture
-            if r_color == r_parent_color and r_material == r_parent_material:
-                if b.parent.roof_texture is None:
-                    b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_len, stats)
-                    if not b.roof_texture:
-                        stats.skipped_texture += 1
-                        logging.debug("WARNING: no matching texture for OsmID %d <%s>" % (b.osm_id, str(b.roof_requires)))
-                        continue
-                    b.parent.roof_texture = b.roof_texture
-                else:
-                    b.roof_texture = b.parent.roof_texture
-            else:
-                b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_len, stats)
-                if not b.roof_texture:
-                    stats.skipped_texture += 1
-                    logging.debug("WARNING: no matching roof texture for OsmID %d <%s>" % (b.osm_id, str(b.roof_requires)))
-                    continue
-        
         if b.roof_texture:
             logging.verbose("__done" + str(b.roof_texture) + str(b.roof_texture.provides))
 
@@ -792,6 +773,12 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
 
         # -- finally: append building to new list
         new_buildings.append(b)
+        if building_parent is not None:
+            b.parent = building_parent
+            building_parents[building_parent.osm_id] = building_parent
+
+    for key, parent in building_parents.items():
+        parent.align_textures_children()
 
     return new_buildings
 
@@ -803,7 +790,7 @@ def _write_and_count_vert(ac_object: ac3d.Object, b: Building) -> None:
 
     z = b.ground_elev - 0.1  # FIXME: instead maybe we should have 1 meter of "bottom" texture
     try:
-        z -= b.correct_ground  # FIXME Rick
+        z -= b.correct_ground
     except:
         pass
     
@@ -850,7 +837,6 @@ def _write_ring(out: ac3d.Object, b, ring, v0, texture, tex_y0, tex_y1):
     nnodes_ring = len(ring.coords) - 1
     v1 = v0 + nnodes_ring
     
-    # print "v0 %i v1 %i lenX %i" % (v0, v1, len(b.lenX))
     for ioff in range(0, v1-v0):  # range(0, v1-v0-1):
         i = v0 + ioff
         if False:
@@ -881,8 +867,8 @@ def _write_ring(out: ac3d.Object, b, ring, v0, texture, tex_y0, tex_y1):
 
         out.face([(j, tex_x0, tex_y0),
                   (jpp, tex_x1, tex_y0),
-                  (jpp + b._nnodes_ground, tex_x1, tex_y11),
-                  (j + b._nnodes_ground, tex_x0, tex_y12)],
+                  (jpp + b.nnodes_ground, tex_x1, tex_y11),
+                  (j + b.nnodes_ground, tex_x0, tex_y12)],
                  swap_uv=texture.v_can_repeat)     
     return v1
 
@@ -908,43 +894,6 @@ def write(ac_file_name: str, buildings: List[Building], fg_elev: FGElev,
     
     # Update building hierarchy information
     for ib, b in enumerate(buildings):
-        if b.parent:
-            if not b.parent.ground_elev:
-                b.parent.set_ground_elev_and_offset(fg_elev, cluster_elev, cluster_offset)
-
-            b.ground_elev_min = min(b.parent.ground_elev, b.ground_elev)
-            b.ground_elev_max = max(b.parent.ground_elev, b.ground_elev)
-            
-            b.ground_elev = b.ground_elev_min
-            
-            if b.parent.children:
-                for child in b.parent.children:
-                    if not child.ground_elev:
-                        child.set_ground_elev_and_offset(fg_elev, cluster_elev, cluster_offset)
-                            
-                for child in b.parent.children:
-                    b.ground_elev_min = min(child.ground_elev_min, b.ground_elev)
-                    b.ground_elev_max = max(child.ground_elev_max, b.ground_elev)
-                    
-                b.ground_elev = b.ground_elev_min
-                    
-                for child in b.parent.children:
-                    child.ground_elev = b.ground_elev
-        
-        if b.children:
-            for child in b.parent.children:
-                if not child.ground_elev:
-                    child.set_ground_elev_and_offset(fg_elev, cluster_elev, cluster_offset)
-            
-            for child in b.children:
-                b.ground_elev_min = min(child.ground_elev_min, b.ground_elev)
-                b.ground_elev_max = max(child.ground_elev_max, b.ground_elev)
-                
-            b.ground_evel = b.ground_elev_min
-                
-            for child in b.children:
-                child.ground_elev = b.ground_elev
-                
         try:
             b.ground_elev = float(b.ground_elev)
         except:
@@ -958,27 +907,11 @@ def write(ac_file_name: str, buildings: List[Building], fg_elev: FGElev,
             b.ground_elev += b.correct_ground
             auto_correct = False
         except:
-            try:
-                b.ground_elev += b.parent.correct_ground
-                auto_correct = False
-            except:
-                pass
+            pass
                 
         # auto-correct
         if auto_correct:
-            if b.children:
-                ground_elev_max = b.ground_elev_max  # max( [ child.ground_elev_max for child in b.children ] )
-                min_roof = min([child.height - child.roof_height for child in b.children])
-            
-                if ground_elev_max > (min_roof - 2):
-                    b.correct_ground = ground_elev_max - min_roof
-                    b.ground_elev = ground_elev_max
-                    
-                    for child in b.children:
-                        child.correct_ground = b.correct_ground
-                        child.ground_elev = b.ground_elev
-                
-            elif b.ground_elev_max > (b.height - b.roof_height - 2):
+            if b.ground_elev_max > (b.height - b.roof_height - 2):
                 b.correct_ground = b.ground_elev_max - b.ground_elev_min
                 b.ground_elev = b.ground_elev_max
 
@@ -1006,7 +939,7 @@ def write(ac_file_name: str, buildings: List[Building], fg_elev: FGElev,
 
         else:
             # -- pitched roof for > 4 ground nodes
-            if b._nnodes_ground > 4 and parameters.BUILDING_SKEL_ROOFS:
+            if b.nnodes_ground > 4 and parameters.BUILDING_SKEL_ROOFS:
                 if b.roof_type == 'skillion':
                     roofs.separate_skillion(ac_object, b)
                 elif b.roof_type in ['pyramidal', 'dome']:

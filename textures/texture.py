@@ -159,9 +159,12 @@ Please set either h_can_repeat or v_can_repeat to False.' % self.filename
             return self.y0 + y * self.sy
 
     def __str__(self):
-        return "<%s> x0,1 %4.2f %4.2f  y0,1 %4.2f %4.2f  sh,v %4.2fm %4.2fm" % \
-                (self.filename, self.x0, self.x1, self.y0, self.y1,
-                 self.h_size_meters, self.v_size_meters)
+        return '<%s> x0=%4.2f x1=%4.2f - y0=%4.3f y1=%4.3f - sh=%4.2fm sv=%4.2fm - ax=%d ay=%d' % \
+               (self.filename,
+                self.x0, self.x1,
+                self.y0, self.y1,
+                self.h_size_meters, self.v_size_meters,
+                self.ax, self.ay)
         # self.type = type
         # commercial-
         # - warehouse
@@ -404,7 +407,8 @@ class RoofManager(object):
         return candidates
 
     def __str__(self):
-        return "".join([str(t) + '\n' for t in self.__l])
+        start = 'Textures of type %s with %d of elements:\n' % (self.__cls, len(self.__l))
+        return start + "".join([str(t) + '\n' for t in self.__l])
 
     def __getitem__(self, i):
         return self.__l[i]
@@ -414,7 +418,7 @@ class RoofManager(object):
 
 
 class FacadeManager(RoofManager):
-    def find_matching_facade(self, requires, tags, height, width, stats: Stats):
+    def find_matching_facade(self, requires, tags, height, width, stats: Stats=None):
         exclusions = []
         if 'roof:colour' in tags:
             exclusions.append("%s:%s" % ('roof:colour', tags['roof:colour']))
@@ -433,7 +437,8 @@ class FacadeManager(RoofManager):
                 return None
         ranked_list = _rank_candidates(candidates, tags)
         the_texture = ranked_list[random.randint(0, len(ranked_list) - 1)]
-        stats.count_texture(the_texture)
+        if stats is not None:
+            stats.count_texture(the_texture)
         return the_texture
 
     def find_facade_candidates(self, requires, excludes, height, width):

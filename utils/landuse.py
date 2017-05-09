@@ -4,6 +4,8 @@ from typing import Dict, List
 import shapely.geometry as shg
 
 import parameters
+from utils.coordinates import Transformation
+import utils.osmparser as osm
 
 
 class Landuse(object):
@@ -20,7 +22,8 @@ class Landuse(object):
         self.number_of_buildings = 0  # only set for generated TYPE_NON_OSM land-uses during generation
 
 
-def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator) -> Dict[int, Landuse]:
+def process_osm_landuse_refs(nodes_dict: Dict[int, osm.Node], ways_dict: Dict[int, osm.Way],
+                             my_coord_transformator: Transformation) -> Dict[int, Landuse]:
     my_landuses = dict()  # osm_id as key, Landuse as value
 
     for way in list(ways_dict.values()):
@@ -42,15 +45,9 @@ def process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator) -> D
                     my_landuse.type_ = Landuse.TYPE_RETAIL
                     valid_landuse = True
         if valid_landuse:
-            # Process the Nodes
-            my_coordinates = list()
-            for ref in way.refs:
-                if ref in nodes_dict:
-                    my_node = nodes_dict[ref]
-                    x, y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
-                    my_coordinates.append((x, y))
-            if len(my_coordinates) >= 3:
-                my_landuse.polygon = shg.Polygon(my_coordinates)
+            my_polygon = way.polygon_from_osm_way(nodes_dict, my_coord_transformator)
+            if my_polygon is not None:
+                my_landuse.polygon = my_polygon
                 if my_landuse.polygon.is_valid and not my_landuse.polygon.is_empty:
                     my_landuses[my_landuse.osm_id] = my_landuse
 

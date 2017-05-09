@@ -104,9 +104,6 @@ OVERLAP_CHECK_BRIDGE_MIN_REMAINING = 10
 #    Use unicode strings as in the first example if there are non-ASCII characters.
 #    E.g. SKIP_LIST = ["Theologische Fakultät", "Rhombergpassage", 55875208]
 SKIP_LIST = []
-# -- keep buildings based on their OSM name tag or OSM ID.
-#    keeps also, building:part of buildings
-KEEP_LIST = []
 
 # -- Parameters which influence the number of buildings from OSM taken to output
 BUILDING_MIN_HEIGHT = 3.4           # -- minimum height of a building to be included in output (does not include roof)
@@ -122,7 +119,7 @@ BUILDING_COMPLEX_ROOFS = True       # -- generate complex roofs on buildings?
 BUILDING_COMPLEX_MIN_HEIGHT = 2     # -- don't put complex roof on buildings smaller than value without roof:shape flag
 BUILDING_COMPLEX_ROOFS_MAX_LEVELS = 5 # -- don't put complex roofs on buildings taller than this
 BUILDING_COMPLEX_ROOFS_MAX_AREA = 2000 # -- don't put complex roofs on buildings larger than this
-BUILDING_SKEL_ROOFS = 1             # -- generate complex roofs with pySkeleton? Used to be EXPERIMENTAL_USE_SKEL
+BUILDING_SKEL_ROOFS = True             # -- generate complex roofs with pySkeleton?
 BUILDING_SKEL_ROOFS_MIN_ANGLE = 10  # -- pySkeleton based complex roofs will
 BUILDING_SKEL_ROOFS_MAX_ANGLE = 50  #    have a random angle between MIN and MAX
 BUILDING_SKEL_MAX_NODES = 10        # -- max number of nodes for which we generate pySkeleton roofs
@@ -132,7 +129,7 @@ BUILDING_FAKE_AMBIENT_OCCLUSION = True      # -- fake AO by darkening facade tex
 BUILDING_FAKE_AMBIENT_OCCLUSION_HEIGHT = 6. #    1 - VALUE * exp(- AGL / HEIGHT )
 BUILDING_FAKE_AMBIENT_OCCLUSION_VALUE = 0.6
 
-EXPERIMENTAL_INNER = 0              # -- do we still need this?
+EXPERIMENTAL_INNER = False              # -- do we still need this?
 
 # -- Parameters which influence the height of buildings if no info from OSM is available.
 #    It uses a triangular distribution (see http://en.wikipedia.org/wiki/Triangular_distribution)

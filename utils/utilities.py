@@ -16,8 +16,8 @@ from typing import List, Optional, Tuple
 import unittest
 
 import numpy as np
-import parameters
 
+import parameters
 from utils import coordinates
 import utils.vec2d as ve
 

@@ -17,6 +17,7 @@ import xml.sax
 
 import psycopg2
 import shapely.geometry as shg
+from utils.coordinates import Transformation
 
 import parameters
 
@@ -44,6 +45,20 @@ class OSMElement(object):
         return "<%s OSM_ID %i at %s>" % (type(self).__name__, self.osm_id, hex(id(self)))
 
 
+def combine_tags(first_tags: Dict[str, str], second_tags: Dict[str, str]) -> Dict[str, str]:
+    """Combines the tags of the first with the second, in such a way that the first wins in case of same keys"""
+    if len(second_tags) == 0:
+        return first_tags.copy()
+    if len(first_tags) == 0:
+        return second_tags.copy()
+
+    combined_tags = first_tags.copy()
+    for key, value in second_tags.items():
+        if key not in combined_tags:
+            combined_tags[key] = value
+    return combined_tags
+
+
 class Node(OSMElement):
     __slots__ = ('lat', 'lon', 'MSL', 'h_add')  # the last two are written from roads.py
 
@@ -67,6 +82,21 @@ class Way(OSMElement):
     def add_ref(self, ref: int) -> None:
         self.refs.append(ref)
 
+    def polygon_from_osm_way(self, nodes_dict: Dict[int, Node], my_coord_transformator: Transformation) \
+            -> Optional[shg.Polygon]:
+        """Creates a shapely polygon in local coordinates. Or None is something is not valid."""
+        my_coordinates = list()
+        for ref in self.refs:
+            if ref in nodes_dict:
+                my_node = nodes_dict[ref]
+                x, y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
+                my_coordinates.append((x, y))
+        if len(my_coordinates) >= 3:
+            my_polygon = shg.Polygon(my_coordinates)
+            if my_polygon.is_valid:
+                return my_polygon
+            return None
+
 
 class Member(object):
     __slots__ = ('ref', 'type_', 'role')
@@ -86,6 +116,40 @@ class Relation(OSMElement):
 
     def add_member(self, member: Member) -> None:
         self.members.append(member)
+
+
+def closed_ways_from_multiple_ways(way_parts: List[Way]) -> List[Way]:
+    """Create closed ways from multiple not closed ways where possible.
+    See http://wiki.openstreetmap.org/wiki/Relation:multipolygon.
+    If parts of ways cannot be used, they just get disregarded.
+    The new Way gets the osm_id from the first piece used and gets all tags merged.
+    """
+    remaining_parts = {way.osm_id: way for way in way_parts}
+    closed_ways = list()
+
+    while remaining_parts:
+        matched_candidates = list()
+        match_found = False
+        starting = remaining_parts.popitem()[1]  # it does not matter, which one we pick
+        for key, candidate in remaining_parts.items():
+            # it does not matter whether we test the first or last node, as in the end there needs to be a connection
+            if starting.refs[-1] == candidate.refs[0]:
+                starting.refs.extend(candidate.refs[1:])
+                match_found = True
+            elif starting.refs[-1] == candidate.refs[-1]:  # the candidate's nodes need to be added in reverse order
+                starting.refs.extend(candidate.refs[-2::-1])
+                match_found = True
+            if match_found:
+                matched_candidates.append(key)
+                # combine the tags
+                starting.tags = dict(list(starting.tags.items()) + list(candidate.tags.items()))
+                if starting.refs[0] == starting.refs[-1]:  # we have found a closing ring and can stop searching
+                    closed_ways.append(starting)
+                    break
+        for matched in matched_candidates:
+            remaining_parts.pop(matched)
+
+    return closed_ways
 
 
 OSMReadResult = namedtuple("OSMReadResult", "nodes_dict, ways_dict, relations_dict, rel_nodes_dict, rel_ways_dict")
@@ -564,6 +628,16 @@ def fetch_osm_db_data_relations_keys(req_keys: List[str], input_read_result: OSM
 
     db_connection = make_db_connection()
 
+    # common subquery
+    sub_query = "((r.tags @> 'type=>multipolygon'"
+    sub_query += " AND " + construct_tags_query(req_keys, list(), "r")
+    sub_query += ") OR r.tags @> 'type=>building')"
+    sub_query += " AND r.id = rm.relation_id"
+    sub_query += " AND rm.member_type = 'W'"
+    sub_query += " AND rm.member_id = w.id"
+    sub_query += " AND "
+    sub_query += construct_intersect_bbox_query()
+
     # == Relations and members and ways
     # Getting related way data might add a bit of  volume, but reduces number of queries and might be seldom that
     # same way is in different relations for buildings.
@@ -571,13 +645,7 @@ def fetch_osm_db_data_relations_keys(req_keys: List[str], input_read_result: OSM
     FROM relations AS r, relation_members AS rm, ways AS w
     WHERE
     """
-    query += "r.tags @> 'type=>multipolygon'"
-    query += " AND " + construct_tags_query(req_keys, list(), "r")
-    query += " AND r.id = rm.relation_id"
-    query += " AND rm.member_type = 'W'"
-    query += " AND rm.member_id = w.id"
-    query += " AND "
-    query += construct_intersect_bbox_query()
+    query += sub_query
     query += " ORDER BY rm.relation_id, rm.sequence_id"
     query += ";"
 
@@ -610,13 +678,7 @@ def fetch_osm_db_data_relations_keys(req_keys: List[str], input_read_result: OSM
     FROM relations AS r, relation_members AS rm, ways AS w, way_nodes AS wn, nodes AS n
     WHERE
     """
-    query += "r.tags @> 'type=>multipolygon'"
-    query += " AND " + construct_tags_query(req_keys, list(), "r")
-    query += " AND r.id = rm.relation_id"
-    query += " AND rm.member_type = 'W'"
-    query += " AND rm.member_id = w.id"
-    query += " AND "
-    query += construct_intersect_bbox_query()
+    query += sub_query
     query += " AND wn.way_id = w.id"
     query += " AND wn.node_id = n.id"
     query += ";"
@@ -776,7 +838,6 @@ class TestOSMParser(unittest.TestCase):
         self.assertEqual(99, parse_cable_stuff(' 99.1'), 'Float')
         self.assertEqual(88, parse_cable_stuff(' 88; 4'), 'Two valid numbers')
 
-
     def test_is_parsable_float(self):
         self.assertFalse(is_parsable_float('1,2'))
         self.assertFalse(is_parsable_float('x'))
@@ -806,3 +867,39 @@ class TestOSMParser(unittest.TestCase):
         self.assertEqual(2, len(my_dict), "Keys and values with comma")
         self.assertEqual("go,o", my_dict["foo"], "Keys and values with comma validate first value")
         self.assertEqual("i,", my_dict["ho,o"], "Keys and values with comma validate first value")
+
+    def test_closed_ways_from_multiple_ways(self):
+        way_unrelated = Way(1)
+        way_unrelated.refs = [90, 91]
+
+        way_no_ring0 = Way(2)
+        way_no_ring0.refs = [80, 81, 82]
+        way_no_ring1 = Way(3)
+        way_no_ring1.refs = [80, 83]
+
+        way_a_0 = Way(4)
+        way_a_0.refs = [1, 2, 3, 4]
+        way_a_0.tags = {'ring0': 'a_0', 'building': 'yes'}
+        way_a_1 = Way(5)
+        way_a_1.refs = [4, 5, 6, 1]
+        way_a_1.tags = {'ring1': 'a_1', 'building': 'yes'}
+
+        way_b_0 = Way(6)
+        way_b_0.refs = [11, 12, 13, 14]
+        way_b_0.tags = {'ring0': 'b_0', 'building': 'yes'}
+        way_b_1 = Way(7)
+        way_b_1.refs = [16, 15, 14]
+        way_b_1.tags = {'ring1': 'b_1', 'building': 'yes'}
+        way_b_2 = Way(8)
+        way_b_2.refs = [16, 17, 18, 11]
+        way_b_2.tags = {'ring2': 'b_2', 'building': 'yes'}
+
+        closed_ways = closed_ways_from_multiple_ways([way_b_0, way_a_1, way_unrelated, way_a_0, way_b_2, way_no_ring1,
+                                                      way_b_1, way_no_ring0])
+        self.assertEqual(2, len(closed_ways))
+
+    def test_combine_tags(self):
+        first_dict = {'1': '1', '2': '2', '3': '3'}
+        second_dict = {'3': '99', '4': '4'}
+        combined_tags = combine_tags(first_dict, second_dict)
+        self.assertEquals(4, len(combined_tags))

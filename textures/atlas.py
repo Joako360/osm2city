@@ -3,6 +3,8 @@ import logging
 
 import PIL.Image as Image
 
+import textures.texture as tex
+
 
 class Region(object):
     """Also used as a container for a single image"""
@@ -18,7 +20,7 @@ class Region(object):
 
 
 class Atlas(Region):
-    def __init__(self, x, y, width, height, name: str) -> None:
+    def __init__(self, x: int, y: int, width: int, height:float, name: str) -> None:
         super().__init__(x, y, width, height)
         self.regions = [Region(x, y, width, height)]
         self._textures = []  # Type atlas.Texture
@@ -48,7 +50,7 @@ class Atlas(Region):
                 logging.debug("%s : %s: Skipping an empty texture" % (self.name, the_texture.filename))
         atlas.save(filename, optimize=True)
 
-    def pack(self, the_texture) -> bool:
+    def pack(self, the_texture: tex.Texture) -> bool:
         logging.debug("packing %s (%i %i)" % 
                       (the_texture.filename, the_texture.width_px, the_texture.height_px))
         for the_region in self.regions:
@@ -61,7 +63,7 @@ class Atlas(Region):
                 return True
         return False
 
-    def pack_at(self, the_texture, x, y):
+    def pack_at(self, the_texture: tex.Texture, x:int, y: int) -> None:
         logging.debug("packing %s (%i %i) at (%i %i)" % 
                       (the_texture.filename, the_texture.width_px, the_texture.height_px, x, y))
         the_texture.ax = x
