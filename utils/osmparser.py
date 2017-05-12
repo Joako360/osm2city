@@ -717,7 +717,7 @@ def fetch_osm_file_data(valid_way_keys: List[str], req_way_keys: List[str], req_
 def make_db_connection() -> psycopg2.extensions.connection:
     """"Create connection to the database based on parameters."""
     return psycopg2.connect(database=parameters.DB_NAME, host=parameters.DB_HOST, port=parameters.DB_PORT,
-                            user=parameters.DB_USER, password=parameters.DB_USER)
+                            user=parameters.DB_USER, password=parameters.DB_USER_PASSWORD)
 
 
 def construct_intersect_bbox_query(is_way: bool=True) -> str:
