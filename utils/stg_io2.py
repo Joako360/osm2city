@@ -335,8 +335,10 @@ def _parse_stg_entries_for_convex_hull(stg_entries: List[STGEntry], my_coord_tra
     """
     Parses the ac-file content for a set of STGEntry objects and sets their boundary attribute
     to be the convex hull of all points in the ac-file in the specified local coordinate system.
+    If there is a problem creating the convex hull, then the stg_entry will be removed.
     """
-    for entry in stg_entries:
+    ac_filename = ""
+    for entry in reversed(stg_entries):
         if entry.verb_type in [STGVerbType.object_static, STGVerbType.object_shared]:
             try:
                 ac_filename = entry.obj_filename
@@ -360,7 +362,10 @@ def _parse_stg_entries_for_convex_hull(stg_entries: List[STGEntry], my_coord_tra
             except IOError as reason:
                 logging.warning("Ignoring unreadable stg_entry %s", reason)
             except ValueError as e:
-                logging.warning("Ac-filename seems to be wrong in xml-file %s", ac_filename)
+                # Happens e.g. for waterfalls, where the xml-file only references a <particlesystem>
+                logging.debug("AC-filename could be wrong in xml-file %s - or just no ac-file referenced", ac_filename)
+            if entry.convex_hull is None:
+                stg_entries.remove(entry)
 
 
 def _extract_boundary(ac_filename: str, alternative_ac_filename: str=None) -> shg.Polygon:
