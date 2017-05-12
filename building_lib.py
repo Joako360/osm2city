@@ -44,7 +44,7 @@ class BuildingParent(object):
             if child.parent is None:
                 self.children.remove(child)
         if len(self.children) == 1:
-            self.children.parent = None
+            self.children[0].parent = None
             self.children = list()
 
     def align_textures_children(self) -> None:
