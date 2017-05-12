@@ -456,7 +456,7 @@ def parse_boundary(boundary_string: str) -> Optional[List[float]]:
 
     Raises BoundaryError if cannot be parsed into 4 floats.
     """
-    boundary_parts = boundary_string.replace("'", "").split("_")
+    boundary_parts = boundary_string.replace("*", "").split("_")
     if len(boundary_parts) != 4:
         message = "Boundary must have four elements separated by '_': {} has only {} element(s) \
         -> aborting!".format(boundary_string, len(boundary_parts))
