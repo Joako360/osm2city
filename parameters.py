@@ -252,7 +252,7 @@ BUILT_UP_AREA_LIT_BUFFER = 20  # the buffer around built-up land-use areas to be
 # PARAMETERS RELATED TO TEXTURES
 # =============================================================================
 
-ATLAS_SUFFIX_DATE = False   # -- add timestamp to file name
+ATLAS_SUFFIX = ''   # -- add a suffix to the atlas/atlas_LM file name
 TEXTURES_ROOFS_NAME_EXCLUDE = []  # list of roof file names to exclude, e.g. ["roof_red3.png", "roof_orange.png"]
 TEXTURES_FACADES_NAME_EXCLUDE = []  # e.g. ["de/commercial/facade_modern_21x42m.jpg"]
 TEXTURES_ROOFS_PROVIDE_EXCLUDE = []  # list of roof provides features to exclude, e.g. ["colour:red"]

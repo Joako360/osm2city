@@ -8,19 +8,19 @@ import textures.texture as tex
 
 class Region(object):
     """Also used as a container for a single image"""
-    def __init__(self, x, y, width, height):
+    def __init__(self, x: int, y: int, width: int, height) -> None:
         self.x = x
         self.y = y        
         self.width_px = width
         self.height_px = height
-        logging.debug("  New Region " + str(self))  # @UndefinedVariable
+        logging.debug("  New Region " + str(self))
 
     def __str__(self):
         return "(%i x %i + %i + %i)" % (self.width_px, self.height_px, self.x, self.y)
 
 
 class Atlas(Region):
-    def __init__(self, x: int, y: int, width: int, height:float, name: str) -> None:
+    def __init__(self, x: int, y: int, width: int, height: int, name: str) -> None:
         super().__init__(x, y, width, height)
         self.regions = [Region(x, y, width, height)]
         self._textures = []  # Type atlas.Texture
@@ -31,10 +31,6 @@ class Atlas(Region):
     def cur_height(self):
         """return the current height"""
         return self.regions[-1].y
-
-    def set_height(self, height):
-        self.height_px = height
-        self._compute_nondim_tex_coords()
 
     def write(self, filename, image_var):
         """Allocate memory for the actual atlas image, paste images, write to disk.
@@ -70,7 +66,7 @@ class Atlas(Region):
         the_texture.ay = y
         self._textures.append(the_texture)
 
-    def _compute_nondim_tex_coords(self):
+    def compute_nondim_tex_coords(self):
         """compute non-dim texture coords"""
         for t in self._textures:
             t.x0 = float(t.ax) / self.width_px

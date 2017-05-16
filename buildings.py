@@ -674,7 +674,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
         logging.info("No buildings after overlap check etc. Stopping further processing.")
         return
 
-    prepare_textures.init(stats, False)
+    prepare_textures.init(stats)
 
     the_buildings = building_lib.analyse(the_buildings, fg_elev,
                                          prepare_textures.facades, prepare_textures.roofs, stats)
@@ -766,14 +766,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
     parameters.read_from_file(args.filename)
     parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
-    if args.skip_elev:
-        parameters.NO_ELEV = True
-    parameters.show()
 
     if args.skip_elev:
         parameters.NO_ELEV = True
     if args.skip_overlap_check:
         parameters.OVERLAP_CHECK = False
+    parameters.show()
 
     my_coords_transform = coordinates.Transformation(parameters.get_center_global())
     my_fg_elev = utilities.FGElev(my_coords_transform)

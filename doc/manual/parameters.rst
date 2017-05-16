@@ -195,7 +195,8 @@ Textures
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
-ATLAS_SUFFIX_DATE                               Boolean    False     Add the current date as a suffix to the texture atlas in ``osm2city-data``.
+ATLAS_SUFFIX                                    String     (empty)   Add the the suffix to the texture atlas (also light-map) in ``osm2city-data``
+                                                                     including an underscore (e.g. 'foo' leads to atlas_facades_foo.png).
 
 TEXTURES_ROOFS_NAME_EXCLUDE                     List       []        List of roof file names to exclude, e.g. ["roof_red3.png", "roof_orange.png"].
                                                                      The file names must be relative paths to the ``tex.src`` directory within
