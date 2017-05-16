@@ -61,7 +61,7 @@ def process_osm_landuse_as_areas(nodes_dict, ways_dict, my_coord_transformator: 
     landuse_refs = process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator)
     if parameters.LU_LANDUSE_GENERATE_LANDUSE:
         building_refs = _process_osm_building_refs(my_coord_transformator)
-        # generate_landuse_from_buildings(landuse_refs, building_refs)
+        generate_landuse_from_buildings(landuse_refs, building_refs)
     landuse_areas = list()
     for key, value in landuse_refs.items():
         landuse_areas.append(value.polygon.buffer(parameters.BUILT_UP_AREA_LIT_BUFFER))

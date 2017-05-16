@@ -198,8 +198,7 @@ class LinearBridge(linear.LinearObject):
 
         return ofs + 2*self.pillar_nnodes, vert, nodes_list
 
-    def write_to(self, obj: utils.ac3d.Object, fg_elev: FGElev, elev_offset, built_up_areas: List[shg.Polygon],
-                 offset=None):
+    def write_to(self, obj: utils.ac3d.Object, fg_elev: FGElev, elev_offset, offset=None) -> None:
         """
         write
         - deck
@@ -231,20 +230,22 @@ class LinearBridge(linear.LinearObject):
         right_bottom_nodes = self.write_nodes(obj, right_bottom_edge, z-parameters.BRIDGE_BODY_HEIGHT, 
                                               elev_offset, offset)
         # -- top
-        lighting_nodes_list = self.calc_lit_nodes(self.edge[0], built_up_areas)
-        self.write_quads(obj, left_top_nodes, right_top_nodes, self.tex[0], self.tex[1], lighting_nodes_list)
+        mat_idx = utils.ac3d.MAT_IDX_UNLIT
+        if 'lit' in self.tags and self.tags['lit'] == 'yes':
+            mat_idx = utils.ac3d.MAT_IDX_LIT
+        self.write_quads(obj, left_top_nodes, right_top_nodes, self.tex[0], self.tex[1], mat_idx)
         
         # -- right
         self.write_quads(obj, right_top_nodes, right_bottom_nodes, textures.road.BRIDGE_1[1], textures.road.BRIDGE_1[0],
-                         None)
+                         utils.ac3d.MAT_IDX_UNLIT)
         
         # -- left
         self.write_quads(obj, left_bottom_nodes, left_top_nodes, textures.road.BRIDGE_1[0], textures.road.BRIDGE_1[1],
-                         None)
+                         utils.ac3d.MAT_IDX_UNLIT)
 
         # -- bottom
         self.write_quads(obj, right_bottom_nodes, left_bottom_nodes, textures.road.BOTTOM[0], textures.road.BOTTOM[1],
-                         None)
+                         utils.ac3d.MAT_IDX_UNLIT)
 
         # -- end wall 1
         the_node = self.edge[0].coords[0]

@@ -359,7 +359,7 @@ class Roads(object):
                                                                len(self.railway_list), len(self.bridges_list))
 
     def process(self, blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
-                stats: utilities.Stats) -> None:
+                built_up_areas: List[shg.Polygon], stats: utilities.Stats) -> None:
         """Processes the OSM data until data can be clusterized.
         """
         self._remove_tunnels()
@@ -367,6 +367,7 @@ class Roads(object):
         self._check_ways_in_water()
         self._check_against_blocked_areas(blocked_areas)
         self._check_against_stg_entries(stg_entries)
+        self._check_lighting(built_up_areas)
         self._cleanup_topology()
         self._check_points_on_line_distance()
 
@@ -495,6 +496,45 @@ class Roads(object):
                         continue
                     if isinstance(my_line_difference, shg.MultiLineString) and my_line_difference.geoms == 2:
                         new_ways.append(self._split_way_for_object(my_line_difference, way))
+
+        self.ways_list.extend(new_ways)
+
+    def _check_lighting(self, built_up_areas) -> None:
+        """Checks ways for lighting and maybe splits at borders for built-up areas."""
+        new_ways = list()
+        for way in self.ways_list:
+            if not _is_highway(way):
+                continue
+            if 'lit' in way.tags and way.tags['lit'] == 'yes':
+                continue  # nothing further to do with this way
+            my_line = self._line_string_from_way(way)
+            outside_built_up = True
+            for built_up_area in built_up_areas:
+                if my_line.within(built_up_area) or my_line.touches(built_up_area):
+                    outside_built_up = False
+                    way.tags['lit'] = 'yes'
+                    break
+
+                my_line_difference = my_line.intersection(built_up_area)
+                if my_line_difference is None:
+                    continue
+                if isinstance(my_line_difference, shg.GeometryCollection) and my_line_difference.is_empty:
+                    continue
+
+                # it is a valid intersectiio
+                outside_built_up = False
+                way.tags['lit'] = 'yes'
+                break
+
+                #my_line_difference = my_line.difference(blocked_area)
+                #if isinstance(my_line_difference, shg.LineString):
+                #    self._change_way_for_object(my_line_difference, way)
+                #    continue
+                #if isinstance(my_line_difference, shg.MultiLineString) and my_line_difference.geoms == 2:
+                #    new_ways.append(self._split_way_for_object(my_line_difference, way))
+
+            if outside_built_up:
+                way.tags['lit'] = 'no'
 
         self.ways_list.extend(new_ways)
 
@@ -655,10 +695,10 @@ class Roads(object):
 
         for the_way in self.ways_list:
             if _is_highway(the_way):
-                if "access" in the_way.tags:
-                    if not (the_way.tags["access"] == 'no'):
+                if 'access' in the_way.tags:
+                    if not (the_way.tags['access'] == 'no'):
                         continue  # do not process small access links
-                highway_type = highway_type_from_osm_tags(the_way.tags["highway"])
+                highway_type = highway_type_from_osm_tags(the_way.tags['highway'])
                 # in method Roads.store_way smaller highways already got removed
 
                 priority, tex, width = get_highway_attributes(highway_type)
@@ -1071,8 +1111,7 @@ def process_osm_ways(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int,
 
 
 def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, stg_manager, stg_paths, is_railway,
-                      coords_transform: coordinates.Transformation, built_up_areas: List[shg.Polygon],
-                      stats: utilities.Stats, is_rough_LOD: bool):
+                      coords_transform: coordinates.Transformation, stats: utilities.Stats, is_rough_LOD: bool) -> None:
     for cl in clusters:
         if len(cl.objects) < parameters.CLUSTER_MIN_OBJECTS:
             continue  # skip almost empty clusters
@@ -1097,7 +1136,7 @@ def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, s
             texture_string = 'Textures/osm2city/roads.png'
         ac3d_obj = ac.new_object(file_name, texture_string, default_swap_uv=True, default_mat_idx=ac3d.MAT_IDX_UNLIT)
         for rd in cl.objects:
-            rd.write_to(ac3d_obj, fg_elev, cluster_elev, built_up_areas, offset=offset_local)
+            rd.write_to(ac3d_obj, fg_elev, cluster_elev, offset=offset_local)
 
         suffix = ".xml"
         if is_railway or parameters.FLAG_2017_2:
@@ -1231,7 +1270,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     path_to_output = parameters.get_output_path()
     logging.debug("before linear " + str(roads))
 
-    roads.process(blocked_areas, stg_entries, stats)  # does the heavy lifting based on OSM data including clustering
+    roads.process(blocked_areas, stg_entries, built_up_areas, stats)  # does the heavy lifting incl. clustering
 
     replacement_prefix = parameters.get_repl_prefix()
     stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.roads, OUR_MAGIC, replacement_prefix)
@@ -1240,11 +1279,11 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     stg_paths = set()
 
     _process_clusters(roads.railways_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, True,
-                      coords_transform, built_up_areas, stats, True)
+                      coords_transform, stats, True)
     _process_clusters(roads.roads_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, False,
-                      coords_transform, built_up_areas, stats, False)
+                      coords_transform, stats, False)
     _process_clusters(roads.roads_rough_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, False,
-                      coords_transform, built_up_areas, stats, True)
+                      coords_transform, stats, True)
 
     roads.debug_plot(show=True, plot_junctions=False, clusters=roads.roads_clusters)
     

@@ -226,11 +226,10 @@ class LinearObject(object):
         return nodes_list
 
     def write_quads(self, obj: utils.ac3d.Object, left_nodes_list, right_nodes_list, tex_y0, tex_y1,
-                    lighting_nodes_list: Optional[List[bool]]) -> None:
+                    mat_idx: int) -> None:
         """Write a series of quads bound by left and right. 
         Left/right are lists of node indices which will be used to form a series of quads.
-        lighting_nodes_list tells whether a given node is lit. If the list is None or empty, then none will be lit.
-        If either the start or the end node is lit, then the face will get a lit material.
+        Material tells whether it is lit or not.
         """
         scale = 32.  # length of texture in meters
                      # 2 lanes * 4m per lane = 128 px wide. 512px long = 32 m
@@ -241,10 +240,6 @@ class LinearObject(object):
         n_nodes = len(left_nodes_list)
         assert(len(left_nodes_list) == len(right_nodes_list))
         for i in range(n_nodes-1):
-            mat_idx = utils.ac3d.MAT_IDX_UNLIT
-            if lighting_nodes_list:
-                if lighting_nodes_list[i] or lighting_nodes_list[i+1]:
-                    mat_idx = utils.ac3d.MAT_IDX_LIT
             xl = self.dist[i]/scale
             xr = self.dist[i+1]/scale
             face = [(left_nodes_list[i],    xl, tex_y0),
@@ -442,8 +437,7 @@ class LinearObject(object):
             e = z[i] - elev_offset
             ac.add_label('<' + str(self.osm_id) + '> add %5.2f' % h_add[i], -(anchor[1] - offset.y), e+0.5, -(anchor[0] - offset.x), scale=1)
         
-    def write_to(self, obj: utils.ac3d.Object, fg_elev: FGElev, elev_offset, built_up_areas: List[shg.Polygon],
-                 offset=None):
+    def write_to(self, obj: utils.ac3d.Object, fg_elev: FGElev, elev_offset, offset=None) -> bool:
         """
            assume we are a street: flat (or elevated) on terrain, left and right edges
            #need adjacency info
@@ -458,8 +452,12 @@ class LinearObject(object):
                                            offset, join=True, is_left=True)
         right_nodes_list = self.write_nodes(obj, self.edge[1], right_z, elev_offset,
                                             offset, join=True, is_left=False)
-        lighting_nodes_list = self.calc_lit_nodes(self.edge[0], built_up_areas)
-        self.write_quads(obj, left_nodes_list, right_nodes_list, self.tex[0], self.tex[1], lighting_nodes_list)
+
+        mat_idx = utils.ac3d.MAT_IDX_UNLIT
+        if 'lit' in self.tags and self.tags['lit'] == 'yes':
+            mat_idx = utils.ac3d.MAT_IDX_LIT
+
+        self.write_quads(obj, left_nodes_list, right_nodes_list, self.tex[0], self.tex[1], mat_idx)
         if h_add is not None:
             # -- side walls of embankment
             if h_add.max() > 0.1:
@@ -571,27 +569,3 @@ class LinearObject(object):
             logging.error("error in osm_id", self.osm_id)
 
         return True
-
-    def calc_lit_nodes(self, line_string: shg.LineString, built_up_areas: List[shg.Polygon]) -> List[bool]:
-        """Determines whether a given node on a line should be lit by looking at the tag and intersection.
-        Railways will always be non-lit.
-        The tag of the underlying road can contain key=lit.
-        Otherwise check whether the node is inside a built-up area.
-        """
-        # exclude railway
-        if osmparser.has_railway_tag(self.tags):
-            return [False] * len(line_string.coords)
-
-        # check tag lit
-        if 'lit' in self.tags:
-            if self.tags['lit'] == 'yes':
-                return [True] * len(line_string.coords)
-
-        # check built-up area
-        lit_nodes = [False] * len(line_string.coords)
-        for i in range(len(lit_nodes)):
-            for area in built_up_areas:
-                if area.contains(shg.Point(line_string.coords[i][0], line_string.coords[i][1])):
-                    lit_nodes[i] = True
-                    break
-        return lit_nodes
