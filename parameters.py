@@ -258,6 +258,7 @@ TEXTURES_FACADES_NAME_EXCLUDE = []  # e.g. ["de/commercial/facade_modern_21x42m.
 TEXTURES_ROOFS_PROVIDE_EXCLUDE = []  # list of roof provides features to exclude, e.g. ["colour:red"]
 TEXTURES_FACADES_PROVIDE_EXCLUDE = []  # ditto for facade provides features, e.g. ["age:modern"]
 TEXTURES_REGIONS_EXPLICIT = []  # list of exclusive regions to accept. All if empty
+TEXTURES_EMPTY_LM_RGB_VALUE = 35
 
 
 # default_args_end # DO NOT MODIFY THIS LINE

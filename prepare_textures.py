@@ -109,7 +109,9 @@ def _make_per_texture_type(texture_list: List[Texture], the_atlas: atlas.Atlas, 
         try:
             tex.im_LM = Image.open(filename)
         except IOError:
-            tex.im_LM = None
+            # assuming there is no light-map. Put a dark uniform light-map
+            the_image = Image.new('RGB', tex.im.size, 'rgb({0},{0},{0})'.format(parameters.TEXTURES_EMPTY_LM_RGB_VALUE))
+            tex.im_LM = the_image
 
         assert (tex.v_can_repeat + tex.h_can_repeat < 2)
         if tex.v_can_repeat:

@@ -219,6 +219,9 @@ TEXTURES_REGIONS_EXPLICIT                       List       []        Explicit li
                                                                      "generic", as it provides a lot of colours etc. (which however could be
                                                                      filtered with the other parameters).
 
+TEXTURES_EMPTY_LM_RGB_VALUE                     Integer    35        If a texture does not have an explicit light-map (i.e. same file name plus
+                                                                     "_LM", then a default light-map is constructed with RGB(VALUE, VALUE, VALUE).
+
 =============================================   ========   =======   ==============================================================================
 
 
