@@ -1683,50 +1683,6 @@ def _process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
     return my_highways
 
 
-def _generate_landuse_from_buildings(osm_landuses, building_refs: List[shg.Polygon]):
-    """Adds "missing" landuses based on building clusters"""
-    my_landuse_candidates = dict()
-    index = 10000000000
-    for my_building in building_refs:
-        # check whether the building already is in a land use
-        within_existing_landuse = False
-        for osm_landuse in list(osm_landuses.values()):
-            if my_building.intersects(osm_landuse.polygon):
-                within_existing_landuse = True
-                break
-        if not within_existing_landuse:
-            # create new clusters of land uses
-            buffer_distance = parameters.LU_LANDUSE_BUILDING_BUFFER_DISTANCE
-            if my_building.area > parameters.LU_LANDUSE_BUILDING_BUFFER_DISTANCE**2:
-                factor = math.sqrt(my_building.area / parameters.LU_LANDUSE_BUILDING_BUFFER_DISTANCE**2)
-                buffer_distance = min(factor*parameters.LU_LANDUSE_BUILDING_BUFFER_DISTANCE,
-                                      parameters.LU_LANDUSE_BUILDING_BUFFER_DISTANCE_MAX)
-            buffer_polygon = my_building.buffer(buffer_distance)
-            buffer_polygon = buffer_polygon
-            within_existing_landuse = False
-            for candidate in list(my_landuse_candidates.values()):
-                if buffer_polygon.intersects(candidate.polygon):
-                    candidate.polygon = candidate.polygon.union(buffer_polygon)
-                    candidate.number_of_buildings += 1
-                    within_existing_landuse = True
-                    break
-            if not within_existing_landuse:
-                index += 1
-                my_candidate = landuse.Landuse(index)
-                my_candidate.polygon = buffer_polygon
-                my_candidate.number_of_buildings = 1
-                my_candidate.type_ = landuse.Landuse.TYPE_NON_OSM
-                my_landuse_candidates[my_candidate.osm_id] = my_candidate
-    # add landuse candidates to landuses
-    logging.debug("Candidate land-uses found: %s", len(my_landuse_candidates))
-    for candidate in list(my_landuse_candidates.values()):
-        if candidate.polygon.area < parameters.LU_LANDUSE_MIN_AREA:
-            del my_landuse_candidates[candidate.osm_id]
-    logging.debug("Candidate land-uses with sufficient area found: %s", len(my_landuse_candidates))
-
-    return my_landuse_candidates
-
-
 def _fetch_osm_file_data() -> Tuple[Dict[int, osmparser.Node], Dict[int, osmparser.Way]]:
     start_time = time.time()
     # the lists below are in sequence: buildings references, power/aerialway, railway overhead, landuse and highway
@@ -1824,9 +1780,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
 
         landuse_refs = landuse.process_osm_landuse_refs(osm_nodes_dict, osm_ways_dict, coords_transform)
         if parameters.LU_LANDUSE_GENERATE_LANDUSE:
-            generated_landuses = _generate_landuse_from_buildings(landuse_refs, building_refs)
-            for generated in list(generated_landuses.values()):
-                landuse_refs[generated.osm_id] = generated
+            landuse.generate_landuse_from_buildings(landuse_refs, building_refs)
         logging.info('Number of landuse references: %s', len(landuse_refs))
         streetlamp_buffers = _merge_streetlamp_buffers(landuse_refs)
         logging.info('Number of streetlamp buffers: %s', len(streetlamp_buffers))

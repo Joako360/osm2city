@@ -153,7 +153,9 @@ LOD_PERCENTAGE_DETAIL = 0.5         # -- of the remaining buildings, this percen
 LIGHTMAP_ENABLE = True                 # -- include lightmap in xml
 OBSTRUCTION_LIGHT_MIN_LEVELS = 15   # -- put obstruction lights on buildings with >= given levels
 
-CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if too little objects
+CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if too few objects
+
+BUILDING_TOLERANCE_MATCH_NODE = 0.5  # when searching for a OSM node based on distance: what is the allowed tolerance
 
 
 # =============================================================================

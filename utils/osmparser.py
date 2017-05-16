@@ -17,9 +17,9 @@ import xml.sax
 
 import psycopg2
 import shapely.geometry as shg
-from utils.coordinates import Transformation
 
 import parameters
+from utils.coordinates import Transformation
 
 
 PSEUDO_OSM_ID = -1  # For those nodes and ways, which get added as part of processing. Not written back to OSM.

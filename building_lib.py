@@ -31,7 +31,7 @@ from utils.stg_io2 import STGVerbType
 class BuildingParent(object):
     """The parent of buildings that are part of a Simple3D building.
     Mostly used to coordinate textures for facades and roofs.
-    The parts determine the common textures by a simple: the first to set the values wins the race.
+    The parts determine the common textures by a simple rule: the first to set the values wins the race.
     """
     def __init__(self, osm_id: int) -> None:
         self.osm_id = osm_id
@@ -114,14 +114,12 @@ class Building(object):
     Read-only access to node coordinates via self.X[node][0|1]
     """
 
-    def __init__(self, osm_id: int, tags: Dict[str, str], outer_ring: BaseGeometry, name: str,
+    def __init__(self, osm_id: int, tags: Dict[str, str], outer_ring: shg.LinearRing, name: str,
                  height: float, levels: int,
                  stg_typ: STGVerbType=None, stg_hdg=None, inner_rings_list=list(), building_type='unknown',
                  roof_type: str='flat', roof_height: int=0, refs: List[int]=list()) -> None:
         self.osm_id = osm_id
         self.tags = tags
-        self.refs = refs
-        self.inner_rings_list = inner_rings_list
         self.name = name
         self.stg_typ = stg_typ  # STGVerbType
         self.stg_hdg = stg_hdg
@@ -131,7 +129,6 @@ class Building(object):
         self.longest_edge_len = 0.
         self.levels = levels
         self.first_node = 0  # index of first node in final OBJECT node list
-        self.anchor = Vec2d(list(outer_ring.coords[0]))
         self.facade_texture = None
         self.roof_texture = None
         self.roof_complex = False  # if False then compat:roof-flat; else compat:roof-pitched
@@ -139,15 +136,17 @@ class Building(object):
         self.roof_type = roof_type  # str: flat, skillion, pyramidal, dome, gabled, half-hipped, hipped
         self.ceiling = 0.
         self.LOD = None  # see utils.utilities.LOD for values
-        self.outer_nodes_closest = []
-        if len(outer_ring.coords) > 2:
-            self._set_polygon(outer_ring, self.inner_rings_list)
-        else:
-            self.polygon = None
-        if self.inner_rings_list:
-            self.roll_inner_nodes()
+
+        self.refs = None
+        self.inner_rings_list = None
+        self.outer_nodes_closest = None
+        self.anchor = None
+        self.polygon = None
+        self.update_geometry(outer_ring, inner_rings_list, refs)
+
         self.building_type = building_type
         self.parent = None  # BuildingParent if available
+        self.pseudo_parents = list()  # list of Building: only set for building:part without a real parent
         self.ground_elev = None
         self.ground_elev_min = None
         self.ground_elev_max = None
@@ -157,6 +156,18 @@ class Building(object):
                 self.is_external_model = True
                 self.model3d = tags['model3d']
                 self.angle3d = tags['angle3d']
+
+    def update_geometry(self, outer_ring: shg.LinearRing, inner_rings_list=list(), refs: List[int]=list()) -> None:
+        self.refs = refs
+        self.inner_rings_list = inner_rings_list
+        self.outer_nodes_closest = []
+        self.anchor = Vec2d(list(outer_ring.coords[0]))
+        if len(outer_ring.coords) > 2:
+            self._set_polygon(outer_ring, self.inner_rings_list)
+        else:
+            self.polygon = None
+        if self.inner_rings_list:
+            self.roll_inner_nodes()
 
     def roll_inner_nodes(self) -> None:
         """Roll inner rings such that the node closest to an outer node goes first.
@@ -777,8 +788,17 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
             b.parent = building_parent
             building_parents[building_parent.osm_id] = building_parent
 
+    # align textures etc. for buildings with parents or pseudo-parents
     for key, parent in building_parents.items():
         parent.align_textures_children()
+
+    for building_part in new_buildings:
+        if building_part.pseudo_parents:
+            # FIXME there should be some checks whether the part is really the highest / most levels
+            # to determine whether the pseudo_parent really should pick the part's texture
+            for pseudo_parent in building_part.pseudo_parents:
+                pseudo_parent.facade_texture = building_part.facade_texture
+                pseudo_parent.roof_texture = building_part.roof_texture
 
     return new_buildings
 
