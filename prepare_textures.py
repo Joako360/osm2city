@@ -29,32 +29,67 @@ import parameters
 import utils.utilities as util
 from PIL import Image
 from textures import atlas
-from textures.texture import Texture, RoofManager, FacadeManager
+from textures.texture import Texture, FacadeManager, RoofManager, SpecialManager
 
 atlas_file_name = None
 
 ROOFS_DEFAULT_FILE_NAME = "roofs_default.py"
 
+# expose the three managers on module level
+roofs = None  # RoofManager
+facades = None  # FacadeManager
+specials = None  # SpecialManager
 
 # Hard-coded constants for the texture atlas. If they are changed, then maybe all sceneries in Terrasync need
 # to be recreated -> therefore not configurable. Numbers are in pixels (need to be factor 2).
 ATLAS_ROOFS_START = 0
 ATLAS_FACADES_START = 16384
-ATLAS_SPECIAL_START = 65536
+ATLAS_SPECIALS_START = 65536
 ATLAS_HEIGHT = 131072
 ATLAS_WIDTH = 256
 
 
-def _make_texture_atlas(texture_list: List[Texture], atlas_filename: str, ext: str, pad_y: int=0):
+def _make_texture_atlas(roofs_list: List[Texture], facades_list: List[Texture], specials_list: List[Texture],
+                        atlas_filename: str, ext: str, pad_y: int=0) -> None:
     """
     Create texture atlas from all textures. Update all our item coordinates.
     """
     logging.info("Making texture atlas")
-    
-    if len(texture_list) < 1:
+
+    if (len(facades_list) + len(roofs_list) + len(specials_list)) < 1:
         logging.error('Got an empty texture list. Check installation of tex.src/ folder!')
         sys.exit(-1)
 
+    the_atlas = atlas.Atlas(0, 0, ATLAS_WIDTH, ATLAS_HEIGHT, 'Facades')
+
+    _make_per_texture_type(roofs_list, the_atlas, pad_y)
+    # reduce the available region based on roof slot
+    the_atlas.regions = [atlas.Region(0, ATLAS_FACADES_START, ATLAS_WIDTH, ATLAS_HEIGHT - ATLAS_FACADES_START)]
+    _make_per_texture_type(facades_list, the_atlas, pad_y)
+    # reduce the available region based on facades slot
+    the_atlas.regions = [atlas.Region(0, ATLAS_SPECIALS_START, ATLAS_WIDTH, ATLAS_HEIGHT - ATLAS_SPECIALS_START)]
+    _make_per_texture_type(specials_list, the_atlas, pad_y)
+
+    the_atlas.compute_nondim_tex_coords()
+    the_atlas.write(atlas_filename + ext, 'im')
+
+    # -- create LM atlas, using the coordinates of the main atlas
+    light_map_atlas = atlas.Atlas(0, 0, ATLAS_WIDTH, ATLAS_HEIGHT, 'FacadesLM')
+    for tex in roofs_list:
+        light_map_atlas.pack_at_coords(tex, tex.ax, tex.ay)
+    for tex in facades_list:
+        light_map_atlas.pack_at_coords(tex, tex.ax, tex.ay)
+    for tex in specials_list:
+        light_map_atlas.pack_at_coords(tex, tex.ax, tex.ay)
+    light_map_atlas.write(atlas_filename + '_LM' + ext, 'im_LM')
+
+    for tex in (roofs_list + facades_list + specials_list):
+        logging.debug('%s (%4.2f, %4.2f) (%4.2f, %4.2f)' % (tex.filename, tex.x0, tex.y0, tex.x1, tex.y1))
+        del tex.im
+        del tex.im_LM
+
+
+def _make_per_texture_type(texture_list: List[Texture], the_atlas: atlas.Atlas, pad_y: int, ) -> None:
     keep_aspect = True  # FIXME: False won't work -- im.thumbnail seems to keep aspect no matter what
 
     next_y = 0
@@ -63,103 +98,87 @@ def _make_texture_atlas(texture_list: List[Texture], atlas_filename: str, ext: s
     #    append to either can_repeat or non_repeat list
     can_repeat_list = []
     non_repeat_list = []
-    for l in texture_list:
-        filename = l.filename
-        l.im = Image.open(filename)
-        logging.debug("name %s size " % filename + str(l.im.size))
+    for tex in texture_list:
+        filename = tex.filename
+        tex.im = Image.open(filename)
+        logging.debug("name %s size " % filename + str(tex.im.size))
 
         # light-map
-        filename, file_extension = os.path.splitext(l.filename)
+        filename, file_extension = os.path.splitext(tex.filename)
         filename += '_LM' + file_extension
         try:
-            l.im_LM = Image.open(filename)
+            tex.im_LM = Image.open(filename)
         except IOError:
-            l.im_LM = None
+            tex.im_LM = None
 
-        assert (l.v_can_repeat + l.h_can_repeat < 2)
-        if l.v_can_repeat:
-            l.rotated = True
-            l.im = l.im.transpose(Image.ROTATE_270)
+        assert (tex.v_can_repeat + tex.h_can_repeat < 2)
+        if tex.v_can_repeat:
+            tex.rotated = True
+            tex.im = tex.im.transpose(Image.ROTATE_270)
 
-            l.im_LM = l.im_LM.transpose(Image.ROTATE_270)
-        
-        if l.v_can_repeat or l.h_can_repeat: 
-            can_repeat_list.append(l)
+            tex.im_LM = tex.im_LM.transpose(Image.ROTATE_270)
+
+        if tex.v_can_repeat or tex.h_can_repeat:
+            can_repeat_list.append(tex)
         else:
-            non_repeat_list.append(l)
-
-    the_atlas = atlas.Atlas(0, 0, ATLAS_WIDTH, ATLAS_HEIGHT, 'Facades')
+            non_repeat_list.append(tex)
 
     # Work on not repeatable textures
-    # Sort textures by perimeter size in non-increasing order
-    non_repeat_list = sorted(non_repeat_list, key=lambda i: i.sy, reverse=True)
-    for the_texture in non_repeat_list:
-        the_texture.width_px, the_texture.height_px = the_texture.im.size
+    for tex in non_repeat_list:
+        tex.width_px, tex.height_px = tex.im.size
 
-        if not the_atlas.pack(the_texture):
-            logging.info("Failed to pack" + str(the_texture))
+        if not the_atlas.pack(tex):
+            logging.info("Failed to pack" + str(tex))
     atlas_sy = the_atlas.cur_height()
 
     # Work on repeatable textures.
     # Scale each to full atlas width
     # Compute total height of repeatable section
-    for l in can_repeat_list:
-        scale_x = 1. * ATLAS_WIDTH / l.im.size[0]
+    for tex in can_repeat_list:
+        scale_x = 1. * ATLAS_WIDTH / tex.im.size[0]
         if keep_aspect:
             scale_y = scale_x
         else:
             scale_y = 1.
-        org_size = l.im.size
-        
+        org_size = tex.im.size
+
         nx = int(org_size[0] * scale_x)
         ny = int(org_size[1] * scale_y)
-        l.im = l.im.resize((nx, ny), Image.ANTIALIAS)
-        if l.im_LM:
-            l.im_LM = l.im_LM.resize((nx, ny), Image.ANTIALIAS)
-        logging.debug("scale:" + str(org_size) + str(l.im.size))
-        atlas_sy += l.im.size[1] + pad_y
-        l.width_px, l.height_px = l.im.size
+        tex.im = tex.im.resize((nx, ny), Image.ANTIALIAS)
+        if tex.im_LM:
+            tex.im_LM = tex.im_LM.resize((nx, ny), Image.ANTIALIAS)
+        logging.debug("scale:" + str(org_size) + str(tex.im.size))
+        atlas_sy += tex.im.size[1] + pad_y
+        tex.width_px, tex.height_px = tex.im.size
 
     # Bake fake ambient occlusion. Multiply all channels of a facade texture by
     # 1. - param.BUILDING_FAKE_AMBIENT_OCCLUSION_VALUE * np.exp(-z / param.BUILDING_FAKE_AMBIENT_OCCLUSION_HEIGHT)
-    #    where z is height above ground. 
+    #    where z is height above ground.
+    # Has to be done after scaling of texture has happened
     if parameters.BUILDING_FAKE_AMBIENT_OCCLUSION:
-        for l in texture_list:
-            if l.cls == 'facade':
-                R, G, B, A = img2np.img2RGBA(l.im)
+        for tex in texture_list:
+            if tex.cls == 'facade':
+                R, G, B, A = img2np.img2RGBA(tex.im)
                 height_px = R.shape[0]
                 # reversed height
-                Z = np.linspace(l.v_size_meters, 0, height_px).reshape(height_px, 1)
-                fac = 1. - parameters.BUILDING_FAKE_AMBIENT_OCCLUSION_VALUE * np.exp(-Z / parameters.BUILDING_FAKE_AMBIENT_OCCLUSION_HEIGHT)
-                l.im = img2np.RGBA2img(R * fac, G * fac, B * fac)
+                Z = np.linspace(tex.v_size_meters, 0, height_px).reshape(height_px, 1)
+                fac = 1. - parameters.BUILDING_FAKE_AMBIENT_OCCLUSION_VALUE * np.exp(
+                    -Z / parameters.BUILDING_FAKE_AMBIENT_OCCLUSION_HEIGHT)
+                tex.im = img2np.RGBA2img(R * fac, G * fac, B * fac)
 
     # -- paste, compute atlas coords
     #    lower left corner of texture is x0, y0
-    for l in can_repeat_list:
-        l.x0 = 0
-        l.x1 = float(l.width_px) / ATLAS_WIDTH
-        l.y1 = 1 - float(next_y) / atlas_sy
-        l.y0 = 1 - float(next_y + l.height_px) / atlas_sy
-        l.sy = float(l.height_px) / atlas_sy
-        l.sx = 1.
+    for tex in can_repeat_list:
+        tex.x0 = 0
+        tex.x1 = float(tex.width_px) / ATLAS_WIDTH
+        tex.y1 = 1 - float(next_y) / atlas_sy
+        tex.y0 = 1 - float(next_y + tex.height_px) / atlas_sy
+        tex.sy = float(tex.height_px) / atlas_sy
+        tex.sx = 1.
 
-        next_y += l.height_px + pad_y
-        if not the_atlas.pack(l):
-            logging.info("Failed to pack" + str(l))
-
-    the_atlas.compute_nondim_tex_coords()
-    the_atlas.write(atlas_filename + ext, 'im')
-
-    # -- create LM atlas, using the coordinates of the main atlas
-    light_map_atlas = atlas.Atlas(0, 0, ATLAS_WIDTH, ATLAS_HEIGHT, 'FacadesLM')
-    for l in texture_list:
-        light_map_atlas.pack_at(l, l.ax, l.ay)
-    light_map_atlas.write(atlas_filename + '_LM' + ext, 'im_LM')
-
-    for l in texture_list:
-        logging.debug('%s (%4.2f, %4.2f) (%4.2f, %4.2f)' % (l.filename, l.x0, l.y0, l.x1, l.y1))
-        del l.im
-        del l.im_LM
+        next_y += tex.height_px + pad_y
+        if not the_atlas.pack(tex):
+            logging.info("Failed to pack" + str(tex))
 
 
 def _check_missed_input_textures(tex_prefix: str, registered_textures: List[Texture]) -> None:
@@ -249,8 +268,9 @@ class InitMode(enum.IntEnum):
 def init(stats: util.Stats, mode: InitMode=InitMode.read) -> None:
     """Initializes the texture atlas based on the init mode of the process."""
     logging.debug("prepare_textures: init")
-    global facades
     global roofs
+    global facades
+    global specials
     global atlas_file_name
 
     atlas_file_name = os.path.join("tex", "atlas_facades")
@@ -260,47 +280,52 @@ def init(stats: util.Stats, mode: InitMode=InitMode.read) -> None:
     pkl_file_name = os.path.join(parameters.PATH_TO_OSM2CITY_DATA, "tex", "atlas_facades.pkl")
     
     if mode is InitMode.create:
-        facades = FacadeManager('facade', stats)
         roofs = RoofManager('roof', stats)
+        facades = FacadeManager('facade', stats)
+        specials = SpecialManager('special', stats)
 
         # read registrations
         _append_roofs(roofs, my_tex_prefix_src)
         _append_facades(facades, my_tex_prefix_src)
-
-        texture_list = facades.get_list() + roofs.get_list()
+        # FIXME: nothing to do yet for SpecialManager
 
         # warn for missed out textures
-        _check_missed_input_textures(my_tex_prefix_src, texture_list)
+        _check_missed_input_textures(my_tex_prefix_src, roofs.get_list() + facades.get_list())
 
         # -- make texture atlas
         if parameters.ATLAS_SUFFIX:
             atlas_file_name += '_' + parameters.ATLAS_SUFFIX
 
-        _make_texture_atlas(texture_list, os.path.join(parameters.PATH_TO_OSM2CITY_DATA, atlas_file_name), '.png')
+        _make_texture_atlas(roofs.get_list(), facades.get_list(), specials.get_list(),
+                            os.path.join(parameters.PATH_TO_OSM2CITY_DATA, atlas_file_name), '.png')
         
         params = dict()
         params['atlas_file_name'] = atlas_file_name
 
         logging.info("Saving %s", pkl_file_name)
         pickle_file = open(pkl_file_name, 'wb')
-        pickle.dump(facades, pickle_file, -1)
         pickle.dump(roofs, pickle_file, -1)
+        pickle.dump(facades, pickle_file, -1)
+        pickle.dump(specials, pickle_file, -1)
         pickle.dump(params, pickle_file, -1)
         pickle_file.close()
 
-        logging.info(str(facades))
         logging.info(str(roofs))
+        logging.info(str(facades))
+        logging.info(str(specials))
     else:
         logging.info("Loading %s", pkl_file_name)
         pickle_file = open(pkl_file_name, 'rb')
-        facades = pickle.load(pickle_file)
         roofs = pickle.load(pickle_file)
+        facades = pickle.load(pickle_file)
+        specials = pickle.load(pickle_file)
         params = pickle.load(pickle_file)
         atlas_file_name = params['atlas_file_name']
         pickle_file.close()
 
-    stats.textures_total = dict((filename, 0) for filename in map((lambda x: x.filename), facades.get_list()))
-    stats.textures_total.update(dict((filename, 0) for filename in map((lambda x: x.filename), roofs.get_list())))
+    stats.textures_total = dict((filename, 0) for filename in map((lambda x: x.filename), roofs.get_list()))
+    stats.textures_total.update(dict((filename, 0) for filename in map((lambda x: x.filename), facades.get_list())))
+    stats.textures_total.update(dict((filename, 0) for filename in map((lambda x: x.filename), specials.get_list())))
     logging.info('Skipped textures: %d', stats.skipped_texture)
 
 

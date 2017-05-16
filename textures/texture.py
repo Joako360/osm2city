@@ -71,6 +71,8 @@ class Texture(object):
         self.registered_in = None  # filename of the .py file, where this texture has been referenced
         self.cls = ''  # The class of the texture depends on the manager: 'roof' or 'facade'
 
+        self.im = None
+        self.im_LM = None  # is only set when processing texture atlas
         try:
             self.im = Image.open(self.filename)
         except IOError:
@@ -457,6 +459,12 @@ class FacadeManager(RoofManager):
 
             new_candidates.append(t)
         return new_candidates
+
+
+class SpecialManager(RoofManager):
+    """Manager for all those textures, which are specific for a given ac-file or so."""
+    def find_matching(self, tex_path: str) -> Texture:
+        pass
 
 
 def _rank_candidates(candidates, tags):

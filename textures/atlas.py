@@ -7,7 +7,9 @@ import textures.texture as tex
 
 
 class Region(object):
-    """Also used as a container for a single image"""
+    """The atlas is composed of small slots of containers for images. There can be 1 or many images.
+    In atlas_pack() new regions are added automatically and used deleted.
+    Also used as a container for a single image"""
     def __init__(self, x: int, y: int, width: int, height) -> None:
         self.x = x
         self.y = y        
@@ -22,7 +24,7 @@ class Region(object):
 class Atlas(Region):
     def __init__(self, x: int, y: int, width: int, height: int, name: str) -> None:
         super().__init__(x, y, width, height)
-        self.regions = [Region(x, y, width, height)]
+        self.regions = [Region(x, y, width, height)]  # create first default region
         self._textures = []  # Type atlas.Texture
         self.min_width = 1
         self.min_height = 1
@@ -47,6 +49,7 @@ class Atlas(Region):
         atlas.save(filename, optimize=True)
 
     def pack(self, the_texture: tex.Texture) -> bool:
+        """Pack the texture in the atlas in the most convenient region."""
         logging.debug("packing %s (%i %i)" % 
                       (the_texture.filename, the_texture.width_px, the_texture.height_px))
         for the_region in self.regions:
@@ -59,7 +62,8 @@ class Atlas(Region):
                 return True
         return False
 
-    def pack_at(self, the_texture: tex.Texture, x:int, y: int) -> None:
+    def pack_at_coords(self, the_texture: tex.Texture, x:int, y: int) -> None:
+        """Pack the texture in the atlas at specific pixel coordinates."""
         logging.debug("packing %s (%i %i) at (%i %i)" % 
                       (the_texture.filename, the_texture.width_px, the_texture.height_px, x, y))
         the_texture.ax = x
@@ -89,7 +93,8 @@ class Atlas(Region):
                     region1.height_px += region2.height_px
                     self.regions.remove(region2)
 
-    def _pack(self, the_texture, the_region):
+    def _pack(self, the_texture: tex.Texture, the_region: Region) -> bool:
+        """Tries to pack a texture into the given region. Return True if successful."""
         assert(the_texture.height_px > 0)
         assert(the_texture.width_px > 0)
         if the_texture.height_px == the_region.height_px:
