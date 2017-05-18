@@ -6,12 +6,8 @@ TODO: linear deck: limit slope
       limit transverse slope of road
       if h_add too high, continue/insert bridge
 """
-from typing import List
-
 import numpy as np
 import scipy.interpolate
-
-import shapely.geometry as shg
 
 import linear
 import parameters

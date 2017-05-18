@@ -12,13 +12,13 @@ import pickle
 import subprocess
 import sys
 import textwrap
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 import unittest
 
 import numpy as np
 
 import parameters
-from utils import coordinates
+from utils import coordinates, osmparser
 import utils.vec2d as ve
 
 
@@ -97,6 +97,46 @@ def replace_with_os_separator(path: str) -> str:
     my_string = path.replace("/", os.sep)
     my_string = my_string.replace("\\", os.sep)
     return my_string
+
+
+def match_local_coords_with_global_nodes(local_list: List[Tuple[float, float]], ref_list: List[int],
+                                         all_nodes: Dict[int, osmparser.Node],
+                                         coords_transform: coordinates.Transformation, osm_id: int,
+                                         create_node: bool=False) -> List[int]:
+    """Given a set of coordinates in local space find matching Node objects in global space.
+    Matching is using a bit of tolerance (cf. parameter), which should be enough to account for conversion precision
+    resp. float precision.
+    If a node cannot be matched: if parameter create_node is False, then a ValueError is thrown - else a new
+    Node is created and added to the all_nodes dict.
+    """
+    matched_nodes = list()
+    nodes_local = dict()  # key is osm_id from Node, value is Tuple[float, float]
+    for ref in ref_list:
+        node = all_nodes[ref]
+        nodes_local[node.osm_id] = coords_transform.toLocal((node.lon, node.lat))
+
+    for local in local_list:
+        closest_distance = 999999
+        found_key = -1
+        for key, node_local in nodes_local.items():
+            distance = coordinates.calc_distance_local(local[0], local[1], node_local[0], node_local[1])
+            if distance < closest_distance:
+                closest_distance = distance
+            if distance < parameters.BUILDING_TOLERANCE_MATCH_NODE:
+                found_key = key
+                break
+        if found_key < 0:
+            if create_node:
+                lon, lat = coords_transform.toGlobal(local)
+                new_node = osmparser.Node(osmparser.get_next_pseudo_osm_id(), lat, lon)
+                all_nodes[new_node.osm_id] = new_node
+                matched_nodes.append(new_node.osm_id)
+            else:
+                raise ValueError('No match for pseudo_parent with osm_id = %d. Closest: %f' % (osm_id, closest_distance))
+        else:
+            matched_nodes.append(found_key)
+
+    return matched_nodes
 
 
 def write_one_gp(b, filename):

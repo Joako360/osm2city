@@ -361,7 +361,7 @@ def _process_lonely_building_parts(nodes_dict: Dict[int, osmparser.Node], ways_d
                         try:
                             if isinstance(a_geometry, shg.Polygon) and a_geometry.is_valid:
                                 coords_list = list(a_geometry.exterior.coords)
-                                new_refs = _match_local_coords_with_global_nodes(
+                                new_refs = utilities.match_local_coords_with_global_nodes(
                                     coords_list, pp_refs + b_part.refs, nodes_dict,
                                     coords_transform, pseudo_parent.osm_id)
                                 pseudo_parent.update_geometry(a_geometry.exterior, refs=new_refs)
@@ -375,7 +375,7 @@ def _process_lonely_building_parts(nodes_dict: Dict[int, osmparser.Node], ways_d
                                         if isinstance(my_poly, shg.Polygon) and my_poly.is_valid:
                                             if my_poly.area > parameters.BUILDING_MIN_AREA:
                                                 coords_list = list(my_poly.exterior.coords)
-                                                new_refs = _match_local_coords_with_global_nodes(
+                                                new_refs = utilities.match_local_coords_with_global_nodes(
                                                     coords_list, pp_refs + b_part.refs, nodes_dict,
                                                     coords_transform, pseudo_parent.osm_id)
                                                 found_pseudo_parents += 1
@@ -411,38 +411,6 @@ def _process_lonely_building_parts(nodes_dict: Dict[int, osmparser.Node], ways_d
     logging.info('Processed valid build:part objects: %d', len(valid_parts))
     logging.info('Parts: %s', str(valid_parts))
     logging.info('Number of found building:part objects within buildings outside of relation: %d', found_pseudo_parents)
-
-
-def _match_local_coords_with_global_nodes(local_list: List[Tuple[float, float]], ref_list: List[osmparser.Node],
-                                          all_nodes: Dict[int, osmparser.Node],
-                                          coords_transform: coordinates.Transformation, osm_id: int) -> List[int]:
-    """Given a set of coordinates in local space find matching Node objects in global space.
-    Matching is using a bit of tolerance (0.1 meters), which should be enough to account for conversion precision
-    resp. float precision.
-    If a node cannot be matched, then a ValueError is thrown
-    """
-    matched_nodes = list()
-    nodes_local = dict()  # key is osm_id from Node, value is Tuple[float, float]
-    for ref in ref_list:
-        node = all_nodes[ref]
-        nodes_local[node.osm_id] = coords_transform.toLocal((node.lon, node.lat))
-
-    for local in local_list:
-        closest_distance = 999999
-        found_key = -1
-        for key, node_local in nodes_local.items():
-            distance = coordinates.calc_distance_local(local[0], local[1], node_local[0], node_local[1])
-            if distance < closest_distance:
-                closest_distance = distance
-            if distance < parameters.BUILDING_TOLERANCE_MATCH_NODE:
-                found_key = key
-                break
-        if found_key < 0:
-            raise ValueError('No match for pseudo_parent with osm_id = %d. Closest: %f' % (osm_id, closest_distance))
-        else:
-            matched_nodes.append(found_key)
-
-    return matched_nodes
 
 
 def _process_osm_building(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int, osmparser.Way],

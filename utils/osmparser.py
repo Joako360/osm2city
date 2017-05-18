@@ -66,6 +66,8 @@ class Node(OSMElement):
         OSMElement.__init__(self, osm_id)
         self.lat = lat  # float value
         self.lon = lon  # float value
+        self.MSL = None
+        self.h_add = None
 
 
 class Way(OSMElement):

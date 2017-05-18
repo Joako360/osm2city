@@ -13,7 +13,6 @@ import textures.road
 from utils.utilities import FGElev
 from utils.vec2d import Vec2d
 import utils.ac3d
-from utils import osmparser
 
 
 def probe_ground(fg_elev: FGElev, line_string):
@@ -467,9 +466,9 @@ class LinearObject(object):
                 left_ground_nodes = self.write_nodes(obj, self.edge[0], left_ground_z, elev_offset, offset=offset)
                 right_ground_nodes = self.write_nodes(obj, self.edge[1], right_ground_z, elev_offset, offset=offset)
                 self.write_quads(obj, left_ground_nodes, left_nodes_list, parameters.EMBANKMENT_TEXTURE[0],
-                                 parameters.EMBANKMENT_TEXTURE[1], None)
+                                 parameters.EMBANKMENT_TEXTURE[1], utils.ac3d.MAT_IDX_UNLIT)
                 self.write_quads(obj, right_nodes_list, right_ground_nodes, parameters.EMBANKMENT_TEXTURE[0],
-                                 parameters.EMBANKMENT_TEXTURE[1], None)
+                                 parameters.EMBANKMENT_TEXTURE[1], utils.ac3d.MAT_IDX_UNLIT)
 
         return True
         # options:

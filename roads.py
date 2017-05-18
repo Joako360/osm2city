@@ -184,8 +184,8 @@ def _init_way_from_existing(way: osmparser.Way, node_references: List[int]) -> o
     """Return copy of way. The copy will have same osm_id and tags, but only given refs"""
     new_way = osmparser.Way(way.osm_id)
     new_way.pseudo_osm_id = osmparser.get_next_pseudo_osm_id()
-    new_way.tags = way.tags
-    new_way.refs.extend(node_references)
+    new_way.tags = way.tags.copy()
+    new_way.refs = node_references
     return new_way
 
 
@@ -499,44 +499,101 @@ class Roads(object):
 
         self.ways_list.extend(new_ways)
 
-    def _check_lighting(self, built_up_areas) -> None:
+    def _check_lighting(self, built_up_areas: List[shg.Polygon]) -> None:
         """Checks ways for lighting and maybe splits at borders for built-up areas."""
-        new_ways = list()
+        way_bua_map = dict()  # key: way, value built_up_area from split -> prevent re-check of mini-residuals
+        new_ways_1 = self._check_lighting_inner(self.ways_list, built_up_areas, way_bua_map)
+        self.ways_list.extend(new_ways_1)
+        new_ways_2 = self._check_lighting_inner(new_ways_1, built_up_areas, way_bua_map)
+        self.ways_list.extend(new_ways_2)
+        # Looping again might get even better splits, but is quite costly for the gained extra effect.
+        # now replace 'gen' with 'yes'
         for way in self.ways_list:
+            if 'lit' in way.tags and way.tags['lit'] == 'gen':
+                way.tags['lit'] = 'yes'
+
+    def _check_lighting_inner(self, ways_list: List[osmparser.Way], built_up_areas: List[shg.Polygon],
+                              way_bua_map: Dict[osmparser.Way, shg.Polygon]) -> List[osmparser.Way]:
+        """Inner method for _check_lighting doing the actual checking. New split ways are outcome of method.
+        However all ways by reference get updated tags. This method exists such that new ways can be checked again
+        against other built-up areas.
+        Using 'gen' instead of 'yes' for lit, because else it would be excluded from furhter processing by first
+        check in loop."""
+        new_ways = list()
+        non_highway = 0
+        orig_lit_ways = 0  # where the tag was set in OSM
+        gen_lit_ways = 0  # where the tag is from this processing
+        for way in ways_list:
             if not _is_highway(way):
+                non_highway += 1
                 continue
             if 'lit' in way.tags and way.tags['lit'] == 'yes':
+                orig_lit_ways += 1
                 continue  # nothing further to do with this way
             my_line = self._line_string_from_way(way)
-            outside_built_up = True
-            for built_up_area in built_up_areas:
-                if my_line.within(built_up_area) or my_line.touches(built_up_area):
-                    outside_built_up = False
-                    way.tags['lit'] = 'yes'
-                    break
 
-                my_line_difference = my_line.intersection(built_up_area)
+            already_checked_bua = None
+            if way in way_bua_map:
+                already_checked_bua = way_bua_map[way]
+
+            for built_up_area in built_up_areas:
+                if built_up_area is already_checked_bua:
+                    continue
+                if my_line.within(built_up_area):
+                    way.tags['lit'] = 'gen'
+                    gen_lit_ways += 1
+                    break  # it cannot be in more than one built_up area at a time
+
+                if my_line.touches(built_up_area):
+                    continue
+                if my_line.disjoint(built_up_area):
+                    continue
+                # now we know, that it actually intersects
+                my_line_difference = my_line.difference(built_up_area)
                 if my_line_difference is None:
                     continue
                 if isinstance(my_line_difference, shg.GeometryCollection) and my_line_difference.is_empty:
                     continue
+                # it is a valid intersection
+                original_refs = way.refs.copy()
 
-                # it is a valid intersectiio
-                outside_built_up = False
-                way.tags['lit'] = 'yes'
-                break
+                # difference means we are outside of the built_up_area polygon and therefore by default not lit
+                if isinstance(my_line_difference, shg.LineString):
+                    # check whether it is worth it - has also influence on intersection due to break/continue
+                    if my_line_difference.length < parameters.BUILT_UP_AREA_LIT_BUFFER:  # nearly totally inside
+                        way.tags['lit'] = 'gen'
+                        gen_lit_ways += 1
+                        break  # it cannot be in more than one built_up area at a time
+                    elif my_line.length - my_line_difference.length < parameters.BUILT_UP_AREA_LIT_BUFFER:
+                        continue  # nearly totally outside
 
-                #my_line_difference = my_line.difference(blocked_area)
-                #if isinstance(my_line_difference, shg.LineString):
-                #    self._change_way_for_object(my_line_difference, way)
-                #    continue
-                #if isinstance(my_line_difference, shg.MultiLineString) and my_line_difference.geoms == 2:
-                #    new_ways.append(self._split_way_for_object(my_line_difference, way))
+                    # so we are neither nearly totally outside or nearly totally inside
+                    # ergo this is the outside part
+                    new_refs = utilities.match_local_coords_with_global_nodes(list(my_line_difference.coords),
+                                                                              original_refs, self.nodes_dict,
+                                                                              self.transform, way.osm_id, True)
+                    way.refs = new_refs  # keep current way and just update references
+                    way.tags['lit'] = 'no'
 
-            if outside_built_up:
-                way.tags['lit'] = 'no'
+                    # now the opposite
+                    my_line_intersection = my_line.intersection(built_up_area)
+                    if isinstance(my_line_intersection, shg.LineString):
+                        new_refs = utilities.match_local_coords_with_global_nodes(list(my_line_intersection.coords),
+                                                                                  original_refs, self.nodes_dict,
+                                                                                  self.transform, way.osm_id, True)
+                        new_way = _init_way_from_existing(way, new_refs)
+                        new_way.tags['lit'] = 'gen'
+                        gen_lit_ways += 1
+                        new_ways.append(new_way)
+                        way_bua_map[new_way] = built_up_area
+                    else:
+                        pass  # should not be possible to happen, when the difference is a LineString, but it happens
+                    my_line = self._line_string_from_way(way)  # new to re-calculate the line_string for next pass
+                # FIXME: also handle MultilineString - however would add more code and processing time for little gain
+        logging.info('Originally lit streets: {} - generated lit streets {}'.format(orig_lit_ways, gen_lit_ways))
+        logging.info('Added {} new streets to existing {} streets'.format(len(new_ways), len(ways_list)))
 
-        self.ways_list.extend(new_ways)
+        return new_ways
 
     def _change_way_for_object(self, my_line: shg.LineString, original_way: osmparser.Way) -> None:
         """Processes an original way and replaces its coordinates with the coordinates of a LineString."""
