@@ -13,7 +13,6 @@ from typing import List, Dict
 import myskeleton
 import numpy as np
 import shapely.geometry as shg
-from shapely.geometry.base import BaseGeometry
 from shapely.geos import TopologicalError
 
 import parameters

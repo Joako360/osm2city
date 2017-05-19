@@ -3,7 +3,7 @@ import os
 from PIL import Image
 import random
 import re
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 
@@ -420,7 +420,8 @@ class RoofManager(object):
 
 
 class FacadeManager(RoofManager):
-    def find_matching_facade(self, requires, tags, height, width, stats: Stats=None):
+    def find_matching_facade(self, requires: List[str], tags: Dict[str, str], height: float, width: float,
+                             stats: Stats=None) -> Optional[Texture]:
         exclusions = []
         if 'roof:colour' in tags:
             exclusions.append("%s:%s" % ('roof:colour', tags['roof:colour']))
@@ -443,7 +444,8 @@ class FacadeManager(RoofManager):
             stats.count_texture(the_texture)
         return the_texture
 
-    def find_facade_candidates(self, requires, excludes, height, width):
+    def find_facade_candidates(self, requires: List[str], excludes: List[str], height: float, width: float)\
+            -> List[Texture]:
         candidates = RoofManager.find_candidates(self, requires, excludes)
         # -- check height
         new_candidates = []
