@@ -7,9 +7,9 @@ import textures.texture as tex
 
 
 class Region(object):
-    """The atlas is composed of small slots of containers for images. There can be 1 or many images.
+    """The atlas is composed of small slots of containers for images. There can be 1 or many images in a region.
     In atlas_pack() new regions are added automatically and used deleted.
-    Also used as a container for a single image"""
+    """
     def __init__(self, x: int, y: int, width: int, height) -> None:
         self.x = x
         self.y = y        
@@ -18,10 +18,14 @@ class Region(object):
         logging.debug("  New Region " + str(self))
 
     def __str__(self):
-        return "(%i x %i + %i + %i)" % (self.width_px, self.height_px, self.x, self.y)
+        return "(x:%i y:%i - w:%i h:%i @ id: %s)" % (self.x, self.y, self.width_px, self.height_px, str(id(self)))
 
 
 class Atlas(Region):
+    """The atlas has all textures in a set of regions. Once a region has been filled up with textures, it is removed
+    and a new one  created.
+    An atlas can have many bands/lanes of regions. If one band is filled up in height and there is still an extra
+    band available, then new regions are created in the new band. Bands/lanes are distributed over x."""
     def __init__(self, x: int, y: int, width: int, height: int, name: str) -> None:
         super().__init__(x, y, width, height)
         self.regions = [Region(x, y, width, height)]  # create first default region
@@ -29,7 +33,7 @@ class Atlas(Region):
         self.min_width = 1
         self.min_height = 1
         self.name = name
-        
+
     def cur_height(self):
         """return the current height"""
         return self.regions[-1].y

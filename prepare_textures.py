@@ -43,9 +43,8 @@ specials = None  # SpecialManager
 # Hard-coded constants for the texture atlas. If they are changed, then maybe all sceneries in Terrasync need
 # to be recreated -> therefore not configurable. Numbers are in pixels (need to be factor 2).
 ATLAS_ROOFS_START = 0
-ATLAS_FACADES_START = 16384
-ATLAS_SPECIALS_START = 65536
-ATLAS_HEIGHT = 131072
+ATLAS_FACADES_START = 18 * 256
+ATLAS_HEIGHT = 64 * 256  # 16384
 ATLAS_WIDTH = 256
 
 
@@ -66,9 +65,6 @@ def _make_texture_atlas(roofs_list: List[Texture], facades_list: List[Texture], 
     # reduce the available region based on roof slot
     the_atlas.regions = [atlas.Region(0, ATLAS_FACADES_START, ATLAS_WIDTH, ATLAS_HEIGHT - ATLAS_FACADES_START)]
     _make_per_texture_type(facades_list, the_atlas, pad_y)
-    # reduce the available region based on facades slot
-    the_atlas.regions = [atlas.Region(0, ATLAS_SPECIALS_START, ATLAS_WIDTH, ATLAS_HEIGHT - ATLAS_SPECIALS_START)]
-    _make_per_texture_type(specials_list, the_atlas, pad_y)
 
     the_atlas.compute_nondim_tex_coords()
     the_atlas.write(atlas_filename + ext, 'im')
@@ -78,8 +74,6 @@ def _make_texture_atlas(roofs_list: List[Texture], facades_list: List[Texture], 
     for tex in roofs_list:
         light_map_atlas.pack_at_coords(tex, tex.ax, tex.ay)
     for tex in facades_list:
-        light_map_atlas.pack_at_coords(tex, tex.ax, tex.ay)
-    for tex in specials_list:
         light_map_atlas.pack_at_coords(tex, tex.ax, tex.ay)
     light_map_atlas.write(atlas_filename + '_LM' + ext, 'im_LM')
 
@@ -130,7 +124,7 @@ def _make_per_texture_type(texture_list: List[Texture], the_atlas: atlas.Atlas, 
         tex.width_px, tex.height_px = tex.im.size
 
         if not the_atlas.pack(tex):
-            logging.info("Failed to pack" + str(tex))
+            raise ValueError("No more space left and therefore failed to pack: %s" % str(tex))
     atlas_sy = the_atlas.cur_height()
 
     # Work on repeatable textures.
@@ -180,7 +174,8 @@ def _make_per_texture_type(texture_list: List[Texture], the_atlas: atlas.Atlas, 
 
         next_y += tex.height_px + pad_y
         if not the_atlas.pack(tex):
-            logging.info("Failed to pack" + str(tex))
+            #logging.debug("No more space left and therefore failed to pack: %s", str(tex))
+            raise ValueError("No more space left and therefore failed to pack: %s" % str(tex))
 
 
 def _check_missed_input_textures(tex_prefix: str, registered_textures: List[Texture]) -> None:
