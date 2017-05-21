@@ -37,25 +37,25 @@ The following shows a directory structure, which one of the developers is using 
             osm2city-data/
             ...
         fg_customscenery/
-            LSZS/
-                Objects/
-                    e000n0040/
-                        e009n46/
+            KBOS/
+                Buildings/
+                    w080n40/
+                        w071n42/
                             3105315.btg
-                            LSZScity0418.ac
-                            LSZScity0418.xml
+                            w080n40_w071n42_1794312city00000.ac
                             ...
-            LSMM/
-                Objects/
+                Pylons/
+                    ...
+                Roads/
+                    ...
+            LSME/
+                Buildings/
                     ...
             projects/
-                LSZS/
-                    lszs_narrow.osm
+                KBOS/
+                    kbos_narrow.osm          (not needed it database is used)
                     params.ini
-                    elev.in                  (not always present)
-                    elev.out                 (not always present)
-                    elev.pkl                 (not always present)
-                LSMM/
+                LSME/
                     ...
 
 
@@ -65,9 +65,9 @@ The directory ``flightgear`` contains folder ``fgfs_terrasync``. This is where y
 
 The directory ``development`` contains the ``osm2city`` programs and data after installation as explained in :ref:`Installation <chapter-parameters-label>`.
 
-In the example directory structure above the directory ``fg_customscenery`` hosts the input and output information — here two sceneries for airports LSZS and LSMM (however there is no need to structure sceneries by airports). The output of ``osm2city`` scenery generation goes into e.g. ``fg_customscenery/LSZS`` while the input to the scenery generation is situated in e.g. ``fg_customscenery/projects/LSZS`` (how to get the input files in this folder is discussed in the following chapters).
+In the example directory structure above the directory ``fg_customscenery`` hosts the input and output information — here two sceneries for airports KBOS and LSME (however there is no need to structure sceneries by airports). The output of ``osm2city`` scenery generation goes into e.g. ``fg_customscenery/KBOS`` while the input to the scenery generation is situated in e.g. ``fg_customscenery/projects/KBOS`` (how to get the input files in this folder is discussed in the following chapters).
 
-The directory structure in the output folders (e.g. ``fg_customscenery/LSZS``) is created by ``osm2city`` related programs, i.e. you do not need to create it manually.
+The directory structure in the output folders (e.g. ``fg_customscenery/KBOS``) is created by ``osm2city`` related programs, i.e. you do not need to create it manually.
 
 The directory ``.../fg_customscenery/projects`` will be called ``WORKING_DIRECTORY`` in the following. This is important because ``osm2city`` related programs will have assumptions about this.
 
@@ -80,7 +80,7 @@ Getting OpenStreetMap Data
 
 The OpenStreetMap Wiki has comprehensive information_ about how to get OSM data. An easy way to start is using Geofabrik's extracts (http://download.geofabrik.de/).
 
-Be aware that ``osm2city`` only accepts OSM data in xml-format, i.e. ``*.osm`` files. Therefore you might need to translate data from the binary ``*.pbf`` format using e.g. Osmosis_. It is highly recommend to limit the area covered as much as possible: it leads to faster processing and it is easier to experiment with smaller areas until you found suitable parameters. If you use Osmosis to cut the area with ``--bounding-box``, then you need to use ``completeWays=yes`` [#]_. E.g. on Windows it could look as follows:
+Unless you are using a PostGIS database as input, then be aware that ``osm2city`` only accepts OSM data in xml-format, i.e. ``*.osm`` files. Therefore you might need to translate data from the binary ``*.pbf`` format using e.g. Osmosis_. It is highly recommend to limit the area covered as much as possible: it leads to faster processing and it is easier to experiment with smaller areas until you found suitable parameters. If you use Osmosis to cut the area with ``--bounding-box``, then you need to use ``completeWays=yes`` [#]_. E.g. on Windows it could look as follows:
 
 ::
 
@@ -90,6 +90,8 @@ Be aware that ``osm2city`` only accepts OSM data in xml-format, i.e. ``*.osm`` f
 The exception to the requirement of using OSM data in xml-format is if you use batch processing with the optional ``-d`` command line argument (see :ref:`Calling build_tiles.py <chapter-build-tiles-label>`). In that situation you might want to consider using the pbf-format_.
 
 Please be aware of the `Tile Index Schema`_ in FlightGear. It is advised to set boundaries, which do not cross tiles. Otherwise the scenery objects can jitter and disappear / re-appear due to the clusters of facades crossing tiles. Another reason to keep within boundaries is the sheer amount of data that needs to be kept in memory.
+
+E.g. Switzerland is around 46 degrees of latitude, therefore the boundary can be set in increments of 0.125 degrees of latitude and 0.25 degrees of longitude. Smaller works fine. If you are using the recommended approach of :ref:`batch processing <chapter-batch-mode>`, then these details will be taken care of for you automatically.
 
 .. _information: http://wiki.openstreetmap.org/wiki/Downloading_data
 .. _Osmosis: http://wiki.openstreetmap.org/wiki/Osmosis
@@ -103,7 +105,7 @@ Please be aware of the `Tile Index Schema`_ in FlightGear. It is advised to set 
 Setting a Minimal Set of Parameters
 ===================================
 
-``osm2city`` has a large amount of parameters, by which the generation of scenery objects based on OSM data can be influenced. Chapter :ref:`Parameters <chapter-parameters-label>` has detailed information about all these parameters. However to get started only a few parameters must be specified — actually it is generally recommended only to specify those parameters, which need to get a different value from the default values, so as to have a better understanding for which parameters you have taken an active decision.
+``osm2city`` has a large amount of parameters, by which the generation of scenery objects based on OSM data can be influenced. Chapter :ref:`Parameters <chapter-parameters-label>` has detailed information about the most important of these parameters[#]_. However to get started only a few parameters must be specified — actually it is generally recommended only to specify those parameters, which need to get a different value from the default values, so as to have a better understanding for which parameters you have taken an active decision.
 
 Create a ``params.ini`` file with your favorite text editor. In our example it would get stored in ``fg_customscenery/projects/LSZS`` and the minimal content could be as follows:
 
@@ -134,15 +136,15 @@ PATH_TO_SCENERY
     likely you'll want to use your TerraSync path here.
 
 PATH_TO_OUTPUT
-    The generated scenery (.stg, .ac, .xml) will be written to this path — specified without trailing slash. If empty then the correct location in PATH_TO_SCENERY is used. Note that if you use TerraSync for PATH_TO_SCENERY, you MUST choose a different path here. Otherwise, TerraSync will overwrite the generated scenery. Unless you know what you are doing, there is no reason not to specify a dedicated path here. While not absolutely needed it is good practice to name the output folder the same as ``PREFIX``.
+    The generated scenery files (.stg, .ac) will be written to this path — specified without trailing slash. If empty then the correct location in PATH_TO_SCENERY is used. Note that if you use TerraSync for PATH_TO_SCENERY, you MUST choose a different path here. Otherwise, TerraSync will overwrite the generated scenery. Unless you know what you are doing, there is no reason not to specify a dedicated path here. While not absolutely needed, it is good practice to name the output folder the same as ``PREFIX``.
 OSM_FILE
-    The file containing OpenStreetMap data. See previous chapter :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>`. The file should reside in $PREFIX and no path components are allowed (i.e. pure file name).
+    The file containing OpenStreetMap data. See previous chapter :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>`. The file should reside in $PREFIX and no path components are allowed (i.e. pure file name). If you have your data in PostGIS, then instead you need to specify the :ref:`database parameters <chapter-parameters-database>`.
 BOUNDARY_*
-    The longitude and latitude of the boundaries of the generated scenery. The boundaries should correspond to the boundaries in the ``OSM_FILE`` (open the \*.osm file in a text editor and check the data in ca. line 3). The boundaries can be different, but then you might either miss data (if the OSM boundaries are larger) or do more processing than necessary (if the OSM boundaries are more narrow).
+    The longitude and latitude of the boundaries of the generated scenery. The boundaries should correspond to the boundaries in the ``OSM_FILE`` (open the \*.osm file in a text editor and check the data in ca. line 3) respectively the data in PostGIS. The boundaries can be different, but then you might either miss data (if the OSM boundaries are larger) or do more processing than necessary (if the OSM boundaries are more narrow and you use a fiel based approach — not an issue when using a database).
 NO_ELEV
     Set this to ``False``. The only reason to set this to ``True`` would be for developers to check generated scenery objects a bit faster not caring about the vertical position in the scenery.
 FG_ELEV
-    Set parameter ``FG_ELEV`` to point to the full path of the fgelev executable. On Linux it could be something like ``FG_ELEV = '/home/pingu/bin/fgfs_git/next/install/flightgear/bin/fgelev'``. On Windows you might have to put quotes around the path due to whitespace e.g. ``FG_ELEV = '"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'``.
+    Set parameter ``FG_ELEV`` to point to the full path of the fgelev executable. On Linux it could be something like ``FG_ELEV = '/home/pingu/bin/fgfs_git/next/install/flightgear/bin/fgelev'``. On Windows you might have to put quotes around the path due to whitespace e.g. ``FG_ELEV = '"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'`` (yes, both single and double quotes).
 
 
 .. _chapter-generating-elevation-data-label:
@@ -151,12 +153,12 @@ FG_ELEV
 Generating Elevation Data
 =========================
 
-``osm2city`` uses existing scenery elevation data for two reasons:
+``osm2city`` uses scenery elevation data from the FlightGear sceneries (TerraSync) for two reasons:
 
 * No need to get additional data from elsewhere.
-* The elevation of the generated scenery objects need to be align with the underlying scenery data.
+* The elevation of the generated scenery objects need to be aligned with the underlying scenery data (otherwise houses could hover over the ground or be invisible because below ground level).
 
-This comes at the cost that elevation data must be obtained by "flying" through the scenery, which can be a time consuming process for larger areas — especially if you need a good spatial resolution e.g. in mountain areas like Switzerland. The good part is that you only need to do this once and then only whenever the underlying scenery's elevation data changes (which is quite seldom in the case of scenery from TerraSync_).
+This comes at the cost that elevation data must be obtained by "flying" through the scenery, which can be a time consuming process for larger areas — especially if you need a good spatial resolution e.g. in mountain areas like Switzerland.
 
 Please be aware that the scenery data needed for your area might not have been downloaded yet by TerraSync, e.g. if you have not yet "visited" a specific tile. An easy way to download large areas of data is by using TerraMaster_. If you are exclusively using TerraMaster_ to download data, then make sure that you in TerraMaster also use button "Synchronise shared models".
 
@@ -166,3 +168,4 @@ Please be aware that the scenery data needed for your area might not have been d
 
 
 .. [#] Failing to do so might result in an exception, where the stack trace might contain something like ``KeyError: 1227981870``.
+.. [#] Many parameters are self-explanatory by their name. Otherwise have a look at the comments in parameters.py

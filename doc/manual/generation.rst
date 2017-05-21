@@ -8,7 +8,7 @@ Scenery Generation
 Setting the Working Directory
 =============================
 
-``osm2city`` needs to make some assumption about the absolute paths. Unfortunately there are still some residuals assuming the the information is processed relative to a specific directory (e.g. the root folder of ``osm2city``). Please report if you cannot find generated or copied files (e.g. textures) respectively get file related exceptions.
+``osm2city`` needs to make some assumption about the absolute paths.
 
 It is recommended to make conscious decisions about the :ref:`directory structure <chapter-creating-directory-structure-label>` and choosing the ``WORKING_DIRECTORY`` accordingly.
 
@@ -28,7 +28,9 @@ Therefore before running ``osm2city`` related programs please either:
 Creating the Texture Atlas
 ==========================
 
-In order to be able to use textures for buildings a texture atlas (a structured collection of textures stored in a single image file) needs to be created. As this is a bit of a time consuming task, re-creating a texture atlas should only be done if the contained textures change. That is rarely the case. Also remember that if the texture atlas changes, then also the content has to be copied separately (see :ref:`chapter-copy-textures-label`).
+If you are creating sceneries to be consumed by others using a FG version 2017.2 or later, then please skip this chapter — unless you know what you are doing. Skipping will just use the texture atlas already provided by ``osm2city-data``.
+
+In order to be able to use textures for buildings a texture atlas (a structured collection of textures stored in a single image file) needs to be created. Re-creating a texture atlas should only be done if the contained textures change. That is rarely the case. Also remember that if the texture atlas changes, then also the content has to be copied separately (see :ref:`chapter-copy-textures-label`).
 
 In most situations it is enough to call the following command once and then only if the textures have changed:
 
@@ -85,10 +87,10 @@ Working in Batch Mode
 
 As described in chapter :ref:`Getting OpenStreetMap data <chapter-getting-data-label>` FlightGear works with tiles and scenery objects should not excessively cross tiles boundaries. So in order to cover most of Switzerland you would need to run ``osm2city`` related programs for 4 degrees longitude and 2 degrees latitude. Given the geographic location of Switzerland there are 4 tiles per longitude and 8 tiles per latitude. I.e. a total of 4*2*4*8 = 256 tiles. In order to make this process a bit easier, you can use 2 types of batch modes:
 
-* ``build_tiles.py``, which creates a set of shell scripts and a suitable directory structure
-* ``build_tiles_db``, which works on top of data in a database
+* ``batch_processing/build_tiles.py``, which creates a set of shell scripts and a suitable directory structure
+* ``batch_processing/build_tiles_db.py``, which works on top of data in a database
 
-Working with a database requires additional steps in setting up data in a database, however all subsequent steps require much less work - especially if working across several degrees of latitude or longitude.
+Working with a database requires additional steps in setting up data in a database, however all subsequent steps require much less work - especially if working across several degrees of latitude or longitude. Also ``build_tiles.py`` has more manual steps and has not been actively supported since around autumn 2016.
 
 
 ---------------------------------------------
@@ -105,7 +107,7 @@ Calling the batch process is then pretty easy in just one step:
 
 Mandatory command line arguments:
 
-* -b: the boundary as an underscore delimited string WEST_SOUTH_EAST_NORTH like 9.1_47.0_11_48.8 (use '.' as decimal separator). If the Western longitude is negative (e.g. in Americas), then use an asterisk character (``*``) in front (e.g. -b *-71.25_42.25_-70.75_42.5 for the Boston Logan airport KBOS).
+* -b: the boundary as an underscore delimited string WEST_SOUTH_EAST_NORTH like 9.1_47.0_11_48.8 (use '.' as decimal separator). If the Western longitude is negative (e.g. in Americas), then use an asterisk character (``\*``) in front (e.g. -b \*-71.25_42.25_-70.75_42.5 for the Boston Logan airport KBOS).
 * -f: the relative path to the main params.ini file, which is the template copied to all sub-directories.
 * -p: number of parallel processes (should not be more than the number of cores/CPUs) and might be constrained by memory
 

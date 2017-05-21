@@ -8,7 +8,7 @@ Using Generated Scenery
 Adding to FG_SCENERY Path
 =========================
 
-You need to add the directory containing the ``Objects`` folder (i.e. not the ``Objects`` folder itself) to the paths, where FlightGear searches for scenery. You can to this either through the command line option ``--fg-scenery`` or setting the FG_SCENERY environment variable. This is extensively described in the ``README.scenery`` and the ``getstart.pdf`` [#]_ documents found in $FG_ROOT/Docs as part of your FlightGear installation.
+You need to add the directory containing the ``Buildings``, ``Pylons`` and ``Roads`` folders to the path, where FlightGear searches for scenery. You can to this either through the command line option ``--fg-scenery`` or setting the FG_SCENERY environment variable. This is extensively described in the ``README.scenery`` and the ``getstart.pdf`` [#]_ documents found in $FG_ROOT/Docs as part of your FlightGear installation.
 
 If you followed the :ref:`directory structure <chapter-creating-directory-structure-label>` presented in chapter :ref:`Preparation <chapter-preparation-label>` and we take the example of ``LSZS`` then you would e.g. use the following command line option:
 
@@ -23,19 +23,17 @@ If you followed the :ref:`directory structure <chapter-creating-directory-struct
 Copy Textures, Effects and Other Data
 =====================================
 
-If you are using ``buildings.py`` to generate buildings or ``roads.py`` to generate roads, then you need to have the content of the ``tex`` linked from ``osm2city-data`` copied or linked into all scenery sub-folders, where there are ``*.stg`` files. There are two possibilities:
-
-#. Do it manually. In this case you can choose whether to create links or hard copies. If you want to distribute the generated scenery objects, then you must copy the whole directory. E.g. ``/home/pingu/fg_customscenery/LSZS/Objects/e000n40/e009n46/tex`` in the example used previously.
-#. Use ``copy_data_stuff.py`` to do it automatically. E.g.
+If you are using ``buildings.py`` to generate buildings or ``roads.py`` to generate roads, then you need to have the content of the ``tex`` linked from ``osm2city-data`` copied or linked into all scenery sub-folders, where there are ``*.stg`` files by using ``copy_data_stuff.py`` to do it automatically. E.g.
 
 ::
 
     /usr/bin/python3 /home/pingu/development/osm2city/copy_data_stuff.py -f LSZS/params.ini -t Buildings
 
 
-The mandatory ``-t`` argument is used to write the data to a specific Terrasync folder.
+The mandatory ``-t`` argument is used to write the data to a specific scenery folder.
 
-There is also a third possibility of copying the ``tex`` directory into ``$FG_ROOT``. However you would not be able to distribute the generated scenery objects and it might interfere with other scenery objects using a potentially different texture map.
+* Batch processing does this automatically for you.
+* Sceneries for FG 2017.2 and newer do not need this step anymore.
 
 
 .. _chapter-lod-label:
@@ -46,7 +44,7 @@ Adjusting Visibility of Scenery Objects
 
 The ``osm2city`` related programs and especially ``buildings.py`` are using heuristics and parameters to determine at what level of detail (LOD) scenery objects should be visible. This is done by adding the objects to one of the three FlightGear LOD schemes: "rough" and "detailed".
 
-In ``buildings.py`` you can influence into which of the three LOD ranges the objects are placed by using the following :ref:`Parameters <chapter-parameters-lod-label>`:
+For ``buildings.py`` before creating a scenery you can influence into which of the two LOD ranges the objects are placed by using the following :ref:`Parameters <chapter-parameters-lod-label>`:
 
 * LOD_ALWAYS_DETAIL_BELOW_AREA
 * LOD_ALWAYS_ROUGH_ABOVE_AREA
@@ -54,7 +52,7 @@ In ``buildings.py`` you can influence into which of the three LOD ranges the obj
 * LOD_ALWAYS_DETAIL_BELOW_LEVELS
 * LOD_PERCENTAGE_DETAIL
 
-In FlightGear you can influence the actual distance (in meters) for the respective ranges by one of the following ways:
+In FlightGear as a scenery user you influence the actual distance (in meters) for the respective ranges by one of the following ways:
 
 #. In The FlightGear user interface use menu ``View`` > menu item ``Adjust LOD Ranges`` and then change the values manually.
 #. Include command line options into your fgfsrc_ file or `Properties in FGRun`_ like follows (adjust the values to your needs and depending on your hardware capabilities):
@@ -75,10 +73,13 @@ Disable Urban Shader and Random Buildings
 
 There is no point in having both OSM building scenery objects and dynamically generated buildings in FlightGear. Therefore it is recommended to turn off the random building and urban shader features in FlightGear. Please be aware that this will also affect those areas in FlightGear, where there are no generated scenery objects from OSM.
 
-There are two possibilities to disable random buildings:
+Use the FlightGear menu ``View``, menu item ``Rendering Options``.
 
-#. Use command line option ``--disable-random-buildings`` in your fgfsrc_ file — and while you are at it you might want to consider ``--disable-random-objects``.
-#. Use the FlightGear menu ``View``, menu item ``Rendering Options``. Tick off ``Random buildings`` and ``Random objects``.
+* Scenery layers:
+  * Buildings: Choose ``OpenStreetMap Data`` (i.e. ``Randomly Generated`` is turned off)
+  * Pylons and power lines: not only used for electrical power pylons and cables, but also e.g. wind turbines
+  * Detailed Roads and Railways: draped over the grey roads and railways lines in the default scenery.
+* If you also enable ``Atmospheric Light Scattering (ALS)`` you also get better effects during the night as well as moving cars.
 
 .. image:: fgfs_rendering_options.png
 
@@ -87,13 +88,14 @@ In the same dialog press the ``Shader Options`` button and set the slider for ``
 .. image:: fgfs_shader_options.png
 
 
+
 .. _chapter-hide-urban-textures-label:
 
 =======================================
 Change Materials to Hide Urban Textures
 =======================================
 
-FlightGear allows to change the texture used for a given land-class. More information is available in ``$FG_ROOT/Docs/README.materials`` as well as in the FlightGear Forum thread regarding `New Regional Textures <http://forum.flightgear.org/viewtopic.php?f=5&t=26031>`_. There is not yet a good base texture replacing the urban textures. However many users find it more visually appealing to use a uniform texture like grass under the generated buildings etc. instead of urban textures (because urban textures interfere visually with ways, houses etc.). A drawback of using different textures is the absence of trees — however in many regions of the world there are lot of trees / vegetation in urban areas.
+FlightGear allows to change the texture used for a given land-class. More information is available in ``$FG_ROOT/Docs/README.materials`` as well as in the FlightGear Forum thread regarding `New Regional Textures <http://forum.flightgear.org/viewtopic.php?f=5&t=26031>`_. There is not yet a good base texture replacing the urban textures. However many users find it more visually appealing to use a uniform texture like grass under the generated buildings etc. instead of urban textures (because urban textures interfere visually with ways, houses etc.). A drawback of using different textures is the absence of trees — however in many regions of the world there are lot of trees / vegetation in urban areas. An important drawback is that you will find the texturing missing when flying high over ground (due to level of distance not loading OSM objects) or for stuff far in the distance, where OSM data has not yet been loaded.
 
 E.g. for the airport ``LSZS`` in Engadin in Switzerland you would have to go to ``$FG_ROOT/Materials/regions`` and edit file ``europe.xml`` in a text editor: add name-tags for e.g. ``BuiltUpCover``, ``Urban``, ``Town``, ``SubUrban`` to a material as shown below and comment out the existing name-tags using ``<!-- -->``. Basically all name-tags, which relate to a material using ``<effect>Effects/urban</effect>``. The outcome before and after edit (you need to restart FlightGear in between!) can be seen in the screenshots below (for illustration purposes the buildings and roads do not have textures).
 

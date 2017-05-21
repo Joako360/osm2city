@@ -54,7 +54,6 @@ Do the following:
 #. Add the ``osm2city`` directory to your ``PYTHONPATH`` (see :ref:`below <chapter-set-pythonpath-label>`).
 #. Make sure that you have :ref:`set $FG_ROOT <chapter-set-fgroot-label>`
 
-You might as well check your installation and :ref:`create a texture atlas <chapter-create-texture-atlas>` — doing so makes sure your installation works and you do not run into the problem of having an empty texture atlas.
 
 .. _chapter-set-pythonpath-label:
 
@@ -86,3 +85,22 @@ You might have to restart Windows to be able to read the environment variable th
 `$FG_ROOT`_ is typically a path ending with directories ``data`` or ``fgdata`` (e.g. on Linux it could be ``/home/pingu/bin/fgfs_git/next/install/flightgear/fgdata``).
 
 .. _$FG_ROOT: http://wiki.flightgear.org/$FG_ROOT
+
+
+-----------------------------
+Setting up a PostGIS Database
+-----------------------------
+At the moment using a database instead of reading directly from OSM-files is not yet mandatory. However it is strongly recommended to do so, as most development is done using a database as the data source.
+
+Creating and populating a PostGIS database is described in :ref:`OSM Data in a PostGIS Database<chapter-osm-database-label>`.
+
+
+.. _chapter-helpers-install:
+
+===========
+Other Tools
+===========
+
+You might want to check out Sławek Mikuła's scripts_ for osm2city parsing and generation, which make some of the repetitice manual tasks involved in generating a scenery a bit easier.
+
+.. _scripts: https://github.com/slawekmikula/scripts-osm2city
