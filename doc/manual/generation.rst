@@ -1,8 +1,8 @@
 .. _chapter-generation-label:
 
-##################
-Scenery Generation
-##################
+##############################
+Scenery Generation [Developer]
+##############################
 
 =============================
 Setting the Working Directory
@@ -77,6 +77,25 @@ In most situations you may want to at least provide command line parameter ``-f`
   /usr/bin/python3 /home/pingu/develop_vcs/osm2city/buildings.py -f LSZS/params.ini -l DEBUG
 
 Remember that the paths are relative to the ``WORKING_DIRECTORY``. Alternatively provide the full path to your ``params.ini`` [#]_ file.
+
+
+.. _chapter-copy-textures-label:
+
+=====================================
+Copy Textures, Effects and Other Data
+=====================================
+
+If you are using ``buildings.py`` to generate buildings or ``roads.py`` to generate roads, then you need to have the content of the ``tex`` linked from ``osm2city-data`` copied or linked into all scenery sub-folders, where there are ``*.stg`` files by using ``copy_data_stuff.py`` to do it automatically. E.g.
+
+::
+
+    /usr/bin/python3 /home/pingu/development/osm2city/copy_data_stuff.py -f LSZS/params.ini -t Buildings
+
+
+The mandatory ``-t`` argument is used to write the data to a specific scenery folder.
+
+* Batch processing does this automatically for you.
+* Sceneries for FG 2017.2 and newer do not need this step anymore.
 
 
 .. _chapter-batch-mode:
@@ -195,3 +214,13 @@ If you used argument ``-p`` during generation of the shell / command files, then
 
 
 .. [#] you can name this file whatever you want — "params.ini" is just a convenience / convention.
+
+
+===============================================
+Consider Sharing Your Generated Scenery Objects
+===============================================
+
+Although this guide hopefully helps, not everybody might be able to generate scenery objects wih ``osm2city`` related programs. Therefore please consider sharing your generated scenery objects. You can do so by announcing it in the Sceneries_ part of the FlightGear Forums and linking from the bottom of the ``osm2city`` related Wiki_ article.
+
+.. _Sceneries: http://forum.flightgear.org/viewforum.php?f=5
+.. _Wiki: http://wiki.flightgear.org/Osm2city.py

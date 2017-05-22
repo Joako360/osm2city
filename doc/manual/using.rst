@@ -1,8 +1,19 @@
 .. _chapter-using-label:
 
-#######################
-Using Generated Scenery
-#######################
+##############################
+Using Generated Scenery [User]
+##############################
+
+==========================================
+Finding and Downloading a osm2city Scenery
+==========================================
+
+The FlightGear wiki article `Howto: Install Scenery <http://wiki.flightgear.org/Howto:Install_scenery>`_ has a general overview over installing scenery in FlightGear.
+
+`Areas populated with osm2city scenery <http://wiki.flightgear.org/Areas_populated_with_osm2city_scenery>`_ is the best way currently to find osm2city generated sceneries. That wiki page also list which sceneries can be downloaded in Terrasync and for which FlightGear version. The plan for the future is to have the whole world available in constantly updated versions — however as of spring 2017 this is not yet a reality.
+
+Even though a scenery might be available for download in TerraSync, you might want to download offline by using a tool like `TerraMaster <http://wiki.flightgear.org/TerraMaster>`_ or `terrasync.py <http://wiki.flightgear.org/TerraSync#terrasync.py>`_, because the volume of data can be quite comprehensive — the faster you fly and the slower your internet connection, the rougher the experience will be.
+
 
 =========================
 Adding to FG_SCENERY Path
@@ -17,24 +28,7 @@ If you followed the :ref:`directory structure <chapter-creating-directory-struct
     --fg-scenery=/home/pingu/fg_customscenery/LSZS
 
 
-.. _chapter-copy-textures-label:
-
-=====================================
-Copy Textures, Effects and Other Data
-=====================================
-
-If you are using ``buildings.py`` to generate buildings or ``roads.py`` to generate roads, then you need to have the content of the ``tex`` linked from ``osm2city-data`` copied or linked into all scenery sub-folders, where there are ``*.stg`` files by using ``copy_data_stuff.py`` to do it automatically. E.g.
-
-::
-
-    /usr/bin/python3 /home/pingu/development/osm2city/copy_data_stuff.py -f LSZS/params.ini -t Buildings
-
-
-The mandatory ``-t`` argument is used to write the data to a specific scenery folder.
-
-* Batch processing does this automatically for you.
-* Sceneries for FG 2017.2 and newer do not need this step anymore.
-
+.. [#] As of November 2016: chapters 3.1 and 4.2.2
 
 .. _chapter-lod-label:
 
@@ -134,16 +128,3 @@ Depending on your region and your shader settings you might want to search for e
 
 
 .. _ALS: http://wiki.flightgear.org/Atmospheric_light_scattering
-
-
-===============================================
-Consider Sharing Your Generated Scenery Objects
-===============================================
-
-Although this guide hopefully helps, not everybody might be able to generate scenery objects wih ``osm2city`` related programs. Therefore please consider sharing your generated scenery objects. You can do so by announcing it in the Sceneries_ part of the FlightGear Forums and linking from the bottom of the ``osm2city`` related Wiki_ article.
-
-.. _Sceneries: http://forum.flightgear.org/viewforum.php?f=5
-.. _Wiki: http://wiki.flightgear.org/Osm2city.py
-
-
-.. [#] As of November 2016: chapters 3.1 and 4.2.2

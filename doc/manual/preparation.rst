@@ -1,8 +1,8 @@
 .. _chapter-preparation-label:
 
-###########
-Preparation
-###########
+#######################
+Preparation [Developer]
+#######################
 
 Before ``osm2city`` related programs can be run to generate FlightGear scenery objects, the following steps need to be done:
 
