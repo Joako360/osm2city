@@ -93,8 +93,6 @@ OVERLAP_CHECK_CONVEX_HULL = False
 OVERLAP_CHECK_CH_BUFFER_STATIC = 0.0
 OVERLAP_CHECK_CH_BUFFER_SHARED = 0.0
 
-# -- Check for overlap with static and shared models. The scenery folder must contain an "Objects" folder
-OVERLAP_CHECK = True
 OVERLAP_CHECK_CONSIDER_SHARED = True
 # when a static bridge model intersect with a way, how much must at least be left so the way is kept after intersection
 OVERLAP_CHECK_BRIDGE_MIN_REMAINING = 10
