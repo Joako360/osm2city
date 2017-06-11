@@ -74,6 +74,7 @@ required graph functions:
 """
 
 import argparse
+from collections import OrderedDict
 import enum
 import logging
 import math
@@ -81,7 +82,8 @@ import multiprocessing as mp
 import os
 import random
 import textwrap
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, MutableMapping, Optional, Tuple
+import unittest
 
 import graph
 import matplotlib.pyplot as plt
@@ -103,6 +105,7 @@ OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 BRIDGE_KEY = 'bridge'  # the original OSM tag key
 MAN_MADE_KEY = 'man_made'
 REPLACED_BRIDGE_KEY = 'replaced_bridge'  # specifies a way that was originally a bridge, but due to length was changed
+LIT = 'lit'
 
 
 def _is_bridge(way: osmparser.Way) -> bool:
@@ -140,6 +143,11 @@ def _is_processed_railway(way):
     return False
 
 
+def is_lit(tags: Dict[str, str]) -> bool:
+    if LIT in tags and tags[LIT] == 'yes':
+        return True
+    return False
+
 def _calc_railway_gauge(way) -> float:
     """Based on railway tags determine the width in meters (3.18 meters for normal gauge)."""
     width = 1435  # millimeters
@@ -156,7 +164,7 @@ def _is_highway(way):
 
 
 def _compatible_ways(way1, way2):
-    """Returns True if both ways are either a railway, a bridge or a highway."""
+    """Returns True if both ways are either a railway, a bridge or a highway - and have common type attributes"""
     logging.debug("trying join %i %i", way1.osm_id, way2.osm_id)
     if osmparser.is_railway(way1) != osmparser.is_railway(way2):
         logging.debug("Nope, either both or none must be railway")
@@ -168,10 +176,16 @@ def _compatible_ways(way1, way2):
         logging.debug("Nope, either both or none must be a highway")
         return False
     elif _is_highway(way1) and _is_highway(way2):
+        # check type
         highway_type1 = highway_type_from_osm_tags(way1.tags["highway"])
         highway_type2 = highway_type_from_osm_tags(way2.tags["highway"])
         if highway_type1 != highway_type2:
             logging.debug("Nope, both must be of same highway type")
+            return False
+        # check lit
+        highway_lit1 = is_lit(way1.tags)
+        highway_lit2 = is_lit(way2.tags)
+        if highway_lit1 != highway_lit2:
             return False
     elif osmparser.is_railway(way1) and osmparser.is_railway(way2):
         if way1.tags['railway'] != way2.tags['railway']:
@@ -339,6 +353,42 @@ def _attached_ways_dict_append(attached_ways_dict, the_ref, the_way, is_first, i
     attached_ways_dict[the_ref].append((the_way, is_first))
 
 
+def cut_line_at_points(line: shg.LineString, points: List[shg.Point]) -> List[shg.LineString]:
+    """Creates a set of new lines based on an existing line and cutting points.
+    E.g. used to cut a line at intersection points with other lines / polygons.
+    See https://stackoverflow.com/questions/34754777/shapely-split-linestrings-at-intersections-with-other-linestrings.
+    """
+    lines = list()
+
+    # First coords of line
+    coords = list(line.coords)
+
+    # Keep list coords where to cut (cuts = 1)
+    cuts = [0] * len(coords)
+    cuts[0] = 1
+    cuts[-1] = 1
+
+    # Add the coords from the points
+    coords += [list(p.coords)[0] for p in points]
+    cuts += [1] * len(points)
+
+    # Calculate the distance along the line for each point
+    dists = [line.project(shg.Point(p)) for p in coords]
+
+    # sort the coords/cuts based on the distances
+    # see http://stackoverflow.com/questions/6618515/sorting-list-based-on-values-from-another-list
+    coords = [p for (d, p) in sorted(zip(dists, coords))]
+    cuts = [p for (d, p) in sorted(zip(dists, cuts))]
+
+    for i in range(len(coords)-1):
+        if cuts[i] == 1:
+            # find next element in cuts == 1 starting from index i + 1
+            j = cuts.index(1, i + 1)
+            lines.append(shg.LineString(coords[i:j+1]))
+
+    return lines
+
+
 class Roads(object):
     def __init__(self, raw_osm_ways: List[osmparser.Way], nodes_dict: Dict[int, osmparser.Node],
                  coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev) -> None:
@@ -501,7 +551,7 @@ class Roads(object):
 
     def _check_lighting(self, built_up_areas: List[shg.Polygon]) -> None:
         """Checks ways for lighting and maybe splits at borders for built-up areas."""
-        way_bua_map = dict()  # key: way, value built_up_area from split -> prevent re-check of mini-residuals
+        way_bua_map = dict()  # key: way, value: list(built_up_area) from split -> prevent re-check of mini-residuals
         new_ways_1 = self._check_lighting_inner(self.ways_list, built_up_areas, way_bua_map)
         self.ways_list.extend(new_ways_1)
         new_ways_2 = self._check_lighting_inner(new_ways_1, built_up_areas, way_bua_map)
@@ -509,91 +559,201 @@ class Roads(object):
         # Looping again might get even better splits, but is quite costly for the gained extra effect.
         # now replace 'gen' with 'yes'
         for way in self.ways_list:
-            if 'lit' in way.tags and way.tags['lit'] == 'gen':
-                way.tags['lit'] = 'yes'
+            if LIT in way.tags and way.tags[LIT] == 'gen':
+                way.tags[LIT] = 'yes'
 
     def _check_lighting_inner(self, ways_list: List[osmparser.Way], built_up_areas: List[shg.Polygon],
                               way_bua_map: Dict[osmparser.Way, shg.Polygon]) -> List[osmparser.Way]:
-        """Inner method for _check_lighting doing the actual checking. New split ways are outcome of method.
+        """Inner method for _check_lighting doing the actual checking. New split ways are the outcome of the method.
         However all ways by reference get updated tags. This method exists such that new ways can be checked again
         against other built-up areas.
-        Using 'gen' instead of 'yes' for lit, because else it would be excluded from furhter processing by first
+        Using 'gen' instead of 'yes' for lit, because else it would be excluded from further processing by first
         check in loop."""
         new_ways = list()
         non_highway = 0
-        orig_lit_ways = 0  # where the tag was set in OSM
-        gen_lit_ways = 0  # where the tag is from this processing
-        for way in ways_list:
+        orig_lit = 0  # where the tag was set in OSM
+        has_intersection = 0
+        total_ways = len(ways_list)
+        for i, way in enumerate(ways_list):
+            if i % 10 == 0:
+                logging.info('{} of {} ways processed for lighting'.format(i, total_ways))
             if not _is_highway(way):
                 non_highway += 1
                 continue
-            if 'lit' in way.tags and way.tags['lit'] == 'yes':
-                orig_lit_ways += 1
+            if is_lit(way.tags):
+                orig_lit += 1
                 continue  # nothing further to do with this way
-            my_line = self._line_string_from_way(way)
 
-            already_checked_bua = None
             if way in way_bua_map:
-                already_checked_bua = way_bua_map[way]
+                already_checked_buas = way_bua_map[way]
+            else:
+                already_checked_buas = list()
+                way_bua_map[way] = already_checked_buas
 
+            way_changed = True
+            my_line = None
             for built_up_area in built_up_areas:
-                if built_up_area is already_checked_bua:
+                if way_changed:
+                    my_line = self._line_string_from_way(way)  # needs to be re-calculated because could change below
+                    way_changed = False
+                if built_up_area in already_checked_buas:
                     continue
+                # do a fast cheap check on intersection
+                ml_bounds = my_line.bounds
+                my_line_box = shg.box(ml_bounds[0], ml_bounds[1], ml_bounds[2], ml_bounds[3])
+                bua_bounds = built_up_area.bounds
+                bua_box = shg.box(bua_bounds[0], bua_bounds[1], bua_bounds[2], bua_bounds[3])
+                if bua_box.disjoint(my_line_box):
+                    continue
+
+                # do more narrow intersection checks
                 if my_line.within(built_up_area):
-                    way.tags['lit'] = 'gen'
-                    gen_lit_ways += 1
+                    way.tags[LIT] = 'gen'
                     break  # it cannot be in more than one built_up area at a time
 
-                if my_line.touches(built_up_area):
-                    continue
-                if my_line.disjoint(built_up_area):
-                    continue
-                # now we know, that it actually intersects
-                my_line_difference = my_line.difference(built_up_area)
-                if my_line_difference is None:
-                    continue
-                if isinstance(my_line_difference, shg.GeometryCollection) and my_line_difference.is_empty:
-                    continue
-                # it is a valid intersection
-                original_refs = way.refs.copy()
+                intersection_points = list()
+                some_geometry = my_line.intersection(built_up_area.exterior)
+                if isinstance(some_geometry, shg.LineString):
+                    continue  # it only touches
+                elif isinstance(some_geometry, shg.Point):
+                    intersection_points.append(some_geometry)
+                elif isinstance(some_geometry, shg.MultiPoint):
+                    for a_point in some_geometry:
+                        intersection_points.append(a_point)
+                elif isinstance(some_geometry, shg.GeometryCollection):
+                    if some_geometry.is_empty:
+                        continue  # disjoint
+                    for a_geom in some_geometry:
+                        if isinstance(a_geom, shg.Point):
+                            intersection_points.append(a_geom)
+                        elif isinstance(a_geom, shg.MultiPoint):
+                            for a_point in a_geom:
+                                intersection_points.append(a_point)
+                        # else nothing to do (we are not interested in a touching LineString
+                if intersection_points:
+                    way_changed = True
+                    has_intersection += 1
+                    cut_ways_dict = self.cut_way_at_intersection_points(intersection_points, way, my_line)
 
-                # difference means we are outside of the built_up_area polygon and therefore by default not lit
-                if isinstance(my_line_difference, shg.LineString):
-                    # check whether it is worth it - has also influence on intersection due to break/continue
-                    if my_line_difference.length < parameters.BUILT_UP_AREA_LIT_BUFFER:  # nearly totally inside
-                        way.tags['lit'] = 'gen'
-                        gen_lit_ways += 1
-                        break  # it cannot be in more than one built_up area at a time
-                    elif my_line.length - my_line_difference.length < parameters.BUILT_UP_AREA_LIT_BUFFER:
-                        continue  # nearly totally outside
+                    # now check whether it is lit or not. Due to rounding errors we do this conservatively
+                    is_new_way = False  # the first item in the dict is the original way by convention
+                    for cut_way, distance in cut_ways_dict.items():
+                        my_point = my_line.interpolate(distance)
+                        if my_point.within(built_up_area):
+                            cut_way.tags[LIT] = 'gen'
+                        else:
+                            cut_way.tags[LIT] = 'no'
+                        already_checked_buas.append(built_up_area)
+                        if is_new_way:
+                            new_ways.append(cut_way)
+                        else:
+                            is_new_way = True  # set at end of (first) loop
 
-                    # so we are neither nearly totally outside or nearly totally inside
-                    # ergo this is the outside part
-                    new_refs = utilities.match_local_coords_with_global_nodes(list(my_line_difference.coords),
-                                                                              original_refs, self.nodes_dict,
-                                                                              self.transform, way.osm_id, True)
-                    way.refs = new_refs  # keep current way and just update references
-                    way.tags['lit'] = 'no'
+            if LIT not in way.tags:
+                way.tags[LIT] = 'no'
 
-                    # now the opposite
-                    my_line_intersection = my_line.intersection(built_up_area)
-                    if isinstance(my_line_intersection, shg.LineString):
-                        new_refs = utilities.match_local_coords_with_global_nodes(list(my_line_intersection.coords),
-                                                                                  original_refs, self.nodes_dict,
-                                                                                  self.transform, way.osm_id, True)
-                        new_way = _init_way_from_existing(way, new_refs)
-                        new_way.tags['lit'] = 'gen'
-                        gen_lit_ways += 1
-                        new_ways.append(new_way)
-                        way_bua_map[new_way] = built_up_area
-                    else:
-                        pass  # should not be possible to happen, when the difference is a LineString, but it happens
-                    my_line = self._line_string_from_way(way)  # new to re-calculate the line_string for next pass
-                # FIXME: also handle MultilineString - however would add more code and processing time for little gain
-        logging.info('Originally lit streets: {} - generated lit streets {}'.format(orig_lit_ways, gen_lit_ways))
-        logging.info('Added {} new streets to existing {} streets'.format(len(new_ways), len(ways_list)))
+        number_lit = 0
+        number_unlit = 0
+        for way in ways_list:
+            if not _is_highway(way):
+                continue
+            if way.tags[LIT] in ['yes', 'gen']:
+                number_lit += 1
+            elif way.tags[LIT] == 'no':
+                number_unlit += 1
+        for way in new_ways:
+            if way.tags[LIT] in ['yes', 'gen']:
+                number_lit += 1
+            elif way.tags[LIT] == 'no':
+                number_unlit += 1
+
+        logging.info('Originally lit {} - generated lit {} - no lit {}'.format(orig_lit, number_lit - orig_lit,
+                                                                               number_unlit))
+        logging.info('Added {} new streets to existing {} highways'.format(len(new_ways), len(ways_list) - non_highway))
+        logging.info('There were {} existing highways with at least 1 intersection'.format(has_intersection))
 
         return new_ways
+
+    def cut_way_at_intersection_points(self, intersection_points: List[shg.Point], way: osmparser.Way,
+                                       my_line: shg.LineString) -> MutableMapping[osmparser.Way, float]:
+        """Cuts an existing way into several parts based in intersection points given as a parameter.
+        Returns an OrderedDict of Ways, where the first element is always the (changed) original way, such
+        that the distance from start to intersection is clear.
+        Cutting also checks that the potential new cut ways have a minimum distance based on 
+        parameters.BUILT_UP_AREA_LIT_BUFFER, such that the splitting is not too tiny. This can lead to that
+        an original way just keeps its original length despite one or several intersection points.
+        Distance in the returned dictionary refers to the last point's distance along the original way, which
+        is e.g. the length of the original way for the last cut way."""
+        original_refs = way.refs[:]
+        intersect_dict = dict()  # osm_id for node, distance from start
+        cut_ways_dict = OrderedDict()  # osm_id for way, distance of end from start of original way
+        # create new global nodes
+        for point in intersection_points:
+            distance = my_line.project(point)
+            lon, lat = self.transform.toGlobal((point.x, point.y))
+            new_node = osmparser.Node(osmparser.get_next_pseudo_osm_id(), lat, lon)
+            self.nodes_dict[new_node.osm_id] = new_node
+            intersect_dict[new_node.osm_id] = distance
+
+        # create lines based on old and new points
+        coords = list(my_line.coords)
+        prev_orig_point_dist = 0
+        is_first = True
+        current_way_refs = list()
+        new_way = None
+        ordered_intersect_dict = OrderedDict(sorted(intersect_dict.items(), key=lambda t: t[1]))
+        for next_index in range(len(coords) - 1):
+            current_way_refs.append(original_refs[next_index])
+            next_orig_point_dist = my_line.project(shg.Point(coords[next_index + 1]))
+            intersects_to_remove = list()  # osm_id
+            for key, distance in ordered_intersect_dict.items():
+                if prev_orig_point_dist < distance < next_orig_point_dist:
+                    intersects_to_remove.append(key)
+                    # check minimal distance of way pieces
+                    if (distance - prev_orig_point_dist) < parameters.BUILT_UP_AREA_LIT_BUFFER:
+                        continue
+                    # make cut
+                    current_way_refs.append(key)
+                    if is_first:
+                        is_first = False
+                        way.refs = current_way_refs.copy()
+                        new_way = way  # needed to have reference for closing last node below
+                    else:
+                        new_way = osmparser.Way(osmparser.get_next_pseudo_osm_id())
+                        new_way.pseudo_osm_id = way.osm_id
+                        new_way.tags = way.tags.copy()
+                        new_way.refs = current_way_refs.copy()
+                    middle_distance = distance - (distance - prev_orig_point_dist) / 2
+                    cut_ways_dict[new_way] = middle_distance
+
+                    # restart current_way_refs with found cut point as new starting
+                    current_way_refs = [key]
+                    prev_orig_point_dist = distance
+
+            # remove not needed intersection points
+            for key in intersects_to_remove:
+                del ordered_intersect_dict[key]
+
+        # close the last node
+        if is_first:  # maybe the intersection points were all below minimal distance -> nothing to do
+            cut_ways_dict[way] = my_line.length / 2
+        else:
+            # check minimal distance of way pieces
+            if (my_line.length - prev_orig_point_dist) < parameters.BUILT_UP_AREA_LIT_BUFFER:
+                # instead of new cut way extend the last cut way, but do not change its middle_distance
+                # last cut_way is still "new_way", because we are not is_first
+                new_way.refs.append(original_refs[-1])
+            else:
+                new_way = osmparser.Way(osmparser.get_next_pseudo_osm_id())
+                new_way.pseudo_osm_id = way.osm_id
+                new_way.tags = way.tags.copy()
+                new_way.refs = current_way_refs.copy()
+                new_way.refs.append(original_refs[-1])
+                cut_ways_dict[new_way] = my_line.length - (my_line.length - prev_orig_point_dist) / 2
+
+        logging.debug('{} new cut ways (not including orig way) from {} intersections'.format(len(cut_ways_dict) - 1,
+                                                                                              len(intersection_points)))
+        return cut_ways_dict
 
     def _change_way_for_object(self, my_line: shg.LineString, original_way: osmparser.Way) -> None:
         """Processes an original way and replaces its coordinates with the coordinates of a LineString."""
@@ -752,9 +912,6 @@ class Roads(object):
 
         for the_way in self.ways_list:
             if _is_highway(the_way):
-                if 'access' in the_way.tags:
-                    if not (the_way.tags['access'] == 'no'):
-                        continue  # do not process small access links
                 highway_type = highway_type_from_osm_tags(the_way.tags['highway'])
                 # in method Roads.store_way smaller highways already got removed
 
@@ -1381,3 +1538,66 @@ if __name__ == "__main__":
     my_fg_elev.close()
 
     logging.info("******* Finished *******")
+
+
+# ================ UNITTESTS =======================
+
+class TestUtilities(unittest.TestCase):
+    def test_cut_way_at_intersection_points(self):
+        raw_osm_ways = list()
+        nodes_dict = dict()
+        my_coords_transform = coordinates.Transformation(parameters.get_center_global())
+        my_fg_elev = utilities.FGElev(my_coords_transform)
+        test_roads = Roads(raw_osm_ways, nodes_dict, my_coords_transform, my_fg_elev)
+
+        msg = 'line with 2 nodes and no intersection points -> 1 way orig'
+        way = osmparser.Way(1)
+        way.refs = [1, 2]
+        way.tags["hello"] = "world"
+        my_line = shg.LineString([(0, 0), (0, 1000)])
+        intersection_points = []
+
+        cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
+        self.assertEqual(1, len(cut_ways_dict), 'number of ways: '+ msg)
+        self.assertEqual(2, len(way.refs), 'references of orig way: ' + msg)
+
+        msg = 'line with 2 nodes and 1 valid intersection point -> 1 way orig shorter, 1 new way'
+        way.refs = [1, 2]
+        intersection_points = [shg.Point(0, 500)]
+        cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
+        self.assertEqual(2, len(cut_ways_dict), 'number of ways: '+ msg)
+        self.assertEqual(2, len(way.refs), 'references of orig way: ' + msg)
+
+        msg = 'line with 3 nodes and one intersection point too short at start -> 1 way orig'
+        way.refs = [1, 2, 3]
+        my_line = shg.LineString([(0, 0), (0, 500), (0, 1000)])
+        intersection_points = [shg.Point(0, parameters.BUILT_UP_AREA_LIT_BUFFER - 1)]
+        cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
+        self.assertEqual(1, len(cut_ways_dict), 'number of ways: '+ msg)
+        self.assertEqual(3, len(way.refs), 'references of orig way: ' + msg)
+
+        msg = 'line with 3 nodes and one intersection point too short at end -> 1 way orig'
+        way.refs = [1, 2, 3]
+        my_line = shg.LineString([(0, 0), (0, 500), (0, 1000)])
+        intersection_points = [shg.Point(0, 1000 - (parameters.BUILT_UP_AREA_LIT_BUFFER - 1))]
+        cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
+        self.assertEqual(1, len(cut_ways_dict), 'number of ways: '+ msg)
+        self.assertEqual(4, len(way.refs), 'references of orig way: ' + msg) # 1 more because intersection point remains
+
+        msg = 'line with 3 nodes and 2 intersection points just after each other -> 1 way orig shorter, 2 new ways'
+        way.refs = [1, 2, 3]
+        my_line = shg.LineString([(0, 0), (0, 500), (0, 1000)])
+        intersection_points = [shg.Point(0, parameters.BUILT_UP_AREA_LIT_BUFFER + 2),
+                               shg.Point(0, 2 * parameters.BUILT_UP_AREA_LIT_BUFFER + 10)]
+        cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
+        self.assertEqual(3, len(cut_ways_dict), 'number of ways: '+ msg)
+        self.assertEqual(2, len(way.refs), 'references of orig way: ' + msg)
+
+        msg = 'line with 6 nodes and two intersection points given in reverse order for distance -> 1 & 2 new ways'
+        way.refs = [1, 2, 3, 4, 5, 6]
+        my_line = shg.LineString([(0, 0), (0, 300), (0, 500), (0, 600), (0, 900), (0, 1000)])
+        intersection_points = [shg.Point(0, 700),
+                               shg.Point(0, 400)]
+        cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
+        self.assertEqual(3, len(cut_ways_dict), 'number of ways: '+ msg)
+        self.assertEqual(3, len(way.refs), 'references of orig way: ' + msg)
