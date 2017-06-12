@@ -599,11 +599,7 @@ class Roads(object):
                 if built_up_area in already_checked_buas:
                     continue
                 # do a fast cheap check on intersection
-                ml_bounds = my_line.bounds
-                my_line_box = shg.box(ml_bounds[0], ml_bounds[1], ml_bounds[2], ml_bounds[3])
-                bua_bounds = built_up_area.bounds
-                bua_box = shg.box(bua_bounds[0], bua_bounds[1], bua_bounds[2], bua_bounds[3])
-                if bua_box.disjoint(my_line_box):
+                if coordinates.disjoint_bounds(my_line.bounds, built_up_area.bounds):
                     continue
 
                 # do more narrow intersection checks

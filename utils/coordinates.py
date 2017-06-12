@@ -156,6 +156,19 @@ def calc_angle_of_line_global(lon1, lat1, lon2, lat2):
     return angle
 
 
+def disjoint_bounds(bounds_1: Tuple[float, float, float, float], bounds_2: Tuple[float, float, float, float]) -> bool:
+    """Returns True if the two input bounds are disjoint. False otherwise.
+    Bounds are Shapely (minx, miny, maxx, maxy) tuples (float values) that bounds the object -> geom.bounds.
+    """
+    x_overlap = bounds_1[0] <= bounds_2[0] <= bounds_1[2] or bounds_1[0] <= bounds_2[2] <= bounds_1[2] or \
+                bounds_2[0] <= bounds_1[0] <= bounds_2[2] or bounds_2[0] <= bounds_1[2] <= bounds_2[2]
+    y_overlap = bounds_1[1] <= bounds_2[1] <= bounds_1[3] or bounds_1[1] <= bounds_2[3] <= bounds_1[3] or \
+                bounds_2[1] <= bounds_1[1] <= bounds_2[3] or bounds_2[1] <= bounds_1[3] <= bounds_2[3]
+    if x_overlap and y_overlap:
+        return False
+    return True
+
+
 if __name__ == "__main__":
     t = Transformation((0, 0))
     print(t.toLocal((0., 0)))
@@ -197,3 +210,17 @@ class TestCoordinates(unittest.TestCase):
         self.assertAlmostEqual(NAUTICAL_MILES_METERS * 60, calc_distance_global(1, -33, 1, -34), delta=10)
         self.assertAlmostEqual(NAUTICAL_MILES_METERS * 60, calc_distance_global(1, 0, 2, 0), delta=10)
         self.assertAlmostEqual(NAUTICAL_MILES_METERS * 60 * sqrt(2), calc_distance_global(1, 0, 2, 1), delta=10)
+
+    def test_disjoint_bounds(self):
+        bounds_1 = (0, 0, 10, 10)
+        bounds_2 = (2, 2, 8, 8)
+        self.assertFalse(disjoint_bounds(bounds_1, bounds_2), 'Within 1-2')
+        self.assertFalse(disjoint_bounds(bounds_2, bounds_1), 'Within 2-1')
+
+        bounds_2 = (10, 10, 20, 20)
+        self.assertFalse(disjoint_bounds(bounds_1, bounds_2), 'Touch 1-2')
+        self.assertFalse(disjoint_bounds(bounds_2, bounds_1), 'Touch 2-1')
+
+        bounds_2 = (0, 20, 20, 30)
+        self.assertTrue(disjoint_bounds(bounds_1, bounds_2), 'Disjoint 1-2')
+        self.assertTrue(disjoint_bounds(bounds_2, bounds_1), 'Disjoint 2-1')
