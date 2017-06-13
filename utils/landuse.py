@@ -19,8 +19,24 @@ class Landuse(object):
     def __init__(self, osm_id):
         self.osm_id = osm_id
         self.type_ = 0
-        self.polygon = None  # the polygon defining its outer boundary
+        self._polygon = None  # the polygon defining its outer boundary
         self.number_of_buildings = 0  # only set for generated TYPE_NON_OSM land-uses during generation
+        self._bounds = None  # is set when the polygon is set for performance reasons (.bounds makes a new calc)
+
+    @property
+    def bounds(self):
+        if self._bounds is None:
+            raise AttributeError('Trying to get bounds before valid geometry has been added')
+        return self._bounds
+
+    @property
+    def polygon(self):
+        return self._polygon
+
+    @polygon.setter
+    def polygon(self, polygon: shg.Polygon):
+        self._polygon = polygon
+        self._bounds = self._polygon.bounds
 
 
 def process_osm_landuse_refs(nodes_dict: Dict[int, osm.Node], ways_dict: Dict[int, osm.Way],
@@ -56,20 +72,20 @@ def process_osm_landuse_refs(nodes_dict: Dict[int, osm.Node], ways_dict: Dict[in
     return my_landuses
 
 
-def process_osm_landuse_as_areas(nodes_dict, ways_dict, my_coord_transformator: Transformation) -> List[shg.Polygon]:
-    """Just a wrapper around process_osm_landuse_refs(...) to get the list of polygons."""
+def process_osm_landuse_for_lighting(nodes_dict: Dict[int, osm.Node], ways_dict: Dict[int, osm.Way],
+                                     my_coord_transformator: Transformation) -> List[Landuse]:
+    """Wrapper around process_osm_landuse_refs(...) to get landuses with BUILT_UP_AREA_LIT_BUFFER."""
     landuse_refs = process_osm_landuse_refs(nodes_dict, ways_dict, my_coord_transformator)
     if parameters.LU_LANDUSE_GENERATE_LANDUSE:
         building_refs = _process_osm_building_refs(my_coord_transformator)
         generate_landuse_from_buildings(landuse_refs, building_refs)
-    landuse_areas = list()
-    for key, value in landuse_refs.items():
-        landuse_areas.append(value.polygon.buffer(parameters.BUILT_UP_AREA_LIT_BUFFER))
-    return landuse_areas
+    for key, landuse in landuse_refs.items():
+        landuse.polygon = landuse.polygon.buffer(parameters.BUILT_UP_AREA_LIT_BUFFER)
+    return list(landuse_refs.values())
 
 
-def generate_landuse_from_buildings(osm_landuses: Dict[int, Landuse], building_refs: List[shg.Polygon]):
-    """Adds 'missing' land-uses based on building clusters."""
+def generate_landuse_from_buildings(osm_landuses: Dict[int, Landuse], building_refs: List[shg.Polygon]) -> None:
+    """Generates 'missing' land-uses based on building clusters."""
     my_landuse_candidates = dict()
     index = 0
     for my_building in building_refs:
@@ -110,8 +126,6 @@ def generate_landuse_from_buildings(osm_landuses: Dict[int, Landuse], building_r
             osm_landuses[key] = candidate
             added += 1
     logging.info("Candidate land-uses with sufficient area added: %d", added)
-
-    return my_landuse_candidates
 
 
 def _process_osm_building_refs(my_coord_transformator: Transformation) -> List[shg.Polygon]:

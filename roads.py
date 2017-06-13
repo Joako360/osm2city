@@ -88,7 +88,6 @@ import unittest
 import graph
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.interpolate
 import shapely.geometry as shg
 
 import linear
@@ -148,6 +147,7 @@ def is_lit(tags: Dict[str, str]) -> bool:
         return True
     return False
 
+
 def _calc_railway_gauge(way) -> float:
     """Based on railway tags determine the width in meters (3.18 meters for normal gauge)."""
     width = 1435  # millimeters
@@ -163,7 +163,7 @@ def _is_highway(way):
     return "highway" in way.tags
 
 
-def _compatible_ways(way1, way2):
+def _compatible_ways(way1: osmparser.Way, way2: osmparser.Way) -> bool:
     """Returns True if both ways are either a railway, a bridge or a highway - and have common type attributes"""
     logging.debug("trying join %i %i", way1.osm_id, way2.osm_id)
     if osmparser.is_railway(way1) != osmparser.is_railway(way2):
@@ -299,8 +299,8 @@ def max_slope_for_road(obj):
         return parameters.MAX_SLOPE_RAILWAY
 
 
-def _find_junctions(ways_list, degree=2):
-    """
+def _find_junctions(ways_list: List[osmparser.Way]) -> Dict[int, List[Tuple[osmparser.Way, bool]]]:
+    """Finds nodes, which are shared by at least 2 ways.
     N = number of nodes
     find junctions by brute force:
     - for each node, store attached ways in a dict                O(N)
@@ -316,7 +316,7 @@ def _find_junctions(ways_list, degree=2):
         utilities.progress(j, len(ways_list))
         for i, ref in enumerate(the_way.refs):
             try:
-                attached_ways_dict[ref].append((the_way, i == 0))  # store tuple (the_way, is_first)
+                attached_ways_dict[ref].append((the_way, i == 0))  # store tuple (the_way, is_first_node)
                 # -- check if ways are actually distinct before declaring
                 #    an junction?
                 # not an junction if
@@ -328,13 +328,12 @@ def _find_junctions(ways_list, degree=2):
 
     # kick nodes that belong to one way only
     for ref, the_ways in list(attached_ways_dict.items()):
-        if len(the_ways) < degree:
-            # FIXME: join_ways, then return 2 here
+        if len(the_ways) < 2:
             attached_ways_dict.pop(ref)
     return attached_ways_dict
 
 
-def _attached_ways_dict_remove(attached_ways_dict, the_ref, the_way, ignore_missing_ref=False):
+def _attached_ways_dict_remove(attached_ways_dict, the_ref: int, the_way: osmparser.Way, ignore_missing_ref: bool=False):
     """Remove given way from given node in attached_ways_dict"""
     if ignore_missing_ref and the_ref not in attached_ways_dict:
         logging.debug("not removing way from the ref %i because the ref is not in attached_ways_dict", the_ref)
@@ -409,7 +408,7 @@ class Roads(object):
                                                                len(self.railway_list), len(self.bridges_list))
 
     def process(self, blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
-                built_up_areas: List[shg.Polygon], stats: utilities.Stats) -> None:
+                landuses_lit: List[landuse.Landuse], stats: utilities.Stats) -> None:
         """Processes the OSM data until data can be clusterized.
         """
         self._remove_tunnels()
@@ -417,7 +416,7 @@ class Roads(object):
         self._check_ways_in_water()
         self._check_against_blocked_areas(blocked_areas)
         self._check_against_stg_entries(stg_entries)
-        self._check_lighting(built_up_areas)
+        self._check_lighting(landuses_lit)
         self._cleanup_topology()
         self._check_points_on_line_distance()
 
@@ -549,12 +548,12 @@ class Roads(object):
 
         self.ways_list.extend(new_ways)
 
-    def _check_lighting(self, built_up_areas: List[shg.Polygon]) -> None:
+    def _check_lighting(self, landuses_lit: List[landuse.Landuse]) -> None:
         """Checks ways for lighting and maybe splits at borders for built-up areas."""
-        way_bua_map = dict()  # key: way, value: list(built_up_area) from split -> prevent re-check of mini-residuals
-        new_ways_1 = self._check_lighting_inner(self.ways_list, built_up_areas, way_bua_map)
+        way_lul_map = dict()  # key: way, value: list(landuse_lit) from split -> prevent re-check of mini-residuals
+        new_ways_1 = self._check_lighting_inner(self.ways_list, landuses_lit, way_lul_map)
         self.ways_list.extend(new_ways_1)
-        new_ways_2 = self._check_lighting_inner(new_ways_1, built_up_areas, way_bua_map)
+        new_ways_2 = self._check_lighting_inner(new_ways_1, landuses_lit, way_lul_map)
         self.ways_list.extend(new_ways_2)
         # Looping again might get even better splits, but is quite costly for the gained extra effect.
         # now replace 'gen' with 'yes'
@@ -562,8 +561,8 @@ class Roads(object):
             if LIT in way.tags and way.tags[LIT] == 'gen':
                 way.tags[LIT] = 'yes'
 
-    def _check_lighting_inner(self, ways_list: List[osmparser.Way], built_up_areas: List[shg.Polygon],
-                              way_bua_map: Dict[osmparser.Way, shg.Polygon]) -> List[osmparser.Way]:
+    def _check_lighting_inner(self, ways_list: List[osmparser.Way], landuses_lit: List[landuse.Landuse],
+                              way_lul_map: Dict[osmparser.Way, landuse.Landuse]) -> List[osmparser.Way]:
         """Inner method for _check_lighting doing the actual checking. New split ways are the outcome of the method.
         However all ways by reference get updated tags. This method exists such that new ways can be checked again
         against other built-up areas.
@@ -573,10 +572,7 @@ class Roads(object):
         non_highway = 0
         orig_lit = 0  # where the tag was set in OSM
         has_intersection = 0
-        total_ways = len(ways_list)
         for i, way in enumerate(ways_list):
-            if i % 10 == 0:
-                logging.info('{} of {} ways processed for lighting'.format(i, total_ways))
             if not _is_highway(way):
                 non_highway += 1
                 continue
@@ -584,31 +580,34 @@ class Roads(object):
                 orig_lit += 1
                 continue  # nothing further to do with this way
 
-            if way in way_bua_map:
-                already_checked_buas = way_bua_map[way]
+            if way in way_lul_map:
+                already_checked_luls = way_lul_map[way]
             else:
-                already_checked_buas = list()
-                way_bua_map[way] = already_checked_buas
+                already_checked_luls = list()
+                way_lul_map[way] = already_checked_luls
 
             way_changed = True
             my_line = None
-            for built_up_area in built_up_areas:
+            my_line_bounds = None
+            for landuse_lit in landuses_lit:
                 if way_changed:
                     my_line = self._line_string_from_way(way)  # needs to be re-calculated because could change below
+                    my_line_bounds = my_line.bounds
                     way_changed = False
-                if built_up_area in already_checked_buas:
+                if landuse_lit in already_checked_luls:
                     continue
-                # do a fast cheap check on intersection
-                if coordinates.disjoint_bounds(my_line.bounds, built_up_area.bounds):
+                # do a fast cheap check on intersection working with static .bounds (ca. 200 times faster than calling
+                # every time)
+                if coordinates.disjoint_bounds(my_line_bounds, landuse_lit.bounds):
                     continue
 
                 # do more narrow intersection checks
-                if my_line.within(built_up_area):
+                if my_line.within(landuse_lit.polygon):
                     way.tags[LIT] = 'gen'
                     break  # it cannot be in more than one built_up area at a time
 
                 intersection_points = list()
-                some_geometry = my_line.intersection(built_up_area.exterior)
+                some_geometry = my_line.intersection(landuse_lit.polygon.exterior)
                 if isinstance(some_geometry, shg.LineString):
                     continue  # it only touches
                 elif isinstance(some_geometry, shg.Point):
@@ -635,11 +634,11 @@ class Roads(object):
                     is_new_way = False  # the first item in the dict is the original way by convention
                     for cut_way, distance in cut_ways_dict.items():
                         my_point = my_line.interpolate(distance)
-                        if my_point.within(built_up_area):
+                        if my_point.within(landuse_lit.polygon):
                             cut_way.tags[LIT] = 'gen'
                         else:
                             cut_way.tags[LIT] = 'no'
-                        already_checked_buas.append(built_up_area)
+                        already_checked_luls.append(landuse_lit)
                         if is_new_way:
                             new_ways.append(cut_way)
                         else:
@@ -839,7 +838,7 @@ class Roads(object):
     def _cleanup_topology(self):
         """Cleans op the topology for junctions etc."""
         logging.debug("len before %i" % len(self.ways_list))
-        attached_ways_dict = _find_junctions(self.ways_list)
+        attached_ways_dict = _find_junctions(self.ways_list)  # key = node ref, value = List((way, is_first_node))
         self._split_ways_at_inner_junctions(attached_ways_dict)
         self._join_degree2_junctions(attached_ways_dict)
 
@@ -959,17 +958,16 @@ class Roads(object):
 
             self.G.add_edge(obj)
 
-    def _split_ways_at_inner_junctions(self, attached_ways_dict):
-        """Split ways such that none of the interior nodes are junctions.
-           I.e., each way object connects to at most two junctions.
+    def _split_ways_at_inner_junctions(self, attached_ways_dict: Dict[int, List[Tuple[osmparser.Way, bool]]]) -> None:
+        """Split ways such that none of the interior nodes are junctions to other ways
+           I.e., each way object connects to at most two junctions at start and end.
         """
         logging.info('Splitting ways at inner junctions...')
-        # FIXME: auch splitten, wenn Weg1 von Weg2 erst abzweigt und später wieder hinzukommt 
-        #        i.e. way1 and way2 share TWO nodes, both end nodes of one of them 
         new_list = []
+        the_ref = 0
         for i, the_way in enumerate(self.ways_list):
             utilities.progress(i, len(self.ways_list))
-            self.debug_plot_way(the_way, '-', lw=2, color='0.90', show_label=0)
+            self.debug_plot_way(the_way, '-', lw=2, color='0.90', show_label=False)
 
             new_way = _init_way_from_existing(the_way, [the_way.refs[0]])
             for the_ref in the_way.refs[1:]:
@@ -978,94 +976,18 @@ class Roads(object):
                     new_list.append(new_way)
                     self.debug_plot_way(new_way, '-', lw=1)
                     new_way = _init_way_from_existing(the_way, [the_ref])
-            if the_ref not in attached_ways_dict:  # FIXME: store previous test?
+            if the_ref not in attached_ways_dict:
                 new_list.append(new_way)
                 self.debug_plot_way(new_way, '--', lw=1)
 
         self.ways_list = new_list
-
-    def _compute_junction_nodes(self):
-        """ac3d nodes that belong to an junction need special treatment to make sure
-           the ways attached to an junction join exactly, i.e., without gaps or overlap. 
-        """
-        def pr_angle(a):
-            print("%5.1f " % (a * 57.3), end='x')
-
-        def angle_from(lin_obj, is_first):
-            """if IS_FIRST, the way is pointing away from us, and we can use the angle straight away.
-               Otherwise, add 180 deg.
-            """
-            if is_first:
-                angle = lin_obj.angle[0]
-            else:
-                angle = lin_obj.angle[-1] + np.pi
-                if angle > np.pi:
-                    angle -= np.pi * 2
-            return angle
-
-        for the_ref, ways_list in list(self.attached_ways_dict.items()):
-            # each junction knows about the attached ways
-            # -- Sort (the_junction.ways) by angle, taking into account is_first. 
-            #    This is tricky. x[0] is our linear_object (which has a property "angle").
-            #    x[1] is our IS_FIRST flag.
-            #    According to IS_FIRST use either first or last angle in list,
-            #    (-1 + is_first) evaluates to 0 or -1.
-            #    Sorting results in LHS neighbours.
-            ways_list.sort(key=lambda x: angle_from(x[0], x[1])) 
-
-            # testing            
-            if 1:
-                pref_an = -999
-                for way, is_first in ways_list:
-                    an = angle_from(way, is_first)
-                    assert(an > pref_an)
-                    pref_an = an
-
-            our_node = np.array(ways_list[0][0].center.coords[-1 + ways_list[0][1]])
-            for i, (way_a, is_first_a) in enumerate(ways_list):
-                (way_b, is_first_b) = ways_list[(i+1) % len(ways_list)] # wrap around
-                # now we have two neighboring ways
-                print(way_a, is_first_a, "joins with", way_b, is_first_b)
-                # compute their joining node
-                index_a = -1 + is_first_a                
-                index_b = -1 + is_first_b                
-                if 1:
-                    va = way_a.vectors[index_a]
-                    na = way_a.normals[index_a] * way_a.width / 2.
-                    vb = way_b.vectors[index_b]
-                    nb = way_b.normals[index_b] * way_b.width / 2.
-                    if not is_first_a:
-                        va *= -1
-                        na *= -1
-                    if is_first_b:
-                        vb *= -1
-                        nb *= -1
-                    
-                    Ainv = 1./(va[1]*vb[0]-va[0]*vb[1]) * np.array([[-vb[1], vb[0]], [-va[1], va[0]]])
-                    RHS = (nb - na)
-                    s = np.dot(Ainv, RHS)
-    # FIXME: check which is faster
-                    A = np.vstack((va, -vb)).transpose()
-                    s = scipy.linalg.solve(A, RHS)
-                    q = our_node + na * s[0]
-
-                way_a_lr = way_a.edge[1-is_first_a]
-                way_b_lr = way_b.edge[is_first_b]
-
-                q1 = way_a_lr.junction(way_b_lr)
-                print(q, q1)
-                way_a.plot(center=False, left=True, right=True, show=False)
-                way_b.plot(center=False, left=True, right=True, clf=False, show=False)
-                plt.plot(q[0], q[1], 'b+')
-                plt.plot(q1.coords[0][0], q1.coords[0][1], 'bo')
-                plt.show()
 
     def debug_plot_ref(self, ref, style): 
         if not parameters.DEBUG_PLOT:
             return
         plt.plot(self.nodes_dict[ref].lon, self.nodes_dict[ref].lat, style)
 
-    def debug_plot_way(self, way, ls, lw, color=False, ends_marker=False, show_label=False, show_ends=False):
+    def debug_plot_way(self, way, ls, lw, color=None, ends_marker=False, show_label=False) -> None:
         if not parameters.DEBUG_PLOT:
             return
         col = ['b', 'r', 'y', 'g', '0.25', 'k', 'c']
@@ -1150,7 +1072,8 @@ class Roads(object):
         for the_node in self.nodes_dict.values():
             logging.debug("Context: %s # id=%12i h_add %5.2f", context, the_node.osm_id, the_node.h_add)
 
-    def _join_ways(self, way1, way2, attached_ways_dict):
+    def _join_ways(self, way1: osmparser.Way, way2: osmparser.Way,
+                   attached_ways_dict: Dict[int, List[Tuple[osmparser.Way, bool]]]) -> None:
         """Join ways that
            - don't make an junction and
            - are of compatible type
@@ -1475,12 +1398,12 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
         landuse_result = osmparser.fetch_osm_db_data_ways_keys(['landuse'])
     landuse_nodes_dict = landuse_result.nodes_dict
     landuse_ways_dict = landuse_result.ways_dict
-    built_up_areas = landuse.process_osm_landuse_as_areas(landuse_nodes_dict, landuse_ways_dict, coords_transform)
+    landuses_lit = landuse.process_osm_landuse_for_lighting(landuse_nodes_dict, landuse_ways_dict, coords_transform)
 
     path_to_output = parameters.get_output_path()
     logging.debug("before linear " + str(roads))
 
-    roads.process(blocked_areas, stg_entries, built_up_areas, stats)  # does the heavy lifting incl. clustering
+    roads.process(blocked_areas, stg_entries, landuses_lit, stats)  # does the heavy lifting incl. clustering
 
     replacement_prefix = parameters.get_repl_prefix()
     stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.roads, OUR_MAGIC, replacement_prefix)
@@ -1542,9 +1465,9 @@ class TestUtilities(unittest.TestCase):
     def test_cut_way_at_intersection_points(self):
         raw_osm_ways = list()
         nodes_dict = dict()
-        my_coords_transform = coordinates.Transformation(parameters.get_center_global())
-        my_fg_elev = utilities.FGElev(my_coords_transform)
-        test_roads = Roads(raw_osm_ways, nodes_dict, my_coords_transform, my_fg_elev)
+        coords_transform = coordinates.Transformation(parameters.get_center_global())
+        the_fg_elev = utilities.FGElev(coords_transform)
+        test_roads = Roads(raw_osm_ways, nodes_dict, coords_transform, the_fg_elev)
 
         msg = 'line with 2 nodes and no intersection points -> 1 way orig'
         way = osmparser.Way(1)
@@ -1554,14 +1477,14 @@ class TestUtilities(unittest.TestCase):
         intersection_points = []
 
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
-        self.assertEqual(1, len(cut_ways_dict), 'number of ways: '+ msg)
+        self.assertEqual(1, len(cut_ways_dict), 'number of ways: ' + msg)
         self.assertEqual(2, len(way.refs), 'references of orig way: ' + msg)
 
         msg = 'line with 2 nodes and 1 valid intersection point -> 1 way orig shorter, 1 new way'
         way.refs = [1, 2]
         intersection_points = [shg.Point(0, 500)]
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
-        self.assertEqual(2, len(cut_ways_dict), 'number of ways: '+ msg)
+        self.assertEqual(2, len(cut_ways_dict), 'number of ways: ' + msg)
         self.assertEqual(2, len(way.refs), 'references of orig way: ' + msg)
 
         msg = 'line with 3 nodes and one intersection point too short at start -> 1 way orig'
@@ -1569,7 +1492,7 @@ class TestUtilities(unittest.TestCase):
         my_line = shg.LineString([(0, 0), (0, 500), (0, 1000)])
         intersection_points = [shg.Point(0, parameters.BUILT_UP_AREA_LIT_BUFFER - 1)]
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
-        self.assertEqual(1, len(cut_ways_dict), 'number of ways: '+ msg)
+        self.assertEqual(1, len(cut_ways_dict), 'number of ways: ' + msg)
         self.assertEqual(3, len(way.refs), 'references of orig way: ' + msg)
 
         msg = 'line with 3 nodes and one intersection point too short at end -> 1 way orig'
@@ -1577,8 +1500,8 @@ class TestUtilities(unittest.TestCase):
         my_line = shg.LineString([(0, 0), (0, 500), (0, 1000)])
         intersection_points = [shg.Point(0, 1000 - (parameters.BUILT_UP_AREA_LIT_BUFFER - 1))]
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
-        self.assertEqual(1, len(cut_ways_dict), 'number of ways: '+ msg)
-        self.assertEqual(4, len(way.refs), 'references of orig way: ' + msg) # 1 more because intersection point remains
+        self.assertEqual(1, len(cut_ways_dict), 'number of ways: ' + msg)
+        self.assertEqual(4, len(way.refs), 'references of orig way: ' + msg)  # 1 more because inters.n point remains
 
         msg = 'line with 3 nodes and 2 intersection points just after each other -> 1 way orig shorter, 2 new ways'
         way.refs = [1, 2, 3]
@@ -1586,7 +1509,7 @@ class TestUtilities(unittest.TestCase):
         intersection_points = [shg.Point(0, parameters.BUILT_UP_AREA_LIT_BUFFER + 2),
                                shg.Point(0, 2 * parameters.BUILT_UP_AREA_LIT_BUFFER + 10)]
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
-        self.assertEqual(3, len(cut_ways_dict), 'number of ways: '+ msg)
+        self.assertEqual(3, len(cut_ways_dict), 'number of ways: ' + msg)
         self.assertEqual(2, len(way.refs), 'references of orig way: ' + msg)
 
         msg = 'line with 6 nodes and two intersection points given in reverse order for distance -> 1 & 2 new ways'
@@ -1595,5 +1518,5 @@ class TestUtilities(unittest.TestCase):
         intersection_points = [shg.Point(0, 700),
                                shg.Point(0, 400)]
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
-        self.assertEqual(3, len(cut_ways_dict), 'number of ways: '+ msg)
+        self.assertEqual(3, len(cut_ways_dict), 'number of ways: ' + msg)
         self.assertEqual(3, len(way.refs), 'references of orig way: ' + msg)
