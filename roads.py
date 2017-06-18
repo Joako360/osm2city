@@ -105,6 +105,7 @@ BRIDGE_KEY = 'bridge'  # the original OSM tag key
 MAN_MADE_KEY = 'man_made'
 REPLACED_BRIDGE_KEY = 'replaced_bridge'  # specifies a way that was originally a bridge, but due to length was changed
 LIT = 'lit'
+MIN_SEGMENT_LENGTH = 1.0
 
 
 def _is_bridge(way: osmparser.Way) -> bool:
@@ -196,8 +197,8 @@ def _compatible_ways(way1: osmparser.Way, way2: osmparser.Way) -> bool:
 
 def _init_way_from_existing(way: osmparser.Way, node_references: List[int]) -> osmparser.Way:
     """Return copy of way. The copy will have same osm_id and tags, but only given refs"""
-    new_way = osmparser.Way(way.osm_id)
-    new_way.pseudo_osm_id = osmparser.get_next_pseudo_osm_id()
+    new_way = osmparser.Way(osmparser.get_next_pseudo_osm_id())
+    new_way.pseudo_osm_id = way.osm_id
     new_way.tags = way.tags.copy()
     new_way.refs = node_references
     return new_way
@@ -299,7 +300,7 @@ def max_slope_for_road(obj):
         return parameters.MAX_SLOPE_RAILWAY
 
 
-def _find_junctions(ways_list: List[osmparser.Way]) -> Dict[int, List[Tuple[osmparser.Way, bool]]]:
+def _find_junctions(ways_list: List[osmparser.Way]) -> Dict[int, List[Tuple[osmparser.Way, int]]]:
     """Finds nodes, which are shared by at least 2 ways.
     N = number of nodes
     find junctions by brute force:
@@ -307,7 +308,6 @@ def _find_junctions(ways_list: List[osmparser.Way]) -> Dict[int, List[Tuple[osmp
     - if a node has 2 ways, store that node as a candidate
     - remove entries/nodes that have less than 2 ways attached    O(N)
     - one way ends, other way starts: also a junction
-    FIXME: use quadtree/kdtree
     """
 
     logging.info('Finding junctions...')
@@ -315,16 +315,13 @@ def _find_junctions(ways_list: List[osmparser.Way]) -> Dict[int, List[Tuple[osmp
     for j, the_way in enumerate(ways_list):
         utilities.progress(j, len(ways_list))
         for i, ref in enumerate(the_way.refs):
-            try:
-                attached_ways_dict[ref].append((the_way, i == 0))  # store tuple (the_way, is_first_node)
-                # -- check if ways are actually distinct before declaring
-                #    an junction?
-                # not an junction if
-                # - only 2 ways && one ends && other starts
-                # easier?: only 2 ways, at least one node is middle node
-#                        self.junctions_set.add(ref)
-            except KeyError:
-                attached_ways_dict[ref] = [(the_way, i == 0)]  # initialize node
+            if i == 0:  # start
+                position = -1
+            elif i == len(the_way.refs) - 1:  # last
+                position = 1
+            else:
+                position = 0
+            _attached_ways_dict_append(attached_ways_dict, ref, the_way, position)
 
     # kick nodes that belong to one way only
     for ref, the_ways in list(attached_ways_dict.items()):
@@ -333,23 +330,24 @@ def _find_junctions(ways_list: List[osmparser.Way]) -> Dict[int, List[Tuple[osmp
     return attached_ways_dict
 
 
-def _attached_ways_dict_remove(attached_ways_dict, the_ref: int, the_way: osmparser.Way, ignore_missing_ref: bool=False):
+def _attached_ways_dict_remove(attached_ways_dict: Dict[int, List[Tuple[osmparser.Way, int]]], the_ref: int,
+                               the_way: osmparser.Way) -> None:
     """Remove given way from given node in attached_ways_dict"""
-    if ignore_missing_ref and the_ref not in attached_ways_dict:
-        logging.debug("not removing way from the ref %i because the ref is not in attached_ways_dict", the_ref)
+    if the_ref not in attached_ways_dict:
+        logging.warning("not removing way from the ref %i because the ref is not in attached_ways_dict", the_ref)
         return
-    for way, boolean in attached_ways_dict[the_ref]:
-        if way == the_way:
+    for way_pos_tuple in attached_ways_dict[the_ref]:
+        if way_pos_tuple[0] == the_way:
             logging.debug("removing way %s from node %i", the_way, the_ref)
-            attached_ways_dict[the_ref].remove((the_way, boolean))
+            attached_ways_dict[the_ref].remove(way_pos_tuple)
 
 
-def _attached_ways_dict_append(attached_ways_dict, the_ref, the_way, is_first, ignore_missing_ref=False):
-    """Append given way to attached_ways_dict. If ignore_non_existing is True, silently
-       do nothing in case the_ref does not exist. Otherwise we may get a KeyError."""
-    if ignore_missing_ref and the_ref not in attached_ways_dict:
-        return
-    attached_ways_dict[the_ref].append((the_way, is_first))
+def _attached_ways_dict_append(attached_ways_dict: Dict[int, List[Tuple[osmparser.Way, int]]], the_ref: int,
+                               the_way: osmparser.Way, position: int) -> None:
+    """Append given way to attached_ways_dict."""
+    if the_ref not in attached_ways_dict:
+        attached_ways_dict[the_ref] = list()
+    attached_ways_dict[the_ref].append((the_way, position))
 
 
 def cut_line_at_points(line: shg.LineString, points: List[shg.Point]) -> List[shg.LineString]:
@@ -679,18 +677,36 @@ class Roads(object):
         an original way just keeps its original length despite one or several intersection points.
         Distance in the returned dictionary refers to the last point's distance along the original way, which
         is e.g. the length of the original way for the last cut way."""
-        original_refs = way.refs[:]
         intersect_dict = dict()  # osm_id for node, distance from start
-        cut_ways_dict = OrderedDict()  # osm_id for way, distance of end from start of original way
+        cut_ways_dict = OrderedDict()  # key: way, value: distance of end from start of original way
         # create new global nodes
         for point in intersection_points:
             distance = my_line.project(point)
             lon, lat = self.transform.toGlobal((point.x, point.y))
-            new_node = osmparser.Node(osmparser.get_next_pseudo_osm_id(), lat, lon)
-            self.nodes_dict[new_node.osm_id] = new_node
-            intersect_dict[new_node.osm_id] = distance
+
+            # make sure that the new node is relevant and not just a rounding residual
+            add_intersection = True
+            for ref in way.refs:
+                ref_node = self.nodes_dict[ref]
+                segment_length = coordinates.calc_distance_global(lon, lat, ref_node.lon, ref_node.lat)
+                if segment_length < MIN_SEGMENT_LENGTH:
+                    if ref == way.refs[0] or ref == way.refs[-1]:  # ignore because it is almost at either start or end
+                        add_intersection = False
+                        break
+                    else:  # tweak so it can be used as intersection, but based on existing point
+                        add_intersection = False
+                        way.refs.remove(ref)
+                        intersect_dict[ref] = distance
+                        my_line = self._line_string_from_way(way)
+                        break
+
+            if add_intersection:
+                new_node = osmparser.Node(osmparser.get_next_pseudo_osm_id(), lat, lon)
+                self.nodes_dict[new_node.osm_id] = new_node
+                intersect_dict[new_node.osm_id] = distance
 
         # create lines based on old and new points
+        original_refs = way.refs[:]
         coords = list(my_line.coords)
         prev_orig_point_dist = 0
         is_first = True
@@ -836,13 +852,43 @@ class Roads(object):
         return shg.LineString(nodes)
 
     def _cleanup_topology(self):
-        """Cleans op the topology for junctions etc."""
-        logging.debug("len before %i" % len(self.ways_list))
-        attached_ways_dict = _find_junctions(self.ways_list)  # key = node ref, value = List((way, is_first_node))
-        self._split_ways_at_inner_junctions(attached_ways_dict)
-        self._join_degree2_junctions(attached_ways_dict)
+        """Cleans up the topology for junctions etc."""
+        logging.debug("Number of ways before cleaning topology: %i" % len(self.ways_list))
 
-        logging.debug("len after %i" % len(self.ways_list))
+        # make sure there are no almost zero length segments
+        # FIXME: this should not be necessary and is most probably residual from _check_lighting
+        for way in self.ways_list:
+            refs_to_remove = list()
+            for i in range(1, len(way.refs)):
+                first_node = self.nodes_dict[way.refs[i - 1]]
+                second_node = self.nodes_dict[way.refs[i]]
+                distance = coordinates.calc_distance_global(first_node.lon, first_node.lat,
+                                                            second_node.lon, second_node.lat)
+                if distance < MIN_SEGMENT_LENGTH:
+                    if len(way.refs) == 2:
+                        break  # nothing to do - need to keep it
+                    elif i == 1:
+                        refs_to_remove.append(way.refs[i])
+                    else:
+                        refs_to_remove.append(way.refs[i - 1])
+
+            for ref in refs_to_remove:
+                way.refs.remove(ref)
+                logging.debug('Removing ref {} from way {} due to too short segment')
+
+        # create a dict referencing for every node those ways, which are using this node in their references
+        # key = node ref, value = List((way, pos)), where pos=-1 for start, pos=0 for inner, pos=1 for end
+        attached_ways_dict = _find_junctions(self.ways_list)
+
+        # split ways where a node not being at start or end is referenced by another way
+        self._split_ways_at_inner_junctions(attached_ways_dict)
+
+        # do it again, because the references and positions have changed
+        attached_ways_dict = _find_junctions(self.ways_list)
+
+        self._rejoin_ways(attached_ways_dict)
+
+        logging.debug("Number of ways after cleaning topology: %i" % len(self.ways_list))
 
     def _remove_tunnels(self):
         """Remove tunnels."""
@@ -958,9 +1004,9 @@ class Roads(object):
 
             self.G.add_edge(obj)
 
-    def _split_ways_at_inner_junctions(self, attached_ways_dict: Dict[int, List[Tuple[osmparser.Way, bool]]]) -> None:
-        """Split ways such that none of the interior nodes are junctions to other ways
-           I.e., each way object connects to at most two junctions at start and end.
+    def _split_ways_at_inner_junctions(self, attached_ways_dict: Dict[int, List[Tuple[osmparser.Way, int]]]) -> None:
+        """Split ways such that none of the interior nodes are junctions to other ways.
+        I.e., each way object connects to at most two junctions at start and end.
         """
         logging.info('Splitting ways at inner junctions...')
         new_list = []
@@ -982,12 +1028,7 @@ class Roads(object):
 
         self.ways_list = new_list
 
-    def debug_plot_ref(self, ref, style): 
-        if not parameters.DEBUG_PLOT:
-            return
-        plt.plot(self.nodes_dict[ref].lon, self.nodes_dict[ref].lat, style)
-
-    def debug_plot_way(self, way, ls, lw, color=None, ends_marker=False, show_label=False) -> None:
+    def debug_plot_way(self, way, ls, lw, color=None, ends_marker='', show_label=False) -> None:
         if not parameters.DEBUG_PLOT:
             return
         col = ['b', 'r', 'y', 'g', '0.25', 'k', 'c']
@@ -1002,35 +1043,21 @@ class Roads(object):
             plt.plot(a[-1, 0], a[-1, 1], ends_marker, linewidth=lw, color=color)
         if show_label:
             plt.text(0.5*(a[0, 0]+a[-1, 0]), 0.5*(a[0, 1]+a[-1, 1]), way.osm_id, color="b")
-    
-    def debug_plot_junctions(self, style):
-        if not parameters.DEBUG_PLOT:
-            return
-        for ref in self.attached_ways_dict:
-            node = self.nodes_dict[ref]
-            plt.plot(node.lon, node.lat, style, mfc='None')
 
     def debug_label_node(self, ref, text=""):
-        if not parameters.DEBUG_PLOT:
-            return
-
         node = self.nodes_dict[ref]
         plt.plot(node.lon, node.lat, 'rs', mfc='None', ms=10)
         plt.text(node.lon+0.0001, node.lat, str(node.osm_id) + " h" + str(text))
 
-    def debug_plot(self, save=False, plot_junctions=False, show=False, label_nodes=[], label_all_ways=False, clusters=None):
-        if not parameters.DEBUG_PLOT: return
+    def debug_plot(self, save=False, show=False, label_nodes=list(), clusters=None):
         plt.clf()
-        if plot_junctions:
-            self.debug_plot_junctions('o')            
         for ref in label_nodes:
             self.debug_label_node(ref)
-        col = ['b', 'r', 'y', 'g', '0.75', '0.5', 'k', 'c']
         col = ['0.5', '0.75', 'y', 'g', 'r', 'b', 'k']
-        lw    = [1, 1, 1, 1.2, 1.5, 2, 1]
-        lw_w  = np.array([1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]) * 0.1
+        lw_w = np.array([1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]) * 0.1
 
         if clusters:
+            cluster_color = col[0]
             for i, cl in enumerate(clusters):
                 if cl.objects:
                     cluster_color = col[random.randint(0, len(col)-1)]
@@ -1042,11 +1069,8 @@ class Roads(object):
                     c = np.array([self.transform.toGlobal(p) for p in c])
                     plt.plot(c[:, 0], c[:, 1], '-', color=cluster_color)
                 for r in cl.objects:
-                    random_color = col[random.randint(0, len(col)-1)]
-                    osmid_color = col[(r.osm_id + len(r.refs)) % len(col)]                
                     a = np.array(r.center.coords)
                     a = np.array([self.transform.toGlobal(p) for p in a])
-                    #color = col[r.typ]
                     try:
                         lw = lw_w[r.typ]
                     except:
@@ -1068,125 +1092,81 @@ class Roads(object):
         if show:
             plt.show()
 
-    def _debug_show_h_add(self, context):
-        for the_node in self.nodes_dict.values():
-            logging.debug("Context: %s # id=%12i h_add %5.2f", context, the_node.osm_id, the_node.h_add)
-
     def _join_ways(self, way1: osmparser.Way, way2: osmparser.Way,
-                   attached_ways_dict: Dict[int, List[Tuple[osmparser.Way, bool]]]) -> None:
-        """Join ways that
-           - don't make an junction and
-           - are of compatible type
-           must share exactly one node
-        """
+                   attached_ways_dict: Dict[int, List[Tuple[osmparser.Way, int]]]) -> None:
+        """Join ways of compatible type, where way1's last node is way2's first node."""
         logging.debug("Joining %i and %i", way1.osm_id, way2.osm_id)
         if way1.osm_id == way2.osm_id:
             logging.debug("WARNING: Not joining way %i with itself", way1.osm_id)
             return
-        if way1.refs[0] == way2.refs[0]:
-            new_refs = way1.refs[::-1] + way2.refs[1:]
-        elif way1.refs[0] == way2.refs[-1]:
-            new_refs = way2.refs + way1.refs[1:]
-        elif way1.refs[-1] == way2.refs[0]:
-            new_refs = way1.refs + way2.refs[1:]
-        elif way1.refs[-1] == way2.refs[-1]:
-            new_refs = way1.refs[:-1] + way2.refs[::-1]
-        else:
-            logging.debug("WARNING: Not joining ways that share no endpoint %i %i", way1.osm_id, way2.osm_id)
-            return
-            
-        new_way = _init_way_from_existing(way1, new_refs)
-        logging.debug("old and new" + str(way1) + str(new_way))
+        way1.refs.extend(way2.refs[1:])
 
-        _attached_ways_dict_remove(attached_ways_dict, way1.refs[0], way1, ignore_missing_ref=True)
-        _attached_ways_dict_remove(attached_ways_dict, way1.refs[-1], way1, ignore_missing_ref=True)
-        _attached_ways_dict_remove(attached_ways_dict, way2.refs[0], way2, ignore_missing_ref=True)
-        _attached_ways_dict_remove(attached_ways_dict, way2.refs[-1], way2, ignore_missing_ref=True)
+        _attached_ways_dict_remove(attached_ways_dict, way1.refs[-1], way1)
+        _attached_ways_dict_remove(attached_ways_dict, way2.refs[0], way2)
+        _attached_ways_dict_remove(attached_ways_dict, way2.refs[-1], way2)
+        _attached_ways_dict_append(attached_ways_dict, way1.refs[-1], way1, 1)
 
-        _attached_ways_dict_append(attached_ways_dict, new_way.refs[0], new_way,
-                                   is_first=True, ignore_missing_ref=True)
-        _attached_ways_dict_append(attached_ways_dict, new_way.refs[-1], new_way,
-                                   is_first=False, ignore_missing_ref=True)
-
-        try:
-            self.ways_list.remove(way1)
-            logging.debug("1ok ")
-        except ValueError:
-            self.ways_list.remove(self._debug_find_way_by_osm_id(way1.osm_id))
-            logging.debug("1not ")
         try:
             self.ways_list.remove(way2)
             logging.debug("2ok")
         except ValueError:
-            self.ways_list.remove(self._debug_find_way_by_osm_id(way2.osm_id))
+            try:
+                self.ways_list.remove(self._find_way_by_osm_id(way2.osm_id))
+            except ValueError:
+                logging.warning('Way with osm_id={} cannot be removed because cannot be found'.format(way2.osm_id))
             logging.debug("2not")
-        self.ways_list.append(new_way)
 
-    def _join_degree2_junctions(self, attached_ways_dict):
-        for ref, ways_tuple_list in attached_ways_dict.items():
-            if len(ways_tuple_list) == 2:
-                if _compatible_ways(ways_tuple_list[0][0], ways_tuple_list[1][0]):
-                    self._join_ways(ways_tuple_list[0][0], ways_tuple_list[1][0], attached_ways_dict)
-                    
-    def _debug_find_way_by_osm_id(self, osm_id):
+    def _rejoin_ways(self, attached_ways_dict: Dict[int, List[Tuple[osmparser.Way, int]]]) -> None:
+        for ref in list(attached_ways_dict.keys()):  # dict is changed during looping, so using list of keys
+            way_pos_list = attached_ways_dict[ref]
+            start_dict = dict()  # dict of ways where node is start point with key = way, value = degree from north
+            end_dict = dict()  # ditto for node is end point
+            for way, position in way_pos_list:
+                try:
+                    if position == -1:  # start
+                        first_node = self.nodes_dict[way.refs[0]]
+                        second_node = self.nodes_dict[way.refs[1]]
+                        angle = coordinates.calc_angle_of_line_global(first_node.lon, first_node.lat,
+                                                                       second_node.lon, second_node.lat)
+                        start_dict[way] = angle
+                    elif position == 1:  # end
+                        first_node = self.nodes_dict[way.refs[-2]]
+                        second_node = self.nodes_dict[way.refs[-1]]
+                        angle = coordinates.calc_angle_of_line_global(first_node.lon, first_node.lat,
+                                                                       second_node.lon, second_node.lat)
+                        end_dict[way] = angle
+                    else:  # should never happen
+                        logging.warning("Way with osm-id={} has not valid position {} for node {}.".format(way.osm_id,
+                                                                                                           position,
+                                                                                                           ref))
+                except ValueError as e:
+                    logging.exception('Rejoin not possible for way {} and position {}.'.format(way.osm_id, position))
+                    # nothing more to do - most probably rounding error or zero segment length
+            # for each in end_dict search in start_dict the one with the closest angle and which is a compatible way
+            for end_way, end_angle in end_dict.items():
+                candidate_way = None
+                candidate_angle = 999
+                start_way = None
+                for start_way, start_angle in start_dict.items():
+                    if _compatible_ways(end_way, start_way):
+                        if abs(start_angle - end_angle) >= 90:
+                            continue  # larger angles lead to strange visuals
+                        if candidate_way is None:
+                            candidate_way = start_way
+                            candidate_angle = start_angle
+                        elif abs(candidate_angle - end_angle) > abs(start_angle - end_angle):
+                            candidate_way = start_way
+                            candidate_angle = start_angle
+
+                if candidate_way is not None:
+                    self._join_ways(end_way, candidate_way, attached_ways_dict)
+                    del start_dict[candidate_way]
+
+    def _find_way_by_osm_id(self, osm_id):
         for the_way in self.ways_list:
             if the_way.osm_id == osm_id:
                 return the_way
         raise ValueError("way %i not found" % osm_id)
-
-    def debug_drop_unused_nodes(self):
-        new_nodes_dict = {}
-        for the_list in [self.ways_list, self.bridges_list, self.roads_list, self.railway_list]:
-            for the_obj in the_list:
-                for the_ref in the_obj.refs:
-                    new_nodes_dict[the_ref] = self.nodes_dict[the_ref]
-        self.nodes_dict = new_nodes_dict
-                
-    def debug_label_nodes(self, stg_manager, stats: utilities.Stats, file_name="labels"):
-        """write OSM_ID for nodes"""
-        ac = ac3d.File(stats=stats, show_labels=True)
-
-        for way in self.bridges_list + self.roads_list + self.railway_list:
-            # -- label center with way ID
-            the_node = self.nodes_dict[way.refs[len(way.refs)/2]]
-            anchor = Vec2d(self.transform.toLocal(Vec2d(the_node.lon, the_node.lat)))
-            if math.isnan(anchor.lon) or math.isnan(anchor.lat):
-                logging.error("Nan encountered while probing anchor elevation")
-                continue
-
-            e = self.fg_elev.probe_elev(anchor) + the_node.h_add + 1.
-            ac.add_label('way %i' % way.osm_id, -anchor.y, e, -anchor.x, scale=1.)
-
-            # -- label first node
-            the_node = self.nodes_dict[way.refs[0]]
-            anchor = Vec2d(self.transform.toLocal(Vec2d(the_node.lon, the_node.lat)))
-            if math.isnan(anchor.lon) or math.isnan(anchor.lat):
-                logging.error("Nan encountered while probing anchor elevation")
-                continue
-
-            e = self.fg_elev.probe_elev(anchor) + the_node.h_add + 3.
-            ac.add_label(' %i h=%1.1f' % (the_node.osm_id, the_node.h_add), -anchor.y, e, -anchor.x, scale=1.)
-
-            # -- label last node
-            the_node = self.nodes_dict[way.refs[-1]]
-            anchor = Vec2d(self.transform.toLocal(Vec2d(the_node.lon, the_node.lat)))
-            if math.isnan(anchor.lon) or math.isnan(anchor.lat):
-                logging.error("Nan encountered while probing anchor elevation")
-                continue
-
-            e = self.fg_elev.probe_elev(anchor) + the_node.h_add + 3.
-            ac.add_label(' %i h=%1.1f' % (the_node.osm_id, the_node.h_add), -anchor.y, e, -anchor.x, scale=1.)
-
-        path_to_stg = stg_manager.add_object_static(file_name + '.ac', Vec2d(self.transform.toGlobal((0, 0))), 0, 0)
-        ac.write(os.path.join(path_to_stg, file_name + '.ac'))
-
-    def debug_print_refs_of_way(self, way_osm_id):
-        """print refs of given way"""
-        for the_way in self.ways_list:
-            if the_way.osm_id == way_osm_id:
-                print("found", the_way)
-                for the_ref in the_way.refs:
-                    print("+", the_ref)
 
     def _clusterize(self, stats: utilities.Stats):
         """Create cluster.
@@ -1318,55 +1298,6 @@ def _write_xml(path_to_stg, file_name, object_name):
     """ % (file_name, shader_str, object_name)))
 
 
-def debug_create_eps(roads, clusters, elev, coords_transform: coordinates.Transformation, plot_cluster_borders=0):
-    """debug: plot roads map to .eps"""
-    if not parameters.DEBUG_PLOT:
-        return
-    plt.clf()
-    if 0:
-        c = np.array([[elev.min.x, elev.min.y], 
-                      [elev.max.x, elev.min.y], 
-                      [elev.max.x, elev.max.y], 
-                      [elev.min.x, elev.max.y],
-                      [elev.min.x, elev.min.y]])
-        #c = np.array([transform.toGlobal(p) for p in c])
-        plt.plot(c[:, 0], c[:, 1], 'r-', label="elev")
-
-    col = ['b', 'r', 'y', 'g', '0.75', '0.5', 'k', 'c']
-    col = ['0.5', '0.75', 'y', 'g', 'r', 'b', 'k']
-    lw = [1, 1, 1, 1.2, 1.5, 2, 1]
-    lw_w = np.array([1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]) * 0.1
-
-    if 1:
-        for i, cl in enumerate(clusters):
-            if plot_cluster_borders and len(cl.objects): 
-                cluster_color = col[random.randint(0, len(col)-1)]
-                c = np.array([[cl.min.x, cl.min.y], 
-                              [cl.max.x, cl.min.y], 
-                              [cl.max.x, cl.max.y], 
-                              [cl.min.x, cl.max.y],
-                              [cl.min.x, cl.min.y]])
-                c = np.array([coords_transform.toGlobal(p) for p in c])
-                plt.plot(c[:, 0], c[:, 1], '-', color=cluster_color)
-            for r in cl.objects:
-                random_color = col[random.randint(0, len(col)-1)]
-                osmid_color = col[(r.osm_id + len(r.refs)) % len(col)]                
-                a = np.array(r.center.coords)
-                a = np.array([coords_transform.toGlobal(p) for p in a])
-                #color = col[r.typ]
-                try:
-                    lw = lw_w[r.typ]
-                except:
-                    lw = lw_w[0]
-                    
-                plt.plot(a[:, 0], a[:, 1], color=cluster_color, linewidth=lw)
-
-    plt.axes().set_aspect('equal')
-    plt.legend()
-    plt.savefig('roads.eps')
-    plt.clf()
-
-
 def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
             blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
             file_lock: mp.Lock=None) -> None:
@@ -1418,9 +1349,9 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     _process_clusters(roads.roads_rough_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, False,
                       coords_transform, stats, True)
 
-    roads.debug_plot(show=True, plot_junctions=False, clusters=roads.roads_clusters)
-    
-    debug_create_eps(roads, roads.roads_clusters, fg_elev, coords_transform, plot_cluster_borders=1)
+    if parameters.DEBUG_PLOT:
+        roads.debug_plot(show=True, clusters=roads.roads_clusters)
+
     stg_manager.write(file_lock)
 
     utilities.troubleshoot(stats)
@@ -1467,45 +1398,59 @@ class TestUtilities(unittest.TestCase):
         nodes_dict = dict()
         coords_transform = coordinates.Transformation(parameters.get_center_global())
         the_fg_elev = utilities.FGElev(coords_transform)
+        way = osmparser.Way(1)
+        way.tags["hello"] = "world"
+        way.refs = [1, 2, 3, 4, 5, 6]
+        my_line = shg.LineString([(0, 0), (0, 300), (0, 500), (0, 600), (0, 900), (0, 1000)])
+        lon, lat = coords_transform.toGlobal((0,0))
+        nodes_dict[1] = osmparser.Node(1, lat, lon)
+        lon, lat = coords_transform.toGlobal((0,300))
+        nodes_dict[2] = osmparser.Node(2, lat, lon)
+        lon, lat = coords_transform.toGlobal((0,500))
+        nodes_dict[3] = osmparser.Node(3, lat, lon)
+        lon, lat = coords_transform.toGlobal((0,600))
+        nodes_dict[4] = osmparser.Node(4, lat, lon)
+        lon, lat = coords_transform.toGlobal((0,900))
+        nodes_dict[5] = osmparser.Node(5, lat, lon)
+        lon, lat = coords_transform.toGlobal((0,1000))
+        nodes_dict[6] = osmparser.Node(6, lat, lon)
+
         test_roads = Roads(raw_osm_ways, nodes_dict, coords_transform, the_fg_elev)
 
-        msg = 'line with 2 nodes and no intersection points -> 1 way orig'
-        way = osmparser.Way(1)
-        way.refs = [1, 2]
-        way.tags["hello"] = "world"
-        my_line = shg.LineString([(0, 0), (0, 1000)])
+        msg = 'line with no intersection points -> 1 way orig'
         intersection_points = []
 
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
         self.assertEqual(1, len(cut_ways_dict), 'number of ways: ' + msg)
-        self.assertEqual(2, len(way.refs), 'references of orig way: ' + msg)
+        self.assertEqual(6, len(way.refs), 'references of orig way: ' + msg)
 
-        msg = 'line with 2 nodes and 1 valid intersection point -> 1 way orig shorter, 1 new way'
-        way.refs = [1, 2]
-        intersection_points = [shg.Point(0, 500)]
+        msg = 'line with 1 valid intersection point -> 1 way orig shorter, 1 new way'
+        way.refs = [1, 2, 3, 4, 5, 6]
+        my_line = shg.LineString([(0, 0), (0, 300), (0, 500), (0, 600), (0, 900), (0, 1000)])
+        intersection_points = [shg.Point(0, 100)]
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
         self.assertEqual(2, len(cut_ways_dict), 'number of ways: ' + msg)
         self.assertEqual(2, len(way.refs), 'references of orig way: ' + msg)
 
-        msg = 'line with 3 nodes and one intersection point too short at start -> 1 way orig'
-        way.refs = [1, 2, 3]
-        my_line = shg.LineString([(0, 0), (0, 500), (0, 1000)])
+        msg = 'line with one intersection point too short at start -> 1 way orig'
+        way.refs = [1, 2, 3, 4, 5, 6]
+        my_line = shg.LineString([(0, 0), (0, 300), (0, 500), (0, 600), (0, 900), (0, 1000)])
         intersection_points = [shg.Point(0, parameters.BUILT_UP_AREA_LIT_BUFFER - 1)]
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
         self.assertEqual(1, len(cut_ways_dict), 'number of ways: ' + msg)
-        self.assertEqual(3, len(way.refs), 'references of orig way: ' + msg)
+        self.assertEqual(6, len(way.refs), 'references of orig way: ' + msg)
 
-        msg = 'line with 3 nodes and one intersection point too short at end -> 1 way orig'
-        way.refs = [1, 2, 3]
-        my_line = shg.LineString([(0, 0), (0, 500), (0, 1000)])
+        msg = 'line with 1 intersection point too short at end -> 1 way orig'
+        way.refs = [1, 2, 3, 4, 5, 6]
+        my_line = shg.LineString([(0, 0), (0, 300), (0, 500), (0, 600), (0, 900), (0, 1000)])
         intersection_points = [shg.Point(0, 1000 - (parameters.BUILT_UP_AREA_LIT_BUFFER - 1))]
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
         self.assertEqual(1, len(cut_ways_dict), 'number of ways: ' + msg)
-        self.assertEqual(4, len(way.refs), 'references of orig way: ' + msg)  # 1 more because inters.n point remains
+        self.assertEqual(7, len(way.refs), 'references of orig way: ' + msg)  # 1 more because intersec. point remains
 
-        msg = 'line with 3 nodes and 2 intersection points just after each other -> 1 way orig shorter, 2 new ways'
-        way.refs = [1, 2, 3]
-        my_line = shg.LineString([(0, 0), (0, 500), (0, 1000)])
+        msg = 'line with 2 intersection points just after each other -> 1 way orig shorter, 2 new ways'
+        way.refs = [1, 2, 3, 4, 5, 6]
+        my_line = shg.LineString([(0, 0), (0, 300), (0, 500), (0, 600), (0, 900), (0, 1000)])
         intersection_points = [shg.Point(0, parameters.BUILT_UP_AREA_LIT_BUFFER + 2),
                                shg.Point(0, 2 * parameters.BUILT_UP_AREA_LIT_BUFFER + 10)]
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
@@ -1519,4 +1464,28 @@ class TestUtilities(unittest.TestCase):
                                shg.Point(0, 400)]
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
         self.assertEqual(3, len(cut_ways_dict), 'number of ways: ' + msg)
+        self.assertEqual(3, len(way.refs), 'references of orig way: ' + msg)
+
+        msg = 'line with 1 intersection point almost at start -> 1 way orig'
+        way.refs = [1, 2, 3, 4, 5, 6]
+        my_line = shg.LineString([(0, 0), (0, 300), (0, 500), (0, 600), (0, 900), (0, 1000)])
+        intersection_points = [shg.Point(0, MIN_SEGMENT_LENGTH * 0.1)]
+        cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
+        self.assertEqual(1, len(cut_ways_dict), 'number of ways: ' + msg)
+        self.assertEqual(6, len(way.refs), 'references of orig way: ' + msg)
+
+        msg = 'line with 1 intersection point almost at end -> 1 way orig'
+        way.refs = [1, 2, 3, 4, 5, 6]
+        my_line = shg.LineString([(0, 0), (0, 300), (0, 500), (0, 600), (0, 900), (0, 1000)])
+        intersection_points = [shg.Point(0, MIN_SEGMENT_LENGTH * 0.1)]
+        cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
+        self.assertEqual(1, len(cut_ways_dict), 'number of ways: ' + msg)
+        self.assertEqual(6, len(way.refs), 'references of orig way: ' + msg)
+
+        msg = 'line with 1 intersection point almost at inner-reference -> 1 way orig'
+        way.refs = [1, 2, 3, 4, 5, 6]
+        my_line = shg.LineString([(0, 0), (0, 300), (0, 500), (0, 600), (0, 900), (0, 1000)])
+        intersection_points = [shg.Point(0, 500 + MIN_SEGMENT_LENGTH * 0.1)]
+        cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
+        self.assertEqual(2, len(cut_ways_dict), 'number of ways: ' + msg)
         self.assertEqual(3, len(way.refs), 'references of orig way: ' + msg)
