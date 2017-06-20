@@ -94,7 +94,7 @@ class Airport(object):
 
 
 def read_apt_dat_gz_file(min_lon: float, min_lat: float,
-                          max_lon: float, max_lat: float) -> List[Airport]:
+                         max_lon: float, max_lat: float) -> List[Airport]:
     apt_dat_gz_file = os.path.join(utilities.get_fg_root(), 'Airports', 'apt.dat.gz')
     start_time = time.time()
     airports = list()
@@ -126,14 +126,19 @@ def read_apt_dat_gz_file(min_lon: float, min_lat: float,
 
 
 def get_apt_dat_blocked_areas_from_airports(coords_transform: coordinates.Transformation,
+                                            min_lon: float, min_lat: float, max_lon: float, max_lat: float,
                                             airports: List[Airport]) -> List[Polygon]:
+    """Transforms runways in airports to polygons.
+    Even though get_apt_dat_blocked_areas(...) already checks for boundary it is checked here again because if used
+    from batch, then first boundary of whole batch area is used - and first then reduced to tile boundary."""
     blocked_areas = list()
     for airport in airports:
-        blocked_areas.extend(airport.create_blocked_areas(coords_transform))
+        if airport.within_boundary(min_lon, min_lat, max_lon, max_lat):
+            blocked_areas.extend(airport.create_blocked_areas(coords_transform))
     return blocked_areas
 
 
 def get_apt_dat_blocked_areas(coords_transform: coordinates.Transformation,
                               min_lon: float, min_lat: float, max_lon: float, max_lat: float) -> List[Polygon]:
     airports = read_apt_dat_gz_file(min_lon, min_lat, max_lon, max_lat)
-    return get_apt_dat_blocked_areas_from_airports(coords_transform, airports)
+    return get_apt_dat_blocked_areas_from_airports(coords_transform, min_lon, min_lat, max_lon, max_lat, airports)

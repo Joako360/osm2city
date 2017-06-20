@@ -503,7 +503,7 @@ class Roads(object):
                     if isinstance(my_line_difference, shg.LineString):
                         self._change_way_for_object(my_line_difference, way)
                         continue
-                    if isinstance(my_line_difference, shg.MultiLineString) and my_line_difference.geoms == 2:
+                    if isinstance(my_line_difference, shg.MultiLineString) and len(my_line_difference.geoms) == 2:
                         new_ways.append(self._split_way_for_object(my_line_difference, way))
 
         self.ways_list.extend(new_ways)
@@ -541,7 +541,7 @@ class Roads(object):
                         self._change_way_for_object(my_line_difference, way)
                         logging.debug("Reduced way length (osm_id=%d) due to static object.", way.osm_id)
                         continue
-                    if isinstance(my_line_difference, shg.MultiLineString) and my_line_difference.geoms == 2:
+                    if isinstance(my_line_difference, shg.MultiLineString) and len(my_line_difference.geoms) == 2:
                         new_ways.append(self._split_way_for_object(my_line_difference, way))
 
         self.ways_list.extend(new_ways)

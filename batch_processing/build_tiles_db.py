@@ -83,10 +83,15 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_l
         my_fg_elev = FGElev(the_coords_transform)
         my_stg_entries = utils.stg_io2.read_stg_entries_in_boundary(True, the_coords_transform)
 
-        # cannot be read once for all
+        # cannot be read once for all outside of tiles in main function
         my_blocked_areas = None
         if exec_argument in (Procedures.all, Procedures.buildings, Procedures.roads):
-            my_blocked_areas = aptdat_io.get_apt_dat_blocked_areas_from_airports(the_coords_transform, my_airports)
+            my_blocked_areas = aptdat_io.get_apt_dat_blocked_areas_from_airports(the_coords_transform,
+                                                                                 parameters.BOUNDARY_WEST,
+                                                                                 parameters.BOUNDARY_SOUTH,
+                                                                                 parameters.BOUNDARY_EAST,
+                                                                                 parameters.BOUNDARY_NORTH,
+                                                                                 my_airports)
 
         # run programs
         if exec_argument is Procedures.all:
@@ -218,8 +223,8 @@ if __name__ == '__main__':
 
     # get airports from apt_dat. Transformation to blocked areas can only be done in sub-process due to local
     # coordinate system
-    airports = aptdat_io.read_apt_dat_gz_file(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
-                                              parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
+    airports = aptdat_io.read_apt_dat_gz_file(boundary_west, boundary_south,
+                                              boundary_east, boundary_north)
 
     start_time = time.time()
     mp.set_start_method('spawn')  # use safe approach to make sure e.g. parameters module is initialized separately
