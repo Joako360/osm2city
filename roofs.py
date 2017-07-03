@@ -28,7 +28,7 @@ def flat(ac_object: ac.Object, b, roof_mgr: RoofManager, stats: Stats) -> None:
         if "compat:roof-pitched" in b.roof_requires:
             b.roof_requires.remove("compat:roof-pitched")
         b.roof_requires.append("compat:roof-flat")
-        b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_len, stats)
+        b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_length, stats)
 
     if b.polygon.interiors:
         outer_closest = copy.copy(b.outer_nodes_closest)
@@ -57,7 +57,7 @@ def flat(ac_object: ac.Object, b, roof_mgr: RoofManager, stats: Stats) -> None:
 
     l = []
     for i, node in enumerate(nodes):
-        l.append((node + b.first_node, uv[i][0], uv[i][1]))
+        l.append((node + b.index_first_node_in_ac3d_obj, uv[i][0], uv[i][1]))
     ac_object.face(l)
 
 

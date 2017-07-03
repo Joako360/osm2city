@@ -8,7 +8,7 @@ import copy
 import logging
 import random
 from math import sin, cos, tan, sqrt, pi
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 import myskeleton
 import numpy as np
@@ -74,7 +74,7 @@ class BuildingParent(object):
                 if 'building:facade:material' in child.tags:
                     building_facade_material = child.tags['building:facade:material']
             else:
-                if child.longest_edge_len > default_child.longest_edge_len:
+                if child.longest_edge_length > default_child.longest_edge_length:
                     default_child = child
                 if 'building:colour' in child.tags:
                     if building_colour is None:
@@ -124,10 +124,11 @@ class Building(object):
         self.stg_hdg = stg_hdg
         self.height = height
         self.roof_height = roof_height
-        self.roof_height_X = []
-        self.longest_edge_len = 0.
+        self.roof_height_X = []  # roof height at ground-node X
+        self.edge_length_x = None  # numpy array of side length between ground-node X and X+1
+        self.longest_edge_length = 0.  # the length of the longest edge
         self.levels = levels
-        self.first_node = 0  # index of first node in final OBJECT node list
+        self.index_first_node_in_ac3d_obj = 0  # index of first node in final OBJECT node list
         self.facade_texture = None
         self.roof_texture = None
         self.roof_complex = False  # if False then compat:roof-flat; else compat:roof-pitched
@@ -250,6 +251,174 @@ class Building(object):
     def area(self):
         return self.polygon.area
 
+    def compute_height_and_levels(self) -> None:
+        """Determines total height (and number of levels) of a building based on
+           OSM values and other logic"""
+        try:
+            if isinstance(self.height, int):
+                self.height = float(self.height)
+            assert(isinstance(self.height, float))
+        except AssertionError:
+            logging.warning("Building height has wrong type. Value is: %s", self.height)
+            self.height = 0
+        # -- try OSM height and levels first
+        if self.height > 0 and self.levels > 0:
+            return
+
+        level_height = _random_level_height()
+        if self.height > 0:
+            self.levels = int(self.height / level_height)
+            return
+        elif self.levels > 0:
+            pass
+        else:
+            # -- neither height nor levels given: use random levels
+            self.levels = _random_levels()
+            # b.levels = random_levels(dist=b.anchor.magnitude())  # gives CBD-like distribution
+
+            if self.area < parameters.BUILDING_MIN_AREA:
+                self.levels = min(self.levels, 2)
+        self.height = float(self.levels) * level_height
+
+    def is_large_enough(self) -> bool:
+        """Checks whether a given building's area is too small for inclusion.
+        Never drop tall buildings.
+        FIXME: Exclusion might be skipped if the building touches another building (i.e. an annex)
+        Returns true if the building should be included (i.e. area is big enough etc.)
+        """
+        if self.levels >= parameters.BUILDING_NEVER_SKIP_LEVELS:
+            return True
+        if self.inner_rings_list:  # never skip a building with inner rings
+            return True
+        if self.parent is not None:  # if we have a parent, then keep always
+            return True
+        if self.area < parameters.BUILDING_MIN_AREA or \
+                (self.area < parameters.BUILDING_REDUCE_THRESHOLD and
+                 random.uniform(0, 1) < parameters.BUILDING_REDUCE_RATE):
+            return False
+        return True
+
+    def compute_roof_height(self) -> None:
+        """Compute roof_height for each node"""
+        max_height = self.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO
+
+        self.roof_height = 0
+        temp_roof_height = 0  # temp variable before assigning to self
+
+        if self.roof_type == 'skillion':
+            # get global roof_height and height for each vertex
+            if 'roof:height' in self.tags:
+                # force clean of tag if the unit is given
+                temp_roof_height = utils.osmparser.parse_length(self.tags['roof:height'])
+            else:
+                if 'roof:angle' in self.tags:
+                    angle = float(self.tags['roof:angle'])
+                else:
+                    angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE,
+                                           parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
+
+                while angle > 0:
+                    temp_roof_height = tan(np.deg2rad(angle)) * (self.edge_length_x[1] / 2)
+                    if temp_roof_height < max_height:
+                        break
+                    angle -= 1
+
+            if 'roof:slope:direction' in self.tags:
+                # Input angle
+                # angle are given clock wise with reference 0 as north
+                #
+                # angle 0 north
+                # angle 90 east
+                # angle 180 south
+                # angle 270 west
+                # angle 360 north
+                #
+                # here we works with trigo angles
+                angle00 = pi / 2. - (((utils.osmparser.parse_direction(self.tags['roof:slope:direction'])) % 360.)
+                                     * pi / 180.)
+            else:
+                angle00 = 0
+
+            angle90 = angle00 + pi / 2.
+            # assume that first point is on the bottom side of the roof
+            # and is a reference point (0,0)
+            # compute line slope*x
+
+            slope = sin(angle90)
+
+            dir1n = (cos(angle90), slope)  # (1/ndir1, slope/ndir1)
+
+            # keep in mind direction
+            # if angle90 < 270 and angle90 >= 90 :
+            #    #dir1, dir1n = -dir1, -dir1n
+            #    dir1=(-dir1[0],-dir1[1])
+            #    dir1n=(-dir1n[0],-dir1n[1])
+
+            # compute distance from points to line slope*x
+            X2 = list()
+            XN = list()
+            nXN = list()
+            vprods = list()
+
+            X = self.X
+
+            p0 = (X[0][0], X[0][1])
+            for i in range(0, len(X)):
+                # compute coord in new referentiel
+                vecA = (X[i][0] - p0[0], X[i][1] - p0[1])
+                X2.append(vecA)
+                #
+                norm = vecA[0] * dir1n[0] + vecA[1] * dir1n[1]
+                vecN = (vecA[0] - norm * dir1n[0], vecA[1] - norm * dir1n[1])
+                nvecN = sqrt(vecN[0] ** 2 + vecN[1] ** 2)
+                # store vec and norms
+                XN.append(vecN)
+                nXN.append(nvecN)
+                # compute ^ product
+                vprod = dir1n[0] * vecN[1] - dir1n[1] * vecN[0]
+                vprods.append(vprod)
+
+            # if first point was not on bottom side, one must find the right point
+            # and correct distances
+            if min(vprods) < 0:
+                ibottom = vprods.index(min(vprods))
+                offset = nXN[ibottom]
+                norms_o = [nXN[i] + offset if vprods[i] >= 0 else -nXN[i] + offset for i in
+                           range(0, len(X))]  # oriented norm
+            else:
+                norms_o = nXN
+
+            # compute height for each point with thales
+            L = float(max(norms_o))
+
+            self.roof_height_X = [temp_roof_height * l / L for l in norms_o]
+            self.roof_height = temp_roof_height
+
+        else:  # roof types other than skillion
+            if 'roof:height' in self.tags:
+                # get roof:height given by osm
+                self.roof_height = utils.osmparser.parse_length(self.tags['roof:height'])
+
+            else:
+                # random roof:height
+                if self.roof_type == 'flat':
+                    self.roof_height = 0
+                else:
+                    if 'roof:angle' in self.tags:
+                        angle = float(self.tags['roof:angle'])
+                    else:
+                        angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE,
+                                               parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
+                    while angle > 0:
+                        temp_roof_height = tan(np.deg2rad(angle)) * (self.edge_length_x[1] / 2)
+                        if temp_roof_height < max_height:
+                            break
+                        angle -= 5
+                    if temp_roof_height > max_height:
+                        logging.warning("roof too high %g > %g" % (temp_roof_height, max_height))
+
+                    self.roof_height = temp_roof_height
+
 
 def _random_level_height() -> float:
     """ Calculates the height for each level of a building based on place and random factor"""
@@ -267,19 +436,19 @@ def _random_levels() -> int:
                                        parameters.BUILDING_CITY_LEVELS_MODE)))
 
 
-def _check_height(building_height, t):
-    """check if a texture t fits the building height (h)
-       v-repeatable textures are repeated to fit h
-       For non-repeatable textures,
-       - check if h is within the texture's limits (minheight, maxheight)
-       -
+def _calculate_vertical_texture_coords(building_height: float, t: tex.Texture) -> Tuple[float, float]:
+    """Check if a texture t fits the building height (h) and return the bottom and top relative position of the tex.
+    I.e. return numbers between 0 and 1, where 1 is at the top.
+    v-repeatable textures are repeated to fit h
+    For non-repeatable textures,
+       - check if h is within the texture's limits (min_height, max_height)
     """
     if t.v_can_repeat:
         # -- v-repeatable textures are rotated 90 deg in atlas.
         #    Face will be rotated later on, so his here will actually be u
-        tex_y1 = 1.
-        tex_y0 = 1 - building_height / t.v_size_meters
-        return tex_y0, tex_y1
+        tex_coord_top = 1.
+        tex_coord_bottom = 1 - building_height / t.v_size_meters
+        return tex_coord_bottom, tex_coord_top
         # FIXME: respect v_cuts
     else:
         # x min_height < height < max_height
@@ -292,188 +461,21 @@ def _check_height(building_height, t):
                 logging.verbose("from bottom")
                 for i in range(len(t.v_cuts_meters)):
                     if t.v_cuts_meters[i] >= building_height:
-                        tex_y0 = 0
-                        tex_y1 = t.v_cuts[i]
-                        return tex_y0, tex_y1
+                        tex_coord_bottom = 0
+                        tex_coord_top = t.v_cuts[i]
+                        return tex_coord_bottom, tex_coord_top
             else:
                 for i in range(len(t.v_cuts_meters)-2, -1, -1):
                     if t.v_cuts_meters[-1] - t.v_cuts_meters[i] >= building_height:
                         # FIXME: probably a bug. Should use distance to height?
-                        tex_y0 = t.v_cuts[i]
-                        tex_y1 = 1
+                        tex_coord_bottom = t.v_cuts[i]
+                        tex_coord_top = 1
 
-                        return tex_y0, tex_y1
+                        return tex_coord_bottom, tex_coord_top
             raise ValueError("SHOULD NOT HAPPEN! found no tex_y0, tex_y1 (building_height %g splits %s %g)" %
                              (building_height, str(t.v_cuts_meters), t.v_size_meters))
         else:
             return 0, 0
-
-
-def _is_large_enough(b: Building) -> bool:
-    """Checks whether a given building's area is too small for inclusion.
-    Never drop tall buildings.
-    FIXME: Exclusion might be skipped if the building touches another building (i.e. an annex)
-    Returns true if the building should be included (i.e. area is big enough etc.)
-    """
-    if b.levels >= parameters.BUILDING_NEVER_SKIP_LEVELS: 
-        return True
-    if b.inner_rings_list:  # never skip a building with inner rings
-        return True
-    if b.parent is not None:  # if we have a parent, then keep always
-        return True
-    if b.area < parameters.BUILDING_MIN_AREA or \
-       (b.area < parameters.BUILDING_REDUCE_THRESHOLD and random.uniform(0, 1) < parameters.BUILDING_REDUCE_RATE):
-        return False
-    return True
-
-
-def _compute_height_and_levels(b: Building) -> None:
-    """Determines total height (and number of levels) of a building based on
-       OSM values and other logic"""
-    try:
-        if isinstance(b.height, int):
-            b.height = float(b.height)
-        assert(isinstance(b.height, float))
-    except AssertionError:
-        logging.warning("Building height has wrong type. Value is: %s", b.height)
-        b.height = 0
-    # -- try OSM height and levels first
-    if b.height > 0 and b.levels > 0:
-        return
-
-    level_height = _random_level_height()
-    if b.height > 0:
-        b.levels = int(b.height / level_height)
-        return
-    elif b.levels > 0:
-        pass
-    else:
-        # -- neither height nor levels given: use random levels
-        b.levels = _random_levels()
-        # b.levels = random_levels(dist=b.anchor.magnitude())  # gives CBD-like distribution
-
-        if b.area < parameters.BUILDING_MIN_AREA:
-            b.levels = min(b.levels, 2)
-    b.height = float(b.levels) * level_height
-
-
-def _compute_roof_height(b: Building, max_height: float=1e99):
-    """Compute roof_height for each node"""
-
-    b.roof_height = 0
-    
-    if b.roof_type == 'skillion':
-        # get global roof_height and height for each vertex
-        if 'roof:height' in b.tags:
-            # force clean of tag if the unit is given
-            roof_height = utils.osmparser.parse_length(b.tags['roof:height'])
-        else:
-            if 'roof:angle' in b.tags:
-                angle = float(b.tags['roof:angle'])
-            else:
-                angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE,
-                                       parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
-
-            while angle > 0:
-                roof_height = tan(np.deg2rad(angle)) * (b.lenX[1]/2)
-                if roof_height < max_height:
-                    break
-                angle -= 1
-
-        if 'roof:slope:direction' in b.tags:
-            # Input angle
-            # angle are given clock wise with reference 0 as north
-            #
-            # angle 0 north
-            # angle 90 east
-            # angle 180 south
-            # angle 270 west
-            # angle 360 north
-            #
-            # here we works with trigo angles
-            angle00 = pi/2. - (((utils.osmparser.parse_direction(b.tags['roof:slope:direction'])) % 360.) * pi / 180.)
-        else:
-            angle00 = 0
-
-        angle90 = angle00 + pi/2.
-        # assume that first point is on the bottom side of the roof
-        # and is a reference point (0,0)
-        # compute line slope*x
-
-        slope = sin(angle90)
-
-        dir1n = (cos(angle90), slope)  # (1/ndir1, slope/ndir1)
-
-        # keep in mind direction
-        #if angle90 < 270 and angle90 >= 90 :
-        #    #dir1, dir1n = -dir1, -dir1n
-        #    dir1=(-dir1[0],-dir1[1])
-        #    dir1n=(-dir1n[0],-dir1n[1])
-
-        # compute distance from points to line slope*x
-        X2 = list()
-        XN = list()
-        nXN = list()
-        vprods = list()
-
-        X = b.X
-
-        p0 = (X[0][0], X[0][1])
-        for i in range(0, len(X)):
-            # compute coord in new referentiel
-            vecA = (X[i][0]-p0[0], X[i][1]-p0[1])
-            X2.append(vecA)
-            #
-            norm = vecA[0]*dir1n[0] + vecA[1]*dir1n[1]
-            vecN = (vecA[0] - norm*dir1n[0], vecA[1] - norm*dir1n[1])
-            nvecN = sqrt(vecN[0]**2 + vecN[1]**2)
-            # store vec and norms
-            XN.append(vecN)
-            nXN.append(nvecN)
-            # compute ^ product
-            vprod = dir1n[0]*vecN[1]-dir1n[1]*vecN[0]
-            vprods.append(vprod)
-
-        # if first point was not on bottom side, one must find the right point
-        # and correct distances
-        if min(vprods) < 0:
-            ibottom = vprods.index(min(vprods))
-            offset = nXN[ibottom]
-            norms_o = [nXN[i] + offset if vprods[i] >= 0 else -nXN[i] + offset for i in range(0, len(X))]  # oriented norm
-        else:
-            norms_o = nXN
-
-        # compute height for each point with thales
-        L = float(max(norms_o))
-
-        b.roof_height_X = [roof_height*l/L for l in norms_o]
-        b.roof_height = roof_height
-
-    else:  # roof types other than skillion
-        try:
-            # get roof:height given by osm
-            b.roof_height = utils.osmparser.parse_length(b.tags['roof:height'])
-            
-        except:
-            # random roof:height
-            if b.roof_type == 'flat':
-                b.roof_height = 0
-            else:
-                if 'roof:angle' in b.tags:
-                    angle = float(b.tags['roof:angle'])
-                else:
-                    angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE, parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
-                while angle > 0:
-                    roof_height = tan(np.deg2rad(angle)) * (b.lenX[1]/2)
-                    if roof_height < max_height:
-                        break
-                    angle -= 5
-                if roof_height > max_height:
-                    logging.warning("roof too high %g > %g" % (roof_height, max_height))
-                    return False
-                    
-                b.roof_height = roof_height
-    return
 
 
 def decide_lod(buildings: List[Building], stats: Stats) -> None:
@@ -576,12 +578,12 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
         stats.nodes_ground += b.nnodes_ground
 
         # -- compute edge length
-        b.lenX = np.zeros((b.nnodes_ground))
+        b.edge_length_x = np.zeros((b.nnodes_ground))
         for i in range(b.nnodes_outer - 1):
-            b.lenX[i] = ((Xo[i + 1, 0] - Xo[i, 0]) ** 2 + (Xo[i + 1, 1] - Xo[i, 1]) ** 2) ** 0.5
+            b.edge_length_x[i] = ((Xo[i + 1, 0] - Xo[i, 0]) ** 2 + (Xo[i + 1, 1] - Xo[i, 1]) ** 2) ** 0.5
         n = b.nnodes_outer
-        b.lenX[n - 1] = ((Xo[0, 0] - Xo[n - 1, 0]) ** 2 + (Xo[0, 1] - Xo[n - 1, 1]) ** 2) ** 0.5
-        b.longest_edge_len = max(b.lenX)
+        b.edge_length_x[n - 1] = ((Xo[0, 0] - Xo[n - 1, 0]) ** 2 + (Xo[0, 1] - Xo[n - 1, 1]) ** 2) ** 0.5
+        b.longest_edge_length = max(b.edge_length_x)
 
         if b.inner_rings_list:
             i0 = b.nnodes_outer
@@ -589,30 +591,27 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
                 Xi = np.array(interior.coords)[:-1]
                 n = len(Xi)
                 for i in range(n - 1):
-                    b.lenX[i0 + i] = ((Xi[i + 1, 0] - Xi[i, 0]) ** 2 + (Xi[i + 1, 1] - Xi[i, 1]) ** 2) ** 0.5
-                b.lenX[i0 + n - 1] = ((Xi[0, 0] - Xi[n - 1, 0]) ** 2 + (Xi[0, 1] - Xi[n - 1, 1]) ** 2) ** 0.5
+                    b.edge_length_x[i0 + i] = ((Xi[i + 1, 0] - Xi[i, 0]) ** 2 + (Xi[i + 1, 1] - Xi[i, 1]) ** 2) ** 0.5
+                b.edge_length_x[i0 + n - 1] = ((Xi[0, 0] - Xi[n - 1, 0]) ** 2 + (Xi[0, 1] - Xi[n - 1, 1]) ** 2) ** 0.5
                 i0 += n
 
         # -- re-number nodes such that longest edge is first -- only on simple buildings
         if b.nnodes_outer == 4 and not b.X_inner:
-            if b.lenX[0] < b.lenX[1]:
+            if b.edge_length_x[0] < b.edge_length_x[1]:
                 Xo = np.roll(Xo, 1, axis=0)
-                b.lenX = np.roll(b.lenX, 1)
+                b.edge_length_x = np.roll(b.edge_length_x, 1)
                 b._set_polygon(Xo, b.inner_rings_list)
 
-        b.lenX = b.lenX  # FIXME: compute on the fly, or on set_polygon()? Or is there a shapely equivalent?
-
         # -- work on height and levels
-
-        _compute_height_and_levels(b)
+        b.compute_height_and_levels()
 
         # -- check area
-        if not _is_large_enough(b):
+        if not b.is_large_enough():
             stats.skipped_small += 1
             continue
 
         if b.height < parameters.BUILDING_MIN_HEIGHT:
-            logging.verbose("Skipping small building with height < building_min_height parameter")
+            logging.debug("Skipping small building with height < building_min_height parameter")
             stats.skipped_small += 1
             continue
 
@@ -721,17 +720,16 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
             pass
 
         # ****** determine facade and roof textures *******
-        logging.verbose("___find facade for building %i" % b.osm_id)
-
-        b.facade_texture = facade_mgr.find_matching_facade(facade_requires, b.tags, b.height, b.longest_edge_len, stats)
+        b.facade_texture = facade_mgr.find_matching_facade(facade_requires, b.tags, b.height, b.longest_edge_length, stats)
         if b.facade_texture:
-            logging.verbose("__done" + str(b.facade_texture) + str(b.facade_texture.provides))
+            logging.debug('Facade texture for osm_id {}: {} - {}'.format(b.osm_id, str(b.facade_texture),
+                                                                         str(b.facade_texture.provides)))
         else:
             stats.skipped_texture += 1
-            logging.debug("Skipping building with osm_id %d (no matching facade texture)" % b.osm_id)
+            logging.debug("Skipping building with osm_id %d: (no matching facade texture)" % b.osm_id)
             continue
-        if b.longest_edge_len > b.facade_texture.width_max:
-            logging.debug("Skipping building with osm_id : %d b.longest_edge_len > b.facade_texture.width_max" % b.osm_id)
+        if b.longest_edge_length > b.facade_texture.width_max:
+            logging.debug("Skipping building with osm_id %d: b.longest_edge_len > b.facade_texture.width_max" % b.osm_id)
             continue
 
         # roof search
@@ -767,7 +765,7 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
 
         # Find roof texture
         logging.verbose("___find roof for building %i" % b.osm_id)
-        b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_len, stats)
+        b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_length, stats)
         if not b.roof_texture:
             stats.skipped_texture += 1
             logging.debug("WARNING: no matching roof texture for osm_id %d <%s>" % (b.osm_id, str(b.roof_requires)))
@@ -802,17 +800,17 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
     return new_buildings
 
 
-def _write_and_count_vert(ac_object: ac3d.Object, b: Building) -> None:
-    """Write numvert tag to .ac, update stats."""
+def _write_vertices_for_building(ac_object: ac3d.Object, b: Building) -> None:
+    """Write the vertices for each node along bottom and roof edges to the ac3d object."""
 
-    b.first_node = ac_object.next_node_index()
+    b.index_first_node_in_ac3d_obj = ac_object.next_node_index()
 
     z = b.ground_elev - 0.1  # FIXME: instead maybe we should have 1 meter of "bottom" texture
     try:
         z -= b.correct_ground
     except:
         pass
-    
+
     try:
         if 'min_height' in b.tags:
             min_height = utils.osmparser.parse_length(b.tags['min_height'])
@@ -848,48 +846,89 @@ def _write_and_count_vert(ac_object: ac3d.Object, b: Building) -> None:
     b.ceiling = b.ground_elev + b.height
 
 
-def _write_ring(out: ac3d.Object, b, ring, v0, texture, tex_y0, tex_y1):
-    tex_y0 = texture.y(tex_y0)  # -- to atlas coordinates
-    tex_y1_input = tex_y1
-    tex_y1 = texture.y(tex_y1)
+def _write_faces_for_building(out: ac3d.Object, b: Building, ring: shg.LinearRing, is_exterior_ring: bool) -> None:
+    """Writes all the faces for one building's exterior or interior ring to an ac3d object."""
+    tex_coord_bottom, tex_coord_top = _calculate_vertical_texture_coords(b.height, b.facade_texture)
+    tex_coord_bottom = b.facade_texture.y(tex_coord_bottom)  # -- to atlas coordinates
+    tex_coord_top_input = tex_coord_top
+    tex_coord_top = b.facade_texture.y(tex_coord_top)
 
-    nnodes_ring = len(ring.coords) - 1
-    v1 = v0 + nnodes_ring
-    
-    for ioff in range(0, v1-v0):  # range(0, v1-v0-1):
-        i = v0 + ioff
-        if False:
-            tex_x1 = texture.x(b.lenX[i] / texture.h_size_meters)  # -- simply repeat texture to fit length
+    number_outer_ring_nodes = b.nnodes_outer
+    if is_exterior_ring:
+        number_outer_ring_nodes = 0
+
+    number_ring_nodes = len(ring.coords) - 1
+
+    for ioff in range(0, number_ring_nodes):
+        i = number_outer_ring_nodes + ioff
+
+        if ioff < number_ring_nodes - 1:
+            ipp = i + 1
         else:
-            ipp = i+1 if ioff < v1-v0-1 else v0
-            # FIXME: respect facade texture split_h
-            # FIXME: there is a nan in textures.h_splits of tex/facade_modern36x36_12
-            a = b.lenX[i] / texture.h_size_meters
-            ia = int(a)
-            frac = a - ia
-            tex_x1 = texture.x(texture.closest_h_match(frac) + ia)
-            if texture.v_can_repeat:
-                if not (tex_x1 <= 1.):
-                    logging.debug('FIXME: v_can_repeat: need to check in analyse')
+            ipp = number_outer_ring_nodes
+        # FIXME: respect facade texture split_h
+        # FIXME: there is a nan in textures.h_splits of tex/facade_modern36x36_12
+        a = b.edge_length_x[i] / b.facade_texture.h_size_meters
+        ia = int(a)
+        frac = a - ia
+        tex_coord_right = b.facade_texture.x(b.facade_texture.closest_h_match(frac) + ia)
+        if b.facade_texture.v_can_repeat:
+            if not (tex_coord_right <= 1.):
+                logging.debug('FIXME: v_can_repeat: need to check in analyse')
 
+        if b.roof_type == 'skillion':
+            tex_y12 = b.facade_texture.y((b.height - b.roof_height + b.roof_height_X[i])/b.height * tex_coord_top_input)
+            tex_y11 = b.facade_texture.y((b.height - b.roof_height + b.roof_height_X[ipp])/b.height * tex_coord_top_input)
+        else:
+            tex_y12 = tex_coord_top
+            tex_y11 = tex_coord_top
+
+        tex_coord_left = b.facade_texture.x(0)
+
+        out.face([(i + b.index_first_node_in_ac3d_obj, tex_coord_left, tex_coord_bottom),
+                  (ipp + b.index_first_node_in_ac3d_obj, tex_coord_right, tex_coord_bottom),
+                  (ipp + b.index_first_node_in_ac3d_obj + b.nnodes_ground, tex_coord_right, tex_y11),
+                  (i + b.index_first_node_in_ac3d_obj + b.nnodes_ground, tex_coord_left, tex_y12)],
+                 swap_uv=b.facade_texture.v_can_repeat)
+
+
+def _write_roof_for_building(ac_object: ac3d.Object, b: Building, roof_mgr: tex.RoofManager,
+                             cluster_offset: Vec2d, stats: Stats) -> None:
+    """Writes the roof verteces and faces to an ac3d object."""
+    if not b.roof_complex:
+        roofs.flat(ac_object, b, roof_mgr, stats)
+
+    else:
+        # -- pitched roof for > 4 ground nodes
+        if b.nnodes_ground > 4 and parameters.BUILDING_SKEL_ROOFS:
             if b.roof_type == 'skillion':
-                tex_y12 = texture.y((b.height - b.roof_height + b.roof_height_X[i])/b.height * tex_y1_input)
-                tex_y11 = texture.y((b.height - b.roof_height + b.roof_height_X[ipp])/b.height * tex_y1_input)
+                roofs.separate_skillion(ac_object, b)
+            elif b.roof_type in ['pyramidal', 'dome']:
+                roofs.separate_pyramidal(ac_object, b)
             else:
-                tex_y12 = tex_y1
-                tex_y11 = tex_y1
+                s = myskeleton.myskel(ac_object, b, stats, offset_xy=cluster_offset,
+                                      offset_z=b.ground_elev + b.height - b.roof_height,
+                                      max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
+                if s:
+                    stats.have_complex_roof += 1
 
-        tex_x0 = texture.x(0)
-        # compute indices to handle closing wall
-        j = i + b.first_node
-        jpp = ipp + b.first_node  
-
-        out.face([(j, tex_x0, tex_y0),
-                  (jpp, tex_x1, tex_y0),
-                  (jpp + b.nnodes_ground, tex_x1, tex_y11),
-                  (j + b.nnodes_ground, tex_x0, tex_y12)],
-                 swap_uv=texture.v_can_repeat)     
-    return v1
+                else:  # -- fall back to flat roof
+                    roofs.flat(ac_object, b, roof_mgr, stats)
+        # -- pitched roof for exactly 4 ground nodes
+        else:
+            if b.roof_type == 'gabled' or b.roof_type == 'half-hipped':
+                roofs.separate_gable(ac_object, b)
+            elif b.roof_type == 'hipped':
+                roofs.separate_hipped(ac_object, b)
+            elif b.roof_type in ['pyramidal', 'dome']:
+                roofs.separate_pyramidal(ac_object, b)
+            elif b.roof_type == 'skillion':
+                roofs.separate_skillion(ac_object, b)
+            elif b.roof_type == 'flat':
+                roofs.flat(ac_object, b, roof_mgr, stats)
+            else:
+                logging.debug("FIXME simple roof type %s unsupported ", b.roof_type)
+                roofs.flat(ac_object, b, roof_mgr, stats)
 
 
 def write(ac_file_name: str, buildings: List[Building], fg_elev: FGElev,
@@ -900,34 +939,26 @@ def write(ac_file_name: str, buildings: List[Building], fg_elev: FGElev,
        All LOD in one file. Plus roofs. One ac3d.Object per LOD
     """
     ac = ac3d.File(stats=stats)
-    lod_objects = list()
     texture_name = tm.atlas_file_name + '.png'
     if parameters.FLAG_2017_2:
         texture_name = 'Textures/osm2city/atlas_facades.png'
+    lod_objects = list()  # a list of meshes, where each LOD has one mesh
     lod_objects.append(ac.new_object('LOD_rough', texture_name, default_mat_idx=ac3d.MAT_IDX_LIT))
     lod_objects.append(ac.new_object('LOD_detail', texture_name, default_mat_idx=ac3d.MAT_IDX_LIT))
 
     # get local medium ground elevation for each building
-    for ib, b in enumerate(buildings):
+    for b in buildings:
         b.set_ground_elev_and_offset(fg_elev, cluster_elev, cluster_offset)
-    
-    # Update building hierarchy information
-    for ib, b in enumerate(buildings):
-        try:
-            b.ground_elev = float(b.ground_elev)
-        except:
-            logging.fatal("non float elevation for building %d" % b.osm_id)
-            exit(1)
 
     # Correct height
-    for ib, b in enumerate(buildings):
+    for b in buildings:
         auto_correct = True
         try:
             b.ground_elev += b.correct_ground
             auto_correct = False
-        except:
+        except Exception as e:
             pass
-                
+
         # auto-correct
         if auto_correct:
             if b.ground_elev_max > (b.height - b.roof_height - 2):
@@ -938,60 +969,23 @@ def write(ac_file_name: str, buildings: List[Building], fg_elev: FGElev,
         progress(ib, len(buildings))
         ac_object = lod_objects[b.LOD]
 
-        _compute_roof_height(b, max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
+        b.compute_roof_height()
         
-        _write_and_count_vert(ac_object, b)
+        _write_vertices_for_building(ac_object, b)
 
-        tex_y0, tex_y1 = _check_height(b.height, b.facade_texture)
-
-        if b.facade_texture != 'wall_no':
-            _write_ring(ac_object, b, b.polygon.exterior, 0, b.facade_texture, tex_y0, tex_y1)
-            v0 = b.nnodes_outer
-            for inner in b.polygon.interiors:
-                v0 = _write_ring(ac_object, b, inner, v0, b.facade_texture, tex_y0, tex_y1)
+        _write_faces_for_building(ac_object, b, b.polygon.exterior, True)
+        for inner in b.polygon.interiors:
+            _write_faces_for_building(ac_object, b, inner, False)
 
         if not parameters.EXPERIMENTAL_INNER and len(b.polygon.interiors) > 1:
             raise NotImplementedError("Can't yet handle relations with more than one inner way")
 
-        if not b.roof_complex:
-            roofs.flat(ac_object, b, roof_mgr, stats)
-
-        else:
-            # -- pitched roof for > 4 ground nodes
-            if b.nnodes_ground > 4 and parameters.BUILDING_SKEL_ROOFS:
-                if b.roof_type == 'skillion':
-                    roofs.separate_skillion(ac_object, b)
-                elif b.roof_type in ['pyramidal', 'dome']:
-                    roofs.separate_pyramidal(ac_object, b)
-                else:
-                    s = myskeleton.myskel(ac_object, b, stats, offset_xy=cluster_offset,
-                                          offset_z=b.ground_elev + b.height - b.roof_height,
-                                          max_height=b.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO)
-                    if s:
-                        stats.have_complex_roof += 1
-
-                    else:  # -- fall back to flat roof
-                        roofs.flat(ac_object, b, roof_mgr, stats)
-            # -- pitched roof for exactly 4 ground nodes
-            else:
-                if b.roof_type == 'gabled' or b.roof_type == 'half-hipped':
-                    roofs.separate_gable(ac_object, b)
-                elif b.roof_type == 'hipped':
-                    roofs.separate_hipped(ac_object, b)
-                elif b.roof_type in ['pyramidal', 'dome']:
-                    roofs.separate_pyramidal(ac_object, b)
-                elif b.roof_type == 'skillion':
-                    roofs.separate_skillion(ac_object, b)
-                elif b.roof_type == 'flat':
-                    roofs.flat(ac_object, b, roof_mgr, stats)
-                else:
-                    logging.debug("FIXME simple roof type %s unsupported ", b.roof_type)
-                    roofs.flat(ac_object, b, roof_mgr, stats)
+        _write_roof_for_building(ac_object, b, roof_mgr, cluster_offset, stats)
 
     ac.write(ac_file_name)
 
 
-def map_building_type(tags) -> str:
+def map_building_type(tags: Dict[str, str]) -> str:
     if 'building' in tags and not tags['building'] == 'yes':
         return tags['building']
     return 'unknown'
@@ -1031,7 +1025,7 @@ def overlap_check_convex_hull(buildings: List[Building], stg_entries: List[utils
                         logging.debug("Convex hull of object '%s' is intersecting. Skipping building '%s' (osm_id %d)",
                                       entry.obj_filename, building.name, building.osm_id)
                     break
-            except TopologicalError as e:
+            except TopologicalError:
                 logging.exception('Convex hull could not be checked due to topology problem - building osm_id: %d',
                                   building.osm_id)
 
