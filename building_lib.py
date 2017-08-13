@@ -117,25 +117,25 @@ class Building(object):
                  height: float, levels: int,
                  stg_typ: STGVerbType=None, stg_hdg=None, inner_rings_list=list(), building_type='unknown',
                  roof_type: str='flat', roof_height: int=0, refs: List[int]=list()) -> None:
+        # set during init and methods called by init
         self.osm_id = osm_id
         self.tags = tags
+        self.is_external_model = False
+        if parameters.USE_EXTERNAL_MODELS:
+            if 'model3d' in tags:
+                self.is_external_model = True
+                self.model3d = tags['model3d']
+                self.angle3d = tags['angle3d']
         self.name = name
+        self.height = height
+        self.levels = levels
         self.stg_typ = stg_typ  # STGVerbType
         self.stg_hdg = stg_hdg
-        self.height = height
-        self.roof_height = roof_height
-        self.roof_height_X = []  # roof height at ground-node X
-        self.edge_length_x = None  # numpy array of side length between ground-node X and X+1
-        self.levels = levels
-        self.index_first_node_in_ac3d_obj = 0  # index of first node in final OBJECT node list
-        self.facade_texture = None
-        self.roof_texture = None
-        self.roof_complex = False  # if False then compat:roof-flat; else compat:roof-pitched
-        self.roof_requires = list()
+        self.building_type = building_type
         self.roof_type = roof_type  # str: flat, skillion, pyramidal, dome, gabled, half-hipped, hipped
-        self.ceiling = 0.
-        self.LOD = None  # see utils.utilities.LOD for values
+        self.roof_height = roof_height
 
+        # set during method called by init(...) through self.update_geometry and related sub-calls
         self.refs = None
         self.inner_rings_list = None
         self.outer_nodes_closest = None
@@ -143,19 +143,26 @@ class Building(object):
         self.polygon = None
         self.update_geometry(outer_ring, inner_rings_list, refs)
 
-        self.building_type = building_type
+        # set in buildings.py for building relations prior to building_lib.analyse(...)
+        # - from building._process_simple_3d_building(...)
         self.parent = None  # BuildingParent if available
+        # - from building._process_lonely_building_parts(...)
         self.pseudo_parents = list()  # list of Building: only set for building:part without a real parent
+
+        # set after init(...)
+        self.roof_height_X = []  # roof height at ground-node X
+        self.edge_length_x = None  # numpy array of side length between ground-node X and X+1
+        self.index_first_node_in_ac3d_obj = 0  # index of first node in final OBJECT node list
+        self.facade_texture = None
+        self.roof_texture = None
+        self.roof_complex = False  # if False then compat:roof-flat; else compat:roof-pitched
+        self.roof_requires = list()
+        self.LOD = None  # see utils.utilities.LOD for values
+
         self.correct_ground = None
         self.ground_elev = None
         self.ground_elev_min = None
         self.ground_elev_max = None
-        self.is_external_model = False
-        if parameters.USE_EXTERNAL_MODELS:
-            if 'model3d' in tags:
-                self.is_external_model = True
-                self.model3d = tags['model3d']
-                self.angle3d = tags['angle3d']
 
     def update_geometry(self, outer_ring: shg.LinearRing, inner_rings_list=list(), refs: List[int]=list()) -> None:
         self.refs = refs
@@ -254,6 +261,10 @@ class Building(object):
     @property
     def longest_edge_length(self):
         return max(self.edge_length_x)
+
+    @property
+    def top_of_roof(self):  # aka. ceiling
+        return self.ground_elev + self.height
 
     def _analyse_facade_roof_requirements(self) -> List[str]:
         """Determines the requirements for facade (textures) and depending on requirements found updates roof reqs."""
@@ -658,7 +669,6 @@ class Building(object):
             #
             for x in self.X:
                 ac_object.node(-x[1], self.ground_elev + self.height - self.roof_height, -x[0])
-        self.ceiling = self.ground_elev + self.height
 
     def _write_faces_for_ac(self, ac_object: ac3d.Object, ring: shg.LinearRing, is_exterior_ring: bool) -> None:
         """Writes all the faces for one building's exterior or interior ring to an ac3d object."""
@@ -1001,6 +1011,8 @@ def map_building_type(tags: Dict[str, str]) -> str:
 
 
 def overlap_check_blocked_areas(buildings: List[Building], blocked_areas: List[shg.Polygon]) -> List[Building]:
+    """Checks each building whether it overlaps with a blocked area and excludes it from the returned list of True.
+    Uses intersection checking - i.e. not touches or disjoint."""
     cleared_buildings = list()
     for building in buildings:
         is_intersected = False
@@ -1016,8 +1028,7 @@ def overlap_check_blocked_areas(buildings: List[Building], blocked_areas: List[s
 
 def overlap_check_convex_hull(buildings: List[Building], stg_entries: List[utils.stg_io2.STGEntry],
                               stats: Stats) -> List[Building]:
-    """Checks for all buildings whether their polygon intersects with a static or shared object's convex hull.
-    """
+    """Checks for all buildings whether their polygon intersects with a static or shared object's convex hull."""
     cleared_buildings = list()
 
     for building in buildings:

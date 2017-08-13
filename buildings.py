@@ -60,7 +60,7 @@ import multiprocessing as mp
 import os
 import random
 import textwrap
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import shapely.geometry as shg
 
@@ -553,7 +553,7 @@ def _write_xml(path: str, file_name: str, the_buildings: List[building_lib.Build
             for i in np.arange(0, b.nnodes_outer, b.nnodes_outer/4.):
                 xo = Xo[int(i+0.5), 0] - cluster_offset.x
                 yo = Xo[int(i+0.5), 1] - cluster_offset.y
-                zo = b.ceiling + 1.5
+                zo = b.top_of_roof + 1.5
                 # <path>cursor.ac</path>
                 xml.write(textwrap.dedent("""
                 <model>

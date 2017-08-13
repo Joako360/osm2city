@@ -117,9 +117,9 @@ def separate_gable(ac_object, b, inward_meters=0.) -> None:
     inward_meters = min(roof_height, inward_meters)
 
     # -- tangential vector of long edge
-    tang = (b.X[ind_X[1]]-b.X[ind_X[0]])/b.lenX[ind_X[1]] * inward_meters
+    tang = (b.X[ind_X[1]]-b.X[ind_X[0]])/b.edge_length_x[ind_X[1]] * inward_meters
     
-    len_roof_bottom = 1.*b.lenX[ind_X[0]]
+    len_roof_bottom = 1.*b.edge_length_x[ind_X[0]]
 
     ac_object.node(-(0.5 * (b.X[ind_X[3]][1] + b.X[ind_X[0]][1]) + tang[1]), b.ground_elev + b.height,
                    -(0.5*(b.X[ind_X[3]][0] + b.X[ind_X[0]][0]) + tang[0]))
@@ -129,7 +129,7 @@ def separate_gable(ac_object, b, inward_meters=0.) -> None:
     roof_texture_size_x = t.h_size_meters  # size of roof texture in meters
     roof_texture_size_y = t.v_size_meters
     repeat_x = len_roof_bottom / roof_texture_size_x
-    len_roof_hypo = ((0.5*b.lenX[ind_X[1]])**2 + roof_height**2)**0.5
+    len_roof_hypo = ((0.5*b.edge_length_x[ind_X[1]])**2 + roof_height**2)**0.5
     repeat_y = len_roof_hypo / roof_texture_size_y
 
     ac_object.face([(o + 0, t.x(0), t.y(0)),
@@ -142,14 +142,14 @@ def separate_gable(ac_object, b, inward_meters=0.) -> None:
                     (o + 4, t.x(repeat_x*(1-inward_meters/len_roof_bottom)), t.y(repeat_y)),
                     (o + 5, t.x(repeat_x*(inward_meters/len_roof_bottom)), t.y(repeat_y))])
 
-    repeat_x = b.lenX[ind_X[1]]/roof_texture_size_x
+    repeat_x = b.edge_length_x[ind_X[1]]/roof_texture_size_x
     len_roof_hypo = (inward_meters**2 + roof_height**2)**0.5
     repeat_y = len_roof_hypo/roof_texture_size_y
     ac_object.face([(o + 1, t.x(0), t.y(0)),
                     (o + 2, t.x(repeat_x), t.y(0)),
                     (o + 5, t.x(0.5*repeat_x), t.y(repeat_y))])
 
-    repeat_x = b.lenX[ind_X[3]]/roof_texture_size_x
+    repeat_x = b.edge_length_x[ind_X[3]]/roof_texture_size_x
     ac_object.face([(o + 3, t.x(0), t.y(0)),
                     (o + 0, t.x(repeat_x), t.y(0)),
                     (o + 4, t.x(0.5*repeat_x), t.y(repeat_y))])
@@ -184,7 +184,7 @@ def separate_pyramidal(ac_object: ac.Object, b, inward_meters=0.0) -> None:
 
     # loop on sides of the building
     for i in range(0, len(b.X)):
-        repeat_x = b.lenX[1]/roof_texture_size_x
+        repeat_x = b.edge_length_x[1]/roof_texture_size_x
         len_roof_hypo = (inward_meters**2 + roof_height**2)**0.5
         repeat_y = len_roof_hypo/roof_texture_size_x
         ac_object.face([(o + i, t.x(0), t.y(0)),
