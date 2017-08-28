@@ -68,7 +68,7 @@ The you might first cut down the downloaded OSM pbf-file to the needed area and 
 
     $ /home/vanosten/bin/osmosis-latest/bin/osmosis --read-pbf file="/media/sf_fg_customscenery/projects/TEST/massachusetts-latest.osm.pbf" --bounding-box completeWays=yes top=42.625 left=-72 bottom=42.125 right=-70.5 --write-pbf file="/media/sf_fg_customscenery/projects/TEST/kbos.pbf"
 
-    $ /home/vanosten/bin/osmosis-latest/bin/osmosis --read-pbf "/media/sf_fg_customscenery/projects/TEST/kbos.pbf" --log-progress --write-pgsql database=kbos host=localhost:5433 user=gisuser password=!Password1
+    $ /home/vanosten/bin/osmosis-latest/bin/osmosis --read-pbf file="/media/sf_fg_customscenery/projects/TEST/kbos.pbf" --log-progress --write-pgsql database=kbos host=localhost:5433 user=gisuser password=!Password1
 
 And finally you might want to index the tags in hstore to get some more query speed after loading the data (on a medium powered machine for the relatively small KBOS area this takes ca. 30 minutes):
 

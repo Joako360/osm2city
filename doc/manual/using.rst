@@ -57,8 +57,11 @@ In FlightGear as a scenery user you influence the actual distance (in meters) fo
     --prop:double:/sim/rendering/static-lod/rough=10000
     --prop:/sim/rendering/max-paged-lod=400
 
+See also PagedLOD_.
+
 .. _fgfsrc: http://wiki.flightgear.org/Fgfsrc
 .. _`Properties in FGRun`: http://wiki.flightgear.org/FlightGear_Launch_Control#Properties
+.. _PagedLOD: http://wiki.flightgear.org/PagedLOD
 
 
 =========================================

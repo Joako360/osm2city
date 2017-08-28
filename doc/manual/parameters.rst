@@ -321,7 +321,7 @@ Parameter                                       Type       Default   Description
 USE_DATABASE                                    Boolean    False     If True then the OSM data is read from a database instead of
                                                                      PATH_TO_OSM2CITY_DATA.
 DB_HOST                                         String     n/a       The host name of the computer running PostGIS (e.g. localhost).
-DB_PORT                                         Integer    5432      The port used to connect to the host
+DB_PORT                                         Integer    5432      The port used to connect to the host (5433 for Postgres 9,x+)
 DB_NAME                                         String     n/a       The name of the database (e.g osmogis).
 DB_USER                                         String     n/a       The name of the user to be used to read from the database. Can be read-only.
 DB_USER_PASSWORD                                String     n/a       The password for the DB_USER.
