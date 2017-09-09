@@ -2,6 +2,22 @@
 Created on Thu Feb 28 23:18:08 2013
 
 @author: tom
+
+Call hierarchy (as of summer 2017) - building_lib is called from building.py:
+
+* building_lib.overlap_check_blocked_areas(...)
+* building_lib.overlap_check_convex_hull(...)
+* building_lib.analyse(...)
+    for building in ...
+        b.analyse_height_and_levels()
+        b.analyse_large_enough()
+        b.analyse_roof(...)
+        b.analyse_textures()
+* building_lib.decide_lod(...)
+* building_lib.write(...)
+    for building in ...
+        b.write_to_ac(...)
+
 """
 
 import copy
@@ -114,9 +130,8 @@ class Building(object):
     """
 
     def __init__(self, osm_id: int, tags: Dict[str, str], outer_ring: shg.LinearRing, name: str,
-                 height: float, levels: int,
-                 stg_typ: STGVerbType=None, stg_hdg=None, inner_rings_list=list(), building_type='unknown',
-                 roof_type: str='flat', roof_height: int=0, refs: List[int]=list()) -> None:
+                 stg_typ: STGVerbType=None, stg_hdg=None, inner_rings_list=list(),
+                 refs: List[int]=list()) -> None:
         # set during init and methods called by init
         self.osm_id = osm_id
         self.tags = tags
@@ -127,13 +142,16 @@ class Building(object):
                 self.model3d = tags['model3d']
                 self.angle3d = tags['angle3d']
         self.name = name
-        self.height = height
-        self.levels = levels
         self.stg_typ = stg_typ  # STGVerbType
         self.stg_hdg = stg_hdg
-        self.building_type = building_type
-        self.roof_type = roof_type  # str: flat, skillion, pyramidal, dome, gabled, half-hipped, hipped
-        self.roof_height = roof_height
+        self.building_type = _map_building_type(self.tags)
+
+        # For definition of 'height' see method analyse_height_and_levels(..)
+        self.height = 0.0
+        self.levels = 0
+        self.min_height = 0.0  # the height over ground relative to ground_elev of the facade. See min_height in OSM
+        self.roof_type = 'flat'  # str: flat, skillion, pyramidal, dome, gabled, half-hipped, hipped
+        self.roof_height = 0.0  # the height of the roof (0 if flat), not the elevation over ground of the roof
 
         # set during method called by init(...) through self.update_geometry and related sub-calls
         self.refs = None
@@ -150,7 +168,7 @@ class Building(object):
         self.pseudo_parents = list()  # list of Building: only set for building:part without a real parent
 
         # set after init(...)
-        self.roof_height_X = []  # roof height at ground-node X
+        self.roof_height_x = []  # roof height at ground-node x - only set and used for type=skillion
         self.edge_length_x = None  # numpy array of side length between ground-node X and X+1
         self.index_first_node_in_ac3d_obj = 0  # index of first node in final OBJECT node list
         self.facade_texture = None
@@ -159,10 +177,7 @@ class Building(object):
         self.roof_requires = list()
         self.LOD = None  # see utils.utilities.LOD for values
 
-        self.correct_ground = None
-        self.ground_elev = None
-        self.ground_elev_min = None
-        self.ground_elev_max = None
+        self.ground_elev = 0.0  # the lowest elevation over sea of any point in the outer ring of the building
 
     def update_geometry(self, outer_ring: shg.LinearRing, inner_rings_list=list(), refs: List[int]=list()) -> None:
         self.refs = refs
@@ -223,17 +238,9 @@ class Building(object):
 
     def set_ground_elev_and_offset(self, fg_elev: FGElev, cluster_elev: float, cluster_offset: Vec2d) -> None:
         """Sets the ground elevations as difference between real elevation and cluster elevation.
-        Also calls method to correct x/y coordinates"""
-        def local_elev(p):
-            return fg_elev.probe_elev(p + cluster_offset) - cluster_elev
-
+        Also translates x/y coordinates"""
         self._set_X(cluster_offset)
-
-        elevations = [local_elev(Vec2d(self.X[i])) for i in range(self.nnodes_ground)]
-
-        self.ground_elev_min = min(elevations)
-        self.ground_elev_max = max(elevations)
-        self.ground_elev = self.ground_elev_min
+        self.ground_elev -= cluster_elev
 
     @property
     def X_outer(self):
@@ -401,21 +408,52 @@ class Building(object):
 
         return True
 
-    def analyse_height_and_levels(self) -> bool:
+    def analyse_height_and_levels(self):
         """Determines total height (and number of levels) of a building based on OSM values and other logic.
-        Returns False if the height is less than the building min height parameter.
+        Raises ValueError if the height is less than the building min height parameter or layer OSM attribute
+        cannot be interpreted if needed.
+        
+        The OSM key 'height' is defined as: Distance between the lowest possible position with ground contact and 
+        the top of the roof of the building, excluding antennas, spires and other equipment mounted on the roof. 
+        
+        The OSM key 'min_height' is for raising a facade. Even if this m'min_height' is > 0, then the height
+        of the building remains the same - the facade just gets shorter.
+        See http://wiki.openstreetmap.org/wiki/Key:min_height and http://wiki.openstreetmap.org/wiki/Simple_3D_buildings
         """
-        try:
-            if isinstance(self.height, int):
-                self.height = float(self.height)
-            assert(isinstance(self.height, float))
-        except AssertionError:
-            logging.warning("Building height has wrong type. Value is: %s", self.height)
-            self.height = 0
+        layer = 9999
 
-        if self.height == 0 or self.levels == 0:  # otherwise both are already set and therefore nothing to do
+        if 'height' in self.tags:
+            self.height = utils.osmparser.parse_length(self.tags['height'])
+        elif 'building:height' in self.tags:
+            self.height = utils.osmparser.parse_length(self.tags['building:height'])
+        if 'building:levels' in self.tags:
+            self.levels = float(self.tags['building:levels'])
+        if 'levels' in self.tags:
+            self.levels = float(self.tags['levels'])
+        if 'layer' in self.tags:
+            layer = int(self.tags['layer'])
+        if 'roof:shape' in self.tags:
+            self.roof_type = self.tags['roof:shape']
+        else:
+            self.roof_type = parameters.BUILDING_UNKNOWN_ROOF_TYPE
+
+        self.roof_height = 0.
+        if 'roof:height' in self.tags:
+            try:
+                self.roof_height = utils.osmparser.parse_length(self.tags['roof:height'])
+            except:
+                self.roof_height = 0.
+
+        # Simple (silly?) heuristics to 'respect' layers (http://wiki.openstreetmap.org/wiki/Key:layer)
+        # Basically the use of layers is wrong, so this is a last resort method
+        if layer == 0:
+            raise ValueError('Layer attribute is given, but is set to 0 and can therefore not be interpreted.')
+        if layer < 99 and self.height == 0.0 and self.levels == 0:
+            self.levels = layer + 2
+
+        if self.height == 0. or self.levels == 0:  # otherwise both are already set and therefore nothing to do
             level_height = _random_level_height()
-            if self.height > 0:
+            if self.height > 0.0:
                 self.levels = int(self.height / level_height)
             elif self.levels == 0:
                 self.levels = _random_levels()
@@ -424,9 +462,13 @@ class Building(object):
                     self.levels = min(self.levels, 2)
             self.height = float(self.levels) * level_height
 
-        if self.height < parameters.BUILDING_MIN_HEIGHT:
-            return False
-        return True
+        # OSM key min_value is used to raise ("hover") a facade above ground
+        # -- no complex roof on tiny buildings.
+        if "min_height" in self.tags:
+            self.min_height = utils.osmparser.parse_length(self.tags['min_height'])
+
+        if parameters.BUILDING_MIN_HEIGHT > 0.0 and self.height < parameters.BUILDING_MIN_HEIGHT:
+            raise ValueError('The height given or calculated is less then the BUILDING_MIN_HEIGHT parameter.')
 
     def analyse_roof(self) -> None:
         """Work on roof, which is controlled by two flags:
@@ -442,7 +484,7 @@ class Building(object):
                 if self.nnodes_ground == 4:
                     self.roof_complex = True
                 if (parameters.BUILDING_SKEL_ROOFS and
-                    self.nnodes_ground in range(4, parameters.BUILDING_SKEL_MAX_NODES)):
+                            self.nnodes_ground in range(4, parameters.BUILDING_SKEL_MAX_NODES)):
                     self.roof_complex = True
                 try:
                     if str(self.tags['roof:shape']) == 'skillion':
@@ -451,25 +493,16 @@ class Building(object):
                     pass
 
             # -- no complex roof on tall buildings
-            if self.levels > parameters.BUILDING_COMPLEX_ROOFS_MAX_LEVELS:
+            if self.levels > parameters.BUILDING_COMPLEX_ROOFS_MAX_LEVELS and 'roof:shape' not in self.tags:
                 self.roof_complex = False
 
             # -- no complex roof on tiny buildings.
-            # FIXME: this seems to be a misunderstanding: min_height in OSM is used in 3D buildings with parts
-            # "hovering" over the ground -> remove the whole next checks?
-            min_height = 0
-            if "min_height" in self.tags:
-                try:
-                    min_height = utils.osmparser.parse_length(self.tags['min_height'])
-                except KeyError:
-                    min_height = 0
-            if self.height - min_height < parameters.BUILDING_COMPLEX_MIN_HEIGHT and 'roof:shape' not in self.tags:
+            if self.height < parameters.BUILDING_COMPLEX_ROOFS_MIN_LEVELS and 'roof:shape' not in self.tags:
                 self.roof_complex = False
 
     def analyse_large_enough(self) -> bool:
         """Checks whether a given building's area is too small for inclusion.
         Never drop tall buildings.
-        FIXME: Exclusion might be skipped if the building touches another building (i.e. an annex)
         Returns true if the building should be included (i.e. area is big enough etc.)
         """
         if self.levels >= parameters.BUILDING_NEVER_SKIP_LEVELS:
@@ -486,8 +519,8 @@ class Building(object):
         """Compute roof_height for each node"""
         max_height = self.height * parameters.BUILDING_SKEL_MAX_HEIGHT_RATIO
 
-        self.roof_height = 0
-        temp_roof_height = 0  # temp variable before assigning to self
+        self.roof_height = 0.
+        temp_roof_height = 0.  # temp variable before assigning to self
 
         if self.roof_type == 'skillion':
             # get global roof_height and height for each vertex
@@ -575,7 +608,7 @@ class Building(object):
             # compute height for each point with thales
             L = float(max(norms_o))
 
-            self.roof_height_X = [temp_roof_height * l / L for l in norms_o]
+            self.roof_height_x = [temp_roof_height * l / L for l in norms_o]
             self.roof_height = temp_roof_height
 
         else:  # roof types other than skillion
@@ -586,7 +619,7 @@ class Building(object):
             else:
                 # random roof:height
                 if self.roof_type == 'flat':
-                    self.roof_height = 0
+                    self.roof_height = 0.
                 else:
                     if 'roof:angle' in self.tags:
                         angle = float(self.tags['roof:angle'])
@@ -606,14 +639,6 @@ class Building(object):
         # get local medium ground elevation for each building
         self.set_ground_elev_and_offset(fg_elev, cluster_elev, cluster_offset)
 
-        # Correct height
-        if self.ground_elev and self.correct_ground:
-            self.ground_elev += self.correct_ground
-        else:
-            if self.ground_elev_max > (self.height - self.roof_height - 2):
-                self.correct_ground = self.ground_elev_max - self.ground_elev_min
-                self.ground_elev = self.ground_elev_max
-
         self._compute_roof_height()
 
         self._write_vertices_for_ac(ac_object)
@@ -631,17 +656,7 @@ class Building(object):
 
         self.index_first_node_in_ac3d_obj = ac_object.next_node_index()
 
-        z = self.ground_elev - 0.1  # FIXME: instead maybe we should have 1 meter of "bottom" texture
-        if self.correct_ground:
-            z -= self.correct_ground
-
-        try:
-            if 'min_height' in self.tags:
-                min_height = utils.osmparser.parse_length(self.tags['min_height'])
-                z = self.ground_elev + min_height
-        except KeyError:
-            logging.warning("Error reading min_height for building %d", self.osm_id)
-            pass
+        z = self.ground_elev + self.min_height  # FIXME: reduce facade height with min_height
 
         # ground nodes
         for x in self.X:
@@ -655,10 +670,10 @@ class Building(object):
             #  |            |
             #  +-----+------+
             #
-            if self.roof_height_X:
+            if self.roof_height_x:
                 for i in range(len(self.X)):
                     ac_object.node(-self.X[i][1],
-                                   self.ground_elev + self.height - self.roof_height + self.roof_height_X[i],
+                                   self.ground_elev + self.height - self.roof_height + self.roof_height_x[i],
                                    -self.X[i][0])
         else:
             # others roofs
@@ -701,9 +716,9 @@ class Building(object):
                     logging.debug('FIXME: v_can_repeat: need to check in analyse')
 
             if self.roof_type == 'skillion':
-                tex_y12 = self.facade_texture.y((self.height - self.roof_height + self.roof_height_X[i]) /
+                tex_y12 = self.facade_texture.y((self.height - self.roof_height + self.roof_height_x[i]) /
                                                 self.height * tex_coord_top_input)
-                tex_y11 = self.facade_texture.y((self.height - self.roof_height + self.roof_height_X[ipp]) /
+                tex_y11 = self.facade_texture.y((self.height - self.roof_height + self.roof_height_x[ipp]) /
                                                 self.height * tex_coord_top_input)
             else:
                 tex_y12 = tex_coord_top
@@ -851,7 +866,7 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
     building_parents = dict()
     for b in buildings:
         building_parent = b.parent
-        b.parent = None  # will reset again if actually all is ok at end
+        b.parent = None  # will be reset again if actually all is ok at end
 
         # make sure we have a flat roof in parent:child situation
         if building_parent is not None:
@@ -879,8 +894,6 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
                     'man_made' in b.tags and b.tags['man_made'] in ['storage_tank', 'tank']):
                 logging.debug("Excluded storage tank with osm_id={}".format(b.osm_id))
                 continue
-        b.mat = 0
-        b.roof_mat = 0
 
         # -- get geometry right
         #    - simplify
@@ -898,6 +911,7 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
         Xo = np.array(b.X_outer)
 
         elev_water_ok = True
+        temp_ground_elev = 9999
         for i in range(len(Xo)):
             elev_is_solid_tuple = fg_elev.probe(Vec2d(Xo[i]))
             b.ground_elev = elev_is_solid_tuple[0]  # temporarily set - will be overwritten later
@@ -910,8 +924,10 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
                 logging.debug("in water")
                 elev_water_ok = False
                 break
+            temp_ground_elev = min([temp_ground_elev, elev_is_solid_tuple[0]])  # we are looking for the lowest value
         if not elev_water_ok:
             continue
+        b.ground_elev = temp_ground_elev
 
         if b.is_external_model:
             new_buildings.append(b)
@@ -937,6 +953,7 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
                 i0 += n
 
         # -- re-number nodes such that longest edge is first -- only on simple buildings
+        # FIXME: why? We can and do calculate longest edge and can use that for texture
         if b.nnodes_outer == 4 and not b.X_inner:
             if b.edge_length_x[0] < b.edge_length_x[1]:
                 Xo = np.roll(Xo, 1, axis=0)
@@ -944,8 +961,10 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
                 b._set_polygon(Xo, b.inner_rings_list)
 
         # -- work on height and levels
-        if not b.analyse_height_and_levels():
-            logging.debug('Skipping building osm_id = {} with height < building_min_height parameter'.format(b.osm_id))
+        try:
+            b.analyse_height_and_levels()
+        except ValueError as e:
+            logging.debug('Skipping building osm_id = {}: {}'.format(b.osm_id, e))
             stats.skipped_small += 1
             continue
 
@@ -977,6 +996,12 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
                 pseudo_parent.facade_texture = building_part.facade_texture
                 pseudo_parent.roof_texture = building_part.roof_texture
 
+    # make sure that min_height is only used if there is a real parent (not pseudo_parents)
+    # i.e. for all others we just set it to 0.0
+    for building in new_buildings:
+        if building.parent is None:
+            building.min_height = 0.0
+
     return new_buildings
 
 
@@ -1004,7 +1029,7 @@ def write(ac_file_name: str, buildings: List[Building], fg_elev: FGElev,
     ac.write(ac_file_name)
 
 
-def map_building_type(tags: Dict[str, str]) -> str:
+def _map_building_type(tags: Dict[str, str]) -> str:
     if 'building' in tags and not tags['building'] == 'yes':
         return tags['building']
     return 'unknown'

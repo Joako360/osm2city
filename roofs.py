@@ -207,7 +207,7 @@ def separate_skillion(ac_object: ac.Object, b):
     # FLAT PART
     i = 0
     for x in b.X:
-        ac_object.node(-x[1], b.ground_elev + b.height - b.roof_height + b.roof_height_X[i], -x[0])
+        ac_object.node(-x[1], b.ground_elev + b.height - b.roof_height + b.roof_height_x[i], -x[0])
         i += 1
 
     if b.polygon.interiors:
@@ -242,7 +242,7 @@ def separate_skillion(ac_object: ac.Object, b):
     # create nodes for/ and roof
     for i, node in enumerate(nodes):
         # new nodes
-        ac_object.node(-b.X[node][1], b.ground_elev + b.height - b.roof_height + b.roof_height_X[node], -b.X[node][0])
+        ac_object.node(-b.X[node][1], b.ground_elev + b.height - b.roof_height + b.roof_height_x[node], -b.X[node][0])
         l.append((o + node, uv[i][0], uv[i][1]))
     ac_object.face(l)
     return

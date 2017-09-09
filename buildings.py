@@ -276,7 +276,7 @@ def _process_simple_3d_building(nodes_dict: Dict[int, osmparser.Node], rel_ways_
         for i_key, i_value in polygons.items():
             if o_key == i_key:
                 continue
-            if (o_value.intersects(i_value) == True) and (o_value.touches(i_value) == False):
+            if (o_value.intersects(i_value) is True) and (o_value.touches(i_value) is False):
                 is_intersecting = True
                 break
         if not is_intersecting:
@@ -447,9 +447,6 @@ def _make_building_from_way(nodes_dict: Dict[int, osmparser.Node], all_tags: Dic
         way.refs = way.refs[0:-1]  # -- kick last ref if it coincides with first
 
     name = ""
-    height = 0.
-    levels = 0
-    layer = 99
 
     # -- funny things might happen while parsing OSM
     try:
@@ -458,35 +455,6 @@ def _make_building_from_way(nodes_dict: Dict[int, osmparser.Node], all_tags: Dic
             if name in parameters.SKIP_LIST:
                 logging.debug("SKIPPING " + name)
                 return None
-        if 'height' in all_tags:
-            height = osmparser.parse_length(all_tags['height'])
-        elif 'building:height' in all_tags:
-            height = osmparser.parse_length(all_tags['building:height'])
-        if 'building:levels' in all_tags:
-            levels = float(all_tags['building:levels'])
-        if 'levels' in all_tags:
-            levels = float(all_tags['levels'])
-        if 'layer' in all_tags:
-            layer = int(all_tags['layer'])
-        if 'roof:shape' in all_tags:
-            _roof_type = all_tags['roof:shape']
-        else:
-            _roof_type = parameters.BUILDING_UNKNOWN_ROOF_TYPE
-
-        _roof_height = 0
-        if 'roof:height' in all_tags:
-            try:
-                _roof_height = utils.osmparser.parse_length(all_tags['roof:height'])
-            except:
-                _roof_height = 0.
-
-        _building_type = building_lib.map_building_type(all_tags)
-
-        # -- simple (silly?) heuristics to 'respect' layers
-        if layer == 0:
-            return None
-        if layer < 99 and height == 0 and levels == 0:
-            levels = layer + 2
 
         # -- make outer and inner rings from refs
         outer_ring = _refs_to_ring(coords_transform, way.refs, nodes_dict)
@@ -506,9 +474,8 @@ def _make_building_from_way(nodes_dict: Dict[int, osmparser.Node], all_tags: Dic
         stats.parse_errors += 1
         return None
 
-    return building_lib.Building(way.osm_id, all_tags, outer_ring, name, height, levels,
-                                 inner_rings_list=inner_rings_list, building_type=_building_type,
-                                 roof_type=_roof_type, roof_height=_roof_height, refs=way.refs)
+    return building_lib.Building(way.osm_id, all_tags, outer_ring, name, inner_rings_list=inner_rings_list,
+                                 refs=way.refs)
 
 
 def _refs_to_ring(coords_transform: coordinates.Transformation, refs, nodes_dict: Dict[int, osmparser.Node],

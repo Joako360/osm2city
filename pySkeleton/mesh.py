@@ -124,7 +124,7 @@ class Mesh:
         for face in self.faces:
             face = np.roll(face[::-1], 1)  # -- make outer edge the first
             s += "SURF 0x0\n"
-            s += "mat %i\n" % b.roof_mat
+            s += "mat 0\n"
             s += "refs %i\n" % len(face)
             uv = roofs.face_uv(face, np.array(X), b.roof_texture.h_size_meters, b.roof_texture.v_size_meters)
             i = 0
