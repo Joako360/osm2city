@@ -305,8 +305,8 @@ class Building(object):
         """Proxy to see whether the roof is flat or not.
         Skillion is also kind of flat, but is not horisontal and therfore would also return false."""
         if self.roof_shape is RoofShape.flat:
-            return True
-        return False
+            return False
+        return True
 
     @property
     def X_outer(self):
