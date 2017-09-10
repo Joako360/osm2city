@@ -127,6 +127,74 @@ LOD_PERCENTAGE_DETAIL                           Decimal    0.5       Of the rema
 =============================================   ========   =======   ==============================================================================
 
 
+
+.. _chapter-parameters-roofs-label:
+
+------------------
+Roofs on Buildings
+------------------
+
+Below you will find quite a lot of parameters deciding what type of roofs should be generated on buildings. To understand the basic concepts, you should understand `OSM Simple 3D buildings`_. With ``complex roof`` below all those roof types, which are not flat/horizontal are meant.
+
+The following parameters decide whether a complex roof should be used on top of a building at all.
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+BUILDING_COMPLEX_ROOFS                          Bool       True      Set this to false if only flat roofs should be used. Good for performance, but
+                                                                     not so nice for the eye.
+                                                                     If this is set to False, all other parameters do not matter.
+
+BUILDING_COMPLEX_ROOFS_MIN_LEVELS               Integer    1         Don't put complex roof on buildings smaller than the specified value unless
+                                                                     there is an explicit ``roof:shape`` flag in OSM.
+
+BUILDING_COMPLEX_ROOFS_MAX_LEVELS               Integer    5         Don't put complex roofs on buildings taller than the specified value unless
+                                                                     there is an explicit ``roof:shape`` flag in OSM.
+
+BUILDING_COMPLEX_ROOFS_MAX_AREA                 Integer    800       Don't put complex roofs on buildings larger than this.
+
+BUILDING_COMPLEX_ROOFS_MIN_RATIO_AREA           Integer    250       If a building is larger than this but smaller than ``..._MAX_AREA``, then
+                                                                     it is compared whether the building tends to be small and long, because often
+                                                                     one more square buildings, which at the same time are large, the roof tends
+                                                                     to be flat.
+
+BUILDING_SKEL_MAX_NODES                         Integer    10        The maximum number of nodes for which a complex roof is generated.
+
+=============================================   ========   =======   ==============================================================================
+
+If the ``roof:shape`` tag is missing in OSM (which it most oftenly is), then the following parameters can help to make region specific decision on what roof types are to be applied randomly with a given ratio. Again — only if the roofs even may be somethine else than flat given the parameters above. Thes sum of the ratios should give 1.0.
+
+=============================================   ========   =======
+Parameter                                       Type       Default
+=============================================   ========   =======
+BUILDING_ROOF_FLAT_RATIO                        Decimal    0.2
+BUILDING_ROOF_SKILLION_RATIO                    Decimal    0.1
+BUILDING_ROOF_GABLED_RATIO                      Decimal    0.55
+BUILDING_ROOF_HIPPED_RATIO                      Decimal    0.1
+BUILDING_ROOF_PYRAMIDAL_RATIO                   Decimal    0.05
+=============================================   ========   =======
+
+Finally the following parameters let you play around with how complex roofs are done.
+
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+BUILDING_SKEL_ROOFS_MIN_ANGLE                   Integer    10        The minimum angle of the roof
+BUILDING_SKEL_ROOFS_MAX_ANGLE                   Integer    50        The max angle of the roof. Some randomness is applied between MIN and MAX.
+BUILDING_SKILLION_ROOF_MAX_HEIGHT               Decimal    2.        No matter the MIN and MAX angles: a skillion will have at most this height
+                                                                     difference.
+BUILDING_SKEL_ROOF_MAX_HEIGHT = 6.              Decimal    6.        Skip skeleton roofs (gabled, pyramidal, ..) if the roof height is larger than
+                                                                     this value.
+BUILDING_SKEL_ROOF_DEFAULT_HEIGHT               Decimal    2.5       If the roof_height is not given in OSM this is what is used to calculate the
+                                                                     real building height temporarily - until the real roof is constructed.
+                                                                     Unless you know the code behind or see very odd effects, then you should
+                                                                     probably not change this value.
+=============================================   ========   =======   ==============================================================================
+
+
+.. _`OSM Simple 3D buildings`: http://wiki.openstreetmap.org/wiki/Simple_3D_buildings
+
 .. _chapter-parameters-overlap-label:
 
 ---------------------------

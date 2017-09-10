@@ -600,8 +600,7 @@ class Building(object):
                     allow_complex_roofs = False
                     # Now lets see whether we can allow complex nevertheless when more than 4 corners
                     # a bit more relaxed, if we do skeleton roofs
-                    if (parameters.BUILDING_SKEL_ROOFS and
-                                self.nnodes_ground in range(4, parameters.BUILDING_SKEL_MAX_NODES)):
+                    if self.nnodes_ground in range(4, parameters.BUILDING_SKEL_MAX_NODES):
                         allow_complex_roofs = True
                     # even more relaxed if it is a skillion
                     if self.roof_shape is RoofShape.skillion:
@@ -849,7 +848,7 @@ class Building(object):
 
         else:
             # -- pitched roof for > 4 ground nodes
-            if self.nnodes_ground > 4 and parameters.BUILDING_SKEL_ROOFS:
+            if self.nnodes_ground > 4:
                 if self.roof_shape is RoofShape.skillion:
                     roofs.separate_skillion(ac_object, self)
                 elif self.roof_shape is RoofShape.pyramidal:
