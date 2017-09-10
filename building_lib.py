@@ -332,6 +332,10 @@ class Building(object):
         return self.polygon.area
 
     @property
+    def circumference(self):
+        return self.polygon.length
+
+    @property
     def longest_edge_length(self):
         return max(self.edge_length_x)
 
@@ -576,7 +580,15 @@ class Building(object):
                 if self.polygon.interiors:
                     allow_complex_roofs = False
                 # no complex roof on large buildings
-                elif self.area < parameters.BUILDING_COMPLEX_ROOFS_MAX_AREA:
+                elif self.area > parameters.BUILDING_COMPLEX_ROOFS_MAX_AREA:
+                    allow_complex_roofs = False
+                # if area between thresholds, then have a look at the ratio between area and circumference
+                # the smaller the ratio, the less deep the building is compared to its length
+                # it is more common to have long houses with complex roofs than a square once it is a big building
+                # the formula basically states that if it was a rectangle, then the ratio between the long side length
+                # and the short side length should be at least 2.
+                elif (parameters.BUILDING_COMPLEX_ROOFS_MIN_RATIO_AREA < self.area <
+                        parameters.BUILDING_COMPLEX_ROOFS_MAX_AREA) and (self.circumference > 3 * sqrt(2 * self.area)):
                     allow_complex_roofs = False
                 # no complex roof on tall buildings
                 elif self.levels > parameters.BUILDING_COMPLEX_ROOFS_MAX_LEVELS and 'roof:shape' not in self.tags:

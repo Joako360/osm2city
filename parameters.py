@@ -117,6 +117,7 @@ BUILDING_COMPLEX_ROOFS = True       # -- generate complex roofs on buildings? I.
 BUILDING_COMPLEX_ROOFS_MIN_LEVELS = 1  # don't put complex roof on buildings smaller than the specified value unless there is an explicit roof:shape flag
 BUILDING_COMPLEX_ROOFS_MAX_LEVELS = 5   # don't put complex roofs on buildings taller the specified value unless there is an explicit roof:shape flag
 BUILDING_COMPLEX_ROOFS_MAX_AREA = 800  # -- don't put complex roofs on buildings larger than this
+BUILDING_COMPLEX_ROOFS_MIN_RATIO_AREA = 250  # if larger than this then ratio of length vs. area must be fulfilled
 BUILDING_SKEL_ROOFS = True             # -- generate complex roofs with pySkeleton?
 BUILDING_SKEL_ROOFS_MIN_ANGLE = 10  # -- pySkeleton based complex roofs will
 BUILDING_SKEL_ROOFS_MAX_ANGLE = 50  #    have a random angle between MIN and MAX
