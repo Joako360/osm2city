@@ -317,11 +317,12 @@ def read_stg_entries_in_boundary(consider_shared: bool=True, my_coord_transform:
                                                     parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH,
                                                     parameters.PATH_TO_SCENERY, "Objects")
 
-    if parameters.PATH_TO_SCENERY_OPT is not None:
-        stg_files_opt = calc_tile.get_stg_files_in_boundary(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
-                                                            parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH,
-                                                            parameters.PATH_TO_SCENERY_OPT, "Objects")
-        stg_files.extend(stg_files_opt)
+    if parameters.PATH_TO_SCENERY_OPT:
+        for my_path in parameters.PATH_TO_SCENERY_OPT:
+            stg_files_opt = calc_tile.get_stg_files_in_boundary(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
+                                                                parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH,
+                                                                my_path, "Objects")
+            stg_files.extend(stg_files_opt)
 
     for filename in stg_files:
         stg_entries.extend(read_stg_entries(filename, consider_shared))

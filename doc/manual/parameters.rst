@@ -54,7 +54,8 @@ PATH_TO_SCENERY                                 Path       n/a       Full path t
                                                                      probe elevation and check for overlap with static objects. Most likely you'll
                                                                      want to use your TerraSync path here.
 
-PATH_TO_SCENERY_OPT                             Path       None      Optional additional path to a scenery folder (e.g. for `Project3000`_).
+PATH_TO_SCENERY_OPT                             List       None      Optional additional paths to scenery folders (e.g. for `Project3000`_).
+                                                                     Specified as a list of strings (e.g. ['/foo/uno', '/foo/due'].
                                                                      Only used for overlap checking for buildings against static and shared
                                                                      objects.
 

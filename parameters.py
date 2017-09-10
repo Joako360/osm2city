@@ -50,9 +50,9 @@ OSM_FILE = "buildings.osm"  # -- file name of file with OSM data. Should reside 
 #    likely you'll want to use your TerraSync path here.
 PATH_TO_SCENERY = "/home/user/fgfs/scenery/TerraSync"
 
-# Optional additional path to a scenery folder (e.g. project3000).
+# Optional additional list of paths to scenery folders (e.g. project3000).
 # Only used for overlap checking for buildings against static and shared objects
-PATH_TO_SCENERY_OPT = None
+PATH_TO_SCENERY_OPT = None  # if not none, then needs to be list of strings
 
 # -- The generated scenery (.stg, .ac, .xml) will be written to this path.
 #    If empty, we'll use the correct location in PATH_TO_SCENERY. Note that
@@ -355,6 +355,15 @@ def read_from_file(filename):
             default_globals[k] = v
         else:
             logging.warning('Unknown parameter: %s=%s' % (k, v))
+
+    # correct use of parameter PATH_TO_SCENERY_OPT: earlier only string, now list of strings (or None)
+    global PATH_TO_SCENERY_OPT
+    if PATH_TO_SCENERY_OPT:
+        if isinstance(PATH_TO_SCENERY_OPT, str):
+            if PATH_TO_SCENERY_OPT == "":
+                PATH_TO_SCENERY_OPT = None
+            else:
+                PATH_TO_SCENERY_OPT = [PATH_TO_SCENERY_OPT]
 
 
 def show_default():
