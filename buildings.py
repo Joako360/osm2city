@@ -520,7 +520,7 @@ def _write_xml(path: str, file_name: str, the_buildings: List[building_lib.Build
             for i in np.arange(0, b.nnodes_outer, b.nnodes_outer/4.):
                 xo = Xo[int(i+0.5), 0] - cluster_offset.x
                 yo = Xo[int(i+0.5), 1] - cluster_offset.y
-                zo = b.top_of_roof + 1.5
+                zo = b.top_of_roof_above_sea_level + 1.5
                 # <path>cursor.ac</path>
                 xml.write(textwrap.dedent("""
                 <model>
@@ -671,7 +671,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
             stg_manager.add_object_static('lightmap-switch.xml', center_global, cluster_elev, 0, once=True)
 
             # -- write .ac and .xml
-            building_lib.write(os.path.join(path_to_stg, file_name + ".ac"), cl.objects, fg_elev,
+            building_lib.write(os.path.join(path_to_stg, file_name + ".ac"), cl.objects,
                                cluster_elev, cluster_offset, prepare_textures.roofs, stats)
             if not parameters.FLAG_2017_2:
                 _write_xml(path_to_stg, file_name, cl.objects, cluster_offset)

@@ -113,16 +113,24 @@ BUILDING_REDUCE_CHECK_TOUCH = False # -- before removing a building due to area,
 BUILDING_SIMPLIFY_TOLERANCE = 1.0   # -- all points in the simplified building will be within the tolerance distance of the original geometry.
 BUILDING_NEVER_SKIP_LEVELS = 6      # -- buildings that tall will never be skipped
 
-BUILDING_UNKNOWN_ROOF_TYPE = "flat"  # -- If the roof type isn't given use this type
-BUILDING_COMPLEX_ROOFS = True       # -- generate complex roofs on buildings?
+BUILDING_COMPLEX_ROOFS = True       # -- generate complex roofs on buildings? I.e. other shpaes than horizontal and flat
 BUILDING_COMPLEX_ROOFS_MIN_LEVELS = 1  # don't put complex roof on buildings smaller than the specified value unless there is an explicit roof:shape flag
-BUILDING_COMPLEX_ROOFS_MAX_LEVELS = 20  # don't put complex roofs on buildings taller the specified value unless there is an explicit roof:shape flag
-BUILDING_COMPLEX_ROOFS_MAX_AREA = 2000 # -- don't put complex roofs on buildings larger than this
+BUILDING_COMPLEX_ROOFS_MAX_LEVELS = 5   # don't put complex roofs on buildings taller the specified value unless there is an explicit roof:shape flag
+BUILDING_COMPLEX_ROOFS_MAX_AREA = 800  # -- don't put complex roofs on buildings larger than this
 BUILDING_SKEL_ROOFS = True             # -- generate complex roofs with pySkeleton?
 BUILDING_SKEL_ROOFS_MIN_ANGLE = 10  # -- pySkeleton based complex roofs will
 BUILDING_SKEL_ROOFS_MAX_ANGLE = 50  #    have a random angle between MIN and MAX
 BUILDING_SKEL_MAX_NODES = 10        # -- max number of nodes for which we generate pySkeleton roofs
-BUILDING_SKEL_MAX_HEIGHT_RATIO = 0.7 # -- skip skel roofs if ratio of roof height to base building height is larger than this
+BUILDING_SKILLION_ROOF_MAX_HEIGHT = 2.
+BUILDING_SKEL_ROOF_MAX_HEIGHT = 6.  # -- skip skeleton roofs (gabled, pyramidal, ..) if the roof height is larger than this
+BUILDING_SKEL_ROOF_DEFAULT_HEIGHT = 2.5  # if the roof_height is not given what we use to calculate real building heihgt temporarily
+
+# If the roof_type is missing, what shall be the distribution of roof_types (must sum up to 1.0)
+BUILDING_ROOF_FLAT_RATIO = 0.2
+BUILDING_ROOF_SKILLION_RATIO = 0.1
+BUILDING_ROOF_GABLED_RATIO = 0.55
+BUILDING_ROOF_HIPPED_RATIO = 0.1
+BUILDING_ROOF_PYRAMIDAL_RATIO = 0.05
 
 BUILDING_FAKE_AMBIENT_OCCLUSION = True      # -- fake AO by darkening facade textures towards the ground, using
 BUILDING_FAKE_AMBIENT_OCCLUSION_HEIGHT = 6. #    1 - VALUE * exp(- AGL / HEIGHT )

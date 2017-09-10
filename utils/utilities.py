@@ -188,7 +188,7 @@ class Stats(object):
         self.area_above = np.zeros_like(self.area_levels)
         self.vertices = 0
         self.surfaces = 0
-        self.roof_types = {}
+        self.roof_shapes = {}
         self.have_complex_roof = 0
         self.roof_errors = 0
         self.out = None
@@ -201,10 +201,10 @@ class Stats(object):
     def count(self, b):
         """update stats (vertices, surfaces, area, corners) with given building's data
         """
-        if b.roof_type in self.roof_types:
-            self.roof_types[b.roof_type] += 1
+        if b.roof_shape.name in self.roof_shapes:
+            self.roof_shapes[b.roof_shape.name] += 1
         else:
-            self.roof_types[b.roof_type] = 1
+            self.roof_shapes[b.roof_shape.name] = 1
 
         # -- stats on number of ground nodes.
         #    Complex buildings counted in corners[0]
@@ -251,8 +251,8 @@ class Stats(object):
             """ % (self.objects, self.parse_errors, total_written, self.corners[4],
                    self.skipped_small, self.skipped_nearby, self.skipped_no_elev, self.skipped_texture)))
         roof_line = "        roof-types"
-        for roof_type in self.roof_types:
-            roof_line += """\n          %s\t%i""" % (roof_type, self.roof_types[roof_type])
+        for roof_shape in self.roof_shapes:
+            roof_line += """\n          %s\t%i""" % (roof_shape, self.roof_shapes[roof_shape])
         out.write(textwrap.dedent(roof_line))
 
         textures_used = {k: v for k, v in self.textures_total.items() if v > 0}

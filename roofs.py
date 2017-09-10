@@ -112,7 +112,7 @@ def separate_gable(ac_object, b, inward_meters=0.) -> None:
     # -- 4 corners
     o = ac_object.next_node_index()
     for i in range(0, 4):
-        ac_object.node(-b.X[ind_X[i]][1], b.ground_elev + b.height - roof_height, -b.X[ind_X[i]][0])
+        ac_object.node(-b.X[ind_X[i]][1], b.beginning_of_roof_above_sea_level, -b.X[ind_X[i]][0])
     # We don't want the hipped part to be greater than the height, which is 45 deg
     inward_meters = min(roof_height, inward_meters)
 
@@ -121,9 +121,9 @@ def separate_gable(ac_object, b, inward_meters=0.) -> None:
     
     len_roof_bottom = 1.*b.edge_length_x[ind_X[0]]
 
-    ac_object.node(-(0.5 * (b.X[ind_X[3]][1] + b.X[ind_X[0]][1]) + tang[1]), b.ground_elev + b.height,
+    ac_object.node(-(0.5 * (b.X[ind_X[3]][1] + b.X[ind_X[0]][1]) + tang[1]), b.top_of_roof_above_sea_level,
                    -(0.5*(b.X[ind_X[3]][0] + b.X[ind_X[0]][0]) + tang[0]))
-    ac_object.node(-(0.5 * (b.X[ind_X[1]][1] + b.X[ind_X[2]][1]) - tang[1]), b.ground_elev + b.height,
+    ac_object.node(-(0.5 * (b.X[ind_X[1]][1] + b.X[ind_X[2]][1]) - tang[1]), b.top_of_roof_above_sea_level,
                    -(0.5*(b.X[ind_X[1]][0] + b.X[ind_X[2]][0]) - tang[0]))
 
     roof_texture_size_x = t.h_size_meters  # size of roof texture in meters
@@ -169,7 +169,7 @@ def separate_pyramidal(ac_object: ac.Object, b, inward_meters=0.0) -> None:
     # -- ? corners
     o = ac_object.next_node_index()
     for x in b.X:
-        ac_object.node(-x[1], b.ground_elev + b.height - roof_height, -x[0])
+        ac_object.node(-x[1], b.beginning_of_roof_above_sea_level, -x[0])
 
     # We don't want the hipped part to be greater than the height, which is 45 deg
     inward_meters = min(roof_height, inward_meters)
@@ -177,7 +177,7 @@ def separate_pyramidal(ac_object: ac.Object, b, inward_meters=0.0) -> None:
     # get middle node of the "tower"
     out_1 = -sum([xi[1] for xi in b.X])/len(b.X)
     out_2 = -sum([xi[0] for xi in b.X])/len(b.X)
-    ac_object.node(out_1, b.ground_elev + b.height, out_2)
+    ac_object.node(out_1, b.top_of_roof_above_sea_level, out_2)
 
     # texture it
     roof_texture_size_x = t.h_size_meters  # size of roof texture in meters
@@ -200,14 +200,14 @@ def separate_skillion(ac_object: ac.Object, b):
     # -- 4 corners
     o = ac_object.next_node_index()
     for x in b.X:
-        ac_object.node(-x[1], b.ground_elev + b.height - b.roof_height, -x[0])
+        ac_object.node(-x[1], b.beginning_of_roof_above_sea_level, -x[0])
 
     # We don't want the hipped part to be greater than the height, which is 45 deg
 
     # FLAT PART
     i = 0
     for x in b.X:
-        ac_object.node(-x[1], b.ground_elev + b.height - b.roof_height + b.roof_height_x[i], -x[0])
+        ac_object.node(-x[1], b.beginning_of_roof_above_sea_level + b.roof_height_x[i], -x[0])
         i += 1
 
     if b.polygon.interiors:
@@ -242,7 +242,7 @@ def separate_skillion(ac_object: ac.Object, b):
     # create nodes for/ and roof
     for i, node in enumerate(nodes):
         # new nodes
-        ac_object.node(-b.X[node][1], b.ground_elev + b.height - b.roof_height + b.roof_height_x[node], -b.X[node][0])
+        ac_object.node(-b.X[node][1], b.beginning_of_roof_above_sea_level + b.roof_height_x[node], -b.X[node][0])
         l.append((o + node, uv[i][0], uv[i][1]))
     ac_object.face(l)
     return
