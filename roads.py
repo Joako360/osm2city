@@ -873,7 +873,8 @@ class Roads(object):
                         refs_to_remove.append(way.refs[i - 1])
 
             for ref in refs_to_remove:
-                way.refs.remove(ref)
+                if ref in way.refs:
+                    way.refs.remove(ref)  # FIXME: this is a hack for something that actually happens, but should not
                 logging.debug('Removing ref {} from way {} due to too short segment')
 
         # create a dict referencing for every node those ways, which are using this node in their references
