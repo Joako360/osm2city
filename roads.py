@@ -435,10 +435,10 @@ class Roads(object):
     def _check_ways_in_water(self) -> None:
         """Checks whether a way or parts of a way is in water and removes those parts.
         Water in relation to the FlightGear scenery, not OSM data (can be different).
-        Bridges and replaced bridges needs to be kept.
+        Bridges and replaced bridges need to be kept.
         It does performance wise not matter, that _probe_elev_at_nodes also checks the scenery as stuff is cached."""
         extra_ways = list()  # new ways to be added based on split ways
-        removed_ways = list()  # existing ways to be removed because not more than one node outside of water
+        removed_ways = list()  # existing ways to be removed because at most one node outside of water
         for way in self.ways_list:
             if _is_bridge(way) or _is_replaced_bridge(way):
                 continue
@@ -456,7 +456,7 @@ class Roads(object):
 
             if not node_refs_in_water:  # all on land - just continue
                 continue
-            elif len(node_refs_in_water) == 1 and len(way.refs) > 2:  # only 1 point
+            elif len(node_refs_in_water) == 1 and len(way.refs) > 2:  # only 1 point in water for way with 2+ nodes
                 if way.refs[0] is not node_refs_in_water[0] and way.refs[-1] is not node_refs_in_water[0]:
                     if logging.getLogger().isEnabledFor(logging.DEBUG):
                         my_string = """Accepting way with only 1 point in water at odm_id = {};
@@ -875,7 +875,7 @@ class Roads(object):
             for ref in refs_to_remove:
                 if ref in way.refs:
                     way.refs.remove(ref)  # FIXME: this is a hack for something that actually happens, but should not
-                logging.debug('Removing ref {} from way {} due to too short segment')
+                    logging.debug('Removing ref %d from way %d due to too short segment', ref, way.osm_id)
 
         # create a dict referencing for every node those ways, which are using this node in their references
         # key = node ref, value = List((way, pos)), where pos=-1 for start, pos=0 for inner, pos=1 for end
@@ -901,8 +901,8 @@ class Roads(object):
         """Remove bridge tag from short bridges, making them a simple way."""
         for the_way in self.ways_list:
             if _is_bridge(the_way):
-                center = self._line_string_from_way(the_way)
-                if center.length < parameters.BRIDGE_MIN_LENGTH:
+                bridge = self._line_string_from_way(the_way)
+                if bridge.length < parameters.BRIDGE_MIN_LENGTH:
                     _replace_bridge_tags(the_way.tags)
 
     def _keep_only_bridges_and_embankments(self):
@@ -1284,7 +1284,7 @@ def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, s
 
 def _write_xml(path_to_stg, file_name, object_name):
     xml = open(os.path.join(path_to_stg, file_name + '.xml'), "w")
-    if parameters.TRAFFIC_SHADER_ENABLE and not parameters.FLAG_2017_2:
+    if parameters.TRAFFIC_SHADER_ENABLE and (parameters.FLAG_2017_2 is False):
         shader_str = "Effects/road-high"
     else:
         shader_str = "roads"

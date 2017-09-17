@@ -307,7 +307,7 @@ class File(object):
             self.materials_list.append(tokens[1])
 
         def convertLObj(tokens):
-            self.new_object(None, None)
+            self.new_object("", "")
             self._current_object._type = tokens[1]
 
         def convertLKids(tokens):

@@ -452,7 +452,7 @@ class WindTurbine(SharedPylon):
                     shared_model = "39m"
                 if is_illuminated:
                     shared_model += "_obst"
-                shared_model = "windturbine_LAG18_" + shared_model
+                shared_model = "windturbine_LAG18_" + shared_model  + '.xml'
         logging.debug("Wind turbine shared model chosen: {}".format(shared_model))
         return common_path + shared_model
 
