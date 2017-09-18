@@ -864,7 +864,7 @@ class Building(object):
                         self.roof_shape = RoofShape.flat
                         roofs.flat(ac_object, self, roof_mgr, stats)
             # -- pitched roof for exactly 4 ground nodes
-            else:
+            elif self.nnodes_ground == 4:
                 if self.roof_shape is RoofShape.gabled:
                     roofs.separate_gable(ac_object, self)
                 elif self.roof_shape is RoofShape.hipped:
@@ -873,11 +873,11 @@ class Building(object):
                     roofs.separate_pyramidal(ac_object, self)
                 elif self.roof_shape is RoofShape.skillion:
                     roofs.separate_skillion(ac_object, self)
-                elif self.roof_shape is RoofShape.flat:
-                    roofs.flat(ac_object, self, roof_mgr, stats)
                 else:
                     logging.warning("Roof type %s seems to be unsupported, but is mapped ", self.roof_shape.name)
                     roofs.flat(ac_object, self, roof_mgr, stats)
+            else:  # fall back to pyramidal
+                roofs.separate_pyramidal(ac_object, self)
 
 
 def _random_level_height() -> float:
