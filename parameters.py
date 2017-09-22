@@ -176,6 +176,7 @@ C2P_PROCESS_OVERHEAD_LINES = False
 C2P_PROCESS_WIND_TURBINES = True
 C2P_PROCESS_STREETLAMPS = False
 C2P_PROCESS_STORAGE_TANKS = True
+C2P_PROCESS_CHIMNEYS = True
 
 # The radius for the cable. The cable will be a triangle with side length 2*radius.
 # In order to be better visible the radius might be chosen larger than in real life
@@ -224,6 +225,10 @@ C2P_STREETLAMPS_MIN_STREET_LENGTH = 20
 
 C2P_WIND_TURBINE_MAX_DISTANCE_WITHIN_WIND_FARM = 700
 C2P_WIND_TURBINE_MIN_DISTANCE_SHARED_OBJECT = 10
+
+C2P_CHIMNEY_BRICK_RATION = 0.2  # the ratio of chimneys being made of bricks (rest is cement etc.)
+C2P_CHIMNEY_DEFAULT_HEIGHT = 100  # the default height of chimneys, where the height is not specified in OSM
+C2P_CHIMNEY_DEFAULT_HEIGHT_VARIATION = 20  # a random variation on top of the default height between 0 and value
 
 # =============================================================================
 # PARAMETERS RELATED TO landuse.py - might be replaced by another library

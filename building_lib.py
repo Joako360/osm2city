@@ -1002,6 +1002,10 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
                     'man_made' in b.tags and b.tags['man_made'] in ['storage_tank', 'tank']):
                 logging.debug("Excluded storage tank with osm_id={}".format(b.osm_id))
                 continue
+            # exclude chimneys -> pylons.py
+            if 'man_made' in b.tags and b.tags['man_made'] in ['chimney']:
+                logging.debug("Excluded chimney or with osm_id={}".format(b.osm_id))
+                continue
 
         # -- get geometry right
         #    - simplify

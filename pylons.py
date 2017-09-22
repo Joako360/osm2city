@@ -22,6 +22,7 @@ import logging
 import math
 import multiprocessing as mp
 import os
+import random
 import time
 from typing import Dict, List, Tuple
 import unittest
@@ -320,6 +321,86 @@ class SharedPylon(object):
         my_stg_mgr.add_object_shared(self.pylon_model, vec2d.Vec2d(self.lon, self.lat),
                                      self.elevation,
                                      _stg_angle(self.heading - 90 + direction_correction))
+
+
+class Chimney(SharedPylon):
+    def __init__(self, osm_id: int, lon: float, lat: float, elevation: float, tags: Dict[str, str]) -> None:
+        super().__init__()
+        self.osm_id = osm_id
+        self.lon = lon
+        self.lat = lat
+        self.height = parameters.C2P_CHIMNEY_DEFAULT_HEIGHT  # the height of the chimney
+        variation = random.uniform(0, parameters.C2P_CHIMNEY_DEFAULT_HEIGHT_VARIATION)
+        self.height += variation
+        if 'height' in tags:
+            self.height = osmparser.parse_length(tags['height'])
+
+        bricks = False
+        if 'building:material' in tags and tags['building:material'] == 'brick':
+            bricks = True
+        else:  # determine brick material randomly
+            ratio = random.uniform(0, 1)
+            if ratio <= parameters.C2P_CHIMNEY_BRICK_RATION:
+                bricks = True
+        if bricks:
+            self.pylon_model = 'brick_chimney_502m.ac'
+            model_height = 502.
+            if self.height > 502.:
+                self.height = 502.
+        else:
+            if self.height <= 120.:
+                model_height = 120
+                self.pylon_model = 'TPS_Drujba2_chimney.ac'
+            else:
+                if self.height <= 205.:
+                    model_height = 205.
+                    self.pylon_model = 'Boesdorf_Chimney.xml'
+                elif 205 < self.height < 250:
+                    model_height = 250.
+                    self.pylon_model = 'kw_altbach_chimney250.xml'
+                else:
+                    if self.height > 500:
+                        self.height = 500.
+                    self.poly_model = 'generic_chimney_01.xml'
+                    model_height = 500.
+        # correct elevation to account for model height vs. chimney height
+        self.elevation = elevation - (model_height - self.height)
+        self.pylon_model = 'Models/Industrial/' + self.pylon_model
+
+
+def _process_osm_chimneys_nodes(osm_nodes_dict: Dict[int, osmparser.Node], coords_transform: coordinates.Transformation,
+                               fg_elev: utilities.FGElev) -> List[Chimney]:
+    chimneys = list()
+
+    for key, node in osm_nodes_dict.items():
+        probe_tuple = fg_elev.probe(vec2d.Vec2d(node.lon, node.lat), True)
+        chimney = Chimney(key, node.lon, node.lat, probe_tuple[0], node.tags)
+        chimney.x, chimney.y = coords_transform.toLocal((node.lon, node.lat))
+        chimneys.append(chimney)
+    return chimneys
+
+
+def _process_osm_chimneys_ways(nodes_dict, ways_dict, my_coord_transformator,
+                               fg_elev: utilities.FGElev) ->  List[Chimney]:
+    chimneys = list()
+    for way in list(ways_dict.values()):
+        for key in way.tags:
+            my_coordinates = list()
+            for ref in way.refs:
+                if ref in nodes_dict:
+                    my_node = nodes_dict[ref]
+                    my_coordinates.append(my_coord_transformator.toLocal((my_node.lon, my_node.lat)))
+            if 2 < len(my_coordinates):
+                my_polygon = shg.Polygon(my_coordinates)
+                if my_polygon.is_valid and not my_polygon.is_empty:
+                    my_centroid = my_polygon.centroid
+                    lon, lat = my_coord_transformator.toGlobal((my_centroid.x, my_centroid.y))
+                    probe_tuple = fg_elev.probe(vec2d.Vec2d(lon, lat), True)
+                    chimney = Chimney(key, lon, lat, probe_tuple[0], way.tags)
+                    chimney.x = my_centroid.x
+                    chimney.y = my_centroid.y
+                    chimneys.append(chimney)
+    return chimneys
 
 
 class StorageTank(SharedPylon):
@@ -1797,6 +1878,18 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
             osm_nodes_dict = osmparser.fetch_db_nodes_isolated(["generator:source=>wind"])
         wind_turbines = _process_osm_wind_turbines(osm_nodes_dict, coords_transform, fg_elev, stg_entries)
         logging.info("Number of valid wind turbines found: {}".format(len(wind_turbines)))
+    # chimneys
+    chimneys = list()
+    if parameters.C2P_PROCESS_WIND_TURBINES:
+        # start with chimneys tagged as node
+        osm_nodes_dict = osmparser.fetch_db_nodes_isolated(['man_made=>chimney'])
+        chimneys = _process_osm_chimneys_nodes(osm_nodes_dict, coords_transform, fg_elev)
+        # add chimneys tagged as way
+        osm_way_result = osmparser.fetch_osm_db_data_ways_key_values(['man_made=>chimney'])
+        osm_nodes_dict = osm_way_result.nodes_dict
+        osm_ways_dict = osm_way_result.ways_dict
+        chimneys.extend(_process_osm_chimneys_ways(osm_nodes_dict, osm_ways_dict, coords_transform, fg_elev))
+        logging.info("Number of valid chimneys found: {}".format(len(chimneys)))
 
     # free some memory
     del building_refs
@@ -1833,6 +1926,9 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     if parameters.C2P_PROCESS_STORAGE_TANKS:
         for tank in storage_tanks:
             tank.make_stg_entry(stg_manager)
+    if parameters.C2P_PROCESS_CHIMNEYS:
+        for chimney in chimneys:
+            chimney.make_stg_entry(stg_manager)
 
     stg_manager.write(file_lock)
 
