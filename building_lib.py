@@ -528,6 +528,21 @@ class Building(object):
         if 'layer' in self.tags:
             layer = int(self.tags['layer'])
 
+        # For Czech republic there are special rules due to OSM building import from RUIAN:
+        # http://wiki.openstreetmap.org/wiki/RUIAN.
+        # A lot of times building:levels is set to 1 despite building:flats having a high number.
+        # http://wiki.openstreetmap.org/wiki/Key:building:ruian:type = 6 -> apartment house
+        if 'building:ruian:type' in self.tags and self.tags['building:ruian:type'] in ['3', '6', '12', '19']:
+            if proxy_total_height == 0. and proxy_levels <= 1:
+                flats = 0
+                if 'building:flats' in self.tags:
+                    flats = utils.osmparser.parse_length(self.tags['building:flats'])
+                proxy_levels = 4
+                if flats > 10:
+                    proxy_levels = 5
+                if flats > 15:
+                    proxy_levels = 6
+
         proxy_roof_height = 0.
         if 'roof:height' in self.tags:
             try:
