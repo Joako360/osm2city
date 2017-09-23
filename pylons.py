@@ -376,7 +376,8 @@ def _process_osm_chimneys_nodes(osm_nodes_dict: Dict[int, osmparser.Node], coord
         probe_tuple = fg_elev.probe(vec2d.Vec2d(node.lon, node.lat), True)
         chimney = Chimney(key, node.lon, node.lat, probe_tuple[0], node.tags)
         chimney.x, chimney.y = coords_transform.toLocal((node.lon, node.lat))
-        chimneys.append(chimney)
+        if chimney.height >= parameters.C2P_CHIMNEY_MIN_HEIGHT:
+            chimneys.append(chimney)
     return chimneys
 
 
@@ -399,7 +400,8 @@ def _process_osm_chimneys_ways(nodes_dict, ways_dict, my_coord_transformator,
                     chimney = Chimney(key, lon, lat, probe_tuple[0], way.tags)
                     chimney.x = my_centroid.x
                     chimney.y = my_centroid.y
-                    chimneys.append(chimney)
+                    if chimney.height >= parameters.C2P_CHIMNEY_MIN_HEIGHT:
+                        chimneys.append(chimney)
     return chimneys
 
 

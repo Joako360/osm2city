@@ -227,6 +227,7 @@ C2P_WIND_TURBINE_MAX_DISTANCE_WITHIN_WIND_FARM = 700
 C2P_WIND_TURBINE_MIN_DISTANCE_SHARED_OBJECT = 10
 
 C2P_CHIMNEY_BRICK_RATION = 0.2  # the ratio of chimneys being made of bricks (rest is cement etc.)
+C2P_CHIMNEY_MIN_HEIGHT = 30  # the minimum height a Chimney needs to have to be taken into account. Depends on available static models
 C2P_CHIMNEY_DEFAULT_HEIGHT = 100  # the default height of chimneys, where the height is not specified in OSM
 C2P_CHIMNEY_DEFAULT_HEIGHT_VARIATION = 20  # a random variation on top of the default height between 0 and value
 
