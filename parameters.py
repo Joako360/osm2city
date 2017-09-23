@@ -260,6 +260,8 @@ HIGHWAY_TYPE_MIN_ROUGH_LOD = 6  # the minimum type tobe added to the rough LOD c
 POINTS_ON_LINE_DISTANCE_MAX = 1000  # the maximum distance between two points on a line. If longer, then new points are added
 BUILT_UP_AREA_LIT_BUFFER = 20  # the buffer around built-up land-use areas to be used for lighting of streets
 
+USE_TRAM_LINES = False  # whether to build tram lines (OSM railway=tram)  often they do not merge well with roads
+
 
 # =============================================================================
 # PARAMETERS RELATED TO TEXTURES

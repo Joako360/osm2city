@@ -364,6 +364,9 @@ MAX_SLOPE_ROAD, MAX_SLOPE_*                     Decimal    0.08      The maximum
                                                                      higher values (e.g. 0.15 for roads works fine in Switzeland). This leads to
                                                                      steeper ramps to bridges, but give much fewer residuals with embankments.
 
+USE_TRAM_LINE                                   Boolean    False     Often tram lines are on top of existing roads or between. This can lead to
+                                                                     roads being (partially) hidden etc.
+
 =============================================   ========   =======   ==============================================================================
 
 With residuals:

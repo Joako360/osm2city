@@ -130,6 +130,11 @@ def _is_replaced_bridge(way: osmparser.Way) -> bool:
     return REPLACED_BRIDGE_KEY in way.tags
 
 
+VALID_RAILWAYS = ['rail', 'disused', 'preserved', 'subway', 'narrow_gauge', 'light_rail']
+if parameters.USE_TRAM_LINES:
+    VALID_RAILWAYS.append('tram')
+
+
 def _is_processed_railway(way):
     """Check whether this is not only a railway, but one that gets processed.
 
@@ -138,7 +143,7 @@ def _is_processed_railway(way):
     """
     if not osmparser.is_railway(way):
         return False
-    if way.tags['railway'] in ['rail', 'disused', 'preserved', 'subway', 'narrow_gauge', 'tram', 'light_rail']:
+    if way.tags['railway'] in VALID_RAILWAYS:
         return True
     return False
 
