@@ -1,8 +1,8 @@
 .. _chapter-installation-label:
 
-########################
-Installation [Developer]
-########################
+######################
+Installation [Builder]
+######################
 
 The following specifies software and data requirements as part of the installation. Please be aware that different steps in scenery generation (e.g. generating elevation data, generating scenery objects) might require a lot of memory and are CPU intensive. Either use decent hardware or experiment with the size of the sceneries. However it is more probable that your computer gets at limits when flying around in FlightGear with sceneries using ``osm2city`` than when generating the sceneries.
 

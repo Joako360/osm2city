@@ -1,8 +1,8 @@
 .. _chapter-parameters-label:
 
-######################
-Parameters [Developer]
-######################
+####################
+Parameters [Builder]
+####################
 
 Please consider the following:
 
@@ -83,7 +83,7 @@ BOUNDARY_SOUTH, BOUNDARY_WEST                                        scenery.
                                                                      (if the OSM boundaries are more narrow).
 
 NO_ELEV                                         Boolean    False     Set this to ``False``. The only reason to set this to ``True`` would be for
-                                                                     developers to check generated scenery objects a bit faster not caring about 
+                                                                     builders to check generated scenery objects a bit faster not caring about
                                                                      the vertical position in the scenery.
 
 FG_ELEV                                         String     n/a       Points to the full path of the fgelev executable. On Linux it could be
@@ -151,9 +151,9 @@ BUILDING_COMPLEX_ROOFS_MIN_LEVELS               Integer    1         Don't put c
 BUILDING_COMPLEX_ROOFS_MAX_LEVELS               Integer    5         Don't put complex roofs on buildings taller than the specified value unless
                                                                      there is an explicit ``roof:shape`` flag in OSM.
 
-BUILDING_COMPLEX_ROOFS_MAX_AREA                 Integer    800       Don't put complex roofs on buildings larger than this.
+BUILDING_COMPLEX_ROOFS_MAX_AREA                 Integer    1600      Don't put complex roofs on buildings larger than this.
 
-BUILDING_COMPLEX_ROOFS_MIN_RATIO_AREA           Integer    250       If a building is larger than this but smaller than ``..._MAX_AREA``, then
+BUILDING_COMPLEX_ROOFS_MIN_RATIO_AREA           Integer    600       If a building is larger than this but smaller than ``..._MAX_AREA``, then
                                                                      it is compared whether the building tends to be small and long, because often
                                                                      one more square buildings, which at the same time are large, the roof tends
                                                                      to be flat.

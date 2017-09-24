@@ -13,7 +13,7 @@ Before you generate your own sceneries, you might want to get familiar with the 
 
 .. _Sceneries: http://forum.flightgear.org/viewforum.php?f=5
 
-``User`` in the context of this guide means the end user in FlightGear using osm2city generated sceneries. ``Developer`` means a person using osm2city to generate a scenery.
+``User`` in the context of this guide means the end user in FlightGear using osm2city generated sceneries. ``Builder`` means a person using osm2city to generate a scenery.
 
 **Contents:**
 

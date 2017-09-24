@@ -1,8 +1,8 @@
 .. _chapter-appendix-label:
 
-####################
-Appendix [Developer]
-####################
+##################
+Appendix [Builder]
+##################
 
 
 .. _chapter-osm-database-label:

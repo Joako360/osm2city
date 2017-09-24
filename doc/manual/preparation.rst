@@ -1,8 +1,8 @@
 .. _chapter-preparation-label:
 
-#######################
-Preparation [Developer]
-#######################
+#####################
+Preparation [Builder]
+#####################
 
 Before ``osm2city`` related programs can be run to generate FlightGear scenery objects, the following steps need to be done:
 
@@ -142,7 +142,7 @@ OSM_FILE
 BOUNDARY_*
     The longitude and latitude of the boundaries of the generated scenery. The boundaries should correspond to the boundaries in the ``OSM_FILE`` (open the \*.osm file in a text editor and check the data in ca. line 3) respectively the data in PostGIS. The boundaries can be different, but then you might either miss data (if the OSM boundaries are larger) or do more processing than necessary (if the OSM boundaries are more narrow and you use a fiel based approach — not an issue when using a database).
 NO_ELEV
-    Set this to ``False``. The only reason to set this to ``True`` would be for developers to check generated scenery objects a bit faster not caring about the vertical position in the scenery.
+    Set this to ``False``. The only reason to set this to ``True`` would be for builders to check generated scenery objects a bit faster not caring about the vertical position in the scenery.
 FG_ELEV
     Set parameter ``FG_ELEV`` to point to the full path of the fgelev executable. On Linux it could be something like ``FG_ELEV = '/home/pingu/bin/fgfs_git/next/install/flightgear/bin/fgelev'``. On Windows you might have to put quotes around the path due to whitespace e.g. ``FG_ELEV = '"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'`` (yes, both single and double quotes).
 

@@ -1,8 +1,8 @@
 .. _chapter-generation-label:
 
-##############################
-Scenery Generation [Developer]
-##############################
+############################
+Scenery Generation [Builder]
+############################
 
 =============================
 Setting the Working Directory
