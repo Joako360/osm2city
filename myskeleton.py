@@ -7,6 +7,9 @@ Created on Fri Sep  6 19:37:03 2013
 
 import logging
 import random
+import textwrap
+
+import numpy as np
 
 import parameters
 import pySkeleton.polygon as polygon
@@ -46,7 +49,42 @@ def myskel(out, b, stats: utilities.Stats, offset_xy=Vec2d(0, 0), offset_z=0., h
         stats.roof_errors += 1
         gp = parameters.get_repl_prefix() + '_roof-error-%04i' % stats.roof_errors
         if parameters.log_level_debug_or_lower():
-            utilities.write_one_gp(b, gp)
+            _write_one_gp(b, gp)
         return False
 
     return result
+
+
+def _write_one_gp(b, filename):
+    npv = np.array(b.X_outer)
+    minx = min(npv[:, 0])
+    maxx = max(npv[:, 0])
+    miny = min(npv[:, 1])
+    maxy = max(npv[:, 1])
+    dx = 0.1 * (maxx - minx)
+    minx -= dx
+    maxx += dx
+    dy = 0.1 * (maxy - miny)
+    miny -= dy
+    maxy += dy
+
+    gp = open(filename + '.gp', 'w')
+    term = "png"
+    ext = "png"
+    gp.write(textwrap.dedent("""
+    set term %s
+    set out '%s.%s'
+    set xrange [%g:%g]
+    set yrange [%g:%g]
+    set title "%s"
+    unset key
+    """ % (term, filename, ext, minx, maxx, miny, maxy, b.osm_id)))
+    i = 0
+    for v in b.X_outer:
+        i += 1
+        gp.write('set label "%i" at %g, %g\n' % (i, v[0], v[1]))
+
+    gp.write("plot '-' w lp\n")
+    for v in b.X_outer:
+        gp.write('%g %g\n' % (v[0], v[1]))
+    gp.close()

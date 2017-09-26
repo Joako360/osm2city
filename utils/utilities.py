@@ -139,41 +139,6 @@ def match_local_coords_with_global_nodes(local_list: List[Tuple[float, float]], 
     return matched_nodes
 
 
-def write_one_gp(b, filename):
-    npv = np.array(b.X_outer)
-    minx = min(npv[:, 0])
-    maxx = max(npv[:, 0])
-    miny = min(npv[:, 1])
-    maxy = max(npv[:, 1])
-    dx = 0.1 * (maxx - minx)
-    minx -= dx
-    maxx += dx
-    dy = 0.1 * (maxy - miny)
-    miny -= dy
-    maxy += dy
-
-    gp = open(filename + '.gp', 'w')
-    term = "png"
-    ext = "png"
-    gp.write(textwrap.dedent("""
-    set term %s
-    set out '%s.%s'
-    set xrange [%g:%g]
-    set yrange [%g:%g]
-    set title "%s"
-    unset key
-    """ % (term, filename, ext, minx, maxx, miny, maxy, b.osm_id)))
-    i = 0
-    for v in b.X_outer:
-        i += 1
-        gp.write('set label "%i" at %g, %g\n' % (i, v[0], v[1]))
-
-    gp.write("plot '-' w lp\n")
-    for v in b.X_outer:
-        gp.write('%g %g\n' % (v[0], v[1]))
-    gp.close()
-
-
 class Stats(object):
     def __init__(self):
         self.objects = 0
