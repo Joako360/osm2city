@@ -69,10 +69,8 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_l
         parameters.set_loglevel(log_level)
         parameters.USE_DATABASE = True  # just to be sure
         # adapt boundary
-        parameters.BOUNDARY_WEST = scenery_tile.boundary_west
-        parameters.BOUNDARY_SOUTH = scenery_tile.boundary_south
-        parameters.BOUNDARY_EAST = scenery_tile.boundary_east
-        parameters.BOUNDARY_NORTH = scenery_tile.boundary_north
+        parameters.set_boundary(scenery_tile.boundary_west, scenery_tile.boundary_south,
+                                scenery_tile.boundary_east, scenery_tile.boundary_north)
         parameters.PREFIX = scenery_tile.prefix
         logging.info("Processing tile {} in prefix {} with process id = {}".format(scenery_tile.tile_index,
                                                                                    parameters.PREFIX,
