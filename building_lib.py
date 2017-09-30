@@ -9,6 +9,8 @@ Call hierarchy (as of summer 2017) - building_lib is called from building.py:
 * building_lib.overlap_check_convex_hull(...)
 * building_lib.analyse(...)
     for building in ...
+        b.analyse_elev_and_water(..)
+        b.analyse.edge_lengths(...)
         b.analyse_roof_shape(...)
         b.analyse_height_and_levels()
         b.analyse_large_enough()
@@ -185,7 +187,12 @@ class BuildingParent(object):
 class Building(object):
     """Central object class.
     Holds all data relevant for a building. Coordinates, type, area, ...
-    Read-only access to node coordinates via self.X[node][0|1]
+    Read-only access to node coordinates via self.pts[node][0|1]
+
+    Trying to keep naming consistent:
+        * Node: from OSM ans OSM way
+        * Vertex: in ac-file
+        * Point (abbreviated to pt and pts): local coordinates for points on building (inner and outer)
     """
 
     def __init__(self, osm_id: int, tags: Dict[str, str], outer_ring: shg.LinearRing, name: str,
@@ -213,7 +220,7 @@ class Building(object):
         self.roof_height = 0.0  # the height of the roof (0 if flat), not the elevation over ground of the roof
 
         # set during method called by init(...) through self.update_geometry and related sub-calls
-        self.refs = None
+        self.refs = None  # nice for debugging, but not really needed. Might not be same sequence as pts_all
         self.inner_rings_list = None
         self.outer_nodes_closest = None
         self.anchor = None
@@ -227,9 +234,9 @@ class Building(object):
         self.pseudo_parents = list()  # list of Building: only set for building:part without a real parent
 
         # set after init(...)
-        self.roof_height_x = []  # roof height at ground-node x - only set and used for type=skillion
-        self.edge_length_x = None  # numpy array of side length between ground-node X and X+1
-        self.index_first_node_in_ac3d_obj = 0  # index of first node in final OBJECT node list
+        self.pts_all = None
+        self.roof_height_pts = []  # roof height at pt - only set and used for type=skillion
+        self.edge_length_pts = None  # numpy array of side length between pt and pt+1
         self.facade_texture = None
         self.roof_texture = None
         self.roof_requires = list()
@@ -238,8 +245,19 @@ class Building(object):
         self.ground_elev = 0.0  # the lowest elevation over sea of any point in the outer ring of the building
 
     def update_geometry(self, outer_ring: shg.LinearRing, inner_rings_list=list(), refs: List[int]=list()) -> None:
+        """Updates the geometry of the building. This can also happen after the building has been initialized.
+        Makes also sure, that inner and outer rings have correct orientation.
+        """
+        # make sure that outer ring is ccw
+        if outer_ring.is_ccw is False:
+            outer_ring.coords = list(outer_ring.coords)[::-1]
         self.refs = refs
         self.inner_rings_list = inner_rings_list
+        if self.inner_rings_list:
+            # make sure that inner rings are not ccw
+            for inner_ring in self.inner_rings_list:
+                if inner_ring.is_ccw:
+                    inner_ring.coords = list(inner_ring.coords)[::-1]
         self.outer_nodes_closest = []
         self.anchor = Vec2d(list(outer_ring.coords[0]))
         if len(outer_ring.coords) > 2:
@@ -256,13 +274,13 @@ class Building(object):
         """
         new_inner_rings_list = []
         self.outer_nodes_closest = []
-        outer_nodes_avail = list(range(self.nnodes_outer))
+        outer_nodes_avail = list(range(self.pts_outer_count))
         for inner in self.polygon.interiors:
             min_r = 1e99
             for i, node_i in enumerate(list(inner.coords)[:-1]):
                 node_i = Vec2d(node_i)
                 for o in outer_nodes_avail:
-                    r = node_i.distance_to(Vec2d(self.X_outer[o]))
+                    r = node_i.distance_to(Vec2d(self.pts_outer[o]))
                     if r <= min_r:
                         min_r = r
                         min_i = i
@@ -278,26 +296,26 @@ class Building(object):
         self._set_polygon(self.polygon.exterior, self.inner_rings_list)
 
     def simplify(self, tolerance):
-        original_nodes = self.nnodes_outer + len(self.X_inner)
+        original_nodes = self.pts_outer_count + len(self.pts_inner)
         self.polygon = self.polygon.simplify(tolerance)
-        nnodes_simplified = original_nodes - (self.nnodes_outer + len(self.X_inner))
+        nnodes_simplified = original_nodes - (self.pts_outer_count + len(self.pts_inner))
         # FIXME: simplify interiors
         return nnodes_simplified
 
     def _set_polygon(self, outer: shg.LinearRing, inner: List[shg.LinearRing]=list()) -> None:
         self.polygon = shg.Polygon(outer, inner)
 
-    def _set_X(self, cluster_offset: Vec2d) -> None:
+    def _set_pts_all(self, cluster_offset: Vec2d) -> None:
         """Given an cluster middle point changes all coordinates in x/y space."""
-        self.X = np.array(self.X_outer + self.X_inner)
-        for i in range(self.nnodes_ground):
-            self.X[i, 0] -= cluster_offset.x
-            self.X[i, 1] -= cluster_offset.y
+        self.pts_all = np.array(self.pts_outer + self.pts_inner)
+        for i in range(self.pts_all_count):
+            self.pts_all[i, 0] -= cluster_offset.x
+            self.pts_all[i, 1] -= cluster_offset.y
 
     def set_ground_elev_and_offset(self, cluster_elev: float, cluster_offset: Vec2d) -> None:
         """Sets the ground elevations as difference between real elevation and cluster elevation.
         Also translates x/y coordinates"""
-        self._set_X(cluster_offset)
+        self._set_pts_all(cluster_offset)
         self.ground_elev -= cluster_elev
 
     @property
@@ -309,23 +327,23 @@ class Building(object):
         return True
 
     @property
-    def X_outer(self):
+    def pts_outer(self) -> List[Tuple[float, float]]:
         return list(self.polygon.exterior.coords)[:-1]
 
     @property
-    def X_inner(self):
+    def pts_inner(self) -> List[Tuple[float, float]]:
         return [coord for interior in self.polygon.interiors for coord in list(interior.coords)[:-1]]
 
     @property
-    def nnodes_ground(self):  # FIXME: changed behavior. Keep _ until all bugs found
-        n = len(self.polygon.exterior.coords) - 1
+    def pts_outer_count(self) -> int:
+        return len(self.polygon.exterior.coords) - 1
+
+    @property
+    def pts_all_count(self) -> int:  # FIXME: changed behavior. Keep _ until all bugs found
+        n = self.pts_outer_count
         for item in self.polygon.interiors:
             n += len(item.coords) - 1
         return n
-
-    @property
-    def nnodes_outer(self):
-        return len(self.polygon.exterior.coords) - 1
 
     @property
     def area(self):
@@ -337,7 +355,7 @@ class Building(object):
 
     @property
     def longest_edge_length(self):
-        return max(self.edge_length_x)
+        return max(self.edge_length_pts)
 
     @property
     def building_height(self) -> float:
@@ -479,6 +497,58 @@ class Building(object):
 
         return True
 
+    def analyse_elev_and_water(self, fg_elev: FGElev, stats: Stats) -> bool:
+        """Get the elevation of the node lowest node on the outer ring.
+        If a node is in water or at -9999, then return False."""
+        elev_water_ok = True
+        temp_ground_elev = 9999
+        for pt_outer in self.pts_outer:
+            elev_is_solid_tuple = fg_elev.probe(Vec2d(pt_outer))
+            self.ground_elev = elev_is_solid_tuple[0]  # temporarily set - will be overwritten later
+            if elev_is_solid_tuple[0] == -9999:
+                logging.debug("-9999")
+                stats.skipped_no_elev += 1
+                elev_water_ok = False
+                break
+            elif not elev_is_solid_tuple[1]:
+                logging.debug("in water")
+                elev_water_ok = False
+                break
+            temp_ground_elev = min([temp_ground_elev, elev_is_solid_tuple[0]])  # we are looking for the lowest value
+        self.ground_elev = temp_ground_elev
+        return elev_water_ok
+
+    def analyse_edge_lengths(self) -> None:
+        # -- compute edge length
+        pts_outer = np.array(self.pts_outer)
+        self.edge_length_pts = np.zeros(self.pts_all_count)
+        for i in range(self.pts_outer_count - 1):
+            self.edge_length_pts[i] = ((pts_outer[i + 1, 0] - pts_outer[i, 0]) ** 2 +
+                                       (pts_outer[i + 1, 1] - pts_outer[i, 1]) ** 2) ** 0.5
+        n = self.pts_outer_count
+        self.edge_length_pts[n - 1] = ((pts_outer[0, 0] - pts_outer[n - 1, 0]) ** 2 +
+                                       (pts_outer[0, 1] - pts_outer[n - 1, 1]) ** 2) ** 0.5
+
+        if self.inner_rings_list:
+            index = self.pts_outer_count
+            for interior in self.polygon.interiors:
+                pts_inner = np.array(interior.coords)[:-1]
+                n = len(pts_inner)
+                for i in range(n - 1):
+                    self.edge_length_pts[index + i] = ((pts_inner[i + 1, 0] - pts_inner[i, 0]) ** 2 +
+                                                       (pts_inner[i + 1, 1] - pts_inner[i, 1]) ** 2) ** 0.5
+                self.edge_length_pts[index + n - 1] = ((pts_inner[0, 0] - pts_inner[n - 1, 0]) ** 2 +
+                                                       (pts_inner[0, 1] - pts_inner[n - 1, 1]) ** 2) ** 0.5
+                index += n
+
+        # -- re-number nodes such that longest edge is first -- only on simple buildings
+        # FIXME: why? We can and do calculate longest edge and can use that for texture
+        if self.pts_outer_count == 4 and not self.pts_inner:
+            if self.edge_length_pts[0] < self.edge_length_pts[1]:
+                pts_outer = np.roll(pts_outer, 1, axis=0)
+                self.edge_length_pts = np.roll(self.edge_length_pts, 1)
+                self._set_polygon(pts_outer, self.inner_rings_list)
+
     def analyse_roof_shape(self) -> None:
         if 'roof:shape' in self.tags:
             self.roof_shape = _map_osm_roof_shape(self.tags['roof:shape'])
@@ -611,11 +681,11 @@ class Building(object):
                 # no complex roof on tiny buildings.
                 elif self.levels < parameters.BUILDING_COMPLEX_ROOFS_MIN_LEVELS and 'roof:shape' not in self.tags:
                     allow_complex_roofs = False
-                elif self.nnodes_ground > 4:
+                elif self.pts_all_count > 4:
                     allow_complex_roofs = False
                     # Now lets see whether we can allow complex nevertheless when more than 4 corners
                     # a bit more relaxed, if we do skeleton roofs
-                    if self.nnodes_ground in range(4, parameters.BUILDING_SKEL_MAX_NODES):
+                    if self.pts_all_count in range(4, parameters.BUILDING_SKEL_MAX_NODES):
                         allow_complex_roofs = True
                     # even more relaxed if it is a skillion
                     if self.roof_shape is RoofShape.skillion:
@@ -658,7 +728,7 @@ class Building(object):
                                            parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
 
                 while angle > 0:
-                    temp_roof_height = tan(np.deg2rad(angle)) * (self.edge_length_x[1] / 2)
+                    temp_roof_height = tan(np.deg2rad(angle)) * (self.edge_length_pts[1] / 2)
                     if temp_roof_height < parameters.BUILDING_SKILLION_ROOF_MAX_HEIGHT:
                         break
                     angle -= 1
@@ -700,12 +770,10 @@ class Building(object):
             nXN = list()
             vprods = list()
 
-            X = self.X
-
-            p0 = (X[0][0], X[0][1])
-            for i in range(0, len(X)):
+            p0 = (self.pts_all[0][0], self.pts_all[0][1])
+            for i in range(0, len(self.pts_all)):
                 # compute coord in new referentiel
-                vecA = (X[i][0] - p0[0], X[i][1] - p0[1])
+                vecA = (self.pts_all[i][0] - p0[0], self.pts_all[i][1] - p0[1])
                 X2.append(vecA)
                 #
                 norm = vecA[0] * dir1n[0] + vecA[1] * dir1n[1]
@@ -724,14 +792,14 @@ class Building(object):
                 ibottom = vprods.index(min(vprods))
                 offset = nXN[ibottom]
                 norms_o = [nXN[i] + offset if vprods[i] >= 0 else -nXN[i] + offset for i in
-                           range(0, len(X))]  # oriented norm
+                           range(0, len(self.pts_all))]  # oriented norm
             else:
                 norms_o = nXN
 
             # compute height for each point with thales
             L = float(max(norms_o))
 
-            self.roof_height_x = [temp_roof_height * l / L for l in norms_o]
+            self.roof_height_pts = [temp_roof_height * l / L for l in norms_o]
             self.roof_height = temp_roof_height
 
         else:  # roof types other than skillion
@@ -750,7 +818,7 @@ class Building(object):
                         angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE,
                                                parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
                     while angle > 0:
-                        temp_roof_height = tan(np.deg2rad(angle)) * (self.edge_length_x[1] / 2)
+                        temp_roof_height = tan(np.deg2rad(angle)) * (self.edge_length_pts[1] / 2)
                         if temp_roof_height < parameters.BUILDING_SKEL_ROOF_MAX_HEIGHT:
                             break
                         angle -= 5
@@ -765,26 +833,25 @@ class Building(object):
 
         self._compute_roof_height()
 
+        index_first_node_in_ac_obj = ac_object.next_node_index()
+
         self._write_vertices_for_ac(ac_object)
 
-        self._write_faces_for_ac(ac_object, self.polygon.exterior, True)
+        self._write_faces_for_ac(ac_object, self.polygon.exterior, True, index_first_node_in_ac_obj)
         if not parameters.EXPERIMENTAL_INNER and len(self.polygon.interiors) > 1:
             raise NotImplementedError("Can't yet handle relations with more than one inner way")
         for inner in self.polygon.interiors:
-            self._write_faces_for_ac(ac_object, inner, False)
+            self._write_faces_for_ac(ac_object, inner, False, index_first_node_in_ac_obj)
 
-        self._write_roof_for_ac(ac_object, roof_mgr, cluster_offset, stats)
+        self._write_roof_for_ac(ac_object, index_first_node_in_ac_obj, roof_mgr, cluster_offset, stats)
 
     def _write_vertices_for_ac(self, ac_object: ac3d.Object) -> None:
         """Write the vertices for each node along bottom and roof edges to the ac3d object."""
-
-        self.index_first_node_in_ac3d_obj = ac_object.next_node_index()
-
         z = self.ground_elev + self.min_height
 
         # ground nodes
-        for x in self.X:
-            ac_object.node(-x[1], z, -x[0])
+        for pt in self.pts_all:
+            ac_object.node(-pt[1], z, -pt[0])
         # under the roof nodes
         if self.roof_shape is RoofShape.skillion:
             # skillion
@@ -794,10 +861,10 @@ class Building(object):
             #  |            |
             #  +-----+------+
             #
-            if self.roof_height_x:
-                for i in range(len(self.X)):
-                    ac_object.node(-self.X[i][1], self.beginning_of_roof_above_sea_level + self.roof_height_x[i],
-                                   -self.X[i][0])
+            if self.roof_height_pts:
+                for i in range(len(self.pts_all)):
+                    ac_object.node(-self.pts_all[i][1], self.beginning_of_roof_above_sea_level + self.roof_height_pts[i],
+                                   -self.pts_all[i][0])
         else:
             # others roofs
             #
@@ -805,17 +872,18 @@ class Building(object):
             #  |            |
             #  +-----+------+
             #
-            for x in self.X:
-                ac_object.node(-x[1], self.beginning_of_roof_above_sea_level, -x[0])
+            for pt in self.pts_all:
+                ac_object.node(-pt[1], self.beginning_of_roof_above_sea_level, -pt[0])
 
-    def _write_faces_for_ac(self, ac_object: ac3d.Object, ring: shg.LinearRing, is_exterior_ring: bool) -> None:
+    def _write_faces_for_ac(self, ac_object: ac3d.Object, ring: shg.LinearRing, is_exterior_ring: bool,
+                            index_first_node_in_ac_obj: int) -> None:
         """Writes all the faces for one building's exterior or interior ring to an ac3d object."""
         tex_coord_bottom, tex_coord_top = _calculate_vertical_texture_coords(self.body_height, self.facade_texture)
         tex_coord_bottom = self.facade_texture.y(tex_coord_bottom)  # -- to atlas coordinates
         tex_coord_top_input = tex_coord_top
         tex_coord_top = self.facade_texture.y(tex_coord_top)
 
-        number_outer_ring_nodes = self.nnodes_outer
+        number_outer_ring_nodes = self.pts_outer_count
         if is_exterior_ring:
             number_outer_ring_nodes = 0
 
@@ -830,7 +898,7 @@ class Building(object):
                 ipp = number_outer_ring_nodes
             # FIXME: respect facade texture split_h
             # FIXME: there is a nan in textures.h_splits of tex/facade_modern36x36_12
-            a = self.edge_length_x[i] / self.facade_texture.h_size_meters
+            a = self.edge_length_pts[i] / self.facade_texture.h_size_meters
             ia = int(a)
             frac = a - ia
             tex_coord_right = self.facade_texture.x(self.facade_texture.closest_h_match(frac) + ia)
@@ -839,9 +907,9 @@ class Building(object):
                     logging.debug('FIXME: v_can_repeat: need to check in analyse')
 
             if self.roof_shape is RoofShape.skillion:
-                tex_y12 = self.facade_texture.y((self.body_height + self.roof_height_x[i]) /
+                tex_y12 = self.facade_texture.y((self.body_height + self.roof_height_pts[i]) /
                                                 self.body_height * tex_coord_top_input)
-                tex_y11 = self.facade_texture.y((self.body_height + self.roof_height_x[ipp]) /
+                tex_y11 = self.facade_texture.y((self.body_height + self.roof_height_pts[ipp]) /
                                                 self.body_height * tex_coord_top_input)
             else:
                 tex_y12 = tex_coord_top
@@ -849,21 +917,21 @@ class Building(object):
 
             tex_coord_left = self.facade_texture.x(0)
 
-            ac_object.face([(i + self.index_first_node_in_ac3d_obj, tex_coord_left, tex_coord_bottom),
-                            (ipp + self.index_first_node_in_ac3d_obj, tex_coord_right, tex_coord_bottom),
-                            (ipp + self.index_first_node_in_ac3d_obj + self.nnodes_ground, tex_coord_right, tex_y11),
-                            (i + self.index_first_node_in_ac3d_obj + self.nnodes_ground, tex_coord_left, tex_y12)],
+            ac_object.face([(i + index_first_node_in_ac_obj, tex_coord_left, tex_coord_bottom),
+                            (ipp + index_first_node_in_ac_obj, tex_coord_right, tex_coord_bottom),
+                            (ipp + index_first_node_in_ac_obj + self.pts_all_count, tex_coord_right, tex_y11),
+                            (i + index_first_node_in_ac_obj + self.pts_all_count, tex_coord_left, tex_y12)],
                            swap_uv=self.facade_texture.v_can_repeat)
 
-    def _write_roof_for_ac(self, ac_object: ac3d.Object, roof_mgr: tex.RoofManager,
+    def _write_roof_for_ac(self, ac_object: ac3d.Object, index_first_node_in_ac_obj: int, roof_mgr: tex.RoofManager,
                            cluster_offset: Vec2d, stats: Stats) -> None:
         """Writes the roof vertices and faces to an ac3d object."""
         if self.roof_shape is RoofShape.flat:
-            roofs.flat(ac_object, self, roof_mgr, stats)
+            roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, stats)
 
         else:
             # -- pitched roof for > 4 ground nodes
-            if self.nnodes_ground > 4:
+            if self.pts_all_count > 4:
                 if self.roof_shape is RoofShape.skillion:
                     roofs.separate_skillion(ac_object, self)
                 elif self.roof_shape is RoofShape.pyramidal:
@@ -877,9 +945,9 @@ class Building(object):
 
                     else:  # something went wrong - fall back to flat roof
                         self.roof_shape = RoofShape.flat
-                        roofs.flat(ac_object, self, roof_mgr, stats)
+                        roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, stats)
             # -- pitched roof for exactly 4 ground nodes
-            elif self.nnodes_ground == 4:
+            elif self.pts_all_count == 4:
                 if self.roof_shape is RoofShape.gabled:
                     roofs.separate_gable(ac_object, self)
                 elif self.roof_shape is RoofShape.hipped:
@@ -890,7 +958,7 @@ class Building(object):
                     roofs.separate_skillion(ac_object, self)
                 else:
                     logging.warning("Roof type %s seems to be unsupported, but is mapped ", self.roof_shape.name)
-                    roofs.flat(ac_object, self, roof_mgr, stats)
+                    roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, stats)
             else:  # fall back to pyramidal
                 roofs.separate_pyramidal(ac_object, self)
 
@@ -978,14 +1046,7 @@ def decide_lod(buildings: List[Building], stats: Stats) -> None:
 
 def analyse(buildings: List[Building], fg_elev: FGElev,
             facade_mgr: tex.FacadeManager, roof_mgr: tex.RoofManager, stats: Stats) -> List[Building]:
-    """Analyse all buildings:
-    - calculate area
-    - location clash with stg static models? drop building
-    - analyze surrounding: similar shaped buildings nearby? will get same texture
-    - set building type, roof type etc
-
-    On entry, we're in global coordinates. Change to local coordinates.
-    """
+    """Analyse all buildings"""
     new_buildings = []
     building_parents = dict()
     for b in buildings:
@@ -996,15 +1057,6 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
         # property we make sure, that it is not overwritten in analysis later
         if building_parent is not None:
             b.tags['roof:shape'] = 'flat'
-
-        # am Anfang Geometrieanalyse
-        # - ort: urban, residential, rural
-        # - region: europe, asia...
-        # - levels: 1-2, 3-5, hi-rise
-        # - roof-shape: flat, gable
-        # - age: old, modern
-
-        # - facade raussuchen
 
         if 'building' in b.tags:  # not if 'building:part'
             # temporarily exclude greenhouses / glasshouses
@@ -1022,10 +1074,6 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
                 logging.debug("Excluded chimney or with osm_id={}".format(b.osm_id))
                 continue
 
-        # -- get geometry right
-        #    - simplify
-        #    - compute edge lengths
-
         if not b.is_external_model:
             try:
                 # FIXME RICK stats.nodes_simplified += b.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
@@ -1034,63 +1082,19 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
                 logging.warning("simplify or roll_inner_nodes failed (OSM ID %i, %s)", b.osm_id, reason)
                 continue
 
-        # -- array of local outer coordinates
-        Xo = np.array(b.X_outer)
-
-        elev_water_ok = True
-        temp_ground_elev = 9999
-        for i in range(len(Xo)):
-            elev_is_solid_tuple = fg_elev.probe(Vec2d(Xo[i]))
-            b.ground_elev = elev_is_solid_tuple[0]  # temporarily set - will be overwritten later
-            if elev_is_solid_tuple[0] == -9999:
-                logging.debug("-9999")
-                stats.skipped_no_elev += 1
-                elev_water_ok = False
-                break
-            elif not elev_is_solid_tuple[1]:
-                logging.debug("in water")
-                elev_water_ok = False
-                break
-            temp_ground_elev = min([temp_ground_elev, elev_is_solid_tuple[0]])  # we are looking for the lowest value
-        if not elev_water_ok:
+        if not b.analyse_elev_and_water(fg_elev, stats):
             continue
-        b.ground_elev = temp_ground_elev
 
         if b.is_external_model:
             new_buildings.append(b)
             continue
 
-        stats.nodes_ground += b.nnodes_ground
+        stats.nodes_ground += b.pts_all_count
 
-        # -- compute edge length
-        b.edge_length_x = np.zeros((b.nnodes_ground))
-        for i in range(b.nnodes_outer - 1):
-            b.edge_length_x[i] = ((Xo[i + 1, 0] - Xo[i, 0]) ** 2 + (Xo[i + 1, 1] - Xo[i, 1]) ** 2) ** 0.5
-        n = b.nnodes_outer
-        b.edge_length_x[n - 1] = ((Xo[0, 0] - Xo[n - 1, 0]) ** 2 + (Xo[0, 1] - Xo[n - 1, 1]) ** 2) ** 0.5
+        b.analyse_edge_lengths()
 
-        if b.inner_rings_list:
-            i0 = b.nnodes_outer
-            for interior in b.polygon.interiors:
-                Xi = np.array(interior.coords)[:-1]
-                n = len(Xi)
-                for i in range(n - 1):
-                    b.edge_length_x[i0 + i] = ((Xi[i + 1, 0] - Xi[i, 0]) ** 2 + (Xi[i + 1, 1] - Xi[i, 1]) ** 2) ** 0.5
-                b.edge_length_x[i0 + n - 1] = ((Xi[0, 0] - Xi[n - 1, 0]) ** 2 + (Xi[0, 1] - Xi[n - 1, 1]) ** 2) ** 0.5
-                i0 += n
-
-        # -- re-number nodes such that longest edge is first -- only on simple buildings
-        # FIXME: why? We can and do calculate longest edge and can use that for texture
-        if b.nnodes_outer == 4 and not b.X_inner:
-            if b.edge_length_x[0] < b.edge_length_x[1]:
-                Xo = np.roll(Xo, 1, axis=0)
-                b.edge_length_x = np.roll(b.edge_length_x, 1)
-                b._set_polygon(Xo, b.inner_rings_list)
-
-        # - find the roof_shape
         b.analyse_roof_shape()
 
-        # -- work on height and levels
         try:
             b.analyse_height_and_levels()
         except ValueError as e:

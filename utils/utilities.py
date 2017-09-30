@@ -173,10 +173,10 @@ class Stats(object):
 
         # -- stats on number of ground nodes.
         #    Complex buildings counted in corners[0]
-        if b.X_inner:
+        if b.pts_inner:
             self.corners[0] += 1
         else:
-            self.corners[min(b.nnodes_outer, len(self.corners)-1)] += 1
+            self.corners[min(b.pts_outer_count, len(self.corners) - 1)] += 1
 
         # --stats on area
         for i in range(len(self.area_levels))[::-1]:

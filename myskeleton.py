@@ -18,8 +18,8 @@ from utils.vec2d import Vec2d
 
 
 def myskel(out, b, stats: utilities.Stats, offset_xy=Vec2d(0, 0), offset_z=0., header=False, max_height=1e99) -> bool:
-    vertices = b.X_outer
-    no = len(b.X_outer)
+    vertices = b.pts_outer
+    no = len(b.pts_outer)
     edges = [(i, i+1) for i in range(no-1)]
     edges.append((no-1, 0))
     speeds = [1.] * no
@@ -49,14 +49,14 @@ def myskel(out, b, stats: utilities.Stats, offset_xy=Vec2d(0, 0), offset_z=0., h
         stats.roof_errors += 1
         gp = parameters.get_repl_prefix() + '_roof-error-%04i' % stats.roof_errors
         if parameters.log_level_debug_or_lower():
-            _write_one_gp(b, gp)
+            _write_one_gp(b.pts_outer, b.osm_id, gp)
         return False
 
     return result
 
 
-def _write_one_gp(b, filename):
-    npv = np.array(b.X_outer)
+def _write_one_gp(pts_outer, osm_id: int, filename: str) -> None:
+    npv = np.array(pts_outer)
     minx = min(npv[:, 0])
     maxx = max(npv[:, 0])
     miny = min(npv[:, 1])
@@ -76,15 +76,15 @@ def _write_one_gp(b, filename):
     set out '%s.%s'
     set xrange [%g:%g]
     set yrange [%g:%g]
-    set title "%s"
+    set title "%d"
     unset key
-    """ % (term, filename, ext, minx, maxx, miny, maxy, b.osm_id)))
+    """ % (term, filename, ext, minx, maxx, miny, maxy, osm_id)))
     i = 0
-    for v in b.X_outer:
+    for v in pts_outer:
         i += 1
         gp.write('set label "%i" at %g, %g\n' % (i, v[0], v[1]))
 
     gp.write("plot '-' w lp\n")
-    for v in b.X_outer:
+    for v in pts_outer:
         gp.write('%g %g\n' % (v[0], v[1]))
     gp.close()

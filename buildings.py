@@ -478,20 +478,15 @@ def _make_building_from_way(nodes_dict: Dict[int, osmparser.Node], all_tags: Dic
                                  refs=way.refs)
 
 
-def _refs_to_ring(coords_transform: coordinates.Transformation, refs, nodes_dict: Dict[int, osmparser.Node],
-                  inner=False) -> shg.LinearRing:
-    """Accept a list of OSM refs, return a linear ring. Also
-       fixes face orientation, depending on inner/outer.
-    """
+def _refs_to_ring(coords_transform: coordinates.Transformation, refs,
+                  nodes_dict: Dict[int, osmparser.Node]) -> shg.LinearRing:
+    """Accept a list of OSM refs, return a linear ring."""
     coords = []
     for ref in refs:
         c = nodes_dict[ref]
         coords.append(coords_transform.toLocal((c.lon, c.lat)))
 
     ring = shg.polygon.LinearRing(coords)
-    # -- outer -> CCW (counter clock wise), inner -> not CCW
-    if ring.is_ccw == inner:
-        ring.coords = list(ring.coords)[::-1]
     return ring
 
 
@@ -516,8 +511,8 @@ def _write_xml(path: str, file_name: str, the_buildings: List[building_lib.Build
     # -- put obstruction lights on hi-rise buildings
     for b in the_buildings:
         if b.levels >= parameters.OBSTRUCTION_LIGHT_MIN_LEVELS:
-            Xo = np.array(b.X_outer)
-            for i in np.arange(0, b.nnodes_outer, b.nnodes_outer/4.):
+            Xo = np.array(b.pts_outer)
+            for i in np.arange(0, b.pts_outer_count, b.pts_outer_count/4.):
                 xo = Xo[int(i+0.5), 0] - cluster_offset.x
                 yo = Xo[int(i+0.5), 1] - cluster_offset.y
                 zo = b.top_of_roof_above_sea_level + 1.5
