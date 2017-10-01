@@ -1882,14 +1882,16 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
         logging.info("Number of valid wind turbines found: {}".format(len(wind_turbines)))
     # chimneys
     chimneys = list()
-    if parameters.C2P_PROCESS_WIND_TURBINES:
+    if parameters.C2P_PROCESS_CHIMNEYS:
         # start with chimneys tagged as node
-        osm_nodes_dict = osmparser.fetch_db_nodes_isolated(['man_made=>chimney'])
+        if parameters.USE_DATABASE:
+            osm_nodes_dict = osmparser.fetch_db_nodes_isolated(['man_made=>chimney'])
         chimneys = _process_osm_chimneys_nodes(osm_nodes_dict, coords_transform, fg_elev)
         # add chimneys tagged as way
-        osm_way_result = osmparser.fetch_osm_db_data_ways_key_values(['man_made=>chimney'])
-        osm_nodes_dict = osm_way_result.nodes_dict
-        osm_ways_dict = osm_way_result.ways_dict
+        if parameters.USE_DATABASE:
+            osm_way_result = osmparser.fetch_osm_db_data_ways_key_values(['man_made=>chimney'])
+            osm_nodes_dict = osm_way_result.nodes_dict
+            osm_ways_dict = osm_way_result.ways_dict
         chimneys.extend(_process_osm_chimneys_ways(osm_nodes_dict, osm_ways_dict, coords_transform, fg_elev))
         logging.info("Number of valid chimneys found: {}".format(len(chimneys)))
 
