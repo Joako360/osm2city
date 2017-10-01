@@ -24,6 +24,7 @@ def flat(ac_object: ac.Object, index_first_node_in_ac_obj: int, b, roof_mgr: Roo
         raise ValueError("Roof texture None")
 
     if "compat:roof-flat" not in b.roof_requires:
+        # flat roof might have gotten required later in process, so we must find a new roof texture
         logging.debug("Replacing texture for flat roof despite " + str(b.roof_requires))
         if "compat:roof-pitched" in b.roof_requires:
             b.roof_requires.remove("compat:roof-pitched")
@@ -50,7 +51,8 @@ def flat(ac_object: ac.Object, index_first_node_in_ac_obj: int, b, roof_mgr: Roo
     else:
         nodes = list(range(b.pts_outer_count))
 
-    uv = face_uv(nodes, b.pts_all, b.roof_texture, angle=None)
+    # FIXME Rick uv = face_uv(nodes, b.pts_all, b.roof_texture, angle=None)
+    uv = face_uv_flat_roof(nodes, b.pts_all, b.roof_texture)
     nodes = np.array(nodes) + b.pts_all_count
 
     assert(len(nodes) == b.pts_all_count + 2 * len(b.polygon.interiors))
@@ -256,10 +258,49 @@ def face_uv(nodes: List[int], pts_all, texture: Texture, angle=None):
     if angle is None:
         x, y = pts_all[1]
         angle = -atan2(y, x)
-    R = np.array([[cos(angle), -sin(angle)],
-                  [sin(angle),  cos(angle)]])
-    uv = np.dot(pts_all, R.transpose())
+    rotation = np.array([[cos(angle), -sin(angle)],
+                        [sin(angle),  cos(angle)]])
+    uv = np.dot(pts_all, rotation.transpose())
 
     uv[:, 0] = texture.x(uv[:, 0] / texture.h_size_meters)
     uv[:, 1] = texture.y(uv[:, 1] / texture.v_size_meters)
+    return uv
+
+
+def face_uv_flat_roof(nodes: List[int], pts_all, texture: Texture):
+    """Special handling for flat roofs."""
+    pts_all = pts_all[nodes]
+
+    # rotate the roof to align with edge between first and second node
+    x0, y0 = pts_all[0]
+    x1, y1 = pts_all[1]
+    angle = -atan2(y1 - y0, x1 - x0)
+    rotation = np.array([[cos(angle), -sin(angle)],
+                        [sin(angle),  cos(angle)]])
+    uv = np.dot(pts_all, rotation.transpose())
+
+    # make sure all is translated to positive values
+    min_x = 99999.
+    min_y = 99999.
+    max_x = -99999.
+    max_y = -99999.
+    for pt in uv:
+        min_x = min(min_x, pt[0])
+        min_y = min(min_y, pt[1])
+        max_x = max(max_x, pt[0])
+        max_y = max(max_y, pt[1])
+    min_pt = np.array([min_x, min_y])
+    uv = (uv - min_pt)
+    max_x -= min_x
+    max_y -= min_y
+
+    # check whether texture might be smaller in one or the other dimension
+    h_ratio = max_x / texture.h_size_meters
+    v_ratio = max_y / texture.v_size_meters
+    max_ratio = max(h_ratio, v_ratio)
+    scale_factor = 1.
+    if max_ratio > 1.:
+        scale_factor = max_ratio  # meaning we artifically make the texture larger
+    uv[:, 0] = texture.x(uv[:, 0] / (texture.h_size_meters * scale_factor))
+    uv[:, 1] = texture.y(uv[:, 1] / (texture.v_size_meters * scale_factor))
     return uv
