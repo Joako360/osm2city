@@ -423,8 +423,8 @@ class FacadeManager(RoofManager):
     def find_matching_facade(self, requires: List[str], tags: Dict[str, str], height: float, width: float,
                              stats: Stats=None) -> Optional[Texture]:
         exclusions = []
-        if 'roof:colour' in tags:
-            exclusions.append("%s:%s" % ('roof:colour', tags['roof:colour']))
+        #if 'roof:colour' in tags: FIXME why would we need this at all?
+            #exclusions.append("%s:%s" % ('roof:colour', tags['roof:colour']))
         candidates = self.find_facade_candidates(requires, exclusions, height, width)
         if not candidates:
             # Break down requirements to something that matches

@@ -127,6 +127,32 @@ LOD_PERCENTAGE_DETAIL                           Decimal    0.5       Of the rema
 =============================================   ========   =======   ==============================================================================
 
 
+.. _chapter-parameters-buildings-european-label:
+
+------------------------------------------
+European Style Inner Cities (Experimental)
+------------------------------------------
+
+
+Given the available textures in ``osm2city-data`` and the limited tagging of buildings in OSM as of fall 2017, European cities look wrong, because there are too many modern facades used and too many flat roofs.
+
+The following parameters try to "fix" this by adding OSM-tags ``roof:colour=red`` and ``roof:shape=gabled`` to all those buildings, which do not have parents or pseudo-parents (i.e. nor relationships or parts in OSM), but which share node references with other buildings. So typically what is happening in blocks in inner cities in Europe.
+
+Excluded from this are buildings tagged as ``building=house`` or ``building=terrace`` or ``building=detached``.
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+BUILDING_FORCE_EUROPEAN_INNER_CITY_STYLE        Boolean    False     If True then some OSM tags are enforced to better simulate European style
+                                                                     buildings - especially in inner cities.
+
+BUILDING_FORCE_EUROPEAN_MAX_LEVEL               Integer    5         If the buildings is tagged with more levels than this parameter or the
+                                                                     corresponding height of levels * BUILDING_CITY_LEVEL_HEIGHT_HIGH, then the
+                                                                     OSM tags are not enforced.
+
+=============================================   ========   =======   ==============================================================================
+
+
 
 .. _chapter-parameters-roofs-label:
 
@@ -184,7 +210,7 @@ BUILDING_SKEL_ROOFS_MIN_ANGLE                   Integer    10        The minimum
 BUILDING_SKEL_ROOFS_MAX_ANGLE                   Integer    50        The max angle of the roof. Some randomness is applied between MIN and MAX.
 BUILDING_SKILLION_ROOF_MAX_HEIGHT               Decimal    2.        No matter the MIN and MAX angles: a skillion will have at most this height
                                                                      difference.
-BUILDING_SKEL_ROOF_MAX_HEIGHT = 6.              Decimal    6.        Skip skeleton roofs (gabled, pyramidal, ..) if the roof height is larger than
+BUILDING_SKEL_ROOF_MAX_HEIGHT                   Decimal    6.        Skip skeleton roofs (gabled, pyramidal, ..) if the roof height is larger than
                                                                      this value.
 BUILDING_SKEL_ROOF_DEFAULT_HEIGHT               Decimal    2.5       If the roof_height is not given in OSM this is what is used to calculate the
                                                                      real building height temporarily - until the real roof is constructed.

@@ -132,6 +132,10 @@ BUILDING_ROOF_GABLED_RATIO = 0.55
 BUILDING_ROOF_HIPPED_RATIO = 0.1
 BUILDING_ROOF_PYRAMIDAL_RATIO = 0.05
 
+# Force European style inner cities with gables and red tiles
+BUILDING_FORCE_EUROPEAN_INNER_CITY_STYLE = False
+BUILDING_FORCE_EUROPEAN_MAX_LEVEL = 5  # If a building has more levels (or level*BUILDING_CITY_LEVEL_HEIGHT_HIGH height), then this is not applied
+
 BUILDING_FAKE_AMBIENT_OCCLUSION = True      # -- fake AO by darkening facade textures towards the ground, using
 BUILDING_FAKE_AMBIENT_OCCLUSION_HEIGHT = 6. #    1 - VALUE * exp(- AGL / HEIGHT )
 BUILDING_FAKE_AMBIENT_OCCLUSION_VALUE = 0.6
@@ -142,10 +146,10 @@ EXPERIMENTAL_INNER = False              # -- do we still need this?
 #    It uses a triangular distribution (see http://en.wikipedia.org/wiki/Triangular_distribution)
 BUILDING_CITY_LEVELS_LOW = 2.0
 BUILDING_CITY_LEVELS_MODE = 3.5
-BUILDING_CITY_LEVELS_HEIGH = 5.0
+BUILDING_CITY_LEVELS_HIGH = 5.0
 BUILDING_CITY_LEVEL_HEIGHT_LOW = 3.1
 BUILDING_CITY_LEVEL_HEIGHT_MODE = 3.3
-BUILDING_CITY_LEVEL_HEIGHT_HEIGH = 3.6
+BUILDING_CITY_LEVEL_HEIGHT_HIGH = 3.6
 # FIXME: same parameters for place = town, village, suburb
 
 # -- The more buildings end up in LOD rough, the more work for your GPU.

@@ -220,7 +220,7 @@ class Building(object):
         self.roof_height = 0.0  # the height of the roof (0 if flat), not the elevation over ground of the roof
 
         # set during method called by init(...) through self.update_geometry and related sub-calls
-        self.refs = None  # nice for debugging, but not really needed. Might not be same sequence as pts_all
+        self.refs = None
         self.inner_rings_list = None
         self.outer_nodes_closest = None
         self.anchor = None
@@ -232,6 +232,9 @@ class Building(object):
         self.parent = None  # BuildingParent if available
         # - from building._process_lonely_building_parts(...)
         self.pseudo_parents = list()  # list of Building: only set for building:part without a real parent
+
+        # to know which buildings share references. Set in relate_neighbours(...)
+        self.neighbours = set()  # set of buildings
 
         # set after init(...)
         self.pts_all = None
@@ -602,7 +605,7 @@ class Building(object):
         # http://wiki.openstreetmap.org/wiki/RUIAN.
         # A lot of times building:levels is set to 1 despite building:flats having a high number.
         # http://wiki.openstreetmap.org/wiki/Key:building:ruian:type = 6 -> apartment house
-        if 'building:ruian:type' in self.tags and self.tags['building:ruian:type'] in ['3', '6', '12', '19']:
+        if 'building:ruian:type' in self.tags and self.tags['building:ruian:type'] in ['3', '5', '6', '12', '19']:
             if proxy_total_height == 0. and proxy_levels <= 1:
                 flats = 0
                 if 'building:flats' in self.tags:
@@ -709,6 +712,42 @@ class Building(object):
                  random.uniform(0, 1) < parameters.BUILDING_REDUCE_RATE):
             return False
         return True
+
+    def enforce_european_style(self) -> None:
+        """See description in manual for European Style parameters.
+
+        Be aware that these tags could be overwritten later in the processing again. It just increases probability.
+        """
+        if self.neighbours:
+            # exclude those with (pseudo)parents
+            if self.parent is not None or len(self.pseudo_parents) > 0:
+                return
+            # exclude houses and terraces
+            if 'building' in self.tags and self.tags['building'] in ['house', 'detached', 'terrace']:
+                return
+            # exclude based on levels
+            proxy_levels = 0
+            if 'building:levels' in self.tags:
+                proxy_levels = float(self.tags['building:levels'])
+            if 'levels' in self.tags:
+                proxy_levels = float(self.tags['levels'])
+            if proxy_levels > parameters.BUILDING_FORCE_EUROPEAN_MAX_LEVEL:
+                return
+            # exclude based on height
+            proxy_total_height = 0.
+            if 'height' in self.tags:
+                proxy_total_height = utils.osmparser.parse_length(self.tags['height'])
+            elif 'building:height' in self.tags:
+                proxy_total_height = utils.osmparser.parse_length(self.tags['building:height'])
+            max_height = parameters.BUILDING_FORCE_EUROPEAN_MAX_LEVEL * parameters.BUILDING_CITY_LEVEL_HEIGHT_HIGH
+            if proxy_total_height > max_height:
+                return
+
+            # now apply some tags to increase European style
+            if 'roof:colour' not in self.tags:
+                self.tags['roof:colour'] = 'red'
+            if 'roof:shape' not in self.tags:
+                self.tags['roof:shape'] = 'gabled'
 
     def _compute_roof_height(self) -> None:
         """Compute roof_height for each node"""
@@ -962,12 +1001,15 @@ class Building(object):
             else:  # fall back to pyramidal
                 roofs.separate_pyramidal(ac_object, self)
 
+    def __str__(self):
+        return "<OSM_ID %d at %s>" % (self.osm_id, hex(id(self)))
+
 
 def _random_level_height() -> float:
     """ Calculates the height for each level of a building based on place and random factor"""
     # FIXME: other places (e.g. village)
     return random.triangular(parameters.BUILDING_CITY_LEVEL_HEIGHT_LOW,
-                             parameters.BUILDING_CITY_LEVEL_HEIGHT_HEIGH,
+                             parameters.BUILDING_CITY_LEVEL_HEIGHT_HIGH,
                              parameters.BUILDING_CITY_LEVEL_HEIGHT_MODE)
 
 
@@ -975,7 +1017,7 @@ def _random_levels() -> int:
     """ Calculates the number of building levels based on place and random factor"""
     # FIXME: other places
     return int(round(random.triangular(parameters.BUILDING_CITY_LEVELS_LOW,
-                                       parameters.BUILDING_CITY_LEVELS_HEIGH,
+                                       parameters.BUILDING_CITY_LEVELS_HIGH,
                                        parameters.BUILDING_CITY_LEVELS_MODE)))
 
 
@@ -1044,20 +1086,34 @@ def decide_lod(buildings: List[Building], stats: Stats) -> None:
         stats.count_LOD(lod)
 
 
+def relate_neighbours(buildings: List[Building]) -> None:
+    """Relates neighbour buildings based on shared references."""
+    neighbours = 0
+    for i in range(0, len(buildings)):
+        for j in range (i + 1, len(buildings)):
+            if set(buildings[i].refs).isdisjoint(set(buildings[j].refs)) is False:
+                buildings[i].neighbours.add(buildings[j])
+                buildings[j].neighbours.add(buildings[i])
+                neighbours += 1
+
+    logging.info('%d neighbour relations for %d buildings created (some buildings have several neighbours.',
+                 neighbours, len(buildings))
+
+
 def analyse(buildings: List[Building], fg_elev: FGElev,
             facade_mgr: tex.FacadeManager, roof_mgr: tex.RoofManager, stats: Stats) -> List[Building]:
     """Analyse all buildings"""
+    # run a neighbour analysis
+    relate_neighbours(buildings)
+
+    # do the analysis
     new_buildings = []
     building_parents = dict()
     for b in buildings:
         building_parent = b.parent
         b.parent = None  # will be reset again if actually all is ok at end
 
-        # make sure we have a flat roof in parent:child situation. By using tag instead of direct b.roof_shape
-        # property we make sure, that it is not overwritten in analysis later
-        if building_parent is not None:
-            b.tags['roof:shape'] = 'flat'
-
+        # exclude what is processed elsewhere
         if 'building' in b.tags:  # not if 'building:part'
             # temporarily exclude greenhouses / glasshouses
             if b.tags['building'] in ['glasshouse', 'greenhouse'] or (
@@ -1073,6 +1129,14 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
             if 'man_made' in b.tags and b.tags['man_made'] in ['chimney']:
                 logging.debug("Excluded chimney or with osm_id={}".format(b.osm_id))
                 continue
+
+        # make sure we have a flat roof in parent:child situation. By using tag instead of direct b.roof_shape
+        # property we make sure, that it is not overwritten in analysis later
+        if building_parent is not None:
+            b.tags['roof:shape'] = 'flat'
+
+        if parameters.BUILDING_FORCE_EUROPEAN_INNER_CITY_STYLE:
+            b.enforce_european_style()
 
         if not b.is_external_model:
             try:
