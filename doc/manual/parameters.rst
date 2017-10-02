@@ -102,6 +102,21 @@ PROBE_FOR_WATER                                 Boolean    False     Checks the 
 .. _`Project3000`: http://wiki.flightgear.org/Project3000
 
 
+.. _chapter-param-flags-label:
+
+---------------
+Important Flags
+---------------
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+FLAG_2017_2                                     Boolean    True      If True then the textures and effects for osm2city built into FlightGear will
+                                                                     be used. Otherwise each scenery sub-folder will have a folder with textures.
+
+=============================================   ========   =======   ==============================================================================
+
+
 .. _chapter-parameters-lod-label:
 
 -----------------------------
@@ -152,6 +167,13 @@ BUILDING_FORCE_EUROPEAN_MAX_LEVEL               Integer    5         If the buil
 
 =============================================   ========   =======   ==============================================================================
 
+Example of using the flag set to True in a part of Prague:
+
+.. image:: force_european_true.png
+
+vs. setting it to False (default):
+
+.. image:: force_european_false.png
 
 
 .. _chapter-parameters-roofs-label:
