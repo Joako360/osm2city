@@ -139,10 +139,10 @@ class LinearObject(object):
                 plt.text(n[0], n[1]+random.uniform(-1, 1), s, color='k')
         if left: 
             for i, n in enumerate(l):
-                plt.text(n[0]-3, n[1], "%i" % (i), color='g')
+                plt.text(n[0]-3, n[1], "%i" % i, color='g')
         if right:
             for i, n in enumerate(r):
-                plt.text(n[0]+3, n[1], "%i" % (i), color='r')
+                plt.text(n[0]+3, n[1], "%i" % i, color='r')
         if show:
             plt.show()
             plt.savefig('roads_%i.eps' % self.osm_id)
@@ -228,19 +228,13 @@ class LinearObject(object):
                     mat_idx: int) -> None:
         """Write a series of quads bound by left and right. 
         Left/right are lists of node indices which will be used to form a series of quads.
-        Material tells whether it is lit or not.
+        Material index tells whether it is lit or not.
         """
-        scale = 32.  # length of texture in meters
-                     # 2 lanes * 4m per lane = 128 px wide. 512px long = 32 m
-                     #                Autobahnen      Andere Straßen
-                     # Schmalstrich   0,15 m          0,12 m
-                     # Breitstrich    0,30 m          0,25 m
-                     # Leitlinie Schmalstrich, 3m innerorts, 6m BAB. Verhältnis Strich:Lücke = 1:2
         n_nodes = len(left_nodes_list)
         assert(len(left_nodes_list) == len(right_nodes_list))
         for i in range(n_nodes-1):
-            xl = self.dist[i]/scale
-            xr = self.dist[i+1]/scale
+            xl = self.dist[i] / textures.road.LENGTH
+            xr = self.dist[i+1] / textures.road.LENGTH
             face = [(left_nodes_list[i],    xl, tex_y0),
                     (left_nodes_list[i+1],  xr, tex_y0),
                     (right_nodes_list[i+1], xr, tex_y1),
@@ -259,7 +253,7 @@ class LinearObject(object):
 
         center_z = np.array([fg_elev.probe_elev(the_node) for the_node in self.center.coords]) + self.AGL
 
-        EPS = 0.001
+        epsilon = 0.001
 
         assert(len(self.edge[0].coords) == len(self.edge[0].coords))
         n_nodes = len(self.edge[0].coords)
@@ -271,19 +265,18 @@ class LinearObject(object):
         MSL_0 = center_z[0] + h_add_0
         MSL_1 = center_z[-1] + h_add_1
 
-        if h_add_0 <= EPS and h_add_1 <= EPS:
+        if h_add_0 <= epsilon and h_add_1 <= epsilon:
             h_add = np.zeros(n_nodes)
-        elif h_add_0 <= EPS:
-            h_add = np.array([max(0, MSL_1 - (self.dist[-1] - self.dist[i]) * dh_dx - center_z[i]) for i in range(n_nodes)])
-        elif h_add_1 <= EPS:
+        elif h_add_0 <= epsilon:
+            h_add = np.array([max(0, MSL_1 - (self.dist[-1] - self.dist[i]) * dh_dx - center_z[i])
+                              for i in range(n_nodes)])
+        elif h_add_1 <= epsilon:
             h_add = np.array([max(0, MSL_0 - self.dist[i] * dh_dx - center_z[i]) for i in range(n_nodes)])
         else:
-            #actual_slope = 
-#            h_add = np.array([max(0, h_add_0 + (h_add_1 - h_add_0) * self.dist[i]/self.dist[-1]) for i in range(n_nodes)])
             h_add = np.zeros(n_nodes)
             for i in range(n_nodes):
                 h_add[i] = max(0, MSL_0 - self.dist[i] * dh_dx - center_z[i])
-                if h_add[i] < EPS:  # FIXME: different for other h_add?
+                if h_add[i] < epsilon:  # FIXME: different for other h_add?
                     break
             
 #            for i in range(n_nodes):
@@ -316,8 +309,7 @@ class LinearObject(object):
         
         # conditions for left z probing:
         # left coord given, no left z        
-        
-        
+
         # normal road:
         # - left and right coord given     NO INDEX AT ALL
         # - neither left/right elev given: NO ELEV AT ALL
@@ -341,7 +333,7 @@ class LinearObject(object):
         #        
         # Is there a case with
         # ONE index given, but need to probe elev on other side? Perhaps.
-        #left_is_coords == left.coords
+        # left_is_coords == left.coords
 
 # ALT:
 # get_level_point()
@@ -373,7 +365,7 @@ class LinearObject(object):
 #        
 #        left_z = self.probe_ground(elev, self.edge[0]) + self.AGL
 #        right_z = self.probe_ground(elev, self.edge[1]) + self.AGL
-##        diff = np.maximum(left_z, right_z) - center_z
+#        diff = np.maximum(left_z, right_z) - center_z
 #        diff_elev = abs(left_z - right_z)
 #        
 #        for i, the_diff in enumerate(diff_elev):
@@ -406,10 +398,10 @@ class LinearObject(object):
                 # road which is then higher than h_add anyway.
                 # Otherwise, create sloped road and ignore h_add.
                 # FIXME: is this a bug?
-                if the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT:  #  left > right
+                if the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT:  # left > right
                     right_z[i] += the_diff  # dirty
                     h_add[i] += the_diff/2.
-                elif -the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT: # right > left
+                elif -the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT:  # right > left
                     left_z[i] += - the_diff  # dirty
                     h_add[i] -= the_diff/2.  # the_diff is negative
                 else:
@@ -425,7 +417,7 @@ class LinearObject(object):
             i = self.refs.index(the_node)
             logging.debug(">> OSMID %i %i h_add %5.2g", self.osm_id, i, self.nodes_dict[the_node].h_add)
             if h_add is not None:
-                logging.debug(h_add)  #[i]
+                logging.debug(h_add)
             else:
                 pass
             return True
@@ -434,7 +426,8 @@ class LinearObject(object):
     def debug_label_nodes(self, line_string, z, ac, elev_offset, offset, h_add):
         for i, anchor in enumerate(line_string.coords):
             e = z[i] - elev_offset
-            ac.add_label('<' + str(self.osm_id) + '> add %5.2f' % h_add[i], -(anchor[1] - offset.y), e+0.5, -(anchor[0] - offset.x), scale=1)
+            ac.add_label('<' + str(self.osm_id) + '> add %5.2f' % h_add[i], -(anchor[1] - offset.y),
+                         e+0.5, -(anchor[0] - offset.x), scale=1)
         
     def write_to(self, obj: utils.ac3d.Object, fg_elev: FGElev, elev_offset, offset=None) -> bool:
         """
@@ -460,7 +453,7 @@ class LinearObject(object):
         if h_add is not None:
             # -- side walls of embankment
             if h_add.max() > 0.1:
-                left_ground_z  = probe_ground(fg_elev, self.edge[0])
+                left_ground_z = probe_ground(fg_elev, self.edge[0])
                 right_ground_z = probe_ground(fg_elev, self.edge[1])
 
                 left_ground_nodes = self.write_nodes(obj, self.edge[0], left_ground_z, elev_offset, offset=offset)
@@ -497,14 +490,10 @@ class LinearObject(object):
             if len_left != len_right:
                 logging.info("different lengths not yet implemented ", self.osm_id)
                 do_tex = False
-                #continue
             elif len_left != len(self.center.coords):
                 print("WTF? ", self.osm_id, len(self.center.coords))
                 do_tex = False
-#            else:
-#                return False
             self.plot()
-                #continue
 
             # -- write OSM_ID label
             if 0:
@@ -528,7 +517,7 @@ class LinearObject(object):
                     obj.node(-p[1], e, -p[0])
 #                    ac.add_label('r'+str(ni), -p[1], e+5, -p[0], scale=5)
                     ni += 1
-                #refs = np.arange(len_left + len_right) + o
+                # refs = np.arange(len_left + len_right) + o
                 nodes_l = np.arange(len(self.edge[0].coords))
                 nodes_r = np.arange(len(self.edge[1].coords))
 
@@ -556,10 +545,10 @@ class LinearObject(object):
                 for i in range(len(self.edge[0].coords)-1):
                     xl = self.dist[i]/scale
                     xr = self.dist[i+1]/scale
-                    face = [ (l,   xl, self.tex_y0),
-                             (l+1, xr, self.tex_y0),
-                             (r+1, xr, self.tex_y1),
-                             (r,   xl, self.tex_y1) ]
+                    face = [(l,   xl, self.tex_y0),
+                            (l+1, xr, self.tex_y0),
+                            (r+1, xr, self.tex_y1),
+                            (r,   xl, self.tex_y1)]
                     l += 1
                     r += 1
                     obj.face(face[::-1])

@@ -105,7 +105,8 @@ class Object(object):
             mat_idx = self.default_mat_ix
         if not swap_uv:
             swap_uv = self.default_swap_uv
-        self._faces.append(Face(nodes_uv_list, typ, mat_idx, swap_uv))
+        my_face = Face(nodes_uv_list, typ, mat_idx, swap_uv)
+        self._faces.append(my_face)
         if self.stats:
             self.stats.surfaces += 1
         return len(self._faces) - 1

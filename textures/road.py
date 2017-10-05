@@ -9,3 +9,11 @@ EMBANKMENT_2 = (6/8., 7/8.)
 TRAMWAY = (7/8., 8/8.)
 
 BOTTOM = (4/8.-0.05, 4/8.)
+
+# texture length in meters
+# 2 lanes * 4m per lane = 128 px wide. 512px long = 32 m
+#                Autobahnen      Andere Straßen
+# Schmalstrich   0,15 m          0,12 m
+# Breitstrich    0,30 m          0,25 m
+# Leitlinie Schmalstrich, 3m innerorts, 6m BAB. Verhältnis Strich:Lücke = 1:2
+LENGTH = 32.
