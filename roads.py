@@ -691,6 +691,7 @@ class Roads(object):
 
             # make sure that the new node is relevant and not just a rounding residual
             add_intersection = True
+            refs_to_remove = set()
             for ref in way.refs:
                 ref_node = self.nodes_dict[ref]
                 segment_length = coordinates.calc_distance_global(lon, lat, ref_node.lon, ref_node.lat)
@@ -700,10 +701,13 @@ class Roads(object):
                         break
                     else:  # tweak so it can be used as intersection, but based on existing point
                         add_intersection = False
-                        way.refs.remove(ref)
+                        refs_to_remove.add(ref)
                         intersect_dict[ref] = distance
                         my_line = self._line_string_from_way(way)
                         break
+
+            for ref in refs_to_remove:
+                way.refs.remove(ref)
 
             if add_intersection:
                 new_node = osmparser.Node(osmparser.get_next_pseudo_osm_id(), lat, lon)
@@ -898,7 +902,7 @@ class Roads(object):
 
     def _remove_tunnels(self):
         """Remove tunnels."""
-        for the_way in self.ways_list:
+        for the_way in reversed(self.ways_list):
             if "tunnel" in the_way.tags:
                 self.ways_list.remove(the_way)
 
@@ -912,7 +916,7 @@ class Roads(object):
 
     def _keep_only_bridges_and_embankments(self):
         """Remove everything that is not elevated - for debugging purposes"""
-        for the_way in self.roads_list:
+        for the_way in reversed(self.roads_list):
             h_add = np.array([abs(self.nodes_dict[the_ref].h_add) for the_ref in the_way.refs])
             if h_add.sum() == 0:
                 self.roads_list.remove(the_way)
