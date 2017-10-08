@@ -1137,13 +1137,15 @@ class Roads(object):
                         first_node = self.nodes_dict[way.refs[0]]
                         second_node = self.nodes_dict[way.refs[1]]
                         angle = coordinates.calc_angle_of_line_global(first_node.lon, first_node.lat,
-                                                                       second_node.lon, second_node.lat)
+                                                                      second_node.lon, second_node.lat,
+                                                                      self.transform)
                         start_dict[way] = angle
                     elif position == 1:  # end
                         first_node = self.nodes_dict[way.refs[-2]]
                         second_node = self.nodes_dict[way.refs[-1]]
                         angle = coordinates.calc_angle_of_line_global(first_node.lon, first_node.lat,
-                                                                       second_node.lon, second_node.lat)
+                                                                      second_node.lon, second_node.lat,
+                                                                      self.transform)
                         end_dict[way] = angle
                     else:  # should never happen
                         logging.warning("Way with osm-id={} has not valid position {} for node {}.".format(way.osm_id,

@@ -594,10 +594,7 @@ class Building(object):
             proxy_total_height = utils.osmparser.parse_length(self.tags['height'])
         elif 'building:height' in self.tags:
             proxy_total_height = utils.osmparser.parse_length(self.tags['building:height'])
-        if 'building:levels' in self.tags:
-            proxy_levels = float(self.tags['building:levels'])
-        if 'levels' in self.tags:
-            proxy_levels = float(self.tags['levels'])
+        proxy_levels = _parse_building_levels(self.tags)
         if 'layer' in self.tags:
             layer = int(self.tags['layer'])
 
@@ -727,10 +724,7 @@ class Building(object):
                 return
             # exclude based on levels
             proxy_levels = 0
-            if 'building:levels' in self.tags:
-                proxy_levels = float(self.tags['building:levels'])
-            if 'levels' in self.tags:
-                proxy_levels = float(self.tags['levels'])
+            proxy_levels = _parse_building_levels(self.tags)
             if proxy_levels > parameters.BUILDING_FORCE_EUROPEAN_MAX_LEVEL:
                 return
             # exclude based on height
@@ -1003,6 +997,21 @@ class Building(object):
 
     def __str__(self):
         return "<OSM_ID %d at %s>" % (self.osm_id, hex(id(self)))
+
+
+def _parse_building_levels(tags: Dict[str, str]) -> float:
+    proxy_levels = 0.
+    if 'building:levels' in tags:
+        if ';' in tags['building:levels']:
+            proxy_levels = float(utils.osmparser.parse_multi_int_values(tags['building:levels']))
+        else:
+            proxy_levels = float(tags['building:levels'])
+    if 'levels' in tags:
+        if ';' in tags['levels']:
+            proxy_levels = float(utils.osmparser.parse_multi_int_values(tags['levels']))
+        else:
+            proxy_levels = float(tags['levels'])
+    return proxy_levels
 
 
 def _random_level_height() -> float:

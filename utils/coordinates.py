@@ -50,7 +50,7 @@ Created on Sat Jun  7 22:38:59 2014
 # distances. The fractional errors are of order (distance/R)^2.
 
 
-from math import acos, asin, atan2, sin, cos, sqrt, radians, degrees, pi
+from math import asin, atan2, sin, cos, sqrt, radians, degrees, pi
 import logging
 from typing import Tuple
 import unittest
@@ -142,18 +142,10 @@ def calc_distance_global_radians(lon1_r, lat1_r, lon2_r, lat2_r):
     return 2*asin(sqrt(pow(sin((lat1_r-lat2_r)/2), 2) + cos(lat1_r)*cos(lat2_r)*pow(sin((lon1_r-lon2_r)/2), 2)))
 
 
-def calc_angle_of_line_global(lon1, lat1, lon2, lat2):
-    lon1_r = radians(lon1)
-    lat1_r = radians(lat1)
-    lon2_r = radians(lon2)
-    lat2_r = radians(lat2)
-    d = calc_distance_global_radians(lon1_r, lat1_r, lon2_r, lat2_r)
-    if sin(lon2_r-lon1_r) > 0:
-        angle = acos((sin(lat2_r)-sin(lat1_r)*cos(d))/(sin(d)*cos(lat1_r)))
-    else:
-        angle = 2*pi-acos((sin(lat2_r)-sin(lat1_r)*cos(d))/(sin(d)*cos(lat1_r)))
-    angle = degrees(angle)
-    return angle
+def calc_angle_of_line_global(lon1: float, lat1:float, lon2:float, lat2:float, transformation: Transformation) -> float:
+    x1, y1 = transformation.toLocal((lon1, lat1))
+    x2, y2 = transformation.toLocal((lon2, lat2))
+    return calc_angle_of_line_local(x1, y1, x2, y2)
 
 
 def disjoint_bounds(bounds_1: Tuple[float, float, float, float], bounds_2: Tuple[float, float, float, float]) -> bool:
@@ -194,13 +186,14 @@ class TestCoordinates(unittest.TestCase):
         self.assertEqual(225, calc_angle_of_line_local(1, 1, 0, 0), "South West")
 
     def test_calc_angle_of_line_global(self):
-        self.assertAlmostEqual(360, calc_angle_of_line_global(1, 46, 1, 47), delta=0.5)  # "North"
-        self.assertAlmostEqual(90, calc_angle_of_line_global(1, -46, 2, -46), delta=0.5)  # "East"
-        self.assertAlmostEqual(180, calc_angle_of_line_global(-1, -33, -1, -34), delta=0.5)  # "South"
-        self.assertAlmostEqual(270, calc_angle_of_line_global(-29, 20, -30, 20), delta=0.5)  # "West"
-        self.assertAlmostEqual(45, calc_angle_of_line_global(0, 0, 1, 1), delta=0.5)  # "North East"
-        self.assertAlmostEqual(315, calc_angle_of_line_global(1, 0, 0, 1), delta=0.5)  # "North West"
-        self.assertAlmostEqual(225, calc_angle_of_line_global(1, 1, 0, 0), delta=0.5)  # "South West"
+        trans = Transformation()
+        self.assertAlmostEqual(0, calc_angle_of_line_global(1, 46, 1, 47, trans), delta=0.5)  # "North"
+        self.assertAlmostEqual(90, calc_angle_of_line_global(1, -46, 2, -46, trans), delta=0.5)  # "East"
+        self.assertAlmostEqual(180, calc_angle_of_line_global(-1, -33, -1, -34, trans), delta=0.5)  # "South"
+        self.assertAlmostEqual(270, calc_angle_of_line_global(-29, 20, -30, 20, trans), delta=0.5)  # "West"
+        self.assertAlmostEqual(45, calc_angle_of_line_global(0, 0, 1, 1, trans), delta=0.5)  # "North East"
+        self.assertAlmostEqual(315, calc_angle_of_line_global(1, 0, 0, 1, trans), delta=0.5)  # "North West"
+        self.assertAlmostEqual(225, calc_angle_of_line_global(1, 1, 0, 0, trans), delta=0.5)  # "South West"
 
     def test_calc_distance_local(self):
         self.assertEqual(5, calc_distance_local(0, -1, -4, 2))

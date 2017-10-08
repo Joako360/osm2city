@@ -443,8 +443,9 @@ def parse_generator_output(str_output: str) -> float:
         return 0.
 
 
-def parse_cable_stuff(str_value: str) -> int:
-    """Parse values for tags 'cables' and 'voltage' for power cables, which can have multiple values.
+def parse_multi_int_values(str_value: str) -> int:
+    """Parse int values for tags, where values can be separated by semi-colons.
+    E.g. for building levels, 'cables' and 'voltage' for power cables, which can have multiple values.
     If only one value is present, then that value is used, otherwise the max value as int.
     Separator for multiple values is ';'.
     If it cannot be parsed, then 0 is returned.
@@ -833,12 +834,12 @@ class TestOSMParser(unittest.TestCase):
         self.assertAlmostEqual(300000000, parse_generator_output(' 0.3GW'), 2, "Correct number with GW unit w/o space")
         self.assertAlmostEqual(0, parse_generator_output(' 0.3 XW'), 2, "Correct number with unknown unit")
 
-    def test_parse_cable_stuff(self):
-        self.assertEqual(99, parse_cable_stuff(' 99 '), 'Correct value to start with')
-        self.assertEqual(0, parse_cable_stuff(' a'), 'Not a number')
-        self.assertEqual(0, parse_cable_stuff(' ;'), 'Empty')
-        self.assertEqual(99, parse_cable_stuff(' 99.1'), 'Float')
-        self.assertEqual(88, parse_cable_stuff(' 88; 4'), 'Two valid numbers')
+    def test_parse_multi_int_values(self):
+        self.assertEqual(99, parse_multi_int_values(' 99 '), 'Correct value to start with')
+        self.assertEqual(0, parse_multi_int_values(' a'), 'Not a number')
+        self.assertEqual(0, parse_multi_int_values(' ;'), 'Empty')
+        self.assertEqual(99, parse_multi_int_values(' 99.1'), 'Float')
+        self.assertEqual(88, parse_multi_int_values(' 88; 4'), 'Two valid numbers')
 
     def test_is_parsable_float(self):
         self.assertFalse(is_parsable_float('1,2'))

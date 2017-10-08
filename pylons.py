@@ -1307,9 +1307,9 @@ def _process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGEle
                     my_line.type_ = WayLineType.aerialway_goods
             #  special values
             elif "cables" == key:
-                my_line.cables = osmparser.parse_cable_stuff(value)
+                my_line.cables = osmparser.parse_multi_int_values(value)
             elif "voltage" == key:
-                my_line.voltage = osmparser.parse_cable_stuff(value)
+                my_line.voltage = osmparser.parse_multi_int_values(value)
             elif "wires" == key:
                 my_line.wires = value  # is a string, cf. http://wiki.openstreetmap.org/wiki/Key:wires
         if my_line.type_ == 0:
