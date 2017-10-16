@@ -14,7 +14,6 @@ Ludomotico contributed a cleaner version of read_from_file().
 
 import argparse
 import logging
-import os
 import re
 import sys
 import traceback
@@ -38,12 +37,11 @@ LOGLEVEL = "INFO"
 PREFIX = "LSZR"
 
 # -- Boundary of the scenery in degrees (use "." not ","). The example below is from LSZR.
+# The values are set dynamically during program execution - no need to set them manually.
 BOUNDARY_WEST = 9.54
 BOUNDARY_SOUTH = 47.48
 BOUNDARY_EAST = 9.58
 BOUNDARY_NORTH = 47.50
-
-OSM_FILE = "buildings.osm"  # -- file name of file with OSM data. Should reside in $PREFIX. No path components allowed.
 
 # -- Full path to the scenery folder without trailing slash. This is where we
 #    will probe elevation and check for overlap with static objects. Most
@@ -61,10 +59,7 @@ PATH_TO_SCENERY_OPT = None  # if not none, then needs to be list of strings
 #    Also make sure PATH_TO_OUTPUT is included in your $FG_SCENERY.
 PATH_TO_OUTPUT = "/home/user/fgfs/scenery/osm2city"
 
-# OSM DATA is either stored in a file pointed to by PATH_TO_OSM2CITY_DATA (USE_DATABASE = False) or in a database.
-# If using the database then set USE_DATABASE = True and set the DB_* parameters according to your PostGIS instance.
 PATH_TO_OSM2CITY_DATA = "/home/user/osm2city-data"
-USE_DATABASE = False  # If True then the OSM data is read from a database instead of PATH_TO_OSM2CITY_DATA.
 DB_HOST = "localhost"  # The host name of the computer running PostGIS.
 DB_PORT = 5432  # The port used to connect to the host
 DB_NAME = "osmgis"  # The name of the database.
@@ -89,7 +84,7 @@ FLAG_2017_2 = True  # Feature flag for 2017.2 version of FG
 # =============================================================================
 
 # -- Check for static objects in the PATH_TO_SCENERY folder based on convex hull around all points
-OVERLAP_CHECK_CONVEX_HULL = False
+OVERLAP_CHECK_CONVEX_HULL = True
 OVERLAP_CHECK_CH_BUFFER_STATIC = 0.0
 OVERLAP_CHECK_CH_BUFFER_SHARED = 0.0
 
@@ -168,13 +163,15 @@ CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if too few objects
 
 BUILDING_TOLERANCE_MATCH_NODE = 0.5  # when searching for a OSM node based on distance: what is the allowed tolerance
 
+DETAILS_PROCESS_PIERS = True
+DETAILS_PROCESS_PLATFORMS = True
 
 # =============================================================================
-# PARAMETERS RELATED TO PYLONS, POWERLINES, AERIALWAYS IN osm2pylons.py
+# PARAMETERS RELATED TO PYLONS, POWERLINES, AERIALWAYS IN pylons.py
 # =============================================================================
 
 C2P_PROCESS_POWERLINES = True
-C2P_PROCESS_POWERLINES_MINOR = False  # only considered of C2P_PROCESS_POWERLINES is True
+C2P_PROCESS_POWERLINES_MINOR = False  # only considered if C2P_PROCESS_POWERLINES is True
 C2P_PROCESS_AERIALWAYS = False
 C2P_PROCESS_OVERHEAD_LINES = False
 C2P_PROCESS_WIND_TURBINES = True
@@ -287,13 +284,6 @@ def get_output_path():
     if PATH_TO_OUTPUT:
         return PATH_TO_OUTPUT
     return PATH_TO_SCENERY
-
-
-def get_OSM_file_name():
-    """
-    Returns the path to the OSM File
-    """
-    return os.path.join(PREFIX, OSM_FILE)
 
 
 def get_repl_prefix():

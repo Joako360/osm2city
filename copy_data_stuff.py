@@ -2,7 +2,6 @@
 Copies texture related data in directory 'tex' into the scenery folders.
 """
 
-import argparse
 from distutils.dir_util import copy_tree
 import logging
 import os
@@ -124,21 +123,3 @@ def process(scenery_type: stg.SceneryType) -> None:
     else:
         logging.info("ERROR: The scenery path must include a directory '%s' - maybe no objects written",
                      scenery_path)
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-
-    parser = argparse.ArgumentParser(description="Copies texture and effects related data in directory 'tex' \
-    into the scenery folders.")
-    parser.add_argument("-f", "--file", dest="filename",
-                        help="Mandatory: read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
-    parser.add_argument("-t", "--type", dest="scenery_type",
-                        help="Mandatory: Scenery type - typically 'Buildings', 'Roads', 'Pylons'",
-                        metavar="STRING", required=True)
-    args = parser.parse_args()
-
-    parameters.read_from_file(args.filename)
-    try:
-        process(stg.parse_for_scenery_type(args.scenery_type))
-    except KeyError:
-        logging.error('Scenery type cannot be recognized: %s', args.scenery_type)

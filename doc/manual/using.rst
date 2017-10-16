@@ -76,7 +76,7 @@ Use the FlightGear menu ``View``, menu item ``Rendering Options``.
   * Buildings: Choose ``OpenStreetMap Data`` (i.e. ``Randomly Generated`` is turned off)
   * Pylons and power lines: not only used for electrical power pylons and cables, but also e.g. wind turbines
   * Detailed Roads and Railways: draped over the grey roads and railways lines in the default scenery.
-* If you also enable ``Atmospheric Light Scattering (ALS)`` you also get better effects during the night as well as moving cars.
+* If you also enable ``Atmospheric Light Scattering (ALS)`` you also get better effects during day and night as well as moving cars. Not using ALS might give odd graphical effects.
 
 .. image:: fgfs_rendering_options.png
 
@@ -84,6 +84,11 @@ In the same dialog press the ``Shader Options`` button and set the slider for ``
 
 .. image:: fgfs_shader_options.png
 
+
+========================
+Showing Detailed Objects
+========================
+Some of the generated sceneries might contain a sub-folder ``Details`` apart from e.g. ``Buildings``. If you want to show more scenery details (and accept that this might drain some system resources), then rename the folder to ``Objects``.
 
 
 .. _chapter-hide-urban-textures-label:

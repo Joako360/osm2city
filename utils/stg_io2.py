@@ -50,6 +50,7 @@ class SceneryType(enum.IntEnum):
     buildings = 1
     roads = 2
     pylons = 3
+    details = 4
 
 
 def scenery_directory_name(scenery_type: SceneryType) -> str:

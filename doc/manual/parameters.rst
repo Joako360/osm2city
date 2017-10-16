@@ -71,17 +71,6 @@ PATH_TO_OSM2CITY_DATA                           Path       n/a       Full path t
                                                                      :ref:`Installation of osm2city <chapter-osm2city-install>` (e.g.
                                                                      "/home/user/osm2city-data").
 
-OSM_FILE                                        String     n/a       The file containing OpenStreetMap data. See chapter
-                                                                     :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>`. 
-
-BOUNDARY_NORTH, BOUNDARY_EAST,                  Decimal    n/a       The longitude and latitude in degrees of the boundaries of the generated 
-BOUNDARY_SOUTH, BOUNDARY_WEST                                        scenery. 
-                                                                     The boundaries should correspond to the boundaries in the ``OSM_FILE`` 
-                                                                     (open the \*.osm file in a text editor and check the data in ca. line 3). 
-                                                                     The boundaries can be different, but then you might either miss data 
-                                                                     (if the OSM boundaries are larger) or do more processing than necessary 
-                                                                     (if the OSM boundaries are more narrow).
-
 NO_ELEV                                         Boolean    False     Set this to ``False``. The only reason to set this to ``True`` would be for
                                                                      builders to check generated scenery objects a bit faster not caring about
                                                                      the vertical position in the scenery.
@@ -256,7 +245,7 @@ If parameter ``PATH_TO_SCENERY_OPT`` is not None, then also object from that pat
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
-OVERLAP_CHECK_CONVEX_HULL                       Bool       False     Reads all points from static (not shared) objects and creates a convex hull
+OVERLAP_CHECK_CONVEX_HULL                       Bool       True      Reads all points from static (not shared) objects and creates a convex hull
                                                                      around all points. This is a brute force algorithm only taking into account
                                                                      the firsts object's vertices.
 
@@ -270,6 +259,8 @@ OVERLAP_CHECK_CONSIDER_SHARED                   Bool       True      Whether onl
                                                                      models reused in different places like a church model).
                                                                      For this to work ``PATH_TO_SCENERY`` must point to the TerraSync directory.
 
+OVERLAP_CHECK_BRIDGE_MIN_REMAINING              Integer    10        When a static bridge model intersect with a way, how much must at least be
+                                                                     left so the way is kept after intersection.
 =============================================   ========   =======   ==============================================================================
 
 Examples of overlap objects based on static objects at LSZS (light grey structures at bottom of buildings):
@@ -287,7 +278,7 @@ Examples of overlap objects based on static objects at LSZS (light grey structur
 Light Effects
 -------------
 
-Parameters for some light effects / shaders.
+Parameters for some light effects / shaders - has only effect if FLAG_2017_2 = False.
 
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
@@ -348,9 +339,7 @@ TEXTURES_EMPTY_LM_RGB_VALUE                     Integer    35        If a textur
 Clipping Region
 ---------------
 
-The boundary of a scenery as specified by the parameters ``BOUNDARY_*`` is not necessarily sharp. As described in :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>` it is recommended to use ``completeWays=yes``, when manipulating/getting OSM data - this happens also to be the case when using the `OSM Extended API`_ to retrieve data e.g. as part of :ref:`working in batch mode <chapter-batch-mode>`. However there are no parameters to influence the processing of OSM nodes and OSM ways depending on whether they are inside / outside the boundary or intersecting.
-
-NB: in most situations the boundary should correspond to FG tiles or be entirely inside a tile boundary.
+The boundary of a scenery as specified by the parameters boundary command line argument is not necessarily sharp. As described in :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>` it is recommended to use ``completeWays=yes``, when manipulating/getting OSM data - this happens also to be the case when using the `OSM Extended API`_ to retrieve data. However there are no parameters to influence the processing of OSM nodes and OSM ways depending on whether they are inside / outside the boundary or intersecting.
 
 The processing is as follows:
 
@@ -361,7 +350,7 @@ The processing is as follows:
 * pylons.py
 
   * storage tanks: if the centroid is inside the boundary, then the whole storage tank is processed — otherwise not
-  * wind turbines: no checking because the source data for OSM should already be extracted correctly
+  * wind turbines and chimneys: no checking because the source data for OSM should already be extracted correctly
   * aerial ways: if the first node is inside the boundary, then the whole aerial way is processed — otherwise not (assuming that aerial ways are short)
   * power lines and railway overhead lines: as for roads. If the last node was split, then no shared model is placed assuming it is continued in another tile (i.e. optimized for batch processing across tiles)
 
@@ -426,6 +415,32 @@ After adjusted MAX_SLOPE_* and POINTS_ON_LINE_DISTANCE_MAX parameters:
 .. image:: no_elev_residuals.png
 
 
+.. _chapter-parameters-pylons_details:
+
+-----------------
+Detailed Features
+-----------------
+
+The following parameters determine, whether specific features for procedures ``pylons`` respectively ``details`` will be generated at all.
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+C2P_PROCESS_POWERLINES                          Boolean    True      ``pylons``: Generate electrical power lines (incl. cables)
+C2P_PROCESS_WIND_TURBINES                       Boolean    True      ``pylons``: wind turbines
+C2P_PROCESS_STORAGE_TANKS                       Boolean    True      ``pylons``: storage tanks either mapped as nodes or ways in OSM
+C2P_PROCESS_CHIMNEYS                            Boolean    True      ``pylons``: chimneys either mapped as nodes or ways in OSM
+C2P_PROCESS_POWERLINES_MINOR                    Boolean    False     ``details``: Only considered if C2P_PROCESS_POWERLINES is True
+C2P_PROCESS_AERIALWAYS                          Boolean    False     ``details``: Aerial ways is currently experimental and depends on local shared
+                                                                     objects.
+C2P_PROCESS_OVERHEAD_LINES                      Boolean    False     ``details``: Railway overhead lines (pylons and cables)
+C2P_PROCESS_STREETLAMPS                         Boolean    False     ``details``: Only proof of concept. It will drain your resources in larger
+                                                                     sceneries.
+DETAILS_PROCESS_PIERS                           Boolean    True      ``details``: Generate piers and boats
+DETAILS_PROCESS_PLATFORMS                       Boolean    True      ``details``: Generate railway platforms
+
+=============================================   ========   =======   ==============================================================================
+
 
 .. _chapter-parameters-database:
 
@@ -433,13 +448,11 @@ After adjusted MAX_SLOPE_* and POINTS_ON_LINE_DISTANCE_MAX parameters:
 Database
 --------
 
-Instead of reading from OSM files it is possible to use a PostGIS database as OSM data storage. See also :ref:`OSM Data in Database <chapter-osm-database-label>`.
+OSM data is read from a PostGIS database. See also :ref:`OSM Data in Database <chapter-osm-database-label>`.
 
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
-USE_DATABASE                                    Boolean    False     If True then the OSM data is read from a database instead of
-                                                                     PATH_TO_OSM2CITY_DATA.
 DB_HOST                                         String     n/a       The host name of the computer running PostGIS (e.g. localhost).
 DB_PORT                                         Integer    5432      The port used to connect to the host (5433 for Postgres 9,x+)
 DB_NAME                                         String     n/a       The name of the database (e.g osmogis).

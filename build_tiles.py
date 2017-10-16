@@ -48,11 +48,11 @@ class SceneryTile(object):
 @unique
 class Procedures(IntEnum):
     all = 0
-    buildings = 1
-    piers = 2
-    platforms = 3
+    main = 1
+    buildings = 2
+    roads = 3
     pylons = 4
-    roads = 5
+    details = 5
 
 
 def _parse_exec_for_procedure(exec_argument: str) -> Procedures:
@@ -92,24 +92,16 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_l
                                                                                  my_airports)
 
         # run programs
-        if exec_argument is Procedures.all:
-            buildings.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries, file_lock)
-            roads.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries, file_lock)
-            pylons.process(the_coords_transform, my_fg_elev, my_stg_entries, file_lock)
-            if not parameters.FLAG_2017_2:
-                platforms.process(the_coords_transform, my_fg_elev, file_lock)
-                piers.process(the_coords_transform, my_fg_elev, file_lock)
-        elif exec_argument is Procedures.buildings:
-            buildings.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries, file_lock)
-        elif exec_argument is Procedures.roads:
-            roads.process(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries, file_lock)
-        elif exec_argument is Procedures.pylons:
-            pylons.process(the_coords_transform, my_fg_elev, my_stg_entries, file_lock)
-        elif exec_argument is Procedures.platforms:
-            platforms.process(the_coords_transform, my_fg_elev, file_lock)
-        elif exec_argument is Procedures.piers:
-            piers.process(the_coords_transform, my_fg_elev, file_lock)
-            pass
+        if exec_argument in [Procedures.buildings, Procedures.main, Procedures.all]:
+            buildings.process_buildings(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries, file_lock)
+        if exec_argument in [Procedures.roads, Procedures.main, Procedures.all]:
+            roads.process_roads(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries, file_lock)
+        if exec_argument in [Procedures.pylons, Procedures.main, Procedures.all]:
+            pylons.process_pylons(the_coords_transform, my_fg_elev, my_stg_entries, file_lock)
+        if exec_argument in [Procedures.details, Procedures.all]:
+            pylons.process_details(the_coords_transform, my_fg_elev, my_stg_entries, file_lock)
+            platforms.process_details(the_coords_transform, my_fg_elev, file_lock)
+            piers.process_details(the_coords_transform, my_fg_elev, file_lock)
 
         # clean-up
         my_fg_elev.close()
@@ -146,7 +138,7 @@ if __name__ == '__main__':
                         help="number of parallel processes (should not be more than number of cores/CPUs)",
                         required=True)
     parser.add_argument("-e", "--execute", dest="exec",
-                        help="execute only the given osm2city procedure (buildings, piers, platforms, pylons, roads)",
+                        help="execute only the given procedure[s] (buildings, pylons, roads, details, main)",
                         required=False)
     parser.add_argument("-l", "--loglevel", dest="loglevel",
                         help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL",
@@ -235,7 +227,7 @@ if __name__ == '__main__':
     pool.join()
 
     # At the very end copy static data stuff in one process
-    if exec_procedure is Procedures.all:
+    if exec_procedure in [Procedures.all, Procedures.main]:
         copy_data_stuff.process(utils.stg_io2.SceneryType.buildings)
         copy_data_stuff.process(utils.stg_io2.SceneryType.roads)
         copy_data_stuff.process(utils.stg_io2.SceneryType.pylons)
@@ -243,7 +235,7 @@ if __name__ == '__main__':
         copy_data_stuff.process(utils.stg_io2.SceneryType.pylons)
     elif exec_procedure is Procedures.roads:
         copy_data_stuff.process(utils.stg_io2.SceneryType.roads)
-    else:
+    elif exec_procedure is Procedures.buildings:
         copy_data_stuff.process(utils.stg_io2.SceneryType.buildings)
 
     logging.info("Total time used {}".format(time.time() - start_time))

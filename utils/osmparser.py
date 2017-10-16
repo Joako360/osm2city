@@ -7,13 +7,11 @@ Use a tool like Osmosis to pre-process data.
 @author: vanosten
 """
 
-import copy
 from collections import namedtuple
 import logging
 from typing import Dict, List, Optional, Tuple
 import time
 import unittest
-import xml.sax
 
 import psycopg2
 import shapely.geometry as shg
@@ -155,196 +153,6 @@ def closed_ways_from_multiple_ways(way_parts: List[Way]) -> List[Way]:
 
 
 OSMReadResult = namedtuple("OSMReadResult", "nodes_dict, ways_dict, relations_dict, rel_nodes_dict, rel_ways_dict")
-
-
-class OSMContentHandler(xml.sax.ContentHandler):
-    """
-    A Specialized SAX ContentHandler for OpenStreetMap data to be processed by
-    osm2city.
-
-    All nodes will be accepted. However, to save memory, we strip out those
-    tags not present in valid_node_keys.
-
-    By contrast, not all ways and relations will be accepted. We accept a
-    way/relation only if at least one of its tags is in req_??_keys.
-    An accepted way/relation is handed over to the callback. It is then up to
-    the callback to discard certain tags.
-
-    The valid_??_keys and req_??_keys are a primitive way to save memory and
-    reduce the number of further processed elements. A better way is to have
-    the input file processed by e.g. Osmosis first.
-    """
-
-    def __init__(self, valid_node_keys):
-        xml.sax.ContentHandler.__init__(self)
-        self._way_callbacks = []
-        self._relation_callbacks = []
-        self._uncategorized_way_callback = None
-        self._valid_node_keys = valid_node_keys
-        self.nodes_dict = {}
-        self.ways_dict = {}
-        self.relations_dict = {}
-        self._current_node = None
-        self._current_way = None
-        self._current_relation = None
-        self._within_element = None
-
-    def parse(self, source):
-        xml.sax.parse(source, self)
-
-    def register_way_callback(self, callback, req_keys=None):
-        if req_keys is None:
-            req_keys = []
-        self._way_callbacks.append((callback, req_keys))
-
-    def register_relation_callback(self, callback, req_keys):
-        self._relation_callbacks.append((callback, req_keys))
-
-    def register_uncategorized_way_callback(self, callback):
-        self._uncategorized_way_callback = callback
-
-    def startElement(self, name, attrs):
-        if name == "node":
-            self._within_element = name
-            lat = float(attrs.getValue("lat"))
-            lon = float(attrs.getValue("lon"))
-            osm_id = int(attrs.getValue("id"))
-            self._current_node = Node(osm_id, lat, lon)
-        elif name == "way":
-            self._within_element = name
-            osm_id = int(attrs.getValue("id"))
-            self._current_way = Way(osm_id)
-        elif name == "relation":
-            self._within_element = name
-            osm_id = int(attrs.getValue("id"))
-            self._current_relation = Relation(osm_id)
-        elif name == "tag":
-            key = attrs.getValue("k")
-            value = attrs.getValue("v")
-            if "node" == self._within_element:
-                if key in self._valid_node_keys:
-                    self._current_node.add_tag(key, value)
-            elif "way" == self._within_element:
-                self._current_way.add_tag(key, value)
-            elif "relation" == self._within_element:
-                self._current_relation.add_tag(key, value)
-        elif name == "nd":
-            ref = int(attrs.getValue("ref"))
-            self._current_way.add_ref(ref)
-        elif name == "member":
-            ref = int(attrs.getValue("ref"))
-            type_ = attrs.getValue("type")
-            role = attrs.getValue("role")
-            self._current_relation.add_member(Member(ref, type_, role))
-
-    def endElement(self, name):
-        if name == "node":
-            self.nodes_dict[self._current_node.osm_id] = self._current_node
-        elif name == "way":
-            cb = find_callback_for(self._current_way.tags, self._way_callbacks)
-            # no longer filter valid_way_keys here. That's up to the callback.
-            if cb is not None:
-                cb(self._current_way, self.nodes_dict)
-            try:
-                self._uncategorized_way_callback(self._current_way, self.nodes_dict)
-            except TypeError:
-                pass
-        elif name == "relation":
-            cb = find_callback_for(self._current_relation.tags, self._relation_callbacks)
-            if cb is not None:
-                cb(self._current_relation)
-
-    def characters(self, content):
-        pass
-
-
-def find_callback_for(tags, callbacks):
-    for (callback, req_keys) in callbacks:
-        for key in list(tags.keys()):
-            if key in req_keys:
-                return callback
-    return None
-
-
-class OSMContentHandlerOld(xml.sax.ContentHandler):
-    """
-    This is a wrapper for OSMContentHandler, enabling backwards compatibility.
-    It registers way and relation callbacks with the actual handler. During parsing,
-    these callbacks fill dictionaries of ways and relations.
-
-    The valid_??_keys are those tag keys, which will be accepted and added to an element's tags.
-    The req_??_keys are those tag keys, of which at least one must be present to add an element to the saved elements.
-
-    The valid_??_keys and req_??_keys are a primitive way to save memory and reduce the number of further processed
-    elements. A better way is to have the input file processed by e.g. Osmosis first.
-    """
-    def __init__(self, valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_relation_keys):
-        super().__init__()
-        self.valid_way_keys = valid_way_keys
-        self.valid_relation_keys = valid_relation_keys
-        self._handler = OSMContentHandler(valid_node_keys)
-        self._handler.register_way_callback(self.process_way, req_way_keys)
-        if req_relation_keys is not None:
-            self._handler.register_relation_callback(self.process_relation, req_relation_keys)
-            self._handler.register_uncategorized_way_callback(self.process_relation_way)
-        self.nodes_dict = None
-        self.ways_dict = {}
-        self.relations_dict = {}
-        self.rel_ways_dict = {}
-        self.rel_nodes_dict = None
-
-    def parse(self, source):
-        xml.sax.parse(source, self)
-
-    def startElement(self, name, attrs):
-        self._handler.startElement(name, attrs)
-
-    def endElement(self, name):
-        self._handler.endElement(name)
-
-    def process_way(self, current_way, nodes_dict):
-        if not self.nodes_dict:
-            self.nodes_dict = nodes_dict
-        all_tags = current_way.tags
-        current_way.tags = {}
-        for key in list(all_tags.keys()):
-            if self.valid_way_keys:
-                if key in self.valid_way_keys:
-                    current_way.add_tag(key, all_tags[key])
-            else:
-                current_way.add_tag(key, all_tags[key])
-        self.ways_dict[current_way.osm_id] = current_way
-
-    def process_relation(self, current_relation):
-        all_tags = current_relation.tags
-        current_relation.tags = {}
-        for key in list(all_tags.keys()):
-            if self.valid_way_keys:
-                if key in self.valid_way_keys:
-                    current_relation.add_tag(key, all_tags[key])
-            else:
-                if key in self.valid_way_keys:
-                    current_relation.add_tag(key, all_tags[key])
-        self.relations_dict[current_relation.osm_id] = current_relation
-
-    def process_relation_way(self, uncategorized_way, nodes_dict):
-        """Only used in buildings for ways in relations.
-        This method adds way too many due to linear processing of xml-file instead of relational DB access.
-        Taking copies because original nodes and ways might get changed / deleted before relations get processed
-        in the consuming processes."""
-        if not self.rel_nodes_dict:
-            self.rel_nodes_dict = copy.deepcopy(nodes_dict)
-        my_rel_way = Way(uncategorized_way.osm_id)
-        my_rel_way.refs = copy.deepcopy(uncategorized_way.refs)
-        self.rel_ways_dict[my_rel_way.osm_id] = my_rel_way
-
-
-def has_required_tag_keys(my_tags, my_required_keys):
-    """ Checks whether a given set of actual tags contains at least one of the required tags """
-    for key in list(my_tags.keys()):
-        if key in my_required_keys:
-            return True
-    return False
 
 
 def parse_length(str_length: str) -> float:
@@ -698,23 +506,6 @@ def fetch_osm_db_data_relations_keys(req_keys: List[str], input_read_result: OSM
 
     return OSMReadResult(nodes_dict=input_read_result.nodes_dict, ways_dict=input_read_result.ways_dict,
                          relations_dict=relations_dict, rel_nodes_dict=rel_nodes_dict, rel_ways_dict=rel_ways_dict)
-
-
-def fetch_osm_file_data(valid_way_keys: List[str], req_way_keys: List[str], req_rel_keys: Optional[List[str]]=None) \
-        -> OSMReadResult:
-    """Given a list of valid keys and a list of required keys get the ways plus the linked nodes from an OSM file."""
-    start_time = time.time()
-    valid_node_keys = []
-    valid_relation_keys = []
-
-    handler = OSMContentHandlerOld(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys, req_rel_keys)
-    osm_file_name = parameters.get_OSM_file_name()
-    source = open(osm_file_name, encoding="utf8")
-    xml.sax.parse(source, handler)
-    logging.info("Reading OSM data from xml took {0:.4f} seconds.".format(time.time() - start_time))
-    return OSMReadResult(nodes_dict=handler.nodes_dict, ways_dict=handler.ways_dict,
-                         relations_dict=handler.relations_dict,
-                         rel_nodes_dict=handler.rel_nodes_dict, rel_ways_dict=handler.rel_ways_dict)
 
 
 def make_db_connection() -> psycopg2.extensions.connection:

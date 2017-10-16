@@ -43,7 +43,7 @@ Please make sure to use Python 3.5+ compatible extensions. Often Python 3 compat
 Installation of osm2city
 ========================
 
-There is no installer package - neither on Windows nor Linux. ``osm2city`` consists of a set of Python programs "osm2city_"  and the related data in "osm2city-data_". You need both.
+There is no installer package - neither on Windows nor Linux. ``osm2city`` consists of a set of Python programs and the related data in "osm2city-data_". You need both.
 
 .. _osm2city: https://gitlab.com/fg-radi/osm2city
 .. _osm2city-data: https://gitlab.com/fg-radi/osm2city-data
@@ -52,7 +52,7 @@ Do the following:
 
 #. Download the packages either using Git_ or as a zip-package.
 #. Add the ``osm2city`` directory to your ``PYTHONPATH`` (see :ref:`below <chapter-set-pythonpath-label>`).
-#. Make sure that you have :ref:`set $FG_ROOT <chapter-set-fgroot-label>`
+#. Make sure that you have :ref:`set $FG_ROOT <chapter-set-fgroot-label>`.
 
 
 .. _chapter-set-pythonpath-label:
@@ -90,8 +90,6 @@ You might have to restart Windows to be able to read the environment variable th
 -----------------------------
 Setting up a PostGIS Database
 -----------------------------
-At the moment using a database instead of reading directly from OSM-files is not yet mandatory. However it is strongly recommended to do so, as most development is done using a database as the data source.
-
 Creating and populating a PostGIS database is described in :ref:`OSM Data in a PostGIS Database<chapter-osm-database-label>`.
 
 
@@ -101,6 +99,6 @@ Creating and populating a PostGIS database is described in :ref:`OSM Data in a P
 Other Tools
 ===========
 
-You might want to check out Sławek Mikuła's scripts_ for osm2city parsing and generation, which make some of the repetitice manual tasks involved in generating a scenery a bit easier.
+You might want to check out Sławek Mikuła's scripts_ for osm2city parsing and generation, which make some of the repetitive manual tasks involved in generating a scenery a bit easier.
 
 .. _scripts: https://github.com/slawekmikula/scripts-osm2city

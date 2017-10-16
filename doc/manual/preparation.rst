@@ -80,23 +80,16 @@ Getting OpenStreetMap Data
 
 The OpenStreetMap Wiki has comprehensive information_ about how to get OSM data. An easy way to start is using Geofabrik's extracts (http://download.geofabrik.de/).
 
-Unless you are using a PostGIS database as input, then be aware that ``osm2city`` only accepts OSM data in xml-format, i.e. ``*.osm`` files. Therefore you might need to translate data from the binary ``*.pbf`` format using e.g. Osmosis_. It is highly recommend to limit the area covered as much as possible: it leads to faster processing and it is easier to experiment with smaller areas until you found suitable parameters. If you use Osmosis to cut the area with ``--bounding-box``, then you need to use ``completeWays=yes`` [#]_. E.g. on Windows it could look as follows:
+It is highly recommend to limit the area covered as much as possible: it leads to faster processing and it is easier to experiment with smaller areas until you found suitable parameters. If you use Osmosis_ to cut the area with ``--bounding-box``, then you need to use ``completeWays=yes`` [#]_. E.g. on Windows it could look as follows:
 
 ::
 
     c:\> "C:\FlightGear\osmosis-latest\bin\osmosis.bat" --read-pbf file="C:\FlightGear\fg_customscenery\raw_data\switzerland-latest.osm.pbf"
          --bounding-box completeWays=yes top=46.7 left=9.75 bottom=46.4 right=10.0 --wx file="C:\FlightGear\fg_customscenery\projects\LSZS\lszs_wider.osm"
 
-The exception to the requirement of using OSM data in xml-format is if you use batch processing with the optional ``-d`` command line argument (see :ref:`Calling build_tiles.py <chapter-build-tiles-label>`). In that situation you might want to consider using the pbf-format_.
-
-Please be aware of the `Tile Index Schema`_ in FlightGear. It is advised to set boundaries, which do not cross tiles. Otherwise the scenery objects can jitter and disappear / re-appear due to the clusters of facades crossing tiles. Another reason to keep within boundaries is the sheer amount of data that needs to be kept in memory.
-
-E.g. Switzerland is around 46 degrees of latitude, therefore the boundary can be set in increments of 0.125 degrees of latitude and 0.25 degrees of longitude. Smaller works fine. If you are using the recommended approach of :ref:`batch processing <chapter-batch-mode>`, then these details will be taken care of for you automatically.
 
 .. _information: http://wiki.openstreetmap.org/wiki/Downloading_data
 .. _Osmosis: http://wiki.openstreetmap.org/wiki/Osmosis
-.. _`Tile Index Schema`: http://wiki.flightgear.org/Tile_Index_Scheme
-.. _pbf-format: http://wiki.openstreetmap.org/wiki/PBF_Format
 
 
 .. _chapter-setting-parameters-label:
@@ -115,15 +108,16 @@ Create a ``params.ini`` file with your favorite text editor. In our example it w
     PATH_TO_SCENERY = "/home/flightgear/fgfs_terrasync"
     PATH_TO_OUTPUT = "/home/fg_customscenery/LSZS"
     PATH_TO_OSM2CITY_DATA = "/home/user/osm2city-data"
-    OSM_FILE = "lszs_narrow.osm"
-
-    BOUNDARY_WEST = 9.81
-    BOUNDARY_SOUTH = 46.51
-    BOUNDARY_EAST = 9.90
-    BOUNDARY_NORTH = 46.54
 
     NO_ELEV = False
     FG_ELEV = '/home/pingu/bin/fgfs_git/next/install/flightgear/bin/fgelev'
+
+    DB_HOST = "localhost"
+    DB_PORT = 5433
+    DB_NAME = "osmgis"
+    DB_USER = "gisuser"
+    DB_USER_PASSWORD = "n/a"
+
 
 
 A few comments on the parameters:
@@ -137,14 +131,12 @@ PATH_TO_SCENERY
 
 PATH_TO_OUTPUT
     The generated scenery files (.stg, .ac) will be written to this path — specified without trailing slash. If empty then the correct location in PATH_TO_SCENERY is used. Note that if you use TerraSync for PATH_TO_SCENERY, you MUST choose a different path here. Otherwise, TerraSync will overwrite the generated scenery. Unless you know what you are doing, there is no reason not to specify a dedicated path here. While not absolutely needed, it is good practice to name the output folder the same as ``PREFIX``.
-OSM_FILE
-    The file containing OpenStreetMap data. See previous chapter :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>`. The file should reside in $PREFIX and no path components are allowed (i.e. pure file name). If you have your data in PostGIS, then instead you need to specify the :ref:`database parameters <chapter-parameters-database>`.
-BOUNDARY_*
-    The longitude and latitude of the boundaries of the generated scenery. The boundaries should correspond to the boundaries in the ``OSM_FILE`` (open the \*.osm file in a text editor and check the data in ca. line 3) respectively the data in PostGIS. The boundaries can be different, but then you might either miss data (if the OSM boundaries are larger) or do more processing than necessary (if the OSM boundaries are more narrow and you use a fiel based approach — not an issue when using a database).
 NO_ELEV
     Set this to ``False``. The only reason to set this to ``True`` would be for builders to check generated scenery objects a bit faster not caring about the vertical position in the scenery.
 FG_ELEV
     Set parameter ``FG_ELEV`` to point to the full path of the fgelev executable. On Linux it could be something like ``FG_ELEV = '/home/pingu/bin/fgfs_git/next/install/flightgear/bin/fgelev'``. On Windows you might have to put quotes around the path due to whitespace e.g. ``FG_ELEV = '"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'`` (yes, both single and double quotes).
+DB_*
+    Connection settings for PostGIS: see :ref:`database parameters <chapter-parameters-database>`.
 
 
 .. _chapter-generating-elevation-data-label:

@@ -54,7 +54,6 @@ You should disable random buildings.
 # - capitalize class names: class Interpolator(object):
 # - comments: code # -- comment
 
-import argparse
 import logging
 import multiprocessing as mp
 import os
@@ -72,7 +71,7 @@ import prepare_textures
 import textures.texture as tex
 import utils.stg_io2
 import utils.vec2d as v
-from utils import aptdat_io, osmparser, coordinates, stg_io2, utilities
+from utils import osmparser, coordinates, stg_io2, utilities
 
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
 
@@ -536,18 +535,14 @@ def _write_xml(path: str, file_name: str, the_buildings: List[building_lib.Build
     xml.close()
 
 
-def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
-            blocked_areas: List[shg.Polygon], stg_entries: List[utils.stg_io2.STGEntry],
-            file_lock: mp.Lock=None) -> None:
+def process_buildings(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
+                      blocked_areas: List[shg.Polygon], stg_entries: List[utils.stg_io2.STGEntry],
+                      file_lock: mp.Lock=None) -> None:
     random.seed(42)
     stats = utilities.Stats()
 
-    if not parameters.USE_DATABASE:
-        osm_read_results = osmparser.fetch_osm_file_data(list(), ["building", "building:part"],
-                                                         ["building", "building:part"])
-    else:
-        osm_read_results = osmparser.fetch_osm_db_data_ways_keys(["building", "building:part"])
-        osm_read_results = osmparser.fetch_osm_db_data_relations_keys(["building", "building:part"], osm_read_results)
+    osm_read_results = osmparser.fetch_osm_db_data_ways_keys(["building", "building:part"])
+    osm_read_results = osmparser.fetch_osm_db_data_relations_keys(["building", "building:part"], osm_read_results)
     osm_nodes_dict = osm_read_results.nodes_dict
     osm_ways_dict = osm_read_results.ways_dict
     osm_relations_dict = osm_read_results.relations_dict
@@ -678,37 +673,3 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     stg_manager.write(file_lock)
     stats.print_summary()
     utilities.troubleshoot(stats)
-
-
-if __name__ == "__main__":
-    # -- Parse arguments. Command line overrides config file.
-    parser = argparse.ArgumentParser(
-        description="buildings.py reads OSM data and creates buildings for use with FlightGear")
-    parser.add_argument("-f", "--file", dest="filename",
-                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
-    parser.add_argument("-l", "--loglevel",
-                        help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL",
-                        required=False)
-    parser.add_argument("-e", dest="skip_elev", action="store_true",
-                        help="skip elevation interpolation", required=False)
-    args = parser.parse_args()
-    parameters.read_from_file(args.filename)
-    parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
-
-    if args.skip_elev:
-        parameters.NO_ELEV = True
-    parameters.show()
-
-    my_coords_transform = coordinates.Transformation(parameters.get_center_global())
-    my_fg_elev = utilities.FGElev(my_coords_transform)
-    my_blocked_areas = aptdat_io.get_apt_dat_blocked_areas(my_coords_transform,
-                                                           parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
-                                                           parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
-
-    my_stg_entries = utils.stg_io2.read_stg_entries_in_boundary(True, my_coords_transform)
-
-    process(my_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries)
-
-    my_fg_elev.close()
-
-    logging.info("******* Finished *******")

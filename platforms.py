@@ -6,7 +6,6 @@ Created on Sun Sep 29 10:42:12 2013
 
 @author: Portree Kid
 """
-import argparse
 import logging
 import multiprocessing as mp
 import numpy as np
@@ -21,7 +20,7 @@ from utils import osmparser, coordinates, ac3d, stg_io2, utilities
 from utils.vec2d import Vec2d
 
 
-OUR_MAGIC = "osm2platforms"  # Used in e.g. stg files to mark edits by osm2platforms
+OUR_MAGIC = "platforms"  # Used in e.g. stg files to mark edits by osm2platforms
 
 
 class Platform(object):
@@ -205,7 +204,7 @@ def _write_line(platform, fg_elev: utilities.FGElev, obj, offset) -> None:
     obj.face(sideface)
 
 
-def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev, file_lock: mp.Lock=None) -> None:
+def process_details(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev, file_lock: mp.Lock=None) -> None:
     stats = utilities.Stats()
     # -- prepare transformation to local coordinates
     cmin, cmax = parameters.get_extent_global()
@@ -215,10 +214,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     lmax = Vec2d(coords_transform.toLocal(cmax))
     clusters = ClusterContainer(lmin, lmax)
 
-    if not parameters.USE_DATABASE:
-        osm_way_result = osmparser.fetch_osm_file_data(['railway', 'area', 'layer'], ["railway"])
-    else:
-        osm_way_result = osmparser.fetch_osm_db_data_ways_key_values(["railway=>platform"])
+    osm_way_result = osmparser.fetch_osm_db_data_ways_key_values(["railway=>platform"])
     osm_nodes_dict = osm_way_result.nodes_dict
     osm_ways_dict = osm_way_result.ways_dict
 
@@ -234,31 +230,9 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
     replacement_prefix = parameters.get_repl_prefix()
-    stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.buildings, OUR_MAGIC, replacement_prefix)
+    stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.details, OUR_MAGIC, replacement_prefix)
 
     _write(fg_elev, stg_manager, replacement_prefix, clusters, coords_transform, stats)
 
     # -- write stg
     stg_manager.write(file_lock)
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="platforms.py reads OSM data and creates platform models for use with FlightGear")
-    parser.add_argument("-f", "--file", dest="filename",
-                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
-    parser.add_argument("-l", "--loglevel", dest="loglevel",
-                        help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL",
-                        required=False)
-    args = parser.parse_args()
-    parameters.read_from_file(args.filename)
-    parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
-    parameters.show()
-
-    my_coords_transform = coordinates.Transformation(parameters.get_center_global())
-    my_fg_elev = utilities.FGElev(my_coords_transform)
-
-    process(my_coords_transform, my_fg_elev)
-
-    my_fg_elev.close()
-
-    logging.info("******* Finished *******")

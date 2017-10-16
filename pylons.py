@@ -16,17 +16,14 @@ TODO:
 @author: vanosten
 """
 
-import argparse
 from enum import IntEnum, unique
 import logging
 import math
 import multiprocessing as mp
 import os
 import random
-import time
 from typing import Dict, List, Tuple
 import unittest
-import xml.sax
 
 import cluster
 import parameters
@@ -34,7 +31,8 @@ import roads
 import shapely.geometry as shg
 from utils import osmparser, vec2d, coordinates, stg_io2, utilities, landuse
 
-OUR_MAGIC = "osm2pylon"  # Used in e.g. stg files to mark edits by osm2pylon
+OUR_MAGIC = "pylons"  # Used in e.g. stg files to mark edits by osm2pylon
+OUT_MAGIC_DETAILS = "pylonsDetails"
 
 
 class CableVertex(object):
@@ -1664,17 +1662,18 @@ def _process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator, fg
                     if my_polygon.is_valid and not my_polygon.is_empty:
                         my_buildings.append(my_polygon.convex_hull)
                         # process storage tanks
-                        if way.tags['building'] in ['storage_tank', 'tank'] or (
-                                    'man_made' in way.tags and way.tags['man_made'] in ['storage_tank', 'tank']):
-                            my_centroid = my_polygon.centroid
-                            lon, lat = my_coord_transformator.toGlobal((my_centroid.x, my_centroid.y))
-                            if not clipping_border.contains(shg.Point(lon, lat)):
-                                continue
-                            radius = coordinates.calc_distance_global(lon, lat, my_node.lon, my_node.lat)
-                            if radius < 5:  # do not want very small objects
-                                continue
-                            elev = fg_elev.probe_elev(vec2d.Vec2d(lon, lat), True)
-                            storage_tanks.append(StorageTank(way.osm_id, lon, lat, way.tags, radius, elev))
+                        if parameters.C2P_PROCESS_STORAGE_TANKS:
+                            if way.tags['building'] in ['storage_tank', 'tank'] or (
+                                        'man_made' in way.tags and way.tags['man_made'] in ['storage_tank', 'tank']):
+                                my_centroid = my_polygon.centroid
+                                lon, lat = my_coord_transformator.toGlobal((my_centroid.x, my_centroid.y))
+                                if not clipping_border.contains(shg.Point(lon, lat)):
+                                    continue
+                                radius = coordinates.calc_distance_global(lon, lat, my_node.lon, my_node.lat)
+                                if radius < 5:  # do not want very small objects
+                                    continue
+                                elev = fg_elev.probe_elev(vec2d.Vec2d(lon, lat), True)
+                                storage_tanks.append(StorageTank(way.osm_id, lon, lat, way.tags, radius, elev))
     logging.info("Found {} storage tanks".format(len(storage_tanks)))
     return my_buildings
 
@@ -1766,132 +1765,57 @@ def _process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
     return my_highways
 
 
-def _fetch_osm_file_data() -> Tuple[Dict[int, osmparser.Node], Dict[int, osmparser.Way]]:
-    start_time = time.time()
-    # the lists below are in sequence: buildings references, power/aerialway, railway overhead, landuse and highway
-    valid_node_keys = ["power", "structure", "material", "height", "colour", "aerialway",
-                       "railway",
-                       "power=generator", "generator:output:electricity", "generator:type", "generator:source",
-                       "offshore", "rotor:diameter", "manufacturer", "manufacturer:type",
-                       "seamark:landmark:height", "seamark:landmark:status", "seamark:status"]
-    valid_way_keys = ["building",
-                      "power", "aerialway", "voltage", "cables", "wires",
-                      "railway", "electrified", "tunnel",
-                      "landuse",
-                      "highway", "junction"]
-    valid_relation_keys = []
-    req_relation_keys = []
-    req_way_keys = ["building", "power", "aerialway", "railway", "landuse", "highway"]
-    handler = osmparser.OSMContentHandlerOld(valid_node_keys, valid_way_keys, req_way_keys, valid_relation_keys,
-                                             req_relation_keys)
-    osm_file_name = parameters.get_OSM_file_name()
-    source = open(osm_file_name, encoding="utf8")
-    xml.sax.parse(source, handler)
-    logging.info("Reading OSM data from xml took {0:.4f} seconds.".format(time.time() - start_time))
-    return handler.nodes_dict, handler.ways_dict
-
-
-def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
-            stg_entries: List[stg_io2.STGEntry], file_lock: mp.Lock=None) -> None:
+def process_pylons(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
+                   stg_entries: List[stg_io2.STGEntry], file_lock: mp.Lock=None) -> None:
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
-
-    osm_nodes_dict = dict()  # key = osm_id, value = Node
-    osm_ways_dict = dict()  # key = osm_id, value = Way
-    if not parameters.USE_DATABASE:
-        osm_nodes_dict, osm_ways_dict = _fetch_osm_file_data()
 
     # References for buildings
     building_refs = list()
     storage_tanks = list()
-    if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_AERIALWAYS or parameters.C2P_PROCESS_STREETLAMPS \
-            or parameters.C2P_PROCESS_STORAGE_TANKS:
-        if parameters.USE_DATABASE:
-            osm_way_result = osmparser.fetch_osm_db_data_ways_keys(['building'])
-            osm_nodes_dict = osm_way_result.nodes_dict
-            osm_ways_dict = osm_way_result.ways_dict
+    if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_STORAGE_TANKS:
+        osm_way_result = osmparser.fetch_osm_db_data_ways_keys(['building'])
+        osm_nodes_dict = osm_way_result.nodes_dict
+        osm_ways_dict = osm_way_result.ways_dict
         building_refs = _process_osm_building_refs(osm_nodes_dict, osm_ways_dict, coords_transform, fg_elev,
                                                    storage_tanks)
         logging.info('Number of reference buildings: %s', len(building_refs))
-    # Power lines and aerialways
+    # Power lines (major)
     powerlines = list()
-    aerialways = list()
-    if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_AERIALWAYS:
-        if parameters.USE_DATABASE:
-            req_keys = list()
-            if parameters.C2P_PROCESS_POWERLINES:
-                req_keys.append("power")
-            if parameters.C2P_PROCESS_POWERLINES:
-                req_keys.append("aerialway")
-            osm_way_result = osmparser.fetch_osm_db_data_ways_keys(req_keys)
-            osm_nodes_dict = osm_way_result.nodes_dict
-            osm_ways_dict = osm_way_result.ways_dict
+    if parameters.C2P_PROCESS_POWERLINES:
+        req_keys = list()
+        req_keys.append("power")
+        osm_way_result = osmparser.fetch_osm_db_data_ways_keys(req_keys)
+        osm_nodes_dict = osm_way_result.nodes_dict
+        osm_ways_dict = osm_way_result.ways_dict
 
         powerlines, aerialways = _process_osm_power_aerialway(osm_nodes_dict, osm_ways_dict, fg_elev,
                                                               coords_transform, building_refs)
-        if not parameters.C2P_PROCESS_POWERLINES:
-            powerlines = list()
         if not parameters.C2P_PROCESS_AERIALWAYS:
             aerialways = list()
-        logging.info('Number of power lines to process: %s', len(powerlines))
-        logging.info('Number of aerialways to process: %s', len(aerialways))
         for wayline in reversed(powerlines):
             wayline.calc_and_map()
-            if (wayline.type_ is WayLineType.power_minor) and (not parameters.C2P_PROCESS_POWERLINES_MINOR):
+            if wayline.type_ is WayLineType.power_minor:
                 powerlines.remove(wayline)
+        logging.info('Number of major power lines to process: %s', len(powerlines))
         for wayline in aerialways:
             wayline.calc_and_map()
-    # railway overhead lines
-    rail_lines = list()
-    if parameters.C2P_PROCESS_OVERHEAD_LINES:
-        if parameters.USE_DATABASE:
-            osm_way_result = osmparser.fetch_osm_db_data_ways_keys(['railway'])
-            osm_nodes_dict = osm_way_result.nodes_dict
-            osm_ways_dict = osm_way_result.ways_dict
-        rail_lines = _process_osm_rail_overhead(osm_nodes_dict, osm_ways_dict, fg_elev,
-                                                coords_transform)
-        logging.info('Reduced number of rail lines: %s', len(rail_lines))
-        for rail_line in rail_lines:
-            rail_line.calc_and_map(fg_elev, coords_transform, rail_lines)
-    # street lamps
-    streetlamp_ways = list()
-    if parameters.C2P_PROCESS_STREETLAMPS:
-        if parameters.USE_DATABASE:
-            osm_way_result = osmparser.fetch_osm_db_data_ways_keys(["landuse", "highway"])
-            osm_nodes_dict = osm_way_result.nodes_dict
-            osm_ways_dict = osm_way_result.ways_dict
-
-        landuse_refs = landuse.process_osm_landuse_refs(osm_nodes_dict, osm_ways_dict, coords_transform)
-        if parameters.LU_LANDUSE_GENERATE_LANDUSE:
-            landuse.generate_landuse_from_buildings(landuse_refs, building_refs)
-        logging.info('Number of landuse references: %s', len(landuse_refs))
-        streetlamp_buffers = _merge_streetlamp_buffers(landuse_refs)
-        logging.info('Number of streetlamp buffers: %s', len(streetlamp_buffers))
-        highways = _process_osm_highway(osm_nodes_dict, osm_ways_dict, coords_transform)
-        streetlamp_ways = _process_highways_for_streetlamps(highways, streetlamp_buffers)
-        logging.info('Reduced number of streetlamp ways: %s', len(streetlamp_ways))
-        for highway in streetlamp_ways:
-            highway.calc_and_map(fg_elev, coords_transform)
-        del landuse_refs
     # wind turbines
     wind_turbines = list()
     if parameters.C2P_PROCESS_WIND_TURBINES:
-        if parameters.USE_DATABASE:
-            osm_nodes_dict = osmparser.fetch_db_nodes_isolated(["generator:source=>wind"])
+        osm_nodes_dict = osmparser.fetch_db_nodes_isolated(["generator:source=>wind"])
         wind_turbines = _process_osm_wind_turbines(osm_nodes_dict, coords_transform, fg_elev, stg_entries)
         logging.info("Number of valid wind turbines found: {}".format(len(wind_turbines)))
     # chimneys
     chimneys = list()
     if parameters.C2P_PROCESS_CHIMNEYS:
         # start with chimneys tagged as node
-        if parameters.USE_DATABASE:
-            osm_nodes_dict = osmparser.fetch_db_nodes_isolated(['man_made=>chimney'])
+        osm_nodes_dict = osmparser.fetch_db_nodes_isolated(['man_made=>chimney'])
         chimneys = _process_osm_chimneys_nodes(osm_nodes_dict, coords_transform, fg_elev)
         # add chimneys tagged as way
-        if parameters.USE_DATABASE:
-            osm_way_result = osmparser.fetch_osm_db_data_ways_key_values(['man_made=>chimney'])
-            osm_nodes_dict = osm_way_result.nodes_dict
-            osm_ways_dict = osm_way_result.ways_dict
+        osm_way_result = osmparser.fetch_osm_db_data_ways_key_values(['man_made=>chimney'])
+        osm_nodes_dict = osm_way_result.nodes_dict
+        osm_ways_dict = osm_way_result.ways_dict
         chimneys.extend(_process_osm_chimneys_ways(osm_nodes_dict, osm_ways_dict, coords_transform, fg_elev))
         logging.info("Number of valid chimneys found: {}".format(len(chimneys)))
 
@@ -1913,17 +1837,9 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     if parameters.C2P_PROCESS_POWERLINES:
         _distribute_way_segments_to_clusters(powerlines, cluster_container)
         _write_stg_entries_pylons_for_line(stg_manager, powerlines)
-    if parameters.C2P_PROCESS_AERIALWAYS:
-        _distribute_way_segments_to_clusters(aerialways, cluster_container)
-        _write_stg_entries_pylons_for_line(stg_manager, aerialways)
-    if parameters.C2P_PROCESS_OVERHEAD_LINES:
-        _distribute_way_segments_to_clusters(rail_lines, cluster_container)
-        _write_stg_entries_pylons_for_line(stg_manager, rail_lines)
 
     _write_cable_clusters(cluster_container, coords_transform, stg_manager)
 
-    if parameters.C2P_PROCESS_STREETLAMPS:
-        _write_stg_entries_pylons_for_line(stg_manager, streetlamp_ways)
     if parameters.C2P_PROCESS_WIND_TURBINES:
         for turbine in wind_turbines:
             turbine.make_stg_entry(stg_manager)
@@ -1937,32 +1853,112 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     stg_manager.write(file_lock)
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="pylons.py reads OSM data and creates pylons, powerlines and aerialways for use with FlightGear")
-    parser.add_argument("-f", "--file", dest="filename",
-                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
-    parser.add_argument("-l", "--loglevel", dest="loglevel",
-                        help="Set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL",
-                        required=False)
-    parser.add_argument("-e", dest="skip_elev", action="store_true",
-                        help="skip elevation interpolation", required=False)
-    args = parser.parse_args()
-    parameters.read_from_file(args.filename)
-    parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
-    if args.skip_elev:
-        parameters.NO_ELEV = True
-    parameters.show()
+def process_details(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
+                    stg_entries: List[stg_io2.STGEntry], file_lock: mp.Lock=None) -> None:
+    # Transform to real objects
+    logging.info("Transforming OSM data to Line and Pylon objects -> details")
 
-    my_coords_transform = coordinates.Transformation(parameters.get_center_global())
-    my_fg_elev = utilities.FGElev(my_coords_transform)
-    my_stg_entries = stg_io2.read_stg_entries_in_boundary()
+    # References for buildings
+    building_refs = list()
+    storage_tanks = list()
+    if parameters.C2P_PROCESS_AERIALWAYS or parameters.C2P_PROCESS_STREETLAMPS:
+        osm_way_result = osmparser.fetch_osm_db_data_ways_keys(['building'])
+        osm_nodes_dict = osm_way_result.nodes_dict
+        osm_ways_dict = osm_way_result.ways_dict
+        building_refs = _process_osm_building_refs(osm_nodes_dict, osm_ways_dict, coords_transform, fg_elev,
+                                                   storage_tanks)
+        logging.info('Number of reference buildings: %s', len(building_refs))
+    # Minor power lines and aerialways
+    powerlines = list()
+    aerialways = list()
+    if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_AERIALWAYS:
+        req_keys = list()
+        if parameters.C2P_PROCESS_POWERLINES:
+            req_keys.append("power")
+        if parameters.C2P_PROCESS_POWERLINES:
+            req_keys.append("aerialway")
+        osm_way_result = osmparser.fetch_osm_db_data_ways_keys(req_keys)
+        osm_nodes_dict = osm_way_result.nodes_dict
+        osm_ways_dict = osm_way_result.ways_dict
 
-    process(my_coords_transform, my_fg_elev, my_stg_entries)
+        powerlines, aerialways = _process_osm_power_aerialway(osm_nodes_dict, osm_ways_dict, fg_elev,
+                                                              coords_transform, building_refs)
+        if not parameters.C2P_PROCESS_POWERLINES:
+            powerlines = list()
+        if not parameters.C2P_PROCESS_AERIALWAYS:
+            aerialways = list()
+        for wayline in reversed(powerlines):
+            wayline.calc_and_map()
+            if wayline.type_ is WayLineType.power_line:
+                powerlines.remove(wayline)
+            if not parameters.C2P_PROCESS_POWERLINES_MINOR:
+                powerlines.remove(wayline)
+        logging.info('Number of minor power lines to process: %s', len(powerlines))
+        logging.info('Number of aerialways to process: %s', len(aerialways))
+        for wayline in aerialways:
+            wayline.calc_and_map()
+    # railway overhead lines
+    rail_lines = list()
+    if parameters.C2P_PROCESS_OVERHEAD_LINES:
+        osm_way_result = osmparser.fetch_osm_db_data_ways_keys(['railway'])
+        osm_nodes_dict = osm_way_result.nodes_dict
+        osm_ways_dict = osm_way_result.ways_dict
+        rail_lines = _process_osm_rail_overhead(osm_nodes_dict, osm_ways_dict, fg_elev,
+                                                coords_transform)
+        logging.info('Reduced number of rail lines: %s', len(rail_lines))
+        for rail_line in rail_lines:
+            rail_line.calc_and_map(fg_elev, coords_transform, rail_lines)
+    # street lamps
+    streetlamp_ways = list()
+    if parameters.C2P_PROCESS_STREETLAMPS:
+        osm_way_result = osmparser.fetch_osm_db_data_ways_keys(["landuse", "highway"])
+        osm_nodes_dict = osm_way_result.nodes_dict
+        osm_ways_dict = osm_way_result.ways_dict
 
-    my_fg_elev.close()
+        landuse_refs = landuse.process_osm_landuse_refs(osm_nodes_dict, osm_ways_dict, coords_transform)
+        if parameters.LU_LANDUSE_GENERATE_LANDUSE:
+            landuse.generate_landuse_from_buildings(landuse_refs, building_refs)
+        logging.info('Number of landuse references: %s', len(landuse_refs))
+        streetlamp_buffers = _merge_streetlamp_buffers(landuse_refs)
+        logging.info('Number of streetlamp buffers: %s', len(streetlamp_buffers))
+        highways = _process_osm_highway(osm_nodes_dict, osm_ways_dict, coords_transform)
+        streetlamp_ways = _process_highways_for_streetlamps(highways, streetlamp_buffers)
+        logging.info('Reduced number of streetlamp ways: %s', len(streetlamp_ways))
+        for highway in streetlamp_ways:
+            highway.calc_and_map(fg_elev, coords_transform)
+        del landuse_refs
 
-    logging.info("******* Finished *******")
+    # free some memory
+    del building_refs
+
+    # -- initialize STGManager
+    path_to_output = parameters.get_output_path()
+    stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.details, OUT_MAGIC_DETAILS,
+                                     parameters.get_repl_prefix())
+
+    # Write to Flightgear
+    cmin, cmax = parameters.get_extent_global()
+    logging.info("min/max " + str(cmin) + " " + str(cmax))
+    lmin = vec2d.Vec2d(coords_transform.toLocal(cmin))
+    lmax = vec2d.Vec2d(coords_transform.toLocal(cmax))
+    cluster_container = cluster.ClusterContainer(lmin, lmax, stg_io2.STGVerbType.object_static)
+
+    if parameters.C2P_PROCESS_POWERLINES:
+        _distribute_way_segments_to_clusters(powerlines, cluster_container)
+        _write_stg_entries_pylons_for_line(stg_manager, powerlines)
+    if parameters.C2P_PROCESS_AERIALWAYS:
+        _distribute_way_segments_to_clusters(aerialways, cluster_container)
+        _write_stg_entries_pylons_for_line(stg_manager, aerialways)
+    if parameters.C2P_PROCESS_OVERHEAD_LINES:
+        _distribute_way_segments_to_clusters(rail_lines, cluster_container)
+        _write_stg_entries_pylons_for_line(stg_manager, rail_lines)
+
+    _write_cable_clusters(cluster_container, coords_transform, stg_manager)
+
+    if parameters.C2P_PROCESS_STREETLAMPS:
+        _write_stg_entries_pylons_for_line(stg_manager, streetlamp_ways)
+
+    stg_manager.write(file_lock)
 
 
 # ================ UNITTESTS =======================

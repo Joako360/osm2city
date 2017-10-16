@@ -73,7 +73,6 @@ required graph functions:
 -
 """
 
-import argparse
 from collections import OrderedDict
 import enum
 import logging
@@ -95,7 +94,7 @@ import linear_bridge
 import parameters
 import textures.road
 from cluster import ClusterContainer
-from utils import osmparser, coordinates, ac3d, stg_io2, utilities, aptdat_io, landuse
+from utils import osmparser, coordinates, ac3d, stg_io2, utilities, landuse
 from utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
@@ -1310,18 +1309,13 @@ def _write_xml(path_to_stg, file_name, object_name):
     """ % (file_name, shader_str, object_name)))
 
 
-def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
-            blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
-            file_lock: mp.Lock=None) -> None:
+def process_roads(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
+                  blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
+                  file_lock: mp.Lock=None) -> None:
     random.seed(42)
     stats = utilities.Stats()
 
-    if not parameters.USE_DATABASE:
-        osm_way_result = osmparser.fetch_osm_file_data(['highway', 'railway', "tunnel", "bridge", "gauge", "access",
-                                                        "lit"],
-                                                       ['highway', 'railway'])
-    else:
-        osm_way_result = osmparser.fetch_osm_db_data_ways_keys(["highway", "railway"])
+    osm_way_result = osmparser.fetch_osm_db_data_ways_keys(["highway", "railway"])
     osm_nodes_dict = osm_way_result.nodes_dict
     osm_ways_dict = osm_way_result.ways_dict
 
@@ -1335,10 +1329,7 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
     roads = Roads(filtered_osm_ways_list, osm_nodes_dict, coords_transform, fg_elev)
 
     # land-use data for lighting
-    if not parameters.USE_DATABASE:
-        landuse_result = osmparser.fetch_osm_file_data(['landuse'], ['landuse'])
-    else:
-        landuse_result = osmparser.fetch_osm_db_data_ways_keys(['landuse'])
+    landuse_result = osmparser.fetch_osm_db_data_ways_keys(['landuse'])
     landuse_nodes_dict = landuse_result.nodes_dict
     landuse_ways_dict = landuse_result.ways_dict
     landuses_lit = landuse.process_osm_landuse_for_lighting(landuse_nodes_dict, landuse_ways_dict, coords_transform)
@@ -1368,38 +1359,6 @@ def process(coords_transform: coordinates.Transformation, fg_elev: utilities.FGE
 
     utilities.troubleshoot(stats)
     logging.debug("final " + str(roads))
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="roads.py reads OSM data and creates road, railway and bridge models for use with FlightGear")
-    parser.add_argument("-f", "--file", dest="filename",
-                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
-    parser.add_argument("-l", "--loglevel",
-                        help="set loglevel. Valid levels are DEBUG, INFO, WARNING, ERROR, CRITICAL", required=False)
-    parser.add_argument("-e", dest="skip_elev", action="store_true",
-                        help="skip elevation interpolation", required=False)
-    parser.add_argument("-b", "--bridges-only", dest="bridges_only", action="store_true",
-                        help="create only bridges and embankments", required=False)
-    args = parser.parse_args()
-    parameters.read_from_file(args.filename)
-    parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
-    if args.skip_elev:
-        parameters.NO_ELEV = True
-    if args.bridges_only:
-        parameters.CREATE_BRIDGES_ONLY = True
-    parameters.show()
-
-    my_coords_transform = coordinates.Transformation(parameters.get_center_global())
-    my_fg_elev = utilities.FGElev(my_coords_transform)
-    my_blocked_areas = aptdat_io.get_apt_dat_blocked_areas(my_coords_transform,
-                                                           parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
-                                                           parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
-    my_stg_entries = stg_io2.read_stg_entries_in_boundary(True, my_coords_transform)
-
-    process(my_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries)
-
-    my_fg_elev.close()
-
-    logging.info("******* Finished *******")
 
 
 # ================ UNITTESTS =======================
