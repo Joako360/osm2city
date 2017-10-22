@@ -287,7 +287,8 @@ TRAFFIC_SHADER_ENABLE                           Boolean    False     If True the
                                                                      These effects are only for roads, not railways. The traffic shader has moving
                                                                      cars, however it only works with the default renderer — ALS/Rembrandt must be
                                                                      off.
-OBSTRUCTION_LIGHT_MIN_LEVELS                    Integer    15        Puts obstruction lights on buildings >= the specified number levels.
+OBSTRUCTION_LIGHT_MIN_LEVELS                    Integer    15        Puts red obstruction lights on buildings >= the specified number levels.
+                                                                     If you do not want this, then just set the value to 0.
 
 LIGHTMAP_ENABLE                                 Boolean    True      Creates simulated light effects on buildings from street lights.
 

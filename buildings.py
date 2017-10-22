@@ -69,7 +69,6 @@ import numpy as np
 import parameters
 import prepare_textures
 import textures.texture as tex
-import utils.stg_io2
 import utils.vec2d as v
 from utils import osmparser, coordinates, stg_io2, utilities
 
@@ -489,14 +488,11 @@ def _refs_to_ring(coords_transform: coordinates.Transformation, refs,
     return ring
 
 
-def _write_xml(path: str, file_name: str, the_buildings: List[building_lib.Building], cluster_offset: v.Vec2d) -> None:
-    #  -- LOD animation
+def _write_xml(path: str, file_name: str) -> None:
+    """Light map animation"""
     xml = open(os.path.join(path, file_name + ".xml"), "w")
     xml.write("""<?xml version="1.0"?>\n<PropertyList>\n""")
     xml.write("<path>%s.ac</path>" % file_name)
-
-    has_lod_rough = False
-    has_lod_detail = False
 
     if parameters.LIGHTMAP_ENABLE:
         xml.write(textwrap.dedent("""
@@ -507,16 +503,25 @@ def _write_xml(path: str, file_name: str, the_buildings: List[building_lib.Build
         xml.write("  <object-name>LOD_rough</object-name>\n")
         xml.write("</effect>\n")
 
-    # -- put obstruction lights on hi-rise buildings
+    xml.write(textwrap.dedent("""
+    </PropertyList>
+    """))
+    xml.close()
+
+
+def _write_obstruction_lights(path: str, file_name: str,
+                              the_buildings: List[building_lib.Building], cluster_offset: v.Vec2d) -> bool:
+    """Add obstruction lights on top of high buildings. Return true if at least one obstruction light is added."""
+    models_list = list()  # list of strings
     for b in the_buildings:
         if b.levels >= parameters.OBSTRUCTION_LIGHT_MIN_LEVELS:
-            Xo = np.array(b.pts_outer)
-            for i in np.arange(0, b.pts_outer_count, b.pts_outer_count/4.):
-                xo = Xo[int(i+0.5), 0] - cluster_offset.x
-                yo = Xo[int(i+0.5), 1] - cluster_offset.y
+            nodes_outer = np.array(b.pts_outer)
+            for i in np.arange(0, b.pts_outer_count, b.pts_outer_count / 4.):
+                xo = nodes_outer[int(i + 0.5), 0] - cluster_offset.x
+                yo = nodes_outer[int(i + 0.5), 1] - cluster_offset.y
                 zo = b.top_of_roof_above_sea_level + 1.5
-                # <path>cursor.ac</path>
-                xml.write(textwrap.dedent("""
+
+                models_list.append(textwrap.dedent("""
                 <model>
                   <path>Models/Effects/pos_lamp_red_light_2st.xml</path>
                   <offsets>
@@ -526,17 +531,22 @@ def _write_xml(path: str, file_name: str, the_buildings: List[building_lib.Build
                     <pitch-deg> 0.00</pitch-deg>
                     <heading-deg>0.0 </heading-deg>
                   </offsets>
-                </model>""" % (-yo, xo, zo)))  # -- I just don't get those coordinate systems.
-
-    xml.write(textwrap.dedent("""
-
-    </PropertyList>
-    """))
-    xml.close()
+                </model>""") % (-yo, xo, zo))
+    if len(models_list) > 0:
+        xml = open(os.path.join(path, file_name), "w")
+        xml.write('<?xml version="1.0"?>\n<PropertyList>\n')
+        xml.write('\n'.join(models_list))
+        xml.write(textwrap.dedent("""
+        </PropertyList>
+        """))
+        xml.close()
+        return True
+    else:
+        return False
 
 
 def process_buildings(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
-                      blocked_areas: List[shg.Polygon], stg_entries: List[utils.stg_io2.STGEntry],
+                      blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
                       file_lock: mp.Lock=None) -> None:
     random.seed(42)
     stats = utilities.Stats()
@@ -608,13 +618,13 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
     replacement_prefix = parameters.get_repl_prefix()
-    stg_manager = stg_io2.STGManager(path_to_output, utils.stg_io2.SceneryType.buildings, OUR_MAGIC, replacement_prefix)
+    stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.buildings, OUR_MAGIC, replacement_prefix)
 
     # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
     for b in the_buildings:
-        if b.LOD is utils.stg_io2.LOD.detail:
+        if b.LOD is stg_io2.LOD.detail:
             clusters_building_mesh_detailed.append(b.anchor, b, stats)
-        elif b.LOD is utils.stg_io2.LOD.rough:
+        elif b.LOD is stg_io2.LOD.rough:
             clusters_building_mesh_rough.append(b.anchor, b, stats)
 
     # -- write clusters
@@ -664,7 +674,13 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
             building_lib.write(os.path.join(path_to_stg, file_name + ".ac"), cl.objects,
                                cluster_elev, cluster_offset, prepare_textures.roofs, stats)
             if not parameters.FLAG_2017_2:
-                _write_xml(path_to_stg, file_name, cl.objects, cluster_offset)
+                _write_xml(path_to_stg, file_name)
+            if parameters.OBSTRUCTION_LIGHT_MIN_LEVELS > 0:
+                obstr_file_name = file_name + '_obstrlights.xml'
+                has_models = _write_obstruction_lights(path_to_stg, obstr_file_name, cl.objects, cluster_offset)
+                if has_models:
+                    stg_manager.add_object_static(obstr_file_name, center_global, cluster_elev, 0,
+                                                  stg_io2.STGVerbType.object_static)
             total_buildings_written += len(cl.objects)
 
         handled_index += 1

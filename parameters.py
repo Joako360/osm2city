@@ -157,7 +157,7 @@ LOD_PERCENTAGE_DETAIL = 0.5         # -- of the remaining buildings, this percen
                                     #    the rest will be LOD rough.
 
 LIGHTMAP_ENABLE = True                 # -- include lightmap in xml
-OBSTRUCTION_LIGHT_MIN_LEVELS = 15   # -- put obstruction lights on buildings with >= given levels
+OBSTRUCTION_LIGHT_MIN_LEVELS = 15   # -- put obstruction lights on buildings with >= given levels. 0 for no lights.
 
 CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if too few objects
 
