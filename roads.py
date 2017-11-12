@@ -1368,7 +1368,7 @@ class TestUtilities(unittest.TestCase):
         raw_osm_ways = list()
         nodes_dict = dict()
         coords_transform = coordinates.Transformation(parameters.get_center_global())
-        the_fg_elev = utilities.FGElev(coords_transform)
+        the_fg_elev = utilities.FGElev(coords_transform, 111111)
         way = osmparser.Way(1)
         way.tags["hello"] = "world"
         way.refs = [1, 2, 3, 4, 5, 6]

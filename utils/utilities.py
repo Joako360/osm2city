@@ -312,7 +312,8 @@ class FGElev(object):
        By default, queries are cached. Call save_cache() to
        save the cache to disk before freeing the object.
     """
-    def __init__(self, coords_transform: coordinates.Transformation, auto_save_every: int=50000) -> None:
+    def __init__(self, coords_transform: coordinates.Transformation, tile_index: int,
+                 auto_save_every: int=50000) -> None:
         """Open pipe to fgelev.
            Unless disabled by cache=False, initialize the cache and try to read
            it from disk. Automatically save the cache to disk every auto_save_every misses.
@@ -328,7 +329,7 @@ class FGElev(object):
 
         self.pkl_fname = None
         if parameters.FG_ELEV_CACHE and not parameters.NO_ELEV:
-            self.pkl_fname = os.path.join(parameters.PREFIX, 'elev.pkl')
+            self.pkl_fname = str(tile_index) + '_elev.pkl'
             try:
                 logging.info("Loading %s", self.pkl_fname)
                 fpickle = open(self.pkl_fname, 'rb')

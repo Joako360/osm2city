@@ -78,7 +78,7 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_l
 
         # prepare shared resources
         the_coords_transform = coordinates.Transformation(parameters.get_center_global())
-        my_fg_elev = FGElev(the_coords_transform)
+        my_fg_elev = FGElev(the_coords_transform, scenery_tile.tile_index)
         my_stg_entries = utils.stg_io2.read_stg_entries_in_boundary(True, the_coords_transform)
 
         # cannot be read once for all outside of tiles in main function
@@ -108,7 +108,7 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_l
 
     except:
         logging.exception('Exception occurred while processing tile {}.'.format(scenery_tile.tile_index))
-        msg = "******* Exception with tile {} to reprocess use boundaries: {}_{}_{}_{} *******".format(
+        msg = "******* Exception in tile {} - to reprocess use boundaries: {}_{}_{}_{} *******".format(
             scenery_tile.tile_index, scenery_tile.boundary_west, scenery_tile.boundary_south,
             scenery_tile.boundary_east, scenery_tile.boundary_north)
         logging.exception(msg)
