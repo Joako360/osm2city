@@ -1784,15 +1784,16 @@ def process_pylons(coords_transform: coordinates.Transformation, fg_elev: utilit
     powerlines = list()
     if parameters.C2P_PROCESS_POWERLINES:
         req_keys = list()
-        req_keys.append("power")
+        if parameters.C2P_PROCESS_POWERLINES:
+            req_keys.append('power')
         osm_way_result = osmparser.fetch_osm_db_data_ways_keys(req_keys)
         osm_nodes_dict = osm_way_result.nodes_dict
         osm_ways_dict = osm_way_result.ways_dict
 
         powerlines, aerialways = _process_osm_power_aerialway(osm_nodes_dict, osm_ways_dict, fg_elev,
                                                               coords_transform, building_refs)
-        if not parameters.C2P_PROCESS_AERIALWAYS:
-            aerialways = list()
+
+        # remove all those power lines, which are minor - after we have done the mapping in calc_and_map()
         for wayline in reversed(powerlines):
             wayline.calc_and_map()
             if wayline.type_ is WayLineType.power_minor:
@@ -1827,7 +1828,7 @@ def process_pylons(coords_transform: coordinates.Transformation, fg_elev: utilit
     stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.pylons, OUR_MAGIC,
                                      parameters.get_repl_prefix())
 
-    # Write to Flightgear
+    # Write to FlightGear
     cmin, cmax = parameters.get_extent_global()
     logging.info("min/max " + str(cmin) + " " + str(cmax))
     lmin = vec2d.Vec2d(coords_transform.toLocal(cmin))
@@ -1873,25 +1874,21 @@ def process_details(coords_transform: coordinates.Transformation, fg_elev: utili
     aerialways = list()
     if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_AERIALWAYS:
         req_keys = list()
-        if parameters.C2P_PROCESS_POWERLINES:
-            req_keys.append("power")
-        if parameters.C2P_PROCESS_POWERLINES:
-            req_keys.append("aerialway")
+        if parameters.C2P_PROCESS_POWERLINES and parameters.C2P_PROCESS_POWERLINES_MINOR:
+            req_keys.append('power')
+        if parameters.C2P_PROCESS_AERIALWAYS:
+            req_keys.append('aerialway')
         osm_way_result = osmparser.fetch_osm_db_data_ways_keys(req_keys)
         osm_nodes_dict = osm_way_result.nodes_dict
         osm_ways_dict = osm_way_result.ways_dict
 
         powerlines, aerialways = _process_osm_power_aerialway(osm_nodes_dict, osm_ways_dict, fg_elev,
                                                               coords_transform, building_refs)
-        if not parameters.C2P_PROCESS_POWERLINES:
-            powerlines = list()
-        if not parameters.C2P_PROCESS_AERIALWAYS:
-            aerialways = list()
+
+        # remove all those power lines, which are not minor - after we have done the mapping in calc_and_map()
         for wayline in reversed(powerlines):
             wayline.calc_and_map()
             if wayline.type_ is WayLineType.power_line:
-                powerlines.remove(wayline)
-            if not parameters.C2P_PROCESS_POWERLINES_MINOR:
                 powerlines.remove(wayline)
         logging.info('Number of minor power lines to process: %s', len(powerlines))
         logging.info('Number of aerialways to process: %s', len(aerialways))
