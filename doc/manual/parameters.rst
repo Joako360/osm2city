@@ -71,17 +71,13 @@ PATH_TO_OSM2CITY_DATA                           Path       n/a       Full path t
                                                                      :ref:`Installation of osm2city <chapter-osm2city-install>` (e.g.
                                                                      "/home/user/osm2city-data").
 
-NO_ELEV                                         Boolean    False     Set this to ``False``. The only reason to set this to ``True`` would be for
-                                                                     builders to check generated scenery objects a bit faster not caring about
-                                                                     the vertical position in the scenery.
-
 FG_ELEV                                         String     n/a       Points to the full path of the fgelev executable. On Linux it could be
                                                                      something like ``.../bin/fgfs_git/next/install/flightgear/bin/fgelev'``.
                                                                      On Windows you might have to put quotes around the path due to whitespace
                                                                      e.g. ``'"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'``.
 
 PROBE_FOR_WATER                                 Boolean    False     Checks the scenery in ``PATH_TO_SCENERY`` whether points are in the water or
-                                                                     not. The Flightgear scenery's water boundaries might be different from OSM.
+                                                                     not. The FlightGear scenery's water boundaries might be different from OSM.
                                                                      E.g. removes buildings if at least one corner is in the water. And removes
                                                                      or splits (parts of) roads/railways, if at least 1 point is in the water.
                                                                      Only possible with FGElev version after 9th of November 2016 / FG 2016.4.1.
@@ -102,6 +98,19 @@ Parameter                                       Type       Default   Description
 =============================================   ========   =======   ==============================================================================
 FLAG_2017_2                                     Boolean    True      If True then the textures and effects for osm2city built into FlightGear will
                                                                      be used. Otherwise each scenery sub-folder will have a folder with textures.
+
+BUILDING_USE_SHARED_WORSHIP                     Boolean    False     Use a shared model for worship buildings instead of OSM floor plan and
+                                                                     heuristics. The shared models will try to respect the type of building (e.g.
+                                                                     church vs. mosque) and will in size (not height) respect the convex hull of
+                                                                     the building floor plan in OSM.
+                                                                     If the building is composed of several parts as in OSM 3D buildings, then no
+                                                                     shared models are used - as it is assumed that the 3D modeling is more
+                                                                     realistic (e.g number and height of towers) than a generic model, although
+                                                                     the facade texture is more dumb than a typical shared model texture.
+
+NO_ELEV                                         Boolean    False     The only reason to set this to ``True`` would be for scenery builders to
+                                                                     check generated scenery objects a bit faster not caring about the vertical
+                                                                     position in the scenery.
 
 =============================================   ========   =======   ==============================================================================
 

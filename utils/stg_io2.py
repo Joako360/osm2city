@@ -183,16 +183,16 @@ class STGManager(object):
             self.stg_dict[tile_index] = the_stg_file
         return the_stg_file
 
-    def add_object_static(self, ac_file_name, lon_lat: Vec2d, elev, hdg,
-                          stg_verb_type: STGVerbType=STGVerbType.object_static, once=False):
+    def add_object_static(self, ac_file_name: str, lon_lat: Vec2d, elev: float, hdg: float,
+                          stg_verb_type: STGVerbType=STGVerbType.object_static, once=False) -> str:
         """Adds OBJECT_STATIC line. Returns path to stg."""
         the_stg_file = self._find_create_stg_file(lon_lat)
         return the_stg_file.add_object(stg_verb_type.name.upper(), ac_file_name, lon_lat, elev, hdg, once)
 
-    def add_object_shared(self, ac_file_name, lon_lat, elev, hdg):
-        """Adds OBJECT_SHARED line. Returns path to stg it was added to."""
+    def add_object_shared(self, ac_file_name: str, lon_lat: Vec2d, elev:float , hdg: float) -> None:
+        """Adds OBJECT_SHARED line."""
         the_stg_file = self._find_create_stg_file(lon_lat)
-        return the_stg_file.add_object('OBJECT_SHARED', ac_file_name, lon_lat, elev, hdg)
+        the_stg_file.add_object('OBJECT_SHARED', ac_file_name, lon_lat, elev, hdg)
 
     def write(self, file_lock: mp.Lock=None):
         """Writes all new scenery objects including the already existing back to stg-files.

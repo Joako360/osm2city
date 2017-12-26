@@ -75,14 +75,16 @@ On Linux you would typically add something like the following to your ``.bashrc`
 
 .. _chapter-set-fgroot-label:
 
--------------------------------------
-Setting Environment Variable $FG_ROOT
--------------------------------------
+------------------------------------------------------
+Setting Operating System Environment Variable $FG_ROOT
+------------------------------------------------------
 The environment variable ``$FG_ROOT`` must be set in your operating system or at least your current session, such that ``fgelev`` can work optimally. How you set environment variables is depending on your operating system and not described here. I.e. this is NOT something you set as a parameter in ``params.ini``!
 
 You might have to restart Windows to be able to read the environment variable that you set through the control panel. In Linux you might have to create a new console session.
 
-`$FG_ROOT`_ is typically a path ending with directories ``data`` or ``fgdata`` (e.g. on Linux it could be ``/home/pingu/bin/fgfs_git/next/install/flightgear/fgdata``).
+`$FG_ROOT`_ is typically a path ending with directories ``data`` or ``fgdata`` (e.g. on Linux it could be ``/home/pingu/bin/fgfs_git/next/install/flightgear/fgdata``; on Windows it might be ``C:\flightGear\2017.3.1\data``).
+
+BTW: you have to set the name of the variable in your operating system to ``FG_ROOT`` (not ``$FG_ROOT``).
 
 .. _$FG_ROOT: http://wiki.flightgear.org/$FG_ROOT
 

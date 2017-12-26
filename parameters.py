@@ -96,6 +96,7 @@ OVERLAP_CHECK_BRIDGE_MIN_REMAINING = 10
 #    a static model for these, and the overlap check fails.
 #    Use unicode strings as in the first example if there are non-ASCII characters.
 #    E.g. SKIP_LIST = ["Theologische Fakultät", "Rhombergpassage", 55875208]
+#    For roads/railways OSM ID is checked.
 SKIP_LIST = []
 
 # -- Parameters which influence the number of buildings from OSM taken to output
@@ -146,6 +147,8 @@ BUILDING_CITY_LEVEL_HEIGHT_LOW = 3.1
 BUILDING_CITY_LEVEL_HEIGHT_MODE = 3.3
 BUILDING_CITY_LEVEL_HEIGHT_HIGH = 3.6
 # FIXME: same parameters for place = town, village, suburb
+
+BUILDING_USE_SHARED_WORSHIP = False  # try to use shared models for worship buildings
 
 # -- The more buildings end up in LOD rough, the more work for your GPU.
 #    Increasing any of the following parameters will decrease GPU load.
@@ -250,7 +253,7 @@ MAX_SLOPE_MOTORWAY = 0.03       # max slope for motorways
 MAX_SLOPE_ROAD = 0.08
 MAX_TRANSVERSE_GRADIENT = 0.1   #
 BRIDGE_MIN_LENGTH = 20.         # discard short bridges, draw road instead
-DEBUG_PLOT = 0
+DEBUG_PLOT = False
 CREATE_BRIDGES_ONLY = 0         # create only bridges and embankments
 BRIDGE_LAYER_HEIGHT = 4.         # bridge height per layer
 BRIDGE_BODY_HEIGHT = 0.9         # height of bridge body
@@ -261,7 +264,7 @@ HIGHWAY_TYPE_MIN_ROUGH_LOD = 6  # the minimum type tobe added to the rough LOD c
 POINTS_ON_LINE_DISTANCE_MAX = 1000  # the maximum distance between two points on a line. If longer, then new points are added
 BUILT_UP_AREA_LIT_BUFFER = 20  # the buffer around built-up land-use areas to be used for lighting of streets
 
-USE_TRAM_LINES = False  # whether to build tram lines (OSM railway=tram)  often they do not merge well with roads
+USE_TRAM_LINES = False  # whether to build tram lines (OSM railway=tram). Often they do not merge well with roads
 
 
 # =============================================================================

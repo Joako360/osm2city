@@ -99,7 +99,7 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_l
         if exec_argument in [Procedures.pylons, Procedures.main, Procedures.all]:
             pylons.process_pylons(the_coords_transform, my_fg_elev, my_stg_entries, file_lock)
         if exec_argument in [Procedures.details, Procedures.all]:
-            pylons.process_details(the_coords_transform, my_fg_elev, my_stg_entries, file_lock)
+            pylons.process_details(the_coords_transform, my_fg_elev, file_lock)
             platforms.process_details(the_coords_transform, my_fg_elev, file_lock)
             piers.process_details(the_coords_transform, my_fg_elev, file_lock)
 

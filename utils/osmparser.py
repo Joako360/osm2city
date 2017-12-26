@@ -39,7 +39,7 @@ class OSMElement(object):
     def add_tag(self, key: str, value: str) -> None:
         self.tags[key] = value
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "<%s OSM_ID %i at %s>" % (type(self).__name__, self.osm_id, hex(id(self)))
 
 

@@ -611,14 +611,14 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
 
     prepare_textures.init(stats)
 
-    the_buildings = building_lib.analyse(the_buildings, fg_elev,
-                                         prepare_textures.facades, prepare_textures.roofs, stats)
-    building_lib.decide_lod(the_buildings, stats)
-
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
     replacement_prefix = parameters.get_repl_prefix()
     stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.buildings, OUR_MAGIC, replacement_prefix)
+
+    the_buildings = building_lib.analyse(the_buildings, fg_elev, stg_manager, coords_transform,
+                                         prepare_textures.facades, prepare_textures.roofs, stats)
+    building_lib.decide_lod(the_buildings, stats)
 
     # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
     for b in the_buildings:

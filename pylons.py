@@ -299,13 +299,12 @@ class SharedPylon(object):
         self.lon, self.lat = my_coord_transformator.toGlobal((self.x, self.y))
         self.elevation = fg_elev.probe_elev(vec2d.Vec2d(self.lon, self.lat), True)
 
-    def make_stg_entry(self, my_stg_mgr):
-        """
-        Returns a stg entry for this pylon.
+    def make_stg_entry(self, my_stg_mgr: stg_io2.STGManager) -> None:
+        """Returns a stg entry for this pylon.
         E.g. OBJECT_SHARED Models/Airport/ils.xml 5.313108 45.364122 374.49 268.92
         """
         if not self.needs_stg_entry:
-            return " "  # no need to write a shared object
+            return # no need to write a shared object
 
         direction_correction = 0
         if self.direction_type is PylonDirectionType.mirror:
@@ -452,7 +451,7 @@ class StorageTank(SharedPylon):
                 self.elevation -= 62
         self.pylon_model = 'Models/Industrial/' + self.pylon_model
 
-    def make_stg_entry(self, my_stg_mgr) -> None:
+    def make_stg_entry(self, my_stg_mgr: stg_io2.STGManager) -> None:
         my_stg_mgr.add_object_shared(self.pylon_model, vec2d.Vec2d(self.lon, self.lat), self.elevation, 0)
 
 
@@ -537,7 +536,7 @@ class WindTurbine(SharedPylon):
         logging.debug("Wind turbine shared model chosen: {}".format(shared_model))
         return common_path + shared_model
 
-    def make_stg_entry(self, my_stg_mgr) -> None:
+    def make_stg_entry(self, my_stg_mgr: stg_io2.STGManager) -> None:
         # special for Vestas_Off_Shore140M.xml
         if self.pylon_model.endswith("140M.xml"):
             my_stg_mgr.add_object_shared("Models/Power/Vestas_Base.ac", vec2d.Vec2d(self.lon, self.lat),
@@ -1519,7 +1518,7 @@ def _distribute_way_segments_to_clusters(lines: List[Line], cluster_container: c
 
 
 def _write_cable_clusters(cluster_container: cluster.ClusterContainer, coords_transform: coordinates.Transformation,
-                          my_stg_mgr: stg_io2.STGManager) -> None:
+                          my_stg_mgr: stg_io2.STGManager, details: bool=False) -> None:
     cluster_index = 0
     for ic, cl in enumerate(cluster_container):
         cluster_index += 1
@@ -1546,7 +1545,14 @@ def _write_cable_clusters(cluster_container: cluster.ClusterContainer, coords_tr
         cluster_y = y_max - (y_max - y_min)/2.0
         cluster_elevation = elevation_max - (elevation_max - elevation_min)/2.0
         center_global = coords_transform.toGlobal((cluster_x, cluster_y))
-        cluster_filename = parameters.get_repl_prefix() + "cables%05d" % cluster_index
+        cluster_filename = parameters.get_repl_prefix()
+        # it is important to have the ac-file names for cables different in "Pylons" and "Details/Objects",
+        # because otherwise FG does not know which information to take from which stg-files, which results
+        # in that e.g. the ac-file is taken from the Pylons stg - but the lat/lon/angle from the
+        # "Details/Objects" stg-file.
+        if details:
+            cluster_filename += 'd'
+        cluster_filename += 'cables%05d' % cluster_index
         path_to_stg = my_stg_mgr.add_object_static(cluster_filename + '.ac', vec2d.Vec2d(center_global[0],
                                                                                          center_global[1]),
                                                    cluster_elevation, 90, cluster_container.stg_verb_type)
@@ -1855,7 +1861,7 @@ def process_pylons(coords_transform: coordinates.Transformation, fg_elev: utilit
 
 
 def process_details(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
-                    stg_entries: List[stg_io2.STGEntry], file_lock: mp.Lock=None) -> None:
+                    file_lock: mp.Lock=None) -> None:
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects -> details")
 
@@ -1872,12 +1878,12 @@ def process_details(coords_transform: coordinates.Transformation, fg_elev: utili
     # Minor power lines and aerialways
     powerlines = list()
     aerialways = list()
-    if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_AERIALWAYS:
-        req_keys = list()
-        if parameters.C2P_PROCESS_POWERLINES and parameters.C2P_PROCESS_POWERLINES_MINOR:
-            req_keys.append('power')
-        if parameters.C2P_PROCESS_AERIALWAYS:
-            req_keys.append('aerialway')
+    req_keys = list()
+    if parameters.C2P_PROCESS_POWERLINES and parameters.C2P_PROCESS_POWERLINES_MINOR:
+        req_keys.append('power')
+    if parameters.C2P_PROCESS_AERIALWAYS:
+        req_keys.append('aerialway')
+    if req_keys:
         osm_way_result = osmparser.fetch_osm_db_data_ways_keys(req_keys)
         osm_nodes_dict = osm_way_result.nodes_dict
         osm_ways_dict = osm_way_result.ways_dict
@@ -1933,7 +1939,7 @@ def process_details(coords_transform: coordinates.Transformation, fg_elev: utili
     stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.details, OUT_MAGIC_DETAILS,
                                      parameters.get_repl_prefix())
 
-    # Write to Flightgear
+    # Write to FlightGear
     cmin, cmax = parameters.get_extent_global()
     logging.info("min/max " + str(cmin) + " " + str(cmax))
     lmin = vec2d.Vec2d(coords_transform.toLocal(cmin))
@@ -1950,7 +1956,7 @@ def process_details(coords_transform: coordinates.Transformation, fg_elev: utili
         _distribute_way_segments_to_clusters(rail_lines, cluster_container)
         _write_stg_entries_pylons_for_line(stg_manager, rail_lines)
 
-    _write_cable_clusters(cluster_container, coords_transform, stg_manager)
+    _write_cable_clusters(cluster_container, coords_transform, stg_manager, details=True)
 
     if parameters.C2P_PROCESS_STREETLAMPS:
         _write_stg_entries_pylons_for_line(stg_manager, streetlamp_ways)

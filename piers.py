@@ -154,7 +154,7 @@ def _write_boat_line(pier, stg_manager, coords_transform: coordinates.Transforma
                 logging.error(reason)
 
 
-def _write_model(length, stg_manager, pos_global, direction, my_elev):
+def _write_model(length, stg_manager: stg_io2.STGManager, pos_global, direction, my_elev) -> None:
     if length < 20:
         models = [('Models/Maritime/Civilian/wooden_boat.ac', 120),
                   ('Models/Maritime/Civilian/wooden_blue_boat.ac', 120),

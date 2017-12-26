@@ -16,6 +16,8 @@ from typing import Dict, List, Optional, Tuple
 import unittest
 
 import numpy as np
+from shapely import affinity
+import shapely.geometry as shg
 
 import parameters
 from utils import coordinates, osmparser
@@ -437,6 +439,27 @@ class FGElev(object):
                 self._save_cache()
             return elev_is_solid_tuple
 
+    def probe_list_of_points(self, points: List[Tuple[float, float]]) -> float:
+        """Get the elevation of the node lowest node of a list of points.
+        If a node is in water or at -9999, then return -9999
+        """
+        elev_water_ok = True
+        temp_ground_elev = 9999
+        for point in points:
+            elev_is_solid_tuple = self.probe(ve.Vec2d(point))
+            if elev_is_solid_tuple[0] == -9999:
+                logging.debug("-9999")
+                elev_water_ok = False
+                break
+            elif not elev_is_solid_tuple[1]:
+                logging.debug("in water")
+                elev_water_ok = False
+                break
+            temp_ground_elev = min([temp_ground_elev, elev_is_solid_tuple[0]])  # we are looking for the lowest value
+        if not elev_water_ok:
+            return -9999
+        return temp_ground_elev
+
 
 def progress(i, max_i):
     """progress indicator"""
@@ -490,6 +513,170 @@ def check_boundary(boundary_west: float, boundary_south: float,
     if boundary_south >= boundary_north:
         raise BoundaryError("Boundary South {} must be smaller than North {} -> aborting!".format(boundary_south,
                                                                                                   boundary_north))
+
+
+def bounds_from_list(bounds_list: List[Tuple[float, float, float, float]]) -> Tuple[float, float, float, float]:
+    """Finds the bounds (min_x, min_y, max_x, max_y) from a list of bounds.
+
+    If the list of bounds is None or empty, then (0,0,0,0) is returned."""
+    if not bounds_list:
+        return 0, 0, 0, 0
+
+    min_x = sys.float_info.max
+    min_y = sys.float_info.max
+    max_x = sys.float_info.min
+    max_y = sys.float_info.min
+
+    for bounds in bounds_list:
+        min_x = min(min_x, bounds[0])
+        min_y = min(min_y, bounds[1])
+        max_x = max(max_x, bounds[2])
+        max_y = max(max_y, bounds[3])
+
+    return min_x, min_y, max_x, max_y
+
+
+def minimum_circumference_rectangle_for_polygon(hull: shg.Polygon) -> Tuple[float, float, float]:
+    """Constructs a minimum circumference rectangle around a polygon and returns its angle, length and width
+    There is no check whether length is longer than width - or that length is closer to e.g. the x-axis.
+
+    This is different from a bounding box, which just uses min/max along axis.
+    See https://gis.stackexchange.com/questions/22895/finding-minimum-area-rectangle-for-given-points
+
+    Circumference is used as opposed to typically area because often buildings tend to be less quadratic.
+
+    The general idea is that at least one edge of the polygon will be aligned with an edge of the rectangle.
+    Therefore Go through all edges of the polygon, rotate it down to normal axis, create a bounding box and
+    save the dimensions incl. angle. Then compare with others obtained.
+
+    Often the polygon is a convex hull for points. In osm2city it might be the convex hull of a building.
+
+    A different algorithm also discussed in the article referenced above is using m matrix multiplication instead
+    of trigonometrics.
+
+    For an overview see also: David Eberly, 2015: Minimum-Area Rectangle Containing A Set of Points.
+    www.geometrictools.com
+    """
+    min_angle = 0.
+    min_length = 0.
+    min_width = 0.
+    min_circumference = 99999999.
+    hull_coords = hull.exterior.coords[:]  # list of x,y tuples
+    for index in range(len(hull_coords) - 1):
+        angle = coordinates.calc_angle_of_line_local(hull_coords[index][0], hull_coords[index][1],
+                                                     hull_coords[index + 1][0], hull_coords[index + 1][1])
+        rotated_hull = affinity.rotate(hull, - angle, (0, 0))
+        bounding_box = rotated_hull.bounds  # tuple x_min, y_min, x_max, y_max
+        bb_length = math.fabs(bounding_box[2] - bounding_box[0])
+        bb_width = math.fabs(bounding_box[3] - bounding_box[1])
+        circumference = 2 * (bb_length + bb_width)
+        if circumference < min_circumference:
+            min_angle = angle
+            if bb_length >= bb_width:
+                min_length = bb_length
+                min_width = bb_width
+                min_angle += 90  # it happens to be such that the angle is against the y-axis
+            else:
+                min_length = bb_width
+                min_width = bb_length
+            min_circumference = circumference
+
+    return min_angle, min_length, min_width
+
+
+def fit_offsets_for_rectangle_with_hull(angle: float, hull: shg.Polygon, model_length: float, model_width: float,
+                                        model_length_offset: float, model_width_offset: float,
+                                        model_length_largest: bool,
+                                        model_name: str, osm_id: int) -> Tuple[float, float]:
+    """Makes sure that a rectangle (bounding box) on a convex hull fits as good as possible and returns centroid.
+
+    This is necessary because the angle out of function minimum_circumference_rectangle_for_polygon(...) cannot be
+    known whether it should have been +/- 180 degrees (depends on which point in hull gets started with at least
+    if the hull was a rectangle to begin with).
+
+    NB: length_largest could also be calculated on the fly, but is chosen to be consistent with caller in building_lib.
+    """
+    # if both the length and width offsets are null, then the centroid will always be the hull's centroid
+    if model_length_offset == 0 and model_width_offset == 0:
+        return hull.centroid.x, hull.centroid.y
+
+    # need to correct the offsets based on whether the model has longer length or width
+    my_length = model_length
+    my_width = model_width
+    my_length_offset = model_length_offset
+    my_width_offset = model_width_offset
+    if not model_length_largest:
+        my_length = model_width
+        my_width = model_length
+        my_length_offset = model_width_offset
+        my_width_offset = model_length_offset
+
+    box = shg.box(-my_length/2, -my_width/2, my_length/2, my_width/2)
+    box = affinity.rotate(box, angle)
+    box = affinity.translate(box, hull.centroid.x, hull.centroid.y)
+
+    # need to correct along x-axis and y-axis due to offsets in the ac-model
+    correction_x = math.sin(angle) * my_length_offset
+    correction_x += math.cos(angle) * my_width_offset
+    correction_y = math.cos(angle) * my_length_offset
+    correction_y += math.sin(angle) * my_width_offset
+
+    box_minus = affinity.translate(box, -correction_x, -correction_y)
+    difference_minus = box_minus.difference(hull)
+    box_plus = affinity.translate(box, correction_x, correction_y)
+    difference_plus = box_plus.difference(hull)
+
+    new_x = hull.centroid.x - correction_x
+    new_y = hull.centroid.y - correction_y
+    if difference_minus.area > difference_plus.area:
+        new_x = hull.centroid.x + correction_x
+        new_y = hull.centroid.y + correction_y
+
+    if parameters.DEBUG_PLOT:
+        plot_fit_offsets(hull, box_minus, box_plus, angle, model_length_largest,
+                         new_x, new_y, model_name, osm_id)
+
+    return new_x, new_y
+
+
+# ================ PLOTTING FOR VISUAL TESTING =====
+
+import utils.plot_utilities as pu
+from descartes import PolygonPatch
+from matplotlib import patches as pat
+from time import sleep
+
+
+def plot_fit_offsets(hull: shg.Polygon, box_minus: shg.Polygon, box_plus: shg.Polygon,
+                     angle: float,
+                     model_length_largest: bool,
+                     centroid_x: float, centroid_y: float,
+                     model_name: str, osm_id: int) -> None:
+    pdf_pages = pu.create_pdf_pages(str(osm_id))
+
+    my_figure = pu.create_a4_landscape_figure()
+    title = 'osm_id={},\n model={},\n angle={},\n length_largest={}'.format(osm_id, model_name, angle,
+                                                                            model_length_largest)
+    my_figure.suptitle(title)
+
+    ax = my_figure.add_subplot(111)
+
+    patch = PolygonPatch(hull, facecolor='none', edgecolor="black")
+    ax.add_patch(patch)
+    patch = PolygonPatch(box_minus, facecolor='none', edgecolor="green")
+    ax.add_patch(patch)
+    patch = PolygonPatch(box_plus, facecolor='none', edgecolor="red")
+    ax.add_patch(patch)
+    ax.add_patch(pat.Circle((centroid_x, centroid_y), radius=0.4, linewidth=2,
+                            color='blue', fill=False))
+    bounds = bounds_from_list([box_minus.bounds, box_plus.bounds])
+    pu.set_ax_limits_bounds(ax, bounds)
+
+    pdf_pages.savefig(my_figure)
+
+    pdf_pages.close()
+
+    sleep(2)  # to make sure we have not several files in same second
 
 
 # ================ UNITTESTS =======================

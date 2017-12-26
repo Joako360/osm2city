@@ -28,7 +28,7 @@ from enum import IntEnum, unique
 import logging
 import random
 from math import sin, cos, tan, sqrt, pi
-from typing import List, Dict, Tuple
+from typing import List, Dict, Optional, Tuple
 
 import myskeleton
 import numpy as np
@@ -40,9 +40,9 @@ import prepare_textures as tm
 import roofs
 import textures.texture as tex
 import utils.stg_io2
-from utils import ac3d
+from utils import ac3d, coordinates, utilities
 import utils.osmparser
-from utils.utilities import FGElev, progress, Stats
+#from utils.utilities import progress, Stats, minimum_circumference_rectangle_for_polygon
 from utils.vec2d import Vec2d
 from utils.stg_io2 import STGVerbType
 
@@ -437,7 +437,8 @@ class Building(object):
 
         return facade_requires
 
-    def analyse_textures(self, facade_mgr: tex.FacadeManager, roof_mgr: tex.RoofManager, stats: Stats) -> bool:
+    def analyse_textures(self, facade_mgr: tex.FacadeManager, roof_mgr: tex.RoofManager,
+                         stats: utilities.Stats) -> bool:
         """Determine the facade and roof textures. Return False if anomaly is found."""
         facade_requires = self._analyse_facade_roof_requirements()
         longest_edge_length = self.longest_edge_length  # keep for performance
@@ -500,26 +501,14 @@ class Building(object):
 
         return True
 
-    def analyse_elev_and_water(self, fg_elev: FGElev, stats: Stats) -> bool:
+    def analyse_elev_and_water(self, fg_elev: utilities.FGElev) -> bool:
         """Get the elevation of the node lowest node on the outer ring.
         If a node is in water or at -9999, then return False."""
-        elev_water_ok = True
-        temp_ground_elev = 9999
-        for pt_outer in self.pts_outer:
-            elev_is_solid_tuple = fg_elev.probe(Vec2d(pt_outer))
-            self.ground_elev = elev_is_solid_tuple[0]  # temporarily set - will be overwritten later
-            if elev_is_solid_tuple[0] == -9999:
-                logging.debug("-9999")
-                stats.skipped_no_elev += 1
-                elev_water_ok = False
-                break
-            elif not elev_is_solid_tuple[1]:
-                logging.debug("in water")
-                elev_water_ok = False
-                break
-            temp_ground_elev = min([temp_ground_elev, elev_is_solid_tuple[0]])  # we are looking for the lowest value
-        self.ground_elev = temp_ground_elev
-        return elev_water_ok
+        temp_ground_elev = fg_elev.probe_list_of_points(self.pts_outer)
+        if temp_ground_elev != -9999:
+            self.ground_elev = temp_ground_elev
+            return True
+        return False
 
     def analyse_edge_lengths(self) -> None:
         # -- compute edge length
@@ -860,7 +849,7 @@ class Building(object):
                     self.roof_height = temp_roof_height
 
     def write_to_ac(self, ac_object: ac3d.Object, cluster_elev: float, cluster_offset: Vec2d,
-                    roof_mgr: tex.RoofManager, stats: Stats) -> None:
+                    roof_mgr: tex.RoofManager, stats: utilities.Stats) -> None:
         # get local medium ground elevation for each building
         self.set_ground_elev_and_offset(cluster_elev, cluster_offset)
 
@@ -957,7 +946,7 @@ class Building(object):
                            swap_uv=self.facade_texture.v_can_repeat)
 
     def _write_roof_for_ac(self, ac_object: ac3d.Object, index_first_node_in_ac_obj: int, roof_mgr: tex.RoofManager,
-                           cluster_offset: Vec2d, stats: Stats) -> None:
+                           cluster_offset: Vec2d, stats: utilities.Stats) -> None:
         """Writes the roof vertices and faces to an ac3d object."""
         if self.roof_shape is RoofShape.flat:
             roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, stats)
@@ -1072,7 +1061,7 @@ def _calculate_vertical_texture_coords(body_height: float, t: tex.Texture) -> Tu
             return 0, 0
 
 
-def decide_lod(buildings: List[Building], stats: Stats) -> None:
+def decide_lod(buildings: List[Building], stats: utilities.Stats) -> None:
     """Decide on the building's LOD based on area, number of levels, and some randomness."""
     for b in buildings:
         r = random.uniform(0, 1)
@@ -1105,13 +1094,18 @@ def relate_neighbours(buildings: List[Building]) -> None:
                 buildings[j].neighbours.add(buildings[i])
                 neighbours += 1
 
-    logging.info('%d neighbour relations for %d buildings created (some buildings have several neighbours.',
+    logging.info('%d neighbour relations for %d buildings created (some buildings have several neighbours).',
                  neighbours, len(buildings))
 
 
-def analyse(buildings: List[Building], fg_elev: FGElev,
-            facade_mgr: tex.FacadeManager, roof_mgr: tex.RoofManager, stats: Stats) -> List[Building]:
-    """Analyse all buildings"""
+def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: utils.stg_io2.STGManager,
+            coords_transform: coordinates.Transformation,
+            facade_mgr: tex.FacadeManager, roof_mgr: tex.RoofManager, stats: utilities.Stats) -> List[Building]:
+    """Analyse all buildings and either link directly static models or specify Building objects.
+    The static models are directly added to stg_manager. The Building objects get properties set and will later
+    get transformed to dynamically created AC3D files containing a cluster of buildings.
+    Some OSM buildings are excluded from analysis, as they get processed in pylons.py.
+    """
     # run a neighbour analysis
     relate_neighbours(buildings)
 
@@ -1138,6 +1132,10 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
             if 'man_made' in b.tags and b.tags['man_made'] in ['chimney']:
                 logging.debug("Excluded chimney or with osm_id={}".format(b.osm_id))
                 continue
+            # handle places of worship
+            if parameters.BUILDING_USE_SHARED_WORSHIP:
+                if _analyse_worship_building(b, building_parent, stg_manager, fg_elev, coords_transform):
+                    continue
 
         # make sure we have a flat roof in parent:child situation. By using tag instead of direct b.roof_shape
         # property we make sure, that it is not overwritten in analysis later
@@ -1155,7 +1153,7 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
                 logging.warning("simplify or roll_inner_nodes failed (OSM ID %i, %s)", b.osm_id, reason)
                 continue
 
-        if not b.analyse_elev_and_water(fg_elev, stats):
+        if not b.analyse_elev_and_water(fg_elev):
             continue
 
         if b.is_external_model:
@@ -1213,7 +1211,7 @@ def analyse(buildings: List[Building], fg_elev: FGElev,
 
 
 def write(ac_file_name: str, buildings: List[Building], cluster_elev: float, cluster_offset: Vec2d,
-          roof_mgr: tex.RoofManager, stats: Stats) -> None:
+          roof_mgr: tex.RoofManager, stats: utilities.Stats) -> None:
     """Write buildings across LOD for given tile.
        While writing, accumulate some statistics (totals stored in global stats object, individually also in building).
        Offset accounts for cluster center
@@ -1228,7 +1226,7 @@ def write(ac_file_name: str, buildings: List[Building], cluster_elev: float, clu
     lod_objects.append(ac.new_object('LOD_detail', texture_name, default_mat_idx=ac3d.MAT_IDX_LIT))
 
     for ib, b in enumerate(buildings):
-        progress(ib, len(buildings))
+        utilities.progress(ib, len(buildings))
         ac_object = lod_objects[b.LOD]
 
         b.write_to_ac(ac_object, cluster_elev, cluster_offset, roof_mgr, stats)
@@ -1259,7 +1257,7 @@ def overlap_check_blocked_areas(buildings: List[Building], blocked_areas: List[s
 
 
 def overlap_check_convex_hull(buildings: List[Building], stg_entries: List[utils.stg_io2.STGEntry],
-                              stats: Stats) -> List[Building]:
+                              stats: utilities.Stats) -> List[Building]:
     """Checks for all buildings whether their polygon intersects with a static or shared object's convex hull."""
     cleared_buildings = list()
 
@@ -1284,3 +1282,223 @@ def overlap_check_convex_hull(buildings: List[Building], stg_entries: List[utils
         if not is_intersecting:
             cleared_buildings.append(building)
     return cleared_buildings
+
+
+def _analyse_worship_building(building: Building, building_parent: BuildingParent,
+                              stg_manager: utils.stg_io2.STGManager, fg_elev: utilities.FGElev,
+                              coords_transform: coordinates.Transformation) -> bool:
+    """Returns True and adds shared model if the building is a worship place and there is a shared model for it.
+    If the building has a parent, then it is not handled as it is assumed, that then there is a OSM 3D
+    representation, which might be more accurate than a generic shared model.
+    """
+    if building_parent:
+        return False
+    worship_building_type = WorshipBuilding.screen_worship_building_type(building.tags)
+    if worship_building_type:
+        if 'name' in building.tags:
+            name = building.tags['name']
+        else:
+            name = 'No Name'
+        # check dimensions and then whether we have an adequate building
+        hull = building.polygon.convex_hull
+        angle, length, width = utilities.minimum_circumference_rectangle_for_polygon(hull)
+        model = WorshipBuilding.find_matching_worship_building(worship_building_type, length, width)
+        if model:
+            if not model.length_largest:
+                angle += 90
+            if angle >= 360:
+                angle -= 360
+            x, y = utilities.fit_offsets_for_rectangle_with_hull(angle, hull, model.length, model.width,
+                                                                 model.length_offset, model.width_offset,
+                                                                 model.length_largest,
+                                                                 str(model), building.osm_id)
+            lon, lat = coords_transform.toGlobal((x, y))
+            model.lon = lon
+            model.lat = lat
+            model.angle = angle
+            model.elevation = fg_elev.probe_list_of_points(list(hull.exterior.coords)[:-1])
+            model.elevation -= model.height_offset
+            if model.elevation == -9999:
+                logging.debug('Worship building "%s" with osm_id %i is in water or unknown elevation',
+                              name, building.osm_id)
+                return False
+
+            logging.info('Found static model for worship building "%s" with osm_id %i: %s at angle %d',
+                          name, building.osm_id, model.file_name, angle)
+            model.make_stg_entry(stg_manager)
+            return True
+        logging.debug('No static model found for worship building "%s" with osm_id %i', name, building.osm_id)
+        return False
+
+
+@unique
+class ArchitectureStyle(IntEnum):
+    """http://wiki.openstreetmap.org/wiki/Key:building:architecture"""
+    romanesque = 1
+    gothic = 2
+    unknown = 99
+
+
+@unique
+class WorshipBuildingType(IntEnum):
+    """See http://wiki.openstreetmap.org/wiki/Key:building or
+    http://wiki.openstreetmap.org/wiki/Tag:building%3Dchurch
+
+    cathedral is not supported, because too close to church in shared models etc. Size of building should be enough.
+    """
+    church = 10
+    # not supportedOSM value = cathedral
+    chapel = 12
+    church_orthodox = 20  # not official tag - just to make it easier to distinguish from catholoic / protestant
+    mosque = 40
+    synagogue = 50
+    temple = 60
+    shrine = 70
+
+
+class WorshipBuilding(object):
+    """Buildings for worshipping.
+    The building=* should be applied in tagging according to the architectural style, often such religious buildings
+    are recognisable landmarks.
+    Whereas WorshipBuildingType describes the architectural category, Architecture style,
+    the actual style can be described with building:architecture=*.
+
+    For example, a catholic church can be tagged on the building outline with amenity=place_of_worship +
+    religion=christian + denomination=catholic + building=church.
+    """
+    def __init__(self, file_name: str, has_texture: bool, type_: WorshipBuildingType, style: ArchitectureStyle,
+                 number_towers: int, length: float, width: float, height: float,
+                 length_offset: float=0., width_offset: float=0., height_offset: float=0.) -> None:
+        self.file_name = file_name  # without path - see property shared_model
+        self.has_texture = has_texture
+        self.type_ = type_
+        self.style = style
+        self.number_towers = number_towers
+        self.length = length
+        self.width = width
+        self.height = height
+        self.length_offset = length_offset
+        self.width_offset = width_offset
+        self.height_offset = height_offset
+
+        # will be set later
+        self.lon = 0.
+        self.lat = 0.
+        self.elevation = 0.
+        self.angle = 0.
+
+    def __str__(self) -> str:
+        return self.shared_model
+
+    @property
+    def shared_model(self) -> str:
+        """The full path to the shared model"""
+        return '/Models/Misc/' + self.file_name
+
+    @property
+    def length_largest(self) -> bool:
+        """Return  True if the lengths is larger than the width. Length is along x-axis.
+        Happens to be False (i.e. width along y-axis is longer) if model in AC3D has been done so.
+        """
+        if self.length >= self.width:
+            return True
+        return False
+
+    @staticmethod
+    def deduct_worship_building_type(tags: Dict[str, str]) -> Optional['WorshipBuildingType']:
+        """Return a type if the building is a worship building, Otherwise return None."""
+        worship_building_type = None
+        if tags['building'] == 'cathedral':
+            tags['building'] = 'church'
+        try:
+            worship_building_type = WorshipBuildingType.__members__[tags['building']]
+        except KeyError:  # e.g. building=yes
+            if 'amenity' in tags and tags['amenity'] == 'place_of_worship':
+                if 'religion' in tags and tags['religion'] == 'christian':
+                    worship_building_type = WorshipBuildingType.church
+                    if 'denomination' in tags and tags['denomination'].find('orthodox') > 0:
+                        worship_building_type = WorshipBuildingType.church_orthodox
+        return worship_building_type
+
+    @staticmethod
+    def screen_worship_building_type(tags: Dict[str, str]) -> Optional['WorshipBuildingType']:
+        """Returns a type if the building is a worship building, for which there might be a shared model.
+
+        This method needs to be in sync with list available_worship_buildings"""
+        worship_building_type = WorshipBuilding.deduct_worship_building_type(tags)
+        if worship_building_type is not None:
+            # now make sure that we actually have a mapped building
+            for building in _available_worship_buildings:
+                if building.type_ is worship_building_type:
+                    return worship_building_type
+        return None
+
+    @staticmethod
+    def find_matching_worship_building(requested_type: WorshipBuildingType, max_length: float, max_width: float) \
+            -> Optional['WorshipBuilding']:
+        """Finds a worship building of a given type which satisfies the length/widt constraints.
+
+        Satisfying meaning that the one building is chosen, which has the largest circumference
+        measured by a rectangle with the building's length/with.
+        """
+        best_fit_building = None
+        best_fit_circumference = 0
+        for model in _available_worship_buildings:
+            if model.type_ is requested_type:
+                circumference = 2 * (model.length + model.width)
+                if (model.length_largest and model.length <= max_length and model.width <= max_width) or (
+                    model.length_largest is False and model.width <= max_length and model.length <= max_width):
+                    if circumference > best_fit_circumference:
+                        best_fit_building = model
+                        best_fit_circumference = circumference
+        return best_fit_building
+
+    def make_stg_entry(self, my_stg_mgr: utils.stg_io2.STGManager) -> None:
+        """Returns a stg entry for this pylon.
+        E.g. OBJECT_SHARED Models/Airport/ils.xml 5.313108 45.364122 374.49 268.92
+        """
+        angle_correction = 0
+        if self.length_largest:
+            angle_correction = 90
+        my_stg_mgr.add_object_shared(self.shared_model, Vec2d(self.lon, self.lat),
+                                     self.elevation, self.angle - angle_correction)
+
+
+_available_worship_buildings = [WorshipBuilding('big-church.ac', True, WorshipBuildingType.church,
+                                                ArchitectureStyle.romanesque, 1, 30., 26., 40., width_offset=5.5),
+                                WorshipBuilding('breton-church.ac', False, WorshipBuildingType.church,
+                                                ArchitectureStyle.unknown, 1, 50., 28., 43., length_offset=25.),
+                                WorshipBuilding('Church_generic_twintower_oniondome.ac', False,
+                                                WorshipBuildingType.church,
+                                                ArchitectureStyle.unknown, 2, 22., 37., 34., width_offset=12.5),
+                                WorshipBuilding('church36m_blue.ac', False, WorshipBuildingType.church,
+                                                ArchitectureStyle.unknown, 1, 10., 36.2, 34.5, width_offset=0.9),
+                                WorshipBuilding('church36m_blue2.ac', False, WorshipBuildingType.church,
+                                                ArchitectureStyle.unknown, 1, 10., 36.2, 34.5, width_offset=0.9),
+                                WorshipBuilding('church36m_green.ac', False, WorshipBuildingType.church,
+                                                ArchitectureStyle.unknown, 1, 10., 36.2, 34.5, width_offset=0.9),
+                                WorshipBuilding('church36m_red.ac', False, WorshipBuildingType.church,
+                                                ArchitectureStyle.unknown, 1, 10., 36.2, 34.5, width_offset=0.9),
+                                WorshipBuilding('GenChurch_rd.ac', False, WorshipBuildingType.church,
+                                                ArchitectureStyle.unknown, 1, 46., 110., 120.),
+                                WorshipBuilding('generic_cathedral.xml', True, WorshipBuildingType.church,
+                                                ArchitectureStyle.romanesque, 2, 67., 37., 51.),
+                                WorshipBuilding('generic_church_01.ac', True, WorshipBuildingType.church,
+                                                ArchitectureStyle.gothic, 1, 68., 124.4, 100., width_offset=11.2),
+                                WorshipBuilding('generic_church_02.ac', False, WorshipBuildingType.church,
+                                                ArchitectureStyle.unknown, 1, 32.4, 71.8, 63.5, width_offset=-1.5),
+                                WorshipBuilding('generic_church_03.ac', False, WorshipBuildingType.church,
+                                                ArchitectureStyle.unknown, 1, 38., 89.8, 95.),
+                                WorshipBuilding('gothical_church.xml', True, WorshipBuildingType.church,
+                                                ArchitectureStyle.gothic, 1, 44., 24.8, 46., length_offset=22.),
+                                WorshipBuilding('NDBoulogne.ac', True, WorshipBuildingType.church,
+                                                ArchitectureStyle.romanesque, 3, 42., 82., 81.5),
+                                WorshipBuilding('roman_church.xml', True, WorshipBuildingType.church,
+                                                ArchitectureStyle.romanesque, 1, 44., 24.8, 25., length_offset=22.),
+                                WorshipBuilding('StVaast.ac', True, WorshipBuildingType.church,
+                                                ArchitectureStyle.romanesque, 0, 58., 98., 36.)
+                                ]
+
+# WorshipBuilding(eglise.xml, True, church, gothic)  # not aligned to x-axis
+# WorshipBuilding(corp-cathedrale.xml, True, cathedral, gothic)  # is not complete: one wall missing
+# WorshipBuilding(gen_orthodox_church.ac, True, church_orthodox, unknown)  # not aligned to any axis
