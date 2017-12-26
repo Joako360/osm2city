@@ -92,7 +92,7 @@ OVERLAP_CHECK_CONSIDER_SHARED = True
 # when a static bridge model intersect with a way, how much must at least be left so the way is kept after intersection
 OVERLAP_CHECK_BRIDGE_MIN_REMAINING = 10
 
-# -- skip buildings based on their OSM name tag or OSM ID, in case there's already
+# -- Skip buildings based on their OSM name tag or OSM ID, e.g. in case there's already
 #    a static model for these, and the overlap check fails.
 #    Use unicode strings as in the first example if there are non-ASCII characters.
 #    E.g. SKIP_LIST = ["Theologische Fakultät", "Rhombergpassage", 55875208]

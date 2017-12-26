@@ -428,6 +428,16 @@ def _process_osm_building(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict
         if not clipping_border.contains(shg.Point(first_node.lon, first_node.lat)):
             continue
 
+        # checking in SKIP_LIST
+        if 'name' in way.tags:
+            name = way.tags['name']
+            if name in parameters.SKIP_LIST:
+                logging.debug('SKIPPING building with name tag=%s', name)
+                continue
+        if way.osm_id in parameters.SKIP_LIST:
+            logging.debug('SKIPPING building with osm_id=%i', way.osm_id)
+            continue
+
         my_building = _make_building_from_way(nodes_dict, way.tags, way, coords_transform, stats)
         if my_building is not None and my_building.polygon.is_valid:
             my_buildings[my_building.osm_id] = my_building
@@ -448,12 +458,6 @@ def _make_building_from_way(nodes_dict: Dict[int, osmparser.Node], all_tags: Dic
 
     # -- funny things might happen while parsing OSM
     try:
-        if 'name' in all_tags:
-            name = all_tags['name']
-            if name in parameters.SKIP_LIST:
-                logging.debug("SKIPPING " + name)
-                return None
-
         # -- make outer and inner rings from refs
         outer_ring = _refs_to_ring(coords_transform, way.refs, nodes_dict)
         inner_rings_list = []

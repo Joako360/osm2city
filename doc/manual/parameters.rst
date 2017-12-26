@@ -472,6 +472,15 @@ DB_USER_PASSWORD                                String     n/a       The passwor
 =============================================   ========   =======   ==============================================================================
 
 
+----------------------------------------------
+Skipping Specific Buildings and Roads/Railways
+----------------------------------------------
+
+There might be situations, when you need to skip certain buildings or roads/railways, because e.g. the overlap checking does not work or the OSM features simply do not fit with the FlightGear scenery. Often it should be checked, whether the OSM data really is correct (if not, then please directly update the source in OSM) or the FlightGear scenery data is not correct (if not, then please check, whether source data can be improved, such that future versions of the scenery are more in line with reality and thereby with OSM data).
+
+In order to temporarily exclude certain buildings or roads/railways, you can use parameter ``SKIP_LIST``. For buildings you can either specify the OSM id or (if available) the value of the ``name`` tag. For roads/railways only the OSM id can be used.
+
+E.g. ``SKIP_LIST = ['St. Leodegar im Hof (Hofkirche)', 87220999]``
 
 
 .. FIXME missing explanations for MAX_TRANSVERSE_GRADIENT = 0.1   #
