@@ -67,7 +67,6 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_l
     try:
         parameters.read_from_file(params_file_name)
         parameters.set_loglevel(log_level)
-        parameters.USE_DATABASE = True  # just to be sure
         # adapt boundary
         parameters.set_boundary(scenery_tile.boundary_west, scenery_tile.boundary_south,
                                 scenery_tile.boundary_east, scenery_tile.boundary_north)

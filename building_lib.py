@@ -42,7 +42,6 @@ import textures.texture as tex
 import utils.stg_io2
 from utils import ac3d, coordinates, utilities
 import utils.osmparser
-#from utils.utilities import progress, Stats, minimum_circumference_rectangle_for_polygon
 from utils.vec2d import Vec2d
 from utils.stg_io2 import STGVerbType
 

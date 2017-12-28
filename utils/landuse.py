@@ -133,23 +133,22 @@ def _process_osm_building_refs(my_coord_transformator: Transformation) -> List[s
     Only valid if database is used.
     """
     my_buildings = list()
-    if parameters.USE_DATABASE:
-        osm_way_result = osm.fetch_osm_db_data_ways_keys(['building'])
-        osm_nodes_dict = osm_way_result.nodes_dict
-        osm_ways_dict = osm_way_result.ways_dict
+    osm_way_result = osm.fetch_osm_db_data_ways_keys(['building'])
+    osm_nodes_dict = osm_way_result.nodes_dict
+    osm_ways_dict = osm_way_result.ways_dict
 
-        for way in list(osm_ways_dict.values()):
-            for key in way.tags:
-                if "building" == key:
-                    my_coordinates = list()
-                    for ref in way.refs:
-                        if ref in osm_nodes_dict:
-                            my_node = osm_nodes_dict[ref]
-                            my_coordinates.append(my_coord_transformator.toLocal((my_node.lon, my_node.lat)))
-                    if 2 < len(my_coordinates):
-                        my_polygon = shg.Polygon(my_coordinates)
-                        if my_polygon.is_valid and not my_polygon.is_empty:
-                            my_buildings.append(my_polygon.convex_hull)
+    for way in list(osm_ways_dict.values()):
+        for key in way.tags:
+            if "building" == key:
+                my_coordinates = list()
+                for ref in way.refs:
+                    if ref in osm_nodes_dict:
+                        my_node = osm_nodes_dict[ref]
+                        my_coordinates.append(my_coord_transformator.toLocal((my_node.lon, my_node.lat)))
+                if 2 < len(my_coordinates):
+                    my_polygon = shg.Polygon(my_coordinates)
+                    if my_polygon.is_valid and not my_polygon.is_empty:
+                        my_buildings.append(my_polygon.convex_hull)
     return my_buildings
 
 
