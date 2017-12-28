@@ -18,6 +18,7 @@ import re
 import sys
 import traceback
 import types
+from typing import Optional
 
 import textures.road
 from utils import vec2d as v
@@ -31,8 +32,6 @@ import utils.utilities as utils
 # =============================================================================
 # PARAMETERS FOR ALL osm2city MODULES
 # =============================================================================
-LOGLEVEL = "INFO"
-
 # -- Scenery folder, typically a geographic name or the ICAO code of the airport
 PREFIX = "LSZR"
 
@@ -318,7 +317,7 @@ def show():
     """
     Prints all parameters as key = value if log level is INFO or lower
     """
-    if log_level_info_or_lower():
+    if utils.log_level_info_or_lower():
         print('--- Using the following parameters: ---')
         my_globals = globals()
         for k in sorted(my_globals.keys()):
@@ -405,34 +404,6 @@ def set_boundary(boundary_west: float, boundary_south: float,
     BOUNDARY_EAST = boundary_east
     global BOUNDARY_NORTH
     BOUNDARY_NORTH = boundary_north
-
-
-def set_loglevel(args_loglevel=None) -> None:
-    """Set loglevel from parameters or command line."""
-    global LOGLEVEL
-    if args_loglevel is not None:
-        LOGLEVEL = args_loglevel
-    LOGLEVEL = LOGLEVEL.upper()
-    # -- add another log level VERBOSE. Use this when logging stuff in loops, e.g. per-OSM-object,
-    #    potentially flooding the screen
-    logging.VERBOSE = 5
-    logging.addLevelName(logging.VERBOSE, "VERBOSE")
-    logging.Logger.verbose = lambda inst, msg, *args, **kwargs: inst.log(logging.VERBOSE, msg, *args, **kwargs)
-    logging.verbose = lambda msg, *args, **kwargs: logging.log(logging.VERBOSE, msg, *args, **kwargs)
-
-    numeric_level = getattr(logging, LOGLEVEL, None)
-    if not isinstance(numeric_level, int):
-        raise ValueError('Invalid log level: %s' % LOGLEVEL)
-    logging.basicConfig(level=numeric_level)
-    logging.getLogger().setLevel(LOGLEVEL)
-
-
-def log_level_info_or_lower():
-    return logging.getLogger().level <= logging.INFO
-
-
-def log_level_debug_or_lower():
-    return logging.getLogger().level <= logging.DEBUG
 
 
 if __name__ == "__main__":

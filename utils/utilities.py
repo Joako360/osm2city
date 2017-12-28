@@ -3,6 +3,7 @@ Diverse utility methods used throughout osm2city and not having a clear other ho
 """
 
 from collections import defaultdict
+import datetime
 import enum
 import logging
 import math
@@ -94,11 +95,25 @@ def is_linux_or_mac() -> bool:
     return False
 
 
+def date_time_now() -> str:
+    """Date and time as of now formatted as a string incl. seconds."""
+    today = datetime.datetime.now()
+    return today.strftime("%Y-%m-%d_%H%M%S")
+
+
 def replace_with_os_separator(path: str) -> str:
     """Switches forward and backward slash depending on os."""
     my_string = path.replace("/", os.sep)
     my_string = my_string.replace("\\", os.sep)
     return my_string
+
+
+def log_level_info_or_lower():
+    return logging.getLogger().level <= logging.INFO
+
+
+def log_level_debug_or_lower():
+    return logging.getLogger().level <= logging.DEBUG
 
 
 def match_local_coords_with_global_nodes(local_list: List[Tuple[float, float]], ref_list: List[int],
@@ -196,16 +211,13 @@ class Stats(object):
         self.textures_total[str(texture.filename)] += 1
 
     def print_summary(self):
-        if not parameters.log_level_info_or_lower():
-            return
-        out = sys.stdout
         total_written = self.LOD.sum()
         lodzero = 0
         lodone = 0
         if total_written > 0:
             lodzero = 100.*self.LOD[0] / total_written
             lodone = 100.*self.LOD[1] / total_written
-        out.write(textwrap.dedent("""
+        logging.info(textwrap.dedent("""
             total buildings %i
             parse errors    %i
             written         %i
@@ -220,28 +232,28 @@ class Stats(object):
         roof_line = "        roof-types"
         for roof_shape in self.roof_shapes:
             roof_line += """\n          %s\t%i""" % (roof_shape, self.roof_shapes[roof_shape])
-        out.write(textwrap.dedent(roof_line))
+        logging.info(textwrap.dedent(roof_line))
 
         textures_used = {k: v for k, v in self.textures_total.items() if v > 0}
-        textures_notused = {k: v for k, v in self.textures_total.items() if v == 0}
+        textures_not_used = {k: v for k, v in self.textures_total.items() if v == 0}
         try:
             textures_used_percent = len(textures_used) * 100. / len(self.textures_total)
         except:
             textures_used_percent = 99.9
 
-        out.write(textwrap.dedent("""
-            used tex        %i out of %i (%2.0f %%)""" % (len(textures_used), len(self.textures_total), textures_used_percent)))
-        out.write(textwrap.dedent("""
+        logging.info(textwrap.dedent("""
+            used tex        %i out of %i (%2.0f %%)""" % (len(textures_used), len(self.textures_total),    textures_used_percent)))
+        logging.info(textwrap.dedent("""
             Used Textures : """))
         for item in sorted(list(textures_used.items()), key=lambda item: item[1], reverse=True):
-            out.write(textwrap.dedent("""
+            logging.info(textwrap.dedent("""
                  %i %s""" % (item[1], item[0])))
-        out.write(textwrap.dedent("""
+        logging.info(textwrap.dedent("""
             Unused Textures : """))
-        for item in sorted(list(textures_notused.items()), key=lambda item: item[1], reverse=True):
-            out.write(textwrap.dedent("""
+        for item in sorted(list(textures_not_used.items()), key=lambda item: item[1], reverse=True):
+            logging.info(textwrap.dedent("""
                  %i %s""" % (item[1], item[0])))
-        out.write(textwrap.dedent("""
+        logging.info(textwrap.dedent("""
               complex       %i
               roof_errors   %i
             ground nodes    %i
@@ -256,23 +268,21 @@ class Stats(object):
                    self.vertices, self.surfaces,
                    self.LOD[0], lodzero,
                    self.LOD[1], lodone)))
-        out.write("\narea >=\n")
+        logging.info("area >=")
         max_area_above = max(1, self.area_above.max())
         for i in range(len(self.area_levels)):
-            out.write(" %5g m^2  %5i |%s\n" % (self.area_levels[i], self.area_above[i],
-                      "#" * int(56. * self.area_above[i] / max_area_above)))
+            logging.info(" %5g m^2  %5i |%s" % (self.area_levels[i], self.area_above[i],
+                         "#" * int(56. * self.area_above[i] / max_area_above)))
 
-        if logging.getLogger().level <= logging.VERBOSE:  # @UndefinedVariable
-            for name in sorted(self.textures_used):
-                out.write("%s\n" % name)
+        if log_level_debug_or_lower():
+            for name in sorted(textures_used):
+                logging.info("%s" % name)
 
-        out.write("\nnumber of corners >=\n")
+        logging.info("number of corners >=")
         max_corners = max(1, self.corners.max())
         for i in range(3, len(self.corners)):
-            out.write("     %2i %6i |%s\n" % (i, self.corners[i],
-                      "#" * int(56. * self.corners[i] / max_corners)))
-        out.write(" complex %5i |%s\n" % (self.corners[0],
-                  "#" * int(56. * self.corners[0] / max_corners)))
+            logging.info("     %2i %6i |%s" % (i, self.corners[i], "#" * int(56. * self.corners[i] / max_corners)))
+        logging.info(" complex %5i |%s" % (self.corners[0], "#" * int(56. * self.corners[0] / max_corners)))
 
 
 class Troubleshoot:
@@ -463,7 +473,7 @@ class FGElev(object):
 
 def progress(i, max_i):
     """progress indicator"""
-    if sys.stdout.isatty() and parameters.log_level_info_or_lower():
+    if sys.stdout.isatty() and log_level_info_or_lower():
         try:
             if i % (max_i / 100) > 0:
                 return

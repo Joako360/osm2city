@@ -13,6 +13,7 @@ import numpy as np
 
 import parameters
 import pySkeleton.polygon as polygon
+import utils.utilities
 from utils import utilities
 from utils.vec2d import Vec2d
 
@@ -48,7 +49,7 @@ def myskel(out, b, stats: utilities.Stats, offset_xy=Vec2d(0, 0), offset_z=0., h
         logging.debug("ERROR: while creating 3d roof (OSM_ID %s, %s)" % (b.osm_id, reason))
         stats.roof_errors += 1
         gp = parameters.get_repl_prefix() + '_roof-error-%04i' % stats.roof_errors
-        if parameters.log_level_debug_or_lower():
+        if utils.utilities.log_level_debug_or_lower():
             _write_one_gp(b.pts_outer, b.osm_id, gp)
         return False
 

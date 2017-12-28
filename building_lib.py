@@ -1040,7 +1040,7 @@ def _calculate_vertical_texture_coords(body_height: float, t: tex.Texture) -> Tu
         # - error acceptable?
         if t.v_cuts_meters[0] <= body_height <= t.v_size_meters:
             if t.v_align_bottom or parameters.BUILDING_FAKE_AMBIENT_OCCLUSION:
-                logging.verbose("from bottom")
+                logging.debug("from bottom")
                 for i in range(len(t.v_cuts_meters)):
                     if t.v_cuts_meters[i] >= body_height:
                         tex_coord_bottom = 0

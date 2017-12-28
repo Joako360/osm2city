@@ -1,7 +1,7 @@
 import argparse
-import datetime
 from enum import IntEnum, unique
 import logging
+import logging.config
 import multiprocessing as mp
 import os
 import parameters
@@ -21,7 +21,7 @@ import utils.aptdat_io as aptdat_io
 import utils.calc_tile as calc_tile
 import utils.coordinates as coordinates
 import utils.stg_io2
-from utils.utilities import BoundaryError, FGElev, parse_boundary
+from utils.utilities import BoundaryError, FGElev, date_time_now, parse_boundary
 
 
 class SceneryTile(object):
@@ -61,12 +61,54 @@ def _parse_exec_for_procedure(exec_argument: str) -> Procedures:
     return Procedures.__members__[exec_argument.lower()]
 
 
-def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_level: str,
+def configure_logging(log_level: str, log_to_file: bool) -> None:
+    """Set the logging level and maybe write to file.
+
+    See also accepted answer to https://stackoverflow.com/questions/29015958/how-can-i-prevent-the-inheritance-of-python-loggers-and-handlers-during-multipro?noredirect=1&lq=1.
+    And: https://docs.python.org/3.5/howto/logging-cookbook.html#logging-to-a-single-file-from-multiple-processes
+    """
+    logging_config = {
+        'formatters': {
+            'f': {
+                'format': '%(processName)-10s %(name)s'
+                          ' %(levelname)-8s %(message)s',
+            },
+        },
+        'version': 1,
+    }
+    handlers_dict = {
+        'console': {
+            'level': log_level,
+            'formatter': 'f',
+            'class': 'logging.StreamHandler',
+        }
+    }
+    logging_config['handlers'] = handlers_dict
+    handlers_array = ['console']
+    if log_to_file:
+        file_handle_dict = {'level': log_level, 'formatter': 'f', 'class': 'logging.FileHandler'}
+        process_name = mp.current_process().name
+        if process_name == 'MainProcess':
+            file_handle_dict['filename'] = 'osm2city_main_{}.log'.format(date_time_now())
+        else:
+            file_handle_dict['filename'] = 'osm2city_process_{}_{}.log'.format(process_name, date_time_now())
+        handlers_dict['file'] = file_handle_dict
+        handlers_array.append('file')
+
+    logging_config['loggers'] = {'': {'handlers': handlers_array, 'level': log_level, 'propagate': True}}
+
+    logging.config.dictConfig(logging_config)
+
+
+def pool_initializer(log_level: str, log_to_file: bool):
+    configure_logging(log_level, log_to_file)
+
+
+def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
                          exec_argument: Procedures, my_airports: List[aptdat_io.Airport],
                          file_lock: mp.Lock) -> None:
     try:
         parameters.read_from_file(params_file_name)
-        parameters.set_loglevel(log_level)
         # adapt boundary
         parameters.set_boundary(scenery_tile.boundary_west, scenery_tile.boundary_south,
                                 scenery_tile.boundary_east, scenery_tile.boundary_north)
@@ -112,11 +154,9 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_l
             scenery_tile.boundary_east, scenery_tile.boundary_north)
         logging.exception(msg)
 
-        time_now = datetime.datetime.now().strftime('%Y%m%d_%H:%M:%S - ')
-
         with open("osm2city-exceptions.log", "a") as f:
             # print info
-            f.write(msg + ' at ' + time_now + os.linesep)
+            f.write(msg + ' at ' + date_time_now() + ' -  ' + os.linesep)
             # print exception
             exc_type, exc_value, exc_traceback = sys.exc_info()
             f.write(''.join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
@@ -125,7 +165,6 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str, log_l
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser(description="build-tiles DB generates a whole scenery of osm2city objects \
     based on a lon/lat defined area")
     parser.add_argument("-f", "--file", dest="filename",
@@ -136,19 +175,29 @@ if __name__ == '__main__':
     parser.add_argument("-p", "--processes", dest="processes", type=int,
                         help="number of parallel processes (should not be more than number of cores/CPUs)",
                         required=True)
+    parser.add_argument('-m', '--maxtasksperchild', dest='max_tasks', type=int,
+                        help='the number of tasks a worker process completes before it will exit (default: unlimited)',
+                        required=False)
     parser.add_argument("-e", "--execute", dest="exec",
                         help="execute only the given procedure[s] (buildings, pylons, roads, details, main)",
                         required=False)
-    parser.add_argument("-l", "--loglevel", dest="loglevel",
-                        help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL",
+    parser.add_argument("-l", "--loglevel", dest="logging_level",
+                        help="set loggging level. Valid levels are DEBUG, INFO (default), WARNING, ERROR, CRITICAL",
                         required=False)
+    parser.add_argument('-o', '--logtofile', dest='log_to_file', action='store_true',
+                        help='write the logging output to files in addition to stderr')
 
     args = parser.parse_args()
+
+    # configure logging
+    my_log_level = 'INFO'
+    if args.logging_level:
+        my_log_level = args.logging_level.upper()
+    configure_logging(my_log_level, args.log_to_file)
 
     parameters.read_from_file(args.filename)
     if parameters.FLAG_2017_2:
         logging.info('Processing for 2017.2 version')
-    parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
 
     exec_procedure = Procedures.all
     if args.exec:
@@ -217,10 +266,15 @@ if __name__ == '__main__':
 
     start_time = time.time()
     mp.set_start_method('spawn')  # use safe approach to make sure e.g. parameters module is initialized separately
-    pool = mp.Pool(processes=args.processes, maxtasksperchild=1)
+    # max tasks per child: see https://docs.python.org/3.5/library/multiprocessing.html#module-multiprocessing.pool
+    max_tasks_per_child = None  # the default, meaning a worker processes will live as long as the pool
+    if args.max_tasks:
+        max_tasks_per_child = args.max_tasks
+    pool = mp.Pool(processes=args.processes, maxtasksperchild=max_tasks_per_child,
+                   initializer=pool_initializer, initargs=(my_log_level, args.log_to_file))
     the_file_lock = mp.Manager().Lock()
     for my_scenery_tile in scenery_tiles_list:
-        pool.apply_async(process_scenery_tile, (my_scenery_tile, args.filename, args.loglevel,
+        pool.apply_async(process_scenery_tile, (my_scenery_tile, args.filename,
                                                 exec_procedure, airports, the_file_lock))
     pool.close()
     pool.join()

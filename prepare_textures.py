@@ -330,16 +330,20 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="texture manager either reads existing texture atlas or creates new")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
-    parser.add_argument("-l", "--loglevel",
-                        help="set loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL",
+    parser.add_argument("-l", "--loglevel", dest='loglevel',
+                        help="set logging level. Valid levels are DEBUG, INFO (default), WARNING, ERROR, CRITICAL",
                         required=False)
     parser.add_argument("-u", "--update", dest="update", action="store_true",
                         help="update texture atlas instead of creating new", required=False)
     args = parser.parse_args()
 
+    log_level = 'INFO'
+    if args.loglevel:
+        log_level = args.loglevel
+    logging.getLogger().setLevel(log_level)
+
     if args.filename is not None:
         parameters.read_from_file(args.filename)
-    parameters.set_loglevel(args.loglevel)  # -- must go after reading params file
     parameters.show()
 
     init_mode = InitMode.create

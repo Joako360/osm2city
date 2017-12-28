@@ -382,7 +382,7 @@ class RoofManager(object):
                     can_material = False
                     if req_material is not None:
                         for prov_material in prov_materials:
-                            logging.verbose("Provides ", prov_material, " Requires ", requires)
+                            logging.debug("Provides ", prov_material, " Requires ", requires)
                             if prov_material in requires:
                                 can_material = True
                                 break
@@ -404,8 +404,8 @@ class RoofManager(object):
                 if can_use:
                     candidates.append(candidate)
             else:
-                logging.verbose("  unmet requires %s req %s prov %s",
-                                str(candidate.filename), str(requires), str(candidate.provides))
+                logging.debug("  unmet requires %s req %s prov %s",
+                              str(candidate.filename), str(requires), str(candidate.provides))
         return candidates
 
     def __str__(self):
@@ -423,8 +423,8 @@ class FacadeManager(RoofManager):
     def find_matching_facade(self, requires: List[str], tags: Dict[str, str], height: float, width: float,
                              stats: Stats=None) -> Optional[Texture]:
         exclusions = []
-        #if 'roof:colour' in tags: FIXME why would we need this at all?
-            #exclusions.append("%s:%s" % ('roof:colour', tags['roof:colour']))
+        # if 'roof:colour' in tags: FIXME why would we need this at all?
+        # exclusions.append("%s:%s" % ('roof:colour', tags['roof:colour']))
         candidates = self.find_facade_candidates(requires, exclusions, height, width)
         if not candidates:
             # Break down requirements to something that matches
@@ -436,7 +436,8 @@ class FacadeManager(RoofManager):
                 # Now we're really desperate - just find something!
                 candidates = self.find_facade_candidates(['compat:roof-flat'], exclusions, height, width)
             if not candidates:
-                logging.debug("WARNING: no matching facade texture for %1.f m x %1.1f m <%s>", height, width, str(requires))
+                logging.debug("WARNING: no matching facade texture for %1.f m x %1.1f m <%s>",
+                              height, width, str(requires))
                 return None
         ranked_list = _rank_candidates(candidates, tags)
         the_texture = ranked_list[random.randint(0, len(ranked_list) - 1)]
@@ -451,12 +452,12 @@ class FacadeManager(RoofManager):
         new_candidates = []
         for t in candidates:
             if height < t.height_min or height > t.height_max:
-                logging.verbose("height %.2f (%.2f-%.2f) outside bounds : %s",
-                                height, t.height_min, t.height_max, str(t.filename))
+                logging.debug("height %.2f (%.2f-%.2f) outside bounds : %s",
+                              height, t.height_min, t.height_max, str(t.filename))
                 continue
             if width < t.width_min or width > t.width_max:
-                logging.verbose("width %.2f (%.2f-%.2f) outside bounds : %s",
-                                width, t.width_min, t.width_max, str(t.filename))
+                logging.debug("width %.2f (%.2f-%.2f) outside bounds : %s",
+                              width, t.width_min, t.width_max, str(t.filename))
                 continue
 
             new_candidates.append(t)

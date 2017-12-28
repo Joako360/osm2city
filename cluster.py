@@ -117,7 +117,7 @@ class ClusterContainer(object):
         return the_cluster
 
     def write_statistics_for_buildings(self, clusters_name: str) -> None:
-        if parameters.log_level_debug_or_lower() and parameters.WRITE_CLUSTER_STATS:
+        if utils.utilities.log_level_debug_or_lower() and parameters.WRITE_CLUSTER_STATS:
             my_file = open(os.path.join(parameters.PREFIX, clusters_name + ".dat"), "w")
             for j in range(self.max_grid.iy):
                 for i in range(self.max_grid.ix):

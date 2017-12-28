@@ -58,15 +58,21 @@ Calling the batch process is then pretty easy in just one step:
 
 Mandatory command line arguments:
 
-* ``-b``: the boundary as an underscore delimited string WEST_SOUTH_EAST_NORTH like 9.1_47.0_11_48.8 (use '.' as decimal separator). If the Western longitude is negative (e.g. in Americas), then use an asterisk character (``*``) in front (e.g. ``-b *-71.25_42.25_-70.75_42.5`` for the Boston Logan airport KBOS).
-* ``-f``: the relative path to the main params.ini file. Remember that the paths are relative to the ``WORKING_DIRECTORY``.
-* ``-p``: number of parallel processes (should not be more than the number of cores/CPUs) and might be constrained by memory
+* ``-b BOUNDARY``: the boundary as an underscore delimited string WEST_SOUTH_EAST_NORTH like 9.1_47.0_11_48.8 (use '.' as decimal separator). If the Western longitude is negative (e.g. in Americas), then use an asterisk character (``*``) in front (e.g. ``-b *-71.25_42.25_-70.75_42.5`` for the Boston Logan airport KBOS).
+* ``-f FILE_PATH``: the relative path to the main params.ini file. Remember that the paths are relative to the ``WORKING_DIRECTORY``.
+* ``-p NUMBER``: number of parallel processes (should not be more than the number of cores/CPUs) and might be constrained by memory
 
 Optional arguments:
 
 * ``-h``, ``--help``: show a help message and exit
-* ``-l`` LOGLEVEL, ``--loglevel`` LOGLEVEL: sets the  loglevel. Valid levels are VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL
-* ``-e`` PROCEDURE, ``--execute`` PROCEDURE: execute only the given procedure[s]. Otherwise everything is generated (subject to refinement by :ref:`parameters<chapter-parameters-pylons_details>`, not arguments):
+* ``-m NUMBER``: the maximum of child tasks a worker process completes before it will exit. Unless you know what you are doing and have problems with constantly increasing use of resources, then do not specify a value here (otherwise start with assigning the most conservative value of 1). The default is unlimited.
+* ``-l LOGLEVEL``, ``--loglevel LOGLEVEL``: sets the logging level. Valid levels are DEBUG, INFO, WARNING, ERROR, CRITICAL
+* ``-o``, ``--logtofile``: writes the logging information into files in the working directory. There will be a set of log files:
+
+  + ``osm2city-exceptions.log``: is always existing and appended to whenever a tile cannot be processed due to an exception. You should consider deleting the file whenever you are done processing and satisfied with the result. But have first a look at it to make sure that all tiles actually got processed (tile index number and processing time get stored if something is wrong along with the exception)
+  + ``osm2city_main_YYYY-MM-DD_hhmmss.log`` (e.g. osm2city_main_2017-12-28_222432.log): the main process splitting the area up into tiles and assigning to sub-processes. Gives an idea about the overall processing on a per tile level.
+  + ``osm2city_process_SpawnPoolWorker-#_YYYY-MM-DD_hhmmss.log`` (e.g. osm2city_process_SpawnPoolWorker-2_2017-12-28_222442.log): the detailed processing log. Unless you have specified argument ``-m`` then there will be as many files as there are processes as per argument ``-p NUMBER``.
+* ``-e PROCEDURE``, ``--execute PROCEDURE``: execute only the given procedure[s]. Otherwise everything is generated i.e. ``main`` and ``details``  (subject to refinement by :ref:`parameters<chapter-parameters-pylons_details>`, not arguments):
 
   + ``buildings``: generates buildings
   + ``roads``: generates different types of roads and railway lines
