@@ -492,27 +492,6 @@ def _refs_to_ring(coords_transform: coordinates.Transformation, refs,
     return ring
 
 
-def _write_xml(path: str, file_name: str) -> None:
-    """Light map animation"""
-    xml = open(os.path.join(path, file_name + ".xml"), "w")
-    xml.write("""<?xml version="1.0"?>\n<PropertyList>\n""")
-    xml.write("<path>%s.ac</path>" % file_name)
-
-    if parameters.LIGHTMAP_ENABLE:
-        xml.write(textwrap.dedent("""
-        <effect>
-          <inherits-from>cityLM</inherits-from>
-          """))
-        xml.write("  <object-name>LOD_detail</object-name>\n")
-        xml.write("  <object-name>LOD_rough</object-name>\n")
-        xml.write("</effect>\n")
-
-    xml.write(textwrap.dedent("""
-    </PropertyList>
-    """))
-    xml.close()
-
-
 def _write_obstruction_lights(path: str, file_name: str,
                               the_buildings: List[building_lib.Building], cluster_offset: v.Vec2d) -> bool:
     """Add obstruction lights on top of high buildings. Return true if at least one obstruction light is added."""
@@ -665,11 +644,7 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
                                                                                          cl.grid_index.iy)
             logging.info("writing cluster %s with %d buildings" % (file_name, len(cl.objects)))
 
-            file_name_in_stg = file_name + '.xml'
-            if parameters.FLAG_2017_2:
-                file_name_in_stg = file_name + '.ac'
-
-            path_to_stg = stg_manager.add_object_static(file_name_in_stg, center_global, cluster_elev, 0,
+            path_to_stg = stg_manager.add_object_static(file_name + '.ac', center_global, cluster_elev, 0,
                                                         my_clusters.stg_verb_type)
 
             stg_manager.add_object_static('lightmap-switch.xml', center_global, cluster_elev, 0, once=True)
@@ -677,8 +652,6 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
             # -- write .ac and .xml
             building_lib.write(os.path.join(path_to_stg, file_name + ".ac"), cl.objects,
                                cluster_elev, cluster_offset, prepare_textures.roofs, stats)
-            if not parameters.FLAG_2017_2:
-                _write_xml(path_to_stg, file_name)
             if parameters.OBSTRUCTION_LIGHT_MIN_LEVELS > 0:
                 obstr_file_name = file_name + '_obstrlights.xml'
                 has_models = _write_obstruction_lights(path_to_stg, obstr_file_name, cl.objects, cluster_offset)

@@ -12,7 +12,6 @@ from typing import List
 import unittest
 
 import buildings
-import copy_data_stuff
 import piers
 import platforms
 import pylons
@@ -196,8 +195,8 @@ if __name__ == '__main__':
     configure_logging(my_log_level, args.log_to_file)
 
     parameters.read_from_file(args.filename)
-    if parameters.FLAG_2017_2:
-        logging.info('Processing for 2017.2 version')
+    if parameters.FLAG_2018:
+        logging.info('Processing for 2018 version')
 
     exec_procedure = Procedures.all
     if args.exec:
@@ -278,18 +277,6 @@ if __name__ == '__main__':
                                                 exec_procedure, airports, the_file_lock))
     pool.close()
     pool.join()
-
-    # At the very end copy static data stuff in one process
-    if exec_procedure in [Procedures.all, Procedures.main]:
-        copy_data_stuff.process(utils.stg_io2.SceneryType.buildings)
-        copy_data_stuff.process(utils.stg_io2.SceneryType.roads)
-        copy_data_stuff.process(utils.stg_io2.SceneryType.pylons)
-    elif exec_procedure is Procedures.pylons:
-        copy_data_stuff.process(utils.stg_io2.SceneryType.pylons)
-    elif exec_procedure is Procedures.roads:
-        copy_data_stuff.process(utils.stg_io2.SceneryType.roads)
-    elif exec_procedure is Procedures.buildings:
-        copy_data_stuff.process(utils.stg_io2.SceneryType.buildings)
 
     logging.info("Total time used {}".format(time.time() - start_time))
 

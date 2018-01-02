@@ -1255,58 +1255,28 @@ def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, s
         #    First create ac object. Write cluster's objects. Register stg object.
         #    Write ac to file.
         ac = ac3d.File(stats=stats, show_labels=True)
-        texture_string = 'tex/roads.png'
-        if parameters.FLAG_2017_2:
-            texture_string = 'Textures/osm2city/roads.png'
-        ac3d_obj = ac.new_object(file_name, texture_string, default_swap_uv=True, default_mat_idx=ac3d.MAT_IDX_UNLIT)
+        ac3d_obj = ac.new_object(file_name, 'Textures/osm2city/roads.png',
+                                 default_swap_uv=True, default_mat_idx=ac3d.MAT_IDX_UNLIT)
         for rd in cl.objects:
             rd.write_to(ac3d_obj, fg_elev, cluster_elev, offset=offset_local)
 
-        suffix = ".xml"
-        if is_railway or parameters.FLAG_2017_2:
-            suffix = ".ac"
-        stg_verb_type = stg_io2.STGVerbType.object_building_mesh_detailed
-        if parameters.FLAG_2017_2:
-            if is_railway:
-                stg_verb_type = stg_io2.STGVerbType.object_railway_detailed
-            else:
-                stg_verb_type = stg_io2.STGVerbType.object_road_detailed
+        if is_railway:
+            stg_verb_type = stg_io2.STGVerbType.object_railway_detailed
+        else:
+            stg_verb_type = stg_io2.STGVerbType.object_road_detailed
         if is_rough_LOD:
-            stg_verb_type = stg_io2.STGVerbType.object_building_mesh_rough
-            if parameters.FLAG_2017_2:
-                if is_railway:
-                    stg_verb_type = stg_io2.STGVerbType.object_railway_rough
-                else:
-                    stg_verb_type = stg_io2.STGVerbType.object_road_rough
-        path_to_stg = stg_manager.add_object_static(file_name + suffix, center_global, cluster_elev, 0,
+            if is_railway:
+                stg_verb_type = stg_io2.STGVerbType.object_railway_rough
+            else:
+                stg_verb_type = stg_io2.STGVerbType.object_road_rough
+        path_to_stg = stg_manager.add_object_static(file_name + '.ac', center_global, cluster_elev, 0,
                                                     stg_verb_type)
         stg_paths.add(path_to_stg)
         ac.write(os.path.join(path_to_stg, file_name + '.ac'))
 
-        if not is_railway:
-            if not parameters.FLAG_2017_2:
-                _write_xml(path_to_stg, file_name, file_name)
-
         for the_way in cl.objects:
             the_way.junction0.reset()
             the_way.junction1.reset()
-
-
-def _write_xml(path_to_stg, file_name, object_name):
-    xml = open(os.path.join(path_to_stg, file_name + '.xml'), "w")
-    if parameters.TRAFFIC_SHADER_ENABLE and (parameters.FLAG_2017_2 is False):
-        shader_str = "Effects/road-high"
-    else:
-        shader_str = "roads"
-    xml.write(textwrap.dedent("""        <?xml version="1.0"?>
-        <PropertyList>
-        <path>%s.ac</path>
-        <effect>
-                <inherits-from>%s</inherits-from>
-                <object-name>%s</object-name>
-        </effect>
-        </PropertyList>
-    """ % (file_name, shader_str, object_name)))
 
 
 def process_roads(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,

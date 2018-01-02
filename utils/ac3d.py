@@ -279,10 +279,7 @@ class File(object):
         if self.materials_list:
             s += "".join(['MATERIAL %s\n' % the_mat for the_mat in self.materials_list])
         else:
-            rgb_unlit = '1 1 1'
-            if parameters.FLAG_2017_2:
-                rgb_unlit = '0 0 0'
-            s += 'MATERIAL "unlit" rgb ' + rgb_unlit + ' amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0\n'
+            s += 'MATERIAL "unlit" rgb 0 0 0 amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0\n'
             s += 'MATERIAL "lit" rgb 1 1 1 amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0\n'
         non_empty = [o for o in self.objects if not o.is_empty()]
         # FIXME: this doesn't handle nested kids properly

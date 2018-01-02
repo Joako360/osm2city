@@ -96,8 +96,8 @@ Important Flags
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
-FLAG_2017_2                                     Boolean    True      If True then the textures and effects for osm2city built into FlightGear will
-                                                                     be used. Otherwise each scenery sub-folder will have a folder with textures.
+FLAG_2018                                       Boolean    True      If True then then texture catalog and shader integration is for minimal
+                                                                     version of FlightGear 2018.1.
 
 BUILDING_USE_SHARED_WORSHIP                     Boolean    False     Use a shared model for worship buildings instead of OSM floor plan and
                                                                      heuristics. The shared models will try to respect the type of building (e.g.

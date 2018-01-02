@@ -1217,9 +1217,7 @@ def write(ac_file_name: str, buildings: List[Building], cluster_elev: float, clu
        All LOD in one file. Plus roofs. One ac3d.Object per LOD
     """
     ac = ac3d.File(stats=stats)
-    texture_name = tm.atlas_file_name + '.png'
-    if parameters.FLAG_2017_2:
-        texture_name = 'Textures/osm2city/atlas_facades.png'
+    texture_name = 'Textures/osm2city/atlas_facades.png'
     lod_objects = list()  # a list of meshes, where each LOD has one mesh
     lod_objects.append(ac.new_object('LOD_rough', texture_name, default_mat_idx=ac3d.MAT_IDX_LIT))
     lod_objects.append(ac.new_object('LOD_detail', texture_name, default_mat_idx=ac3d.MAT_IDX_LIT))

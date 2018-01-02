@@ -76,7 +76,7 @@ USE_EXTERNAL_MODELS = False
 
 WRITE_CLUSTER_STATS = False
 
-FLAG_2017_2 = True  # Feature flag for 2017.2 version of FG
+FLAG_2018 = False  # Feature flag for 2018.1 or greater version of FG
 
 # =============================================================================
 # PARAMETERS RELATED TO BUILDINGS IN osm2city
@@ -158,7 +158,6 @@ LOD_ALWAYS_DETAIL_BELOW_LEVELS = 3  # -- below this number of levels, buildings 
 LOD_PERCENTAGE_DETAIL = 0.5         # -- of the remaining buildings, this percentage will be LOD detail,
                                     #    the rest will be LOD rough.
 
-LIGHTMAP_ENABLE = True                 # -- include lightmap in xml
 OBSTRUCTION_LIGHT_MIN_LEVELS = 15   # -- put obstruction lights on buildings with >= given levels. 0 for no lights.
 
 CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if too few objects
