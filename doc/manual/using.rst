@@ -88,7 +88,7 @@ In the same dialog press the ``Shader Options`` button and set the slider for ``
 ========================
 Showing Detailed Objects
 ========================
-Some of the generated sceneries might contain a sub-folder ``Details`` apart from e.g. ``Buildings``. If you want to show more scenery details (and accept that this might drain some system resources), then rename the folder to ``Objects``.
+Some of the generated sceneries might contain a sub-folder ``Details`` apart from e.g. ``Buildings``. If you want to show more scenery details like railway overhead lines, smaller electrical pylons and cables, railway platforms etc. (and accept that this might drain some system resources), then rename the folder to ``Objects``.
 
 
 .. _chapter-hide-urban-textures-label:

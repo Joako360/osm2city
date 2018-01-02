@@ -28,7 +28,7 @@ osm2city uses the following Python extension packages, which must be installed o
 
 * matplotlib
 * networkx
-* numpy
+* numpy (on Windows you need Numpy+MKL)
 * pil
 * scipy
 * shapely
