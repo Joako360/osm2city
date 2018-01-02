@@ -7,7 +7,7 @@ Parameters [Builder]
 Please consider the following:
 
 * Python does not recognize operating system environment variables, please use full paths in the parameters file (no ``$HOME`` etc).
-* These parameters determine how scenery objects are generated offline as described in chapter :ref:`Scenery Generation <chapter-generation-label>`. There are as of version 2016.4 no runtime parameters in FlightGear, that influence which ``osm2city`` generated scenery objects are shown — or how and how many [#]_.
+* These parameters determine how scenery objects are generated offline as described in chapter :ref:`Scenery Generation <chapter-generation-label>`.
 * All decimals need to be with "." — i.e. local specific decimal separators like "," are not accepted.
 * You do not have to specify all parameters in your ``params.ini`` file. Actually it is better only to specify those parameters, which you want to actively control — the rest just gets the defaults.
 
@@ -96,7 +96,7 @@ Important Flags
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
-FLAG_2018                                       Boolean    True      If True then then texture catalog and shader integration is for minimal
+FLAG_2018                                       Boolean    False     If True then then texture catalog and shader integration is for minimal
                                                                      version of FlightGear 2018.1.
 
 BUILDING_USE_SHARED_WORSHIP                     Boolean    False     Use a shared model for worship buildings instead of OSM floor plan and
