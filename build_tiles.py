@@ -20,7 +20,7 @@ import utils.aptdat_io as aptdat_io
 import utils.calc_tile as calc_tile
 import utils.coordinates as coordinates
 import utils.stg_io2
-from utils.utilities import BoundaryError, FGElev, date_time_now, parse_boundary
+from utils.utilities import BoundaryError, FGElev, date_time_now, check_boundary, parse_boundary
 
 
 class SceneryTile(object):
@@ -217,6 +217,7 @@ if __name__ == '__main__':
     boundary_east = boundary_floats[2]
     boundary_north = boundary_floats[3]
     logging.info("Overall boundary {}, {}, {}, {}".format(boundary_west, boundary_south, boundary_east, boundary_north))
+    check_boundary(boundary_west, boundary_south, boundary_east, boundary_north)
 
     # list of sceneries tiles (might have smaller boundaries). Each entry has a list with the 4 boundary points
     scenery_tiles_list = list()
