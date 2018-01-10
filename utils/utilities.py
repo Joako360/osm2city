@@ -149,7 +149,7 @@ def match_local_coords_with_global_nodes(local_list: List[Tuple[float, float]], 
                 all_nodes[new_node.osm_id] = new_node
                 matched_nodes.append(new_node.osm_id)
             else:
-                raise ValueError('No match for pseudo_parent with osm_id = %d. Closest: %f' % (osm_id, closest_distance))
+                raise ValueError('No match for parent with osm_id = %d. Closest: %f' % (osm_id, closest_distance))
         else:
             matched_nodes.append(found_key)
 
@@ -243,15 +243,15 @@ class Stats(object):
 
         logging.info(textwrap.dedent("""
             used tex        %i out of %i (%2.0f %%)""" % (len(textures_used), len(self.textures_total),    textures_used_percent)))
-        logging.info(textwrap.dedent("""
+        logging.debug(textwrap.dedent("""
             Used Textures : """))
         for item in sorted(list(textures_used.items()), key=lambda item: item[1], reverse=True):
             logging.info(textwrap.dedent("""
                  %i %s""" % (item[1], item[0])))
-        logging.info(textwrap.dedent("""
+        logging.debug(textwrap.dedent("""
             Unused Textures : """))
         for item in sorted(list(textures_not_used.items()), key=lambda item: item[1], reverse=True):
-            logging.info(textwrap.dedent("""
+            logging.debug(textwrap.dedent("""
                  %i %s""" % (item[1], item[0])))
         logging.info(textwrap.dedent("""
               complex       %i

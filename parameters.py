@@ -101,12 +101,13 @@ SKIP_LIST = []
 # -- Parameters which influence the number of buildings from OSM taken to output
 BUILDING_MIN_HEIGHT = 0.0           # -- minimum height from bottom to top without roof height of a building to be included in output (does not include roof). Different from OSM tag "min_height", which states that the bottom of the building hovers min_height over the ground
 # If set to 0.0, then not taken into consideration (default)
-BUILDING_MIN_AREA = 50.0            # -- minimum area for a building to be included in output
+BUILDING_MIN_AREA = 50.0            # -- minimum area for a building to be included in output (not used for buildings with parent)
+BUILDING_PART_MIN_AREA = 10.0  # minimum area for building:parts
 BUILDING_REDUCE_THRESHOLD = 200.0   # -- threshold area of a building below which a rate of buildings gets reduced from output
 BUILDING_REDUCE_RATE = 0.5          # -- rate (between 0 and 1) of buildings below a threshold which get reduced randomly in output
 BUILDING_REDUCE_CHECK_TOUCH = False # -- before removing a building due to area, check whether it is touching another building and therefore should be kept
-BUILDING_SIMPLIFY_TOLERANCE = 1.0   # -- all points in the simplified building will be within the tolerance distance of the original geometry.
 BUILDING_NEVER_SKIP_LEVELS = 6      # -- buildings that tall will never be skipped
+BUILDING_SIMPLIFY_TOLERANCE = 1.0   # -- all points in the simplified building will be within the tolerance distance of the original geometry.
 
 BUILDING_COMPLEX_ROOFS = True       # -- generate complex roofs on buildings? I.e. other shapes than horizontal and flat
 BUILDING_COMPLEX_ROOFS_MIN_LEVELS = 1  # don't put complex roof on buildings smaller than the specified value unless there is an explicit roof:shape flag

@@ -36,7 +36,6 @@ import shapely.geometry as shg
 from shapely.geos import TopologicalError
 
 import parameters
-import prepare_textures as tm
 import roofs
 import textures.texture as tex
 import utils.stg_io2
@@ -103,86 +102,6 @@ def _random_roof_shape() -> RoofShape:
         return RoofShape.pyramidal
 
 
-class BuildingParent(object):
-    """The parent of buildings that are part of a Simple3D building.
-    Mostly used to coordinate textures for facades and roofs.
-    The parts determine the common textures by a simple rule: the first to set the values wins the race.
-    """
-    def __init__(self, osm_id: int) -> None:
-        self.osm_id = osm_id
-        self.children = list()  # pointers to Building objects. Those building objects point back in self.parent
-
-    def _sanitize_children(self):
-        """Make sure all children have a reference to parent - otherwise delete them.
-        They might have been removed during building_lib.analyse(...)."""
-        for child in reversed(self.children):
-            if child.parent is None:
-                self.children.remove(child)
-        if len(self.children) == 1:
-            self.children[0].parent = None
-            self.children = list()
-
-    def align_textures_children(self) -> None:
-        """Aligns the facade and roof textures for all the children belonging to this parent.
-        Unless there are deviations in the use of tags, then the textures of the child with
-        the largest longest_edge_len is chosen.
-        It might be best if the one part with the most clear tags would win, but [A] it is highly probable
-        that all children have similar tags (but maybe different values), and [B] it is safest to choose
-        a texture matching the longest edge.
-        If there is at least one deviation, then all parts keep their textures.
-        """
-        self._sanitize_children()
-        if len(self.children) == 0:  # might be sanitize_children() has removed them all
-            return
-
-        default_child = None
-        difference_found = False
-        building_colour = None
-        building_material = None
-        building_facade_material = None
-        for child in self.children:
-            if default_child is None:
-                default_child = child
-                if 'building:colour' in child.tags:
-                    building_colour = child.tags['building:colour']
-                if 'building:material' in child.tags:
-                    building_material = child.tags['building:material']
-                if 'building:facade:material' in child.tags:
-                    building_facade_material = child.tags['building:facade:material']
-            else:
-                if child.longest_edge_length > default_child.longest_edge_length:
-                    default_child = child
-                if 'building:colour' in child.tags:
-                    if building_colour is None:
-                        difference_found = True
-                        break
-                    elif building_colour != child.tags['building:colour']:
-                        difference_found = True
-                        break
-                if 'building:material' in child.tags:
-                    if building_material is None:
-                        difference_found = True
-                        break
-                    elif building_material != child.tags['building:material']:
-                        difference_found = True
-                        break
-                if 'building:facade:material' in child.tags:
-                    if building_facade_material is None:
-                        difference_found = True
-                        break
-                    elif building_facade_material != child.tags['building:facade:material']:
-                        difference_found = True
-                        break
-
-        if difference_found:  # nothing to do - keep as is
-            return
-
-        # apply same textures to all children
-        for child in self.children:
-            child.facade_texture = default_child.facade_texture
-            child.roof_texture = default_child.roof_texture
-
-
 class Building(object):
     """Central object class.
     Holds all data relevant for a building. Coordinates, type, area, ...
@@ -227,10 +146,8 @@ class Building(object):
         self.update_geometry(outer_ring, inner_rings_list, refs)
 
         # set in buildings.py for building relations prior to building_lib.analyse(...)
-        # - from building._process_simple_3d_building(...)
+        # - from building._process_building_parts(...)
         self.parent = None  # BuildingParent if available
-        # - from building._process_lonely_building_parts(...)
-        self.pseudo_parents = list()  # list of Building: only set for building:part without a real parent
 
         # to know which buildings share references. Set in relate_neighbours(...)
         self.neighbours = set()  # set of buildings
@@ -692,9 +609,9 @@ class Building(object):
             return True
         if self.inner_rings_list:  # never skip a building with inner rings
             return True
-        if self.area < parameters.BUILDING_MIN_AREA or \
-                (self.area < parameters.BUILDING_REDUCE_THRESHOLD and
-                 random.uniform(0, 1) < parameters.BUILDING_REDUCE_RATE):
+        if self.area < parameters.BUILDING_MIN_AREA and self.parent is None:
+            return False
+        if self.area < parameters.BUILDING_REDUCE_THRESHOLD and random.uniform(0, 1) < parameters.BUILDING_REDUCE_RATE:
             return False
         return True
 
@@ -705,7 +622,7 @@ class Building(object):
         """
         if self.neighbours:
             # exclude those with (pseudo)parents
-            if self.parent is not None or len(self.pseudo_parents) > 0:
+            if self.parent is not None:
                 return
             # exclude houses and terraces
             if 'building' in self.tags and self.tags['building'] in ['house', 'detached', 'terrace']:
@@ -987,6 +904,99 @@ class Building(object):
         return "<OSM_ID %d at %s>" % (self.osm_id, hex(id(self)))
 
 
+class BuildingParent(object):
+    """The parent of buildings that are part of a Simple3D building with an outline building.
+    Alternatively virtual parent for combinations of OSM building and OSM building:part.
+    Mostly used to coordinate textures for facades and roofs.
+    The parts determine the common textures by a simple rule: the first to set the values wins the race.
+    """
+    def __init__(self, osm_id: int, outline: bool) -> None:
+        self.osm_id = osm_id  # By convention the osm_id of the outline building, not the relation id from OSM!
+        self.outline = outline  # True if based on a Simple3D building. False if based on building:part
+        self.children = list()  # pointers to Building objects. Those building objects point back in self.parent
+        self.tags = dict()
+
+    def add_child(self, child: Building) -> None:
+        """Adds the building to the children and adds a pointer back from the child"""
+        self.children.append(child)
+        child.parent = self
+
+    def add_tags(self, tags: Dict[str, str]) -> None:
+        """The added tags are either from the outline if simple3d or otherwise from the original building
+        used as a parent for building_parts, if not relation was given."""
+        self.tags = tags
+
+    def _sanitize_children(self):
+        """Make sure all children have a reference to parent - otherwise delete them.
+        They might have been removed during building_lib.analyse(...)."""
+        for child in reversed(self.children):
+            if child.parent is None:
+                self.children.remove(child)
+        if len(self.children) == 1:
+            self.children[0].parent = None
+            self.children = list()
+
+    def align_textures_children(self) -> None:
+        """Aligns the facade and roof textures for all the children belonging to this parent.
+        Unless there are deviations in the use of tags, then the textures of the child with
+        the largest longest_edge_len is chosen.
+        It might be best if the one part with the most clear tags would win, but [A] it is highly probable
+        that all children have similar tags (but maybe different values), and [B] it is safest to choose
+        a texture matching the longest edge.
+        If there is at least one deviation, then all parts keep their textures.
+        """
+        self._sanitize_children()
+        if len(self.children) == 0:  # might be sanitize_children() has removed them all
+            return
+
+        default_child = None
+        difference_found = False
+        building_colour = None
+        building_material = None
+        building_facade_material = None
+        for child in self.children:
+            if default_child is None:
+                default_child = child
+                if 'building:colour' in child.tags:
+                    building_colour = child.tags['building:colour']
+                if 'building:material' in child.tags:
+                    building_material = child.tags['building:material']
+                if 'building:facade:material' in child.tags:
+                    building_facade_material = child.tags['building:facade:material']
+            else:
+                if child.longest_edge_length > default_child.longest_edge_length:
+                    default_child = child
+                if 'building:colour' in child.tags:
+                    if building_colour is None:
+                        difference_found = True
+                        break
+                    elif building_colour != child.tags['building:colour']:
+                        difference_found = True
+                        break
+                if 'building:material' in child.tags:
+                    if building_material is None:
+                        difference_found = True
+                        break
+                    elif building_material != child.tags['building:material']:
+                        difference_found = True
+                        break
+                if 'building:facade:material' in child.tags:
+                    if building_facade_material is None:
+                        difference_found = True
+                        break
+                    elif building_facade_material != child.tags['building:facade:material']:
+                        difference_found = True
+                        break
+
+        if difference_found:  # nothing to do - keep as is
+            return
+
+        # apply same textures to all children
+        for child in self.children:
+            child.facade_texture = default_child.facade_texture
+            child.roof_texture = default_child.roof_texture
+
+
 def _parse_building_levels(tags: Dict[str, str]) -> float:
     proxy_levels = 0.
     if 'building:levels' in tags:
@@ -1192,14 +1202,6 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: u
     for key, parent in building_parents.items():
         parent.align_textures_children()
 
-    for building_part in new_buildings:
-        if building_part.pseudo_parents:
-            # FIXME there should be some checks whether the part is really the highest / most levels
-            # to determine whether the pseudo_parent really should pick the part's texture
-            for pseudo_parent in building_part.pseudo_parents:
-                pseudo_parent.facade_texture = building_part.facade_texture
-                pseudo_parent.roof_texture = building_part.roof_texture
-
     # make sure that min_height is only used if there is a real parent (not pseudo_parents)
     # i.e. for all others we just set it to 0.0
     for building in new_buildings:
@@ -1237,28 +1239,53 @@ def _map_building_type(tags: Dict[str, str]) -> str:
     return 'unknown'
 
 
-def overlap_check_blocked_areas(buildings: List[Building], blocked_areas: List[shg.Polygon]) -> List[Building]:
+def buildings_after_remove_with_parent_children(orig_buildings: List[Building],
+                                                buildings_to_remove: List[Building]) -> List[Building]:
+    """Returns a list of buildings, which are in the original list, but which are neither in the list
+    to remove or those buildings' parents' related children.
+
+    We do this such that there are no dangling children, which somehow are still related to a parent, but not
+    through a direct link in the final list of buildings, which later gets analyzed.
+    And because most probably if part of a buildings relation is overlapped, then the whole Simple3D
+    building should go away."""
+    all_buildings_to_remove = set()
+
+    for building in buildings_to_remove:
+        if building.parent:
+            for child in building.parent.children:
+                all_buildings_to_remove.add(child)
+        all_buildings_to_remove.add(building)
+
+    cleared_buildings = list()
+    for building in orig_buildings:
+        if building not in all_buildings_to_remove:
+            cleared_buildings.append(building)
+
+    return cleared_buildings
+
+
+def overlap_check_blocked_areas(orig_buildings: List[Building], blocked_areas: List[shg.Polygon]) -> List[Building]:
     """Checks each building whether it overlaps with a blocked area and excludes it from the returned list of True.
     Uses intersection checking - i.e. not touches or disjoint."""
-    cleared_buildings = list()
-    for building in buildings:
+    buildings_to_remove = list()
+    for building in orig_buildings:
         is_intersected = False
         for blocked_area in blocked_areas:
             if building.polygon.intersects(blocked_area):
                 logging.debug("Building osm_id=%d intersects with blocked area.", building.osm_id)
                 is_intersected = True
                 break
-        if not is_intersected:
-            cleared_buildings.append(building)
-    return cleared_buildings
+        if is_intersected:
+            buildings_to_remove.append(building)
+    return buildings_after_remove_with_parent_children(orig_buildings, buildings_to_remove)
 
 
-def overlap_check_convex_hull(buildings: List[Building], stg_entries: List[utils.stg_io2.STGEntry],
+def overlap_check_convex_hull(orig_buildings: List[Building], stg_entries: List[utils.stg_io2.STGEntry],
                               stats: utilities.Stats) -> List[Building]:
     """Checks for all buildings whether their polygon intersects with a static or shared object's convex hull."""
-    cleared_buildings = list()
+    buildings_to_remove = list()
 
-    for building in buildings:
+    for building in orig_buildings:
         is_intersecting = False
         for entry in stg_entries:
             try:
@@ -1276,9 +1303,9 @@ def overlap_check_convex_hull(buildings: List[Building], stg_entries: List[utils
                 logging.exception('Convex hull could not be checked due to topology problem - building osm_id: %d',
                                   building.osm_id)
 
-        if not is_intersecting:
-            cleared_buildings.append(building)
-    return cleared_buildings
+        if is_intersecting:
+            buildings_to_remove.append(building)
+    return buildings_after_remove_with_parent_children(orig_buildings, buildings_to_remove)
 
 
 def _analyse_worship_building(building: Building, building_parent: BuildingParent,

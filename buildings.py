@@ -8,51 +8,7 @@ number of facade/roof textures.
 - cluster a number of buildings into a single .ac files
 - LOD animation based on building height and area
 - terrain elevation probing: places buildings at correct elevation
-
-You should disable random buildings.
 """
-
-# TODO:
-# - FIXME: texture size meters works reversed??
-# x one object per tile only. Now drawables 1072 -> 30fps
-# x use geometry library
-# x read original .stg+.xml, don't place OSM buildings when there's a static model near/within
-# - compute static_object stg's on the fly
-# x put roofs into separate LOD
-# x lights
-# x read relations tag == fix empty backyards
-# x simplify buildings
-# x put tall, large buildings in LOD rough, and small buildings in LOD detail
-# - more complicated roof geometries
-#   x split, new roofs.py?
-# x cmd line switches
-# -
-
-# - city center??
-
-# FIXME:
-# - off-by-one error in building counter
-
-# LOWI:
-# - floating buildings
-# - LOD?
-# - rename textures
-# x respect ac
-
-# cmd line
-# x skip nearby check
-# x fake elev
-# - log level
-
-# development hints:
-# variables
-# b: a building instance
-#
-# coding style
-# - indend 4 spaces, avoid tabulators
-# - variable names: use underscores (my_long_variable), avoid CamelCase
-# - capitalize class names: class Interpolator(object):
-# - comments: code # -- comment
 
 import logging
 import multiprocessing as mp
@@ -62,6 +18,7 @@ import textwrap
 from typing import Dict, List, Optional
 
 import shapely.geometry as shg
+import shapely.ops as sho
 
 import building_lib
 import cluster
@@ -74,27 +31,26 @@ from utils import osmparser, coordinates, stg_io2, utilities
 
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
 
+# Cf. https://taginfo.openstreetmap.org/keys/building%3Apart#values and
+# https://wiki.openstreetmap.org/wiki/Key%3Abuilding%3Apart
+ALLOWED_BUiLDING_PART_VALUES = ['yes', 'residential', 'apartments', 'house', 'commercial', 'retail']
 
-def _process_osm_relation(nodes_dict: Dict[int, osmparser.Node], rel_ways_dict: Dict[int, osmparser.Way],
-                          relations_dict: Dict[int, osmparser.Relation],
-                          my_buildings: Dict[int, building_lib.Building],
-                          coords_transform: coordinates.Transformation,
-                          stats: utilities.Stats) -> None:
+
+def _process_osm_relations(nodes_dict: Dict[int, osmparser.Node], rel_ways_dict: Dict[int, osmparser.Way],
+                           relations_dict: Dict[int, osmparser.Relation],
+                           my_buildings: Dict[int, building_lib.Building],
+                           coords_transform: coordinates.Transformation,
+                           stats: utilities.Stats) -> None:
     """Adds buildings based on relation tags. There are two scenarios: multipolygon buildings and Simple3D tagging.
     Only multipolygon and simple 3D buildings are implemented currently. 
     The added buildings go into parameter my_buildings.
     Multipolygons:
-        * see FIXMEs for in building_lib whether inner rings etc. actually are supported.
+        * see FIXMEs in building_lib whether inner rings etc. actually are supported.
         * Outer rings out of multiple parts are supported.
         * Islands are removed
-    
-    3D: 
-        * only not-intersecting parts are kept.
-        * min_height and min_level are not supported: parts stay on ground.
-    
+
     There is actually a third scenario from Simple3D buildings, where the "building" and "building:part" are not
-    connected with a relation. This is handled separately in _process_lonely_building_parts()
-    
+    connected with a relation. This is handled separately in _process_building_parts()
 
     See also http://wiki.openstreetmap.org/wiki/Key:building:part
     See also http://wiki.openstreetmap.org/wiki/Buildings
@@ -113,7 +69,7 @@ def _process_osm_relation(nodes_dict: Dict[int, osmparser.Node], rel_ways_dict: 
     === 3D buildings ===
     See also http://wiki.openstreetmap.org/wiki/Relation:building (has also examples and demo areas at end)
     http://taginfo.openstreetmap.org/relations/building#roles
-    http://wiki.openstreetmap.org/wiki/Simple_3D_buildings#Demo_areas
+    http://wiki.openstreetmap.org/wiki/Simple_3D_buildings
 
     Example of church: http://www.openstreetmap.org/relation/3792630
     <relation id="3792630" ...>
@@ -135,23 +91,21 @@ def _process_osm_relation(nodes_dict: Dict[int, osmparser.Node], rel_ways_dict: 
     for key, relation in relations_dict.items():
         try:
             if 'type' in relation.tags and relation.tags['type'] == 'multipolygon':
-                added_buildings = _process_multipolygon_building(nodes_dict, rel_ways_dict, relation,
-                                                                 my_buildings, coords_transform, stats)
+                added_buildings = _process_multipolygon_buildings(nodes_dict, rel_ways_dict, relation,
+                                                                  my_buildings, coords_transform, stats)
                 number_of_created_buildings += added_buildings
             elif 'type' in relation.tags and relation.tags['type'] == 'building':
-                added_buildings = _process_simple_3d_building(nodes_dict, rel_ways_dict, relation,
-                                                              my_buildings, coords_transform, stats)
-                number_of_created_buildings += added_buildings
+                _process_simple_3d_building(relation, my_buildings)
         except Exception:
             logging.exception('Unable to process building relation osm_id %d', relation.osm_id)
 
     logging.info("Added {} buildings based on relations.".format(number_of_created_buildings))
 
 
-def _process_multipolygon_building(nodes_dict: Dict[int, osmparser.Node], rel_ways_dict: Dict[int, osmparser.Way],
-                                   relation: osmparser.Relation, my_buildings: Dict[int, building_lib.Building],
-                                   coords_transform: coordinates.Transformation,
-                                   stats: utilities.Stats) -> int:
+def _process_multipolygon_buildings(nodes_dict: Dict[int, osmparser.Node], rel_ways_dict: Dict[int, osmparser.Way],
+                                    relation: osmparser.Relation, my_buildings: Dict[int, building_lib.Building],
+                                    coords_transform: coordinates.Transformation,
+                                    stats: utilities.Stats) -> int:
     """Processes the members in a multipolygon relationship. Returns the number of buildings actually created.
     If there are several members of type 'outer', then multiple buildings are created.
     """
@@ -224,191 +178,198 @@ def _process_multipolygon_building(nodes_dict: Dict[int, osmparser.Node], rel_wa
     return added_buildings
 
 
-def _process_simple_3d_building(nodes_dict: Dict[int, osmparser.Node], rel_ways_dict: Dict[int, osmparser.Way],
-                                relation: osmparser.Relation, my_buildings: Dict[int, building_lib.Building],
-                                coords_transform: coordinates.Transformation,
-                                stats: utilities.Stats) -> int:
-    """Processes the members in a Simple3D relationship."""
-    my_buildings.pop(relation.osm_id, None)  # we do not need the outline - it will be replaced by parts
-    # find relationships
-    outline_member = None
-    parts = dict()
+def _process_simple_3d_building(relation: osmparser.Relation, my_buildings: Dict[int, building_lib.Building]):
+    """Processes the members in a Simple3D relationship in order to make sure that a building outline exists."""
+    buildings_found = list()  # osm_id
+    building_outlines_found = list()  # osm_id
+    # make relations - we are only interested
     for m in relation.members:
-        relation_found = False
         if m.type_ == 'way':
-            if m.ref in rel_ways_dict:
-                way = rel_ways_dict[m.ref]
-                # because the member way already has been processed as normal way, we need to remove
-                # otherwise we might get flickering due to two buildings on top of each other
-                my_buildings.pop(way.osm_id, None)
-                if m.role == 'outline':
-                    outline_member = way
-                elif m.role == 'part':
-                    if way.refs[0] == way.refs[-1]:
-                        parts[way.osm_id] = way
+            if m.ref in my_buildings:
+                related_building = my_buildings[m.ref]
+                if 'building' in related_building.tags:
+                    if m.role == 'outline':
+                        building_outlines_found.append(related_building.osm_id)
                     else:
-                        logging.debug("removed part with osm_id=%d as it is not closed way." % way.osm_id)
-            if not relation_found:
-                logging.debug("Way osm_id=%d not found for relation osm_id=%d}." % (m.ref, relation.osm_id))
+                        buildings_found.append(related_building.osm_id)
 
-    if len(parts) == 0:
-        return 0
-    if len(parts) == 1:
-        my_part = parts.popitem()[1]
-        if outline_member is not None:  # combine the tags and then this is it
-            all_tags = osmparser.combine_tags(my_part.tags, outline_member.tags)
+    if len(building_outlines_found) == 1:
+        # nothing to be done - everything as it should and _process_building_parts() takes care of relating etc.
+        parent = building_lib.BuildingParent(building_outlines_found[0], True)
+        outline_part = my_buildings[building_outlines_found[0]]
+        parent.add_child(outline_part)
+        for member in buildings_found:
+            b_part = my_buildings[member]
+            parent.add_child(b_part)
+    elif len(building_outlines_found) > 1:
+        # meaning the tagging in OSM is wrong - there should only be one outline
+        # _process_building_parts() takes care of relating etc. and will probably find different parents.
+        logging.warning('OSM data error: there is more than one "outline" member in relation %i',
+                        relation.osm_id)
+    else:
+        # meaning that the tagging in OSM is wrong - there should be one outline
+        if buildings_found:
+            # Most probably the role was tagged wrongly.
+            # nothing to be done - at least one building it will be found as parent in _process_building_parts()
+            logging.warning('OSM data error: there is no "outline" member, but at least one "building" in relation %i',
+                            relation.osm_id)
         else:
-            all_tags = my_part.tags
-        a_building = _make_building_from_way(nodes_dict, all_tags, my_part, coords_transform, stats)
-        my_buildings[a_building.osm_id] = a_building
-        return 1
-
-    # otherwise make sure that parts only touch, not intersect
-    # Create polygons to allow some geometry analysis
-    polygons = dict()
-    validated_parts = list()
-    for key, way in parts.items():
-        polygons[way.osm_id] = way.polygon_from_osm_way(nodes_dict, coords_transform)
-    for o_key, o_value in polygons.items():
-        is_intersecting = False
-        for i_key, i_value in polygons.items():
-            if o_key == i_key:
-                continue
-            if (o_value.intersects(i_value) is True) and (o_value.touches(i_value) is False):
-                is_intersecting = True
-                break
-        if not is_intersecting:
-            validated_parts.append(parts[o_key])
-
-    # check again (same logic as above)
-    if len(validated_parts) == 0:
-        return 0
-    if len(validated_parts) == 1:
-        my_part = validated_parts[0]
-        if outline_member is not None:  # combine the tags and then this is it
-            all_tags = osmparser.combine_tags(my_part.tags, outline_member.tags)
-        else:
-            all_tags = my_part.tags
-        a_building = _make_building_from_way(nodes_dict, all_tags, my_part, coords_transform, stats)
-        my_buildings[a_building.osm_id] = a_building
-        return 1
-
-    parent = None
-    if outline_member is not None:
-        parent = building_lib.BuildingParent(outline_member.osm_id)
-    added_buildings = 0
-    for my_part in validated_parts:
-        if outline_member is not None:
-            all_tags = osmparser.combine_tags(my_part.tags, outline_member.tags)
-        else:
-            all_tags = my_part.tags
-        a_building = _make_building_from_way(nodes_dict, all_tags, my_part, coords_transform, stats)
-        my_buildings[a_building.osm_id] = a_building
-        added_buildings += 1
-        if outline_member is not None:
-            parent.children.append(a_building)
-            a_building.parent = parent
-    return added_buildings
+            # now we do not have a building to find as parent in _process_building_parts(). In order to have
+            # the building_parts relate nevertheless, we create a virtual parent and relate all parts to
+            # this after checking that the building_parts are relevant.
+            # There will be no additional checking in _process_building_parts() because now there is a parent already
+            logging.warning('OSM data error: there is no "outline" member in relation %i', relation.osm_id)
+            parent = building_lib.BuildingParent(osmparser.get_next_pseudo_osm_id(), False)
+            # no tags are available to be added on parent level
+            for m in relation.members:
+                if m.ref in my_buildings:
+                    building_part = my_buildings[m.ref]
+                    if 'building:part' in building_part.tags and \
+                            building_part.tags['building:part'] not in ALLOWED_BUiLDING_PART_VALUES:
+                        parent.add_child(building_part)
 
 
-def _process_lonely_building_parts(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int, osmparser.Way],
-                                   my_buildings: Dict[int, building_lib.Building],
-                                   coords_transform: coordinates.Transformation, stats: utilities.Stats) -> None:
+def _process_building_parts(nodes_dict: Dict[int, osmparser.Node],
+                            my_buildings: Dict[int, building_lib.Building],
+                            coords_transform: coordinates.Transformation,
+                            stats: utilities.Stats) -> None:
     """Process building parts, for which there is no relationship tagging and therefore there might be overlaps.
     I.e. methods related to _process_osm_relation do not help. Therefore some brute force searching is needed.
-    If a building: part is within a building, then keep only the difference of the building and mark it as
-    pseudo_parent. In building_lib.analyse() at the end all pseudo_parents get the textures from the building:part."""
-    found_pseudo_parents = 0
-    valid_parts = list()
-    buildings_to_remove = set()  # those pseudo_parents, which are not large enough. List of osm_id
-    buildings_to_add = list()  # new pseudo parents from split buildings. List of Building
+    """
+    stats_parts_tested = 0
+    stats_parts_removed = 0
+    stats_parts_remodelled = 0
+    stats_original_removed = 0
+    # first relate all parts to parent buildings
+    building_parents = dict()  # osm_id, BuildingParent object
+    building_parts_to_remove = list()  # osm_ids
     for part_key, b_part in my_buildings.items():
         if 'building:part' in b_part.tags and 'building' not in b_part.tags:
+            stats_parts_tested += 1
             if 'type' in b_part.tags and b_part.tags['type'] == 'multipolygon':
                 continue
             if b_part.parent is None:  # i.e. there is no relation tagging in OSM
-                valid_parts.append(part_key)
-                if part_key in ways_dict:
-                    my_way = ways_dict[part_key]
-                else:
-                    my_way = osmparser.Way(part_key)
-                    my_way.refs = b_part.refs
-                part_poly = my_way.polygon_from_osm_way(nodes_dict, coords_transform)
-                if part_poly is None:
+                # exclude parts, which we do not want
+                if b_part.tags['building:part'] not in ALLOWED_BUiLDING_PART_VALUES:
+                    building_parts_to_remove.append(b_part.osm_id)
+                    continue
+                if b_part.polygon is None or b_part.polygon.area < parameters.BUILDING_PART_MIN_AREA:
+                    building_parts_to_remove.append(b_part.osm_id)
                     continue
                 # need to find all buildings, which have at least one node in common
                 # do it by common nodes instead of geometry due to performance
-                pseudo_candidates = set()
+                parent_missing = True
+                parent_candidates = set()
                 b_refs_set = set(b_part.refs)
                 for c_key, candidate in my_buildings.items():
-                    if part_key != c_key and c_key not in pseudo_candidates and 'building:part' not in candidate.tags:
+                    if part_key != c_key and c_key not in parent_candidates and 'building:part' not in candidate.tags:
                         if b_refs_set.intersection(set(candidate.refs)):
-                            pseudo_candidates.add(c_key)
-
-                # now check by geometry whether they only touch or whether the part is in the building
-                for candidate in pseudo_candidates:
+                            parent_candidates.add(c_key)
+                # now check by geometry whether part only touches or actually is in the parent_candidate (building)
+                for candidate in parent_candidates:
                     c_way = osmparser.Way(candidate)
                     c_way.refs = my_buildings[candidate].refs
                     candidate_poly = c_way.polygon_from_osm_way(nodes_dict, coords_transform)
-                    if candidate_poly is not None and not part_poly.touches(candidate_poly):
-                        # now reduce the pseudo parent building by the building:part.
-                        # this might split the pseudo parent into several pieces.
-                        pseudo_parent = my_buildings[candidate]
-                        pp_refs = pseudo_parent.refs.copy()
-                        a_geometry = candidate_poly.difference(part_poly)
-                        try:
-                            if isinstance(a_geometry, shg.Polygon) and a_geometry.is_valid:
-                                coords_list = list(a_geometry.exterior.coords)
-                                new_refs = utilities.match_local_coords_with_global_nodes(
-                                    coords_list, pp_refs + b_part.refs, nodes_dict,
-                                    coords_transform, pseudo_parent.osm_id)
-                                pseudo_parent.update_geometry(a_geometry.exterior, refs=new_refs)
-                                b_part.pseudo_parents.append(pseudo_parent)
-                                found_pseudo_parents += 1
-                            elif isinstance(a_geometry, shg.MultiPolygon):
-                                my_polygons = a_geometry.geoms
-                                is_first = True
-                                if my_polygons is not None:
-                                    for my_poly in my_polygons:
-                                        if isinstance(my_poly, shg.Polygon) and my_poly.is_valid:
-                                            if my_poly.area > parameters.BUILDING_MIN_AREA:
-                                                coords_list = list(my_poly.exterior.coords)
-                                                new_refs = utilities.match_local_coords_with_global_nodes(
-                                                    coords_list, pp_refs + b_part.refs, nodes_dict,
-                                                    coords_transform, pseudo_parent.osm_id)
-                                                found_pseudo_parents += 1
-                                                if is_first:
-                                                    pseudo_parent.update_geometry(my_poly.exterior, refs=new_refs)
-                                                    b_part.pseudo_parents.append(pseudo_parent)
-                                                    is_first = False
-                                                else:
-                                                    other_way = osmparser.Way(osmparser.get_next_pseudo_osm_id())
-                                                    other_way.refs = new_refs
-                                                    other_pp = _make_building_from_way(nodes_dict,
-                                                                                       pseudo_parent.tags.copy(),
-                                                                                       other_way,
-                                                                                       coords_transform, stats)
-                                                    b_part.pseudo_parents.append(other_pp)
-                                                    buildings_to_add.append(other_pp)
+                    if candidate_poly is not None and not b_part.polygon.touches(candidate_poly):
+                        if candidate in building_parents:
+                            building_parent = building_parents[candidate]
+                        else:
+                            building_parent = building_lib.BuildingParent(candidate, True)
+                        building_parent.add_child(b_part)
+                        parent_missing = False
+                        building_parents[building_parent.osm_id] = building_parent
+                # if no parent was found, then re-model as a building
+                if parent_missing:
+                    stats_parts_remodelled += 1
+                    building_part_value = b_part.tags['building:part']
+                    del b_part.tags['building:part']
+                    if 'building' not in b_part.tags:
+                        b_part.tags['building'] = building_part_value
+            else:
+                if b_part.parent.outline:
+                    if b_part.parent.osm_id not in building_parents:
+                        building_parents[b_part.parent.osm_id] = b_part.parent
+    # get rid of those building_parts, which we do not need anymore
+    for osm_id in building_parts_to_remove:
+        del my_buildings[osm_id]
+        stats_parts_removed += 1
+    logging.info('Removed %i building:parts, which are not needed due to area etc.', stats_parts_removed)
+    logging.info('Remodelled %i building:parts to buildings due to missing parent', stats_parts_remodelled)
+    logging.info('Tested %i building:parts', stats_parts_tested)
 
-                                if is_first:  # none of the splits from pseudo_parent were large enough
-                                    buildings_to_remove.add(pseudo_parent.osm_id)
+    # now reduce the area of the building_parents' original building and if some area left then add as new part
+    for key, building_parent in building_parents.items():
+        original_building = my_buildings[key]  # the original building acting as parent
+        original_building_still_used = False
+        building_parent.add_tags(original_building.tags.copy())
 
-                        except (ValueError, KeyError) as e:  # FIXME: for key errors should probably add relation nodes
-                            logging.debug(e)
-                            buildings_to_remove.add(pseudo_parent.osm_id)  # bold move - just get rid of flickering!
-                        break  # no matter whether an exception or not, as there cannot be other buildings
+        # combine all node references for later search space
+        node_refs = original_building.refs.copy()
+        for child in building_parent.children:
+            node_refs.extend(child.refs.copy())
+        # add up all areas of the children - we are only interested in what is left
+        children_polygons = list()
+        for child in building_parent.children:
+            if child.polygon.within(original_building.polygon):
+                continue  # excluding, because could have min_height on top of building (e.g. a dome)
+            children_polygons.append(child.polygon)
+        total_area_building_parts = sho.cascaded_union(children_polygons)
+        geometry_difference = original_building.polygon.difference(total_area_building_parts)
+        try:
+            if isinstance(geometry_difference, shg.Polygon) and geometry_difference.is_valid:
+                if geometry_difference.area >= parameters.BUILDING_PART_MIN_AREA:
+                    coords_list = list(geometry_difference.exterior.coords)
+                    new_refs = utilities.match_local_coords_with_global_nodes(
+                        coords_list, node_refs, nodes_dict,
+                        coords_transform, key)
+                    # make the original building a building_part and update with the remaining geometry
+                    original_building.update_geometry(geometry_difference.exterior, refs=new_refs)
+                    original_building.tags = dict()
+                    original_building.tags['building_part'] = 'yes'
+                    building_parent.add_child(original_building)
+                    original_building_still_used = True
+            elif isinstance(geometry_difference, shg.MultiPolygon):
+                my_polygons = geometry_difference.geoms
+                if geometry_difference.area >= parameters.BUILDING_PART_MIN_AREA and my_polygons is not None:
+                    is_first = True
+                    for my_poly in my_polygons:
+                        if isinstance(my_poly, shg.Polygon) and my_poly.is_valid and \
+                                my_poly.area >= parameters.BUILDING_PART_MIN_AREA:
+                            coords_list = list(my_poly.exterior.coords)
+                            new_refs = utilities.match_local_coords_with_global_nodes(
+                                coords_list, node_refs, nodes_dict,
+                                coords_transform, key)
+                            if is_first:
+                                is_first = False
+                                # make the original building a building_part and update with the remaining geometry
+                                original_building.update_geometry(my_poly.exterior, refs=new_refs)
+                                original_building.tags = dict()
+                                original_building.tags['building_part'] = 'yes'
+                                building_parent.add_child(original_building)
+                                original_building_still_used = True
+                            else:
+                                new_way = osmparser.Way(osmparser.get_next_pseudo_osm_id())
+                                new_way.refs = new_refs
+                                new_tags = {'building_part': 'yes'}
+                                new_building_part = _make_building_from_way(nodes_dict, new_tags, new_way,
+                                                                            coords_transform, stats)
+                                my_buildings[new_building_part.osm_id] = new_building_part
+                                building_parent.add_child(new_building_part)
 
-    logging.debug('Removing %d pseudo_parents: %s' % (len(buildings_to_remove), str(buildings_to_remove)))
-    for key in buildings_to_remove:
-        del my_buildings[key]
+            else:  # GeometryCollection empty -> nothing left, i.e. the parts cover the whole original building
+                pass
+        except Exception as e:
+            logging.warning('There is an unresolved problem for building parent with key %i', key)
+            logging.warning(e)
+            # nothing else to be done, original_building_still_used either properly set to True or not
 
-    for new_building in buildings_to_add:
-        my_buildings[new_building.osm_id] = new_building
+        if not original_building_still_used:
+            # if the original_building is not reused, then remove it
+            del my_buildings[key]
+            stats_original_removed += 1
 
-    logging.info('Processed valid build:part objects: %d', len(valid_parts))
-    logging.info('Parts: %s', str(valid_parts))
-    logging.info('Number of found building:part objects within buildings outside of relation: %d', found_pseudo_parents)
+    logging.info('Handled %i building_parents and removed %i original buildings',
+                 len(building_parents), stats_original_removed)
 
 
 def _process_osm_building(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int, osmparser.Way],
@@ -543,9 +504,9 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
     osm_rel_ways_dict = osm_read_results.rel_ways_dict
 
     the_buildings = _process_osm_building(osm_nodes_dict, osm_ways_dict, coords_transform, stats)
-    _process_osm_relation(osm_nodes_dict, osm_rel_ways_dict, osm_relations_dict, the_buildings, coords_transform,
-                          stats)
-    _process_lonely_building_parts(osm_nodes_dict, osm_ways_dict, the_buildings, coords_transform, stats)
+    _process_osm_relations(osm_nodes_dict, osm_rel_ways_dict, osm_relations_dict, the_buildings, coords_transform,
+                           stats)
+    _process_building_parts(osm_nodes_dict, the_buildings, coords_transform, stats)
 
     # for convenience change to list from dict
     the_buildings = list(the_buildings.values())
