@@ -204,11 +204,13 @@ BUILDING_COMPLEX_ROOFS_MIN_RATIO_AREA           Integer    600       If a buildi
                                                                      one more square buildings, which at the same time are large, the roof tends
                                                                      to be flat.
 
-BUILDING_SKEL_MAX_NODES                         Integer    10        The maximum number of nodes for which a complex roof is generated.
+BUILDING_SKEL_MAX_NODES                         Integer    10        The maximum number of nodes for which a complex roof is generated. The higher
+                                                                     the number, the longer the execution time but the more houses actually get
+                                                                     realistic roofs.
 
 =============================================   ========   =======   ==============================================================================
 
-If the ``roof:shape`` tag is missing in OSM (which it most oftenly is), then the following parameters can help to make region specific decision on what roof types are to be applied randomly with a given ratio. Again — only if the roofs even may be somethine else than flat given the parameters above. Thes sum of the ratios should give 1.0.
+If the ``roof:shape`` tag is missing in OSM (which it most often is), then the following parameters can help to make region specific decisions on what roof types are to be applied randomly with a given ratio. The sum of the ratios must give 1.0.
 
 =============================================   ========   =======
 Parameter                                       Type       Default

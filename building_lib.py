@@ -593,15 +593,9 @@ class Building(object):
                 # no complex roof on tiny buildings.
                 elif self.levels < parameters.BUILDING_COMPLEX_ROOFS_MIN_LEVELS and 'roof:shape' not in self.tags:
                     allow_complex_roofs = False
-                elif self.pts_all_count > 4 and self.roof_shape is not RoofShape.pyramidal:
-                    allow_complex_roofs = False
-                    # Now lets see whether we can allow complex nevertheless when more than 4 corners
-                    # a bit more relaxed, if we do skeleton roofs
-                    if self.pts_all_count in range(4, parameters.BUILDING_SKEL_MAX_NODES):
-                        allow_complex_roofs = True
-                    # even more relaxed if it is a skillion
-                    if self.roof_shape is RoofShape.skillion:
-                        allow_complex_roofs = True
+                elif self.roof_shape not in [RoofShape.pyramidal, RoofShape.skillion] \
+                        and self.pts_all_count > parameters.BUILDING_SKEL_MAX_NODES:
+                        allow_complex_roofs = False
 
             # make sure roof shape is flat if we are not allowed to use it
             if allow_complex_roofs is False:
