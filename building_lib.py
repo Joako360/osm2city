@@ -163,6 +163,13 @@ class Building(object):
 
         self.ground_elev = 0.0  # the lowest elevation over sea of any point in the outer ring of the building
 
+    def make_building_from_part(self) -> None:
+        """Make sure a former building_part gets tagged correctly"""
+        part_value = self.tags['building:part']
+        del self.tags['building:part']
+        if 'building' not in self.tags:
+            self.tags['building'] = part_value
+
     def update_geometry(self, outer_ring: shg.LinearRing, inner_rings_list=list(), refs: List[int]=list()) -> None:
         """Updates the geometry of the building. This can also happen after the building has been initialized.
         Makes also sure, that inner and outer rings have correct orientation.
@@ -1145,11 +1152,6 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: u
             if parameters.BUILDING_USE_SHARED_WORSHIP:
                 if _analyse_worship_building(b, building_parent, stg_manager, fg_elev, coords_transform):
                     continue
-
-        # make sure we have a flat roof in parent:child situation. By using tag instead of direct b.roof_shape
-        # property we make sure, that it is not overwritten in analysis later
-        if building_parent is not None:
-            b.tags['roof:shape'] = 'flat'
 
         if parameters.BUILDING_FORCE_EUROPEAN_INNER_CITY_STYLE:
             b.enforce_european_style()

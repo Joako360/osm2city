@@ -259,32 +259,32 @@ def _process_building_parts(nodes_dict: Dict[int, osmparser.Node],
                 # need to find all buildings, which have at least one node in common
                 # do it by common nodes instead of geometry due to performance
                 parent_missing = True
-                parent_candidates = set()
-                b_refs_set = set(b_part.refs)
                 for c_key, candidate in my_buildings.items():
-                    if part_key != c_key and c_key not in parent_candidates and 'building:part' not in candidate.tags:
-                        if b_refs_set.intersection(set(candidate.refs)):
-                            parent_candidates.add(c_key)
-                # now check by geometry whether part only touches or actually is in the parent_candidate (building)
-                for candidate in parent_candidates:
-                    c_way = osmparser.Way(candidate)
-                    c_way.refs = my_buildings[candidate].refs
-                    candidate_poly = c_way.polygon_from_osm_way(nodes_dict, coords_transform)
-                    if candidate_poly is not None and not b_part.polygon.touches(candidate_poly):
-                        if candidate in building_parents:
-                            building_parent = building_parents[candidate]
-                        else:
-                            building_parent = building_lib.BuildingParent(candidate, True)
-                        building_parent.add_child(b_part)
-                        parent_missing = False
-                        building_parents[building_parent.osm_id] = building_parent
+                    if part_key != c_key and 'building:part' not in candidate.tags and candidate.polygon is not None:
+                        # Not sure why it is not enough to just test for "within", but e.g. 511476571 is not
+                        # within 30621689 (building in Prague). Therefore test for references to nodes
+                        # and be satisfied if all references are found in candidate
+                        all_refs_found = True
+                        for ref in b_part.refs:
+                            if ref not in candidate.refs:
+                                all_refs_found = False
+                                break
+                        if all_refs_found:
+                            parent_missing = False
+                        elif b_part.polygon.within(candidate.polygon):
+                            parent_missing = False
+                        if not parent_missing:
+                            if c_key in building_parents:
+                                building_parent = building_parents[c_key]
+                            else:
+                                building_parent = building_lib.BuildingParent(c_key, True)
+                                building_parents[building_parent.osm_id] = building_parent
+                            building_parent.add_child(b_part)
+                            break
                 # if no parent was found, then re-model as a building
                 if parent_missing:
                     stats_parts_remodelled += 1
-                    building_part_value = b_part.tags['building:part']
-                    del b_part.tags['building:part']
-                    if 'building' not in b_part.tags:
-                        b_part.tags['building'] = building_part_value
+                    b_part.make_building_from_part()
             else:
                 if b_part.parent.outline:
                     if b_part.parent.osm_id not in building_parents:
@@ -310,7 +310,8 @@ def _process_building_parts(nodes_dict: Dict[int, osmparser.Node],
         # add up all areas of the children - we are only interested in what is left
         children_polygons = list()
         for child in building_parent.children:
-            if child.polygon.within(original_building.polygon):
+            common_refs = [x for x in child.refs if x in original_building.refs]
+            if len(common_refs) < 2:
                 continue  # excluding, because could have min_height on top of building (e.g. a dome)
             children_polygons.append(child.polygon)
         total_area_building_parts = sho.cascaded_union(children_polygons)
@@ -370,6 +371,20 @@ def _process_building_parts(nodes_dict: Dict[int, osmparser.Node],
 
     logging.info('Handled %i building_parents and removed %i original buildings',
                  len(building_parents), stats_original_removed)
+
+
+def _clean_building_parents_with_one_child(my_buildings: List[building_lib.Building]) -> None:
+    """Make sure that buildings with a parent, which only has this child, gets no parent.
+
+    There is no point in BuildingParent, if there is only one child."""
+    for building in my_buildings:
+        if building.parent is not None:
+            if len(building.parent.children) < 2:
+                building.make_building_from_part()
+                for key, value in building.parent.tags.items():
+                    if key not in building.tags:
+                        building.tags[key] = value
+                building.parent = None
 
 
 def _process_osm_building(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int, osmparser.Way],
@@ -542,6 +557,9 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
 
     if parameters.OVERLAP_CHECK_CONVEX_HULL:  # needs to be before building_lib.analyse to catch more at first hit
         the_buildings = building_lib.overlap_check_convex_hull(the_buildings, stg_entries, stats)
+
+    # final check on building parent hierarchy
+    _clean_building_parents_with_one_child(the_buildings)
 
     # - analyze buildings
     #   - calculate area
