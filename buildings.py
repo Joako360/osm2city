@@ -25,6 +25,7 @@ import cluster
 import numpy as np
 import parameters
 import prepare_textures
+import textures.materials
 import textures.texture as tex
 import utils.vec2d as v
 from utils import osmparser, coordinates, stg_io2, utilities
@@ -537,7 +538,7 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
 
     # clean up "color" in tags
     for b in the_buildings:
-        tex.screen_osm_tags_for_colour_spelling(b.osm_id, b.tags)
+        textures.materials.screen_osm_keys_for_colour_material_variants(b.tags)
 
     # -- create (empty) clusters
     lmin = v.Vec2d(coords_transform.toLocal(cmin))

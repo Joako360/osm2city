@@ -486,7 +486,8 @@ class Building(object):
         
         The OSM key 'min_height' is for raising a facade. Even if this 'min_height' is > 0, then the height
         of the building remains the same - the facade just gets shorter.
-        See http://wiki.openstreetmap.org/wiki/Key:min_height and http://wiki.openstreetmap.org/wiki/Simple_3D_buildings
+        See http://wiki.openstreetmap.org/wiki/Key:min_height and http://wiki.openstreetmap.org/wiki/Simple_3D_buildings        building_facade_material = None
+
 
         In order to make stuff more obvious in processing, the code will use the following properties:
         * min_height - as described above and therefore mostly 0.0
@@ -954,7 +955,6 @@ class BuildingParent(object):
         difference_found = False
         building_colour = None
         building_material = None
-        building_facade_material = None
         for child in self.children:
             if default_child is None:
                 default_child = child
@@ -962,8 +962,6 @@ class BuildingParent(object):
                     building_colour = child.tags['building:colour']
                 if 'building:material' in child.tags:
                     building_material = child.tags['building:material']
-                if 'building:facade:material' in child.tags:
-                    building_facade_material = child.tags['building:facade:material']
             else:
                 if child.longest_edge_length > default_child.longest_edge_length:
                     default_child = child
@@ -979,13 +977,6 @@ class BuildingParent(object):
                         difference_found = True
                         break
                     elif building_material != child.tags['building:material']:
-                        difference_found = True
-                        break
-                if 'building:facade:material' in child.tags:
-                    if building_facade_material is None:
-                        difference_found = True
-                        break
-                    elif building_facade_material != child.tags['building:facade:material']:
                         difference_found = True
                         break
 

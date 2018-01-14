@@ -8,6 +8,7 @@ from typing import Dict, List, Optional
 import numpy as np
 
 import parameters
+from textures.materials import screen_texture_tags_for_colour_spelling, map_hex_colour
 from utils.utilities import replace_with_os_separator, Stats
 
 
@@ -334,7 +335,7 @@ class RoofManager(object):
     def find_candidates(self, requires: List[str], excludes: List[str]):
         candidates = []
         # replace known hex colour codes
-        requires = list(_map_hex_colour(value) for value in requires)
+        requires = list(map_hex_colour(value) for value in requires)
         can_use = True
         for candidate in self.__l:
             for ex in excludes:
@@ -485,59 +486,3 @@ def _rank_candidates(candidates, tags):
     if max_val > 0:
         logging.info("Max Rank %d" % max_val)
     return [t[1] for t in ranked_list if t[0] >= max_val]
-
-
-def _map_hex_colour(value):
-    colour_map = {
-                  "#000000": "black",
-                  "#FFFFFF": "white",
-                  "#808080": "grey",
-                  "#C0C0C0": "silver",
-                  "#800000": "maroon",
-                  "#FF0000": "red",
-                  "#808000": "olive",
-                  "#FFFF00": "yellow",
-                  "#008000": "green",
-                  "#00FF00": "lime",
-                  "#008080": "teal",
-                  "#00FFFF": "aqua",
-                  "#000080": "navy",
-                  "#0000FF": "blue",
-                  "#800080": "purple",
-                  "#FF00FF": "fuchsia"
-    }
-    hash_pos = value.find("#")
-    if (value.startswith("roof:colour") or value.startswith("facade:building:colour")) and hash_pos > 0:
-        try:
-            tag_string = value[:hash_pos]
-            colour_hex_string = value[hash_pos:].upper()
-
-            return tag_string + colour_map[colour_hex_string]
-        except KeyError:
-            return value
-    return value
-
-
-def screen_texture_tags_for_colour_spelling(original: str) -> str:
-    """Replaces all occurrences of color with colour"""
-    if "color" in original or "gray" in original:
-        new_string = original.replace("color", "colour")
-        new_string = new_string.replace("gray", "grey")
-        return new_string
-    else:
-        return original
-
-
-def screen_osm_tags_for_colour_spelling(osm_id: int, tags: Dict[str, str]) -> None:
-    if 'building:color' in tags and 'building:colour' not in tags:
-        logging.debug('osm_id %i uses color instead of colour' % osm_id)
-        tags['building:colour'] = tags['building:color']
-        del (tags['building:color'])
-    elif 'building:color' in tags and 'building:colour' in tags:
-        del (tags['building:color'])
-    if 'roof:color' in tags and 'roof:colour' not in tags:
-        logging.debug('osm_id %i uses color instead of colour' % osm_id)
-        tags['roof:colour'] = tags['roof:color']
-        del (tags['roof:color'])
-    elif 'roof:color' in tags and 'roof:colour' in tags:
-        del (tags['roof:color'])
