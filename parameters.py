@@ -76,7 +76,7 @@ USE_EXTERNAL_MODELS = False
 
 WRITE_CLUSTER_STATS = False
 
-FLAG_2018 = False  # Feature flag for 2018.1 or greater version of FG
+FLAG_2018_2 = False  # Feature flag for 2018.1 or greater version of FG
 
 # =============================================================================
 # PARAMETERS RELATED TO BUILDINGS IN osm2city
@@ -149,6 +149,10 @@ BUILDING_CITY_LEVEL_HEIGHT_HIGH = 3.6
 # FIXME: same parameters for place = town, village, suburb
 
 BUILDING_USE_SHARED_WORSHIP = False  # try to use shared models for worship buildings
+
+# a hex value for the colour to be used if the colour value in OSM is missing or cannot be interpreted
+BUILDING_FACADE_DEFAULT_COLOUR = '#D3D3D3'  # e.g. #d3d3d3 - light grey
+BUILDING_ROOF_DEFAULT_COLOUR = '#B22222'  # e.g. #b22222 - firebrick
 
 # -- The more buildings end up in LOD rough, the more work for your GPU.
 #    Increasing any of the following parameters will decrease GPU load.

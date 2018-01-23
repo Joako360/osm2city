@@ -10,7 +10,8 @@ from utils.utilities import Stats
 from textures.texture import Texture, RoofManager
 
 
-def flat(ac_object: ac.Object, index_first_node_in_ac_obj: int, b, roof_mgr: RoofManager, stats: Stats) -> None:
+def flat(ac_object: ac.Object, index_first_node_in_ac_obj: int, b, roof_mgr: RoofManager, roof_mat_idx: int,
+         stats: Stats) -> None:
     """Flat roof. Also works for relations."""
     #   3-----------------2  Outer is CCW: 0 1 2 3
     #   |                /|  Inner[0] is CW: 4 5 6 7
@@ -60,14 +61,14 @@ def flat(ac_object: ac.Object, index_first_node_in_ac_obj: int, b, roof_mgr: Roo
     nodes_uv_list = []
     for i, node in enumerate(nodes):
         nodes_uv_list.append((node + index_first_node_in_ac_obj, uv[i][0], uv[i][1]))
-    ac_object.face(nodes_uv_list)
+    ac_object.face(nodes_uv_list, mat_idx=roof_mat_idx)
 
 
-def separate_hipped(ac_object: ac.Object, b) -> None:
-    return separate_gable(ac_object, b, inward_meters=3.)
+def separate_hipped(ac_object: ac.Object, b, roof_mat_idx: int) -> None:
+    return separate_gable(ac_object, b, roof_mat_idx, inward_meters=3.)
 
 
-def separate_gable(ac_object, b, inward_meters=0.) -> None:
+def separate_gable(ac_object, b, roof_mat_idx: int, inward_meters=0.) -> None:
     """gable roof, 4 nodes, separate model. Inward_"""
     # -- pitched roof for 4 ground nodes
     t = b.roof_texture
@@ -137,27 +138,31 @@ def separate_gable(ac_object, b, inward_meters=0.) -> None:
     ac_object.face([(o + 0, t.x(0), t.y(0)),
                     (o + 1, t.x(repeat_x), t.y(0)),
                     (o + 5, t.x(repeat_x*(1-inward_meters/len_roof_bottom)), t.y(repeat_y)),
-                    (o + 4, t.x(repeat_x*(inward_meters/len_roof_bottom)), t.y(repeat_y))])
+                    (o + 4, t.x(repeat_x*(inward_meters/len_roof_bottom)), t.y(repeat_y))],
+                   mat_idx=roof_mat_idx)
 
     ac_object.face([(o + 2, t.x(0), t.y(0)),
                     (o + 3, t.x(repeat_x), t.y(0)),
                     (o + 4, t.x(repeat_x*(1-inward_meters/len_roof_bottom)), t.y(repeat_y)),
-                    (o + 5, t.x(repeat_x*(inward_meters/len_roof_bottom)), t.y(repeat_y))])
+                    (o + 5, t.x(repeat_x*(inward_meters/len_roof_bottom)), t.y(repeat_y))],
+                   mat_idx=roof_mat_idx)
 
     repeat_x = b.edge_length_pts[ind_X[1]]/roof_texture_size_x
     len_roof_hypo = (inward_meters**2 + roof_height**2)**0.5
     repeat_y = len_roof_hypo/roof_texture_size_y
     ac_object.face([(o + 1, t.x(0), t.y(0)),
                     (o + 2, t.x(repeat_x), t.y(0)),
-                    (o + 5, t.x(0.5*repeat_x), t.y(repeat_y))])
+                    (o + 5, t.x(0.5*repeat_x), t.y(repeat_y))],
+                   mat_idx=roof_mat_idx)
 
     repeat_x = b.edge_length_pts[ind_X[3]]/roof_texture_size_x
     ac_object.face([(o + 3, t.x(0), t.y(0)),
                     (o + 0, t.x(repeat_x), t.y(0)),
-                    (o + 4, t.x(0.5*repeat_x), t.y(repeat_y))])
+                    (o + 4, t.x(0.5*repeat_x), t.y(repeat_y))],
+                   mat_idx=roof_mat_idx)
 
 
-def separate_pyramidal(ac_object: ac.Object, b, inward_meters=0.0) -> None:
+def separate_pyramidal(ac_object: ac.Object, b, roof_mat_idx: int, inward_meters=0.0) -> None:
     """pyramidal roof, ? nodes, separate model. Inward_"""
     # -- pitched roof for ? ground nodes
     t = b.roof_texture
@@ -191,10 +196,11 @@ def separate_pyramidal(ac_object: ac.Object, b, inward_meters=0.0) -> None:
         repeat_y = len_roof_hypo/roof_texture_size_pt
         ac_object.face([(o + i, t.x(0), t.y(0)),
                         (o + (i+1) % len(b.pts_all), t.x(repeat_x), t.y(0)),
-                        (o + len(b.pts_all), t.x(0.5*repeat_x), t.y(repeat_y))])
+                        (o + len(b.pts_all), t.x(0.5*repeat_x), t.y(repeat_y))],
+                       mat_idx=roof_mat_idx)
 
 
-def separate_skillion(ac_object: ac.Object, b):
+def separate_skillion(ac_object: ac.Object, b, roof_mat_idx: int):
     """skillion roof, n nodes, separate model. Inward_"""
     # - handle square skillion roof
     #   it's assumed that the first 2 nodes are at building:height-roof:height
@@ -247,7 +253,7 @@ def separate_skillion(ac_object: ac.Object, b):
         ac_object.node(-b.pts_all[node][1], b.beginning_of_roof_above_sea_level + b.roof_height_pts[node],
                        -b.pts_all[node][0])
         nodes_uv_list.append((object_node_index + node, uv[i][0], uv[i][1]))
-    ac_object.face(nodes_uv_list)
+    ac_object.face(nodes_uv_list, mat_idx=roof_mat_idx)
     return
 
 

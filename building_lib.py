@@ -23,6 +23,7 @@ Call hierarchy (as of summer 2017) - building_lib is called from building.py:
 
 """
 
+import collections
 import copy
 from enum import IntEnum, unique
 import logging
@@ -38,6 +39,7 @@ from shapely.geos import TopologicalError
 import parameters
 import roofs
 import textures.texture as tex
+import textures.materials as mat
 import utils.stg_io2
 from utils import ac3d, coordinates, utilities
 import utils.osmparser
@@ -413,14 +415,13 @@ class Building(object):
                                                                                         str(self.roof_requires)))
             return False
 
-        if self.roof_texture:
-            logging.debug("__done" + str(self.roof_texture) + str(self.roof_texture.provides))
+        logging.debug("__done" + str(self.roof_texture) + str(self.roof_texture.provides))
 
-        else:
-            stats.skipped_texture += 1
-            logging.debug('WARNING: no matching roof texture for OsmID {} <{}>'.format(self.osm_id,
-                                                                                       str(self.roof_requires)))
-            return False
+        if parameters.FLAG_2018_2:
+            if 'building:colour' not in self.tags:
+                self.tags['building:colour'] = parameters.BUILDING_FACADE_DEFAULT_COLOUR
+            if 'roof:colour' not in self.tags:
+                self.tags['roof:colour'] = parameters.BUILDING_ROOF_DEFAULT_COLOUR
 
         return True
 
@@ -646,7 +647,10 @@ class Building(object):
 
             # now apply some tags to increase European style
             if 'roof:colour' not in self.tags:
-                self.tags['roof:colour'] = 'red'
+                if parameters.FLAG_2018_2:
+                    self.tags['roof:colour'] = '#FF0000'
+                else:
+                    self.tags['roof:colour'] = 'red'
             if 'roof:shape' not in self.tags:
                 self.tags['roof:shape'] = 'gabled'
 
@@ -767,7 +771,8 @@ class Building(object):
                     self.roof_height = temp_roof_height
 
     def write_to_ac(self, ac_object: ac3d.Object, cluster_elev: float, cluster_offset: Vec2d,
-                    roof_mgr: tex.RoofManager, stats: utilities.Stats) -> None:
+                    roof_mgr: tex.RoofManager, face_mat_idx: int, roof_mat_idx: int,
+                    stats: utilities.Stats) -> None:
         # get local medium ground elevation for each building
         self.set_ground_elev_and_offset(cluster_elev, cluster_offset)
 
@@ -777,13 +782,13 @@ class Building(object):
 
         self._write_vertices_for_ac(ac_object)
 
-        self._write_faces_for_ac(ac_object, self.polygon.exterior, True, index_first_node_in_ac_obj)
+        self._write_faces_for_ac(ac_object, self.polygon.exterior, True, index_first_node_in_ac_obj, face_mat_idx)
         if not parameters.EXPERIMENTAL_INNER and len(self.polygon.interiors) > 1:
             raise NotImplementedError("Can't yet handle relations with more than one inner way")
         for inner in self.polygon.interiors:
-            self._write_faces_for_ac(ac_object, inner, False, index_first_node_in_ac_obj)
+            self._write_faces_for_ac(ac_object, inner, False, index_first_node_in_ac_obj, face_mat_idx)
 
-        self._write_roof_for_ac(ac_object, index_first_node_in_ac_obj, roof_mgr, cluster_offset, stats)
+        self._write_roof_for_ac(ac_object, index_first_node_in_ac_obj, roof_mgr, roof_mat_idx, cluster_offset, stats)
 
     def _write_vertices_for_ac(self, ac_object: ac3d.Object) -> None:
         """Write the vertices for each node along bottom and roof edges to the ac3d object."""
@@ -816,7 +821,7 @@ class Building(object):
                 ac_object.node(-pt[1], self.beginning_of_roof_above_sea_level, -pt[0])
 
     def _write_faces_for_ac(self, ac_object: ac3d.Object, ring: shg.LinearRing, is_exterior_ring: bool,
-                            index_first_node_in_ac_obj: int) -> None:
+                            index_first_node_in_ac_obj: int, mat_idx: int) -> None:
         """Writes all the faces for one building's exterior or interior ring to an ac3d object."""
         tex_coord_bottom, tex_coord_top = _calculate_vertical_texture_coords(self.body_height, self.facade_texture)
         tex_coord_bottom = self.facade_texture.y(tex_coord_bottom)  # -- to atlas coordinates
@@ -861,21 +866,22 @@ class Building(object):
                             (ipp + index_first_node_in_ac_obj, tex_coord_right, tex_coord_bottom),
                             (ipp + index_first_node_in_ac_obj + self.pts_all_count, tex_coord_right, tex_y11),
                             (i + index_first_node_in_ac_obj + self.pts_all_count, tex_coord_left, tex_y12)],
+                           mat_idx=mat_idx,
                            swap_uv=self.facade_texture.v_can_repeat)
 
     def _write_roof_for_ac(self, ac_object: ac3d.Object, index_first_node_in_ac_obj: int, roof_mgr: tex.RoofManager,
-                           cluster_offset: Vec2d, stats: utilities.Stats) -> None:
+                           roof_mat_idx: int, cluster_offset: Vec2d, stats: utilities.Stats) -> None:
         """Writes the roof vertices and faces to an ac3d object."""
         if self.roof_shape is RoofShape.flat:
-            roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, stats)
+            roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, roof_mat_idx, stats)
 
         else:
             # -- pitched roof for > 4 ground nodes
             if self.pts_all_count > 4:
                 if self.roof_shape is RoofShape.skillion:
-                    roofs.separate_skillion(ac_object, self)
+                    roofs.separate_skillion(ac_object, self, roof_mat_idx)
                 elif self.roof_shape is RoofShape.pyramidal:
-                    roofs.separate_pyramidal(ac_object, self)
+                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
                 else:
                     s = myskeleton.myskel(ac_object, self, stats, offset_xy=cluster_offset,
                                           offset_z=self.beginning_of_roof_above_sea_level,
@@ -885,22 +891,22 @@ class Building(object):
 
                     else:  # something went wrong - fall back to flat roof
                         self.roof_shape = RoofShape.flat
-                        roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, stats)
+                        roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, roof_mat_idx, stats)
             # -- pitched roof for exactly 4 ground nodes
             elif self.pts_all_count == 4:
                 if self.roof_shape is RoofShape.gabled:
-                    roofs.separate_gable(ac_object, self)
+                    roofs.separate_gable(ac_object, self, roof_mat_idx)
                 elif self.roof_shape is RoofShape.hipped:
-                    roofs.separate_hipped(ac_object, self)
+                    roofs.separate_hipped(ac_object, self, roof_mat_idx)
                 elif self.roof_shape is RoofShape.pyramidal:
-                    roofs.separate_pyramidal(ac_object, self)
+                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
                 elif self.roof_shape is RoofShape.skillion:
-                    roofs.separate_skillion(ac_object, self)
+                    roofs.separate_skillion(ac_object, self, roof_mat_idx)
                 else:
                     logging.warning("Roof type %s seems to be unsupported, but is mapped ", self.roof_shape.name)
-                    roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, stats)
+                    roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, roof_mat_idx, stats)
             else:  # fall back to pyramidal
-                roofs.separate_pyramidal(ac_object, self)
+                roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
 
     def __str__(self):
         return "<OSM_ID %d at %s>" % (self.osm_id, hex(id(self)))
@@ -1205,8 +1211,28 @@ def write(ac_file_name: str, buildings: List[Building], cluster_elev: float, clu
        Offset accounts for cluster center
        All LOD in one file. Plus roofs. One ac3d.Object per LOD
     """
-    ac = ac3d.File(stats=stats)
+    # prepare the colours list (materials in AC3D speech)
     texture_name = 'Textures/osm2city/atlas_facades.png'
+    colours = collections.OrderedDict()  # # hex_value: str, index: int
+    colours_index = 0
+    for building in buildings:
+        if 'building:colour' in building.tags:
+            if building.tags['building:colour'] not in colours:
+                colours[building.tags['building:colour']] = colours_index
+                colours_index += 1
+        if 'roof:colour' in building.tags:
+            if building.tags['roof:colour'] not in colours:
+                colours[building.tags['roof:colour']] = colours_index
+                colours_index += 1
+
+    materials_list = list()
+    if parameters.FLAG_2018_2:
+        texture_name = 'FIXME'  # FIXME: this is only temporary until we have new textures
+        materials_list = mat.create_materials_list_from_hex_colours(colours)
+
+    ac = ac3d.File(stats=stats, materials_list=materials_list)
+
+    # create the main objects in AC3D
     lod_objects = list()  # a list of meshes, where each LOD has one mesh
     lod_objects.append(ac.new_object('LOD_rough', texture_name, default_mat_idx=ac3d.MAT_IDX_LIT))
     lod_objects.append(ac.new_object('LOD_detail', texture_name, default_mat_idx=ac3d.MAT_IDX_LIT))
@@ -1214,8 +1240,12 @@ def write(ac_file_name: str, buildings: List[Building], cluster_elev: float, clu
     for ib, b in enumerate(buildings):
         utilities.progress(ib, len(buildings))
         ac_object = lod_objects[b.LOD]
-
-        b.write_to_ac(ac_object, cluster_elev, cluster_offset, roof_mgr, stats)
+        face_mat_idx = 0
+        roof_mat_idx = 0
+        if parameters.FLAG_2018_2:
+            face_mat_idx = colours[b.tags['building:colour']]
+            roof_mat_idx = colours[b.tags['roof:colour']]
+        b.write_to_ac(ac_object, cluster_elev, cluster_offset, roof_mgr, face_mat_idx, roof_mat_idx, stats)
 
     ac.write(ac_file_name)
 

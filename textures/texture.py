@@ -18,7 +18,7 @@ class Texture(object):
     """
     spelling used internally in osm2city and in many cases automatically converted:
         - colour (instead of color)
-        - grey (instead of gray)
+        - gray (instead of grey)
 
     possible texture types:
         - facade

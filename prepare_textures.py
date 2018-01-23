@@ -11,7 +11,7 @@ Created on Wed Mar 13 22:22:05 2013
 #
 # ideally:
 # Texture(rules='building.height > 15 
-#                AND (roof.color = black OR roof.color = grey)
+#                AND (roof.colour = black OR roof.colour = gray)
 #                AND roof.shape = flat ')
 
 

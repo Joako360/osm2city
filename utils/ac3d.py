@@ -1,13 +1,12 @@
 import logging
-from typing import Optional
+from typing import List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
-
-import parameters
-
 from pyparsing import Literal, Word, alphas, Optional, OneOrMore, \
     Group, nums, Regex, alphanums, LineEnd, Each, ZeroOrMore
+
+import textures.materials
 
 fmt_node = '%g'
 fmt_surf = '%1.4g'
@@ -101,7 +100,7 @@ class Object(object):
         """Add new face. Return its index."""
         if not typ:
             typ = self.default_type
-        if not mat_idx:
+        if mat_idx is None:
             mat_idx = self.default_mat_ix
         if not swap_uv:
             swap_uv = self.default_swap_uv
@@ -199,10 +198,10 @@ class File(object):
     a common source of bugs. Can also add 3d labels (useful for debugging, disabled
     by default)
     """
-    def __init__(self, file_name=None, stats=None, show_labels=False) -> None:
+    def __init__(self, file_name=None, stats=None, show_labels=False, materials_list: List[str]=list()) -> None:
         """If file_name not None, then read ac3d data from file_name if given. Otherwise create empty ac3d object."""
         self.objects = []
-        self.materials_list = []
+        self.materials_list = materials_list
         self.show_labels = show_labels
         self.stats = stats
         self._current_object = None
@@ -276,11 +275,9 @@ class File(object):
 
     def __str__(self) -> str:
         s = 'AC3Db\n'
-        if self.materials_list:
-            s += "".join(['MATERIAL %s\n' % the_mat for the_mat in self.materials_list])
-        else:
-            s += 'MATERIAL "unlit" rgb 0 0 0 amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0\n'
-            s += 'MATERIAL "lit" rgb 1 1 1 amb 1 1 1 emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0\n'
+        if not self.materials_list:
+            self.materials_list = textures.materials.create_materials_list_roads()
+        s += "".join(['%s\n' % the_mat for the_mat in self.materials_list])
         non_empty = [o for o in self.objects if not o.is_empty()]
         # FIXME: this doesn't handle nested kids properly
         s += 'OBJECT world\nkids %i\n' % len(non_empty)
