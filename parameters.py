@@ -136,8 +136,6 @@ BUILDING_FAKE_AMBIENT_OCCLUSION = True      # -- fake AO by darkening facade tex
 BUILDING_FAKE_AMBIENT_OCCLUSION_HEIGHT = 6. #    1 - VALUE * exp(- AGL / HEIGHT )
 BUILDING_FAKE_AMBIENT_OCCLUSION_VALUE = 0.6
 
-EXPERIMENTAL_INNER = False              # -- do we still need this?
-
 # -- Parameters which influence the height of buildings if no info from OSM is available.
 #    It uses a triangular distribution (see http://en.wikipedia.org/wiki/Triangular_distribution)
 BUILDING_CITY_LEVELS_LOW = 2.0

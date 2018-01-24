@@ -223,7 +223,7 @@ class Building(object):
         self.outer_nodes_closest = [y for (y, x) in yx]
         self._set_polygon(self.polygon.exterior, self.inner_rings_list)
 
-    def simplify(self, tolerance):
+    def simplify(self, tolerance):  # TODO: not used
         original_nodes = self.pts_outer_count + len(self.pts_inner)
         self.polygon = self.polygon.simplify(tolerance)
         nnodes_simplified = original_nodes - (self.pts_outer_count + len(self.pts_inner))
@@ -782,11 +782,15 @@ class Building(object):
 
         self._write_vertices_for_ac(ac_object)
 
-        self._write_faces_for_ac(ac_object, self.polygon.exterior, True, index_first_node_in_ac_obj, face_mat_idx)
-        if not parameters.EXPERIMENTAL_INNER and len(self.polygon.interiors) > 1:
-            raise NotImplementedError("Can't yet handle relations with more than one inner way")
+        number_prev_ring_nodes = 0
+        number_prev_ring_nodes += self._write_faces_for_ac(ac_object, self.polygon.exterior,
+                                                          index_first_node_in_ac_obj, number_prev_ring_nodes,
+                                                          face_mat_idx)
+
         for inner in self.polygon.interiors:
-            self._write_faces_for_ac(ac_object, inner, False, index_first_node_in_ac_obj, face_mat_idx)
+            number_prev_ring_nodes += self._write_faces_for_ac(ac_object, inner,
+                                                             index_first_node_in_ac_obj, number_prev_ring_nodes,
+                                                             face_mat_idx)
 
         self._write_roof_for_ac(ac_object, index_first_node_in_ac_obj, roof_mgr, roof_mat_idx, cluster_offset, stats)
 
@@ -820,27 +824,23 @@ class Building(object):
             for pt in self.pts_all:
                 ac_object.node(-pt[1], self.beginning_of_roof_above_sea_level, -pt[0])
 
-    def _write_faces_for_ac(self, ac_object: ac3d.Object, ring: shg.LinearRing, is_exterior_ring: bool,
-                            index_first_node_in_ac_obj: int, mat_idx: int) -> None:
+    def _write_faces_for_ac(self, ac_object: ac3d.Object, ring: shg.LinearRing,
+                            index_first_node_in_ac_obj: int, number_prev_ring_nodes: int, mat_idx: int) -> int:
         """Writes all the faces for one building's exterior or interior ring to an ac3d object."""
         tex_coord_bottom, tex_coord_top = _calculate_vertical_texture_coords(self.body_height, self.facade_texture)
         tex_coord_bottom = self.facade_texture.y(tex_coord_bottom)  # -- to atlas coordinates
         tex_coord_top_input = tex_coord_top
         tex_coord_top = self.facade_texture.y(tex_coord_top)
 
-        number_outer_ring_nodes = self.pts_outer_count
-        if is_exterior_ring:
-            number_outer_ring_nodes = 0
-
         number_ring_nodes = len(ring.coords) - 1
 
         for ioff in range(0, number_ring_nodes):
-            i = number_outer_ring_nodes + ioff
+            i = number_prev_ring_nodes + ioff
 
             if ioff < number_ring_nodes - 1:
                 ipp = i + 1
             else:
-                ipp = number_outer_ring_nodes
+                ipp = number_prev_ring_nodes
             # FIXME: respect facade texture split_h
             # FIXME: there is a nan in textures.h_splits of tex/facade_modern36x36_12
             a = self.edge_length_pts[i] / self.facade_texture.h_size_meters
@@ -868,6 +868,7 @@ class Building(object):
                             (i + index_first_node_in_ac_obj + self.pts_all_count, tex_coord_left, tex_y12)],
                            mat_idx=mat_idx,
                            swap_uv=self.facade_texture.v_can_repeat)
+        return number_ring_nodes
 
     def _write_roof_for_ac(self, ac_object: ac3d.Object, index_first_node_in_ac_obj: int, roof_mgr: tex.RoofManager,
                            roof_mat_idx: int, cluster_offset: Vec2d, stats: utilities.Stats) -> None:

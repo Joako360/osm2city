@@ -26,7 +26,6 @@ import numpy as np
 import parameters
 import prepare_textures
 import textures.materials
-import textures.texture as tex
 import utils.vec2d as v
 from utils import osmparser, coordinates, stg_io2, utilities
 
@@ -437,11 +436,10 @@ def _make_building_from_way(nodes_dict: Dict[int, osmparser.Node], all_tags: Dic
     try:
         # -- make outer and inner rings from refs
         outer_ring = _refs_to_ring(coords_transform, way.refs, nodes_dict)
-        inner_rings_list = []
+        inner_rings_list = list()
 
-        # FIXME : inner rings does not seem to work. Therefore leave out following code
-        # for _way in inner_ways:
-        #    inner_rings_list.append(_refs_to_ring(coords_transform, _way.refs, nodes_dict, inner=True))
+        for _way in inner_ways:
+            inner_rings_list.append(_refs_to_ring(coords_transform, _way.refs, nodes_dict))
     except KeyError as reason:
         logging.debug("ERROR: Failed to parse building referenced node missing clipped?(%s) WayID %d %s Refs %s" % (
             reason, way.osm_id, all_tags, way.refs))
