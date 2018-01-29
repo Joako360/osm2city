@@ -10,24 +10,26 @@ import unittest
 import numpy as np
 
 
-def bucket_span(lat):
+def bucket_span(lat: float) -> float:
     """Latitude Range -> Tile Width (deg)"""
-    alat = abs(lat)
-    if alat >= 89:
+    abs_lat = abs(lat)
+    if abs_lat >= 89:
         return 360
-    if alat >= 88:
+    elif abs_lat >= 88:
         return 8
-    if alat >= 86:
+    elif abs_lat >= 86:
         return 4
-    if alat >= 83:
+    elif abs_lat >= 83:
         return 2
-    if alat >= 76:
+    elif abs_lat >= 76:
         return 1
-    if alat >= 62:
+    elif abs_lat >= 62:
         return .5
-    if alat >= 22:
+    elif abs_lat >= 22:
         return .25
-    return .125
+    elif abs_lat >= 0:
+        return .125
+    return 360
 
 
 def format_lon(lon):

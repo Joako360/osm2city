@@ -15,7 +15,7 @@ The correct approach, though, is probably to do exactly what FG does, which I th
 
 Created on Sat Jun  7 22:38:59 2014
 @author: albrecht
-"""
+
 # http://williams.best.vwh.net/avform.htm
 # Local, flat earth approximation
 # If you stay in the vicinity of a given fixed point (lat0,lon0), it may be a 
@@ -49,14 +49,26 @@ Created on Sat Jun  7 22:38:59 2014
 # These approximations fail in the vicinity of either pole and at large 
 # distances. The fractional errors are of order (distance/R)^2.
 
+See also http://wiki.flightgear.org/Geographic_Coordinate_Systems
+"""
 
-from math import asin, atan2, sin, cos, sqrt, radians, degrees, pi
+import copy
+from math import asin, atan2, sin, cos, sqrt, radians, degrees, pi, fabs
 import logging
-from typing import Tuple
+from typing import List, Tuple
 import unittest
 
 
 NAUTICAL_MILES_METERS = 1852
+
+# from WGS84. See simgear/math/SGGeodesy.cxx
+EQURAD = 6378137.0
+FLATTENING = 298.257223563
+SQUASH = 0.9966471893352525192801545
+
+E2 = fabs(1 - SQUASH * SQUASH)
+RA2 = 1 / (EQURAD * EQURAD)
+E4 = E2 * E2
 
 
 class Transformation(object):
@@ -74,14 +86,13 @@ class Transformation(object):
 
     def _update(self):
         """compute radii for local origin"""
-        a = 6378137.000  # m for WGS84
-        f = 1./298.257223563
-        e2 = f*(2.-f)
+        f = 1. / FLATTENING
+        e2 = f * (2.-f)
 
         self._coslat = cos(radians(self._lat))
         sinlat = sin(radians(self._lat))
-        self._R1 = a*(1.-e2)/(1.-e2*(sinlat**2))**(3./2.)
-        self._R2 = a/sqrt(1-e2*sinlat**2)
+        self._R1 = EQURAD * (1.-e2)/(1.-e2*(sinlat**2))**(3./2.)
+        self._R2 = EQURAD / sqrt(1-e2*sinlat**2)
 
     def setOrigin(self, coord_tuple: Tuple[float, float]):
         """set origin to given global coordinates (lon, lat)"""
@@ -113,6 +124,174 @@ class Transformation(object):
         return "(%f %f)" % (self._lon, self._lat)
 
 
+class Vec3d(object):
+    """A simple 3d object"""
+    __slots__ = ('x', 'y', 'z')
+
+    def __init__(self, x: float, y: float, z: float) -> None:
+        self.x = x
+        self.y = y
+        self.z = z
+
+    @staticmethod
+    def dot(first: 'Vec3d', other: 'Vec3d') -> float:
+        return first.x * other.x + first.y * other.y + first.z * other.z
+
+    @staticmethod
+    def cross(first: 'Vec3d', other: 'Vec3d') -> 'Vec3d':
+        # (a1, a2, a3) X (b1, b2, b3) = (a2*b3-a3*b2, a3*b1-a1*b3, a1*b2-a2*b1)
+        x = first.y * other.z - first.z * other.y
+        y = first.z * other.x - first.x * other.z
+        z = first.x * other.y - first.y * other.x
+        return Vec3d(x, y, z)
+
+    def multiply(self, multiplier: float) -> None:
+        self.x *= multiplier
+        self.y *= multiplier
+        self.z *= multiplier
+
+    def add(self, other: 'Vec3d') -> None:
+        self.x += other.x
+        self.y += other.y
+        self.z += other.z
+
+    def subtract(self, other: 'Vec3d') -> None:
+        self.x -= other.x
+        self.y -= other.y
+        self.z -= other.z
+
+    def __copy__(self) -> 'Vec3d':
+        return Vec3d(self.x, self.y, self.z)
+
+
+def cart_to_geod(center: Vec3d) -> Tuple[float, float, float]:
+    """Converts a cartesian point to geodetic coordinates. Returns lon, lat in radians and elevation in meters
+    See SGGeodesy::SGCartToGeod in simgear/math/SGGeodesy.cxx
+    """
+    xx_p_yy = center.x * center.x + center.y * center.y
+    if xx_p_yy + center.z * center.z < 25.:
+        return 0.0, 0.0, -EQURAD
+
+    sqrt_xx_p_yy = sqrt(xx_p_yy)
+    p = xx_p_yy * RA2
+    q = center.z * center.z * (1 - E2) * RA2
+    r = 1 / 6.0 * (p + q - E4)
+    s = E4 * p * q / (4 * r * r * r)
+    if -2.0 <= s <= 0.0:
+        s = 0.0
+
+    t = pow(1 + s + sqrt(s * (2 + s)), 1 / 3.0)
+    u = r * (1 + t + 1 / t)
+    v = sqrt(u * u + E4 * q)
+    w = E2 * (u + v - q) / (2 * v)
+    k = sqrt(u + v + w * w) - w
+    d = k * sqrt_xx_p_yy / (k + E2)
+    lon_rad = 2 * atan2(center.y, center.x + sqrt_xx_p_yy)
+    sqrt_dd_p_zz = sqrt(d * d + center.z * center.z)
+    lat_rad = 2 * atan2(center.z, d + sqrt_dd_p_zz)
+    elev = (k + E2 - 1) * sqrt_dd_p_zz / k
+    return lon_rad, lat_rad, elev
+
+
+class Quaternion(object):
+    """Quaternion object. See https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation."""
+    __slots__ = ('w', 'x', 'y', 'z')
+
+    def __init__(self, w: float, x: float, y: float, z: float) -> None:
+        self.w = w
+        self.x = x
+        self.y = y
+        self.z = z
+
+    @property
+    def real(self) -> float:
+        """The real part of the quaternion.
+        See static SGQuat real(const SGQuat<T>& v) in simgear/math/SGQuat.hxx.
+        """
+        return self.w
+
+    @property
+    def imag(self) -> Vec3d:
+        """The imaginary part of the quaternion.
+        See static SGQuat imag(const SGQuat<T>& v) in simgear/math/SGQuat.hxx.
+        """
+        return Vec3d(self.x, self.y, self.z)
+
+    @staticmethod
+    def multiply(first: 'Quaternion', other: 'Quaternion') -> 'Quaternion':
+        return Quaternion(first.w * other.w, first.x * other.x, first.y * other.y, first.z * other.z)
+
+    @staticmethod
+    def dot(first: 'Quaternion', other: 'Quaternion') -> float:
+        return first.w * other.w  + first.x * other.x + first.y * other.y + first.z * other.z
+
+
+def quaternion_from_lon_lat_radian(lon_rad: float, lat_rad: float) -> Quaternion:
+    """Return a quaternion rotation from the earth centered to the simulation usual horizontal local frame from given
+    longitude and latitude.
+    lon and lat are in radians.
+    See static SGQuat fromLonLatRad(T lon, T lat) in simgear/math/SGQuat.hxx.
+    """
+    zd2 = 0.5 * lon_rad
+    yd2 = -0.25 * pi - 0.5 * lat_rad
+    s_zd2 = sin(zd2)
+    s_yd2 = sin(yd2)
+    c_zd2 = cos(zd2)
+    c_yd2 = cos(yd2)
+    w = c_zd2 * c_yd2
+    x = -s_zd2 * s_yd2
+    y = c_zd2 * s_yd2
+    z = s_zd2 * c_yd2
+    return Quaternion(w, x, y, z)
+
+
+def quaternion_from_euler_radian(z: float, y: float, x: float) -> Quaternion:
+    """Return a quaternion from euler angles
+    See static SGQuat fromEulerRad(T z, T y, T x) in simgear/math/SGQuat.hxx.
+    """
+    zd2 = 0.5 * z
+    yd2 = 0.5 * y
+    xd2 = 0.5 * x
+    s_zd2 = sin(zd2)
+    s_yd2 = sin(yd2)
+    s_xd2 = sin(xd2)
+    c_zd2 = cos(zd2)
+    c_yd2 = cos(yd2)
+    c_xd2 = cos(xd2)
+    c_xd2_c_zd2 = c_xd2 * c_zd2
+    c_xd2_s_zd2 = c_xd2 * s_zd2
+    s_xd2_s_zd2 = s_xd2 * s_zd2
+    s_xd2_c_zd2 = s_xd2 * c_zd2
+    w = c_xd2_c_zd2 * c_yd2 + s_xd2_s_zd2 * s_yd2
+    x = s_xd2_c_zd2 * c_yd2 - c_xd2_s_zd2 * s_yd2
+    y = c_xd2_c_zd2 * s_yd2 + s_xd2_s_zd2 * c_yd2
+    z = c_xd2_s_zd2 * c_yd2 - s_xd2_c_zd2 * s_yd2
+    return Quaternion(w, x, y, z)
+
+
+def transform_to_rotated_coordinate_frame(quat: Quaternion, originals: List[Vec3d]) -> None:
+    """Transform a list of vectors from the current coordinate frame to a coordinate frame rotated with the quaternion.
+    See SGVec3<T> transform(const SGVec3<T>& v) const in simgear/math/SGQuat.hxx.
+    Given the current use it makes sense to transform a list to keep recurring calculations of r, q_imag and q_real
+    """
+    r = 2 / Quaternion.dot(quat, quat)
+    q_imag = quat.imag
+    q_real = quat.real
+    for vertex in originals:
+        # (r*qr*qr - 1)*v + (r*dot(qimag, v))*qimag - (r*qr)*cross(qimag, v)
+        # first part
+        vertex.multiply(r * q_real * q_real - 1)
+        # second part
+        q_imag_copy1 = copy.copy(q_imag)
+        q_imag_copy1.multiply(r * Vec3d.dot(q_imag, vertex))
+        # third part
+        third_part = Vec3d.cross(q_imag, vertex)
+        third_part.multiply(r * q_real)
+        # combine
+        vertex.add(q_imag_copy1)
+        vertex.subtract(third_part)
+
+
 def calc_angle_of_line_local(x1, y1, x2, y2):
     """Returns the angle in degrees of a line relative to North.
     Based on local coordinates (x,y) of two points.
@@ -135,14 +314,15 @@ def calc_distance_global(lon1, lat1, lon2, lat2):
     lon2_r = radians(lon2)
     lat2_r = radians(lat2)
     distance_radians = calc_distance_global_radians(lon1_r, lat1_r, lon2_r, lat2_r)
-    return distance_radians*((180*60)/pi) * NAUTICAL_MILES_METERS
+    return distance_radians * ((180 * 60) / pi) * NAUTICAL_MILES_METERS
 
 
 def calc_distance_global_radians(lon1_r, lat1_r, lon2_r, lat2_r):
     return 2*asin(sqrt(pow(sin((lat1_r-lat2_r)/2), 2) + cos(lat1_r)*cos(lat2_r)*pow(sin((lon1_r-lon2_r)/2), 2)))
 
 
-def calc_angle_of_line_global(lon1: float, lat1:float, lon2:float, lat2:float, transformation: Transformation) -> float:
+def calc_angle_of_line_global(lon1: float, lat1: float, lon2: float, lat2: float,
+                              transformation: Transformation) -> float:
     x1, y1 = transformation.toLocal((lon1, lat1))
     x2, y2 = transformation.toLocal((lon2, lat2))
     return calc_angle_of_line_local(x1, y1, x2, y2)
@@ -160,17 +340,6 @@ def disjoint_bounds(bounds_1: Tuple[float, float, float, float], bounds_2: Tuple
         return False
     return True
 
-
-if __name__ == "__main__":
-    t = Transformation((0, 0))
-    print(t.toLocal((0., 0)))
-    print(t.toLocal((1., 0)))
-    print(t.toLocal((0, 1.)))
-    print()
-    print(t.toGlobal((100., 0)))
-    print(t.toGlobal((1000., 0)))
-    print(t.toGlobal((10000., 0)))
-    print(t.toGlobal((100000., 0)))
 
 # ================ UNITTESTS =======================
 
