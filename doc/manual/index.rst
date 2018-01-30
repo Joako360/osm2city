@@ -1,7 +1,7 @@
 
 Welcome to osm2city's documentation!
 ====================================
-While the article on FlightGear's Wiki_ presents in general terms what ``osm2city`` is and what features it has, this manual goes into depth with many aspects of generating scenery objects based on OpenStreetMap_ (OSM) data and deploying/using them in FlightGear_.
+While the article on FlightGear's Wiki_ presents in general terms what ``osm2city`` is and which features it has, this manual goes into depth with many aspects of generating scenery objects based on OpenStreetMap_ (OSM) data and deploying/using them in FlightGear_.
 
 
 .. _FlightGear: http://www.flightgear.org/
@@ -25,6 +25,7 @@ Before you generate your own sceneries, you might want to get familiar with the 
    preparation
    generation
    parameters
+   how_it_works
    appendix
 
 
