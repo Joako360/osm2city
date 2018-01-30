@@ -44,3 +44,19 @@ Change into ``docs/manual`` and then run the following command to test on your l
 .. _reStructuredText: http://docutils.sourceforge.net/rst.html
 .. _Read the Docs: https://readthedocs.org/
 
+
+----------
+Developing
+----------
+
+An unstructured list of stuff you might need to know as a developer:
+
+* The code has evolved over time by contributions from persons, who are not necessarily professional Python developers. Whenever you touch or even only read a piece of code, please leave the place in a better state by adding comments with your understanding, refactoring etc.
+* The level of unit testing is minimal and below what is achievable. There is no system testing. All system testing is done in a visual way - one of the reasons being that the scenery generation has randomising elements plus parametrisation, which means there is not deterministic right solution even from a regression point of view.
+* Use an editor, which supports `PEP 08`_. However the current main developer prefers a line length of 120 instead. You should be able to live with that.
+* Use Python `type hints`_ as far as possible — and help improve the current situation. It might make the code a bit harder to read, but it gets so much easier to understand.
+* Try to stick to the Python version as referenced in :ref:`Python<chapter-python-label>`.
+
+
+.. _PEP 08: https://www.python.org/dev/peps/pep-0008/
+.. _type hints: https://docs.python.org/3/library/typing.html
