@@ -12,6 +12,7 @@ from typing import List
 import unittest
 
 import buildings
+import owbb.landuse as ol
 import piers
 import platforms
 import pylons
@@ -20,7 +21,7 @@ import utils.aptdat_io as aptdat_io
 import utils.calc_tile as calc_tile
 import utils.coordinates as coordinates
 import utils.stg_io2
-from utils.utilities import BoundaryError, FGElev, date_time_now, check_boundary, parse_boundary
+from utils.utilities import BoundaryError, FGElev, date_time_now, check_boundary, parse_boundary, time_logging
 
 
 class SceneryTile(object):
@@ -52,6 +53,7 @@ class Procedures(IntEnum):
     roads = 3
     pylons = 4
     details = 5
+    owbb = 6  # experimental
 
 
 def _parse_exec_for_procedure(exec_argument: str) -> Procedures:
@@ -116,35 +118,38 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
                                                                                    parameters.PREFIX,
                                                                                    os.getpid()))
 
-        # prepare shared resources
         the_coords_transform = coordinates.Transformation(parameters.get_center_global())
-        my_fg_elev = FGElev(the_coords_transform, scenery_tile.tile_index)
-        my_stg_entries = utils.stg_io2.read_stg_entries_in_boundary(True, the_coords_transform)
 
-        # cannot be read once for all outside of tiles in main function
-        my_blocked_areas = None
-        if exec_argument in (Procedures.all, Procedures.buildings, Procedures.roads):
-            my_blocked_areas = aptdat_io.get_apt_dat_blocked_areas_from_airports(the_coords_transform,
-                                                                                 parameters.BOUNDARY_WEST,
-                                                                                 parameters.BOUNDARY_SOUTH,
-                                                                                 parameters.BOUNDARY_EAST,
-                                                                                 parameters.BOUNDARY_NORTH,
-                                                                                 my_airports)
+        if exec_argument is Procedures.owbb:
+            ol.process(the_coords_transform)
+        else:
+            my_fg_elev = FGElev(the_coords_transform, scenery_tile.tile_index)
+            my_stg_entries = utils.stg_io2.read_stg_entries_in_boundary(True, the_coords_transform)
 
-        # run programs
-        if exec_argument in [Procedures.buildings, Procedures.main, Procedures.all]:
-            buildings.process_buildings(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries, file_lock)
-        if exec_argument in [Procedures.roads, Procedures.main, Procedures.all]:
-            roads.process_roads(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries, file_lock)
-        if exec_argument in [Procedures.pylons, Procedures.main, Procedures.all]:
-            pylons.process_pylons(the_coords_transform, my_fg_elev, my_stg_entries, file_lock)
-        if exec_argument in [Procedures.details, Procedures.all]:
-            pylons.process_details(the_coords_transform, my_fg_elev, file_lock)
-            platforms.process_details(the_coords_transform, my_fg_elev, file_lock)
-            piers.process_details(the_coords_transform, my_fg_elev, file_lock)
+            # cannot be read once for all outside of tiles in main function due to local coordinates
+            my_blocked_areas = None
+            if exec_argument in (Procedures.all, Procedures.buildings, Procedures.roads):
+                my_blocked_areas = aptdat_io.get_apt_dat_blocked_areas_from_airports(the_coords_transform,
+                                                                                     parameters.BOUNDARY_WEST,
+                                                                                     parameters.BOUNDARY_SOUTH,
+                                                                                     parameters.BOUNDARY_EAST,
+                                                                                     parameters.BOUNDARY_NORTH,
+                                                                                     my_airports)
 
-        # clean-up
-        my_fg_elev.close()
+            # run programs
+            if exec_argument in [Procedures.buildings, Procedures.main, Procedures.all]:
+                buildings.process_buildings(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries, file_lock)
+            if exec_argument in [Procedures.roads, Procedures.main, Procedures.all]:
+                roads.process_roads(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries, file_lock)
+            if exec_argument in [Procedures.pylons, Procedures.main, Procedures.all]:
+                pylons.process_pylons(the_coords_transform, my_fg_elev, my_stg_entries, file_lock)
+            if exec_argument in [Procedures.details, Procedures.all]:
+                pylons.process_details(the_coords_transform, my_fg_elev, file_lock)
+                platforms.process_details(the_coords_transform, my_fg_elev, file_lock)
+                piers.process_details(the_coords_transform, my_fg_elev, file_lock)
+
+            # clean-up
+            my_fg_elev.close()
 
     except:
         logging.exception('Exception occurred while processing tile {}.'.format(scenery_tile.tile_index))
@@ -279,7 +284,7 @@ if __name__ == '__main__':
     pool.close()
     pool.join()
 
-    logging.info("Total time used {}".format(time.time() - start_time))
+    time_logging("Total time used", start_time)
 
 
 # ================ UNITTESTS =======================

@@ -26,8 +26,9 @@ import numpy as np
 import parameters
 import prepare_textures
 import textures.materials
+import utils.osmparser as op
 import utils.vec2d as v
-from utils import osmparser, coordinates, stg_io2, utilities
+from utils import coordinates, stg_io2, utilities
 
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
 
@@ -36,8 +37,8 @@ OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
 ALLOWED_BUiLDING_PART_VALUES = ['yes', 'residential', 'apartments', 'house', 'commercial', 'retail']
 
 
-def _process_osm_relations(nodes_dict: Dict[int, osmparser.Node], rel_ways_dict: Dict[int, osmparser.Way],
-                           relations_dict: Dict[int, osmparser.Relation],
+def _process_osm_relations(nodes_dict: Dict[int, op.Node], rel_ways_dict: Dict[int, op.Way],
+                           relations_dict: Dict[int, op.Relation],
                            my_buildings: Dict[int, building_lib.Building],
                            coords_transform: coordinates.Transformation,
                            stats: utilities.Stats) -> None:
@@ -102,8 +103,8 @@ def _process_osm_relations(nodes_dict: Dict[int, osmparser.Node], rel_ways_dict:
     logging.info("Added {} buildings based on relations.".format(number_of_created_buildings))
 
 
-def _process_multipolygon_buildings(nodes_dict: Dict[int, osmparser.Node], rel_ways_dict: Dict[int, osmparser.Way],
-                                    relation: osmparser.Relation, my_buildings: Dict[int, building_lib.Building],
+def _process_multipolygon_buildings(nodes_dict: Dict[int, op.Node], rel_ways_dict: Dict[int, op.Way],
+                                    relation: op.Relation, my_buildings: Dict[int, building_lib.Building],
                                     coords_transform: coordinates.Transformation,
                                     stats: utilities.Stats) -> int:
     """Processes the members in a multipolygon relationship. Returns the number of buildings actually created.
@@ -142,8 +143,8 @@ def _process_multipolygon_buildings(nodes_dict: Dict[int, osmparser.Node], rel_w
                 logging.debug("Way osm_id={} not found for relation osm_id={}.".format(m.ref, relation.osm_id))
 
     # Process multiple and add to outer_ways/inner_ways as whole rings
-    inner_ways.extend(osmparser.closed_ways_from_multiple_ways(inner_ways_multiple))
-    outer_ways.extend(osmparser.closed_ways_from_multiple_ways(outer_ways_multiple))
+    inner_ways.extend(op.closed_ways_from_multiple_ways(inner_ways_multiple))
+    outer_ways.extend(op.closed_ways_from_multiple_ways(outer_ways_multiple))
 
     # Create polygons to allow some geometry analysis
     polygons = dict()
@@ -178,7 +179,7 @@ def _process_multipolygon_buildings(nodes_dict: Dict[int, osmparser.Node], rel_w
     return added_buildings
 
 
-def _process_simple_3d_building(relation: osmparser.Relation, my_buildings: Dict[int, building_lib.Building]):
+def _process_simple_3d_building(relation: op.Relation, my_buildings: Dict[int, building_lib.Building]):
     """Processes the members in a Simple3D relationship in order to make sure that a building outline exists."""
     buildings_found = list()  # osm_id
     building_outlines_found = list()  # osm_id
@@ -219,7 +220,7 @@ def _process_simple_3d_building(relation: osmparser.Relation, my_buildings: Dict
             # this after checking that the building_parts are relevant.
             # There will be no additional checking in _process_building_parts() because now there is a parent already
             logging.warning('OSM data error: there is no "outline" member in relation %i', relation.osm_id)
-            parent = building_lib.BuildingParent(osmparser.get_next_pseudo_osm_id(), False)
+            parent = building_lib.BuildingParent(op.get_next_pseudo_osm_id(op.OSMFeatureType.building_relation), False)
             # no tags are available to be added on parent level
             for m in relation.members:
                 if m.ref in my_buildings:
@@ -229,7 +230,7 @@ def _process_simple_3d_building(relation: osmparser.Relation, my_buildings: Dict
                         parent.add_child(building_part)
 
 
-def _process_building_parts(nodes_dict: Dict[int, osmparser.Node],
+def _process_building_parts(nodes_dict: Dict[int, op.Node],
                             my_buildings: Dict[int, building_lib.Building],
                             coords_transform: coordinates.Transformation,
                             stats: utilities.Stats) -> None:
@@ -349,7 +350,7 @@ def _process_building_parts(nodes_dict: Dict[int, osmparser.Node],
                                 building_parent.add_child(original_building)
                                 original_building_still_used = True
                             else:
-                                new_way = osmparser.Way(osmparser.get_next_pseudo_osm_id())
+                                new_way = op.Way(op.get_next_pseudo_osm_id(op.OSMFeatureType.building_relation))
                                 new_way.refs = new_refs
                                 new_tags = {'building_part': 'yes'}
                                 new_building_part = _make_building_from_way(nodes_dict, new_tags, new_way,
@@ -387,7 +388,7 @@ def _clean_building_parents_with_one_child(my_buildings: List[building_lib.Build
                 building.parent = None
 
 
-def _process_osm_building(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int, osmparser.Way],
+def _process_osm_building(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, op.Way],
                           coords_transform: coordinates.Transformation,
                           stats: utilities.Stats) -> Dict[int, building_lib.Building]:
     my_buildings = dict()
@@ -424,7 +425,7 @@ def _process_osm_building(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict
     return my_buildings
 
 
-def _make_building_from_way(nodes_dict: Dict[int, osmparser.Node], all_tags: Dict[str, str], way: osmparser.Way,
+def _make_building_from_way(nodes_dict: Dict[int, op.Node], all_tags: Dict[str, str], way: op.Way,
                             coords_transform: coordinates.Transformation, stats: utilities.Stats,
                             inner_ways=list()) -> Optional[building_lib.Building]:
     if way.refs[0] == way.refs[-1]:
@@ -456,7 +457,7 @@ def _make_building_from_way(nodes_dict: Dict[int, osmparser.Node], all_tags: Dic
 
 
 def _refs_to_ring(coords_transform: coordinates.Transformation, refs,
-                  nodes_dict: Dict[int, osmparser.Node]) -> shg.LinearRing:
+                  nodes_dict: Dict[int, op.Node]) -> shg.LinearRing:
     """Accept a list of OSM refs, return a linear ring."""
     coords = []
     for ref in refs:
@@ -509,8 +510,8 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
     random.seed(42)
     stats = utilities.Stats()
 
-    osm_read_results = osmparser.fetch_osm_db_data_ways_keys(["building", "building:part"])
-    osm_read_results = osmparser.fetch_osm_db_data_relations_keys(["building", "building:part"], osm_read_results)
+    osm_read_results = op.fetch_osm_db_data_ways_keys(["building", "building:part"])
+    osm_read_results = op.fetch_osm_db_data_relations_keys(["building", "building:part"], osm_read_results)
     osm_nodes_dict = osm_read_results.nodes_dict
     osm_ways_dict = osm_read_results.ways_dict
     osm_relations_dict = osm_read_results.relations_dict

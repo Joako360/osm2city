@@ -119,9 +119,8 @@ def read_apt_dat_gz_file(min_lon: float, min_lat: float,
                 my_helipad = Helipad(float(parts[5]), float(parts[6]), Vec2d(float(parts[3]), float(parts[2])))
                 my_airport.append_runway(my_helipad)
 
-    end_time = time.time()
     logging.info("Read %d airports, %d having runways/helipads within the boundary", total_airports, len(airports))
-    logging.info("Execution time: %f", end_time - start_time)
+    utilities.time_logging("Execution time", start_time)
     return airports
 
 

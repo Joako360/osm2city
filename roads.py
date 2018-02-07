@@ -27,14 +27,14 @@ Data structures
 ---------------
 
 
-nodes_dict: contains all osmparser.Nodes, by OSM_ID
+nodes_dict: contains all op.Nodes, by OSM_ID
   nodes_dict[OSM_ID] -> Node
   KEEP, because we have a lot more nodes than junctions.
   
 Roads.G: graph
-  its nodes represent junctions. Indexed by OSM_ID of osmparser.Nodes
-  edges represent roads between junctions, and have obj=osmparser.Way
-  self.G[ref_1][ref_2]['obj'] -> osmparser.Way
+  its nodes represent junctions. Indexed by OSM_ID of op.Nodes
+  edges represent roads between junctions, and have obj=op.Way
+  self.G[ref_1][ref_2]['obj'] -> op.Way
 
 attached_ways_dict: for each (true) junction node, store a list of tuples (attached way, is_first)
   basically, this duplicates Roads.G!
@@ -88,12 +88,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import shapely.geometry as shg
 
+from cluster import ClusterContainer
 import linear
 import linear_bridge
 import parameters
 import textures.road
-from cluster import ClusterContainer
-from utils import osmparser, coordinates, ac3d, stg_io2, utilities, landuse
+import utils.osmparser as op
+from utils import coordinates, ac3d, stg_io2, utilities, landuse
 from utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
@@ -106,7 +107,7 @@ LIT = 'lit'
 MIN_SEGMENT_LENGTH = 1.0
 
 
-def _is_bridge(way: osmparser.Way) -> bool:
+def _is_bridge(way: op.Way) -> bool:
     """Returns true if the tags for this way contains the OSM key for bridge."""
     if MAN_MADE_KEY in way.tags and way.tags[MAN_MADE_KEY] == BRIDGE_KEY:
         return True
@@ -121,7 +122,7 @@ def _replace_bridge_tags(tags: Dict[str, str]) -> None:
     tags[REPLACED_BRIDGE_KEY] = 'yes'
 
 
-def _is_replaced_bridge(way: osmparser.Way) -> bool:
+def _is_replaced_bridge(way: op.Way) -> bool:
     """Returns true is this way was originally a bridge, but was changed to a non-bridge due to lenght.
     See method Roads._replace_short_bridges_with_ways.
     The reason to keep a replaced_tag is because else the way might be split if a node is in the water."""
@@ -139,7 +140,7 @@ def _is_processed_railway(way):
     E.g. funiculars are currently not processed.
     Must be aligned with accepted railways in Roads._create_linear_objects.
     """
-    if not osmparser.is_railway(way):
+    if not op.is_railway(way):
         return False
     if way.tags['railway'] in VALID_RAILWAYS:
         return True
@@ -158,7 +159,7 @@ def _calc_railway_gauge(way) -> float:
     if way.tags['railway'] in ['narrow_gauge']:
         width = 1000
     if "gauge" in way.tags:
-        if osmparser.is_parsable_float(way.tags['gauge']):
+        if op.is_parsable_float(way.tags['gauge']):
             width = float(way.tags['gauge'])
     return width / 1000 * 126 / 57  # in the texture roads.png the track uses 57 out of 126 pixels
 
@@ -167,10 +168,10 @@ def _is_highway(way):
     return "highway" in way.tags
 
 
-def _compatible_ways(way1: osmparser.Way, way2: osmparser.Way) -> bool:
+def _compatible_ways(way1: op.Way, way2: op.Way) -> bool:
     """Returns True if both ways are either a railway, a bridge or a highway - and have common type attributes"""
     logging.debug("trying join %i %i", way1.osm_id, way2.osm_id)
-    if osmparser.is_railway(way1) != osmparser.is_railway(way2):
+    if op.is_railway(way1) != op.is_railway(way2):
         logging.debug("Nope, either both or none must be railway")
         return False
     elif _is_bridge(way1) != _is_bridge(way2):
@@ -191,16 +192,16 @@ def _compatible_ways(way1: osmparser.Way, way2: osmparser.Way) -> bool:
         highway_lit2 = is_lit(way2.tags)
         if highway_lit1 != highway_lit2:
             return False
-    elif osmparser.is_railway(way1) and osmparser.is_railway(way2):
+    elif op.is_railway(way1) and op.is_railway(way2):
         if way1.tags['railway'] != way2.tags['railway']:
             logging.debug("Nope, both must be of same railway type")
             return False
     return True
 
 
-def _init_way_from_existing(way: osmparser.Way, node_references: List[int]) -> osmparser.Way:
+def _init_way_from_existing(way: op.Way, node_references: List[int]) -> op.Way:
     """Return copy of way. The copy will have same osm_id and tags, but only given refs"""
-    new_way = osmparser.Way(osmparser.get_next_pseudo_osm_id())
+    new_way = op.Way(op.get_next_pseudo_osm_id(op.OSMFeatureType.road))
     new_way.pseudo_osm_id = way.osm_id
     new_way.tags = way.tags.copy()
     new_way.refs = node_references
@@ -303,7 +304,7 @@ def max_slope_for_road(obj):
         return parameters.MAX_SLOPE_RAILWAY
 
 
-def _find_junctions(ways_list: List[osmparser.Way]) -> Dict[int, List[Tuple[osmparser.Way, int]]]:
+def _find_junctions(ways_list: List[op.Way]) -> Dict[int, List[Tuple[op.Way, int]]]:
     """Finds nodes, which are shared by at least 2 ways.
     N = number of nodes
     find junctions by brute force:
@@ -333,8 +334,8 @@ def _find_junctions(ways_list: List[osmparser.Way]) -> Dict[int, List[Tuple[osmp
     return attached_ways_dict
 
 
-def _attached_ways_dict_remove(attached_ways_dict: Dict[int, List[Tuple[osmparser.Way, int]]], the_ref: int,
-                               the_way: osmparser.Way) -> None:
+def _attached_ways_dict_remove(attached_ways_dict: Dict[int, List[Tuple[op.Way, int]]], the_ref: int,
+                               the_way: op.Way) -> None:
     """Remove given way from given node in attached_ways_dict"""
     if the_ref not in attached_ways_dict:
         logging.warning("not removing way from the ref %i because the ref is not in attached_ways_dict", the_ref)
@@ -345,8 +346,8 @@ def _attached_ways_dict_remove(attached_ways_dict: Dict[int, List[Tuple[osmparse
             attached_ways_dict[the_ref].remove(way_pos_tuple)
 
 
-def _attached_ways_dict_append(attached_ways_dict: Dict[int, List[Tuple[osmparser.Way, int]]], the_ref: int,
-                               the_way: osmparser.Way, position: int) -> None:
+def _attached_ways_dict_append(attached_ways_dict: Dict[int, List[Tuple[op.Way, int]]], the_ref: int,
+                               the_way: op.Way, position: int) -> None:
     """Append given way to attached_ways_dict."""
     if the_ref not in attached_ways_dict:
         attached_ways_dict[the_ref] = list()
@@ -390,7 +391,7 @@ def cut_line_at_points(line: shg.LineString, points: List[shg.Point]) -> List[sh
 
 
 class Roads(object):
-    def __init__(self, raw_osm_ways: List[osmparser.Way], nodes_dict: Dict[int, osmparser.Node],
+    def __init__(self, raw_osm_ways: List[op.Way], nodes_dict: Dict[int, op.Node],
                  coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev) -> None:
         self.transform = coords_transform
         self.fg_elev = fg_elev
@@ -562,8 +563,8 @@ class Roads(object):
             if LIT in way.tags and way.tags[LIT] == 'gen':
                 way.tags[LIT] = 'yes'
 
-    def _check_lighting_inner(self, ways_list: List[osmparser.Way], landuses_lit: List[landuse.Landuse],
-                              way_lul_map: Dict[osmparser.Way, landuse.Landuse]) -> List[osmparser.Way]:
+    def _check_lighting_inner(self, ways_list: List[op.Way], landuses_lit: List[landuse.Landuse],
+                              way_lul_map: Dict[op.Way, landuse.Landuse]) -> List[op.Way]:
         """Inner method for _check_lighting doing the actual checking. New split ways are the outcome of the method.
         However all ways by reference get updated tags. This method exists such that new ways can be checked again
         against other built-up areas.
@@ -670,8 +671,8 @@ class Roads(object):
 
         return new_ways
 
-    def cut_way_at_intersection_points(self, intersection_points: List[shg.Point], way: osmparser.Way,
-                                       my_line: shg.LineString) -> MutableMapping[osmparser.Way, float]:
+    def cut_way_at_intersection_points(self, intersection_points: List[shg.Point], way: op.Way,
+                                       my_line: shg.LineString) -> MutableMapping[op.Way, float]:
         """Cuts an existing way into several parts based in intersection points given as a parameter.
         Returns an OrderedDict of Ways, where the first element is always the (changed) original way, such
         that the distance from start to intersection is clear.
@@ -708,7 +709,7 @@ class Roads(object):
                 way.refs.remove(ref)
 
             if add_intersection:
-                new_node = osmparser.Node(osmparser.get_next_pseudo_osm_id(), lat, lon)
+                new_node = op.Node(op.get_next_pseudo_osm_id(op.OSMFeatureType.road), lat, lon)
                 self.nodes_dict[new_node.osm_id] = new_node
                 intersect_dict[new_node.osm_id] = distance
 
@@ -737,7 +738,7 @@ class Roads(object):
                         way.refs = current_way_refs.copy()
                         new_way = way  # needed to have reference for closing last node below
                     else:
-                        new_way = osmparser.Way(osmparser.get_next_pseudo_osm_id())
+                        new_way = op.Way(op.get_next_pseudo_osm_id(op.OSMFeatureType.road))
                         new_way.pseudo_osm_id = way.osm_id
                         new_way.tags = way.tags.copy()
                         new_way.refs = current_way_refs.copy()
@@ -762,7 +763,7 @@ class Roads(object):
                 # last cut_way is still "new_way", because we are not is_first
                 new_way.refs.append(original_refs[-1])
             else:
-                new_way = osmparser.Way(osmparser.get_next_pseudo_osm_id())
+                new_way = op.Way(op.get_next_pseudo_osm_id(op.OSMFeatureType.road))
                 new_way.pseudo_osm_id = way.osm_id
                 new_way.tags = way.tags.copy()
                 new_way.refs = current_way_refs.copy()
@@ -773,17 +774,17 @@ class Roads(object):
                                                                                               len(intersection_points)))
         return cut_ways_dict
 
-    def _change_way_for_object(self, my_line: shg.LineString, original_way: osmparser.Way) -> None:
+    def _change_way_for_object(self, my_line: shg.LineString, original_way: op.Way) -> None:
         """Processes an original way and replaces its coordinates with the coordinates of a LineString."""
         original_way.refs = list()
         the_coordinates = list(my_line.coords)
         for coords in the_coordinates:
             lon_lat = self.transform.toGlobal(coords)
-            new_node = osmparser.Node(osmparser.get_next_pseudo_osm_id(), lon_lat[1], lon_lat[0])
+            new_node = op.Node(op.get_next_pseudo_osm_id(op.OSMFeatureType.road), lon_lat[1], lon_lat[0])
             self.nodes_dict[new_node.osm_id] = new_node
             original_way.refs.append(new_node.osm_id)
 
-    def _split_way_for_object(self, my_multiline: shg.MultiLineString, original_way: osmparser.Way) -> osmparser.Way:
+    def _split_way_for_object(self, my_multiline: shg.MultiLineString, original_way: op.Way) -> op.Way:
         """Processes an original way split by an object (blocked area, stg_entry) and creates additional way"""
         # last node in first line is "new" node not found in original line
         index = len(list(my_multiline.geoms[0].coords)) - 2
@@ -792,11 +793,11 @@ class Roads(object):
         new_way = _init_way_from_existing(original_way, original_refs[index + 1:])
         # now add new nodes from intersection
         lon_lat = self.transform.toGlobal(list(my_multiline.geoms[0].coords)[-1])
-        new_node = osmparser.Node(osmparser.get_next_pseudo_osm_id(), lon_lat[1], lon_lat[0])
+        new_node = op.Node(op.get_next_pseudo_osm_id(op.OSMFeatureType.road), lon_lat[1], lon_lat[0])
         self.nodes_dict[new_node.osm_id] = new_node
         original_way.refs.append(new_node.osm_id)
         lon_lat = self.transform.toGlobal(list(my_multiline.geoms[1].coords)[0])
-        new_node = osmparser.Node(osmparser.get_next_pseudo_osm_id(), lon_lat[1], lon_lat[0])
+        new_node = op.Node(op.get_next_pseudo_osm_id(op.OSMFeatureType.road), lon_lat[1], lon_lat[0])
         self.nodes_dict[new_node.osm_id] = new_node
         new_way.refs.insert(0, new_node.osm_id)
         logging.debug("Split way (osm_id=%d) into 2 ways due to blocked area.", original_way.osm_id)
@@ -853,7 +854,7 @@ class Roads(object):
             visited = {node0, node1}
             graph.for_edges_in_bfs_call(self._propagate_h_add_over_edge, None, self.G, node0s, visited)
 
-    def _line_string_from_way(self, way: osmparser.Way) -> shg.LineString:
+    def _line_string_from_way(self, way: op.Way) -> shg.LineString:
         osm_nodes = [self.nodes_dict[r] for r in way.refs]
         nodes = np.array([self.transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
         return shg.LineString(nodes)
@@ -939,9 +940,9 @@ class Roads(object):
                     additional_needed_nodes = int(my_line.length / parameters.POINTS_ON_LINE_DISTANCE_MAX)
                     for x in range(additional_needed_nodes):
                         new_point = my_line.interpolate((x + 1) * parameters.POINTS_ON_LINE_DISTANCE_MAX)
-                        osm_id = osmparser.get_next_pseudo_osm_id()
+                        osm_id = op.get_next_pseudo_osm_id(op.OSMFeatureType.road)
                         lon_lat = self.transform.toGlobal((new_point.x, new_point.y))
-                        new_node = osmparser.Node(osm_id, lon_lat[1], lon_lat[0])
+                        new_node = op.Node(osm_id, lon_lat[1], lon_lat[0])
                         self.nodes_dict[osm_id] = new_node
                         my_new_refs.append(osm_id)
                     my_new_refs.append(the_way.refs[index])
@@ -966,7 +967,7 @@ class Roads(object):
 
                 priority, tex, width = get_highway_attributes(highway_type)
 
-            elif osmparser.is_railway(the_way):
+            elif op.is_railway(the_way):
                 if the_way.tags['railway'] in ['rail', 'disused', 'preserved', 'subway']:
                     priority = 20
                     tex = textures.road.TRACK
@@ -1002,7 +1003,7 @@ class Roads(object):
                                               the_way.tags, the_way.refs,
                                               self.nodes_dict, width=width, tex=tex,
                                               AGL=above_ground_level)
-                    if osmparser.is_railway(the_way):
+                    if op.is_railway(the_way):
                         self.railway_list.append(obj)
                     else:
                         self.roads_list.append(obj)
@@ -1012,7 +1013,7 @@ class Roads(object):
 
             self.G.add_edge(obj)
 
-    def _split_ways_at_inner_junctions(self, attached_ways_dict: Dict[int, List[Tuple[osmparser.Way, int]]]) -> None:
+    def _split_ways_at_inner_junctions(self, attached_ways_dict: Dict[int, List[Tuple[op.Way, int]]]) -> None:
         """Split ways such that none of the interior nodes are junctions to other ways.
         I.e., each way object connects to at most two junctions at start and end.
         """
@@ -1100,8 +1101,8 @@ class Roads(object):
         if show:
             plt.show()
 
-    def _join_ways(self, way1: osmparser.Way, way2: osmparser.Way,
-                   attached_ways_dict: Dict[int, List[Tuple[osmparser.Way, int]]]) -> None:
+    def _join_ways(self, way1: op.Way, way2: op.Way,
+                   attached_ways_dict: Dict[int, List[Tuple[op.Way, int]]]) -> None:
         """Join ways of compatible type, where way1's last node is way2's first node."""
         logging.debug("Joining %i and %i", way1.osm_id, way2.osm_id)
         if way1.osm_id == way2.osm_id:
@@ -1124,7 +1125,7 @@ class Roads(object):
                 logging.warning('Way with osm_id={} cannot be removed because cannot be found'.format(way2.osm_id))
             logging.debug("2not")
 
-    def _rejoin_ways(self, attached_ways_dict: Dict[int, List[Tuple[osmparser.Way, int]]]) -> None:
+    def _rejoin_ways(self, attached_ways_dict: Dict[int, List[Tuple[op.Way, int]]]) -> None:
         for ref in list(attached_ways_dict.keys()):  # dict is changed during looping, so using list of keys
             way_pos_list = attached_ways_dict[ref]
             start_dict = dict()  # dict of ways where node is start point with key = way, value = degree from north
@@ -1188,7 +1189,7 @@ class Roads(object):
         self.railways_clusters = ClusterContainer(lmin, lmax)
 
         for the_object in self.bridges_list + self.roads_list + self.railway_list:
-            if osmparser.is_railway(the_object):
+            if op.is_railway(the_object):
                 cluster_ref = self.railways_clusters.append(Vec2d(the_object.center.centroid.coords[0]),
                                                             the_object, stats)
             else:
@@ -1205,7 +1206,7 @@ class Roads(object):
             the_object.cluster_ref = cluster_ref
 
 
-def process_osm_ways(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int, osmparser.Way]) -> List[osmparser.Way]:
+def process_osm_ways(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, op.Way]) -> List[op.Way]:
     """Processes the values returned from OSM and does a bit of filtering.
     Transformation to roads, railways and bridges is only done later in Roads.process()."""
     my_ways = list()
@@ -1222,11 +1223,11 @@ def process_osm_ways(nodes_dict: Dict[int, osmparser.Node], ways_dict: Dict[int,
                 continue
             elif highway_type.value < parameters.HIGHWAY_TYPE_MIN:
                 continue
-        elif osmparser.is_railway(way):
+        elif op.is_railway(way):
             if not _is_processed_railway(way):
                 continue
 
-        split_ways = osmparser.split_way_at_boundary(nodes_dict, way, clipping_border)
+        split_ways = op.split_way_at_boundary(nodes_dict, way, clipping_border, op.OSMFeatureType.road)
         if split_ways:
             my_ways.extend(split_ways)
 
@@ -1284,7 +1285,7 @@ def process_roads(coords_transform: coordinates.Transformation, fg_elev: utiliti
     random.seed(42)
     stats = utilities.Stats()
 
-    osm_way_result = osmparser.fetch_osm_db_data_ways_keys(["highway", "railway"])
+    osm_way_result = op.fetch_osm_db_data_ways_keys(["highway", "railway"])
     osm_nodes_dict = osm_way_result.nodes_dict
     osm_ways_dict = osm_way_result.ways_dict
 
@@ -1298,7 +1299,7 @@ def process_roads(coords_transform: coordinates.Transformation, fg_elev: utiliti
     roads = Roads(filtered_osm_ways_list, osm_nodes_dict, coords_transform, fg_elev)
 
     # land-use data for lighting
-    landuse_result = osmparser.fetch_osm_db_data_ways_keys(['landuse'])
+    landuse_result = op.fetch_osm_db_data_ways_keys(['landuse'])
     landuse_nodes_dict = landuse_result.nodes_dict
     landuse_ways_dict = landuse_result.ways_dict
     landuses_lit = landuse.process_osm_landuse_for_lighting(landuse_nodes_dict, landuse_ways_dict, coords_transform)
@@ -1338,22 +1339,22 @@ class TestUtilities(unittest.TestCase):
         nodes_dict = dict()
         coords_transform = coordinates.Transformation(parameters.get_center_global())
         the_fg_elev = utilities.FGElev(coords_transform, 111111)
-        way = osmparser.Way(1)
+        way = op.Way(1)
         way.tags["hello"] = "world"
         way.refs = [1, 2, 3, 4, 5, 6]
         my_line = shg.LineString([(0, 0), (0, 300), (0, 500), (0, 600), (0, 900), (0, 1000)])
-        lon, lat = coords_transform.toGlobal((0,0))
-        nodes_dict[1] = osmparser.Node(1, lat, lon)
-        lon, lat = coords_transform.toGlobal((0,300))
-        nodes_dict[2] = osmparser.Node(2, lat, lon)
-        lon, lat = coords_transform.toGlobal((0,500))
-        nodes_dict[3] = osmparser.Node(3, lat, lon)
-        lon, lat = coords_transform.toGlobal((0,600))
-        nodes_dict[4] = osmparser.Node(4, lat, lon)
-        lon, lat = coords_transform.toGlobal((0,900))
-        nodes_dict[5] = osmparser.Node(5, lat, lon)
-        lon, lat = coords_transform.toGlobal((0,1000))
-        nodes_dict[6] = osmparser.Node(6, lat, lon)
+        lon, lat = coords_transform.toGlobal((0, 0))
+        nodes_dict[1] = op.Node(1, lat, lon)
+        lon, lat = coords_transform.toGlobal((0, 300))
+        nodes_dict[2] = op.Node(2, lat, lon)
+        lon, lat = coords_transform.toGlobal((0, 500))
+        nodes_dict[3] = op.Node(3, lat, lon)
+        lon, lat = coords_transform.toGlobal((0, 600))
+        nodes_dict[4] = op.Node(4, lat, lon)
+        lon, lat = coords_transform.toGlobal((0, 900))
+        nodes_dict[5] = op.Node(5, lat, lon)
+        lon, lat = coords_transform.toGlobal((0, 1000))
+        nodes_dict[6] = op.Node(6, lat, lon)
 
         test_roads = Roads(raw_osm_ways, nodes_dict, coords_transform, the_fg_elev)
 

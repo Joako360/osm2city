@@ -31,6 +31,7 @@ import struct
 from typing import List
 
 import utils.coordinates as coord
+from utils.exceptions import MyException
 
 WATER_PROXY = 'water'
 
@@ -77,7 +78,7 @@ class Face(object):
     __slots__ = ('material', 'vertices')
 
     def __init__(self, material: bytes, vertices: List[int]) -> None:
-        self.material = material.decode(encoding='ascii')
+        self.material = material.decode(encoding='ascii').lower()
         self.vertices = vertices
 
 
@@ -87,10 +88,12 @@ class BTGReader(object):
 
     def __init__(self, path: str) -> None:
         self.vertex_idx = None  # The x, y, z vertex indices of the current element
-        self.vertices = list()  # corresponds to wgs84_nodes in simgear/io/sg_binobj.hxx
+        self.vertices = list()  # corresponds to wgs84_nodes in simgear/io/sg_binobj.hxx. List of Vec3d objects
         self.bounding_sphere = None
         self.readers = list()  # list of method names - reader methods are called by introspection
-        self.faces = list()
+        self.faces = dict()  # material: str, list of faces
+        for material in SUPPORTED_MATERIALS:
+            self.faces[material] = list()
         self.material_name = None  # byte string
 
         # run the loader
@@ -102,7 +105,7 @@ class BTGReader(object):
 
     def create_face(self, n1: int, n2: int, n3: int) -> Face:
         vertices = [0, 0, 0]
-        vertices[0] = self.vertex_idx[n1]
+        vertices[0] = self.vertex_idx[n1]  # the value is the index position in self.vertices
         vertices[1] = self.vertex_idx[n2]
         vertices[2] = self.vertex_idx[n3]
 
@@ -110,8 +113,8 @@ class BTGReader(object):
 
     def add_face(self, face: Face) -> None:
         """Adds a face if it is one of the supported material types"""
-        if face.material.lower() in SUPPORTED_MATERIALS:
-            self.faces.append(face)
+        if face.material in SUPPORTED_MATERIALS:
+            self.faces[face.material].append(face)
 
     def read_vertex(self, data: bytes) -> None:
         (vertex,) = struct.unpack("<H", data)
@@ -123,7 +126,8 @@ class BTGReader(object):
 
     def parse_property(self, object_type: int, property_type: int, data: bytes) -> None:
         """Only geometry objects may have properties and they are a sort of triangle type"""
-        if object_type in [OBJECT_TYPE_TRIANGLES, OBJECT_TYPE_TRIANGLE_STRIPS, OBJECT_TYPE_TRIANGLE_FANS]:
+        if object_type in [OBJECT_TYPE_POINTS,
+                           OBJECT_TYPE_TRIANGLES, OBJECT_TYPE_TRIANGLE_STRIPS, OBJECT_TYPE_TRIANGLE_FANS]:
             if property_type == PROPERTY_TYPE_MATERIAL:
                 if data in WATER_MATERIALS:
                     self.material_name = WATER_PROXY
@@ -141,6 +145,9 @@ class BTGReader(object):
                     self.readers.append(self.read_discard)
                 if idx & INDEX_TYPE_TEX_COORDS:
                     self.readers.append(self.read_discard)
+
+                if object_type == OBJECT_TYPE_POINTS:
+                    self.readers = [self.read_vertex]
 
                 if len(self.readers) == 0:  # should never happen
                     self.readers = [self.read_vertex, self.read_discard]
@@ -195,7 +202,7 @@ class BTGReader(object):
                     face = self.create_face(0, n, n + 1)
                     self.add_face(face)
 
-    def read_objects(self, btg_file, number_objects: int) -> bool:
+    def read_objects(self, btg_file, number_objects: int) -> None:
         """Reads all top level objects"""
         for my_object in range(0, number_objects):
             self.readers = [self.read_vertex, self.read_discard]
@@ -203,9 +210,8 @@ class BTGReader(object):
             # Object header
             try:
                 obj_data = btg_file.read(5)
-            except IOError:
-                logging.error('Error in file format (object header)')
-                return False
+            except IOError as e:
+                raise MyException('Error in file format (object header)') from e
 
             (object_type, object_properties, object_elements) = struct.unpack("<BHH", obj_data)
 
@@ -214,17 +220,15 @@ class BTGReader(object):
             for a_property in range(0, object_properties):
                 try:
                     prop_data = btg_file.read(5)
-                except IOError:
-                    logging.error('Error in file format (object properties)')
-                    return False
+                except IOError as e:
+                    raise MyException('Error in file format (object properties)') from e
 
                 (property_type, data_bytes) = struct.unpack("<BI", prop_data)
 
                 try:
                     data = btg_file.read(data_bytes)
-                except IOError:
-                    logging.error('Error in file format (property data)')
-                    return False
+                except IOError as e:
+                    raise MyException('Error in file format (property data)') from e
 
                 # Parse property if this is a geometry object
                 self.parse_property(object_type, property_type, data)
@@ -234,24 +238,21 @@ class BTGReader(object):
             for element in range(0, object_elements):
                 try:
                     elem_data = btg_file.read(4)
-                except IOError:
-                    logging.error('Error in file format (object elements)')
-                    return False
+                except IOError as e:
+                    raise MyException('Error in file format (object elements)') from e
 
                 (databytes,) = struct.unpack("<I", elem_data)
 
                 # Read element data
                 try:
                     data = btg_file.read(databytes)
-                except IOError:
-                    logging.error('Error in file format (element data)')
-                    return False
+                except IOError as e:
+                    raise MyException('Error in file format (element data)') from e
 
                 # Parse element data
                 self.parse_element(object_type, databytes, data)
-        return True
 
-    def load(self, path: str) -> bool:
+    def load(self, path: str) -> None:
         """Loads a btg-files and starts reading up to the point, where objects are read"""
         file_name = path.split('\\')[-1].split('/')[-1]
 
@@ -260,58 +261,49 @@ class BTGReader(object):
             # Check if the file is gzipped, if so -> use built in gzip
             if file_name[-7:].lower() == ".btg.gz":
                 btg_file = gzip.open(path, "rb")
-                tile_name = file_name[:-7]
             elif file_name[-4:].lower() == ".btg":
                 btg_file = open(path, "rb")
-                tile_name = file_name[:-4]
             else:
-                logging.error('Not a .btg og .btg.gz file')
-                return False  # Not a btg file!
-        except IOError:
-            logging.error('Cannot open file %s', path)
-            return False
+                raise MyException('Not a .btg or .btg.gz file: %s', file_name)
+        except IOError as e:
+            raise MyException('Cannot open file {}'.format(path)) from e
 
         # Read file contents
-        btg_file.seek(0)
+        with btg_file:
+            btg_file.seek(0)
 
-        # Read and unpack header
-        try:
-            header = btg_file.read(8)
-            number_objects_ushort = btg_file.read(2)
-        except IOError:
-            logging.error('File in wrong format')
-            return False
+            # Read and unpack header
+            try:
+                header = btg_file.read(8)
+                number_objects_ushort = btg_file.read(2)
+            except IOError as e:
+                raise MyException('File in wrong format') from e
 
-        (version, magic, creation_time) = struct.unpack("<HHI", header)
+            (version, magic, creation_time) = struct.unpack("<HHI", header)
 
-        if version < 7:
-            logging.error('The BTG version must be 7 or higher')
-            return False
-        (number_top_level_objects,) = struct.unpack("<h", number_objects_ushort)
+            if version < 7:
+                raise MyException('The BTG version must be 7 or higher')
+            (number_top_level_objects,) = struct.unpack("<h", number_objects_ushort)
 
-        if not magic == 0x5347:
-            logging.error("Magic is not correct ('SG'): %s instead of 0x5347", magic)
-            return False
+            if not magic == 0x5347:
+                raise MyException("Magic is not correct ('SG'): {} instead of 0x5347".format(magic))
 
-        # Read objects
-        self.read_objects(btg_file, number_top_level_objects)
-        btg_file.close()
+            # Read objects
+            self.read_objects(btg_file, number_top_level_objects)
 
-        logging.info('Parsed %i vertices and found %i faces.', len(self.vertices), len(self.faces))
-        materials_names = set()
-        for face in self.faces:
-            materials_names.add(face.material)
-        for name in materials_names:
-            logging.info(name)
-        return True
+        # translate vertices from cartesian to geodetic coordinates
+        lon_rad, lat_rad, elev = coord.cart_to_geod(self.gbs_center)
+        quaternion_first = coord.quaternion_from_lon_lat_radian(lon_rad, lat_rad)
+        quaternion_other = coord.quaternion_from_euler_radian(0.0, 0.0, math.pi)
+        hlOr = coord.Quaternion.multiply(quaternion_first, quaternion_other)
+        coord.transform_to_rotated_coordinate_frame(hlOr, self.vertices)
+
+        logging.info('Parsed %i vertices and found the following materials:', len(self.vertices))
+        for key, faces_list in self.faces.items():
+            logging.info('Material: %s has %i faces', key, len(faces_list))
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    reader = BTGReader('/home/vanosten/bin/terrasync/Terrain/e000n40/e008n47/3088962.btg.gz')
-    lon_rad, lat_rad, elev = coord.cart_to_geod(reader.gbs_center)
-    quaternion_first = coord.quaternion_from_lon_lat_radian(lon_rad, lat_rad)
-    quaternion_other = coord.quaternion_from_euler_radian(0.0, 0.0, math.pi)
-    hlOr = coord.Quaternion.multiply(quaternion_first, quaternion_other)
-    coord.transform_to_rotated_coordinate_frame(hlOr, reader.vertices)
+    btg_reader = BTGReader('/home/vanosten/bin/terrasync/Terrain/e000n40/e008n47/3088962.btg.gz')
     logging.info("Done")

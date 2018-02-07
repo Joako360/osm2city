@@ -8,7 +8,9 @@ Use a tool like Osmosis to pre-process data.
 """
 
 from collections import namedtuple
+from enum import IntEnum, unique
 import logging
+import multiprocessing as mp
 from typing import Dict, List, Optional, Tuple
 import time
 import unittest
@@ -23,10 +25,33 @@ from utils.coordinates import Transformation
 PSEUDO_OSM_ID = -1  # For those nodes and ways, which get added as part of processing. Not written back to OSM.
 
 
-def get_next_pseudo_osm_id() -> int:
+@unique
+class OSMFeatureType(IntEnum):
+    building_relation = 0
+    building_generated = 1
+    landuse = 2
+    road = 3
+    pylon_way = 4
+
+
+def get_next_pseudo_osm_id(osm_feature: OSMFeatureType) -> int:
+    """Constructs a pseudo id for OSM as a negative value and therefore never a real OSM value.
+
+    Depending on which OSM feature is requesting, a different number range is returned.
+    In order not to have conflicts between different processes in multiprocessing, the number range is adapted.
+
+    In Osmosis Ids have to be sorted  from low to high.
+    The highest ID value will be different for each type of object (nodes, ways and relations)
+    The IDs are all 64 bit signed integers at the moment, so have a theoretical limit of 2^63-1
+    or 9,223,372,036,854,775,807
+    See http://gis.stackexchange.com/questions/17242/what-is-the-highest-possible-value-of-osm-id
+    """
+
     global PSEUDO_OSM_ID
     PSEUDO_OSM_ID -= 1
-    return PSEUDO_OSM_ID
+    type_factor = 1000000000000 * osm_feature.value
+    pid_factor = mp.current_process().pid * 1000000
+    return PSEUDO_OSM_ID + type_factor + pid_factor
 
 
 class OSMElement(object):
@@ -93,9 +118,27 @@ class Way(OSMElement):
                 my_coordinates.append((x, y))
         if len(my_coordinates) >= 3:
             my_polygon = shg.Polygon(my_coordinates)
-            if my_polygon.is_valid:
+            if not my_polygon.is_valid:  # it might be self-touching or self-crossing polygons
+                clean = my_polygon.buffer(0)  # cf. http://toblerity.org/shapely/manual.html#constructive-methods
+                if clean.is_valid:
+                    my_polygon = clean  # it is now a Polygon or a MultiPolygon
+            if my_polygon.is_valid and not my_polygon.is_empty:
                 return my_polygon
-            return None
+        return None
+
+    def line_string_from_osm_way(self, nodes_dict: Dict[int, Node], my_coord_transformator: Transformation) \
+            -> Optional[shg.LineString]:
+        my_coordinates = list()
+        for ref in self.refs:
+            if ref in nodes_dict:
+                my_node = nodes_dict[ref]
+                x, y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
+                my_coordinates.append((x, y))
+        if len(my_coordinates) >= 2:
+            my_geometry = shg.LineString(my_coordinates)
+            if my_geometry.is_valid and not my_geometry.is_empty:
+                return my_geometry
+        return None
 
 
 class Member(object):
@@ -108,7 +151,7 @@ class Member(object):
 
 
 class Relation(OSMElement):
-    __slots__ = ('members')
+    __slots__ = 'members'
 
     def __init__(self, osm_id: int):
         OSMElement.__init__(self, osm_id)
@@ -251,6 +294,15 @@ def parse_generator_output(str_output: str) -> float:
         return 0.
 
 
+def parse_int(str_int: str, default_value: int) -> int:
+    """If string can be parsed then return int, otherwise return the default value."""
+    try:
+        x = int(str_int)
+        return x
+    except ValueError:
+        return default_value
+
+
 def parse_multi_int_values(str_value: str) -> int:
     """Parse int values for tags, where values can be separated by semi-colons.
     E.g. for building levels, 'cables' and 'voltage' for power cables, which can have multiple values.
@@ -318,8 +370,7 @@ def parse_hstore_tags(tags_string: str, osm_id: int) -> Dict[str, str]:
     return tags_dict
 
 
-def fetch_db_way_data(req_way_keys: List[str], req_way_key_values: List[str],
-                      db_connection: psycopg2.extensions.connection) -> Dict[int, Way]:
+def fetch_db_way_data(req_way_keys: List[str], req_way_key_values: List[str], db_connection) -> Dict[int, Way]:
     """Fetches Way objects out of database given required tag keys and boundary in parameters."""
     query = """SELECT id, tags, nodes
     FROM ways AS w
@@ -342,8 +393,7 @@ def fetch_db_way_data(req_way_keys: List[str], req_way_key_values: List[str],
     return ways_dict
 
 
-def fetch_db_nodes_for_way(req_way_keys: List[str], req_way_key_values: List[str],
-                           db_connection: psycopg2.extensions.connection) -> Dict[int, Node]:
+def fetch_db_nodes_for_way(req_way_keys: List[str], req_way_key_values: List[str], db_connection) -> Dict[int, Node]:
     """Fetches Node objects for ways out of database given same constraints as for Way.
     Constraints for way: see fetch_db_way_data"""
     query = """SELECT n.id, ST_X(n.geom) as lon, ST_Y(n.geom) as lat
@@ -367,7 +417,7 @@ def fetch_db_nodes_for_way(req_way_keys: List[str], req_way_key_values: List[str
     return nodes_dict
 
 
-def fetch_db_nodes_isolated(req_node_key_values: List[str]) -> Dict[int, Node]:
+def fetch_db_nodes_isolated(req_way_keys: List[str], req_node_key_values: List[str]) -> Dict[int, Node]:
     """Fetches Node objects isolated without relation to way etc."""
     start_time = time.time()
 
@@ -376,7 +426,7 @@ def fetch_db_nodes_isolated(req_node_key_values: List[str]) -> Dict[int, Node]:
     query = """SELECT n.id, ST_X(n.geom) as lon, ST_Y(n.geom) as lat, n.tags
     FROM nodes AS n
     WHERE """
-    query += construct_tags_query(list(), req_node_key_values, table_alias="n")
+    query += construct_tags_query(req_way_keys, req_node_key_values, table_alias="n")
     query += " AND "
     query += construct_intersect_bbox_query(is_way=False)
     query += ";"
@@ -396,7 +446,7 @@ def fetch_db_nodes_isolated(req_node_key_values: List[str]) -> Dict[int, Node]:
     return nodes_dict
 
 
-def fetch_all_query_into_tuple(query: str, db_connection: psycopg2.extensions.connection) -> List[Tuple]:
+def fetch_all_query_into_tuple(query: str, db_connection) -> List[Tuple]:
     """Given a query string and a db connection execute fetch all and return the result as a list of tuples"""
     cur = db_connection.cursor()
     logging.debug("Query string for execution in database: " + query)
@@ -508,10 +558,11 @@ def fetch_osm_db_data_relations_keys(req_keys: List[str], input_read_result: OSM
                          relations_dict=relations_dict, rel_nodes_dict=rel_nodes_dict, rel_ways_dict=rel_ways_dict)
 
 
-def make_db_connection() -> psycopg2.extensions.connection:
+def make_db_connection():
     """"Create connection to the database based on parameters."""
-    return psycopg2.connect(database=parameters.DB_NAME, host=parameters.DB_HOST, port=parameters.DB_PORT,
-                            user=parameters.DB_USER, password=parameters.DB_USER_PASSWORD)
+    connection = psycopg2.connect(database=parameters.DB_NAME, host=parameters.DB_HOST, port=parameters.DB_PORT,
+                                  user=parameters.DB_USER, password=parameters.DB_USER_PASSWORD)
+    return connection
 
 
 def construct_intersect_bbox_query(is_way: bool=True) -> str:
@@ -564,7 +615,8 @@ def construct_tags_query(req_tag_keys: List[str], req_tag_key_values: List[str],
     return tags_query
 
 
-def split_way_at_boundary(nodes_dict: Dict[int, Node], complete_way: Way, clipping_border: shg.Polygon) -> List[Way]:
+def split_way_at_boundary(nodes_dict: Dict[int, Node], complete_way: Way, clipping_border: shg.Polygon,
+                          osm_feature: OSMFeatureType) -> List[Way]:
     """Splits a way (e.g. road) at the clipping border into 0 to n ways.
     A way can be totally inside a boundary, totally outside a boundary, intersect once or several times.
     Splitting is tested at existing nodes of the way. A split way's first node is always inside the boundary.
@@ -587,7 +639,7 @@ def split_way_at_boundary(nodes_dict: Dict[int, Node], complete_way: Way, clippi
                     split_ways.append(current_way)
                 current_way = Way(complete_way.osm_id)
                 current_way.tags = complete_way.tags
-                current_way.pseudo_osm_id = get_next_pseudo_osm_id()
+                current_way.pseudo_osm_id = get_next_pseudo_osm_id(osm_feature)
                 previous_inside = False
             # nothing to do if previous also outside
 

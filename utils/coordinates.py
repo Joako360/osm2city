@@ -292,7 +292,7 @@ def transform_to_rotated_coordinate_frame(quat: Quaternion, originals: List[Vec3
         vertex.subtract(third_part)
 
 
-def calc_angle_of_line_local(x1, y1, x2, y2):
+def calc_angle_of_line_local(x1: float, y1: float, x2: float, y2: float) -> float:
     """Returns the angle in degrees of a line relative to North.
     Based on local coordinates (x,y) of two points.
     """
@@ -301,6 +301,23 @@ def calc_angle_of_line_local(x1, y1, x2, y2):
     if degree < 0:
         degree += 360
     return degree
+
+
+def calc_point_angle_away(x: float, y: float, added_distance:float, angle: float) -> Tuple[float, float]:
+    new_x = x + added_distance * sin(radians(angle))
+    new_y = y + added_distance * cos(radians(angle))
+    return new_x, new_y
+
+
+def calc_angle_of_corner_local(prev_point_x: float, prev_point_y: float,
+                               corner_point_x: float, corner_point_y,
+                               next_point_x: float, next_point_y) -> float:
+    first_angle = calc_angle_of_line_local(corner_point_x, corner_point_y, prev_point_x, prev_point_y)
+    second_angle = calc_angle_of_line_local(corner_point_x, corner_point_y, next_point_x, next_point_y)
+    final_angle = fabs(first_angle - second_angle)
+    if final_angle > 180:
+        final_angle = 360 - final_angle
+    return final_angle
 
 
 def calc_distance_local(x1, y1, x2, y2):
@@ -386,3 +403,22 @@ class TestCoordinates(unittest.TestCase):
         bounds_2 = (0, 20, 20, 30)
         self.assertTrue(disjoint_bounds(bounds_1, bounds_2), 'Disjoint 1-2')
         self.assertTrue(disjoint_bounds(bounds_2, bounds_1), 'Disjoint 2-1')
+
+    def test_calc_angle_of_corner_local(self):
+        self.assertAlmostEqual(180, calc_angle_of_corner_local(-1, 0, 0, 0, 1, 0), 2)
+        self.assertAlmostEqual(180, calc_angle_of_corner_local(1, 0, 0, 0, -1, 0), 2)
+
+        self.assertAlmostEqual(90, calc_angle_of_corner_local(1, 0, 0, 0, 0, 1), 2)
+        self.assertAlmostEqual(90, calc_angle_of_corner_local(0, 1, 0, 0, 1, 0), 2)
+
+        self.assertAlmostEqual(90, calc_angle_of_corner_local(1, 0, 0, 0, 0, -1), 2)
+        self.assertAlmostEqual(90, calc_angle_of_corner_local(0, -1, 0, 0, 1, 0), 2)
+
+        self.assertAlmostEqual(45, calc_angle_of_corner_local(1, 0, 0, 0, 1, 1), 2)
+        self.assertAlmostEqual(45, calc_angle_of_corner_local(1, 1, 0, 0, 1, 0), 2)
+
+        self.assertAlmostEqual(135, calc_angle_of_corner_local(-1, 0, 0, 0, 1, 1), 2)
+        self.assertAlmostEqual(135, calc_angle_of_corner_local(1, 1, 0, 0, -1, 0), 2)
+
+        self.assertAlmostEqual(45, calc_angle_of_corner_local(-1, 1, 0, 0, 0, 1), 2)
+        self.assertAlmostEqual(45, calc_angle_of_corner_local(-1, 1, 0, 0, -1, 0), 2)

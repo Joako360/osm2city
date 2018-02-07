@@ -29,7 +29,8 @@ import cluster
 import parameters
 import roads
 import shapely.geometry as shg
-from utils import osmparser, vec2d, coordinates, stg_io2, utilities, landuse
+import utils.osmparser as op
+from utils import vec2d, coordinates, stg_io2, utilities, landuse
 
 OUR_MAGIC = "pylons"  # Used in e.g. stg files to mark edits by osm2pylon
 OUT_MAGIC_DETAILS = "pylonsDetails"
@@ -330,7 +331,7 @@ class Chimney(SharedPylon):
         variation = random.uniform(0, parameters.C2P_CHIMNEY_DEFAULT_HEIGHT_VARIATION)
         self.height += variation
         if 'height' in tags:
-            self.height = osmparser.parse_length(tags['height'])
+            self.height = op.parse_length(tags['height'])
 
         bricks = False
         if 'building:material' in tags and tags['building:material'] == 'brick':
@@ -365,7 +366,7 @@ class Chimney(SharedPylon):
         self.pylon_model = 'Models/Industrial/' + self.pylon_model
 
 
-def _process_osm_chimneys_nodes(osm_nodes_dict: Dict[int, osmparser.Node], coords_transform: coordinates.Transformation,
+def _process_osm_chimneys_nodes(osm_nodes_dict: Dict[int, op.Node], coords_transform: coordinates.Transformation,
                                fg_elev: utilities.FGElev) -> List[Chimney]:
     chimneys = list()
 
@@ -468,12 +469,12 @@ class WindTurbine(SharedPylon):
         self.offshore = "offshore" in tags and tags["offshore"].lower() == "yes"
         self.height = 0.
         if "height" in tags:
-            self.height = osmparser.parse_length(tags["height"])
+            self.height = op.parse_length(tags["height"])
         elif "seamark:landmark:height" in tags:
-            self.height = osmparser.parse_length(tags["seamark:landmark:height"])
+            self.height = op.parse_length(tags["seamark:landmark:height"])
         self.rotor_diameter = 0.0
         if "rotor_diameter" in tags:
-            self.rotor_diameter = osmparser.parse_length(tags["rotor_diameter"])
+            self.rotor_diameter = op.parse_length(tags["rotor_diameter"])
         self.manufacturer = None
         if "manufacturer" in tags:
             self.manufacturer = tags["manufacturer"]
@@ -577,7 +578,7 @@ class WindFarm(object):
             turbine.pylon_model = shared_model
 
 
-def _process_osm_wind_turbines(osm_nodes_dict: Dict[int, osmparser.Node], coords_transform: coordinates.Transformation,
+def _process_osm_wind_turbines(osm_nodes_dict: Dict[int, op.Node], coords_transform: coordinates.Transformation,
                                fg_elev: utilities.FGElev, stg_entries: List[stg_io2.STGEntry]) -> List[WindTurbine]:
     my_wind_turbines = list()
     wind_farms = list()
@@ -597,7 +598,7 @@ def _process_osm_wind_turbines(osm_nodes_dict: Dict[int, osmparser.Node], coords
                             break
                 if shared_within_distance:
                     continue
-                generator_output = osmparser.parse_generator_output(node.tags["generator:output:electricity"])
+                generator_output = op.parse_generator_output(node.tags["generator:output:electricity"])
                 turbine = WindTurbine(key, node.lon, node.lat, generator_output, node.tags)
                 turbine.x, turbine.y = coords_transform.toLocal((node.lon, node.lat))
                 probe_tuple = fg_elev.probe(vec2d.Vec2d(node.lon, node.lat), True)
@@ -1111,7 +1112,7 @@ def _process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev,
     railway_candidates = list()
     for way_key, way in ways_dict.items():
         if "railway" in way.tags:
-            split_ways = osmparser.split_way_at_boundary(nodes_dict, way, clipping_border)
+            split_ways = op.split_way_at_boundary(nodes_dict, way, clipping_border, op.OSMFeatureType.road)
             if split_ways:
                 railway_candidates.extend(split_ways)
 
@@ -1271,7 +1272,7 @@ def _merge_streetlamp_buffers(landuse_refs):
 def _process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGElev, my_coord_transformator,
                                  building_refs: List[shg.Polygon]) -> Tuple[List[WayLine], List[WayLine]]:
     """
-    Transforms a dict of Node and a dict of Way OSMElements from osmparser.py to a dict of WayLine objects for
+    Transforms a dict of Node and a dict of Way OSMElements from op.py to a dict of WayLine objects for
     electrical power lines and a dict of WayLine objects for aerialways. Nodes are transformed to Pylons.
     The elevation of the pylons is calculated as part of this process.
     """
@@ -1304,9 +1305,9 @@ def _process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGEle
                     my_line.type_ = WayLineType.aerialway_goods
             #  special values
             elif "cables" == key:
-                my_line.cables = osmparser.parse_multi_int_values(value)
+                my_line.cables = op.parse_multi_int_values(value)
             elif "voltage" == key:
-                my_line.voltage = osmparser.parse_multi_int_values(value)
+                my_line.voltage = op.parse_multi_int_values(value)
             elif "wires" == key:
                 my_line.wires = value  # is a string, cf. http://wiki.openstreetmap.org/wiki/Key:wires
         if my_line.type_ == 0:
@@ -1319,7 +1320,7 @@ def _process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGEle
                 my_line.original_osm_way = way
                 way_lines.append(my_line)
         else:
-            split_ways = osmparser.split_way_at_boundary(nodes_dict, way, clipping_border)
+            split_ways = op.split_way_at_boundary(nodes_dict, way, clipping_border, op.OSMFeatureType.pylon_way)
             if not split_ways:
                 continue
             else:
@@ -1365,7 +1366,7 @@ def _process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGEle
                                                   my_pylon.osm_id)
                                     break
                     elif "height" == key:
-                        my_pylon.height = osmparser.parse_length(value)
+                        my_pylon.height = op.parse_length(value)
                     elif "structure" == key:
                         my_pylon.structure = value
                     elif "material" == key:
@@ -1780,7 +1781,7 @@ def process_pylons(coords_transform: coordinates.Transformation, fg_elev: utilit
     building_refs = list()
     storage_tanks = list()
     if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_STORAGE_TANKS:
-        osm_way_result = osmparser.fetch_osm_db_data_ways_keys(['building'])
+        osm_way_result = op.fetch_osm_db_data_ways_keys(['building'])
         osm_nodes_dict = osm_way_result.nodes_dict
         osm_ways_dict = osm_way_result.ways_dict
         building_refs = _process_osm_building_refs(osm_nodes_dict, osm_ways_dict, coords_transform, fg_elev,
@@ -1792,7 +1793,7 @@ def process_pylons(coords_transform: coordinates.Transformation, fg_elev: utilit
         req_keys = list()
         if parameters.C2P_PROCESS_POWERLINES:
             req_keys.append('power')
-        osm_way_result = osmparser.fetch_osm_db_data_ways_keys(req_keys)
+        osm_way_result = op.fetch_osm_db_data_ways_keys(req_keys)
         osm_nodes_dict = osm_way_result.nodes_dict
         osm_ways_dict = osm_way_result.ways_dict
 
@@ -1810,17 +1811,17 @@ def process_pylons(coords_transform: coordinates.Transformation, fg_elev: utilit
     # wind turbines
     wind_turbines = list()
     if parameters.C2P_PROCESS_WIND_TURBINES:
-        osm_nodes_dict = osmparser.fetch_db_nodes_isolated(["generator:source=>wind"])
+        osm_nodes_dict = op.fetch_db_nodes_isolated(list(), ["generator:source=>wind"])
         wind_turbines = _process_osm_wind_turbines(osm_nodes_dict, coords_transform, fg_elev, stg_entries)
         logging.info("Number of valid wind turbines found: {}".format(len(wind_turbines)))
     # chimneys
     chimneys = list()
     if parameters.C2P_PROCESS_CHIMNEYS:
         # start with chimneys tagged as node
-        osm_nodes_dict = osmparser.fetch_db_nodes_isolated(['man_made=>chimney'])
+        osm_nodes_dict = op.fetch_db_nodes_isolated(list(), ['man_made=>chimney'])
         chimneys = _process_osm_chimneys_nodes(osm_nodes_dict, coords_transform, fg_elev)
         # add chimneys tagged as way
-        osm_way_result = osmparser.fetch_osm_db_data_ways_key_values(['man_made=>chimney'])
+        osm_way_result = op.fetch_osm_db_data_ways_key_values(['man_made=>chimney'])
         osm_nodes_dict = osm_way_result.nodes_dict
         osm_ways_dict = osm_way_result.ways_dict
         chimneys.extend(_process_osm_chimneys_ways(osm_nodes_dict, osm_ways_dict, coords_transform, fg_elev))
@@ -1869,7 +1870,7 @@ def process_details(coords_transform: coordinates.Transformation, fg_elev: utili
     building_refs = list()
     storage_tanks = list()
     if parameters.C2P_PROCESS_AERIALWAYS or parameters.C2P_PROCESS_STREETLAMPS:
-        osm_way_result = osmparser.fetch_osm_db_data_ways_keys(['building'])
+        osm_way_result = op.fetch_osm_db_data_ways_keys(['building'])
         osm_nodes_dict = osm_way_result.nodes_dict
         osm_ways_dict = osm_way_result.ways_dict
         building_refs = _process_osm_building_refs(osm_nodes_dict, osm_ways_dict, coords_transform, fg_elev,
@@ -1884,7 +1885,7 @@ def process_details(coords_transform: coordinates.Transformation, fg_elev: utili
     if parameters.C2P_PROCESS_AERIALWAYS:
         req_keys.append('aerialway')
     if req_keys:
-        osm_way_result = osmparser.fetch_osm_db_data_ways_keys(req_keys)
+        osm_way_result = op.fetch_osm_db_data_ways_keys(req_keys)
         osm_nodes_dict = osm_way_result.nodes_dict
         osm_ways_dict = osm_way_result.ways_dict
 
@@ -1903,7 +1904,7 @@ def process_details(coords_transform: coordinates.Transformation, fg_elev: utili
     # railway overhead lines
     rail_lines = list()
     if parameters.C2P_PROCESS_OVERHEAD_LINES:
-        osm_way_result = osmparser.fetch_osm_db_data_ways_keys(['railway'])
+        osm_way_result = op.fetch_osm_db_data_ways_keys(['railway'])
         osm_nodes_dict = osm_way_result.nodes_dict
         osm_ways_dict = osm_way_result.ways_dict
         rail_lines = _process_osm_rail_overhead(osm_nodes_dict, osm_ways_dict, fg_elev,
@@ -1914,7 +1915,7 @@ def process_details(coords_transform: coordinates.Transformation, fg_elev: utili
     # street lamps
     streetlamp_ways = list()
     if parameters.C2P_PROCESS_STREETLAMPS:
-        osm_way_result = osmparser.fetch_osm_db_data_ways_keys(["landuse", "highway"])
+        osm_way_result = op.fetch_osm_db_data_ways_keys(["landuse", "highway"])
         osm_nodes_dict = osm_way_result.nodes_dict
         osm_ways_dict = osm_way_result.ways_dict
 

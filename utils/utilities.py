@@ -13,6 +13,7 @@ import pickle
 import subprocess
 import sys
 import textwrap
+import time
 from typing import Dict, List, Optional, Tuple
 import unittest
 
@@ -21,7 +22,8 @@ from shapely import affinity
 import shapely.geometry as shg
 
 import parameters
-from utils import coordinates, osmparser
+import utils.coordinates as co
+import utils.osmparser as op
 import utils.vec2d as ve
 
 
@@ -117,8 +119,8 @@ def log_level_debug_or_lower():
 
 
 def match_local_coords_with_global_nodes(local_list: List[Tuple[float, float]], ref_list: List[int],
-                                         all_nodes: Dict[int, osmparser.Node],
-                                         coords_transform: coordinates.Transformation, osm_id: int,
+                                         all_nodes: Dict[int, op.Node],
+                                         coords_transform: co.Transformation, osm_id: int,
                                          create_node: bool=False) -> List[int]:
     """Given a set of coordinates in local space find matching Node objects in global space.
     Matching is using a bit of tolerance (cf. parameter), which should be enough to account for conversion precision
@@ -136,7 +138,7 @@ def match_local_coords_with_global_nodes(local_list: List[Tuple[float, float]], 
         closest_distance = 999999
         found_key = -1
         for key, node_local in nodes_local.items():
-            distance = coordinates.calc_distance_local(local[0], local[1], node_local[0], node_local[1])
+            distance = co.calc_distance_local(local[0], local[1], node_local[0], node_local[1])
             if distance < closest_distance:
                 closest_distance = distance
             if distance < parameters.BUILDING_TOLERANCE_MATCH_NODE:
@@ -145,7 +147,7 @@ def match_local_coords_with_global_nodes(local_list: List[Tuple[float, float]], 
         if found_key < 0:
             if create_node:
                 lon, lat = coords_transform.toGlobal(local)
-                new_node = osmparser.Node(osmparser.get_next_pseudo_osm_id(), lat, lon)
+                new_node = op.Node(op.get_next_pseudo_osm_id(op.OSMFeatureType.building_relation), lat, lon)
                 all_nodes[new_node.osm_id] = new_node
                 matched_nodes.append(new_node.osm_id)
             else:
@@ -324,7 +326,7 @@ class FGElev(object):
        By default, queries are cached. Call save_cache() to
        save the cache to disk before freeing the object.
     """
-    def __init__(self, coords_transform: coordinates.Transformation, tile_index: int,
+    def __init__(self, coords_transform: co.Transformation, tile_index: int,
                  auto_save_every: int=50000) -> None:
         """Open pipe to fgelev.
            Unless disabled by cache=False, initialize the cache and try to read
@@ -546,6 +548,12 @@ def bounds_from_list(bounds_list: List[Tuple[float, float, float, float]]) -> Tu
     return min_x, min_y, max_x, max_y
 
 
+def time_logging(message: str, last_time: float) -> float:
+    current_time = time.time()
+    logging.info(message + ": %f", current_time - last_time)
+    return current_time
+
+
 def minimum_circumference_rectangle_for_polygon(hull: shg.Polygon) -> Tuple[float, float, float]:
     """Constructs a minimum circumference rectangle around a polygon and returns its angle, length and width
     There is no check whether length is longer than width - or that length is closer to e.g. the x-axis.
@@ -573,8 +581,8 @@ def minimum_circumference_rectangle_for_polygon(hull: shg.Polygon) -> Tuple[floa
     min_circumference = 99999999.
     hull_coords = hull.exterior.coords[:]  # list of x,y tuples
     for index in range(len(hull_coords) - 1):
-        angle = coordinates.calc_angle_of_line_local(hull_coords[index][0], hull_coords[index][1],
-                                                     hull_coords[index + 1][0], hull_coords[index + 1][1])
+        angle = co.calc_angle_of_line_local(hull_coords[index][0], hull_coords[index][1],
+                                            hull_coords[index + 1][0], hull_coords[index + 1][1])
         rotated_hull = affinity.rotate(hull, - angle, (0, 0))
         bounding_box = rotated_hull.bounds  # tuple x_min, y_min, x_max, y_max
         bb_length = math.fabs(bounding_box[2] - bounding_box[0])
