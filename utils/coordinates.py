@@ -94,26 +94,14 @@ class Transformation(object):
         self._R1 = EQURAD * (1.-e2)/(1.-e2*(sinlat**2))**(3./2.)
         self._R2 = EQURAD / sqrt(1-e2*sinlat**2)
 
-    def setOrigin(self, coord_tuple: Tuple[float, float]):
-        """set origin to given global coordinates (lon, lat)"""
-        (lon, lat) = coord_tuple
-        self._lon, self._lat = lon, lat
-        self._update()
-
-    def getOrigin(self):
-        """return origin in global coordinates"""
-        return self._lat, self._lon
-
-    origin = property(getOrigin, setOrigin)
-
-    def toLocal(self, coord_tuple: Tuple[float, float]):
+    def to_local(self, coord_tuple: Tuple[float, float]) -> Tuple[float, float]:
         """transform global -> local coordinates"""
         (lon, lat) = coord_tuple
         y = self._R1 * radians(lat - self._lat)
         x = self._R2 * radians(lon - self._lon) * self._coslat
         return x, y
 
-    def toGlobal(self, coord_tuple: Tuple[float, float]):
+    def to_global(self, coord_tuple: Tuple[float, float]) -> Tuple[float, float]:
         """transform local -> global coordinates"""
         (x, y) = coord_tuple
         lat = degrees(y / self._R1) + self._lat
@@ -129,9 +117,9 @@ class Vec3d(object):
     __slots__ = ('x', 'y', 'z')
 
     def __init__(self, x: float, y: float, z: float) -> None:
-        self.x = x
-        self.y = y
-        self.z = z
+        self.x = x  # or lon
+        self.y = y  # or lat
+        self.z = z  # or height
 
     @staticmethod
     def dot(first: 'Vec3d', other: 'Vec3d') -> float:
@@ -160,6 +148,11 @@ class Vec3d(object):
         self.y -= other.y
         self.z -= other.z
 
+    def to_local(self, transformer: Transformation) -> None:
+        """Translates to local coordinate system."""
+        self.x, self.y = transformer.to_local((self.x, self.y))
+        # nothing to do for z
+
     def __copy__(self) -> 'Vec3d':
         return Vec3d(self.x, self.y, self.z)
 
@@ -167,6 +160,10 @@ class Vec3d(object):
 def cart_to_geod(center: Vec3d) -> Tuple[float, float, float]:
     """Converts a cartesian point to geodetic coordinates. Returns lon, lat in radians and elevation in meters
     See SGGeodesy::SGCartToGeod in simgear/math/SGGeodesy.cxx
+
+    Description in simgear/math/SGGeod.hxx:
+    Factory to convert position from a cartesian position assumed to be in wgs84 measured in meters
+    Note that this conversion is relatively expensive to compute
     """
     xx_p_yy = center.x * center.x + center.y * center.y
     if xx_p_yy + center.z * center.z < 25.:
@@ -219,11 +216,15 @@ class Quaternion(object):
 
     @staticmethod
     def multiply(first: 'Quaternion', other: 'Quaternion') -> 'Quaternion':
-        return Quaternion(first.w * other.w, first.x * other.x, first.y * other.y, first.z * other.z)
+        w = first.w * other.w - first.x * other.x - first.y * other.y - first.z * other.z
+        x = first.w * other.x + first.x * other.w + first.y * other.z - first.z * other.y
+        y = first.w * other.y + first.y * other.w + first.z * other.x - first.x * other.z
+        z = first.w * other.z + first.z * other.w + first.x * other.y - first.y * other.x
+        return Quaternion(w, x, y, z)
 
     @staticmethod
     def dot(first: 'Quaternion', other: 'Quaternion') -> float:
-        return first.w * other.w  + first.x * other.x + first.y * other.y + first.z * other.z
+        return first.w * other.w + first.x * other.x + first.y * other.y + first.z * other.z
 
 
 def quaternion_from_lon_lat_radian(lon_rad: float, lat_rad: float) -> Quaternion:
@@ -303,7 +304,7 @@ def calc_angle_of_line_local(x1: float, y1: float, x2: float, y2: float) -> floa
     return degree
 
 
-def calc_point_angle_away(x: float, y: float, added_distance:float, angle: float) -> Tuple[float, float]:
+def calc_point_angle_away(x: float, y: float, added_distance: float, angle: float) -> Tuple[float, float]:
     new_x = x + added_distance * sin(radians(angle))
     new_y = y + added_distance * cos(radians(angle))
     return new_x, new_y
@@ -340,8 +341,8 @@ def calc_distance_global_radians(lon1_r, lat1_r, lon2_r, lat2_r):
 
 def calc_angle_of_line_global(lon1: float, lat1: float, lon2: float, lat2: float,
                               transformation: Transformation) -> float:
-    x1, y1 = transformation.toLocal((lon1, lat1))
-    x2, y2 = transformation.toLocal((lon2, lat2))
+    x1, y1 = transformation.to_local((lon1, lat1))
+    x2, y2 = transformation.to_local((lon2, lat2))
     return calc_angle_of_line_local(x1, y1, x2, y2)
 
 
@@ -350,9 +351,9 @@ def disjoint_bounds(bounds_1: Tuple[float, float, float, float], bounds_2: Tuple
     Bounds are Shapely (minx, miny, maxx, maxy) tuples (float values) that bounds the object -> geom.bounds.
     """
     x_overlap = bounds_1[0] <= bounds_2[0] <= bounds_1[2] or bounds_1[0] <= bounds_2[2] <= bounds_1[2] or \
-                bounds_2[0] <= bounds_1[0] <= bounds_2[2] or bounds_2[0] <= bounds_1[2] <= bounds_2[2]
+        bounds_2[0] <= bounds_1[0] <= bounds_2[2] or bounds_2[0] <= bounds_1[2] <= bounds_2[2]
     y_overlap = bounds_1[1] <= bounds_2[1] <= bounds_1[3] or bounds_1[1] <= bounds_2[3] <= bounds_1[3] or \
-                bounds_2[1] <= bounds_1[1] <= bounds_2[3] or bounds_2[1] <= bounds_1[3] <= bounds_2[3]
+        bounds_2[1] <= bounds_1[1] <= bounds_2[3] or bounds_2[1] <= bounds_1[3] <= bounds_2[3]
     if x_overlap and y_overlap:
         return False
     return True

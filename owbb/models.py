@@ -11,8 +11,7 @@ import logging
 import math
 from typing import Dict, List, Union
 
-from shapely import affinity
-from shapely.geometry import box, Point, LineString, Polygon, MultiPolygon
+from shapely.geometry import Point, LineString, Polygon, MultiPolygon
 
 import parameters
 import utils.osmparser as op
@@ -39,8 +38,8 @@ class Bounds(object):
 
     @classmethod
     def create_from_parameters(cls, coord_transform: co.Transformation) -> 'Bounds':
-        min_point = Point(coord_transform.toLocal((parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)))
-        max_point = Point(coord_transform.toLocal((parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)))
+        min_point = Point(coord_transform.to_local((parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH)))
+        max_point = Point(coord_transform.to_local((parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)))
         return Bounds(min_point, max_point)
 
 
@@ -106,7 +105,7 @@ class Place(OSMFeature):
 
     @classmethod
     def create_from_node(cls, node: op.Node, my_coord_transformator: co.Transformation) -> 'Place':
-        x, y = my_coord_transformator.toLocal((node.lon, node.lat))
+        x, y = my_coord_transformator.to_local((node.lon, node.lat))
         my_geometry = Point(x, y)
         feature_type = cls.parse_tags(node.tags)
         obj = Place(node.osm_id, my_geometry, feature_type, True)
@@ -439,8 +438,8 @@ class GeneratedBuildingZone(BuildingZone):
 
 
 class OSMFeatureLinear(OSMFeature):
-    def __init__(self, osm_id: int, geometry: LineString, feature_type: Union[None, IntEnum],
-                 tags_dict: KeyValueDict) -> None:
+    def __init__(self, osm_id: int, geometry: LineString, tags_dict: KeyValueDict) -> None:
+        feature_type = self.parse_tags(tags_dict)
         super().__init__(osm_id, geometry, feature_type)
         if self._parse_tags_tunnel(tags_dict):
             self.type_ = None
@@ -448,11 +447,13 @@ class OSMFeatureLinear(OSMFeature):
 
     @classmethod
     def create_from_way(cls, way: op.Way, nodes_dict: Dict[int, op.Node],
-                        my_coord_transformator: co.Transformation) -> 'OSMFeatureLinear':
-        my_geometry = way.line_string_from_osm_way(nodes_dict, my_coord_transformator)
-        feature_type = cls.parse_tags(way.tags)
-        obj = OSMFeatureLinear(way.osm_id, my_geometry, feature_type, way.tags)
-        return obj
+                        transformer: co.Transformation) -> 'OSMFeatureLinear':
+        raise NotImplementedError("Please implement this method")
+
+    @staticmethod
+    def create_line_string_from_way(way: op.Way, nodes_dict: Dict[int, op.Node],
+                                    transformer: co.Transformation) -> LineString:
+        return way.line_string_from_osm_way(nodes_dict, transformer)
 
     @staticmethod
     def _parse_tags_embankment(tags_dict: KeyValueDict) -> bool:
@@ -478,9 +479,8 @@ class Waterway(OSMFeatureLinear):
     """A 'Waterway' OSM map feature.
      Cf. http://wiki.openstreetmap.org/wiki/Map_Features#Waterway
      """
-    def __init__(self, osm_id: int, geometry: LineString, feature_type: Union[None, IntEnum],
-                 tags_dict: KeyValueDict) -> None:
-        super().__init__(osm_id, geometry, feature_type, tags_dict)
+    def __init__(self, osm_id: int, geometry: LineString, tags_dict: KeyValueDict) -> None:
+        super().__init__(osm_id, geometry, tags_dict)
 
     @staticmethod
     def parse_tags(tags_dict: KeyValueDict) -> Union[WaterwayType, None]:
@@ -500,12 +500,23 @@ class Waterway(OSMFeatureLinear):
             my_width *= 3.0
         return my_width
 
+    @classmethod
+    def create_from_way(cls, way: op.Way, nodes_dict: Dict[int, op.Node],
+                        transformer: co.Transformation) -> 'Waterway':
+        my_geometry = cls.create_line_string_from_way(way, nodes_dict, transformer)
+        obj = Waterway(way.osm_id, my_geometry, way.tags)
+        return obj
+
 
 class OSMFeatureLinearWithTunnel(OSMFeatureLinear):
-    def __init__(self, osm_id: int, geometry: LineString, feature_type: Union[None, IntEnum],
-                 tags_dict: KeyValueDict) -> None:
-        super().__init__(osm_id, geometry, feature_type, tags_dict)
+    def __init__(self, osm_id: int, geometry: LineString, tags_dict: KeyValueDict) -> None:
+        super().__init__(osm_id, geometry, tags_dict)
         self.is_tunnel = self._parse_tags_tunnel(tags_dict)
+
+    @classmethod
+    def create_from_way(cls, way: op.Way, nodes_dict: Dict[int, op.Node],
+                        transformer: co.Transformation) -> 'OSMFeatureLinear':
+        raise NotImplementedError("Please implement this method")
 
 
 @unique
@@ -522,9 +533,8 @@ class RailwayLineType(IntEnum):
 
 class RailwayLine(OSMFeatureLinearWithTunnel):
     """A 'Railway' OSM map feature (only tracks, not land-use etc)"""
-    def __init__(self, osm_id: int, geometry: LineString, feature_type: Union[None, IntEnum],
-                 tags_dict: KeyValueDict) -> None:
-        super().__init__(osm_id, geometry, feature_type, tags_dict)
+    def __init__(self, osm_id: int, geometry: LineString, tags_dict: KeyValueDict) -> None:
+        super().__init__(osm_id, geometry, tags_dict)
         self.tracks = self._parse_tags_tracks(tags_dict)
         self.is_service_spur = self._parse_tags_service_spur(tags_dict)
 
@@ -576,6 +586,13 @@ class RailwayLine(OSMFeatureLinearWithTunnel):
             my_width += 6.0
         return my_width
 
+    @classmethod
+    def create_from_way(cls, way: op.Way, nodes_dict: Dict[int, op.Node],
+                        transformer: co.Transformation) -> 'RailwayLine':
+        my_geometry = cls.create_line_string_from_way(way, nodes_dict, transformer)
+        obj = RailwayLine(way.osm_id, my_geometry, way.tags)
+        return obj
+
 
 @unique
 class HighwayType(IntEnum):
@@ -594,16 +611,16 @@ class HighwayType(IntEnum):
 
 
 class Highway(OSMFeatureLinearWithTunnel):
-    def __init__(self, osm_id: int, geometry: LineString, feature_type: Union[None, IntEnum],
-                 tags_dict: KeyValueDict) -> None:
-        super().__init__(osm_id, geometry, feature_type, tags_dict)
+    def __init__(self, osm_id: int, geometry: LineString, tags_dict: KeyValueDict) -> None:
+        super().__init__(osm_id, geometry, tags_dict)
         self.is_roundabout = self._parse_tags_roundabout(tags_dict)
         self.is_oneway = self._parse_tags_oneway(tags_dict)
         self.lanes = self._parse_tags_lanes(tags_dict)
 
     @classmethod
     def create_from_scratch(cls, pseudo_id: int, existing_highway: 'Highway', linear: LineString) -> 'Highway':
-        obj = Highway(pseudo_id, linear, existing_highway.type_, dict())
+        obj = Highway(pseudo_id, linear, dict())
+        obj.type_ = existing_highway.type_
         obj.is_roundabout = existing_highway.is_roundabout
         obj.is_oneway = existing_highway.is_oneway
         obj.lanes = existing_highway.lanes
@@ -697,6 +714,13 @@ class Highway(OSMFeatureLinearWithTunnel):
     def populate_buildings_along(self) -> bool:
         """The type of highway determines where buildings are built. E.g. motorway would be false"""
         return self.type_ not in (HighwayType.motorway, HighwayType.trunk)
+
+    @classmethod
+    def create_from_way(cls, way: op.Way, nodes_dict: Dict[int, op.Node],
+                        transformer: co.Transformation) -> 'Highway':
+        my_geometry = cls.create_line_string_from_way(way, nodes_dict, transformer)
+        obj = Highway(way.osm_id, my_geometry, way.tags)
+        return obj
 
 
 @unique

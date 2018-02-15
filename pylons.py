@@ -297,7 +297,7 @@ class SharedPylon(object):
         self.direction_type = PylonDirectionType.normal  # correction for which direction mast looks at
 
     def calc_global_coordinates(self, fg_elev: utilities.FGElev, my_coord_transformator) -> None:
-        self.lon, self.lat = my_coord_transformator.toGlobal((self.x, self.y))
+        self.lon, self.lat = my_coord_transformator.to_global((self.x, self.y))
         self.elevation = fg_elev.probe_elev(vec2d.Vec2d(self.lon, self.lat), True)
 
     def make_stg_entry(self, my_stg_mgr: stg_io2.STGManager) -> None:
@@ -373,7 +373,7 @@ def _process_osm_chimneys_nodes(osm_nodes_dict: Dict[int, op.Node], coords_trans
     for key, node in osm_nodes_dict.items():
         probe_tuple = fg_elev.probe(vec2d.Vec2d(node.lon, node.lat), True)
         chimney = Chimney(key, node.lon, node.lat, probe_tuple[0], node.tags)
-        chimney.x, chimney.y = coords_transform.toLocal((node.lon, node.lat))
+        chimney.x, chimney.y = coords_transform.to_local((node.lon, node.lat))
         if chimney.height >= parameters.C2P_CHIMNEY_MIN_HEIGHT:
             chimneys.append(chimney)
     return chimneys
@@ -388,12 +388,12 @@ def _process_osm_chimneys_ways(nodes_dict, ways_dict, my_coord_transformator,
             for ref in way.refs:
                 if ref in nodes_dict:
                     my_node = nodes_dict[ref]
-                    my_coordinates.append(my_coord_transformator.toLocal((my_node.lon, my_node.lat)))
+                    my_coordinates.append(my_coord_transformator.to_local((my_node.lon, my_node.lat)))
             if 2 < len(my_coordinates):
                 my_polygon = shg.Polygon(my_coordinates)
                 if my_polygon.is_valid and not my_polygon.is_empty:
                     my_centroid = my_polygon.centroid
-                    lon, lat = my_coord_transformator.toGlobal((my_centroid.x, my_centroid.y))
+                    lon, lat = my_coord_transformator.to_global((my_centroid.x, my_centroid.y))
                     probe_tuple = fg_elev.probe(vec2d.Vec2d(lon, lat), True)
                     chimney = Chimney(key, lon, lat, probe_tuple[0], way.tags)
                     chimney.x = my_centroid.x
@@ -600,7 +600,7 @@ def _process_osm_wind_turbines(osm_nodes_dict: Dict[int, op.Node], coords_transf
                     continue
                 generator_output = op.parse_generator_output(node.tags["generator:output:electricity"])
                 turbine = WindTurbine(key, node.lon, node.lat, generator_output, node.tags)
-                turbine.x, turbine.y = coords_transform.toLocal((node.lon, node.lat))
+                turbine.x, turbine.y = coords_transform.to_local((node.lon, node.lat))
                 probe_tuple = fg_elev.probe(vec2d.Vec2d(node.lon, node.lat), True)
                 turbine.elevation = probe_tuple[0]
                 turbine.set_offshore_from_probe(probe_tuple[1])
@@ -1145,7 +1145,7 @@ def _process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev,
                     my_rail_node = RailNode(my_node.osm_id)
                     my_rail_node.lat = my_node.lat
                     my_rail_node.lon = my_node.lon
-                    my_rail_node.x, my_rail_node.y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
+                    my_rail_node.x, my_rail_node.y = my_coord_transformator.to_local((my_node.lon, my_node.lat))
                     my_rail_node.elevation = fg_elev.probe_elev(vec2d.Vec2d(my_rail_node.lon, my_rail_node.lat), True)
                     for key in my_node.tags:
                         value = my_node.tags[key]
@@ -1344,7 +1344,7 @@ def _process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGEle
                 my_pylon = Pylon(my_node.osm_id)
                 my_pylon.lat = my_node.lat
                 my_pylon.lon = my_node.lon
-                my_pylon.x, my_pylon.y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
+                my_pylon.x, my_pylon.y = my_coord_transformator.to_local((my_node.lon, my_node.lat))
                 my_pylon.elevation = fg_elev.probe_elev(vec2d.Vec2d(my_pylon.lon, my_pylon.lat), True)
                 for key in my_node.tags:
                     value = my_node.tags[key]
@@ -1545,7 +1545,7 @@ def _write_cable_clusters(cluster_container: cluster.ClusterContainer, coords_tr
         cluster_x = x_max - (x_max - x_min)/2.0
         cluster_y = y_max - (y_max - y_min)/2.0
         cluster_elevation = elevation_max - (elevation_max - elevation_min)/2.0
-        center_global = coords_transform.toGlobal((cluster_x, cluster_y))
+        center_global = coords_transform.to_global((cluster_x, cluster_y))
         cluster_filename = parameters.get_repl_prefix()
         # it is important to have the ac-file names for cables different in "Pylons" and "Details/Objects",
         # because otherwise FG does not know which information to take from which stg-files, which results
@@ -1663,7 +1663,7 @@ def _process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator, fg
                 for ref in way.refs:
                     if ref in nodes_dict:
                         my_node = nodes_dict[ref]
-                        my_coordinates.append(my_coord_transformator.toLocal((my_node.lon, my_node.lat)))
+                        my_coordinates.append(my_coord_transformator.to_local((my_node.lon, my_node.lat)))
                 if 2 < len(my_coordinates):
                     my_polygon = shg.Polygon(my_coordinates)
                     if my_polygon.is_valid and not my_polygon.is_empty:
@@ -1673,7 +1673,7 @@ def _process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator, fg
                             if way.tags['building'] in ['storage_tank', 'tank'] or (
                                         'man_made' in way.tags and way.tags['man_made'] in ['storage_tank', 'tank']):
                                 my_centroid = my_polygon.centroid
-                                lon, lat = my_coord_transformator.toGlobal((my_centroid.x, my_centroid.y))
+                                lon, lat = my_coord_transformator.to_global((my_centroid.x, my_centroid.y))
                                 if not clipping_border.contains(shg.Point(lon, lat)):
                                     continue
                                 radius = coordinates.calc_distance_global(lon, lat, my_node.lon, my_node.lat)
@@ -1763,7 +1763,7 @@ def _process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
             for ref in way.refs:
                 if ref in nodes_dict:
                     my_node = nodes_dict[ref]
-                    x, y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
+                    x, y = my_coord_transformator.to_local((my_node.lon, my_node.lat))
                     my_coordinates.append((x, y))
             if len(my_coordinates) >= 2:
                 my_highway.linear = shg.LineString(my_coordinates)
@@ -1838,8 +1838,8 @@ def process_pylons(coords_transform: coordinates.Transformation, fg_elev: utilit
     # Write to FlightGear
     cmin, cmax = parameters.get_extent_global()
     logging.info("min/max " + str(cmin) + " " + str(cmax))
-    lmin = vec2d.Vec2d(coords_transform.toLocal(cmin))
-    lmax = vec2d.Vec2d(coords_transform.toLocal(cmax))
+    lmin = vec2d.Vec2d(coords_transform.to_local(cmin))
+    lmax = vec2d.Vec2d(coords_transform.to_local(cmax))
     cluster_container = cluster.ClusterContainer(lmin, lmax, stg_io2.STGVerbType.object_building_mesh_detailed)
 
     if parameters.C2P_PROCESS_POWERLINES:
@@ -1943,8 +1943,8 @@ def process_details(coords_transform: coordinates.Transformation, fg_elev: utili
     # Write to FlightGear
     cmin, cmax = parameters.get_extent_global()
     logging.info("min/max " + str(cmin) + " " + str(cmax))
-    lmin = vec2d.Vec2d(coords_transform.toLocal(cmin))
-    lmax = vec2d.Vec2d(coords_transform.toLocal(cmax))
+    lmin = vec2d.Vec2d(coords_transform.to_local(cmin))
+    lmax = vec2d.Vec2d(coords_transform.to_local(cmax))
     cluster_container = cluster.ClusterContainer(lmin, lmax, stg_io2.STGVerbType.object_static)
 
     if parameters.C2P_PROCESS_POWERLINES:

@@ -42,7 +42,7 @@ class Pier(object):
         self.is_area = False
         if 'area' in tags and tags['area'] == 'yes' and len(self.nodes) > 2:
             self.is_area = True
-        self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in self.osm_nodes])
+        self.nodes = np.array([transform.to_local((n.lon, n.lat)) for n in self.osm_nodes])
         self.anchor = Vec2d(self.nodes[0])
 
     def calc_elevation(self, fg_elev: utilities.FGElev) -> None:
@@ -80,7 +80,7 @@ def _write_piers(stg_manager, replacement_prefix, clusters, coords_transform: co
                  stats: utilities.Stats):
     for cl in clusters:
         if cl.objects:
-            center_tile = Vec2d(coords_transform.toGlobal(cl.center))
+            center_tile = Vec2d(coords_transform.to_global(cl.center))
             ac_file_name = "%spiers%02i%02i.ac" % (replacement_prefix, cl.grid_index.ix, cl.grid_index.iy)
             ac = ac3d.File(stats=stats)
             obj = ac.new_object('piers', 'Textures/Terrain/asphalt.png', default_mat_idx=ac3d.MAT_IDX_UNLIT)
@@ -130,7 +130,7 @@ def _write_boat_area(pier, stg_manager, coords_transform: coordinates.Transforma
                 parallel = segment.parallel_offset(10, 'right')
                 boat_position = parallel.interpolate(segment.length / 2)
                 try:
-                    pos_global = coords_transform.toGlobal((boat_position.x, boat_position.y))
+                    pos_global = coords_transform.to_global((boat_position.x, boat_position.y))
                     _write_model(segment.length, stg_manager, pos_global, direction, pier.elevation)
                 except AttributeError as reason:
                     logging.error(reason)
@@ -145,7 +145,7 @@ def _write_boat_line(pier, stg_manager, coords_transform: coordinates.Transforma
             segment = LineString(coords[i:i + 2])
             boat_position = segment.interpolate(segment.length / 2)
             try:
-                pos_global = coords_transform.toGlobal((boat_position.x, boat_position.y))
+                pos_global = coords_transform.to_global((boat_position.x, boat_position.y))
                 direction = math.degrees(math.atan2(segment.coords[0][0] - segment.coords[1][0],
                                                     segment.coords[0][1] - segment.coords[1][1]))
                 if segment.length > 5:
@@ -320,8 +320,8 @@ def process_details(coords_transform: coordinates.Transformation, fg_elev: utili
     cmin, cmax = parameters.get_extent_global()
 
     # -- create (empty) clusters
-    lmin = Vec2d(coords_transform.toLocal(cmin))
-    lmax = Vec2d(coords_transform.toLocal(cmax))
+    lmin = Vec2d(coords_transform.to_local(cmin))
+    lmax = Vec2d(coords_transform.to_local(cmax))
     clusters = ClusterContainer(lmin, lmax)
 
     osm_way_result = osmparser.fetch_osm_db_data_ways_key_values(["man_made=>pier"])

@@ -51,8 +51,8 @@ class LandRunway(Runway):
         return False
 
     def create_blocked_area(self, coords_transform):
-        line = LineString([coords_transform.toLocal((self.start.x, self.start.y)),
-                          coords_transform.toLocal((self.end.x, self.end.y))])
+        line = LineString([coords_transform.to_local((self.start.x, self.start.y)),
+                           coords_transform.to_local((self.end.x, self.end.y))])
         return line.buffer(self.width / 2.0, cap_style=CAP_STYLE.flat)
 
 
@@ -68,7 +68,7 @@ class Helipad(Runway):
         return False
 
     def create_blocked_area(self, coords_transform):
-        my_point = Point(coords_transform.toLocal((self.center.x, self.center.y)))
+        my_point = Point(coords_transform.to_local((self.center.x, self.center.y)))
         return my_point.buffer(math.sqrt(self.length + self.width) / 2)
 
 

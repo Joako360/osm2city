@@ -51,6 +51,9 @@ class SceneryType(enum.IntEnum):
     roads = 2
     pylons = 3
     details = 4
+    # other types
+    objects = 11
+    terrain = 12
 
 
 def scenery_directory_name(scenery_type: SceneryType) -> str:
@@ -69,12 +72,13 @@ class STGFile(object):
        takes care of writing/reading/uninstalling OBJECT_* lines
     """
     
-    def __init__(self, lon_lat: Vec2d, tile_index: int, path_to_scenery: str, scenery_type: SceneryType,
+    def __init__(self, lon_lat: Vec2d, path_to_scenery: str, scenery_type: SceneryType,
                  magic: str, prefix: str) -> None:
         """Read all lines from stg to memory.
            Store our/other lines in two separate lists."""
         scenery_name = scenery_directory_name(scenery_type)
-        self.path_to_stg = calc_tile.construct_path_to_stg(path_to_scenery, scenery_name, (lon_lat.lon, lon_lat.lat))
+        self.path_to_stg = calc_tile.construct_path_to_files(path_to_scenery, scenery_name, (lon_lat.lon, lon_lat.lat))
+        tile_index = calc_tile.calc_tile_index((lon_lat.lon, lon_lat.lat))
         self.file_name = os.path.join(self.path_to_stg, calc_tile.construct_stg_file_name_from_tile_index(tile_index))
         self.other_list = []
         self.our_list = []
@@ -174,12 +178,11 @@ class STGManager(object):
 
     def _find_create_stg_file(self, lon_lat: Vec2d) -> STGFile:
         """Finds an STGFile for a given coordinate. If not yet registered, then new one created."""
-        tile_index = calc_tile.tile_index((lon_lat.lon, lon_lat.lat))
+        tile_index = calc_tile.calc_tile_index((lon_lat.lon, lon_lat.lat))
         try:
             return self.stg_dict[tile_index]
         except KeyError:
-            the_stg_file = STGFile(lon_lat, tile_index, self.path_to_scenery, self.scenery_type, self.magic,
-                                   self.prefix)
+            the_stg_file = STGFile(lon_lat, self.path_to_scenery, self.scenery_type, self.magic, self.prefix)
             self.stg_dict[tile_index] = the_stg_file
         return the_stg_file
 
@@ -351,7 +354,7 @@ def _parse_stg_entries_for_convex_hull(stg_entries: List[STGEntry], my_coord_tra
                 boundary_polygon = _extract_boundary(entry.get_obj_path_and_name(),
                                                      entry.get_obj_path_and_name(parameters.PATH_TO_SCENERY))
                 rotated_polygon = affinity.rotate(boundary_polygon, entry.hdg - 90, (0, 0))
-                x_y_point = my_coord_transformation.toLocal((entry.lon, entry.lat))
+                x_y_point = my_coord_transformation.to_local((entry.lon, entry.lat))
                 translated_polygon = affinity.translate(rotated_polygon, x_y_point[0], x_y_point[1])
                 if entry.verb_type is STGVerbType.object_static and parameters.OVERLAP_CHECK_CH_BUFFER_STATIC > 0.01:
                     entry.convex_hull = translated_polygon.buffer(

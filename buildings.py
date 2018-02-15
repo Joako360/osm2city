@@ -462,7 +462,7 @@ def _refs_to_ring(coords_transform: coordinates.Transformation, refs,
     coords = []
     for ref in refs:
         c = nodes_dict[ref]
-        coords.append(coords_transform.toLocal((c.lon, c.lat)))
+        coords.append(coords_transform.to_local((c.lon, c.lat)))
 
     ring = shg.polygon.LinearRing(coords)
     return ring
@@ -540,8 +540,8 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
         textures.materials.screen_osm_keys_for_colour_material_variants(b.tags)
 
     # -- create (empty) clusters
-    lmin = v.Vec2d(coords_transform.toLocal(cmin))
-    lmax = v.Vec2d(coords_transform.toLocal(cmax))
+    lmin = v.Vec2d(coords_transform.to_local(cmin))
+    lmax = v.Vec2d(coords_transform.to_local(cmax))
 
     handled_clusters = list()  # cluster.ClusterContainer objects
     clusters_building_mesh_detailed = cluster.ClusterContainer(lmin, lmax,
@@ -616,7 +616,7 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
                 max_y = max(max_y, b.anchor.y)
             cluster_elev = (max_elevation - min_elevation) / 2 + min_elevation
             cluster_offset = v.Vec2d((max_x - min_x)/2 + min_x, (max_y - min_y)/2 + min_y)
-            center_global = v.Vec2d(coords_transform.toGlobal(cluster_offset))
+            center_global = v.Vec2d(coords_transform.to_global(cluster_offset))
             logging.debug("Cluster center -> elevation: %d, position: %s", cluster_elev, cluster_offset)
 
             file_name = replacement_prefix + "city" + str(handled_index) + "%02i%02i" % (cl.grid_index.ix,

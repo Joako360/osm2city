@@ -132,7 +132,7 @@ def match_local_coords_with_global_nodes(local_list: List[Tuple[float, float]], 
     nodes_local = dict()  # key is osm_id from Node, value is Tuple[float, float]
     for ref in ref_list:
         node = all_nodes[ref]
-        nodes_local[node.osm_id] = coords_transform.toLocal((node.lon, node.lat))
+        nodes_local[node.osm_id] = coords_transform.to_local((node.lon, node.lat))
 
     for local in local_list:
         closest_distance = 999999
@@ -146,7 +146,7 @@ def match_local_coords_with_global_nodes(local_list: List[Tuple[float, float]], 
                 break
         if found_key < 0:
             if create_node:
-                lon, lat = coords_transform.toGlobal(local)
+                lon, lat = coords_transform.to_global(local)
                 new_node = op.Node(op.get_next_pseudo_osm_id(op.OSMFeatureType.building_relation), lat, lon)
                 all_nodes[new_node.osm_id] = new_node
                 matched_nodes.append(new_node.osm_id)
@@ -431,7 +431,7 @@ class FGElev(object):
             return 0, True
 
         if not is_global:
-            position = ve.Vec2d(self.coords_transform.toGlobal(position))
+            position = ve.Vec2d(self.coords_transform.to_global(position))
         else:
             position = ve.Vec2d(position[0], position[1])
 

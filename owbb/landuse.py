@@ -4,6 +4,7 @@
 
 import logging
 import math
+import os.path
 import time
 from typing import Dict, List, Tuple
 
@@ -13,9 +14,11 @@ from shapely.ops import unary_union
 import parameters
 import owbb.models as m
 import owbb.plotting as plotting
-import utils.osmparser as op
 import utils.btg_io as btg
-from utils.coordinates import Transformation
+import utils.calc_tile as ct
+import utils.osmparser as op
+from utils.coordinates import disjoint_bounds, Transformation
+from utils.stg_io2 import scenery_directory_name, SceneryType
 from utils.utilities import time_logging
 
 
@@ -229,69 +232,69 @@ def _merge_buffers(original_list: List[Polygon]) -> List[Polygon]:
     return handled_list
 
 
-def _process_osm_building_zone_refs(my_coord_transformator: Transformation) -> List[m.BuildingZone]:
+def _process_osm_building_zone_refs(transformer: Transformation) -> List[m.BuildingZone]:
     osm_result = op.fetch_osm_db_data_ways_keys([m.LANDUSE_KEY])
     my_ways = list()
     for way in list(osm_result.ways_dict.values()):
-        my_way = m.BuildingZone.create_from_way(way, osm_result.nodes_dict, my_coord_transformator)
+        my_way = m.BuildingZone.create_from_way(way, osm_result.nodes_dict, transformer)
         if my_way.is_valid():
             my_ways.append(my_way)
     logging.info("OSM land-uses found: %s", len(my_ways))
     return my_ways
 
 
-def _process_osm_building_refs(my_coord_transformator: Transformation) -> List[m.Building]:
+def _process_osm_building_refs(transformer: Transformation) -> List[m.Building]:
     osm_result = op.fetch_osm_db_data_ways_keys([m.BUILDING_KEY])
     my_ways = list()
     for way in list(osm_result.ways_dict.values()):
-        my_way = m.Building.create_from_way(way, osm_result.nodes_dict, my_coord_transformator)
+        my_way = m.Building.create_from_way(way, osm_result.nodes_dict, transformer)
         if my_way.is_valid():
             my_ways.append(my_way)
     logging.info("OSM buildings found: %s", len(my_ways))
     return my_ways
 
 
-def _process_osm_railway_refs(my_coord_transformator: Transformation) -> Dict[int, m.RailwayLine]:
+def _process_osm_railway_refs(transformer: Transformation) -> Dict[int, m.RailwayLine]:
     # TODO: it must be possible to do this for highways and waterways abstract, as only logging, object
     # and key is different
     osm_result = op.fetch_osm_db_data_ways_keys([m.RAILWAY_KEY])
     my_ways = dict()
     for way in list(osm_result.ways_dict.values()):
-        my_way = m.RailwayLine.create_from_way(way, osm_result.nodes_dict, my_coord_transformator)
+        my_way = m.RailwayLine.create_from_way(way, osm_result.nodes_dict, transformer)
         if my_way.is_valid():
-            my_ways[my_way.osm_id] = way
+            my_ways[my_way.osm_id] = my_way
     logging.info("OSM railway lines found: %s", len(my_ways))
     return my_ways
 
 
-def _process_osm_highway_refs(my_coord_transformator: Transformation) -> Dict[int, m.Highway]:
+def _process_osm_highway_refs(transformer: Transformation) -> Dict[int, m.Highway]:
     osm_result = op.fetch_osm_db_data_ways_keys([m.HIGHWAY_KEY])
     my_ways = dict()
     for way in list(osm_result.ways_dict.values()):
-        my_hway = m.Highway.create_from_way(way, osm_result.nodes_dict, my_coord_transformator)
-        if my_hway.is_valid():
-            my_ways[my_hway.osm_id] = my_hway
+        my_way = m.Highway.create_from_way(way, osm_result.nodes_dict, transformer)
+        if my_way.is_valid():
+            my_ways[my_way.osm_id] = my_way
     logging.info("OSM highways found: %s", len(my_ways))
     return my_ways
 
 
-def _process_osm_waterway_refs(my_coord_transformator: Transformation) -> Dict[int, m.Waterway]:
+def _process_osm_waterway_refs(transformer: Transformation) -> Dict[int, m.Waterway]:
     osm_result = op.fetch_osm_db_data_ways_keys([m.WATERWAY_KEY])
     my_ways = dict()
     for way in list(osm_result.ways_dict.values()):
-        my_way = m.Waterway.create_from_way(way, osm_result.nodes_dict, my_coord_transformator)
+        my_way = m.Waterway.create_from_way(way, osm_result.nodes_dict, transformer)
         if my_way.is_valid():
             my_ways[my_way.osm_id] = my_way
     logging.info("OSM waterways found: %s", len(my_ways))
     return my_ways
 
 
-def _process_osm_place_refs(my_coord_transformator: Transformation) -> List[m.Place]:
+def _process_osm_place_refs(transformer: Transformation) -> List[m.Place]:
     my_places = list()
     # points
     osm_nodes_dict = op.fetch_db_nodes_isolated([m.PLACE_KEY], list())
     for key, node in osm_nodes_dict.items():
-        place = m.Place.create_from_node(node, my_coord_transformator)
+        place = m.Place.create_from_node(node, transformer)
         if place.is_valid():
             my_places.append(place)
     # areas
@@ -299,7 +302,7 @@ def _process_osm_place_refs(my_coord_transformator: Transformation) -> List[m.Pl
     osm_nodes_dict = osm_way_result.nodes_dict
     osm_ways_dict = osm_way_result.ways_dict
     for key, way in osm_ways_dict.items():
-        place = m.Place.create_from_way(way, osm_nodes_dict, my_coord_transformator)
+        place = m.Place.create_from_way(way, osm_nodes_dict, transformer)
         if place.is_valid():
             my_places.append(place)
     logging.info("Number of valid places found: {}".format(len(my_places)))
@@ -307,11 +310,29 @@ def _process_osm_place_refs(my_coord_transformator: Transformation) -> List[m.Pl
     return my_places
 
 
-def _process_btg_building_zones(my_coord_transformator: Transformation) -> Tuple[List[m.BTGBuildingZone],
-                                                                                 List[m.BTGBuildingZone]]:
-    btg_reader = btg.BTGReader('/home/vanosten/bin/terrasync/Terrain/e000n40/e008n47/3088962.btg.gz')
+def _process_btg_building_zones(transformer: Transformation) -> Tuple[List[m.BTGBuildingZone],
+                                                                      List[m.BTGBuildingZone]]:
+    """There is a need to do a local coordinate transformation, as BTG also has a local coordinate
+    transformation, but there the center will be in the middle of the tile, whereas here is can be
+     another place if the boundary is not a whole tile."""
+    lon_lat = parameters.get_center_global()
+    path_to_btg = ct.construct_path_to_files(parameters.PATH_TO_SCENERY, scenery_directory_name(SceneryType.terrain),
+                                             (lon_lat.lon, lon_lat.lat))
+    tile_index = ct.calc_tile_index((lon_lat.lon, lon_lat.lat))
+    btg_file_name = os.path.join(path_to_btg, ct.construct_btg_file_name_from_tile_index(tile_index))
+    btg_reader = btg.BTGReader(btg_file_name)
+    logging.debug('Reading btg file: %s', btg_file_name)
     btg_zones = list()
     vertices = btg_reader.vertices
+    btg_lon, btg_lat = btg_reader.gbs_lon_lat
+    btg_x, btg_y = transformer.to_local((btg_lon, btg_lat))
+    logging.debug('Difference between BTG and transformer: x = %d, y = %d', btg_x, btg_y)
+
+    min_x, min_y = transformer.to_local((parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH))
+    max_x, max_y = transformer.to_local((parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH))
+    bounds = (min_x, min_y, max_x, max_y)
+    disjoint = 0
+
     for key, faces_list in btg_reader.faces.items():
         if key != btg.WATER_PROXY:
             # find the corresponding BuildingZoneType
@@ -324,42 +345,56 @@ def _process_btg_building_zones(my_coord_transformator: Transformation) -> Tuple
             if type_ is None:
                 raise Exception('Unknown BTG material: {}. Most probably a programming mismatch.'.format(key))
             # create building zones
+            counter = 0
             for face in faces_list:
                 v0 = vertices[face.vertices[0]]
                 v1 = vertices[face.vertices[1]]
                 v2 = vertices[face.vertices[2]]
-                my_geometry = Polygon([my_coord_transformator.toLocal((v0.x, v0.y)),
-                                       my_coord_transformator.toLocal((v1.x, v1.y)),
-                                       my_coord_transformator.toLocal((v2.x, v2.y))])
+                # translate to local coordinate system
+                v0.to_local(transformer)
+                v1.to_local(transformer)
+                v2.to_local(transformer)
+                # create the triangle polygon
+                my_geometry = Polygon([(v0.x - btg_x, v0.y - btg_y), (v1.x - btg_x, v1.y - btg_y),
+                                       (v2.x - btg_x, v2.y - btg_y), (v0.x - btg_x, v0.y - btg_y)])
                 if not my_geometry.is_valid:  # it might be self-touching or self-crossing polygons
                     clean = my_geometry.buffer(0)  # cf. http://toblerity.org/shapely/manual.html#constructive-methods
                     if clean.is_valid:
                         my_geometry = clean  # it is now a Polygon or a MultiPolygon
-                if my_geometry.is_valid:
-                    my_zone = m.BTGBuildingZone(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse),
-                                                type_, my_geometry)
-                    btg_zones.append(my_zone)
+                if my_geometry.is_valid and not my_geometry.is_empty:
+                    if not disjoint_bounds(bounds, my_geometry.bounds):
+                        my_zone = m.BTGBuildingZone(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse),
+                                                    type_, my_geometry)
+                        if counter < 10:
+                            btg_zones.append(my_zone)
+                            counter += 1
+                    else:
+                        disjoint += 1
     return btg_zones, btg_reader.faces[btg.WATER_PROXY]
 
 
-def process(coords_transform: Transformation) -> None:
+def process(transformer: Transformation) -> None:
     last_time = time.time()
-
-    # =========== READ OSM DATA =============
-    building_zones = _process_osm_building_zone_refs(coords_transform)
-    places = _process_osm_place_refs(coords_transform)
-    osm_buildings = _process_osm_building_refs(coords_transform)
-    highways_dict = _process_osm_highway_refs(coords_transform)
-    railways_dict = _process_osm_railway_refs(coords_transform)
-    waterways_dict = _process_osm_waterway_refs(coords_transform)
-
-    last_time = time_logging("Time used in seconds for parsing OSM data", last_time)
 
     # =========== READ LAND-USE DATA FROM FLIGHTGEAR BTG-FILES =============
     btg_building_zones = list()
     if parameters.OWBB_USE_BTG_LANDUSE:
-        btg_building_zones, btg_water = _process_btg_building_zones(coords_transform)
+        btg_building_zones, btg_water = _process_btg_building_zones(transformer)
         last_time = time_logging("Time used in seconds for reading BTG zones", last_time)
+
+    # =========== READ OSM DATA =============
+    building_zones = _process_osm_building_zone_refs(transformer)
+    places = _process_osm_place_refs(transformer)
+    osm_buildings = _process_osm_building_refs(transformer)
+    highways_dict = _process_osm_highway_refs(transformer)
+    railways_dict = _process_osm_railway_refs(transformer)
+    waterways_dict = _process_osm_waterway_refs(transformer)
+
+    last_time = time_logging("Time used in seconds for parsing OSM data", last_time)
+
+    # =========== FIND CITY BLOCKS ==========
+    # using an algorithm in a undirected graph finding simple cycles
+    # TODO
 
     # =========== GENERATE ADDITIONAL LAND-USE ZONES FOR AND/OR FROM BUILDINGS =============
     if len(btg_building_zones) > 0:
@@ -390,14 +425,16 @@ def process(coords_transform: Transformation) -> None:
         # finally split generated zones by major transport lines
         building_zones = _split_generated_building_zones_by_major_lines(building_zones, highways_dict,
                                                                         railways_dict, waterways_dict)
+    last_time = time_logging("Time used in seconds for splitting zones by major lines", last_time)
 
     # ============finally guess the land-use type ========================================
     for my_zone in building_zones:
         if isinstance(my_zone, m.GeneratedBuildingZone):
             my_zone.guess_building_zone_type(places)
+    last_time = time_logging("Time used in seconds for guessing zone types", last_time)
 
     # =========== FINALIZE PROCESSING ====================================================
     if parameters.DEBUG_PLOT:
-        bounds = m.Bounds.create_from_parameters(coords_transform)
+        bounds = m.Bounds.create_from_parameters(transformer)
         plotting.draw_zones(highways_dict, osm_buildings, building_zones, btg_building_zones, bounds)
         time_logging("Time used in seconds for plotting", last_time)

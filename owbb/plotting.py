@@ -119,14 +119,13 @@ def _draw_generated_zones(building_zones, ax: maxs.Axes) -> None:
                 ax.add_patch(patch)
 
 
-def _draw_external_land_uses(external_land_uses, ax: maxs.Axes) -> None:
-    for item in external_land_uses:
-        my_color = "red"
-        if item.type_ is m.BuildingZoneType.corine_ind_com:
+def _draw_btg_building_zones(btg_building_zones, ax: maxs.Axes) -> None:
+    for item in btg_building_zones:
+        if item.type_ in [m.BuildingZoneType.btg_builtupcover, m.BuildingZoneType.btg_urban]:
             my_color = "cyan"
-        elif item.type_ is m.BuildingZoneType.corine_continuous:
+        elif item.type_ in [m.BuildingZoneType.btg_town, m.BuildingZoneType.btg_suburban]:
             my_color = "gold"
-        elif item.type_ is m.BuildingZoneType.corine_discontinuous:
+        else:
             my_color = "yellow"
         patch = PolygonPatch(item.geometry, facecolor=my_color, edgecolor=my_color)
         ax.add_patch(patch)
@@ -208,7 +207,7 @@ def draw_buildings(buildings, building_zones, bounds) -> None:
     pdf_pages.close()
 
 
-def draw_zones(highways_dict, buildings, building_zones, external_land_uses, bounds) -> None:
+def draw_zones(highways_dict, buildings, building_zones, btg_building_zones, bounds) -> None:
     pdf_pages = _create_pdf_pages("landuse")
 
     # OSM building zones original
@@ -218,18 +217,18 @@ def draw_zones(highways_dict, buildings, building_zones, external_land_uses, bou
     ax = my_figure.add_subplot(111)
     _draw_osm_zones(building_zones, ax)
     _draw_highways(highways_dict, ax)
-    _draw_buildings(buildings, ax)
+    # _draw_buildings(buildings, ax)
     _set_ax_limits_from_bounds(ax, bounds)
     pdf_pages.savefig(my_figure)
 
     # External land use
-    if external_land_uses:
+    if btg_building_zones:
         my_figure = _create_a3_landscape_figure()
-        my_figure.suptitle("Land-use types from other sources than OpenStreetMap \n[cyan=commercial and industrial\
-, gold=continuous urban fabric, yellow=discontinuous urban fabric, red=error]")
+        my_figure.suptitle("Land-use types from FlightGear BTG Files \n[cyan=builtupcover and urban\
+, gold=town and suburban, yellow=construction and industrial and port]")
         ax = my_figure.add_subplot(111)
         ax.grid(True, linewidth=1, linestyle="--", color="silver")
-        _draw_external_land_uses(external_land_uses, ax)
+        _draw_btg_building_zones(btg_building_zones, ax)
         _draw_highways(highways_dict, ax)
         _draw_buildings(buildings, ax)
         _set_ax_limits_from_bounds(ax, bounds)

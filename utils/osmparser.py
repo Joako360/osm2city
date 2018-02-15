@@ -114,7 +114,7 @@ class Way(OSMElement):
         for ref in self.refs:
             if ref in nodes_dict:
                 my_node = nodes_dict[ref]
-                x, y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
+                x, y = my_coord_transformator.to_local((my_node.lon, my_node.lat))
                 my_coordinates.append((x, y))
         if len(my_coordinates) >= 3:
             my_polygon = shg.Polygon(my_coordinates)
@@ -132,7 +132,7 @@ class Way(OSMElement):
         for ref in self.refs:
             if ref in nodes_dict:
                 my_node = nodes_dict[ref]
-                x, y = my_coord_transformator.toLocal((my_node.lon, my_node.lat))
+                x, y = my_coord_transformator.to_local((my_node.lon, my_node.lat))
                 my_coordinates.append((x, y))
         if len(my_coordinates) >= 2:
             my_geometry = shg.LineString(my_coordinates)
@@ -417,7 +417,7 @@ def fetch_db_nodes_for_way(req_way_keys: List[str], req_way_key_values: List[str
     return nodes_dict
 
 
-def fetch_db_nodes_isolated(req_way_keys: List[str], req_node_key_values: List[str]) -> Dict[int, Node]:
+def fetch_db_nodes_isolated(req_node_keys: List[str], req_node_key_values: List[str]) -> Dict[int, Node]:
     """Fetches Node objects isolated without relation to way etc."""
     start_time = time.time()
 
@@ -426,7 +426,7 @@ def fetch_db_nodes_isolated(req_way_keys: List[str], req_node_key_values: List[s
     query = """SELECT n.id, ST_X(n.geom) as lon, ST_Y(n.geom) as lat, n.tags
     FROM nodes AS n
     WHERE """
-    query += construct_tags_query(req_way_keys, req_node_key_values, table_alias="n")
+    query += construct_tags_query(req_node_keys, req_node_key_values, table_alias="n")
     query += " AND "
     query += construct_intersect_bbox_query(is_way=False)
     query += ";"
@@ -440,7 +440,10 @@ def fetch_db_nodes_isolated(req_way_keys: List[str], req_node_key_values: List[s
         nodes_dict[my_node.osm_id] = my_node
     db_connection.close()
 
-    logging.info("Reading OSM node data for {0!s} from db took {1:.4f} seconds.".format(req_node_key_values,
+    used_list = req_node_key_values
+    if len(req_node_keys) > 0:
+        used_list = req_node_keys
+    logging.info("Reading OSM node data for {0!s} from db took {1:.4f} seconds.".format(used_list,
                                                                                         time.time() - start_time))
 
     return nodes_dict
@@ -578,7 +581,7 @@ def construct_intersect_bbox_query(is_way: bool=True) -> str:
 
 
 def construct_tags_query(req_tag_keys: List[str], req_tag_key_values: List[str], table_alias: str="w") -> str:
-    """Constructs the part of a sql where clause, which constrains the result based on required tag keys.
+    """Constructs the part of a sql WHERE clause, which constrains the result based on required tag keys.
     In req_tag_keys at least one of the key needs to be present in the tags of a given record.
     In req_tag_key_values at least one key/value pair must be present (e.g. 'railway=>platform') - the key
     must be separated without blanks from the value by a '=>'."""

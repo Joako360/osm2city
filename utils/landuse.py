@@ -144,7 +144,7 @@ def _process_osm_building_refs(my_coord_transformator: Transformation) -> List[s
                 for ref in way.refs:
                     if ref in osm_nodes_dict:
                         my_node = osm_nodes_dict[ref]
-                        my_coordinates.append(my_coord_transformator.toLocal((my_node.lon, my_node.lat)))
+                        my_coordinates.append(my_coord_transformator.to_local((my_node.lon, my_node.lat)))
                 if 2 < len(my_coordinates):
                     my_polygon = shg.Polygon(my_coordinates)
                     if my_polygon.is_valid and not my_polygon.is_empty:

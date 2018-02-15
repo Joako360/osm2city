@@ -1354,7 +1354,7 @@ def _analyse_worship_building(building: Building, building_parent: BuildingParen
                                                                  model.length_offset, model.width_offset,
                                                                  model.length_largest,
                                                                  str(model), building.osm_id)
-            lon, lat = coords_transform.toGlobal((x, y))
+            lon, lat = coords_transform.to_global((x, y))
             model.lon = lon
             model.lat = lat
             model.angle = angle

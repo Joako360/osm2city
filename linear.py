@@ -77,7 +77,7 @@ class LinearObject(object):
         self.nodes_dict = nodes_dict
         self.written_to_ac = False
         osm_nodes = [nodes_dict[r] for r in refs]
-        nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
+        nodes = np.array([transform.to_local((n.lon, n.lat)) for n in osm_nodes])
         self.center = shg.LineString(nodes)
         try:
             self.compute_angle_etc()

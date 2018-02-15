@@ -2,6 +2,7 @@
 """
 shamelessly translated from calc-tile.pl
 """
+import logging
 from math import floor
 import os
 from typing import List, Tuple
@@ -66,7 +67,7 @@ def directory_name(lon_lat: Tuple[float, float]) -> str:
     return os.path.join(format_lon(lon_chunk) + format_lat(lat_chunk), format_lon(lon_floor) + format_lat(lat_floor))
 
 
-def tile_index(lon_lat: Tuple[float, float], x: int=0, y: int=0) -> int:
+def calc_tile_index(lon_lat: Tuple[float, float], x: int=0, y: int=0) -> int:
     """See  http://wiki.flightgear.org/Tile_Index_Scheme"""
     (lon, lat) = lon_lat
     if x == 0 and y == 0:
@@ -80,23 +81,54 @@ def tile_index(lon_lat: Tuple[float, float], x: int=0, y: int=0) -> int:
     return index
 
 
-def construct_path_to_stg(base_directory: str, scenery_type: str, center_global: Tuple[float, float]) -> str:
-    """Returns the path to the stg-files in a FG scenery directory hierarchy at a given global lat/lon location"""
+def calc_tile_location(tile_index: int) -> Tuple[Tuple[float, float], Tuple[float, float]]:
+    """The lon/lat as well as x/y tuples for the location of a tile by its index"""
+    lon = tile_index >> 14
+    index = tile_index - (lon << 14)
+    lon = lon - 180
+
+    lat = index >> 6
+    index = index - (lat << 6)
+    lat = lat - 90
+
+    y = index >> 3
+    index = index - (y << 3)
+    x = index
+
+    return (lon, lat), (x, y)
+
+
+def log_tile_info(tile_index: int) -> None:
+    """logs information about the til to logging.debug."""
+    (lon, lat), (x, y) = calc_tile_location(tile_index)
+    center_lat = lat + y / 8.0 + 0.0625
+    center_lon = bucket_span(center_lat)
+    if center_lon >= 1.0:
+        center_lon = lon + center_lon / 2.0
+    else:
+        center_lon = lon + x * center_lon * center_lon / 2.0
+
+    tile_info = 'Tile location: {}; lon: {}, lat: {}; x: {}, y: {}; tile span degrees: {}; center lon/lat: {}/{}.'
+    logging.debug(tile_info.format(tile_index, lon, lat, x, y, bucket_span(lat), center_lon, center_lat))
+
+
+def construct_path_to_files(base_directory: str, scenery_type: str, center_global: Tuple[float, float]) -> str:
+    """Returns the path to the stg-files in a FG scenery directory hierarchy at a given global lat/lon location.
+    The scenery type is e.g. 'Terrain', 'Object', 'Buildings'."""
     return os.path.join(base_directory, scenery_type, directory_name(center_global))
 
 
 def construct_stg_file_name(center_global: Tuple[float, float]) -> str:
     """Returns the file name of the stg-file at a given global lat/lon location"""
-    return construct_stg_file_name_from_tile_index(tile_index(center_global))
+    return construct_stg_file_name_from_tile_index(calc_tile_index(center_global))
 
 
 def construct_stg_file_name_from_tile_index(tile_idx: int) -> str:
     return str(tile_idx) + ".stg"
 
 
-def construct_btg_file_name(center_global: Tuple[float, float]) -> str:
-    """Returns the file name of the stg-file at a given global lat/lon location"""
-    return str(tile_index(center_global)) + ".btg.gz"
+def construct_btg_file_name_from_tile_index(tile_idx: int) -> str:
+    return str(tile_idx) + ".btg.gz"
 
 
 def get_north_lat(lat, y):
@@ -151,10 +183,10 @@ def get_stg_files_in_boundary(boundary_west: float, boundary_south: float, bound
     """Based on boundary rectangle returns a list of stg-files (incl. full path) to be found within the boundary of
     the scenery"""
     stg_files = []
-    for my_lat in np.arange(boundary_south, boundary_north, 0.125):  # latitude; FIXME: why use a factor?
+    for my_lat in np.arange(boundary_south, boundary_north, 0.125):  # latitude; 0.125 as there are always 8 tiles
         for my_lon in np.arange(boundary_west, boundary_east, bucket_span(my_lat)):  # longitude
             coords = (my_lon, my_lat)
-            stg_files.append(os.path.join(construct_path_to_stg(path_to_scenery, scenery_type, coords),
+            stg_files.append(os.path.join(construct_path_to_files(path_to_scenery, scenery_type, coords),
                              construct_stg_file_name(coords)))
     return stg_files
 
@@ -164,12 +196,12 @@ def get_stg_files_in_boundary(boundary_west: float, boundary_south: float, bound
 
 class TestCalcTiles(unittest.TestCase):
     def test_calc_tiles(self):
-        self.assertEqual(5760, tile_index((-179.9, 0.1)))
-        self.assertEqual(5752, tile_index((-179.9, -0.1)))
-        self.assertEqual(5887623, tile_index((179.9, 0.1)))
-        self.assertEqual(5887615, tile_index((179.9, -0.1)))
-        self.assertEqual(2954880, tile_index((0.0, 0.0)))
-        self.assertEqual(2938495, tile_index((-0.1, -0.1)))
+        self.assertEqual(5760, calc_tile_index((-179.9, 0.1)))
+        self.assertEqual(5752, calc_tile_index((-179.9, -0.1)))
+        self.assertEqual(5887623, calc_tile_index((179.9, 0.1)))
+        self.assertEqual(5887615, calc_tile_index((179.9, -0.1)))
+        self.assertEqual(2954880, calc_tile_index((0.0, 0.0)))
+        self.assertEqual(2938495, calc_tile_index((-0.1, -0.1)))
 
     def test_file_name(self):
         self.assertEqual("3088961.stg", construct_stg_file_name((8.29, 47.08)))

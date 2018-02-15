@@ -35,7 +35,7 @@ class Platform(object):
         for r in refs:  # safe way instead of [nodes_dict[r] for r in refs] if ref would be missing
             if r in nodes_dict:
                 self.osm_nodes.append(nodes_dict[r])
-        self.nodes = np.array([transform.toLocal((n.lon, n.lat)) for n in self.osm_nodes])
+        self.nodes = np.array([transform.to_local((n.lon, n.lat)) for n in self.osm_nodes])
         self.is_area = False
         if 'area' in tags and tags['area'] == 'yes' and len(self.nodes) > 2:
             self.is_area = True
@@ -69,7 +69,7 @@ def _write(fg_elev: utilities.FGElev, stg_manager, replacement_prefix, clusters,
            coords_transform: coordinates.Transformation, stats: utilities.Stats):
     for cl in clusters:
         if cl.objects:
-            center_tile = Vec2d(coords_transform.toGlobal(cl.center))
+            center_tile = Vec2d(coords_transform.to_global(cl.center))
             ac_file_name = "%splatforms%02i%02i.ac" % (replacement_prefix, cl.grid_index.ix, cl.grid_index.iy)
             ac = ac3d.File(stats=stats)
             obj = ac.new_object('platforms', 'Textures/Terrain/asphalt.png', default_mat_idx=ac3d.MAT_IDX_UNLIT)
@@ -210,8 +210,8 @@ def process_details(coords_transform: coordinates.Transformation, fg_elev: utili
     cmin, cmax = parameters.get_extent_global()
 
     # -- create (empty) clusters
-    lmin = Vec2d(coords_transform.toLocal(cmin))
-    lmax = Vec2d(coords_transform.toLocal(cmax))
+    lmin = Vec2d(coords_transform.to_local(cmin))
+    lmax = Vec2d(coords_transform.to_local(cmax))
     clusters = ClusterContainer(lmin, lmax)
 
     osm_way_result = osmparser.fetch_osm_db_data_ways_key_values(["railway=>platform"])

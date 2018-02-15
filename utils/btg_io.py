@@ -28,8 +28,9 @@ import gzip
 import logging
 import math
 import struct
-from typing import List
+from typing import List, Tuple
 
+import utils.calc_tile as ca
 import utils.coordinates as coord
 from utils.exceptions import MyException
 
@@ -103,6 +104,13 @@ class BTGReader(object):
     def gbs_center(self) -> coord.Vec3d:
         return self.bounding_sphere.center
 
+    @property
+    def gbs_lon_lat(self) -> Tuple[float, float]:
+        lon_rad, lat_rad, elev = coord.cart_to_geod(self.gbs_center)
+        lon_deg = math.degrees(lon_rad)
+        lat_deg = math.degrees(lat_rad)
+        return lon_deg, lat_deg
+
     def create_face(self, n1: int, n2: int, n3: int) -> Face:
         vertices = [0, 0, 0]
         vertices[0] = self.vertex_idx[n1]  # the value is the index position in self.vertices
@@ -161,7 +169,7 @@ class BTGReader(object):
         elif object_type == OBJECT_TYPE_VERTEX_LIST:
             for n in range(0, number_bytes // 12):  # One vertex is 12 bytes (3 * 4 bytes)
                 (v_x, v_y, v_z) = struct.unpack("<fff", data[n * 12:(n + 1) * 12])
-                self.vertices.append(coord.Vec3d(v_x / 1000, v_y / 1000, v_z / 1000))
+                self.vertices.append(coord.Vec3d(v_x, v_y, v_z))  # in import_btg_v7.py all 3 values divided by 1000
 
         elif object_type == OBJECT_TYPE_NORMAL_LIST:
             for n in range(0, number_bytes // 3):  # One normal is 3 bytes ( 3 * 1 )
@@ -261,10 +269,13 @@ class BTGReader(object):
             # Check if the file is gzipped, if so -> use built in gzip
             if file_name[-7:].lower() == ".btg.gz":
                 btg_file = gzip.open(path, "rb")
+                tile_index = int(file_name[:-7])
             elif file_name[-4:].lower() == ".btg":
                 btg_file = open(path, "rb")
+                tile_index = int(file_name[:-4])
             else:
                 raise MyException('Not a .btg or .btg.gz file: %s', file_name)
+            ca.log_tile_info(tile_index)
         except IOError as e:
             raise MyException('Cannot open file {}'.format(path)) from e
 
@@ -292,11 +303,22 @@ class BTGReader(object):
             self.read_objects(btg_file, number_top_level_objects)
 
         # translate vertices from cartesian to geodetic coordinates
+        # see simgear/scene/tgdb/obj.cxx
         lon_rad, lat_rad, elev = coord.cart_to_geod(self.gbs_center)
+        lon_deg = math.degrees(lon_rad)
+        lat_deg = math.degrees(lat_rad)
+        logging.debug('GBS center: lon = %d, lat = %d', lon_deg, lat_deg)
         quaternion_first = coord.quaternion_from_lon_lat_radian(lon_rad, lat_rad)
         quaternion_other = coord.quaternion_from_euler_radian(0.0, 0.0, math.pi)
         hlOr = coord.Quaternion.multiply(quaternion_first, quaternion_other)
         coord.transform_to_rotated_coordinate_frame(hlOr, self.vertices)
+
+        for vertex in self.vertices:
+            vertex.add(self.gbs_center)
+            lon_rad, lat_rad, elev = coord.cart_to_geod(vertex)
+            vertex.x = math.degrees(lon_rad)
+            vertex.y = math.degrees(lat_rad)
+            vertex.z = elev
 
         logging.info('Parsed %i vertices and found the following materials:', len(self.vertices))
         for key, faces_list in self.faces.items():
@@ -305,5 +327,5 @@ class BTGReader(object):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    btg_reader = BTGReader('/home/vanosten/bin/terrasync/Terrain/e000n40/e008n47/3088962.btg.gz')
+    btg_reader = BTGReader('/home/vanosten/bin/terrasync/Terrain/e000n40/e008n47/3088961.btg.gz')
     logging.info("Done")

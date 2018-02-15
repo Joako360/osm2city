@@ -686,7 +686,7 @@ class Roads(object):
         # create new global nodes
         for point in intersection_points:
             distance = my_line.project(point)
-            lon, lat = self.transform.toGlobal((point.x, point.y))
+            lon, lat = self.transform.to_global((point.x, point.y))
 
             # make sure that the new node is relevant and not just a rounding residual
             add_intersection = True
@@ -779,7 +779,7 @@ class Roads(object):
         original_way.refs = list()
         the_coordinates = list(my_line.coords)
         for coords in the_coordinates:
-            lon_lat = self.transform.toGlobal(coords)
+            lon_lat = self.transform.to_global(coords)
             new_node = op.Node(op.get_next_pseudo_osm_id(op.OSMFeatureType.road), lon_lat[1], lon_lat[0])
             self.nodes_dict[new_node.osm_id] = new_node
             original_way.refs.append(new_node.osm_id)
@@ -792,11 +792,11 @@ class Roads(object):
         original_way.refs = original_refs[:index + 1]
         new_way = _init_way_from_existing(original_way, original_refs[index + 1:])
         # now add new nodes from intersection
-        lon_lat = self.transform.toGlobal(list(my_multiline.geoms[0].coords)[-1])
+        lon_lat = self.transform.to_global(list(my_multiline.geoms[0].coords)[-1])
         new_node = op.Node(op.get_next_pseudo_osm_id(op.OSMFeatureType.road), lon_lat[1], lon_lat[0])
         self.nodes_dict[new_node.osm_id] = new_node
         original_way.refs.append(new_node.osm_id)
-        lon_lat = self.transform.toGlobal(list(my_multiline.geoms[1].coords)[0])
+        lon_lat = self.transform.to_global(list(my_multiline.geoms[1].coords)[0])
         new_node = op.Node(op.get_next_pseudo_osm_id(op.OSMFeatureType.road), lon_lat[1], lon_lat[0])
         self.nodes_dict[new_node.osm_id] = new_node
         new_way.refs.insert(0, new_node.osm_id)
@@ -856,7 +856,7 @@ class Roads(object):
 
     def _line_string_from_way(self, way: op.Way) -> shg.LineString:
         osm_nodes = [self.nodes_dict[r] for r in way.refs]
-        nodes = np.array([self.transform.toLocal((n.lon, n.lat)) for n in osm_nodes])
+        nodes = np.array([self.transform.to_local((n.lon, n.lat)) for n in osm_nodes])
         return shg.LineString(nodes)
 
     def _cleanup_topology(self):
@@ -931,8 +931,8 @@ class Roads(object):
             for index in range(1, len(the_way.refs)):
                 node0 = self.nodes_dict[the_way.refs[index - 1]]
                 node1 = self.nodes_dict[the_way.refs[index]]
-                my_line = shg.LineString([self.transform.toLocal((node0.lon, node0.lat)),
-                                         self.transform.toLocal((node1.lon, node1.lat))])
+                my_line = shg.LineString([self.transform.to_local((node0.lon, node0.lat)),
+                                          self.transform.to_local((node1.lon, node1.lat))])
                 if my_line.length <= parameters.POINTS_ON_LINE_DISTANCE_MAX:
                     my_new_refs.append(the_way.refs[index])
                     continue
@@ -941,7 +941,7 @@ class Roads(object):
                     for x in range(additional_needed_nodes):
                         new_point = my_line.interpolate((x + 1) * parameters.POINTS_ON_LINE_DISTANCE_MAX)
                         osm_id = op.get_next_pseudo_osm_id(op.OSMFeatureType.road)
-                        lon_lat = self.transform.toGlobal((new_point.x, new_point.y))
+                        lon_lat = self.transform.to_global((new_point.x, new_point.y))
                         new_node = op.Node(osm_id, lon_lat[1], lon_lat[0])
                         self.nodes_dict[osm_id] = new_node
                         my_new_refs.append(osm_id)
@@ -1075,11 +1075,11 @@ class Roads(object):
                                   [cl.max.x, cl.max.y], 
                                   [cl.min.x, cl.max.y],
                                   [cl.min.x, cl.min.y]])
-                    c = np.array([self.transform.toGlobal(p) for p in c])
+                    c = np.array([self.transform.to_global(p) for p in c])
                     plt.plot(c[:, 0], c[:, 1], '-', color=cluster_color)
                 for r in cl.objects:
                     a = np.array(r.center.coords)
-                    a = np.array([self.transform.toGlobal(p) for p in a])
+                    a = np.array([self.transform.to_global(p) for p in a])
                     try:
                         lw = lw_w[r.typ]
                     except:
@@ -1183,7 +1183,7 @@ class Roads(object):
         """Create cluster.
            Put objects in clusters based on their centroid.
         """
-        lmin, lmax = [Vec2d(self.transform.toLocal(c)) for c in parameters.get_extent_global()]
+        lmin, lmax = [Vec2d(self.transform.to_local(c)) for c in parameters.get_extent_global()]
         self.roads_clusters = ClusterContainer(lmin, lmax)
         self.roads_rough_clusters = ClusterContainer(lmin, lmax)
         self.railways_clusters = ClusterContainer(lmin, lmax)
@@ -1247,7 +1247,7 @@ def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, s
         if is_rough_LOD:
             file_start += "_rough"
         file_name = replacement_prefix + file_start + "%02i%02i" % (cl.grid_index.ix, cl.grid_index.iy)
-        center_global = Vec2d(coords_transform.toGlobal(cl.center))
+        center_global = Vec2d(coords_transform.to_global(cl.center))
         offset_local = cl.center
         cluster_elev = fg_elev.probe_elev(center_global, True)
 
@@ -1343,17 +1343,17 @@ class TestUtilities(unittest.TestCase):
         way.tags["hello"] = "world"
         way.refs = [1, 2, 3, 4, 5, 6]
         my_line = shg.LineString([(0, 0), (0, 300), (0, 500), (0, 600), (0, 900), (0, 1000)])
-        lon, lat = coords_transform.toGlobal((0, 0))
+        lon, lat = coords_transform.to_global((0, 0))
         nodes_dict[1] = op.Node(1, lat, lon)
-        lon, lat = coords_transform.toGlobal((0, 300))
+        lon, lat = coords_transform.to_global((0, 300))
         nodes_dict[2] = op.Node(2, lat, lon)
-        lon, lat = coords_transform.toGlobal((0, 500))
+        lon, lat = coords_transform.to_global((0, 500))
         nodes_dict[3] = op.Node(3, lat, lon)
-        lon, lat = coords_transform.toGlobal((0, 600))
+        lon, lat = coords_transform.to_global((0, 600))
         nodes_dict[4] = op.Node(4, lat, lon)
-        lon, lat = coords_transform.toGlobal((0, 900))
+        lon, lat = coords_transform.to_global((0, 900))
         nodes_dict[5] = op.Node(5, lat, lon)
-        lon, lat = coords_transform.toGlobal((0, 1000))
+        lon, lat = coords_transform.to_global((0, 1000))
         nodes_dict[6] = op.Node(6, lat, lon)
 
         test_roads = Roads(raw_osm_ways, nodes_dict, coords_transform, the_fg_elev)
