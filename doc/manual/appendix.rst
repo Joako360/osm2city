@@ -53,11 +53,13 @@ An unstructured list of stuff you might need to know as a developer:
 
 * The code has evolved over time by contributions from persons, who are not necessarily professional Python developers. Whenever you touch or even only read a piece of code, please leave the place in a better state by adding comments with your understanding, refactoring etc.
 * The level of unit testing is minimal and below what is achievable. There is no system testing. All system testing is done in a visual way - one of the reasons being that the scenery generation has randomising elements plus parametrisation, which means there is not deterministic right solution even from a regression point of view.
+* Apart from testing the results in FlightGear by flying around with e.g. the UFO_, a few operations make use of parameter ``DEBUG_PLOT``, which plots results to a pdf-file.
 * Use an editor, which supports `PEP 08`_. However the current main developer prefers a line length of 120 instead. You should be able to live with that.
 * Use Python `type hints`_ as far as possible — and help improve the current situation. It might make the code a bit harder to read, but it gets so much easier to understand.
 * Try to stick to the Python version as referenced in :ref:`Python<chapter-python-label>`.
 * All code in utf-8. On Windows please make sure that line endings get correct in git (core.autocrlf)
 
 
+.. _UFO: http://wiki.flightgear.org/UFO_from_the_%27White_Project%27_of_the_UNESCO
 .. _PEP 08: https://www.python.org/dev/peps/pep-0008/
 .. _type hints: https://docs.python.org/3/library/typing.html

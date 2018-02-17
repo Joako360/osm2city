@@ -26,7 +26,7 @@ def _create_a4_landscape_figure() -> mfig.Figure:
 def _create_pdf_pages(title_part: str) -> PdfPages:
     today = datetime.datetime.now()
     date_string = today.strftime("%Y-%m-%d_%H%M")
-    return PdfPages("owbb_debug_{0}_{1}.pdf".format(title_part, date_string))
+    return PdfPages("osm2city_debug_{0}_{1}.pdf".format(title_part, date_string))
 
 
 def _plot_line(ax: maxs.Axes, ob, my_color, my_width) -> None:

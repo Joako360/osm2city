@@ -42,6 +42,9 @@ ALLOWED_BUILDING_PART_VALUES = ['yes', 'residential', 'apartments', 'house', 'co
 
 def _process_rectify_buildings(nodes_dict: Dict[int, op.Node], rel_nodes_dict: Dict[int, op.Node],
                                ways_dict: Dict[int, op.Way], coords_transform: coordinates.Transformation) -> None:
+    if not parameters.RECTIFY_ENABLED:
+        return
+    
     last_time = time.time()
     # create rectify objects
     ref_nodes = dict()
