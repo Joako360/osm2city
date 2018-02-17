@@ -24,7 +24,6 @@ import shapely.ops as sho
 import building_lib
 import cluster
 import numpy as np
-import owbb.models as m
 import owbb.plotting as p
 import parameters
 import prepare_textures
@@ -44,13 +43,13 @@ def _process_rectify_buildings(nodes_dict: Dict[int, op.Node], rel_nodes_dict: D
                                ways_dict: Dict[int, op.Way], coords_transform: coordinates.Transformation) -> None:
     if not parameters.RECTIFY_ENABLED:
         return
-    
+
     last_time = time.time()
     # create rectify objects
     ref_nodes = dict()
     for key, node in nodes_dict.items():
         x, y = coords_transform.to_local((node.lon, node.lat))
-        rectify_node = m.RectifyNode(node.osm_id, x, y)
+        rectify_node = building_lib.RectifyNode(node.osm_id, x, y)
         ref_nodes[node.osm_id] = rectify_node
 
     rectify_buildings = list()
@@ -63,7 +62,7 @@ def _process_rectify_buildings(nodes_dict: Dict[int, op.Node], rel_nodes_dict: D
         for ref in way.refs:
             if ref in ref_nodes:
                 rectify_nodes_list.append(ref_nodes[ref])
-        rectify_building = m.RectifyBuilding(way.osm_id, rectify_nodes_list)
+        rectify_building = building_lib.RectifyBuilding(way.osm_id, rectify_nodes_list)
         rectify_buildings.append(rectify_building)
 
     # make a pseudo rectify building to make sure nodes in relations / Simple3D buildings do not get changed
@@ -71,7 +70,8 @@ def _process_rectify_buildings(nodes_dict: Dict[int, op.Node], rel_nodes_dict: D
     rectify_nodes_list = list()
     for key in rel_nodes_dict.keys():
         rectify_nodes_list.append(ref_nodes[key])
-    m.RectifyBuilding(-1, rectify_nodes_list)
+
+    building_lib.RectifyBuilding(-1, rectify_nodes_list)
 
     # classify the nodes
     change_candidates = list()

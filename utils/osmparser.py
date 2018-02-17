@@ -29,9 +29,10 @@ PSEUDO_OSM_ID = -1  # For those nodes and ways, which get added as part of proce
 class OSMFeatureType(IntEnum):
     building_relation = 0
     building_generated = 1
-    landuse = 2
-    road = 3
-    pylon_way = 4
+    building_owbb = 3
+    landuse = 5
+    road = 6
+    pylon_way = 7
 
 
 def get_next_pseudo_osm_id(osm_feature: OSMFeatureType) -> int:

@@ -28,7 +28,7 @@ import copy
 from enum import IntEnum, unique
 import logging
 import random
-from math import sin, cos, tan, sqrt, pi
+from math import fabs, sin, cos, tan, sqrt, pi, radians
 from typing import List, Dict, Optional, Tuple
 
 import myskeleton
@@ -41,7 +41,8 @@ import roofs
 import textures.texture as tex
 import textures.materials as mat
 import utils.stg_io2
-from utils import ac3d, coordinates, utilities
+import utils.coordinates as co
+from utils import ac3d, utilities
 import utils.osmparser
 from utils.vec2d import Vec2d
 from utils.stg_io2 import STGVerbType
@@ -1107,7 +1108,7 @@ def relate_neighbours(buildings: List[Building]) -> None:
 
 
 def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: utils.stg_io2.STGManager,
-            coords_transform: coordinates.Transformation,
+            coords_transform: co.Transformation,
             facade_mgr: tex.FacadeManager, roof_mgr: tex.RoofManager, stats: utilities.Stats) -> List[Building]:
     """Analyse all buildings and either link directly static models or specify Building objects.
     The static models are directly added to stg_manager. The Building objects get properties set and will later
@@ -1328,7 +1329,7 @@ def overlap_check_convex_hull(orig_buildings: List[Building], stg_entries: List[
 
 def _analyse_worship_building(building: Building, building_parent: BuildingParent,
                               stg_manager: utils.stg_io2.STGManager, fg_elev: utilities.FGElev,
-                              coords_transform: coordinates.Transformation) -> bool:
+                              coords_transform: co.Transformation) -> bool:
     """Returns True and adds shared model if the building is a worship place and there is a shared model for it.
     If the building has a parent, then it is not handled as it is assumed, that then there is a OSM 3D
     representation, which might be more accurate than a generic shared model.
@@ -1544,3 +1545,175 @@ _available_worship_buildings = [WorshipBuilding('big-church.ac', True, WorshipBu
 # WorshipBuilding(eglise.xml, True, church, gothic)  # not aligned to x-axis
 # WorshipBuilding(corp-cathedrale.xml, True, cathedral, gothic)  # is not complete: one wall missing
 # WorshipBuilding(gen_orthodox_church.ac, True, church_orthodox, unknown)  # not aligned to any axis
+
+
+@unique
+class RectifyBlockedType(IntEnum):
+    """Some nodes (RectifyNodes) shall be blocked from changing their angle / position during processing.
+    multiple_buildings: if the node is part of more than one building
+    ninety_degrees: if the node already is 90 degrees
+    corner_to_bow: if the next node(s) is between 180 and 180 - 2*MAX_90_DEVIATIOM, then probably the node
+    is part of a curved wall in at least two parts - the more parts the closer the angles in the curve are
+    to 180 degrees."""
+    multiple_buildings = 10
+    ninety_degrees = 20
+    corner_to_bow = 30
+
+
+class RectifyNode(object):
+    """Represents a OSM Node feature used for rectifying building angles."""
+    def __init__(self, osm_id: int, local_x: float, local_y: float) -> None:
+        self.osm_id = osm_id
+        self.x = local_x  # in local coordinates
+        self.original_x = self.x  # should not get updated -> for reference/comparison
+        self.y = local_y
+        self.original_y = self.y
+        self.is_updated = False
+        self.rectify_building_refs = list()  # osm_ids
+
+    @property
+    def has_related_buildings(self) -> bool:
+        return len(self.rectify_building_refs) > 0
+
+    def relates_to_several_buildings(self) -> bool:
+        return len(self.rectify_building_refs) > 1
+
+    def update_point(self, new_x: float, new_y: float) -> False:
+        self.x = new_x
+        self.y = new_y
+        self.is_updated = True
+
+    def append_building_ref(self, osm_id: int) -> None:
+        self.rectify_building_refs.append(osm_id)
+
+
+class NodeInRectifyBuilding(object):
+    """Links RectifyNode and RectifyBuilding because a RectifyNode can be linked to multiple buildings."""
+    def __init__(self, rectify_node: RectifyNode) -> None:
+        self.angle = 0.0  # in degrees. Not guaranteed to be up to date
+        self.my_node = rectify_node  # directly linked RectifyNode in this building context (nodes can be shared)
+        self.prev_node = None  # type NodeInRectifyBuilding
+        self.next_node = None  # type NodeInRectifyBuilding
+        self.blocked_types = list()  # list of RectifyBlockedType
+
+    def within_rectify_deviation(self) -> bool:
+        return fabs(self.angle - 90) <= parameters.RECTIFY_MAX_90_DEVIATION
+
+    def within_rectify_90_tolerance(self) -> bool:
+        return fabs(self.angle - 90) <= parameters.RECTIFY_90_TOLERANCE
+
+    def append_blocked_type(self, append_type: RectifyBlockedType) -> None:
+        needs_append = True
+        for my_type in self.blocked_types:
+            if my_type is append_type:
+                needs_append = False
+                break
+        if needs_append:
+            self.blocked_types.append(append_type)
+
+    def is_blocked(self) -> bool:
+        return len(self.blocked_types) > 0
+
+    def node_needs_change(self) -> bool:
+        if not self.is_blocked():
+            if self.within_rectify_deviation():
+                if not (self.prev_node.is_blocked() and self.next_node.is_blocked()):
+                    return True
+        return False
+
+    def update_angle(self) ->None:
+        self.angle = co.calc_angle_of_corner_local(self.prev_node.my_node.x, self.prev_node.my_node.y,
+                                                   self.my_node.x, self.my_node.y,
+                                                   self.next_node.my_node.x, self.next_node.my_node.y)
+
+
+class RectifyBuilding(object):
+    def __init__(self, osm_id: int, node_refs: List[RectifyNode]) -> None:
+        self.osm_id = osm_id
+        self.node_refs = list()  # NodeInRectifyBuilding objects
+        for ref in node_refs:
+            self._append_node_ref(ref)
+
+    def _append_node_ref(self, node: RectifyNode) -> None:
+        """Appends a RectifyNode to the node references of this building - and vice versa.
+        However do not process last node in way, which is the same as the first one."""
+        my_node = NodeInRectifyBuilding(node)
+        if not ((len(self.node_refs) > 0) and (node.osm_id == self.node_refs[0].my_node.osm_id)):
+            self.node_refs.append(my_node)
+            node.append_building_ref(self.osm_id)
+
+    def is_relevant(self) -> bool:
+        """Only relevant for rectify processing if at least 4 corners."""
+        return len(self.node_refs) > 3
+
+    def classify_and_relate_unchanged_nodes(self) -> bool:
+        """Returns True if at least one node is not blocked and falls within deviation."""
+        # relate nodes and calculate angle
+        for position in range(len(self.node_refs)):
+            prev_node = self.node_refs[position - 1]
+            corner_node = self.node_refs[position]
+            if len(self.node_refs) - 1 == position:
+                next_node = self.node_refs[0]
+            else:
+                next_node = self.node_refs[position + 1]
+            corner_node.prev_node = prev_node
+            corner_node.next_node = next_node
+            corner_node.update_angle()
+
+        # classify nodes
+        for position in range(len(self.node_refs)):
+            corner_node = self.node_refs[position]
+            if corner_node.my_node.relates_to_several_buildings():
+                corner_node.append_blocked_type(RectifyBlockedType.multiple_buildings)
+            if corner_node.within_rectify_90_tolerance():
+                corner_node.append_blocked_type(RectifyBlockedType.ninety_degrees)
+            elif corner_node.within_rectify_deviation():
+                max_angle = 180 - 2 * parameters.RECTIFY_MAX_90_DEVIATION
+                if corner_node.prev_node.angle >= max_angle or corner_node.next_node.angle >= max_angle:
+                    corner_node.append_blocked_type(RectifyBlockedType.corner_to_bow)
+
+        # finally find out whether there is something to change at all
+        for position in range(len(self.node_refs)):
+            corner_node = self.node_refs[position]
+            if corner_node.node_needs_change():
+                return True
+        return False
+
+    def rectify_nodes(self):
+        """Rectifies all those nodes, which can and shall be changed.
+
+        The algorithm looks at the current node angle and the blocked type of the next node.
+        If the next node is blocked, then the current node is moved along the line prev_node-current_node until there
+        are 90 degrees.
+        If the next node is not blocked then in order to keep as much of the area/geometry similar,
+        both the current and the next node are moved a bit. The current node is only moved half the distance,
+        and the next node is moved the same distance in the opposite direction.
+        Basically a triangle with prev_node (a), current_node (b) and next_node (c)."""
+        for position in range(len(self.node_refs)):
+            corner_node = self.node_refs[position]
+            my_next_node = corner_node.next_node
+            my_prev_node = corner_node.prev_node
+            corner_node.update_angle()
+            if corner_node.node_needs_change():
+                dist_bc = co.calc_distance_local(corner_node.my_node.x, corner_node.my_node.y,
+                                                 my_next_node.my_node.x, my_next_node.my_node.y)
+                my_angle = corner_node.angle
+                angle_ab = co.calc_angle_of_line_local(my_prev_node.my_node.x, my_prev_node.my_node.y,
+                                                       corner_node.my_node.x, corner_node.my_node.y)
+                is_add = False  # whether the distance from prev_node (a) to corner_node (b) shall be longer
+                if my_angle > 90:
+                    my_angle = 180 - my_angle
+                    is_add = True
+                dist_add = dist_bc * cos(radians(my_angle))
+                if not my_next_node.is_blocked():
+                    dist_add /= 2
+                if not is_add:
+                    dist_add *= -1
+                new_x, new_y = co.calc_point_angle_away(corner_node.my_node.x, corner_node.my_node.y,
+                                                        dist_add, angle_ab)
+                corner_node.my_node.update_point(new_x, new_y)
+                if not my_next_node.is_blocked():
+                    dist_add *= -1
+                    new_x, new_y = co.calc_point_angle_away(my_next_node.my_node.x, my_next_node.my_node.y,
+                                                            dist_add, angle_ab)
+                    my_next_node.my_node.update_point(new_x, new_y)

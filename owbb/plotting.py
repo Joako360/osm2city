@@ -13,6 +13,7 @@ import numpy as np
 from shapely.geometry import MultiPolygon, Polygon
 
 from owbb import models as m
+import building_lib as bl
 
 
 def _create_a3_landscape_figure() -> mfig.Figure:
@@ -164,17 +165,17 @@ def _draw_blocked_areas(building_zones, ax: maxs.Axes) -> None:
             ax.add_patch(patch)
 
 
-def _draw_blocked_nodes(blocked_nodes: List[m.NodeInRectifyBuilding], ax: maxs.Axes) -> None:
+def _draw_blocked_nodes(blocked_nodes: List[bl.NodeInRectifyBuilding], ax: maxs.Axes) -> None:
     for node in blocked_nodes:
-        if m.RectifyBlockedType.ninety_degrees in node.blocked_types:
+        if bl.RectifyBlockedType.ninety_degrees in node.blocked_types:
             my_color = 'blue'
         else:
             my_color = 'red'
-        if m.RectifyBlockedType.corner_to_bow in node.blocked_types:
+        if bl.RectifyBlockedType.corner_to_bow in node.blocked_types:
             my_fill = True
         else:
             my_fill = False
-        if m.RectifyBlockedType.multiple_buildings in node.blocked_types:
+        if bl.RectifyBlockedType.multiple_buildings in node.blocked_types:
             my_alpha = 0.3
         else:
             my_alpha = 1.0
@@ -184,7 +185,7 @@ def _draw_blocked_nodes(blocked_nodes: List[m.NodeInRectifyBuilding], ax: maxs.A
         ax.add_patch(my_circle)
 
 
-def _draw_nodes_to_change(nodes_to_change: List[m.NodeInRectifyBuilding], ax: maxs.Axes) -> None:
+def _draw_nodes_to_change(nodes_to_change: List[bl.NodeInRectifyBuilding], ax: maxs.Axes) -> None:
     for node in nodes_to_change:
         ax.add_patch(pat.Circle((node.my_node.original_x, node.my_node.original_y), radius=0.4, linewidth=2,
                                 color='green', fill=False))
@@ -250,7 +251,7 @@ def draw_zones(highways_dict, buildings, building_zones, btg_building_zones, bou
     pdf_pages.close()
 
 
-def draw_rectify(rectify_buildings: List[m.RectifyBuilding], max_samples: int, seed_sample: bool) -> None:
+def draw_rectify(rectify_buildings: List[bl.RectifyBuilding], max_samples: int, seed_sample: bool) -> None:
     number_of_samples = len(rectify_buildings)
     if number_of_samples > max_samples:
         number_of_samples = max_samples

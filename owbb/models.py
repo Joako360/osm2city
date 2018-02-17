@@ -11,7 +11,8 @@ import logging
 import math
 from typing import Dict, List, Union
 
-from shapely.geometry import Point, LineString, Polygon, MultiPolygon
+from shapely.geometry import box, Point, LineString, Polygon, MultiPolygon
+import shapely.affinity as saf
 
 import parameters
 import utils.osmparser as op
@@ -224,11 +225,6 @@ class BuildingType(IntEnum):
     stable = 96
     sty = 97
     hangar = 100
-
-    # World-Models cases
-    # agriculture = 10
-    # airport = 11
-    # supermarkets = 18
 
 
 class Building(OSMFeatureArea):
@@ -733,173 +729,307 @@ class BlockedAreaType(IntEnum):
     railway = 13
 
 
-@unique
-class RectifyBlockedType(IntEnum):
-    """Some nodes (RectifyNodes) shall be blocked from changing their angle / position during processing.
-    multiple_buildings: if the node is part of more than one building
-    ninety_degrees: if the node already is 90 degrees
-    corner_to_bow: if the next node(s) is between 180 and 180 - 2*MAX_90_DEVIATIOM, then probably the node
-    is part of a curved wall in at least two parts - the more parts the closer the angles in the curve are
-    to 180 degrees."""
-    multiple_buildings = 10
-    ninety_degrees = 20
-    corner_to_bow = 30
+class BlockedArea(object):
+    """An object representing a specific type of blocked area - blocked for new generated buildings"""
+    def __init__(self, type_: BlockedAreaType, polygon: Polygon, original_type=None) -> None:
+        self.type_ = type_
+        self.polygon = polygon
+        self.original_type = original_type
 
 
-class RectifyNode(object):
-    """Represents a OSM Node feature used for rectifying building angles."""
-    def __init__(self, osm_id: int, local_x: float, local_y: float) -> None:
-        self.osm_id = osm_id
-        self.x = local_x  # in local coordinates
-        self.original_x = self.x  # should not get updated -> for reference/comparison
-        self.y = local_y
-        self.original_y = self.y
-        self.is_updated = False
-        self.rectify_building_refs = list()  # osm_ids
+class BuildingModel(object):
+    """A model of a building used to replace OSM buildings or create buildings where there could be a building.
+
+    The center of the building is strictly in the middle of width/depth.
+    All geometry information is either in the AC3D model or in tags.
+
+    Tags contains e.g. roof type, number of levels etc. according to OSM tagging."""
+
+    def __init__(self, width: float, depth: float, model_type: BuildingType, regions: List[str], model: str,
+                 facade_id: int, roof_id: int, tags: KeyValueDict) -> None:
+        self.width = width  # if you look at the building from its front, then you see the width between the sides
+        self.depth = depth  # from the front to the back
+        self.model_type = model_type
+        self.regions = regions  # list of strings, e.g. GB, IE
+        self.model = model  # a relative path / identifier to the AC3D information if available
+        self.facade_id = facade_id
+        self.roof_id = roof_id
+        self.tags = tags
 
     @property
-    def has_related_buildings(self) -> bool:
-        return len(self.rectify_building_refs) > 0
+    def area(self) -> float:
+        return self.width * self.depth
 
-    def relates_to_several_buildings(self) -> bool:
-        return len(self.rectify_building_refs) > 1
-
-    def update_point(self, new_x: float, new_y: float) -> False:
-        self.x = new_x
-        self.y = new_y
-        self.is_updated = True
-
-    def append_building_ref(self, osm_id: int) -> None:
-        self.rectify_building_refs.append(osm_id)
-
-
-class NodeInRectifyBuilding(object):
-    """Links RectifyNode and RectifyBuilding because a RectifyNode can be linked to multiple buildings."""
-    def __init__(self, rectify_node: RectifyNode) -> None:
-        self.angle = 0.0  # in degrees. Not guaranteed to be up to date
-        self.my_node = rectify_node  # directly linked RectifyNode in this building context (nodes can be shared)
-        self.prev_node = None  # type NodeInRectifyBuilding
-        self.next_node = None  # type NodeInRectifyBuilding
-        self.blocked_types = list()  # list of RectifyBlockedType
-
-    def within_rectify_deviation(self) -> bool:
-        return math.fabs(self.angle - 90) <= parameters.RECTIFY_MAX_90_DEVIATION
-
-    def within_rectify_90_tolerance(self) -> bool:
-        return math.fabs(self.angle - 90) <= parameters.RECTIFY_90_TOLERANCE
-
-    def append_blocked_type(self, append_type: RectifyBlockedType) -> None:
-        needs_append = True
-        for my_type in self.blocked_types:
-            if my_type is append_type:
-                needs_append = False
-                break
-        if needs_append:
-            self.blocked_types.append(append_type)
-
-    def is_blocked(self) -> bool:
-        return len(self.blocked_types) > 0
-
-    def node_needs_change(self) -> bool:
-        if not self.is_blocked():
-            if self.within_rectify_deviation():
-                if not (self.prev_node.is_blocked() and self.next_node.is_blocked()):
-                    return True
-        return False
-
-    def update_angle(self) ->None:
-        self.angle = co.calc_angle_of_corner_local(self.prev_node.my_node.x, self.prev_node.my_node.y,
-                                                   self.my_node.x, self.my_node.y,
-                                                   self.next_node.my_node.x, self.next_node.my_node.y)
+    @staticmethod
+    def _parse_regions(region_string: str) -> List[str]:
+        """Parses a string as a semi-colon separated list of regions"""
+        my_regions = list()
+        if region_string is None:
+            return my_regions
+        elif len(region_string.strip()) == 0:
+            return my_regions
+        else:
+            split_regions = region_string.split(";")
+            for reg in split_regions:
+                my_regions.append(reg.strip())
+        return my_regions
 
 
-class RectifyBuilding(object):
-    def __init__(self, osm_id: int, node_refs: List[RectifyNode]) -> None:
-        self.osm_id = osm_id
-        self.node_refs = list()  # NodeInRectifyBuilding objects
-        for ref in node_refs:
-            self._append_node_ref(ref)
+class SharedModel(object):
+    def __init__(self, building_model: BuildingModel, building_type: BuildingType) -> None:
+        self.building_model = building_model
+        self.type_ = building_type
+        self._front_buffer = 0
+        self._back_buffer = 0
+        self._side_buffer = 0
+        self._calc_buffers()
 
-    def _append_node_ref(self, node: RectifyNode) -> None:
-        """Appends a RectifyNode to the node references of this building - and vice versa.
-        However do not process last node in way, which is the same as the first one."""
-        my_node = NodeInRectifyBuilding(node)
-        if not ((len(self.node_refs) > 0) and (node.osm_id == self.node_refs[0].my_node.osm_id)):
-            self.node_refs.append(my_node)
-            node.append_building_ref(self.osm_id)
+    def _calc_buffers(self) -> None:
+        if self.type_ is BuildingType.detached:
+            front_min = parameters.OWBB_RESIDENTIAL_HOUSE_FRONT_MIN
+            front_max = parameters.OWBB_RESIDENTIAL_HOUSE_FRONT_MAX
+            back_min = parameters.OWBB_RESIDENTIAL_HOUSE_BACK_MIN
+            back_max = parameters.OWBB_RESIDENTIAL_HOUSE_BACK_MAX
+            side_min = parameters.OWBB_RESIDENTIAL_HOUSE_SIDE_MIN
+            side_max = parameters.OWBB_RESIDENTIAL_HOUSE_SIDE_MAX
+        elif self.type_ is BuildingType.terrace:
+            front_min = parameters.OWBB_RESIDENTIAL_TERRACE_FRONT_MIN
+            front_max = parameters.OWBB_RESIDENTIAL_TERRACE_FRONT_MAX
+            back_min = parameters.OWBB_RESIDENTIAL_TERRACE_BACK_MIN
+            back_max = parameters.OWBB_RESIDENTIAL_TERRACE_BACK_MAX
+            side_min = parameters.OWBB_RESIDENTIAL_TERRACE_SIDE_MIN
+            side_max = parameters.OWBB_RESIDENTIAL_TERRACE_SIDE_MAX
+        else:
+            front_min = parameters.OWBB_INDUSTRIAL_BUILDING_FRONT_MIN
+            front_max = parameters.OWBB_INDUSTRIAL_BUILDING_FRONT_MIN
+            back_min = parameters.OWBB_INDUSTRIAL_BUILDING_BACK_MIN
+            back_max = parameters.OWBB_INDUSTRIAL_BUILDING_BACK_MIN
+            side_min = parameters.OWBB_INDUSTRIAL_BUILDING_SIDE_MIN
+            side_max = parameters.OWBB_INDUSTRIAL_BUILDING_SIDE_MIN
+        my_buffer = self.width/2 + math.sqrt(self.width)
+        if my_buffer < front_min:
+            my_buffer = front_min
+        if my_buffer > front_max:
+            my_buffer = front_max
+        self._front_buffer = my_buffer
 
-    def is_relevant(self) -> bool:
-        """Only relevant for rectify processing if at least 4 corners."""
-        return len(self.node_refs) > 3
+        my_buffer = self.width/2 + math.sqrt(self.width)
+        if my_buffer < back_min:
+            my_buffer = back_min
+        if my_buffer > back_max:
+            my_buffer = back_max
+        self._back_buffer = my_buffer
 
-    def classify_and_relate_unchanged_nodes(self) -> bool:
-        """Returns True if at least one node is not blocked and falls within deviation."""
-        # relate nodes and calculate angle
-        for position in range(len(self.node_refs)):
-            prev_node = self.node_refs[position - 1]
-            corner_node = self.node_refs[position]
-            if len(self.node_refs) - 1 == position:
-                next_node = self.node_refs[0]
+        my_buffer = self.width/2 + math.sqrt(self.width)
+        if my_buffer < side_min:
+            my_buffer = side_min
+        if my_buffer > side_max:
+            my_buffer = side_max
+        self._side_buffer = my_buffer
+
+    @property
+    def width(self) -> float:
+        return self.building_model.width
+
+    @property
+    def depth(self) -> float:
+        return self.building_model.depth
+
+    @property
+    def front_buffer(self) -> float:
+        return self._front_buffer
+
+    @property
+    def min_front_buffer(self) -> float:
+        """The absolute minimal distance tolerable, e.g. in a curve at the edges of the lot"""
+        return math.sqrt(self._front_buffer)
+
+    @property
+    def back_buffer(self) -> float:
+        return self._back_buffer
+
+    @property
+    def side_buffer(self) -> float:
+        return self._side_buffer
+
+    @property
+    def building_type(self):
+        return self.type_
+
+    @property
+    def world_model(self):
+        return self.building_model.model
+
+
+class SharedModelsLibrary(object):
+    def __init__(self, building_models):
+        self._residential_detached = list()
+        self._residential_terraces = list()
+        self._industrial_buildings_large = list()
+        self._industrial_buildings_small = list()
+        self._populate_models_library(building_models)
+
+    @property
+    def residential_detached(self):
+        return self._residential_detached
+
+    @property
+    def residential_terraces(self):
+        return self._residential_terraces
+
+    @property
+    def industrial_buildings_large(self):
+        return self._industrial_buildings_large
+
+    @property
+    def industrial_buildings_small(self):
+        return self._industrial_buildings_small
+
+    def _populate_models_library(self, building_models: List[BuildingModel]) -> None:
+        for building_model in building_models:
+            if building_model.model_type is BuildingType.residential:
+                pass  # FIXME: should somehow be translated based on parameters to apartments, detached, terrace, etc.
+            elif building_model.model_type is BuildingType.detached:
+                my_model = SharedModel(building_model, BuildingType.detached)
+                self._residential_detached.append(my_model)
+
+            elif building_model.model_type is BuildingType.terrace:
+                my_model = SharedModel(building_model, BuildingType.terrace)
+                self._residential_terraces.append(my_model)
+            elif building_model.model_type is BuildingType.industrial:
+                my_model = SharedModel(building_model, BuildingType.industrial)
+                if building_model.area > 500:  # FIXME: should be parameter
+                    self._industrial_buildings_large.append(my_model)
+                else:
+                    self._industrial_buildings_small.append(my_model)
+
+    def is_valid(self) -> bool:
+        if 0 == len(self._residential_detached):
+            logging.warning("No residential detached buildings found")
+            return False
+        if 0 == len(self._residential_terraces):
+            logging.warning("No residential terrace buildings found")
+            return False
+        if 0 == len(self._industrial_buildings_large):
+            logging.warning("No large industrial buildings found")
+            return False
+        if 0 == len(self._industrial_buildings_small):
+            logging.warning("No small industrial buildings found")
+            return False
+        return True
+class GenBuilding(object):
+    """An object representing a generated non-OSM building"""
+    def __init__(self, gen_id: int, shared_model: SharedModel, highway_width: float) -> None:
+        self.gen_id = gen_id
+        self.shared_model = shared_model
+        # takes into account that ideal buffer_front is challenged in curve
+        self.area_polygon = None  # A polygon representing only the building, not the buffer around
+        self.buffer_polygon = None  # A polygon representing the building incl. front/back/side buffers
+        self.distance_to_street = 0  # The distance from the building's midpoint to the middle of the street
+        self._create_area_polygons(highway_width)
+        # below location attributes are set after population
+        self.x = 0  # the x coordinate of the mid-point in relation to the local coordinate system
+        self.y = 0  # the y coordinate of the mid-point in relation to the local coordinate system
+        self.angle = 0  # the angle in degrees from North (y-axis) in the local coordinate system for the building's
+                        # static object local x-axis
+
+    def _create_area_polygons(self, highway_width:float) -> None:
+        """Creates polygons at (0,0) and no angle"""
+        buffer_front = self.shared_model.front_buffer
+        min_buffer_front = self.shared_model.min_front_buffer
+        buffer_side = self.shared_model.side_buffer
+        buffer_back = self.shared_model.back_buffer
+
+        self.buffer_polygon = box(-1*(self.shared_model.width/2 + buffer_side),
+                                  highway_width/2 + (buffer_front - min_buffer_front),
+                                  self.shared_model.width/2 + buffer_side,
+                                  highway_width/2 + buffer_front + self.shared_model.depth + buffer_back)
+        self.area_polygon = box(-1*(self.shared_model.width/2),
+                                highway_width/2 + buffer_front,
+                                self.shared_model.width/2,
+                                highway_width/2 + buffer_front + self.shared_model.depth)
+
+        self.distance_to_street = highway_width/2 + buffer_front + self.shared_model.depth/2
+
+    def get_area_polygon(self, has_buffer, highway_point, highway_angle):
+        """
+        Create a polygon for the building and place it in relation to the point and angle of the highway.
+        """
+        if has_buffer:
+            my_box = self.buffer_polygon
+        else:
+            my_box = self.area_polygon
+        rotated_box = saf.rotate(my_box, -1 * (90 + highway_angle), (0, 0))  # plus 90 degrees because right side of
+                                                                             # street along; -1 to go clockwise
+        return saf.translate(rotated_box, highway_point.x, highway_point.y)
+
+    def set_location(self, point_on_line, angle, area_polygon, buffer_polygon):
+        self.area_polygon = area_polygon
+        self.buffer_polygon = buffer_polygon
+        self.angle = angle
+        my_angle = math.radians(angle+90)  # angle plus 90 because the angle is along the street, not square from street
+        self.x = point_on_line.x + self.distance_to_street*math.sin(my_angle)
+        self.y = point_on_line.y + self.distance_to_street*math.cos(my_angle)
+
+
+class TempGenBuildings(object):
+    """Stores generated buildings temporarily before validations shows that they can be committed"""
+    def __init__(self, bounding_box) -> None:
+        self.bounding_box = bounding_box
+        self.generated_blocked_areas = list()  # List of BlockedArea objects from temp generated buildings
+        self.generated_buildings = list()  # List of GenBuildings
+        self.blocked_areas_along_objects = dict()  # key=BlockedArea value=None found during generation along specific highway
+        self.blocked_areas_along_sequence = list()  # BlockedArea objects
+
+    def add_generated(self, building, blocked_area):
+        self.generated_blocked_areas.append(blocked_area)
+        if building.area_polygon.within(self.bounding_box):
+            self.generated_buildings.append(building)
+        self.blocked_areas_along_objects[blocked_area] = True
+        self.blocked_areas_along_sequence.append(blocked_area)
+
+    def validate_uninterrupted_sequence(self, min_share, min_number):
+        """
+        First validates that the min_share is fulfilled.
+        Then validates if there either only are temp. generated buildings or all generated buildings are in just
+        one sequence.
+        E.g. for row houses all houses should be the same - but at the street start/end there might be other houses.
+        Finally validate if the number of generated buildings is at least min_number."""
+        if not self.validate_min_share_generated(min_share):
+            return False
+
+        seq_started = False
+        seq_stopped = False
+        counter = 0
+        for blocked_area in self.blocked_areas_along_sequence:
+            is_temp_generated = self.blocked_areas_along_objects[blocked_area]
+            if is_temp_generated:
+                if not seq_started:
+                    seq_started = True
+                    counter += 1
+                    continue
+                elif seq_started:
+                    counter += 1
+                elif seq_stopped:
+                    return 0
+            elif not is_temp_generated:
+                if seq_started and not seq_stopped:
+                    seq_stopped = True
+                    continue
+        if counter < min_number:
+            return False
+        return True
+
+    def validate_min_share_generated(self, min_share):
+        """Returns true if the share of generated buildings is at least as large as the min_share parameter"""
+        count_temp_generated = 0.0
+        count_others = 0.0
+        for my_bool in self.blocked_areas_along_objects.values():
+            if my_bool:
+                count_temp_generated += 1.0
             else:
-                next_node = self.node_refs[position + 1]
-            corner_node.prev_node = prev_node
-            corner_node.next_node = next_node
-            corner_node.update_angle()
-
-        # classify nodes
-        for position in range(len(self.node_refs)):
-            corner_node = self.node_refs[position]
-            if corner_node.my_node.relates_to_several_buildings():
-                corner_node.append_blocked_type(RectifyBlockedType.multiple_buildings)
-            if corner_node.within_rectify_90_tolerance():
-                corner_node.append_blocked_type(RectifyBlockedType.ninety_degrees)
-            elif corner_node.within_rectify_deviation():
-                max_angle = 180 - 2 * parameters.RECTIFY_MAX_90_DEVIATION
-                if corner_node.prev_node.angle >= max_angle or corner_node.next_node.angle >= max_angle:
-                    corner_node.append_blocked_type(RectifyBlockedType.corner_to_bow)
-
-        # finally find out whether there is something to change at all
-        for position in range(len(self.node_refs)):
-            corner_node = self.node_refs[position]
-            if corner_node.node_needs_change():
-                return True
+                count_others += 1.0
+        my_share = count_temp_generated + count_others
+        if my_share > 0 and (count_temp_generated / my_share) >= min_share:
+            return True
         return False
-
-    def rectify_nodes(self):
-        """Rectifies all those nodes, which can and shall be changed.
-
-        The algorithm looks at the current node angle and the blocked type of the next node.
-        If the next node is blocked, then the current node is moved along the line prev_node-current_node until there
-        are 90 degrees.
-        If the next node is not blocked then in order to keep as much of the area/geometry similar,
-        both the current and the next node are moved a bit. The current node is only moved half the distance,
-        and the next node is moved the same distance in the opposite direction.
-        Basically a triangle with prev_node (a), current_node (b) and next_node (c)."""
-        for position in range(len(self.node_refs)):
-            corner_node = self.node_refs[position]
-            my_next_node = corner_node.next_node
-            my_prev_node = corner_node.prev_node
-            corner_node.update_angle()
-            if corner_node.node_needs_change():
-                dist_bc = co.calc_distance_local(corner_node.my_node.x, corner_node.my_node.y,
-                                                 my_next_node.my_node.x, my_next_node.my_node.y)
-                my_angle = corner_node.angle
-                angle_ab = co.calc_angle_of_line_local(my_prev_node.my_node.x, my_prev_node.my_node.y,
-                                                       corner_node.my_node.x, corner_node.my_node.y)
-                is_add = False  # whether the distance from prev_node (a) to corner_node (b) shall be longer
-                if my_angle > 90:
-                    my_angle = 180 - my_angle
-                    is_add = True
-                dist_add = dist_bc * math.cos(math.radians(my_angle))
-                if not my_next_node.is_blocked():
-                    dist_add /= 2
-                if not is_add:
-                    dist_add *= -1
-                new_x, new_y = co.calc_point_angle_away(corner_node.my_node.x, corner_node.my_node.y,
-                                                        dist_add, angle_ab)
-                corner_node.my_node.update_point(new_x, new_y)
-                if not my_next_node.is_blocked():
-                    dist_add *= -1
-                    new_x, new_y = co.calc_point_angle_away(my_next_node.my_node.x, my_next_node.my_node.y,
-                                                            dist_add, angle_ab)
-                    my_next_node.my_node.update_point(new_x, new_y)
