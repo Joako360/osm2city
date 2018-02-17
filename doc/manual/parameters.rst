@@ -282,6 +282,37 @@ Examples of overlap objects based on static objects at LSZS (light grey structur
 .. image:: lszs_hull_back.png
 
 
+-----------------
+Rectify Buildings
+-----------------
+Rectify angles of corners in buildings to 90 degrees as far as possible (configurable). This operation works on existing buildings as mapped in OSM. It corrects human errors during mapping, when angles are not straight 90 degrees (which they are in reality for the major part of corners). I.e. there is no new information added, only existing information corrected.
+
+This operation is mainly used for eye-candy and to allow easier 3-D visualization. It can be left out if you feel that the OSM mappers have done a good job / used good tooling. On the other hand the processing time compared to other operations is negligible.
+
+The following picture shows an example of a rectified building with a more complex layout. The results are more difficult to predict the more corners there are. The red line is the original boundary, the green line the rectified boundary. Green circles are at corners, where the corner's angle is different from 90 degrees but within a configurable deviation (typically between 5 and 10 degrees). Corners shared with other buildings are not changed by the rectify algorithm (not shown here).
+
+.. image:: rectify.png
+
+Please note that if you are annoyed with angles in OSM, then you have to rectify them manually in OSM. One way to do that is to use :ref:`JOSM <chapter-josm-label>` and related plugins.
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+RECTIFY_90_TOLERANCE                            Number     0.1       Small tolerance from 90 degrees not leading to rectification of corner
+
+RECTIFY_MAX_90_DEVIATION                        Number     7         By how much an angle can be smaller or larger than 90 to still be rectified.
+                                                                     You might need to experiment a bit and use plotting to determine a good value.
+
+RECTIFY_MAX_DRAW_SAMPLE                         Number     20        How many randomly chosen buildings having rectified corners shall be plotted.
+                                                                     The more buildings the better for comparison. However plotting can take quite
+                                                                     some time and system resources.
+
+RECTIFY_SEED_SAMPLE                             Boolean    True      If set to True then the randomizer uses a different seed each time.
+                                                                     In some situations it might be better when the same set of random buildings
+                                                                     are plotted each time - e.g. when experimenting with parameters and wanting to
+                                                                     compare the outcomes.
+=============================================   ========   =======   ==============================================================================
+
 
 .. _chapter-parameters-light:
 

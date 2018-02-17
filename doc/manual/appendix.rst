@@ -56,6 +56,7 @@ An unstructured list of stuff you might need to know as a developer:
 * Use an editor, which supports `PEP 08`_. However the current main developer prefers a line length of 120 instead. You should be able to live with that.
 * Use Python `type hints`_ as far as possible — and help improve the current situation. It might make the code a bit harder to read, but it gets so much easier to understand.
 * Try to stick to the Python version as referenced in :ref:`Python<chapter-python-label>`.
+* All code in utf-8. On Windows please make sure that line endings get correct in git (core.autocrlf)
 
 
 .. _PEP 08: https://www.python.org/dev/peps/pep-0008/

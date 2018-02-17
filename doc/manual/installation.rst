@@ -175,3 +175,14 @@ Other Tools
 You might want to check out Sławek Mikuła's scripts_ for osm2city parsing and generation, which make some of the repetitive manual tasks involved in generating a scenery a bit easier.
 
 .. _scripts: https://github.com/slawekmikula/scripts-osm2city
+
+
+.. _chapter-josm-label:
+
+----
+JOSM
+----
+
+``JOSM`` is an offline editor for OSM-data. It is not strictly required for pre- or post-processing of ``osm2city``, but it might be handy for debugging and detailed investigations.
+
+Information about JOSM including installation instructions can be found at https://josm.openstreetmap.de/.

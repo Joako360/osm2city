@@ -15,6 +15,7 @@ import multiprocessing as mp
 import os
 import random
 import textwrap
+import time
 from typing import Dict, List, Optional
 
 import shapely.geometry as shg
@@ -23,6 +24,8 @@ import shapely.ops as sho
 import building_lib
 import cluster
 import numpy as np
+import owbb.models as m
+import owbb.plotting as p
 import parameters
 import prepare_textures
 import textures.materials
@@ -34,7 +37,74 @@ OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
 
 # Cf. https://taginfo.openstreetmap.org/keys/building%3Apart#values and
 # https://wiki.openstreetmap.org/wiki/Key%3Abuilding%3Apart
-ALLOWED_BUiLDING_PART_VALUES = ['yes', 'residential', 'apartments', 'house', 'commercial', 'retail']
+ALLOWED_BUILDING_PART_VALUES = ['yes', 'residential', 'apartments', 'house', 'commercial', 'retail']
+
+
+def _process_rectify_buildings(nodes_dict: Dict[int, op.Node], rel_nodes_dict: Dict[int, op.Node],
+                               ways_dict: Dict[int, op.Way], coords_transform: coordinates.Transformation) -> None:
+    last_time = time.time()
+    # create rectify objects
+    ref_nodes = dict()
+    for key, node in nodes_dict.items():
+        x, y = coords_transform.to_local((node.lon, node.lat))
+        rectify_node = m.RectifyNode(node.osm_id, x, y)
+        ref_nodes[node.osm_id] = rectify_node
+
+    rectify_buildings = list()
+    for key, way in ways_dict.items():
+        if not ('building' in way.tags or 'building:part' in way.tags) or len(way.refs) == 0:
+            continue
+        if 'indoor' in way.tags and way.tags['indoor'] == 'yes':
+            continue
+        rectify_nodes_list = list()
+        for ref in way.refs:
+            if ref in ref_nodes:
+                rectify_nodes_list.append(ref_nodes[ref])
+        rectify_building = m.RectifyBuilding(way.osm_id, rectify_nodes_list)
+        rectify_buildings.append(rectify_building)
+
+    # make a pseudo rectify building to make sure nodes in relations / Simple3D buildings do not get changed
+    # the object is actually not used anywhere, but the related nodes get updated
+    rectify_nodes_list = list()
+    for key in rel_nodes_dict.keys():
+        rectify_nodes_list.append(ref_nodes[key])
+    m.RectifyBuilding(-1, rectify_nodes_list)
+
+    # classify the nodes
+    change_candidates = list()
+    for building in rectify_buildings:
+        nodes_to_change = building.classify_and_relate_unchanged_nodes()
+        if nodes_to_change:
+            change_candidates.append(building)
+    last_time = utilities.time_logging("Time used in seconds for classifying nodes", last_time)
+
+    logging.info("Found %d buildings out of %d buildings with nodes to rectify",
+                 len(change_candidates), len(rectify_buildings))
+
+    for building in change_candidates:
+        building.rectify_nodes()
+    last_time = utilities.time_logging("Time used in seconds for rectifying nodes", last_time)
+
+    if parameters.DEBUG_PLOT:
+        if change_candidates:
+            p.draw_rectify(change_candidates, parameters.RECTIFY_MAX_DRAW_SAMPLE,
+                           parameters.RECTIFY_SEED_SAMPLE)
+            last_time = utilities.time_logging("Time used in seconds for plotting", last_time)
+        else:
+            logging.info("Nothing to plot.")
+
+    # Finally update the nodes with the new lon/lat
+    counter = 0
+    for rectify_node in ref_nodes.values():
+        if rectify_node.has_related_buildings:
+            if rectify_node.is_updated:
+                counter += 1
+                original_node = nodes_dict[rectify_node.osm_id]
+                lon, lat = coords_transform.to_global((rectify_node.x, rectify_node.y))
+                original_node.lon = lon
+                original_node.lat = lat
+    logging.info("Number of changes for rectified nodes created: %d", counter)
+    utilities.time_logging("Time used in seconds for updating lon/lat", last_time)
 
 
 def _process_osm_relations(nodes_dict: Dict[int, op.Node], rel_ways_dict: Dict[int, op.Way],
@@ -116,23 +186,23 @@ def _process_multipolygon_buildings(nodes_dict: Dict[int, op.Node], rel_ways_dic
     inner_ways_multiple = []  # inner ways, where multiple ways form one or more closed ring
 
     # find relationships
-    for m in relation.members:
+    for member in relation.members:
         relation_found = False
-        if m.type_ == 'way':
-            if m.ref in rel_ways_dict:
-                way = rel_ways_dict[m.ref]
+        if member.type_ == 'way':
+            if member.ref in rel_ways_dict:
+                way = rel_ways_dict[member.ref]
                 # because the member way already has been processed as normal way, we need to remove
                 # otherwise we might get flickering due to two buildings on top of each other
                 my_buildings.pop(way.osm_id, None)
                 relation_found = True
-                if m.role == 'outer':
+                if member.role == 'outer':
                     if way.refs[0] == way.refs[-1]:
                         outer_ways.append(way)
                         logging.debug("add way outer " + str(way.osm_id))
                     else:
                         outer_ways_multiple.append(way)
                         logging.debug("add way outer multiple" + str(way.osm_id))
-                elif m.role == 'inner':
+                elif member.role == 'inner':
                     if way.refs[0] == way.refs[-1]:
                         inner_ways.append(way)
                         logging.debug("add way inner " + str(way.osm_id))
@@ -140,7 +210,7 @@ def _process_multipolygon_buildings(nodes_dict: Dict[int, op.Node], rel_ways_dic
                         inner_ways_multiple.append(way)
                         logging.debug("add way inner multiple" + str(way.osm_id))
             if not relation_found:
-                logging.debug("Way osm_id={} not found for relation osm_id={}.".format(m.ref, relation.osm_id))
+                logging.debug("Way osm_id={} not found for relation osm_id={}.".format(member.ref, relation.osm_id))
 
     # Process multiple and add to outer_ways/inner_ways as whole rings
     inner_ways.extend(op.closed_ways_from_multiple_ways(inner_ways_multiple))
@@ -184,12 +254,12 @@ def _process_simple_3d_building(relation: op.Relation, my_buildings: Dict[int, b
     buildings_found = list()  # osm_id
     building_outlines_found = list()  # osm_id
     # make relations - we are only interested
-    for m in relation.members:
-        if m.type_ == 'way':
-            if m.ref in my_buildings:
-                related_building = my_buildings[m.ref]
+    for member in relation.members:
+        if member.type_ == 'way':
+            if member.ref in my_buildings:
+                related_building = my_buildings[member.ref]
                 if 'building' in related_building.tags:
-                    if m.role == 'outline':
+                    if member.role == 'outline':
                         building_outlines_found.append(related_building.osm_id)
                     else:
                         buildings_found.append(related_building.osm_id)
@@ -222,11 +292,11 @@ def _process_simple_3d_building(relation: op.Relation, my_buildings: Dict[int, b
             logging.warning('OSM data error: there is no "outline" member in relation %i', relation.osm_id)
             parent = building_lib.BuildingParent(op.get_next_pseudo_osm_id(op.OSMFeatureType.building_relation), False)
             # no tags are available to be added on parent level
-            for m in relation.members:
-                if m.ref in my_buildings:
-                    building_part = my_buildings[m.ref]
+            for member in relation.members:
+                if member.ref in my_buildings:
+                    building_part = my_buildings[member.ref]
                     if 'building:part' in building_part.tags and \
-                            building_part.tags['building:part'] not in ALLOWED_BUiLDING_PART_VALUES:
+                            building_part.tags['building:part'] not in ALLOWED_BUILDING_PART_VALUES:
                         parent.add_child(building_part)
 
 
@@ -251,7 +321,7 @@ def _process_building_parts(nodes_dict: Dict[int, op.Node],
                 continue
             if b_part.parent is None:  # i.e. there is no relation tagging in OSM
                 # exclude parts, which we do not want
-                if b_part.tags['building:part'] not in ALLOWED_BUiLDING_PART_VALUES:
+                if b_part.tags['building:part'] not in ALLOWED_BUILDING_PART_VALUES:
                     building_parts_to_remove.append(b_part.osm_id)
                     continue
                 if b_part.polygon is None or b_part.polygon.area < parameters.BUILDING_PART_MIN_AREA:
@@ -518,6 +588,10 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
     osm_nodes_dict.update(osm_read_results.rel_nodes_dict)  # just add all relevant nodes to have one dict of nodes
     osm_rel_ways_dict = osm_read_results.rel_ways_dict
 
+    # first make sure that buildings are as rectified as possible -> temporary buildings
+    _process_rectify_buildings(osm_nodes_dict, osm_read_results.rel_nodes_dict, osm_ways_dict, coords_transform)
+
+    # then create the actual building objects
     the_buildings = _process_osm_building(osm_nodes_dict, osm_ways_dict, coords_transform, stats)
     _process_osm_relations(osm_nodes_dict, osm_rel_ways_dict, osm_relations_dict, the_buildings, coords_transform,
                            stats)
@@ -616,7 +690,7 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
                 max_y = max(max_y, b.anchor.y)
             cluster_elev = (max_elevation - min_elevation) / 2 + min_elevation
             cluster_offset = v.Vec2d((max_x - min_x)/2 + min_x, (max_y - min_y)/2 + min_y)
-            center_global = v.Vec2d(coords_transform.to_global(cluster_offset))
+            center_global = v.Vec2d(coords_transform.to_global((cluster_offset.x, cluster_offset.y)))
             logging.debug("Cluster center -> elevation: %d, position: %s", cluster_elev, cluster_offset)
 
             file_name = replacement_prefix + "city" + str(handled_index) + "%02i%02i" % (cl.grid_index.ix,

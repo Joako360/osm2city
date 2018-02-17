@@ -748,12 +748,11 @@ class RectifyBlockedType(IntEnum):
 
 class RectifyNode(object):
     """Represents a OSM Node feature used for rectifying building angles."""
-    def __init__(self, osm_id: int, key_value_dict: KeyValueDict, original_point: Point) -> None:
+    def __init__(self, osm_id: int, local_x: float, local_y: float) -> None:
         self.osm_id = osm_id
-        self.key_value_dict = key_value_dict
-        self.x = original_point.x  # in local coordinates
+        self.x = local_x  # in local coordinates
         self.original_x = self.x  # should not get updated -> for reference/comparison
-        self.y = original_point.y
+        self.y = local_y
         self.original_y = self.y
         self.is_updated = False
         self.rectify_building_refs = list()  # osm_ids
@@ -784,10 +783,10 @@ class NodeInRectifyBuilding(object):
         self.blocked_types = list()  # list of RectifyBlockedType
 
     def within_rectify_deviation(self) -> bool:
-        return math.fabs(self.angle - 90) <= parameters.OWBB_RECTIFY_MAX_90_DEVIATION
+        return math.fabs(self.angle - 90) <= parameters.RECTIFY_MAX_90_DEVIATION
 
     def within_rectify_90_tolerance(self) -> bool:
-        return math.fabs(self.angle - 90) <= parameters.OWBB_RECTIFY_90_TOLERANCE
+        return math.fabs(self.angle - 90) <= parameters.RECTIFY_90_TOLERANCE
 
     def append_blocked_type(self, append_type: RectifyBlockedType) -> None:
         needs_append = True
@@ -855,7 +854,7 @@ class RectifyBuilding(object):
             if corner_node.within_rectify_90_tolerance():
                 corner_node.append_blocked_type(RectifyBlockedType.ninety_degrees)
             elif corner_node.within_rectify_deviation():
-                max_angle = 180 - 2 * parameters.OWBB_RECTIFY_MAX_90_DEVIATION
+                max_angle = 180 - 2 * parameters.RECTIFY_MAX_90_DEVIATION
                 if corner_node.prev_node.angle >= max_angle or corner_node.next_node.angle >= max_angle:
                     corner_node.append_blocked_type(RectifyBlockedType.corner_to_bow)
 
