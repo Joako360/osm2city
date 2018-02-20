@@ -21,6 +21,7 @@ import types
 
 import textures.road
 from utils import vec2d as v
+import utils.calc_tile as ct
 import utils.utilities as utils
 
 # default_args_start # DO NOT MODIFY THIS LINE
@@ -293,7 +294,7 @@ TEXTURES_EMPTY_LM_RGB_VALUE = 35
 
 # ==================== BUILD-ZONES GENERATION ============
 
-OWBB_GENERATE_LANDUSE = True  # from buildings outside of existing land-use zones
+OWBB_GENERATE_LANDUSE = False  # from buildings outside of existing land-use zones
 OWBB_GENERATE_LANDUSE_BUILDING_BUFFER_DISTANCE = 30
 OWBB_GENERATE_LANDUSE_BUILDING_BUFFER_DISTANCE_MAX = 50
 OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA = 5000  # also used for CORINE
@@ -311,6 +312,7 @@ OWBB_SPLIT_MADE_UP_LANDUSE_WATERWAY_BUFFER = 10  # meters
 
 # ==================== BUILDING GENERATION ============
 
+OWBB_GENERATE_BUILDINGS = False
 OWBB_STEP_DISTANCE = 2  # in meters
 OWBB_MIN_STREET_LENGTH = 10  # in meters
 
@@ -350,9 +352,7 @@ ALLOW_EMPTY_REGIONS = True
 ACCEPTED_REGIONS = ['DE', 'DK']
 
 
-
 # default_args_end # DO NOT MODIFY THIS LINE
-
 
 def get_output_path():
     if PATH_TO_OUTPUT:
@@ -375,6 +375,11 @@ def get_extent_global():
     cmin = v.Vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
     cmax = v.Vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
     return cmin, cmax
+
+
+def get_tile_index() -> int:
+    lon_lat = get_center_global()
+    return ct.calc_tile_index((lon_lat.lon, lon_lat.lat))
 
 
 def get_clipping_border():

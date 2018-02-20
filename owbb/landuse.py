@@ -232,84 +232,6 @@ def _merge_buffers(original_list: List[Polygon]) -> List[Polygon]:
     return handled_list
 
 
-def _process_osm_building_zone_refs(transformer: Transformation) -> List[m.BuildingZone]:
-    osm_result = op.fetch_osm_db_data_ways_keys([m.LANDUSE_KEY])
-    my_ways = list()
-    for way in list(osm_result.ways_dict.values()):
-        my_way = m.BuildingZone.create_from_way(way, osm_result.nodes_dict, transformer)
-        if my_way.is_valid():
-            my_ways.append(my_way)
-    logging.info("OSM land-uses found: %s", len(my_ways))
-    return my_ways
-
-
-def _process_osm_building_refs(transformer: Transformation) -> List[m.Building]:
-    osm_result = op.fetch_osm_db_data_ways_keys([m.BUILDING_KEY])
-    my_ways = list()
-    for way in list(osm_result.ways_dict.values()):
-        my_way = m.Building.create_from_way(way, osm_result.nodes_dict, transformer)
-        if my_way.is_valid():
-            my_ways.append(my_way)
-    logging.info("OSM buildings found: %s", len(my_ways))
-    return my_ways
-
-
-def _process_osm_railway_refs(transformer: Transformation) -> Dict[int, m.RailwayLine]:
-    # TODO: it must be possible to do this for highways and waterways abstract, as only logging, object
-    # and key is different
-    osm_result = op.fetch_osm_db_data_ways_keys([m.RAILWAY_KEY])
-    my_ways = dict()
-    for way in list(osm_result.ways_dict.values()):
-        my_way = m.RailwayLine.create_from_way(way, osm_result.nodes_dict, transformer)
-        if my_way.is_valid():
-            my_ways[my_way.osm_id] = my_way
-    logging.info("OSM railway lines found: %s", len(my_ways))
-    return my_ways
-
-
-def _process_osm_highway_refs(transformer: Transformation) -> Dict[int, m.Highway]:
-    osm_result = op.fetch_osm_db_data_ways_keys([m.HIGHWAY_KEY])
-    my_ways = dict()
-    for way in list(osm_result.ways_dict.values()):
-        my_way = m.Highway.create_from_way(way, osm_result.nodes_dict, transformer)
-        if my_way.is_valid():
-            my_ways[my_way.osm_id] = my_way
-    logging.info("OSM highways found: %s", len(my_ways))
-    return my_ways
-
-
-def _process_osm_waterway_refs(transformer: Transformation) -> Dict[int, m.Waterway]:
-    osm_result = op.fetch_osm_db_data_ways_keys([m.WATERWAY_KEY])
-    my_ways = dict()
-    for way in list(osm_result.ways_dict.values()):
-        my_way = m.Waterway.create_from_way(way, osm_result.nodes_dict, transformer)
-        if my_way.is_valid():
-            my_ways[my_way.osm_id] = my_way
-    logging.info("OSM waterways found: %s", len(my_ways))
-    return my_ways
-
-
-def _process_osm_place_refs(transformer: Transformation) -> List[m.Place]:
-    my_places = list()
-    # points
-    osm_nodes_dict = op.fetch_db_nodes_isolated([m.PLACE_KEY], list())
-    for key, node in osm_nodes_dict.items():
-        place = m.Place.create_from_node(node, transformer)
-        if place.is_valid():
-            my_places.append(place)
-    # areas
-    osm_way_result = op.fetch_osm_db_data_ways_keys([m.PLACE_KEY])
-    osm_nodes_dict = osm_way_result.nodes_dict
-    osm_ways_dict = osm_way_result.ways_dict
-    for key, way in osm_ways_dict.items():
-        place = m.Place.create_from_way(way, osm_nodes_dict, transformer)
-        if place.is_valid():
-            my_places.append(place)
-    logging.info("Number of valid places found: {}".format(len(my_places)))
-
-    return my_places
-
-
 def _process_btg_building_zones(transformer: Transformation) -> Tuple[List[m.BTGBuildingZone],
                                                                       List[m.BTGBuildingZone]]:
     """There is a need to do a local coordinate transformation, as BTG also has a local coordinate
@@ -318,7 +240,7 @@ def _process_btg_building_zones(transformer: Transformation) -> Tuple[List[m.BTG
     lon_lat = parameters.get_center_global()
     path_to_btg = ct.construct_path_to_files(parameters.PATH_TO_SCENERY, scenery_directory_name(SceneryType.terrain),
                                              (lon_lat.lon, lon_lat.lat))
-    tile_index = ct.calc_tile_index((lon_lat.lon, lon_lat.lat))
+    tile_index = parameters.get_tile_index()
     btg_file_name = os.path.join(path_to_btg, ct.construct_btg_file_name_from_tile_index(tile_index))
     btg_reader = btg.BTGReader(btg_file_name)
     logging.debug('Reading btg file: %s', btg_file_name)
@@ -383,12 +305,12 @@ def process(transformer: Transformation) -> None:
         last_time = time_logging("Time used in seconds for reading BTG zones", last_time)
 
     # =========== READ OSM DATA =============
-    building_zones = _process_osm_building_zone_refs(transformer)
-    places = _process_osm_place_refs(transformer)
-    osm_buildings = _process_osm_building_refs(transformer)
-    highways_dict = _process_osm_highway_refs(transformer)
-    railways_dict = _process_osm_railway_refs(transformer)
-    waterways_dict = _process_osm_waterway_refs(transformer)
+    building_zones = m.process_osm_building_zone_refs(transformer)
+    places = m.process_osm_place_refs(transformer)
+    osm_buildings = m.process_osm_building_refs(transformer)
+    highways_dict = m.process_osm_highway_refs(transformer)
+    railways_dict = m.process_osm_railway_refs(transformer)
+    waterways_dict = m.process_osm_waterway_refs(transformer)
 
     last_time = time_logging("Time used in seconds for parsing OSM data", last_time)
 

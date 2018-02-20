@@ -579,6 +579,7 @@ def _write_obstruction_lights(path: str, file_name: str,
 
 def process_buildings(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
                       blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
+                      generated_buildings: List[building_lib.Building],
                       file_lock: mp.Lock=None) -> None:
     random.seed(42)
     stats = utilities.Stats()
@@ -602,9 +603,8 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
 
     # for convenience change to list from dict
     the_buildings = list(the_buildings.values())
-
-    cmin, cmax = parameters.get_extent_global()
-    logging.info("min/max " + str(cmin) + " " + str(cmax))
+    # add generated buildings
+    the_buildings.extend(generated_buildings)
 
     if not the_buildings:
         logging.info("No buildings found in OSM data. Stopping further processing.")
@@ -617,6 +617,8 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
         textures.materials.screen_osm_keys_for_colour_material_variants(b.tags)
 
     # -- create (empty) clusters
+    cmin, cmax = parameters.get_extent_global()
+    logging.info("min/max " + str(cmin) + " " + str(cmax))
     lmin = v.Vec2d(coords_transform.to_local(cmin))
     lmax = v.Vec2d(coords_transform.to_local(cmax))
 

@@ -13,6 +13,7 @@ import unittest
 
 import buildings
 import owbb.landuse as ol
+import owbb.would_be_buildings as ow
 import piers
 import platforms
 import pylons
@@ -138,7 +139,11 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
 
             # run programs
             if exec_argument in [Procedures.buildings, Procedures.main, Procedures.all]:
-                buildings.process_buildings(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries, file_lock)
+                generated_buildings = list()
+                if parameters.OWBB_GENERATE_BUILDINGS:
+                    generated_buildings = ow.process(the_coords_transform)
+                buildings.process_buildings(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries,
+                                            generated_buildings, file_lock)
             if exec_argument in [Procedures.roads, Procedures.main, Procedures.all]:
                 roads.process_roads(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries, file_lock)
             if exec_argument in [Procedures.pylons, Procedures.main, Procedures.all]:

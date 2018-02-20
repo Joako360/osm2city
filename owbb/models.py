@@ -9,11 +9,12 @@ import abc
 from enum import IntEnum, unique
 import logging
 import math
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 
 from shapely.geometry import box, Point, LineString, Polygon, MultiPolygon
 import shapely.affinity as saf
 
+import building_lib
 import parameters
 import utils.osmparser as op
 import utils.coordinates as co
@@ -433,6 +434,66 @@ class GeneratedBuildingZone(BuildingZone):
         self.type_ = guessed_type
 
 
+@unique
+class OpenSpaceType(IntEnum):
+    default = 10
+    landuse = 20
+    amenity = 30
+    leisure = 40
+    natural = 50
+    transport = 60
+    pedestrian = 70
+
+
+class OpenSpace(OSMFeatureArea):
+    """Different OSM map features representing an open space, where no building can be placed.
+    It is important to keep parsing of these tags in synch (i.e. opposite) with the other parsed OSM map features.
+    """
+    # must be in line with method parse_tags
+    REQUESTED_TAGS = ['public_transport', 'railway', 'amenity', 'leisure', 'natural', 'highway']
+
+    def __init__(self, osm_id: int, geometry: MPoly, feature_type: Union[None, OpenSpaceType]) -> None:
+        super().__init__(osm_id, geometry, feature_type)
+
+    @classmethod
+    def create_from_way(cls, way: op.Way, nodes_dict: Dict[int, op.Node],
+                        my_coord_transformator: co.Transformation) -> Union[None, 'OpenSpace']:
+        my_geometry = way.polygon_from_osm_way(nodes_dict, my_coord_transformator)
+        feature_type = cls.parse_tags(way.tags)
+        if None is feature_type:
+            return None
+        obj = OpenSpace(way.osm_id, my_geometry, feature_type)
+        return obj
+
+    @staticmethod
+    def parse_tags(tags_dict: KeyValueDict) -> Union[OpenSpaceType, None]:
+        if Building.parse_tags(tags_dict) is not None:
+            return None
+        elif "public_transport" in tags_dict:
+            return OpenSpaceType.transport
+        elif ("railway" in tags_dict) and (tags_dict["railway"] == "station"):
+            return OpenSpaceType.transport
+        elif LANDUSE_KEY in tags_dict:  # must be in sync with BuildingZone
+            if tags_dict[LANDUSE_KEY] == "railway":
+                return OpenSpaceType.transport
+            elif BuildingZone.is_building_zone_value(tags_dict[LANDUSE_KEY]):
+                return None
+            else:
+                return OpenSpaceType.landuse
+        elif "amenity" in tags_dict:
+            if tags_dict["amenity"] in ["grave_yard", "parking"]:
+                return OpenSpaceType.amenity
+        elif "leisure" in tags_dict:
+            return OpenSpaceType.leisure
+        elif "natural" in tags_dict:
+            return OpenSpaceType.natural
+        elif "highway" in tags_dict:
+            if tags_dict["highway"] == "pedestrian":
+                if ("area" in tags_dict) and (tags_dict["area"] == "yes"):
+                    return OpenSpaceType.pedestrian
+        return None
+
+
 class OSMFeatureLinear(OSMFeature):
     def __init__(self, osm_id: int, geometry: LineString, tags_dict: KeyValueDict) -> None:
         feature_type = self.parse_tags(tags_dict)
@@ -705,7 +766,7 @@ class Highway(OSMFeatureLinearWithTunnel):
 
     def is_sideway(self) -> bool:
         """Not a main street in an urban area. I.e. residential, walking or service"""
-        return self.type_ > HighwayType.road
+        return self.type_ < HighwayType.road
 
     def populate_buildings_along(self) -> bool:
         """The type of highway determines where buildings are built. E.g. motorway would be false"""
@@ -745,7 +806,7 @@ class BuildingModel(object):
 
     Tags contains e.g. roof type, number of levels etc. according to OSM tagging."""
 
-    def __init__(self, width: float, depth: float, model_type: BuildingType, regions: List[str], model: str,
+    def __init__(self, width: float, depth: float, model_type: BuildingType, regions: List[str], model: Optional[str],
                  facade_id: int, roof_id: int, tags: KeyValueDict) -> None:
         self.width = width  # if you look at the building from its front, then you see the width between the sides
         self.depth = depth  # from the front to the back
@@ -862,7 +923,10 @@ class SharedModel(object):
 
 
 class SharedModelsLibrary(object):
-    def __init__(self, building_models):
+
+    INDUSTRIAL_LARGE_MIN_AREA = 500  # FIXME: should be a parameter
+
+    def __init__(self, building_models: List[BuildingModel]):
         self._residential_detached = list()
         self._residential_terraces = list()
         self._industrial_buildings_large = list()
@@ -898,7 +962,7 @@ class SharedModelsLibrary(object):
                 self._residential_terraces.append(my_model)
             elif building_model.model_type is BuildingType.industrial:
                 my_model = SharedModel(building_model, BuildingType.industrial)
-                if building_model.area > 500:  # FIXME: should be parameter
+                if building_model.area > self.INDUSTRIAL_LARGE_MIN_AREA:
                     self._industrial_buildings_large.append(my_model)
                 else:
                     self._industrial_buildings_small.append(my_model)
@@ -917,6 +981,8 @@ class SharedModelsLibrary(object):
             logging.warning("No small industrial buildings found")
             return False
         return True
+
+
 class GenBuilding(object):
     """An object representing a generated non-OSM building"""
     def __init__(self, gen_id: int, shared_model: SharedModel, highway_width: float) -> None:
@@ -933,7 +999,7 @@ class GenBuilding(object):
         self.angle = 0  # the angle in degrees from North (y-axis) in the local coordinate system for the building's
                         # static object local x-axis
 
-    def _create_area_polygons(self, highway_width:float) -> None:
+    def _create_area_polygons(self, highway_width: float) -> None:
         """Creates polygons at (0,0) and no angle"""
         buffer_front = self.shared_model.front_buffer
         min_buffer_front = self.shared_model.min_front_buffer
@@ -970,6 +1036,16 @@ class GenBuilding(object):
         my_angle = math.radians(angle+90)  # angle plus 90 because the angle is along the street, not square from street
         self.x = point_on_line.x + self.distance_to_street*math.sin(my_angle)
         self.y = point_on_line.y + self.distance_to_street*math.cos(my_angle)
+
+    def create_building_lib_building(self) -> building_lib.Building:
+        """Creates a building_lib building to be used in actually creating the FG scenery object"""
+        floor_plan = box(-1 * self.shared_model.width / 2, -1 * self.shared_model.depth / 2,
+                         self.shared_model.width / 2, self.shared_model.depth / 2)
+        rotated = saf.rotate(floor_plan, -1 * self.angle, origin=(0, 0))
+        moved = saf.translate(rotated, self.x, self.y)
+        my_building = building_lib.Building(self.gen_id, self.shared_model.building_model.tags,
+                                            moved.exterior, '')
+        return my_building
 
 
 class TempGenBuildings(object):
@@ -1033,3 +1109,92 @@ class TempGenBuildings(object):
         if my_share > 0 and (count_temp_generated / my_share) >= min_share:
             return True
         return False
+
+
+def process_osm_building_zone_refs(transformer: co.Transformation) -> List[BuildingZone]:
+    osm_result = op.fetch_osm_db_data_ways_keys([LANDUSE_KEY])
+    my_ways = list()
+    for way in list(osm_result.ways_dict.values()):
+        my_way = BuildingZone.create_from_way(way, osm_result.nodes_dict, transformer)
+        if my_way.is_valid():
+            my_ways.append(my_way)
+    logging.info("OSM land-uses found: %s", len(my_ways))
+    return my_ways
+
+
+def process_osm_building_refs(transformer: co.Transformation) -> List[Building]:
+    osm_result = op.fetch_osm_db_data_ways_keys([BUILDING_KEY])
+    my_ways = list()
+    for way in list(osm_result.ways_dict.values()):
+        my_way = Building.create_from_way(way, osm_result.nodes_dict, transformer)
+        if my_way.is_valid():
+            my_ways.append(my_way)
+    logging.info("OSM buildings found: %s", len(my_ways))
+    return my_ways
+
+
+def process_osm_open_space_refs(transformer: co.Transformation) -> Dict[int, OpenSpace]:
+    osm_result = op.fetch_osm_db_data_ways_keys(OpenSpace.REQUESTED_TAGS)
+    my_ways = dict()
+    for way in list(osm_result.ways_dict.values()):
+        my_way = OpenSpace.create_from_way(way, osm_result.nodes_dict, transformer)
+        if my_way is not None and my_way.is_valid():
+            my_ways[my_way.osm_id] = my_way
+    logging.info("OSM open spaces found: %s", len(my_ways))
+    return my_ways
+
+
+def process_osm_railway_refs(transformer: co.Transformation) -> Dict[int, RailwayLine]:
+    # TODO: it must be possible to do this for highways and waterways abstract, as only logging, object
+    # and key is different
+    osm_result = op.fetch_osm_db_data_ways_keys([RAILWAY_KEY])
+    my_ways = dict()
+    for way in list(osm_result.ways_dict.values()):
+        my_way = RailwayLine.create_from_way(way, osm_result.nodes_dict, transformer)
+        if my_way.is_valid():
+            my_ways[my_way.osm_id] = my_way
+    logging.info("OSM railway lines found: %s", len(my_ways))
+    return my_ways
+
+
+def process_osm_highway_refs(transformer: co.Transformation) -> Dict[int, Highway]:
+    osm_result = op.fetch_osm_db_data_ways_keys([HIGHWAY_KEY])
+    my_ways = dict()
+    for way in list(osm_result.ways_dict.values()):
+        my_way = Highway.create_from_way(way, osm_result.nodes_dict, transformer)
+        if my_way.is_valid():
+            my_ways[my_way.osm_id] = my_way
+    logging.info("OSM highways found: %s", len(my_ways))
+    return my_ways
+
+
+def process_osm_waterway_refs(transformer: co.Transformation) -> Dict[int, Waterway]:
+    osm_result = op.fetch_osm_db_data_ways_keys([WATERWAY_KEY])
+    my_ways = dict()
+    for way in list(osm_result.ways_dict.values()):
+        my_way = Waterway.create_from_way(way, osm_result.nodes_dict, transformer)
+        if my_way.is_valid():
+            my_ways[my_way.osm_id] = my_way
+    logging.info("OSM waterways found: %s", len(my_ways))
+    return my_ways
+
+
+def process_osm_place_refs(transformer: co.Transformation) -> List[Place]:
+    my_places = list()
+    # points
+    osm_nodes_dict = op.fetch_db_nodes_isolated([PLACE_KEY], list())
+    for key, node in osm_nodes_dict.items():
+        place = Place.create_from_node(node, transformer)
+        if place.is_valid():
+            my_places.append(place)
+    # areas
+    osm_way_result = op.fetch_osm_db_data_ways_keys([PLACE_KEY])
+    osm_nodes_dict = osm_way_result.nodes_dict
+    osm_ways_dict = osm_way_result.ways_dict
+    for key, way in osm_ways_dict.items():
+        place = Place.create_from_way(way, osm_nodes_dict, transformer)
+        if place.is_valid():
+            my_places.append(place)
+    logging.info("Number of valid places found: {}".format(len(my_places)))
+
+    return my_places

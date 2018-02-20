@@ -14,6 +14,7 @@ from shapely.geometry import MultiPolygon, Polygon
 
 from owbb import models as m
 import building_lib as bl
+import parameters
 
 
 def _create_a3_landscape_figure() -> mfig.Figure:
@@ -27,7 +28,8 @@ def _create_a4_landscape_figure() -> mfig.Figure:
 def _create_pdf_pages(title_part: str) -> PdfPages:
     today = datetime.datetime.now()
     date_string = today.strftime("%Y-%m-%d_%H%M")
-    return PdfPages("osm2city_debug_{0}_{1}.pdf".format(title_part, date_string))
+    tile_index_str = str(parameters.get_tile_index())
+    return PdfPages("osm2city_debug_{0}_{1}_{2}.pdf".format(title_part, tile_index_str, date_string))
 
 
 def _plot_line(ax: maxs.Axes, ob, my_color, my_width) -> None:
