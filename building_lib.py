@@ -785,15 +785,16 @@ class Building(object):
 
         number_prev_ring_nodes = 0
         number_prev_ring_nodes += self._write_faces_for_ac(ac_object, self.polygon.exterior,
-                                                          index_first_node_in_ac_obj, number_prev_ring_nodes,
-                                                          face_mat_idx)
+                                                           index_first_node_in_ac_obj, number_prev_ring_nodes,
+                                                           face_mat_idx)
 
         for inner in self.polygon.interiors:
             number_prev_ring_nodes += self._write_faces_for_ac(ac_object, inner,
-                                                             index_first_node_in_ac_obj, number_prev_ring_nodes,
-                                                             face_mat_idx)
+                                                               index_first_node_in_ac_obj, number_prev_ring_nodes,
+                                                               face_mat_idx)
 
-        self._write_roof_for_ac(ac_object, index_first_node_in_ac_obj, roof_mgr, roof_mat_idx, cluster_offset, stats)
+        self._write_roof_for_ac(ac_object, index_first_node_in_ac_obj, roof_mgr, roof_mat_idx, face_mat_idx,
+                                cluster_offset, stats)
 
     def _write_vertices_for_ac(self, ac_object: ac3d.Object) -> None:
         """Write the vertices for each node along bottom and roof edges to the ac3d object."""
@@ -872,7 +873,8 @@ class Building(object):
         return number_ring_nodes
 
     def _write_roof_for_ac(self, ac_object: ac3d.Object, index_first_node_in_ac_obj: int, roof_mgr: tex.RoofManager,
-                           roof_mat_idx: int, cluster_offset: Vec2d, stats: utilities.Stats) -> None:
+                           roof_mat_idx: int, facade_mat_idx: int,
+                           cluster_offset: Vec2d, stats: utilities.Stats) -> None:
         """Writes the roof vertices and faces to an ac3d object."""
         if self.roof_shape is RoofShape.flat:
             roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, roof_mat_idx, stats)
@@ -897,7 +899,7 @@ class Building(object):
             # -- pitched roof for exactly 4 ground nodes
             elif self.pts_all_count == 4:
                 if self.roof_shape is RoofShape.gabled:
-                    roofs.separate_gable(ac_object, self, roof_mat_idx)
+                    roofs.separate_gable(ac_object, self, roof_mat_idx, facade_mat_idx)
                 elif self.roof_shape is RoofShape.hipped:
                     roofs.separate_hipped(ac_object, self, roof_mat_idx)
                 elif self.roof_shape is RoofShape.pyramidal:

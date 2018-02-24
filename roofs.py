@@ -5,6 +5,7 @@ from typing import List
 
 import numpy as np
 
+import parameters
 import utils.ac3d as ac
 from utils.utilities import Stats
 from textures.texture import Texture, RoofManager
@@ -65,10 +66,10 @@ def flat(ac_object: ac.Object, index_first_node_in_ac_obj: int, b, roof_mgr: Roo
 
 
 def separate_hipped(ac_object: ac.Object, b, roof_mat_idx: int) -> None:
-    return separate_gable(ac_object, b, roof_mat_idx, inward_meters=3.)
+    return separate_gable(ac_object, b, roof_mat_idx, roof_mat_idx, inward_meters=3.)
 
 
-def separate_gable(ac_object, b, roof_mat_idx: int, inward_meters=0.) -> None:
+def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_meters=0.) -> None:
     """gable roof, 4 nodes, separate model. Inward_"""
     # -- pitched roof for 4 ground nodes
     t = b.roof_texture
@@ -135,6 +136,7 @@ def separate_gable(ac_object, b, roof_mat_idx: int, inward_meters=0.) -> None:
     len_roof_hypo = ((0.5*b.edge_length_pts[ind_X[1]])**2 + roof_height**2)**0.5
     repeat_y = len_roof_hypo / roof_texture_size_y
 
+    # roofs
     ac_object.face([(o + 0, t.x(0), t.y(0)),
                     (o + 1, t.x(repeat_x), t.y(0)),
                     (o + 5, t.x(repeat_x*(1-inward_meters/len_roof_bottom)), t.y(repeat_y)),
@@ -147,19 +149,27 @@ def separate_gable(ac_object, b, roof_mat_idx: int, inward_meters=0.) -> None:
                     (o + 5, t.x(repeat_x*(inward_meters/len_roof_bottom)), t.y(repeat_y))],
                    mat_idx=roof_mat_idx)
 
-    repeat_x = b.edge_length_pts[ind_X[1]]/roof_texture_size_x
+    # sides if inward_meters = 0, else inward roofs for hipped
     len_roof_hypo = (inward_meters**2 + roof_height**2)**0.5
     repeat_y = len_roof_hypo/roof_texture_size_y
+    if parameters.FLAG_2018_2 and inward_meters == 0.:
+        repeat_y = 0
+
+    repeat_x = b.edge_length_pts[ind_X[1]]/roof_texture_size_x
+    if parameters.FLAG_2018_2 and inward_meters == 0.:
+        repeat_x = 0
     ac_object.face([(o + 1, t.x(0), t.y(0)),
                     (o + 2, t.x(repeat_x), t.y(0)),
                     (o + 5, t.x(0.5*repeat_x), t.y(repeat_y))],
-                   mat_idx=roof_mat_idx)
+                   mat_idx=facade_mat_idx)
 
     repeat_x = b.edge_length_pts[ind_X[3]]/roof_texture_size_x
+    if parameters.FLAG_2018_2 and inward_meters == 0.:
+        repeat_x = 0
     ac_object.face([(o + 3, t.x(0), t.y(0)),
                     (o + 0, t.x(repeat_x), t.y(0)),
                     (o + 4, t.x(0.5*repeat_x), t.y(repeat_y))],
-                   mat_idx=roof_mat_idx)
+                   mat_idx=facade_mat_idx)
 
 
 def separate_pyramidal(ac_object: ac.Object, b, roof_mat_idx: int, inward_meters=0.0) -> None:
