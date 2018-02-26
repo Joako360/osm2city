@@ -83,7 +83,6 @@ import random
 from typing import Dict, List, MutableMapping, Optional, Tuple
 import unittest
 
-import graph
 import matplotlib.pyplot as plt
 import numpy as np
 import shapely.geometry as shg
@@ -94,7 +93,7 @@ import linear_bridge
 import parameters
 import textures.road
 import utils.osmparser as op
-from utils import coordinates, ac3d, stg_io2, utilities, landuse
+from utils import coordinates, ac3d, stg_io2, utilities, landuse, graph
 from utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
@@ -1011,7 +1010,7 @@ class Roads(object):
                 logging.warning("skipping OSM_ID %i: %s" % (the_way.osm_id, reason))
                 continue
 
-            self.G.add_edge(obj)
+            self.G.add_linear_object_edge(obj)
 
     def _split_ways_at_inner_junctions(self, attached_ways_dict: Dict[int, List[Tuple[op.Way, int]]]) -> None:
         """Split ways such that none of the interior nodes are junctions to other ways.

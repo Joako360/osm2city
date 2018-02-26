@@ -6,7 +6,7 @@ graph support stuff
 import networkx as nx
 
 
-def for_edges_in_bfs_call(func, args, G, node0_set, visited_set):
+def for_edges_in_bfs_call(func, args, graph, node0_set, visited_set):
     """Start at nodes in node0_set. Breadth-first search, excluding nodes 
        in visited_set. 
        For each edge, call func(node0, node1, args). 
@@ -16,7 +16,7 @@ def for_edges_in_bfs_call(func, args, G, node0_set, visited_set):
         # get neighbors not visited        
         next_nodes = {}
         for node0 in node0_set:
-            neighbours = [n for n in nx.all_neighbors(G, node0) if n not in visited_set]
+            neighbours = [n for n in nx.all_neighbors(graph, node0) if n not in visited_set]
             next_nodes[node0] = neighbours
         
         node0_set = set()
@@ -30,7 +30,7 @@ def for_edges_in_bfs_call(func, args, G, node0_set, visited_set):
 
 
 class Stub(object):
-    def __init__(self, attached_way, is_first, joint_nodes=[]):
+    def __init__(self, attached_way, is_first, joint_nodes=list()):
         self.attached_way = attached_way
         self.is_first = is_first
         self.joint_nodes = joint_nodes
@@ -51,10 +51,13 @@ class Junction(object):
                junction.attached_ways
     - 
     """
-    def __init__(self, way, is_first, joint_nodes=[]):
+    def __init__(self, way, is_first, joint_nodes=list()):
         self._attached_ways = [way]
         self._is_first = [is_first]
         self.joint_nodes = joint_nodes  # list of tuples -- unused?
+        self._left_node = None
+        self._right_node = None
+        self._cluster_ref = None
         self.reset()
         
     def reset(self):
@@ -90,11 +93,11 @@ class Junction(object):
         """We also store cluster reference to avoid using nodes from other clusters"""
         self._cluster_ref = cluster_ref
         if self._use_left_node(way, is_left):
-            if self._left_node != None:
+            if self._left_node is not None:
                 raise ValueError("other node already set")
             self._left_node = node
         else:
-            if self._right_node != None:
+            if self._right_node is not None:
                 raise ValueError("other node already set")
             self._right_node = node
 
@@ -105,17 +108,13 @@ class Graph(nx.Graph):
         """return object attached to node"""
         return self.node[the_ref]['obj']
 
-    def add_node(self, the_ref, obj):
-        super().add_node(the_ref, obj=obj)
-        
-    def add_edge(self, way):
+    def add_linear_object_edge(self, way):
         ref0 = way.refs[0]
         ref1 = way.refs[-1]
         try:
             junction0 = self.junction(ref0)
             junction0.append_way(way, is_first = True)
         except KeyError:
-            #assert(the_ref1 == the_way.refs[0] and the_ref2 == the_way.refs[-1] )
             junction0 = Junction(way, is_first=True) # IS_FIRST
             super().add_node(ref0, obj=junction0)
 
@@ -123,7 +122,6 @@ class Graph(nx.Graph):
             junction1 = self.junction(ref1)
             junction1.append_way(way, is_first = False)
         except KeyError:
-            #assert(the_ref1 == the_way.refs[0] and the_ref2 == the_way.refs[-1] )
             junction1 = Junction(way, is_first=False)
             super().add_node(ref1, obj=junction1)
             
@@ -132,6 +130,9 @@ class Graph(nx.Graph):
         way.junction0 = junction0
         way.junction1 = junction1
 
-#        for the_way in source_iterable:
-#            self.G.add_edge(the_way.refs[0], the_way.refs[-1], obj=the_way)
 
+if __name__ == '__main__':
+    my_graph = nx.Graph()
+    my_graph.add_edges_from([(1, 2), (1, 3), (1, 4), (2, 3), (3, 4), (2, 6), (4, 6), (8, 7), (8, 9), (9, 7)])
+    cycles = nx.cycle_basis(my_graph) # -> list of list of nodes
+    foo = 1

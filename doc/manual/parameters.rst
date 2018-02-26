@@ -449,6 +449,10 @@ MAX_SLOPE_ROAD, MAX_SLOPE_*                     Decimal    0.08      The maximum
 USE_TRAM_LINE                                   Boolean    False     Often tram lines are on top of existing roads or between. This can lead to
                                                                      roads being (partially) hidden etc.
 
+BUILT_UP_AREA_LIT_BUFFER                        Integer    50        The buffer around built-up land-use areas to be used for lighting of streets
+BUILT_UP_AREA_LIT_HOLES_MIN_AREA                Integer    100000    The minimum area a hole in a LIT_BUFFER needs to have, such that it is not
+                                                                     considered for lighting.
+
 =============================================   ========   =======   ==============================================================================
 
 With residuals:

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import datetime
 import random
-from typing import List
+from typing import Dict, List
 
 from descartes import PolygonPatch
 from matplotlib import axes as maxs
@@ -134,6 +134,13 @@ def _draw_btg_building_zones(btg_building_zones, ax: maxs.Axes) -> None:
         ax.add_patch(patch)
 
 
+def _draw_lit_areas(lit_areas: List[Polygon], ax: maxs.Axes) -> None:
+    for item in lit_areas:
+        my_color = "cyan"
+        patch = PolygonPatch(item, facecolor=my_color, edgecolor="black")
+        ax.add_patch(patch)
+
+
 def _draw_background_zones(building_zones, ax: maxs.Axes) -> None:
     for building_zone in building_zones:
         my_color = "lightgray"
@@ -210,7 +217,9 @@ def draw_buildings(buildings, building_zones, bounds) -> None:
     pdf_pages.close()
 
 
-def draw_zones(highways_dict, buildings, building_zones, btg_building_zones, bounds) -> None:
+def draw_zones(highways_dict: Dict[int, m.Highway], buildings: List[m.Building],
+               building_zones: List[m.BuildingZone], btg_building_zones, lit_areas: List[Polygon],
+               bounds: m.Bounds) -> None:
     pdf_pages = _create_pdf_pages("landuse")
 
     # OSM building zones original
@@ -236,6 +245,16 @@ def draw_zones(highways_dict, buildings, building_zones, btg_building_zones, bou
         _draw_buildings(buildings, ax)
         _set_ax_limits_from_bounds(ax, bounds)
         pdf_pages.savefig(my_figure)
+
+    # Lit areas
+    my_figure = _create_a3_landscape_figure()
+    my_figure.suptitle("Lit areas from building zones")
+    ax = my_figure.add_subplot(111)
+    ax.grid(True, linewidth=1, linestyle="--", color="silver")
+    _draw_lit_areas(lit_areas, ax)
+    _draw_highways(highways_dict, ax)
+    _set_ax_limits_from_bounds(ax, bounds)
+    pdf_pages.savefig(my_figure)
 
     # All land-use
     my_figure = _create_a3_landscape_figure()
