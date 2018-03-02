@@ -307,18 +307,7 @@ class BTGReader(object):
         lon_rad, lat_rad, elev = coord.cart_to_geod(self.gbs_center)
         lon_deg = math.degrees(lon_rad)
         lat_deg = math.degrees(lat_rad)
-        logging.debug('GBS center: lon = %d, lat = %d', lon_deg, lat_deg)
-        quaternion_first = coord.quaternion_from_lon_lat_radian(lon_rad, lat_rad)
-        quaternion_other = coord.quaternion_from_euler_radian(0.0, 0.0, math.pi)
-        hlOr = coord.Quaternion.multiply(quaternion_first, quaternion_other)
-        coord.transform_to_rotated_coordinate_frame(hlOr, self.vertices)
-
-        for vertex in self.vertices:
-            vertex.add(self.gbs_center)
-            lon_rad, lat_rad, elev = coord.cart_to_geod(vertex)
-            vertex.x = math.degrees(lon_rad)
-            vertex.y = math.degrees(lat_rad)
-            vertex.z = elev
+        logging.debug('GBS center: lon = %f, lat = %f', lon_deg, lat_deg)
 
         logging.info('Parsed %i vertices and found the following materials:', len(self.vertices))
         for key, faces_list in self.faces.items():

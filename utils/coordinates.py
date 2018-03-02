@@ -84,6 +84,10 @@ class Transformation(object):
         self._lat = lat
         self._update()
 
+    @property
+    def cos_lat_factor(self) -> float:
+        return self._coslat
+
     def _update(self):
         """compute radii for local origin"""
         f = 1. / FLATTENING

@@ -8,7 +8,8 @@ import os.path
 import time
 from typing import List, Tuple
 
-from shapely.geometry import MultiPolygon, Polygon
+import shapely.affinity as saf
+from shapely.geometry import MultiPolygon, Point, Polygon
 from shapely.ops import unary_union
 
 import parameters
@@ -178,10 +179,33 @@ def _process_btg_building_zones(transformer: Transformation) -> Tuple[List[m.BTG
                                              (lon_lat.lon, lon_lat.lat))
     tile_index = parameters.get_tile_index()
     btg_file_name = os.path.join(path_to_btg, ct.construct_btg_file_name_from_tile_index(tile_index))
-    btg_reader = btg.BTGReader(btg_file_name)
     logging.debug('Reading btg file: %s', btg_file_name)
+    btg_reader = btg.BTGReader(btg_file_name)
     btg_zones = list()
     vertices = btg_reader.vertices
+    v_max_x = 0
+    v_max_y = 0
+    v_max_z = 0
+    v_min_x = 0
+    v_min_y = 0
+    v_min_z = 0
+    for vertex in vertices:
+        if vertex.x >= 0:
+            v_max_x = max(v_max_x, vertex.x)
+        else:
+            v_min_x = min(v_min_x, vertex.x)
+        if vertex.y >= 0:
+            v_max_y = max(v_max_y, vertex.y)
+        else:
+            v_min_y = min(v_min_y, vertex.y)
+        if vertex.z >= 0:
+            v_max_z = max(v_max_z, vertex.z)
+        else:
+            v_min_z = min(v_min_z, vertex.z)
+        rotated_point = saf.rotate(Point(vertex.x, vertex.y), 90, (0, 0))
+        vertex.x = rotated_point.x * transformer.cos_lat_factor
+        vertex.y = rotated_point.y / transformer.cos_lat_factor
+
     btg_lon, btg_lat = btg_reader.gbs_lon_lat
     btg_x, btg_y = transformer.to_local((btg_lon, btg_lat))
     logging.debug('Difference between BTG and transformer: x = %d, y = %d', btg_x, btg_y)
@@ -189,7 +213,10 @@ def _process_btg_building_zones(transformer: Transformation) -> Tuple[List[m.BTG
     min_x, min_y = transformer.to_local((parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH))
     max_x, max_y = transformer.to_local((parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH))
     bounds = (min_x, min_y, max_x, max_y)
+
     disjoint = 0
+    accepted = 0
+    counter = 0
 
     for key, faces_list in btg_reader.faces.items():
         if key != btg.WATER_PROXY:
@@ -203,15 +230,11 @@ def _process_btg_building_zones(transformer: Transformation) -> Tuple[List[m.BTG
             if type_ is None:
                 raise Exception('Unknown BTG material: {}. Most probably a programming mismatch.'.format(key))
             # create building zones
-            counter = 0
             for face in faces_list:
+                counter += 1
                 v0 = vertices[face.vertices[0]]
                 v1 = vertices[face.vertices[1]]
                 v2 = vertices[face.vertices[2]]
-                # translate to local coordinate system
-                v0.to_local(transformer)
-                v1.to_local(transformer)
-                v2.to_local(transformer)
                 # create the triangle polygon
                 my_geometry = Polygon([(v0.x - btg_x, v0.y - btg_y), (v1.x - btg_x, v1.y - btg_y),
                                        (v2.x - btg_x, v2.y - btg_y), (v0.x - btg_x, v0.y - btg_y)])
@@ -219,15 +242,25 @@ def _process_btg_building_zones(transformer: Transformation) -> Tuple[List[m.BTG
                     clean = my_geometry.buffer(0)  # cf. http://toblerity.org/shapely/manual.html#constructive-methods
                     if clean.is_valid:
                         my_geometry = clean  # it is now a Polygon or a MultiPolygon
+                    else:  # lets try with a different sequence of points
+                        my_geometry = Polygon([(v0.x - btg_x, v0.y - btg_y), (v2.x - btg_x, v2.y - btg_y),
+                                               (v1.x - btg_x, v1.y - btg_y), (v0.x - btg_x, v0.y - btg_y)])
+                        if not my_geometry.is_valid:
+                            clean = my_geometry.buffer(0)
+                            if clean.is_valid:
+                                my_geometry = clean
                 if my_geometry.is_valid and not my_geometry.is_empty:
                     if not disjoint_bounds(bounds, my_geometry.bounds):
                         my_zone = m.BTGBuildingZone(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse),
                                                     type_, my_geometry)
-                        if counter < 10:
-                            btg_zones.append(my_zone)
-                            counter += 1
+                        btg_zones.append(my_zone)
+                        accepted += 1
                     else:
                         disjoint += 1
+                else:
+                    foo = 1  # FIXME
+    logging.debug('Out of %i faces %i were disjoint and %i were accepted with the bounds.',
+                  counter, disjoint, accepted)
     return btg_zones, btg_reader.faces[btg.WATER_PROXY]
 
 

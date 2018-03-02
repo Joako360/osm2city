@@ -99,14 +99,14 @@ def calc_tile_location(tile_index: int) -> Tuple[Tuple[float, float], Tuple[floa
 
 
 def log_tile_info(tile_index: int) -> None:
-    """logs information about the til to logging.debug."""
+    """logs information about the tile to logging.debug."""
     (lon, lat), (x, y) = calc_tile_location(tile_index)
     center_lat = lat + y / 8.0 + 0.0625
     center_lon = bucket_span(center_lat)
     if center_lon >= 1.0:
         center_lon = lon + center_lon / 2.0
     else:
-        center_lon = lon + x * center_lon * center_lon / 2.0
+        center_lon = lon + x * center_lon + center_lon / 2.0
 
     tile_info = 'Tile location: {}; lon: {}, lat: {}; x: {}, y: {}; tile span degrees: {}; center lon/lat: {}/{}.'
     logging.debug(tile_info.format(tile_index, lon, lat, x, y, bucket_span(lat), center_lon, center_lat))
