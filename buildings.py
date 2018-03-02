@@ -705,8 +705,6 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
             path_to_stg = stg_manager.add_object_static(file_name + '.ac', center_global, cluster_elev, 0,
                                                         my_clusters.stg_verb_type)
 
-            stg_manager.add_object_static('lightmap-switch.xml', center_global, cluster_elev, 0, once=True)
-
             # -- write .ac and .xml
             building_lib.write(os.path.join(path_to_stg, file_name + ".ac"), cl.objects,
                                cluster_elev, cluster_offset, prepare_textures.roofs, stats)

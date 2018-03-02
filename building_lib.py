@@ -1244,8 +1244,8 @@ def write(ac_file_name: str, buildings: List[Building], cluster_elev: float, clu
     for ib, b in enumerate(buildings):
         utilities.progress(ib, len(buildings))
         ac_object = lod_objects[b.LOD]
-        face_mat_idx = 0
-        roof_mat_idx = 0
+        face_mat_idx = 1  # needs to correspond with with a material that has r, g, b = 1.0
+        roof_mat_idx = 1  # ditto
         if parameters.FLAG_2018_2:
             face_mat_idx = colours[b.tags['building:colour']]
             roof_mat_idx = colours[b.tags['roof:colour']]
