@@ -150,6 +150,3 @@ def _process_osm_building_refs(my_coord_transformator: Transformation) -> List[s
                     if my_polygon.is_valid and not my_polygon.is_empty:
                         my_buildings.append(my_polygon.convex_hull)
     return my_buildings
-
-
-

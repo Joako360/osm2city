@@ -9,7 +9,7 @@ import abc
 from enum import IntEnum, unique
 import logging
 import math
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 from shapely.geometry import box, Point, LineString, Polygon, MultiPolygon
 import shapely.affinity as saf
@@ -314,6 +314,14 @@ class BuildingZoneType(IntEnum):  # element names must match OSM values apart fr
     btg_port = 223
 
 
+class CityBlock():
+    """A special land-use derived from many kinds of land-use info and enclosed by streets (kind of)."""
+    def __init__(self, osm_id: int, geometry: Polygon, feature_type: Union[None, BuildingZoneType]) -> None:
+        self.osm_id = osm_id
+        self.geometry = geometry
+        self.building_zone_type = feature_type
+
+
 class BuildingZone(OSMFeatureArea):
     """ A 'Landuse' OSM map feature
     A Landuse can either be of element type Node -> Point geometry or Way -> Area -> LinearString.
@@ -332,6 +340,7 @@ class BuildingZone(OSMFeatureArea):
         self.osm_buildings = list()  # List of already existing osm buildings
         self.generated_buildings = list()  # List og GenBuilding objects for generated non-osm buildings
         self.linked_genways = list()  # List of Highways that are available for generating buildings
+        self.linked_city_blocks = list()
 
     @classmethod
     def create_from_way(cls, way: op.Way, nodes_dict: Dict[int, op.Node],
@@ -364,6 +373,8 @@ class BuildingZone(OSMFeatureArea):
         self.linked_blocked_areas.extend(temp_buildings.generated_blocked_areas)
         self.generated_buildings.extend(temp_buildings.generated_buildings)
 
+    def add_city_block(self, city_block: CityBlock) -> None:
+        self.linked_city_blocks.append(city_block)
 
 class BTGBuildingZone(object):
     """A land-use from materials in FlightGear read from BTG-files"""
@@ -668,15 +679,16 @@ class HighwayType(IntEnum):
 
 
 class Highway(OSMFeatureLinearWithTunnel):
-    def __init__(self, osm_id: int, geometry: LineString, tags_dict: KeyValueDict) -> None:
+    def __init__(self, osm_id: int, geometry: LineString, tags_dict: KeyValueDict, refs: List[int]) -> None:
         super().__init__(osm_id, geometry, tags_dict)
         self.is_roundabout = self._parse_tags_roundabout(tags_dict)
         self.is_oneway = self._parse_tags_oneway(tags_dict)
         self.lanes = self._parse_tags_lanes(tags_dict)
+        self.refs = refs
 
     @classmethod
     def create_from_scratch(cls, pseudo_id: int, existing_highway: 'Highway', linear: LineString) -> 'Highway':
-        obj = Highway(pseudo_id, linear, dict())
+        obj = Highway(pseudo_id, linear, dict(), existing_highway.refs)
         obj.type_ = existing_highway.type_
         obj.is_roundabout = existing_highway.is_roundabout
         obj.is_oneway = existing_highway.is_oneway
@@ -776,7 +788,7 @@ class Highway(OSMFeatureLinearWithTunnel):
     def create_from_way(cls, way: op.Way, nodes_dict: Dict[int, op.Node],
                         transformer: co.Transformation) -> 'Highway':
         my_geometry = cls.create_line_string_from_way(way, nodes_dict, transformer)
-        obj = Highway(way.osm_id, my_geometry, way.tags)
+        obj = Highway(way.osm_id, my_geometry, way.tags, way.refs)
         return obj
 
 
@@ -1157,7 +1169,7 @@ def process_osm_railway_refs(transformer: co.Transformation) -> Dict[int, Railwa
     return my_ways
 
 
-def process_osm_highway_refs(transformer: co.Transformation) -> Dict[int, Highway]:
+def process_osm_highway_refs(transformer: co.Transformation) -> Tuple[Dict[int, Highway], Dict[int, op.Node]]:
     osm_result = op.fetch_osm_db_data_ways_keys([HIGHWAY_KEY])
     my_ways = dict()
     for way in list(osm_result.ways_dict.values()):
@@ -1165,7 +1177,7 @@ def process_osm_highway_refs(transformer: co.Transformation) -> Dict[int, Highwa
         if my_way.is_valid():
             my_ways[my_way.osm_id] = my_way
     logging.info("OSM highways found: %s", len(my_ways))
-    return my_ways
+    return my_ways, osm_result.nodes_dict
 
 
 def process_osm_waterway_refs(transformer: co.Transformation) -> Dict[int, Waterway]:

@@ -6,10 +6,10 @@ import logging
 import math
 import os.path
 import time
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import shapely.affinity as saf
-from shapely.geometry import MultiPolygon, Point, Polygon
+from shapely.geometry import MultiPolygon, Point, Polygon, CAP_STYLE, JOIN_STYLE
 from shapely.ops import unary_union
 
 import parameters
@@ -264,17 +264,65 @@ def _process_btg_building_zones(transformer: Transformation) -> Tuple[List[m.BTG
     return btg_zones, btg_reader.faces[btg.WATER_PROXY]
 
 
-def split_to_city_blocks() -> None:
-    """Splits all land-use into (city) blocks, i.e. areas surrounded by streets.
-    Creates a 'virtual' street at land-use boundary to also have blocks at outside of land-use zones.
+def _link_area_with_highways(area: Polygon, highways_dict: Dict[int, m.Highway]) -> List[m.Highway]:
+    """Link highways to an area to prepare for building generation.
 
-    See https://networkx.github.io/documentation/stable/reference/algorithms/generated/networkx.algorithms.cycles.cycle_basis.html#networkx.algorithms.cycles.cycle_basis
-    https://stackoverflow.com/questions/24021840/find-edges-in-a-cycle-networkx-python
-
-    https://stackoverflow.com/questions/12367801/finding-all-cycles-in-undirected-graphs#18388696
+    Highways_dict gets reduced by those highways, which were within, such that searching in other
+    areas gets quicker due to reduced volume.
     """
+    linked_highways = list()
+    to_be_removed = list()
+    for my_highway in highways_dict.values():
+        if not my_highway.populate_buildings_along():
+            continue
+        if not disjoint_bounds(my_highway.geometry.bounds, area.bounds):  # a bit speed up
+            if my_highway.geometry.within(area):
+                linked_highways.append(my_highway)
+                to_be_removed.append(my_highway.osm_id)
 
-    return
+            elif my_highway.geometry.intersects(area):
+                linked_highways.append(my_highway)
+
+    for key in to_be_removed:
+        del highways_dict[key]
+
+    return linked_highways
+
+
+def _assign_city_blocks(building_zones: List[m.BuildingZone], highways_dict: Dict[int, m.Highway]) -> None:
+    """Splits all land-use into (city) blocks, i.e. areas surrounded by streets.
+    Brute force by buffering all highways, then take the geometry difference, which splits the zone into
+    multiple polygons. Some of the polygons will be real city blocks, others will be border areas.
+
+    Could also be done by using e.g. networkx.algorithms.cycles.cycle_basis.html. However is a bit more complicated
+    logic and programming wise, but might be faster.
+    """
+    highways_dict_copy1 = highways_dict.copy()  # otherwise when using highways_dict in plotting it will be "used"
+
+    for building_zone in building_zones:
+        polygons = list()
+        linked_highways = _link_area_with_highways(building_zone.geometry, highways_dict_copy1)
+        if linked_highways:
+            buffers = list()
+            for highway in linked_highways:
+                buffers.append(highway.geometry.buffer(2, cap_style=CAP_STYLE.square,
+                                                       join_style=JOIN_STYLE.bevel))
+            geometry_difference = building_zone.geometry.difference(unary_union(buffers))
+            if isinstance(geometry_difference, Polygon) and geometry_difference.is_valid and \
+                    geometry_difference >= parameters.OWBB_MIN_CITY_BLOCK_AREA:
+                polygons.append(geometry_difference)
+            elif isinstance(geometry_difference, MultiPolygon):
+                my_polygons = geometry_difference.geoms
+                for my_poly in my_polygons:
+                    if isinstance(my_poly, Polygon) and my_poly.is_valid and \
+                            my_poly.area >= parameters.OWBB_MIN_CITY_BLOCK_AREA:
+                        polygons.append(my_poly)
+
+        logging.debug('Found %i city blocks in building zone osm_ID=%i', len(polygons), building_zone.osm_id)
+
+        for polygon in polygons:
+            my_city_block = m.CityBlock(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse), polygon, None)
+            building_zone.add_city_block(my_city_block)
 
 
 def _process_landuse_for_lighting(building_zones: List[m.BuildingZone]) -> List[Polygon]:
@@ -308,6 +356,57 @@ def _process_landuse_for_lighting(building_zones: List[m.BuildingZone]) -> List[
     return lit_areas
 
 
+def _split_generated_building_zones_by_major_lines(before_list: List[m.BuildingZone],
+                                                   highways: Dict[int, m.Highway],
+                                                   railways: Dict[int, m.RailwayLine],
+                                                   waterways: Dict[int, m.Waterway]) -> List[m.BuildingZone]:
+    """Splits generated building zones into several sub-zones along major transport lines and waterways.
+    Major transport lines are motorways, trunks as well as certain railway lines.
+    Using buffers (= polygons) instead of lines because Shapely cannot do it natively.
+    Using buffers directly instead of trying to entangle line strings of highways/railways due to
+    easiness plus performance wise most probably same or better."""
+
+    # create buffers around major transport
+    line_buffers = list()
+    for highway in highways.values():
+        if highway.type_ in [m.HighwayType.motorway, m.HighwayType.trunk] and not highway.is_tunnel:
+            line_buffers.append(highway.geometry.buffer(highway.get_width()/2))
+
+    for railway in railways.values():
+        if railway.type_ in [m.RailwayLineType.rail, m.RailwayLineType.light_rail, m.RailwayLineType.subway,
+                             m.RailwayLineType.narrow_gauge] and not (railway.is_tunnel or railway.is_service_spur):
+            line_buffers.append(railway.geometry.buffer(railway.get_width() / 2))
+
+    for waterway in waterways.values():
+        if waterway.type_ is m.WaterwayType.large:
+            line_buffers.append(waterway.geometry.buffer(10))
+
+    merged_buffers = _merge_buffers(line_buffers)
+    if len(merged_buffers) == 0:
+        return before_list
+
+    # walk through all buffers and where intersecting get the difference with zone geometry as new zone polygon(s).
+    unhandled_list = before_list[:]
+    after_list = None
+    for buffer in merged_buffers:
+        after_list = list()
+        while len(unhandled_list) > 0:
+            zone = unhandled_list.pop()
+            if isinstance(zone, m.GeneratedBuildingZone) and zone.geometry.intersects(buffer):
+                zone.geometry = zone.geometry.difference(buffer)
+                if isinstance(zone.geometry, MultiPolygon):
+                    after_list.extend(_split_multipolygon_generated_building_zone(zone))
+                    # it could be that the returned list is empty because all parts are below size criteria for
+                    # generated zones, which is ok
+                else:
+                    after_list.append(zone)
+            else:  # just keep as is if not GeneratedBuildingZone or not intersecting
+                after_list.append(zone)
+        unhandled_list = after_list
+
+    return after_list
+
+
 def _merge_buffers(original_list: List[Polygon]) -> List[Polygon]:
     """Attempts to merge as many polygon buffers with each other as possible to return a reduced list."""
     multi_polygon = unary_union(original_list)
@@ -328,7 +427,7 @@ def process(transformer: Transformation) -> None:
     building_zones = m.process_osm_building_zone_refs(transformer)
     places = m.process_osm_place_refs(transformer)
     osm_buildings = m.process_osm_building_refs(transformer)
-    highways_dict = m.process_osm_highway_refs(transformer)
+    highways_dict, nodes_dict = m.process_osm_highway_refs(transformer)
     railways_dict = m.process_osm_railway_refs(transformer)
     waterways_dict = m.process_osm_waterway_refs(transformer)
 
@@ -363,13 +462,20 @@ def process(transformer: Transformation) -> None:
     del buildings_outside
     last_time = time_logging("Time used in seconds for generating building zones", last_time)
 
-    # =========== CREATE POLYGONS FOR LIGTHING OF STREETS ================================
+    # =========== CREATE POLYGONS FOR LIGHTING OF STREETS ================================
+    # Needs to be before finding city blocks as we need the boundary
     lit_areas = _process_landuse_for_lighting(building_zones)
     last_time = time_logging("Time used in seconds for finding lit areas", last_time)
 
-    # =========== FIND CITY BLOCKS ==========
-    # using an algorithm in a undirected graph finding simple cycles
-    # TODO
+    # =========== MAKE SURE GENERATED LAND-USE DOES NOT CROSS MAJOR LINEAR OBJECTS =======
+    if parameters.OWBB_SPLIT_MADE_UP_LANDUSE_BY_MAJOR_LINES:
+        # finally split generated zones by major transport lines
+        building_zones = _split_generated_building_zones_by_major_lines(building_zones, highways_dict,
+                                                                        railways_dict, waterways_dict)
+
+    # =========== FIND CITY BLOCKS AND ASSIGN TO BUILDING_ZONES ==========================
+    _assign_city_blocks(building_zones, highways_dict)
+    last_time = time_logging('Time used in seconds for splitting into city blocks', last_time)
 
     # ============finally guess the land-use type ========================================
     for my_zone in building_zones:
@@ -380,5 +486,6 @@ def process(transformer: Transformation) -> None:
     # =========== FINALIZE PROCESSING ====================================================
     if parameters.DEBUG_PLOT:
         bounds = m.Bounds.create_from_parameters(transformer)
-        plotting.draw_zones(highways_dict, osm_buildings, building_zones, btg_building_zones, lit_areas, bounds)
+        plotting.draw_zones(highways_dict, osm_buildings, building_zones, btg_building_zones,
+                            lit_areas, bounds)
         time_logging("Time used in seconds for plotting", last_time)

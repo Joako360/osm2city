@@ -56,7 +56,7 @@ def _set_ax_limits(ax: maxs.Axes, x_min: float, x_max:  float, y_min: float, y_m
 def _draw_highways(highways_dict, ax: maxs.Axes) -> None:
     for my_highway in highways_dict.values():
         if my_highway.is_sideway():
-            _plot_line(ax, my_highway.geometry, "black", 1)
+            _plot_line(ax, my_highway.geometry, "green", 1)
         else:
             _plot_line(ax, my_highway.geometry, "lime", 1)
 
@@ -68,7 +68,7 @@ def _draw_buildings(buildings, ax: maxs.Axes) -> None:
             ax.add_patch(patch)
 
 
-def _draw_osm_zones(building_zones, ax: maxs.Axes) -> None:
+def _draw_osm_zones(building_zones: List[m.BuildingZone], ax: maxs.Axes) -> None:
     edge_color = "red"
     for building_zone in building_zones:
         if not isinstance(building_zone, m.GeneratedBuildingZone):
@@ -139,6 +139,17 @@ def _draw_lit_areas(lit_areas: List[Polygon], ax: maxs.Axes) -> None:
         my_color = "cyan"
         patch = PolygonPatch(item, facecolor=my_color, edgecolor="black")
         ax.add_patch(patch)
+
+
+def _draw_city_blocks(building_zones: List[m.BuildingZone], ax: maxs.Axes) -> None:
+    for zone in building_zones:
+        city_blocks = zone.linked_city_blocks
+        for item in city_blocks:
+            red = random.random()
+            green = random.random()
+            blue = random.random()
+            patch = PolygonPatch(item.geometry, facecolor=(red, green, blue), edgecolor="black")
+            ax.add_patch(patch)
 
 
 def _draw_background_zones(building_zones, ax: maxs.Axes) -> None:
@@ -218,8 +229,8 @@ def draw_buildings(buildings, building_zones, bounds) -> None:
 
 
 def draw_zones(highways_dict: Dict[int, m.Highway], buildings: List[m.Building],
-               building_zones: List[m.BuildingZone], btg_building_zones, lit_areas: List[Polygon],
-               bounds: m.Bounds) -> None:
+               building_zones: List[m.BuildingZone], btg_building_zones,
+               lit_areas: List[Polygon], bounds: m.Bounds) -> None:
     pdf_pages = _create_pdf_pages("landuse")
 
     # OSM building zones original
@@ -266,6 +277,16 @@ def draw_zones(highways_dict: Dict[int, m.Highway], buildings: List[m.Building],
     _draw_generated_zones(building_zones, ax)
     _draw_highways(highways_dict, ax)
     _draw_buildings(buildings, ax)
+    _set_ax_limits_from_bounds(ax, bounds)
+    pdf_pages.savefig(my_figure)
+
+    # City blocks
+    my_figure = _create_a3_landscape_figure()
+    my_figure.suptitle("City blocks")
+    ax = my_figure.add_subplot(111)
+    ax.grid(True, linewidth=1, linestyle="--", color="silver")
+    _draw_city_blocks(building_zones, ax)
+    _draw_highways(highways_dict, ax)
     _set_ax_limits_from_bounds(ax, bounds)
     pdf_pages.savefig(my_figure)
 

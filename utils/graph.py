@@ -113,14 +113,14 @@ class Graph(nx.Graph):
         ref1 = way.refs[-1]
         try:
             junction0 = self.junction(ref0)
-            junction0.append_way(way, is_first = True)
+            junction0.append_way(way, is_first=True)
         except KeyError:
-            junction0 = Junction(way, is_first=True) # IS_FIRST
+            junction0 = Junction(way, is_first=True)  # IS_FIRST
             super().add_node(ref0, obj=junction0)
 
         try:
             junction1 = self.junction(ref1)
-            junction1.append_way(way, is_first = False)
+            junction1.append_way(way, is_first=False)
         except KeyError:
             junction1 = Junction(way, is_first=False)
             super().add_node(ref1, obj=junction1)
@@ -129,10 +129,3 @@ class Graph(nx.Graph):
 
         way.junction0 = junction0
         way.junction1 = junction1
-
-
-if __name__ == '__main__':
-    my_graph = nx.Graph()
-    my_graph.add_edges_from([(1, 2), (1, 3), (1, 4), (2, 3), (3, 4), (2, 6), (4, 6), (8, 7), (8, 9), (9, 7)])
-    cycles = nx.cycle_basis(my_graph) # -> list of list of nodes
-    foo = 1

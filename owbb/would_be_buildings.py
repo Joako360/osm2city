@@ -31,7 +31,7 @@ def _prepare_building_zone_for_building_generation(building_zone, open_spaces_di
     As soon as an element is entirely within a building zone, it is removed
     from the lists in order to speedup by reducing the number of stuff to compare in the next
     building zone (the lists area shared / passed by reference.
-    In order to make these removals fast the data structures must be dics instead of lists.
+    In order to make these removals fast the data structures must be dicts instead of lists.
 
     Another possibility would be parallel processing, but that would lead to big
     memory consumption due to copies of data structures in each process
@@ -283,7 +283,7 @@ def process(transformer: co.Transformation) -> List[building_lib.Building]:
     osm_buildings = m.process_osm_building_refs(transformer)
     building_zones = m.process_osm_building_zone_refs(transformer)
     open_spaces_dict = m.process_osm_open_space_refs(transformer)
-    highways_dict = m.process_osm_highway_refs(transformer)
+    highways_dict, nodes_dict = m.process_osm_highway_refs(transformer)
     railways_dict = m.process_osm_railway_refs(transformer)
     waterways_dict = m.process_osm_waterway_refs(transformer)
     last_time = time_logging("Time used in seconds for parsing OSM data", last_time)
