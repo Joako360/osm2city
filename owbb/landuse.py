@@ -5,6 +5,7 @@
 import logging
 import math
 import os.path
+import pickle
 import time
 from typing import Dict, List, Tuple
 
@@ -264,8 +265,8 @@ def _process_btg_building_zones(transformer: Transformation) -> Tuple[List[m.BTG
     return btg_zones, btg_reader.faces[btg.WATER_PROXY]
 
 
-def _link_area_with_highways(area: Polygon, highways_dict: Dict[int, m.Highway]) -> List[m.Highway]:
-    """Link highways to an area to prepare for building generation.
+def _test_highway_intersecting_area(area: Polygon, highways_dict: Dict[int, m.Highway]) -> List[m.Highway]:
+    """Returns highways that are within an area or intersecting with an area.
 
     Highways_dict gets reduced by those highways, which were within, such that searching in other
     areas gets quicker due to reduced volume.
@@ -301,10 +302,10 @@ def _assign_city_blocks(building_zones: List[m.BuildingZone], highways_dict: Dic
 
     for building_zone in building_zones:
         polygons = list()
-        linked_highways = _link_area_with_highways(building_zone.geometry, highways_dict_copy1)
-        if linked_highways:
+        intersecting_highways = _test_highway_intersecting_area(building_zone.geometry, highways_dict_copy1)
+        if intersecting_highways:
             buffers = list()
-            for highway in linked_highways:
+            for highway in intersecting_highways:
                 buffers.append(highway.geometry.buffer(2, cap_style=CAP_STYLE.square,
                                                        join_style=JOIN_STYLE.bevel))
             geometry_difference = building_zone.geometry.difference(unary_union(buffers))
@@ -321,7 +322,8 @@ def _assign_city_blocks(building_zones: List[m.BuildingZone], highways_dict: Dic
         logging.debug('Found %i city blocks in building zone osm_ID=%i', len(polygons), building_zone.osm_id)
 
         for polygon in polygons:
-            my_city_block = m.CityBlock(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse), polygon, None)
+            my_city_block = m.CityBlock(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse), polygon,
+                                        building_zone.type_)
             building_zone.add_city_block(my_city_block)
 
 
@@ -420,8 +422,25 @@ def _merge_buffers(original_list: List[Polygon]) -> List[Polygon]:
     return handled_list
 
 
-def process(transformer: Transformation) -> None:
+def process(transformer: Transformation) -> Tuple[List[Polygon], List[m.BuildingZone]]:
     last_time = time.time()
+
+    # =========== TRY TO READ CACHED DATA FIRST =======
+    tile_index = parameters.get_tile_index()
+    cache_file_la = str(tile_index) + '_lit_areas.pkl'
+    cache_file_bz = str(tile_index) + '_building_zones.pkl'
+    if parameters.OWBB_LANDUSE_CACHE:
+        try:
+            with open(cache_file_la, 'rb') as file_pickle:
+                lit_areas = pickle.load(file_pickle)
+            logging.info('Successfully loaded %i objects from %s', len(lit_areas), cache_file_la)
+
+            with open(cache_file_bz, 'rb') as file_pickle:
+                building_zones = pickle.load(file_pickle)
+            logging.info('Successfully loaded %i objects from %s', len(building_zones), cache_file_bz)
+            return lit_areas, building_zones
+        except (IOError, EOFError) as reason:
+            logging.info("Loading of cache %s or %s failed (%s)", cache_file_la, cache_file_bz, reason)
 
     # =========== READ OSM DATA =============
     building_zones = m.process_osm_building_zone_refs(transformer)
@@ -477,6 +496,10 @@ def process(transformer: Transformation) -> None:
     _assign_city_blocks(building_zones, highways_dict)
     last_time = time_logging('Time used in seconds for splitting into city blocks', last_time)
 
+    # now assign the osm_buildings to the city blocks
+    for building_zone in building_zones:
+        building_zone.reassign_osm_buildings_to_city_blocks()
+
     # ============finally guess the land-use type ========================================
     for my_zone in building_zones:
         if isinstance(my_zone, m.GeneratedBuildingZone):
@@ -489,3 +512,19 @@ def process(transformer: Transformation) -> None:
         plotting.draw_zones(highways_dict, osm_buildings, building_zones, btg_building_zones,
                             lit_areas, bounds)
         time_logging("Time used in seconds for plotting", last_time)
+
+    # =========== WRITE TO CACHE AND RETURN
+    if parameters.OWBB_LANDUSE_CACHE:
+        try:
+
+            with open(cache_file_la, 'wb') as file_pickle:
+                pickle.dump(lit_areas, file_pickle)
+            logging.info('Successfully saved %i objects to %s', len(lit_areas), cache_file_la)
+
+            with open(cache_file_bz, 'wb') as file_pickle:
+                pickle.dump(building_zones, file_pickle)
+            logging.info('Successfully saved %i objects to %s', len(building_zones), cache_file_bz)
+        except (IOError, EOFError) as reason:
+            logging.info("Saving of cache %s or %s failed (%s)", cache_file_la, cache_file_bz, reason)
+
+    return lit_areas, building_zones

@@ -93,7 +93,7 @@ import linear_bridge
 import parameters
 import textures.road
 import utils.osmparser as op
-from utils import coordinates, ac3d, stg_io2, utilities, landuse, graph
+from utils import coordinates, ac3d, stg_io2, utilities, graph
 from utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
@@ -409,7 +409,7 @@ class Roads(object):
                                                                len(self.railway_list), len(self.bridges_list))
 
     def process(self, blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
-                landuses_lit: List[landuse.Landuse], stats: utilities.Stats) -> None:
+                lit_areas: List[shg.Polygon], stats: utilities.Stats) -> None:
         """Processes the OSM data until data can be clusterized.
         """
         self._remove_tunnels()
@@ -417,7 +417,7 @@ class Roads(object):
         self._check_ways_in_water()
         self._check_against_blocked_areas(blocked_areas)
         self._check_against_stg_entries(stg_entries)
-        self._check_lighting(landuses_lit)
+        self._check_lighting(lit_areas)
         self._cleanup_topology()
         self._check_points_on_line_distance()
 
@@ -549,12 +549,12 @@ class Roads(object):
 
         self.ways_list.extend(new_ways)
 
-    def _check_lighting(self, landuses_lit: List[landuse.Landuse]) -> None:
+    def _check_lighting(self, lit_areas: List[shg.Polygon]) -> None:
         """Checks ways for lighting and maybe splits at borders for built-up areas."""
-        way_lul_map = dict()  # key: way, value: list(landuse_lit) from split -> prevent re-check of mini-residuals
-        new_ways_1 = self._check_lighting_inner(self.ways_list, landuses_lit, way_lul_map)
+        way_la_map = dict()  # key: way, value: list(lit_Area) from split -> prevent re-check of mini-residuals
+        new_ways_1 = self._check_lighting_inner(self.ways_list, lit_areas, way_la_map)
         self.ways_list.extend(new_ways_1)
-        new_ways_2 = self._check_lighting_inner(new_ways_1, landuses_lit, way_lul_map)
+        new_ways_2 = self._check_lighting_inner(new_ways_1, lit_areas, way_la_map)
         self.ways_list.extend(new_ways_2)
         # Looping again might get even better splits, but is quite costly for the gained extra effect.
         # now replace 'gen' with 'yes'
@@ -562,8 +562,8 @@ class Roads(object):
             if LIT in way.tags and way.tags[LIT] == 'gen':
                 way.tags[LIT] = 'yes'
 
-    def _check_lighting_inner(self, ways_list: List[op.Way], landuses_lit: List[landuse.Landuse],
-                              way_lul_map: Dict[op.Way, landuse.Landuse]) -> List[op.Way]:
+    def _check_lighting_inner(self, ways_list: List[op.Way], lit_areas: List[shg.Polygon],
+                              way_la_map: Dict[op.Way, shg.Polygon]) -> List[op.Way]:
         """Inner method for _check_lighting doing the actual checking. New split ways are the outcome of the method.
         However all ways by reference get updated tags. This method exists such that new ways can be checked again
         against other built-up areas.
@@ -581,34 +581,34 @@ class Roads(object):
                 orig_lit += 1
                 continue  # nothing further to do with this way
 
-            if way in way_lul_map:
-                already_checked_luls = way_lul_map[way]
+            if way in way_la_map:
+                already_checked_luls = way_la_map[way]
             else:
                 already_checked_luls = list()
-                way_lul_map[way] = already_checked_luls
+                way_la_map[way] = already_checked_luls
 
             way_changed = True
             my_line = None
             my_line_bounds = None
-            for landuse_lit in landuses_lit:
+            for lit_area in lit_areas:
                 if way_changed:
                     my_line = self._line_string_from_way(way)  # needs to be re-calculated because could change below
                     my_line_bounds = my_line.bounds
                     way_changed = False
-                if landuse_lit in already_checked_luls:
+                if lit_area in already_checked_luls:
                     continue
                 # do a fast cheap check on intersection working with static .bounds (ca. 200 times faster than calling
                 # every time)
-                if coordinates.disjoint_bounds(my_line_bounds, landuse_lit.bounds):
+                if coordinates.disjoint_bounds(my_line_bounds, lit_area.bounds):
                     continue
 
                 # do more narrow intersection checks
-                if my_line.within(landuse_lit.polygon):
+                if my_line.within(lit_area):
                     way.tags[LIT] = 'gen'
                     break  # it cannot be in more than one built_up area at a time
 
                 intersection_points = list()
-                some_geometry = my_line.intersection(landuse_lit.polygon.exterior)
+                some_geometry = my_line.intersection(lit_area.exterior)
                 if isinstance(some_geometry, shg.LineString):
                     continue  # it only touches
                 elif isinstance(some_geometry, shg.Point):
@@ -635,11 +635,11 @@ class Roads(object):
                     is_new_way = False  # the first item in the dict is the original way by convention
                     for cut_way, distance in cut_ways_dict.items():
                         my_point = my_line.interpolate(distance)
-                        if my_point.within(landuse_lit.polygon):
+                        if my_point.within(lit_area):
                             cut_way.tags[LIT] = 'gen'
                         else:
                             cut_way.tags[LIT] = 'no'
-                        already_checked_luls.append(landuse_lit)
+                        already_checked_luls.append(lit_area)
                         if is_new_way:
                             new_ways.append(cut_way)
                         else:
@@ -1279,8 +1279,8 @@ def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, s
 
 
 def process_roads(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
-                  blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
-                  file_lock: mp.Lock=None) -> None:
+                  blocked_areas: List[shg.Polygon], lit_areas: List[shg.Polygon],
+                  stg_entries: List[stg_io2.STGEntry], file_lock: mp.Lock=None) -> None:
     random.seed(42)
     stats = utilities.Stats()
 
@@ -1297,16 +1297,10 @@ def process_roads(coords_transform: coordinates.Transformation, fg_elev: utiliti
 
     roads = Roads(filtered_osm_ways_list, osm_nodes_dict, coords_transform, fg_elev)
 
-    # land-use data for lighting
-    landuse_result = op.fetch_osm_db_data_ways_keys(['landuse'])
-    landuse_nodes_dict = landuse_result.nodes_dict
-    landuse_ways_dict = landuse_result.ways_dict
-    landuses_lit = landuse.process_osm_landuse_for_lighting(landuse_nodes_dict, landuse_ways_dict, coords_transform)
-
     path_to_output = parameters.get_output_path()
     logging.debug("before linear " + str(roads))
 
-    roads.process(blocked_areas, stg_entries, landuses_lit, stats)  # does the heavy lifting incl. clustering
+    roads.process(blocked_areas, stg_entries, lit_areas, stats)  # does the heavy lifting incl. clustering
 
     replacement_prefix = parameters.get_repl_prefix()
     stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.roads, OUR_MAGIC, replacement_prefix)

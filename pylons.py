@@ -30,7 +30,7 @@ import parameters
 import roads
 import shapely.geometry as shg
 import utils.osmparser as op
-from utils import vec2d, coordinates, stg_io2, utilities, landuse
+from utils import vec2d, coordinates, stg_io2, utilities
 
 OUR_MAGIC = "pylons"  # Used in e.g. stg files to mark edits by osm2pylon
 OUT_MAGIC_DETAILS = "pylonsDetails"
@@ -1196,7 +1196,7 @@ def _process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev,
     return my_railways
 
 
-def _process_highways_for_streetlamps(my_highways, landuse_buffers) -> List[StreetlampWay]:
+def _process_highways_for_streetlamps(my_highways, lit_areas: List[shg.Polygon]) -> List[StreetlampWay]:
     """
     Test whether the highway is within appropriate land use or intersects with appropriate land use
     No attempt to merge lines because most probably the lines are split at crossing.
@@ -1210,12 +1210,12 @@ def _process_highways_for_streetlamps(my_highways, landuse_buffers) -> List[Stre
             continue
         is_within = False
         intersections = []
-        for lu_buffer in landuse_buffers:
-            if my_highway.linear.within(lu_buffer):
+        for lit_area in lit_areas:
+            if my_highway.linear.within(lit_area):
                 is_within = True
                 break
-            elif my_highway.linear.intersects(lu_buffer):
-                intersections.append(my_highway.linear.intersection(lu_buffer))
+            elif my_highway.linear.intersects(lit_area):
+                intersections.append(my_highway.linear.intersection(lit_area))
         if is_within:
             my_streetlamps[my_highway.osm_id] = StreetlampWay(my_highway.osm_id, my_highway)
         else:
@@ -1247,26 +1247,6 @@ def _process_highways_for_streetlamps(my_highways, landuse_buffers) -> List[Stre
             del my_streetlamps[key]
 
     return list(my_streetlamps.values())
-
-
-def _merge_streetlamp_buffers(landuse_refs):
-    """Based on existing landuses applies extra buffer and then unions as many as possible"""
-    landuse_buffers = []
-    for landuse_ref in list(landuse_refs.values()):
-        streetlamp_buffer = landuse_ref.polygon.buffer(parameters.C2P_STREETLAMPS_MAX_DISTANCE_LANDUSE)
-        if 0 == len(landuse_buffers):
-            landuse_buffers.append(streetlamp_buffer)
-        else:
-            is_found = False
-            for i in range(len(landuse_buffers)):
-                merged_buffer = landuse_buffers[i]
-                if streetlamp_buffer.intersects(merged_buffer):
-                    landuse_buffers[i] = merged_buffer.union(streetlamp_buffer)
-                    is_found = True
-                    break
-            if not is_found:
-                landuse_buffers.append(streetlamp_buffer)
-    return landuse_buffers
 
 
 def _process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGElev, my_coord_transformator,
@@ -1861,8 +1841,8 @@ def process_pylons(coords_transform: coordinates.Transformation, fg_elev: utilit
     stg_manager.write(file_lock)
 
 
-def process_details(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
-                    file_lock: mp.Lock=None) -> None:
+def process_details(coords_transform: coordinates.Transformation, lit_areas: List[shg.Polygon],
+                    fg_elev: utilities.FGElev, file_lock: mp.Lock=None) -> None:
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects -> details")
 
@@ -1915,22 +1895,15 @@ def process_details(coords_transform: coordinates.Transformation, fg_elev: utili
     # street lamps
     streetlamp_ways = list()
     if parameters.C2P_PROCESS_STREETLAMPS:
-        osm_way_result = op.fetch_osm_db_data_ways_keys(["landuse", "highway"])
+        osm_way_result = op.fetch_osm_db_data_ways_keys(["highway"])
         osm_nodes_dict = osm_way_result.nodes_dict
         osm_ways_dict = osm_way_result.ways_dict
 
-        landuse_refs = landuse.process_osm_landuse_refs(osm_nodes_dict, osm_ways_dict, coords_transform)
-        if parameters.LU_LANDUSE_GENERATE_LANDUSE:
-            landuse.generate_landuse_from_buildings(landuse_refs, building_refs)
-        logging.info('Number of landuse references: %s', len(landuse_refs))
-        streetlamp_buffers = _merge_streetlamp_buffers(landuse_refs)
-        logging.info('Number of streetlamp buffers: %s', len(streetlamp_buffers))
         highways = _process_osm_highway(osm_nodes_dict, osm_ways_dict, coords_transform)
-        streetlamp_ways = _process_highways_for_streetlamps(highways, streetlamp_buffers)
+        streetlamp_ways = _process_highways_for_streetlamps(highways, lit_areas)
         logging.info('Reduced number of streetlamp ways: %s', len(streetlamp_ways))
         for highway in streetlamp_ways:
             highway.calc_and_map(fg_elev, coords_transform)
-        del landuse_refs
 
     # free some memory
     del building_refs

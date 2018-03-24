@@ -320,6 +320,7 @@ class CityBlock():
         self.osm_id = osm_id
         self.geometry = geometry
         self.building_zone_type = feature_type
+        self.osm_buildings = list()  # List of already existing osm buildings
 
 
 class BuildingZone(OSMFeatureArea):
@@ -338,7 +339,7 @@ class BuildingZone(OSMFeatureArea):
         # i.e. they are not directly based on OSM data
         self.linked_blocked_areas = list()  # List of BlockedArea objects for blocked areas.
         self.osm_buildings = list()  # List of already existing osm buildings
-        self.generated_buildings = list()  # List og GenBuilding objects for generated non-osm buildings
+        self.generated_buildings = list()  # List of GenBuilding objects for generated non-osm buildings
         self.linked_genways = list()  # List of Highways that are available for generating buildings
         self.linked_city_blocks = list()
 
@@ -375,6 +376,14 @@ class BuildingZone(OSMFeatureArea):
 
     def add_city_block(self, city_block: CityBlock) -> None:
         self.linked_city_blocks.append(city_block)
+
+    def reassign_osm_buildings_to_city_blocks(self) -> None:
+        for osm_building in self.osm_buildings:
+            for city_block in self.linked_city_blocks:
+                if osm_building.geometry.within(city_block.geometry) or osm_building.geometry.intersects(
+                        city_block.geometry):
+                    city_block.osm_buildings.append(osm_building)
+
 
 class BTGBuildingZone(object):
     """A land-use from materials in FlightGear read from BTG-files"""
@@ -1135,7 +1144,7 @@ def process_osm_building_zone_refs(transformer: co.Transformation) -> List[Build
 
 
 def process_osm_building_refs(transformer: co.Transformation) -> List[Building]:
-    osm_result = op.fetch_osm_db_data_ways_keys([BUILDING_KEY])
+    osm_result = op.fetch_osm_db_data_ways_keys([BUILDING_KEY, BUILDING_PART_KEY])
     my_ways = list()
     for way in list(osm_result.ways_dict.values()):
         my_way = Building.create_from_way(way, osm_result.nodes_dict, transformer)

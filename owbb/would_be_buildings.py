@@ -2,6 +2,7 @@
 """Module analyzing OSM data and generating buildings at plausible places."""
 
 import logging
+import pickle
 import random
 import time
 from typing import List
@@ -275,13 +276,23 @@ def _read_building_models_library() -> List[m.BuildingModel]:
     return models
 
 
-def process(transformer: co.Transformation) -> List[building_lib.Building]:
+def process(transformer: co.Transformation, building_zones: List[m.BuildingZone]) -> List[building_lib.Building]:
     last_time = time.time()
+
+    # =========== TRY TO READ CACHED DATA FIRST =======
+    tile_index = parameters.get_tile_index()
+    cache_file = str(tile_index) + '_generated_buildings.pkl'
+    if parameters.OWBB_GENERATED_BUILDINGS_CACHE:
+        try:
+            with open(cache_file, 'rb') as file_pickle:
+                generated_buildings = pickle.load(file_pickle)
+            logging.info('Successfully loaded %i objects from %s', len(generated_buildings), cache_file)
+            return generated_buildings
+        except (IOError, EOFError) as reason:
+            logging.info("Loading of cache %s failed (%s)", cache_file, reason)
 
     # =========== READ OSM DATA =============
 
-    osm_buildings = m.process_osm_building_refs(transformer)
-    building_zones = m.process_osm_building_zone_refs(transformer)
     open_spaces_dict = m.process_osm_open_space_refs(transformer)
     highways_dict, nodes_dict = m.process_osm_highway_refs(transformer)
     railways_dict = m.process_osm_railway_refs(transformer)
@@ -304,14 +315,6 @@ def process(transformer: co.Transformation) -> List[building_lib.Building]:
         sys.exit(1)
 
     last_time = time_logging("Time used in seconds for reading building model data", last_time)
-
-    # =========== ASSIGN OSM_BUILDINGS TO ZONES =============
-    for candidate in osm_buildings:
-        for b_zone in building_zones:
-            if candidate.geometry.within(b_zone.geometry) or candidate.geometry.intersects(b_zone.geometry):
-                b_zone.osm_buildings.append(candidate)
-                break
-    last_time = time_logging("Time used in seconds for assigning buildings to OSM zones", last_time)
 
     # =========== SELECT ZONES FOR GENERATION OF BUILDINGS =============
     not_used_zones = list()  # not used for generation of new buildings
@@ -354,24 +357,35 @@ def process(transformer: co.Transformation) -> List[building_lib.Building]:
     last_time = time_logging("Time used in seconds for preparing building zones for building generation", last_time)
 
     building_zones = list()  # will be filled again with used_zones out of the parallel processes
-    generated_buildings = list()
+    preliminary_buildings = list()
     for b_zone in used_zones:
         _generate_extra_buildings(b_zone, shared_models_library, bounding_box)
         building_zones.append(b_zone)
         logging.debug("Generated %d buildings for building zone %d", len(b_zone.generated_buildings),
                       b_zone.osm_id)
-        generated_buildings.extend(b_zone.generated_buildings)
+        preliminary_buildings.extend(b_zone.generated_buildings)
     last_time = time_logging("Time used in seconds for generating buildings", last_time)
-    logging.info("Total number of buildings generated: %d", len(generated_buildings))
+    logging.info("Total number of buildings generated: %d", len(preliminary_buildings))
 
     building_zones.extend(not_used_zones)  # lets add the not_used_zones again, so we have everything again
 
     if parameters.DEBUG_PLOT:
-        plotting.draw_buildings(osm_buildings, building_zones, bounds)
+        plotting.draw_buildings(building_zones, bounds)
         time_logging("Time used in seconds for plotting", last_time)
 
     # ============== Create buildings for building_lib processing ==
-    building_buildings = list()
-    for gen_building in generated_buildings:
-        building_buildings.append(gen_building.create_building_lib_building())
-    return building_buildings
+    generated_buildings = list()
+    for pre_building in preliminary_buildings:
+        generated_buildings.append(pre_building.create_building_lib_building())
+
+    # =========== WRITE TO CACHE AND RETURN
+    if parameters.OWBB_GENERATED_BUILDINGS_CACHE:
+        try:
+
+            with open(cache_file, 'wb') as file_pickle:
+                pickle.dump(generated_buildings, file_pickle)
+            logging.info('Successfully saved %i objects to %s', len(generated_buildings), cache_file)
+        except (IOError, EOFError) as reason:
+            logging.info("Saving of cache %s failed (%s)", cache_file, reason)
+
+    return generated_buildings
