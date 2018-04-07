@@ -383,7 +383,7 @@ class RoofManager(object):
                     can_material = False
                     if req_material is not None:
                         for prov_material in prov_materials:
-                            logging.debug("Provides ", prov_material, " Requires ", requires)
+                            logging.debug('Provides: %s; requires: %s', prov_material, requires)
                             if prov_material in requires:
                                 can_material = True
                                 break

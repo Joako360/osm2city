@@ -255,7 +255,6 @@ LU_LANDUSE_MIN_AREA = 5000
 # PARAMETERS RELATED TO roads.py
 # =============================================================================
 
-TRAFFIC_SHADER_ENABLE = False
 MAX_SLOPE_RAILWAY = 0.04
 MAX_SLOPE_MOTORWAY = 0.03       # max slope for motorways
 MAX_SLOPE_ROAD = 0.08

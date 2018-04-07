@@ -204,7 +204,7 @@ def _process_multipolygon_buildings(nodes_dict: Dict[int, op.Node], rel_ways_dic
                         logging.debug("add way outer " + str(way.osm_id))
                     else:
                         outer_ways_multiple.append(way)
-                        logging.debug("add way outer multiple" + str(way.osm_id))
+                        logging.debug("add way outer multiple " + str(way.osm_id))
                 elif member.role == 'inner':
                     if way.refs[0] == way.refs[-1]:
                         inner_ways.append(way)

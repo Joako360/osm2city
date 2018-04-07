@@ -314,6 +314,17 @@ def calc_point_angle_away(x: float, y: float, added_distance: float, angle: floa
     return new_x, new_y
 
 
+def calc_point_on_line_local(x1: float, y1: float, x2:float, y2:float, factor: float) -> Tuple[float, float]:
+    """Returns the x,y coordinates of a point along the line defined by the input coordinates factor away from first.
+    """
+    angle = calc_angle_of_line_local(x1, y1, x2, y2)
+    length = calc_distance_local(x1, y1, x2, y2) * factor
+
+    x_diff = sin(radians(angle)) * length
+    y_diff = cos(radians(angle)) * length
+    return x1 + x_diff, y1 + y_diff
+
+
 def calc_angle_of_corner_local(prev_point_x: float, prev_point_y: float,
                                corner_point_x: float, corner_point_y,
                                next_point_x: float, next_point_y) -> float:
@@ -427,3 +438,32 @@ class TestCoordinates(unittest.TestCase):
 
         self.assertAlmostEqual(45, calc_angle_of_corner_local(-1, 1, 0, 0, 0, 1), 2)
         self.assertAlmostEqual(45, calc_angle_of_corner_local(-1, 1, 0, 0, -1, 0), 2)
+
+    def test_calc_point_on_line_local(self):
+        # straight up
+        x, y = calc_point_on_line_local(0, 1, 0, 2, 0.5)
+        self.assertAlmostEqual(0., x)
+        self.assertAlmostEqual(1.5, y)
+        x, y = calc_point_on_line_local(0, 1, 0, 2, 2.0)
+        self.assertAlmostEqual(0., x)
+        self.assertAlmostEqual(3., y)
+        # straight down
+        x, y = calc_point_on_line_local(1, -1, 1, -2, 0.5)
+        self.assertAlmostEqual(1., x)
+        self.assertAlmostEqual(-1.5, y)
+        # straight right
+        x, y = calc_point_on_line_local(1, -1, 2, -1, 0.5)
+        self.assertAlmostEqual(1.5, x)
+        self.assertAlmostEqual(-1., y)
+        # straight left
+        x, y = calc_point_on_line_local(-1, 1, -2, 1, 0.5)
+        self.assertAlmostEqual(-1.5, x)
+        self.assertAlmostEqual(1, y)
+        # 45 degrees
+        x, y = calc_point_on_line_local(1, 1, 2, 2, 2.)
+        self.assertAlmostEqual(3., x)
+        self.assertAlmostEqual(3., y)
+        # straight right with negative value
+        x, y = calc_point_on_line_local(1, -1, 2, -1, -1)
+        self.assertAlmostEqual(0, x)
+        self.assertAlmostEqual(-1., y)

@@ -310,7 +310,7 @@ def _assign_city_blocks(building_zones: List[m.BuildingZone], highways_dict: Dic
                                                        join_style=JOIN_STYLE.bevel))
             geometry_difference = building_zone.geometry.difference(unary_union(buffers))
             if isinstance(geometry_difference, Polygon) and geometry_difference.is_valid and \
-                    geometry_difference >= parameters.OWBB_MIN_CITY_BLOCK_AREA:
+                    geometry_difference.area >= parameters.OWBB_MIN_CITY_BLOCK_AREA:
                 polygons.append(geometry_difference)
             elif isinstance(geometry_difference, MultiPolygon):
                 my_polygons = geometry_difference.geoms
@@ -412,6 +412,9 @@ def _split_generated_building_zones_by_major_lines(before_list: List[m.BuildingZ
 def _merge_buffers(original_list: List[Polygon]) -> List[Polygon]:
     """Attempts to merge as many polygon buffers with each other as possible to return a reduced list."""
     multi_polygon = unary_union(original_list)
+    if isinstance(multi_polygon, Polygon):
+        return [multi_polygon]
+
     handled_list = list()
     for polygon in multi_polygon.geoms:
         if isinstance(polygon, Polygon):

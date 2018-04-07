@@ -48,61 +48,22 @@ from utils.vec2d import Vec2d
 from utils.stg_io2 import STGVerbType
 
 
-@unique
-class RoofShape(IntEnum):
-    """Matches the roof:shape in OSM, see http://wiki.openstreetmap.org/wiki/Simple_3D_buildings.
-
-    Some of the OSM types might not be directly supported and are mapped to a different type,
-    which actually is supported in osm2city.
-
-    The enumeration should match what is provided in roofs.py and referenced in _write_roof_for_ac().
-    """
-    flat = 0
-    skillion = 1
-    gabled = 2
-    hipped = 3
-    pyramidal = 4
-
-
-def _map_osm_roof_shape(osm_roof_shape: str) -> RoofShape:
-    """Maps OSM roof:shape tag to supported types in osm2city.
-
-    See http://wiki.openstreetmap.org/wiki/Simple_3D_buildings#Roof_shape"""
-    _shape = osm_roof_shape.strip()
-    if len(_shape) == 0:
-        return RoofShape.flat
-    if _shape == 'flat':
-        return RoofShape.flat
-    if _shape == 'skillion':
-        return RoofShape.skillion
-    if _shape in ['gabled', 'half-hipped', 'gambrel', 'round', 'saltbox']:
-        return RoofShape.gabled
-    if _shape in ['hipped', 'mansard']:
-        return RoofShape.hipped
-    if _shape in ['pyramidal', 'dome', 'onion']:
-        return RoofShape.pyramidal
-
-    # fall back for all not directly handled OSM types
-    logging.debug('Not handled roof shape found: %s. Therefore transformed to "flat".', _shape)
-    return RoofShape.flat
-
-
-def _random_roof_shape() -> RoofShape:
+def _random_roof_shape() -> roofs.RoofShape:
     ratio = random.uniform(0, 1)
     accumulated_ratio = parameters.BUILDING_ROOF_FLAT_RATIO
     if ratio <= accumulated_ratio:
-        return RoofShape.flat
+        return roofs.RoofShape.flat
     accumulated_ratio += parameters.BUILDING_ROOF_SKILLION_RATIO
     if ratio <= accumulated_ratio:
-        return RoofShape.skillion
+        return roofs.RoofShape.skillion
     accumulated_ratio += parameters.BUILDING_ROOF_GABLED_RATIO
     if ratio <= accumulated_ratio:
-        return RoofShape.gabled
+        return roofs.RoofShape.gabled
     accumulated_ratio += parameters.BUILDING_ROOF_HIPPED_RATIO
     if ratio <= accumulated_ratio:
-        return RoofShape.hipped
+        return roofs.RoofShape.hipped
     else:
-        return RoofShape.pyramidal
+        return roofs.RoofShape.pyramidal
 
 
 class Building(object):
@@ -137,7 +98,7 @@ class Building(object):
         self.body_height = 0.0
         self.levels = 0
         self.min_height = 0.0  # the height over ground relative to ground_elev of the facade. See min_height in OSM
-        self.roof_shape = RoofShape.flat
+        self.roof_shape = roofs.RoofShape.flat
         self.roof_height = 0.0  # the height of the roof (0 if flat), not the elevation over ground of the roof
 
         # set during method called by init(...) through self.update_geometry and related sub-calls
@@ -251,7 +212,7 @@ class Building(object):
     def roof_complex(self) -> bool:
         """Proxy to see whether the roof is flat or not.
         Skillion is also kind of flat, but is not horisontal and therfore would also return false."""
-        if self.roof_shape is RoofShape.flat:
+        if self.roof_shape is roofs.RoofShape.flat:
             return False
         return True
 
@@ -468,7 +429,7 @@ class Building(object):
 
     def analyse_roof_shape(self) -> None:
         if 'roof:shape' in self.tags:
-            self.roof_shape = _map_osm_roof_shape(self.tags['roof:shape'])
+            self.roof_shape = roofs.map_osm_roof_shape(self.tags['roof:shape'])
         else:
             # use some parameters and randomize to assign optimistically a roof shape
             # in analyse_roof_shape_check it is double checked whether e.g. building height or area exceed limits
@@ -476,7 +437,7 @@ class Building(object):
             if parameters.BUILDING_COMPLEX_ROOFS:
                 self.roof_shape = _random_roof_shape()
             else:
-                self.roof_shape = RoofShape.flat
+                self.roof_shape = roofs.RoofShape.flat
 
     def analyse_height_and_levels(self):
         """Determines total height (and number of levels) of a building based on OSM values and other logic.
@@ -596,13 +557,14 @@ class Building(object):
                 # no complex roof on tiny buildings.
                 elif self.levels < parameters.BUILDING_COMPLEX_ROOFS_MIN_LEVELS and 'roof:shape' not in self.tags:
                     allow_complex_roofs = False
-                elif self.roof_shape not in [RoofShape.pyramidal, RoofShape.skillion] \
+                elif self.roof_shape not in [roofs.RoofShape.pyramidal, roofs.RoofShape.dome, roofs.RoofShape.onion,
+                                             roofs.RoofShape.skillion] \
                         and self.pts_all_count > parameters.BUILDING_SKEL_MAX_NODES:
                         allow_complex_roofs = False
 
             # make sure roof shape is flat if we are not allowed to use it
             if allow_complex_roofs is False:
-                self.roof_shape = RoofShape.flat
+                self.roof_shape = roofs.RoofShape.flat
 
     def analyse_large_enough(self) -> bool:
         """Checks whether a given building's area is too small for inclusion.
@@ -660,7 +622,7 @@ class Building(object):
         self.roof_height = 0.
         temp_roof_height = 0.  # temp variable before assigning to self
 
-        if self.roof_shape is RoofShape.skillion:
+        if self.roof_shape is roofs.RoofShape.skillion:
             # get global roof_height and height for each vertex
             if 'roof:height' in self.tags:
                 # force clean of tag if the unit is given
@@ -754,7 +716,7 @@ class Building(object):
 
             else:
                 # random roof:height
-                if self.roof_shape is RoofShape.flat:
+                if self.roof_shape is roofs.RoofShape.flat:
                     self.roof_height = 0.
                 else:
                     if 'roof:angle' in self.tags:
@@ -804,7 +766,7 @@ class Building(object):
         for pt in self.pts_all:
             ac_object.node(-pt[1], z, -pt[0])
         # under the roof nodes
-        if self.roof_shape is RoofShape.skillion:
+        if self.roof_shape is roofs.RoofShape.skillion:
             # skillion
             #           __ -+
             #     __-+--    |
@@ -853,7 +815,7 @@ class Building(object):
                 if not (tex_coord_right <= 1.):
                     logging.debug('FIXME: v_can_repeat: need to check in analyse')
 
-            if self.roof_shape is RoofShape.skillion:
+            if self.roof_shape is roofs.RoofShape.skillion:
                 tex_y12 = self.facade_texture.y((self.body_height + self.roof_height_pts[i]) /
                                                 self.body_height * tex_coord_top_input)
                 tex_y11 = self.facade_texture.y((self.body_height + self.roof_height_pts[ipp]) /
@@ -876,16 +838,20 @@ class Building(object):
                            roof_mat_idx: int, facade_mat_idx: int,
                            cluster_offset: Vec2d, stats: utilities.Stats) -> None:
         """Writes the roof vertices and faces to an ac3d object."""
-        if self.roof_shape is RoofShape.flat:
+        if self.roof_shape is roofs.RoofShape.flat:
             roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, roof_mat_idx, stats)
 
         else:
             # -- pitched roof for > 4 ground nodes
             if self.pts_all_count > 4:
-                if self.roof_shape is RoofShape.skillion:
+                if self.roof_shape is roofs.RoofShape.skillion:
                     roofs.separate_skillion(ac_object, self, roof_mat_idx)
-                elif self.roof_shape is RoofShape.pyramidal:
-                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
+                elif self.roof_shape is roofs.RoofShape.pyramidal:
+                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx, roofs.RoofShape.pyramidal)
+                elif self.roof_shape is roofs.RoofShape.dome:
+                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx, roofs.RoofShape.dome)
+                elif self.roof_shape is roofs.RoofShape.onion:
+                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx, roofs.RoofShape.onion)
                 else:
                     s = myskeleton.myskel(ac_object, self, stats, offset_xy=cluster_offset,
                                           offset_z=self.beginning_of_roof_above_sea_level,
@@ -894,17 +860,21 @@ class Building(object):
                         stats.have_complex_roof += 1
 
                     else:  # something went wrong - fall back to flat roof
-                        self.roof_shape = RoofShape.flat
+                        self.roof_shape = roofs.RoofShape.flat
                         roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, roof_mat_idx, stats)
             # -- pitched roof for exactly 4 ground nodes
             elif self.pts_all_count == 4:
-                if self.roof_shape is RoofShape.gabled:
+                if self.roof_shape is roofs.RoofShape.gabled:
                     roofs.separate_gable(ac_object, self, roof_mat_idx, facade_mat_idx)
-                elif self.roof_shape is RoofShape.hipped:
+                elif self.roof_shape is roofs.RoofShape.hipped:
                     roofs.separate_hipped(ac_object, self, roof_mat_idx)
-                elif self.roof_shape is RoofShape.pyramidal:
-                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
-                elif self.roof_shape is RoofShape.skillion:
+                elif self.roof_shape is roofs.RoofShape.pyramidal:
+                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx, roofs.RoofShape.pyramidal)
+                elif self.roof_shape is roofs.RoofShape.dome:
+                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx, roofs.RoofShape.dome)
+                elif self.roof_shape is roofs.RoofShape.onion:
+                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx, roofs.RoofShape.onion)
+                elif self.roof_shape is roofs.RoofShape.skillion:
                     roofs.separate_skillion(ac_object, self, roof_mat_idx)
                 else:
                     logging.warning("Roof type %s seems to be unsupported, but is mapped ", self.roof_shape.name)
