@@ -61,12 +61,11 @@ def _draw_highways(highways_dict, ax: maxs.Axes) -> None:
             _plot_line(ax, my_highway.geometry, "lime", 1)
 
 
-def _draw_buildings(building_zones, ax: maxs.Axes) -> None:
-    for building_zone in building_zones:
-        for building in building_zone.osm_buildings:
-            if isinstance(building.geometry, Polygon):
-                patch = PolygonPatch(building.geometry, facecolor="black", edgecolor="black")
-                ax.add_patch(patch)
+def _draw_buildings(buildings: List[m.Building], ax: maxs.Axes) -> None:
+    for building in buildings:
+        if isinstance(building.geometry, Polygon):
+            patch = PolygonPatch(building.geometry, facecolor="black", edgecolor="black")
+            ax.add_patch(patch)
 
 
 def _draw_osm_zones(building_zones: List[m.BuildingZone], ax: maxs.Axes) -> None:
@@ -222,15 +221,17 @@ def draw_buildings(building_zones, bounds) -> None:
     ax = my_figure.add_subplot(111)
     _draw_background_zones(building_zones, ax)
     _draw_blocked_areas(building_zones, ax)
-    _draw_buildings(building_zones, ax)
+    for building_zone in building_zones:
+        _draw_buildings(building_zone.osm_buildings, ax)
     _set_ax_limits_from_bounds(ax, bounds)
     pdf_pages.savefig(my_figure)
 
     pdf_pages.close()
+    plt.close("all")
 
 
 def draw_zones(highways_dict: Dict[int, m.Highway], buildings: List[m.Building],
-               building_zones: List[m.BuildingZone], btg_building_zones,
+               building_zones: List[m.BuildingZone], btg_building_zones: List[m.BTGBuildingZone],
                lit_areas: List[Polygon], bounds: m.Bounds) -> None:
     pdf_pages = _create_pdf_pages("landuse")
 
@@ -292,6 +293,7 @@ def draw_zones(highways_dict: Dict[int, m.Highway], buildings: List[m.Building],
     pdf_pages.savefig(my_figure)
 
     pdf_pages.close()
+    plt.close("all")
 
 
 def draw_rectify(rectify_buildings: List[bl.RectifyBuilding], max_samples: int, seed_sample: bool) -> None:
@@ -341,3 +343,4 @@ def draw_rectify(rectify_buildings: List[bl.RectifyBuilding], max_samples: int, 
         pdf_pages.savefig(my_figure)
 
     pdf_pages.close()
+    plt.close("all")

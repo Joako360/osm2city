@@ -143,7 +143,7 @@ class BTGReader(object):
                     self.material_name = data
 
             elif property_type == PROPERTY_TYPE_INDEX:
-                (idx,) = struct.unpack("B", data[:1])
+                (idx,) = struct.unpack("<B", data[:1])
                 self.readers = []
                 if idx & INDEX_TYPE_VERTICES:
                     self.readers.append(self.read_vertex)
@@ -173,7 +173,7 @@ class BTGReader(object):
 
         elif object_type == OBJECT_TYPE_NORMAL_LIST:
             for n in range(0, number_bytes // 3):  # One normal is 3 bytes ( 3 * 1 )
-                struct.unpack("BBB", data[n * 3:(n + 1) * 3])  # read and discard
+                struct.unpack("<BBB", data[n * 3:(n + 1) * 3])  # read and discard
 
         elif object_type == OBJECT_TYPE_TEXTURE_COORD_LIST:
             for n in range(0, number_bytes // 8):  # One texture coord is 8 bytes ( 2 * 4 )

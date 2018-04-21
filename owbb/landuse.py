@@ -259,7 +259,7 @@ def _process_btg_building_zones(transformer: Transformation) -> Tuple[List[m.BTG
                     else:
                         disjoint += 1
                 else:
-                    foo = 1  # FIXME
+                    pass  # just discard the triangle
     logging.debug('Out of %i faces %i were disjoint and %i were accepted with the bounds.',
                   counter, disjoint, accepted)
     return btg_zones, btg_reader.faces[btg.WATER_PROXY]
