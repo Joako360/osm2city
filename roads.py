@@ -728,7 +728,7 @@ class Roads(object):
                 if prev_orig_point_dist < distance < next_orig_point_dist:
                     intersects_to_remove.append(key)
                     # check minimal distance of way pieces
-                    if (distance - prev_orig_point_dist) < parameters.BUILT_UP_AREA_LIT_BUFFER:
+                    if (distance - prev_orig_point_dist) < parameters.OWBB_BUILT_UP_BUFFER:
                         continue
                     # make cut
                     current_way_refs.append(key)
@@ -757,7 +757,7 @@ class Roads(object):
             cut_ways_dict[way] = my_line.length / 2
         else:
             # check minimal distance of way pieces
-            if (my_line.length - prev_orig_point_dist) < parameters.BUILT_UP_AREA_LIT_BUFFER:
+            if (my_line.length - prev_orig_point_dist) < parameters.OWBB_BUILT_UP_BUFFER:
                 # instead of new cut way extend the last cut way, but do not change its middle_distance
                 # last cut_way is still "new_way", because we are not is_first
                 new_way.refs.append(original_refs[-1])
@@ -1369,7 +1369,7 @@ class TestUtilities(unittest.TestCase):
         msg = 'line with one intersection point too short at start -> 1 way orig'
         way.refs = [1, 2, 3, 4, 5, 6]
         my_line = shg.LineString([(0, 0), (0, 300), (0, 500), (0, 600), (0, 900), (0, 1000)])
-        intersection_points = [shg.Point(0, parameters.BUILT_UP_AREA_LIT_BUFFER - 1)]
+        intersection_points = [shg.Point(0, parameters.OWBB_BUILT_UP_BUFFER - 1)]
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
         self.assertEqual(1, len(cut_ways_dict), 'number of ways: ' + msg)
         self.assertEqual(6, len(way.refs), 'references of orig way: ' + msg)
@@ -1377,7 +1377,7 @@ class TestUtilities(unittest.TestCase):
         msg = 'line with 1 intersection point too short at end -> 1 way orig'
         way.refs = [1, 2, 3, 4, 5, 6]
         my_line = shg.LineString([(0, 0), (0, 300), (0, 500), (0, 600), (0, 900), (0, 1000)])
-        intersection_points = [shg.Point(0, 1000 - (parameters.BUILT_UP_AREA_LIT_BUFFER - 1))]
+        intersection_points = [shg.Point(0, 1000 - (parameters.OWBB_BUILT_UP_BUFFER - 1))]
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
         self.assertEqual(1, len(cut_ways_dict), 'number of ways: ' + msg)
         self.assertEqual(7, len(way.refs), 'references of orig way: ' + msg)  # 1 more because intersec. point remains
@@ -1385,8 +1385,8 @@ class TestUtilities(unittest.TestCase):
         msg = 'line with 2 intersection points just after each other -> 1 way orig shorter, 2 new ways'
         way.refs = [1, 2, 3, 4, 5, 6]
         my_line = shg.LineString([(0, 0), (0, 300), (0, 500), (0, 600), (0, 900), (0, 1000)])
-        intersection_points = [shg.Point(0, parameters.BUILT_UP_AREA_LIT_BUFFER + 2),
-                               shg.Point(0, 2 * parameters.BUILT_UP_AREA_LIT_BUFFER + 10)]
+        intersection_points = [shg.Point(0, parameters.OWBB_BUILT_UP_BUFFER + 2),
+                               shg.Point(0, 2 * parameters.OWBB_BUILT_UP_BUFFER + 10)]
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
         self.assertEqual(3, len(cut_ways_dict), 'number of ways: ' + msg)
         self.assertEqual(2, len(way.refs), 'references of orig way: ' + msg)

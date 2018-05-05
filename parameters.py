@@ -244,14 +244,6 @@ C2P_CHIMNEY_DEFAULT_HEIGHT = 100  # the default height of chimneys, where the he
 C2P_CHIMNEY_DEFAULT_HEIGHT_VARIATION = 20  # a random variation on top of the default height between 0 and value
 
 # =============================================================================
-# PARAMETERS RELATED TO landuse.py - might be replaced by another library
-# =============================================================================
-LU_LANDUSE_GENERATE_LANDUSE = True
-LU_LANDUSE_BUILDING_BUFFER_DISTANCE = 25
-LU_LANDUSE_BUILDING_BUFFER_DISTANCE_MAX = 50
-LU_LANDUSE_MIN_AREA = 5000
-
-# =============================================================================
 # PARAMETERS RELATED TO roads.py
 # =============================================================================
 
@@ -269,8 +261,6 @@ MIN_ABOVE_GROUND_LEVEL = 0.01    # how much a highway / railway is at least hove
 HIGHWAY_TYPE_MIN = 4  # The lower the number, the more ways are added. See roads.HighwayType
 HIGHWAY_TYPE_MIN_ROUGH_LOD = 6  # the minimum type tobe added to the rough LOD clusters
 POINTS_ON_LINE_DISTANCE_MAX = 1000  # the maximum distance between two points on a line. If longer, then new points are added
-BUILT_UP_AREA_LIT_BUFFER = 50  # the buffer around built-up land-use areas to be used for lighting of streets
-BUILT_UP_AREA_LIT_HOLES_MIN_AREA = 100000  # the minimum area a hole in a LIT_BUFFER needs to have to be not lit
 
 USE_TRAM_LINES = False  # whether to build tram lines (OSM railway=tram). Often they do not merge well with roads
 
@@ -298,18 +288,26 @@ OWBB_LANDUSE_CACHE = False
 OWBB_GENERATE_LANDUSE = False  # from buildings outside of existing land-use zones
 OWBB_GENERATE_LANDUSE_BUILDING_BUFFER_DISTANCE = 30
 OWBB_GENERATE_LANDUSE_BUILDING_BUFFER_DISTANCE_MAX = 50
-OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA = 5000  # also used for CORINE
-OWBB_GENERATE_LANDUSE_LANDUSE_HOLES_MIN_AREA = 5000
+OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA = 5000
+OWBB_GENERATE_LANDUSE_LANDUSE_HOLES_MIN_AREA = 20000
 OWBB_GENERATE_LANDUSE_SIMPLIFICATION_TOLERANCE = 20
 
-OWBB_USE_BTG_LANDUSE = False  # doe not work currently
-
-OWBB_USE_GENERATED_LANDUSE_FOR_BUILDING_GENERATION = False
-OWBB_USE_EXTERNAL_LANDUSE_FOR_BUILDING_GENERATION = True
+OWBB_USE_BTG_LANDUSE = False  # does not work currently
 
 OWBB_SPLIT_MADE_UP_LANDUSE_BY_MAJOR_LINES = True  # for external and generated
-OWBB_SPLIT_MADE_UP_LANDUSE_WATERWAY_BUFFER = 10  # meters
 
+OWBB_BUILT_UP_BUFFER = 50  # the buffer around built-up land-use areas to be used for lighting of streets
+OWBB_BUILT_UP_AREA_HOLES_MIN_AREA = 100000  # the minimum area a hole in a LIT_BUFFER needs to have to be not lit
+
+OWBB_PLACE_POPULATION_DEFAULT_CITY = 200000
+OWBB_PLACE_POPULATION_DEFAULT_TOWN = 20000
+OWBB_PLACE_RADIUS_EXPONENT_CENTRE = 0.5  # 1/2
+OWBB_PLACE_RADIUS_EXPONENT_BLOCK = 0.6  # 5/8
+OWBB_PLACE_RADIUS_EXPONENT_DENSE = 0.666  # 2/3
+OWBB_PLACE_RADIUS_FACTOR_CITY = 1.
+OWBB_PLACE_RADIUS_FACTOR_TOWN = 1.
+
+OWBB_PLACE_TILE_BORDER_EXTENSION = 10000
 
 # ==================== BUILDING GENERATION ============
 
@@ -323,6 +321,9 @@ OWBB_RESIDENTIAL_HIGHWAY_MIN_GEN_SHARE = 0.3
 OWBB_INDUSTRIAL_HIGHWAY_MIN_GEN_SHARE = 0.3  # FIXME: not yet used
 
 OWBB_ZONE_AREA_MAX_GEN = 0.1  # FIXME: needs to be zone type specific and maybe village vs. town
+
+OWBB_USE_GENERATED_LANDUSE_FOR_BUILDING_GENERATION = False
+OWBB_USE_EXTERNAL_LANDUSE_FOR_BUILDING_GENERATION = True
 
 OWBB_RESIDENTIAL_HOUSE_FRONT_MIN = 5
 OWBB_RESIDENTIAL_HOUSE_FRONT_MAX = 15

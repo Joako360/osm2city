@@ -9,6 +9,7 @@ Please consider the following:
 * Python does not recognize operating system environment variables, please use full paths in the parameters file (no ``$HOME`` etc).
 * These parameters determine how scenery objects are generated offline as described in chapter :ref:`Scenery Generation <chapter-generation-label>`.
 * All decimals need to be with "." — i.e. local specific decimal separators like "," are not accepted.
+* Unless specified otherwise then all length is in metres and areas are in square metres.
 * You do not have to specify all parameters in your ``params.ini`` file. Actually it is better only to specify those parameters, which you want to actively control — the rest just gets the defaults.
 
 
@@ -31,9 +32,9 @@ If you want to see a listing of the actual parameters used during scenery genera
     /usr/bin/python3 --file /home/pingu/development/osm2city/parameters.py -f LSZS/params.ini
 
 
-==================================
-Detailed Description of Parameters
-==================================
+====================
+Important Parameters
+====================
 
 
 .. _chapter-param-minimal-label:
@@ -114,6 +115,10 @@ NO_ELEV                                         Boolean    False     The only re
 
 =============================================   ========   =======   ==============================================================================
 
+
+=========
+Buildings
+=========
 
 .. _chapter-parameters-lod-label:
 
@@ -318,9 +323,9 @@ RECTIFY_SEED_SAMPLE                             Boolean    True      If set to T
 
 .. _chapter-parameters-light:
 
--------------
-Light Effects
--------------
+--------------------------
+Light Effects on Buildings
+--------------------------
 
 Parameters for some light effects.
 
@@ -330,80 +335,19 @@ Parameter                                       Type       Default   Description
 OBSTRUCTION_LIGHT_MIN_LEVELS                    Integer    15        Puts red obstruction lights on buildings >= the specified number levels.
                                                                      If you do not want this, then just set the value to 0.
 
-LIGHTMAP_ENABLE                                 Boolean    True      Creates simulated light effects on buildings from street lights.
+BUILDING_FAKE_AMBIENT_OCCLUSION                 Boolean    True      Fake ambient occlusion by darkening facade textures towards the ground, using
+                                                                     the formula 1 - VALUE * exp(- AGL / HEIGHT ) during texture atlas generation.
+BUILDING_FAKE_AMBIENT_OCCLUSION_HEIGHT          Number     6.        (see above)
+BUILDING_FAKE_AMBIENT_OCCLUSION_VALUE           Number     0.6       (see above)
 
 =============================================   ========   =======   ==============================================================================
-
-
-.. _chapter-parameters-textures:
-
---------
-Textures
---------
-
-=============================================   ========   =======   ==============================================================================
-Parameter                                       Type       Default   Description / Example
-=============================================   ========   =======   ==============================================================================
-ATLAS_SUFFIX                                    String     (empty)   Add the the suffix to the texture atlas (also light-map) in ``osm2city-data``
-                                                                     including an underscore (e.g. 'foo' leads to atlas_facades_foo.png).
-
-TEXTURES_ROOFS_NAME_EXCLUDE                     List       []        List of roof file names to exclude, e.g. ["roof_red3.png", "roof_orange.png"].
-                                                                     The file names must be relative paths to the ``tex.src`` directory within
-                                                                     ``PATH_TO_OSM2CITY_DATA``.
-                                                                     Be aware the excluding roofs can lead to indirectly excluding facade textures,
-                                                                     which might be depending on provided roof types.
-                                                                     An empty list means that no filtering is done.
-
-TEXTURES_FACADES_NAME_EXCLUDE                   List       []        Same as ``TEXTURES_ROOFS_EXCLUDE`` but for facades — e.g.
-                                                                     ["de/commercial/facade_modern_21x42m.jpg"].
-
-TEXTURES_ROOFS_PROVIDE_EXCLUDE                  List       []        List of provided features for roofs to exclude, e.g. ["colour:red"].
-
-TEXTURES_FACADES_PROVIDE_EXCLUDE                List       []        Ditto for facades.
-
-TEXTURES_REGIONS_EXPLICIT                       List       []        Explicit list of regions to include. If list is empty, then all regions are
-                                                                     accepted.
-                                                                     There is also a special region "generic", which corresponds to
-                                                                     top directory structure. In many situations it might not make sense to include
-                                                                     "generic", as it provides a lot of colours etc. (which however could be
-                                                                     filtered with the other parameters).
-
-TEXTURES_EMPTY_LM_RGB_VALUE                     Integer    35        If a texture does not have an explicit light-map (i.e. same file name plus
-                                                                     "_LM", then a default light-map is constructed with RGB(VALUE, VALUE, VALUE).
-
-=============================================   ========   =======   ==============================================================================
-
-
-.. _chapter-parameters-clipping:
-
----------------
-Clipping Region
----------------
-
-The boundary of a scenery as specified by the parameters boundary command line argument is not necessarily sharp. As described in :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>` it is recommended to use ``completeWays=yes``, when manipulating/getting OSM data - this happens also to be the case when using the `OSM Extended API`_ to retrieve data. However there are no parameters to influence the processing of OSM nodes and OSM ways depending on whether they are inside / outside the boundary or intersecting.
-
-The processing is as follows:
-
-* buildings.py: if the first node is inside the boundary, then the whole building is processed — otherwise not
-* roads.py: if not entirely inside then split at boundary, such that the first node is always inside and the last is either inside by default or the first node outside for splitting.
-* piers.py: as above for piers
-* platforms.py: as above for platforms
-* pylons.py
-
-  * storage tanks: if the centroid is inside the boundary, then the whole storage tank is processed — otherwise not
-  * wind turbines and chimneys: no checking because the source data for OSM should already be extracted correctly
-  * aerial ways: if the first node is inside the boundary, then the whole aerial way is processed — otherwise not (assuming that aerial ways are short)
-  * power lines and railway overhead lines: as for roads. If the last node was split, then no shared model is placed assuming it is continued in another tile (i.e. optimized for batch processing across tiles)
-
-
-.. _`OSM Extended API`: http://wiki.openstreetmap.org/wiki/Xapi
 
 
 .. _chapter-parameters-roads:
 
---------------------------------
+================================
 Linear Objects (Roads, Railways)
---------------------------------
+================================
 
 Parameters for roads, railways and related bridges. One of the challenges to show specific textures based on OSM data is to fit the texture such that it drapes ok on top of the scenery. Therefore several parameters relate to enabling proper draping.
 
@@ -459,6 +403,155 @@ After adjusted MAX_SLOPE_* and POINTS_ON_LINE_DISTANCE_MAX parameters:
 
 .. image:: no_elev_residuals.png
 
+
+.. _chapter-parameters-landuse-label:
+
+========
+Land-Use
+========
+
+Land-use data is only used for built-up area in ``osm2city``. All other land-use is per the scenery in FlightGear. The main use of the land-use information processed is to determine building types, building height etc. for those buildings (often the majority), where this information is lacking and therefore must be obtained by means of heuristics. See :ref:`Land-use <chapter-howto-land-use-label>` for an overall description.
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+OWBB_LANDUSE_CACHE                              Boolean    False     Instead of calculating land-use related stuff from scratch each time, use
+                                                                     cached (but possibly stale) data for speed-up.
+
+=============================================   ========   =======   ==============================================================================
+
+-----------------------------------
+Complement OSM Land-Use Information
+-----------------------------------
+
+This operations complements land-use information from OSM based on some simple heuristics, where there currently are no land-use zones for built-up areas in OSM: If there are clusters of buildings outside of registered OSM land-use zones, then zones are added based on clusters of buildings and buffers around them. The land-use type is based on information of building types, amenities etc. — if available.
+
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+OWBB_GENERATE_LANDUSE                           Boolean    False     Create land-use based on building clusters outside of existing land-use
+                                                                     information (OSM and/or BTG-files).
+OWBB_GENERATE..._BUILDING_BUFFER_DISTANCE       Number     30        The minimum buffering distance around a building.
+OWBB_GENERATE..._BUILDING_BUFFER_DISTANCE_MAX   Number     50        The maximum buffering distance around a building. The actual value is a
+                                                                     function of the previous parameter and the building's size (the larger the
+                                                                     building the larger the buffering distance - up to this max value.
+OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA          Number     5000      The minimum area in square metres of a generated land-use. Otherwise it is
+                                                                     discarded.
+OWBB_GENERATE_LANDUSE_LANDUSE_HOLES_MIN_AREA    Number     20000     The minimum area for a hole within a generated land-use that is kept as a
+                                                                     hole (square metres).
+OWBB_GENERATE..._SIMPLIFICATION_TOLERANCE       Number     20        The tolerance in metres used for simplifying the geometry of the generated
+                                                                     land-use boundaries. Tolerance means that all points in the simplified
+                                                                     land-use will be within the tolerance distance of the original geometry.
+
+OWBB_SPLIT_MADE_UP_LANDUSE_BY_MAJOR_LINES       Boolean    True      Splits generated land-use by major lines, as typically land-use changes occur
+                                                                     across larger boundaries. "Major lines" here are motorways, most railways
+                                                                     (not trams) and waterways classified in OSM as rivers and canals.
+
+=============================================   ========   =======   ==============================================================================
+
+
+On the left side of the picture below the original OSM-data is shown, where there only is one land-use zone (green), but areas with buildings outside of land-use zones as well as several streets without buildings (which from an arial picture actually have lots of buildings — they have just not been mapped in OSM.
+
+On the right side of the picture the pink areas are generated based on building clusters and the yellow zone is from CORINE data.
+
+.. image:: landuse.png
+
+.. _BTG-files: http://wiki.flightgear.org/BTG_file_format
+
+
+------------------------------------
+Generating Areas Where Roads are Lit
+------------------------------------
+
+Land-use information is used to determine which roads are lit during the night (in addition to those roads which in OSM are explicitly tagged as
+being lit).
+
+The resulting built-up areas are also used for finding city and town areas — another reason why the values should be chosen conservative, i.e. large.
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+BUILT_UP_AREA_LIT_BUFFER                        Number     100       The buffer distance around built-up land-use areas to be used for lighting of
+                                                                     streets. The number is chosen pretty large such that as many building zone
+                                                                     clusters as possible are connected. also it is not unusual that the lighting
+                                                                     of streets starts a bit outside of a built-up area.
+BUILT_UP_AREA_LIT_HOLES_MIN_AREA                Number     100000    The minimum area in square metres a hole in a LIT_BUFFER needs to have to be
+                                                                     not lit. In general this can be quite a large value and larger than e.g.
+                                                                     parameter OWBB_GENERATE_LANDUSE_LANDUSE_HOLES_MIN_AREA.
+=============================================   ========   =======   ==============================================================================
+
+
+----------------------------------------
+Size of Concentric Settlement Type Rings
+----------------------------------------
+
+The formula for the radius of the outer border of the ring is:
+
+::
+
+    radius = population^OWBB_PLACE_RADIUS_EXPONENT * OWBB_PLACE_RADIUS_FACTOR
+
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+OWBB_PLACE_POPULATION_DEFAULT_CITY              Integer    200000    The default population for a settlement tagged with ``place=city``, where the
+                                                                     population size is not tagged.
+OWBB_PLACE_POPULATION_DEFAULT_TOWN              Integer    20000     Ditto for ``place=town``.
+OWBB_PLACE_RADIUS_EXPONENT_CENTRE               Number     0.5       The exponent for calculating the radius for settlement type ``centre``, i.e.
+                                                                     1/2.
+OWBB_PLACE_RADIUS_EXPONENT_BLOCK                Number     0.6       Ditto for type ``block``, i.e. 5/8.
+OWBB_PLACE_RADIUS_EXPONENT_DENSE                Number     0.666     Ditto for type ``dense``, i.e. 2/3.
+OWBB_PLACE_RADIUS_FACTOR_CITY                   Number     1.        Linear correction factor for radius when dealing with ``place=city``.
+OWBB_PLACE_RADIUS_FACTOR_TOWN                   Number     1.        Ditto for ``place=town``.
+OWBB_PLACE_TILE_BORDER_EXTENSION                Integer    10000     Extension of the perimeter (tile borders) to read place information from, as
+                                                                     e.g. a city might extend across til border areas.
+=============================================   ========   =======   ==============================================================================
+
+
+.. _chapter-parameters-textures:
+
+========
+Textures
+========
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+ATLAS_SUFFIX                                    String     (empty)   Add the the suffix to the texture atlas (also light-map) in ``osm2city-data``
+                                                                     including an underscore (e.g. 'foo' leads to atlas_facades_foo.png).
+
+TEXTURES_ROOFS_NAME_EXCLUDE                     List       []        List of roof file names to exclude, e.g. ["roof_red3.png", "roof_orange.png"].
+                                                                     The file names must be relative paths to the ``tex.src`` directory within
+                                                                     ``PATH_TO_OSM2CITY_DATA``.
+                                                                     Be aware the excluding roofs can lead to indirectly excluding facade textures,
+                                                                     which might be depending on provided roof types.
+                                                                     An empty list means that no filtering is done.
+
+TEXTURES_FACADES_NAME_EXCLUDE                   List       []        Same as ``TEXTURES_ROOFS_EXCLUDE`` but for facades — e.g.
+                                                                     ["de/commercial/facade_modern_21x42m.jpg"].
+
+TEXTURES_ROOFS_PROVIDE_EXCLUDE                  List       []        List of provided features for roofs to exclude, e.g. ["colour:red"].
+
+TEXTURES_FACADES_PROVIDE_EXCLUDE                List       []        Ditto for facades.
+
+TEXTURES_REGIONS_EXPLICIT                       List       []        Explicit list of regions to include. If list is empty, then all regions are
+                                                                     accepted.
+                                                                     There is also a special region "generic", which corresponds to
+                                                                     top directory structure. In many situations it might not make sense to include
+                                                                     "generic", as it provides a lot of colours etc. (which however could be
+                                                                     filtered with the other parameters).
+
+TEXTURES_EMPTY_LM_RGB_VALUE                     Integer    35        If a texture does not have an explicit light-map (i.e. same file name plus
+                                                                     "_LM", then a default light-map is constructed with RGB(VALUE, VALUE, VALUE).
+
+=============================================   ========   =======   ==============================================================================
+
+
+================
+Other Parameters
+================
 
 .. _chapter-parameters-pylons_details:
 
@@ -527,3 +620,30 @@ E.g. ``SKIP_LIST = ['St. Leodegar im Hof (Hofkirche)', 87220999]``
 
 
 .. [#] The only exception to the rule is the possibility to adjust the :ref:`Actual Distance of LOD Ranges <chapter-lod-label>`.
+
+
+.. _chapter-parameters-clipping:
+
+---------------
+Clipping Region
+---------------
+
+The boundary of a scenery as specified by the parameters boundary command line argument is not necessarily sharp. As described in :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>` it is recommended to use ``completeWays=yes``, when manipulating/getting OSM data - this happens also to be the case when using the `OSM Extended API`_ to retrieve data. However there are no parameters to influence the processing of OSM nodes and OSM ways depending on whether they are inside / outside the boundary or intersecting.
+
+The processing is as follows:
+
+* buildings.py: if the first node is inside the boundary, then the whole building is processed — otherwise not
+* roads.py: if not entirely inside then split at boundary, such that the first node is always inside and the last is either inside by default or the first node outside for splitting.
+* piers.py: as above for piers
+* platforms.py: as above for platforms
+* pylons.py
+
+  * storage tanks: if the centroid is inside the boundary, then the whole storage tank is processed — otherwise not
+  * wind turbines and chimneys: no checking because the source data for OSM should already be extracted correctly
+  * aerial ways: if the first node is inside the boundary, then the whole aerial way is processed — otherwise not (assuming that aerial ways are short)
+  * power lines and railway overhead lines: as for roads. If the last node was split, then no shared model is placed assuming it is continued in another tile (i.e. optimized for batch processing across tiles)
+
+
+.. _`OSM Extended API`: http://wiki.openstreetmap.org/wiki/Xapi
+
+

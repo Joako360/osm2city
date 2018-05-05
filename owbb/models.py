@@ -70,16 +70,16 @@ class OSMFeature(abc.ABC):
 
 @unique
 class PlaceType(IntEnum):
+    """See https://wiki.openstreetmap.org/wiki/Key:place - only used for city and town as well as farm.
+    Rest is ignored - including:
+    * isolated_dwelling and allotments -> too small
+    * borough: administrative and very few mappings
+    * quarter; not used much in OSM and might be better off just using neighbourhood in osm2city
+    * city_block and plot: too small
+    """
     city = 10
-    borough = 11
-    suburb = 12
-    quarter = 13
-    neighbourhood = 14
-    city_block = 15
     town = 20
-    village = 30
-    hamlet = 40
-    farm = 50
+    farm = 50  # only type allowed to remain as area as it is used to recognize land-use type
 
 
 class Place(OSMFeature):
@@ -125,28 +125,10 @@ class Place(OSMFeature):
     @staticmethod
     def parse_tags(tags_dict: KeyValueDict) -> Union[None, PlaceType]:
         value = tags_dict["place"]
-        if value == "city":
-            return PlaceType.city
-        elif value == "borough":
-            return PlaceType.borough
-        elif value == "suburb":
-            return PlaceType.suburb
-        elif value == "quarter":
-            return PlaceType.quarter
-        elif value == "neighbourhood":
-            return PlaceType.neighbourhood
-        elif value == "city_block":
-            return PlaceType.city_block
-        elif value == "town":
-            return PlaceType.town
-        elif value == "village":
-            return PlaceType.village
-        elif value == "hamlet":
-            return PlaceType.hamlet
-        elif value == "farm":
-            return PlaceType.farm
-        else:
-            return None
+        for member in PlaceType:
+            if value == member.name:
+                return member
+        return None
 
     def is_valid(self) -> bool:
         if None is self.type_:
@@ -158,6 +140,62 @@ class Place(OSMFeature):
             if not isinstance(self.geometry, Polygon):
                 return False
         return True
+
+    def transform_to_point(self) -> None:
+        """Transforms a Place defined as Way to a Point."""
+        if self.is_point:
+            return
+        if self.type_ is PlaceType.farm:
+            logging.debug('Attempted to transform Place of type farm from area to point')
+            return
+        self.is_point = True
+        self.geometry = self.geometry.centroid
+
+    def _calculate_circle_radius(self, population: int, power: float) -> float:
+        radius = math.pow(population, power)
+        if self.type_ is PlaceType.city:
+            radius *= parameters.OWBB_PLACE_RADIUS_FACTOR_CITY
+        else:
+            radius *= parameters.OWBB_PLACE_RADIUS_FACTOR_TOWN
+        return radius
+
+    def create_settlement_type_circles(self) -> Tuple[Polygon, Polygon, Polygon]:
+        population = self.population
+        if population == 0:
+            if self.type_ is PlaceType.city:
+                population = parameters.OWBB_PLACE_POPULATION_DEFAULT_CITY
+            else:
+                population = parameters.OWBB_PLACE_POPULATION_DEFAULT_TOWN
+        centre_circle = Polygon()
+        if self.type_ is PlaceType.city:
+            radius = self._calculate_circle_radius(population, parameters.OWBB_PLACE_RADIUS_EXPONENT_CENTRE)
+            centre_circle = self.geometry.buffer(radius)
+            radius = self._calculate_circle_radius(population, parameters.OWBB_PLACE_RADIUS_EXPONENT_BLOCK)
+            block_circle = self.geometry.buffer(radius)
+            radius = self._calculate_circle_radius(population, parameters.OWBB_PLACE_RADIUS_EXPONENT_DENSE)
+            dense_circle = self.geometry.buffer(radius)
+        else:
+            radius = self._calculate_circle_radius(population, parameters.OWBB_PLACE_RADIUS_EXPONENT_BLOCK)
+            block_circle = self.geometry.buffer(radius)
+            radius = self._calculate_circle_radius(population, parameters.OWBB_PLACE_RADIUS_EXPONENT_DENSE)
+            dense_circle = self.geometry.buffer(radius)
+        return (centre_circle, block_circle, dense_circle)
+
+
+@unique
+class SettlementType(IntEnum):
+    centre = 1
+    block = 2
+    dense = 3
+    periphery = 4  # default
+
+
+class SettlementCluster:
+    """A polygon based on lit_area representing a settlement cluster.
+    Built-up areas can sprawl and a coherent area can contain several cities and towns."""
+    def __init__(self, linked_places: List[Place], geometry: Polygon) -> None:
+        self.linked_places = linked_places
+        self.geometry = geometry
 
 
 class OSMFeatureArea(OSMFeature):
@@ -225,6 +263,7 @@ class BuildingType(IntEnum):
     greenhouse = 95
     stable = 96
     sty = 97
+    riding_hall = 98
     hangar = 100
 
 
@@ -285,7 +324,7 @@ class Building(OSMFeatureArea):
                             BuildingType.hotel, BuildingType.kiosk]:
             return BuildingClass.public
         elif self.type_ in [BuildingType.farm, BuildingType.barn, BuildingType.cowshed, BuildingType.farm_auxiliary,
-                            BuildingType.greenhouse, BuildingType.stable, BuildingType.sty]:
+                            BuildingType.greenhouse, BuildingType.stable, BuildingType.sty, BuildingType.riding_hall]:
             return BuildingClass.farm
         elif self.type_ in [BuildingType.hangar]:
             return BuildingClass.airport
@@ -300,27 +339,19 @@ class BuildingZoneType(IntEnum):  # element names must match OSM values apart fr
     retail = 40
     farmyard = 50  # for generated land-use zones this is not correctly applied, as several farmyards might be
     # interpreted as one. See GeneratedBuildingZone.guess_building_zone_type
+    port = 60
 
     non_osm = 100  # used for land-uses constructed with heuristics and not in original data from OSM
 
-    # FlightGear in BTG files
-    # must be in line with SUPPORTED_MATERIALS in btg_io.py (except from water)
-    btg_builtupcover = 201
-    btg_urban = 202
-    btg_town = 211
-    btg_suburban = 212
-    btg_construction = 221
-    btg_industrial = 222
-    btg_port = 223
 
-
-class CityBlock():
+class CityBlock:
     """A special land-use derived from many kinds of land-use info and enclosed by streets (kind of)."""
     def __init__(self, osm_id: int, geometry: Polygon, feature_type: Union[None, BuildingZoneType]) -> None:
         self.osm_id = osm_id
         self.geometry = geometry
         self.building_zone_type = feature_type
         self.osm_buildings = list()  # List of already existing osm buildings
+        self.settlement_type = SettlementType.periphery
 
 
 class BuildingZone(OSMFeatureArea):
@@ -399,7 +430,7 @@ class GeneratedBuildingZone(BuildingZone):
         super().__init__(generated_id, geometry, building_zone_type)
         self.from_buildings = from_buildings  # False for e.g. external land-use
 
-    def guess_building_zone_type(self, places: List[Place]):
+    def guess_building_zone_type(self, farm_places: List[Place]):
         """Based on some heuristics of linked buildings guess the building zone type"""
         residential_buildings = 0
         commercial_buildings = 0
@@ -424,21 +455,20 @@ class GeneratedBuildingZone(BuildingZone):
                          farm_buildings])
         if 0 < max_value:
             if len(self.osm_buildings) < 10:
-                logging.debug("Checking generated land-use for place=farm based on %d place tags", len(places))
-                for my_place in places:
-                    if my_place.type_ is PlaceType.farm:
-                        if my_place.is_point:
-                            if my_place.geometry.within(self.geometry):
-                                self.type_ = BuildingZoneType.farmyard
-                                places.remove(my_place)
-                                logging.debug("Found one based on node place")
-                                return
-                        else:
-                            if my_place.geometry.intersects(self.geometry):
-                                self.type_ = BuildingZoneType.farmyard
-                                places.remove(my_place)
-                                logging.debug("Found one based on area place")
-                                return
+                logging.debug("Checking generated land-use for place=farm based on %d place tags", len(farm_places))
+                for my_place in farm_places:
+                    if my_place.is_point:
+                        if my_place.geometry.within(self.geometry):
+                            self.type_ = BuildingZoneType.farmyard
+                            farm_places.remove(my_place)
+                            logging.debug("Found one based on node place")
+                            return
+                    else:
+                        if my_place.geometry.intersects(self.geometry):
+                            self.type_ = BuildingZoneType.farmyard
+                            farm_places.remove(my_place)
+                            logging.debug("Found one based on area place")
+                            return
             if farm_buildings == max_value:  # in small villages farm houses might be tagged, but rest just ="yes"
                 if (len(self.osm_buildings) >= 10) and (farm_buildings < int(0.5*len(self.osm_buildings))):
                     guessed_type = BuildingZoneType.residential
@@ -1200,22 +1230,67 @@ def process_osm_waterway_refs(transformer: co.Transformation) -> Dict[int, Water
     return my_ways
 
 
-def process_osm_place_refs(transformer: co.Transformation) -> List[Place]:
-    my_places = list()
+def _add_extension_to_tile_border(transformer: co.Transformation) -> None:
+    x, y = transformer.to_local((parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH))
+    lon, lat = transformer.to_global((x - parameters.OWBB_PLACE_TILE_BORDER_EXTENSION,
+                                      y - parameters.OWBB_PLACE_TILE_BORDER_EXTENSION))
+    parameters.BOUNDARY_WEST = lon
+    parameters.BOUNDARY_SOUTH = lat
+
+    x, y = transformer.to_local((parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH))
+    lon, lat = transformer.to_global((x + parameters.OWBB_PLACE_TILE_BORDER_EXTENSION,
+                                      y + parameters.OWBB_PLACE_TILE_BORDER_EXTENSION))
+    parameters.BOUNDARY_EAST = lon
+    parameters.BOUNDARY_NORTH = lat
+
+
+def process_osm_place_refs(transformer: co.Transformation) -> Tuple[List[Place], List[Place]]:
+    """Reads both nodes and areas from OSM, but then transforms areas to nodes.
+    We trust that there is no double tagging of a place as both node and area.
+    """
+    urban_places = list()
+    farm_places = list()
+
+    key_value_pairs = list()
+    for member in PlaceType:
+        key_value_pairs.append('place=>{}'.format(member.name))
+
+    # temporarily change the tile border to get more places
+    temp_east = parameters.BOUNDARY_EAST
+    temp_west = parameters.BOUNDARY_WEST
+    temp_north = parameters.BOUNDARY_NORTH
+    temp_south = parameters.BOUNDARY_SOUTH
+
+    _add_extension_to_tile_border(transformer)
+
     # points
-    osm_nodes_dict = op.fetch_db_nodes_isolated([PLACE_KEY], list())
+    osm_nodes_dict = op.fetch_db_nodes_isolated(list(), key_value_pairs)
     for key, node in osm_nodes_dict.items():
         place = Place.create_from_node(node, transformer)
         if place.is_valid():
-            my_places.append(place)
+            if place.type_ is PlaceType.farm:
+                farm_places.append(place)
+            else:
+                urban_places.append(place)
     # areas
-    osm_way_result = op.fetch_osm_db_data_ways_keys([PLACE_KEY])
+    osm_way_result = op.fetch_osm_db_data_ways_key_values(key_value_pairs)
     osm_nodes_dict = osm_way_result.nodes_dict
     osm_ways_dict = osm_way_result.ways_dict
     for key, way in osm_ways_dict.items():
         place = Place.create_from_way(way, osm_nodes_dict, transformer)
         if place.is_valid():
-            my_places.append(place)
-    logging.info("Number of valid places found: {}".format(len(my_places)))
+            if place.type_ is PlaceType.farm:
+                farm_places.append(place)
+            else:
+                place.transform_to_point()
+                urban_places.append(place)
 
-    return my_places
+    logging.info("Number of valid places found: urban={}, farm={}".format(len(urban_places), len(farm_places)))
+
+    # change the tile border back
+    parameters.BOUNDARY_EAST = temp_east
+    parameters.BOUNDARY_WEST = temp_west
+    parameters.BOUNDARY_NORTH = temp_north
+    parameters.BOUNDARY_SOUTH = temp_south
+
+    return urban_places, farm_places

@@ -54,6 +54,7 @@ class Procedures(IntEnum):
     roads = 3
     pylons = 4
     details = 5
+    owbb = 6  # only land-use
 
 
 def _parse_exec_for_procedure(exec_argument: str) -> Procedures:
@@ -188,7 +189,7 @@ if __name__ == '__main__':
                         help='the number of tasks a worker process completes before it will exit (default: unlimited)',
                         required=False)
     parser.add_argument("-e", "--execute", dest="exec",
-                        help="execute only the given procedure[s] (buildings, pylons, roads, details, main)",
+                        help="execute only the given procedure[s] (buildings, pylons, roads, details, main, owbb, all)",
                         required=False)
     parser.add_argument("-l", "--loglevel", dest="logging_level",
                         help="set loggging level. Valid levels are DEBUG, INFO (default), WARNING, ERROR, CRITICAL",

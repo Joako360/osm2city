@@ -68,58 +68,74 @@ def _draw_buildings(buildings: List[m.Building], ax: maxs.Axes) -> None:
             ax.add_patch(patch)
 
 
+def _add_patch_for_building_zone(building_zone: m.BuildingZone, face_color: str, edge_color: str, ax: maxs.Axes)  \
+            -> None:
+    if isinstance(building_zone.geometry, MultiPolygon):
+        for polygon in building_zone.geometry.geoms:
+            patch = PolygonPatch(polygon, facecolor=face_color, edgecolor=edge_color)
+            ax.add_patch(patch)
+    else:
+        patch = PolygonPatch(building_zone.geometry, facecolor=face_color, edgecolor=edge_color)
+        ax.add_patch(patch)
+
+
+def _draw_settlement_zones(building_zones: List[m.BuildingZone], ax: maxs.Axes) -> None:
+    for building_zone in building_zones:
+        colour = 'grey'
+        if building_zone.type_ is m.BuildingZoneType.farmyard:
+            colour = 'brown'
+        _add_patch_for_building_zone(building_zone, colour, colour, ax)
+        for block in building_zone.linked_city_blocks:
+            if block.settlement_type is m.SettlementType.centre:
+                colour = 'blue'
+            elif block.settlement_type is m.SettlementType.block:
+                colour = 'green'
+            elif block.settlement_type is m.SettlementType.dense:
+                colour = 'magenta'
+            patch = PolygonPatch(block.geometry, facecolor=colour, edgecolor=colour)
+            ax.add_patch(patch)
+
+
 def _draw_osm_zones(building_zones: List[m.BuildingZone], ax: maxs.Axes) -> None:
     edge_color = "red"
     for building_zone in building_zones:
         if not isinstance(building_zone, m.GeneratedBuildingZone):
-            my_color = "red"
+            face_color = "red"
             if m.BuildingZoneType.commercial is building_zone.type_:
-                my_color = "blue"
+                face_color = "blue"
             elif m.BuildingZoneType.industrial is building_zone.type_:
-                my_color = "green"
+                face_color = "green"
             elif m.BuildingZoneType.retail is building_zone.type_:
-                my_color = "darkorange"
+                face_color = "darkorange"
             elif m.BuildingZoneType.residential is building_zone.type_:
-                my_color = "magenta"
+                face_color = "magenta"
             elif m.BuildingZoneType.farmyard is building_zone.type_:
-                my_color = "chocolate"
-            if isinstance(building_zone.geometry, MultiPolygon):
-                for polygon in building_zone.geometry.geoms:
-                    patch = PolygonPatch(polygon, facecolor=my_color, edgecolor=edge_color)
-                    ax.add_patch(patch)
-            else:
-                patch = PolygonPatch(building_zone.geometry, facecolor=my_color, edgecolor=edge_color)
-                ax.add_patch(patch)
+                face_color = "chocolate"
+            _add_patch_for_building_zone(building_zone, face_color, edge_color, ax)
 
 
 def _draw_generated_zones(building_zones, ax: maxs.Axes) -> None:
     edge_color = "red"
     for building_zone in building_zones:
         if isinstance(building_zone, m.GeneratedBuildingZone):
-            my_color = "red"
+            face_color = "red"
             if m.BuildingZoneType.commercial is building_zone.type_:
-                my_color = "lightblue"
+                face_color = "lightblue"
             elif m.BuildingZoneType.industrial is building_zone.type_:
-                my_color = "lightgreen"
+                face_color = "lightgreen"
             elif m.BuildingZoneType.retail is building_zone.type_:
-                my_color = "orange"
+                face_color = "orange"
             elif m.BuildingZoneType.residential is building_zone.type_:
-                my_color = "pink"
+                face_color = "pink"
             elif m.BuildingZoneType.farmyard is building_zone.type_:
-                my_color = "sandybrown"
+                face_color = "sandybrown"
             elif m.BuildingZoneType.corine_ind_com is building_zone.type_:
-                my_color = "cyan"
+                face_color = "cyan"
             elif m.BuildingZoneType.corine_continuous is building_zone.type_:
-                my_color = "gold"
+                face_color = "gold"
             elif m.BuildingZoneType.corine_discontinuous is building_zone.type_:
-                my_color = "yellow"
-            if isinstance(building_zone.geometry, MultiPolygon):
-                for polygon in building_zone.geometry.geoms:
-                    patch = PolygonPatch(polygon, facecolor=my_color, edgecolor=edge_color)
-                    ax.add_patch(patch)
-            else:
-                patch = PolygonPatch(building_zone.geometry, facecolor=my_color, edgecolor=edge_color)
-                ax.add_patch(patch)
+                face_color = "yellow"
+            _add_patch_for_building_zone(building_zone, face_color, edge_color, ax)
 
 
 def _draw_btg_building_zones(btg_building_zones, ax: maxs.Axes) -> None:
@@ -148,7 +164,7 @@ def _draw_city_blocks(building_zones: List[m.BuildingZone], ax: maxs.Axes) -> No
             red = random.random()
             green = random.random()
             blue = random.random()
-            patch = PolygonPatch(item.geometry, facecolor=(red, green, blue), edgecolor="black")
+            patch = PolygonPatch(item.geometry, facecolor=(red, green, blue), edgecolor=(red, green, blue))
             ax.add_patch(patch)
 
 
@@ -241,8 +257,6 @@ def draw_zones(highways_dict: Dict[int, m.Highway], buildings: List[m.Building],
 , magenta=residential, brown=farmyard, red=error]")
     ax = my_figure.add_subplot(111)
     _draw_osm_zones(building_zones, ax)
-    _draw_highways(highways_dict, ax)
-    # _draw_buildings(buildings, ax)
     _set_ax_limits_from_bounds(ax, bounds)
     pdf_pages.savefig(my_figure)
 
@@ -265,7 +279,6 @@ def draw_zones(highways_dict: Dict[int, m.Highway], buildings: List[m.Building],
     ax = my_figure.add_subplot(111)
     ax.grid(True, linewidth=1, linestyle="--", color="silver")
     _draw_lit_areas(lit_areas, ax)
-    _draw_highways(highways_dict, ax)
     _set_ax_limits_from_bounds(ax, bounds)
     pdf_pages.savefig(my_figure)
 
@@ -277,8 +290,16 @@ def draw_zones(highways_dict: Dict[int, m.Highway], buildings: List[m.Building],
     ax = my_figure.add_subplot(111)
     _draw_osm_zones(building_zones, ax)
     _draw_generated_zones(building_zones, ax)
-    _draw_highways(highways_dict, ax)
     _draw_buildings(buildings, ax)
+    _set_ax_limits_from_bounds(ax, bounds)
+    pdf_pages.savefig(my_figure)
+
+    # Settlement type
+    my_figure = _create_a3_landscape_figure()
+    my_figure.suptitle("Built-up areas by settlement type \n[blue=centre (city), green=block, magenta=dense, \
+    ,  brown=farmyard]")
+    ax = my_figure.add_subplot(111)
+    _draw_settlement_zones(building_zones, ax)
     _set_ax_limits_from_bounds(ax, bounds)
     pdf_pages.savefig(my_figure)
 
@@ -288,7 +309,6 @@ def draw_zones(highways_dict: Dict[int, m.Highway], buildings: List[m.Building],
     ax = my_figure.add_subplot(111)
     ax.grid(True, linewidth=1, linestyle="--", color="silver")
     _draw_city_blocks(building_zones, ax)
-    _draw_highways(highways_dict, ax)
     _set_ax_limits_from_bounds(ax, bounds)
     pdf_pages.savefig(my_figure)
 

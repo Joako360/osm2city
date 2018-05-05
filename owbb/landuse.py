@@ -4,23 +4,18 @@
 
 import logging
 import math
-import os.path
 import pickle
 import time
 from typing import Dict, List, Tuple
 
-import shapely.affinity as saf
-from shapely.geometry import MultiPolygon, Point, Polygon, CAP_STYLE, JOIN_STYLE
+from shapely.geometry import MultiPolygon, Polygon, CAP_STYLE, JOIN_STYLE
 from shapely.ops import unary_union
 
 import parameters
 import owbb.models as m
 import owbb.plotting as plotting
-import utils.btg_io as btg
-import utils.calc_tile as ct
 import utils.osmparser as op
 from utils.coordinates import disjoint_bounds, Transformation
-from utils.stg_io2 import scenery_directory_name, SceneryType
 from utils.utilities import time_logging
 
 
@@ -170,101 +165,6 @@ def _split_multipolygon_generated_building_zone(zone: m.GeneratedBuildingZone) -
     return split_zones
 
 
-def _process_btg_building_zones(transformer: Transformation) -> Tuple[List[m.BTGBuildingZone],
-                                                                      List[m.BTGBuildingZone]]:
-    """There is a need to do a local coordinate transformation, as BTG also has a local coordinate
-    transformation, but there the center will be in the middle of the tile, whereas here is can be
-     another place if the boundary is not a whole tile."""
-    lon_lat = parameters.get_center_global()
-    path_to_btg = ct.construct_path_to_files(parameters.PATH_TO_SCENERY, scenery_directory_name(SceneryType.terrain),
-                                             (lon_lat.lon, lon_lat.lat))
-    tile_index = parameters.get_tile_index()
-    btg_file_name = os.path.join(path_to_btg, ct.construct_btg_file_name_from_tile_index(tile_index))
-    logging.debug('Reading btg file: %s', btg_file_name)
-    btg_reader = btg.BTGReader(btg_file_name)
-    btg_zones = list()
-    vertices = btg_reader.vertices
-    v_max_x = 0
-    v_max_y = 0
-    v_max_z = 0
-    v_min_x = 0
-    v_min_y = 0
-    v_min_z = 0
-    for vertex in vertices:
-        if vertex.x >= 0:
-            v_max_x = max(v_max_x, vertex.x)
-        else:
-            v_min_x = min(v_min_x, vertex.x)
-        if vertex.y >= 0:
-            v_max_y = max(v_max_y, vertex.y)
-        else:
-            v_min_y = min(v_min_y, vertex.y)
-        if vertex.z >= 0:
-            v_max_z = max(v_max_z, vertex.z)
-        else:
-            v_min_z = min(v_min_z, vertex.z)
-        rotated_point = saf.rotate(Point(vertex.x, vertex.y), 90, (0, 0))
-        vertex.x = rotated_point.x * transformer.cos_lat_factor
-        vertex.y = rotated_point.y / transformer.cos_lat_factor
-
-    btg_lon, btg_lat = btg_reader.gbs_lon_lat
-    btg_x, btg_y = transformer.to_local((btg_lon, btg_lat))
-    logging.debug('Difference between BTG and transformer: x = %d, y = %d', btg_x, btg_y)
-
-    min_x, min_y = transformer.to_local((parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH))
-    max_x, max_y = transformer.to_local((parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH))
-    bounds = (min_x, min_y, max_x, max_y)
-
-    disjoint = 0
-    accepted = 0
-    counter = 0
-
-    for key, faces_list in btg_reader.faces.items():
-        if key != btg.WATER_PROXY:
-            # find the corresponding BuildingZoneType
-            type_ = None
-            for member in m.BuildingZoneType:
-                btg_key = 'btg_' + key
-                if btg_key == member.name:
-                    type_ = member
-                    break
-            if type_ is None:
-                raise Exception('Unknown BTG material: {}. Most probably a programming mismatch.'.format(key))
-            # create building zones
-            for face in faces_list:
-                counter += 1
-                v0 = vertices[face.vertices[0]]
-                v1 = vertices[face.vertices[1]]
-                v2 = vertices[face.vertices[2]]
-                # create the triangle polygon
-                my_geometry = Polygon([(v0.x - btg_x, v0.y - btg_y), (v1.x - btg_x, v1.y - btg_y),
-                                       (v2.x - btg_x, v2.y - btg_y), (v0.x - btg_x, v0.y - btg_y)])
-                if not my_geometry.is_valid:  # it might be self-touching or self-crossing polygons
-                    clean = my_geometry.buffer(0)  # cf. http://toblerity.org/shapely/manual.html#constructive-methods
-                    if clean.is_valid:
-                        my_geometry = clean  # it is now a Polygon or a MultiPolygon
-                    else:  # lets try with a different sequence of points
-                        my_geometry = Polygon([(v0.x - btg_x, v0.y - btg_y), (v2.x - btg_x, v2.y - btg_y),
-                                               (v1.x - btg_x, v1.y - btg_y), (v0.x - btg_x, v0.y - btg_y)])
-                        if not my_geometry.is_valid:
-                            clean = my_geometry.buffer(0)
-                            if clean.is_valid:
-                                my_geometry = clean
-                if my_geometry.is_valid and not my_geometry.is_empty:
-                    if not disjoint_bounds(bounds, my_geometry.bounds):
-                        my_zone = m.BTGBuildingZone(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse),
-                                                    type_, my_geometry)
-                        btg_zones.append(my_zone)
-                        accepted += 1
-                    else:
-                        disjoint += 1
-                else:
-                    pass  # just discard the triangle
-    logging.debug('Out of %i faces %i were disjoint and %i were accepted with the bounds.',
-                  counter, disjoint, accepted)
-    return btg_zones, btg_reader.faces[btg.WATER_PROXY]
-
-
 def _test_highway_intersecting_area(area: Polygon, highways_dict: Dict[int, m.Highway]) -> List[m.Highway]:
     """Returns highways that are within an area or intersecting with an area.
 
@@ -290,8 +190,8 @@ def _test_highway_intersecting_area(area: Polygon, highways_dict: Dict[int, m.Hi
     return linked_highways
 
 
-def _assign_city_blocks(building_zones: List[m.BuildingZone], highways_dict: Dict[int, m.Highway]) -> None:
-    """Splits all land-use into (city) blocks, i.e. areas surrounded by streets.
+def _assign_city_blocks(building_zone: m.BuildingZone, highways_dict: Dict[int, m.Highway]) -> None:
+    """Splits the land-use into (city) blocks, i.e. areas surrounded by streets.
     Brute force by buffering all highways, then take the geometry difference, which splits the zone into
     multiple polygons. Some of the polygons will be real city blocks, others will be border areas.
 
@@ -300,38 +200,40 @@ def _assign_city_blocks(building_zones: List[m.BuildingZone], highways_dict: Dic
     """
     highways_dict_copy1 = highways_dict.copy()  # otherwise when using highways_dict in plotting it will be "used"
 
-    for building_zone in building_zones:
-        polygons = list()
-        intersecting_highways = _test_highway_intersecting_area(building_zone.geometry, highways_dict_copy1)
-        if intersecting_highways:
-            buffers = list()
-            for highway in intersecting_highways:
-                buffers.append(highway.geometry.buffer(2, cap_style=CAP_STYLE.square,
-                                                       join_style=JOIN_STYLE.bevel))
-            geometry_difference = building_zone.geometry.difference(unary_union(buffers))
-            if isinstance(geometry_difference, Polygon) and geometry_difference.is_valid and \
-                    geometry_difference.area >= parameters.OWBB_MIN_CITY_BLOCK_AREA:
-                polygons.append(geometry_difference)
-            elif isinstance(geometry_difference, MultiPolygon):
-                my_polygons = geometry_difference.geoms
-                for my_poly in my_polygons:
-                    if isinstance(my_poly, Polygon) and my_poly.is_valid and \
-                            my_poly.area >= parameters.OWBB_MIN_CITY_BLOCK_AREA:
-                        polygons.append(my_poly)
+    polygons = list()
+    intersecting_highways = _test_highway_intersecting_area(building_zone.geometry, highways_dict_copy1)
+    if intersecting_highways:
+        buffers = list()
+        for highway in intersecting_highways:
+            buffers.append(highway.geometry.buffer(2, cap_style=CAP_STYLE.square,
+                                                   join_style=JOIN_STYLE.bevel))
+        geometry_difference = building_zone.geometry.difference(unary_union(buffers))
+        if isinstance(geometry_difference, Polygon) and geometry_difference.is_valid and \
+                geometry_difference.area >= parameters.OWBB_MIN_CITY_BLOCK_AREA:
+            polygons.append(geometry_difference)
+        elif isinstance(geometry_difference, MultiPolygon):
+            my_polygons = geometry_difference.geoms
+            for my_poly in my_polygons:
+                if isinstance(my_poly, Polygon) and my_poly.is_valid and \
+                        my_poly.area >= parameters.OWBB_MIN_CITY_BLOCK_AREA:
+                    polygons.append(my_poly)
 
-        logging.debug('Found %i city blocks in building zone osm_ID=%i', len(polygons), building_zone.osm_id)
+    logging.debug('Found %i city blocks in building zone osm_ID=%i', len(polygons), building_zone.osm_id)
 
-        for polygon in polygons:
-            my_city_block = m.CityBlock(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse), polygon,
-                                        building_zone.type_)
-            building_zone.add_city_block(my_city_block)
+    for polygon in polygons:
+        my_city_block = m.CityBlock(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse), polygon,
+                                    building_zone.type_)
+        building_zone.add_city_block(my_city_block)
+
+    # now assign the osm_buildings to the city blocks
+    building_zone.reassign_osm_buildings_to_city_blocks()
 
 
 def _process_landuse_for_lighting(building_zones: List[m.BuildingZone]) -> List[Polygon]:
     """Uses BUILT_UP_AREA_LIT_BUFFER to produce polygons for lighting of streets."""
     buffered_polygons = list()
     for zone in building_zones:
-        buffered_polygons.append(zone.geometry.buffer(parameters.BUILT_UP_AREA_LIT_BUFFER))
+        buffered_polygons.append(zone.geometry.buffer(parameters.OWBB_BUILT_UP_BUFFER))
 
     merged_polygons = _merge_buffers(buffered_polygons)
 
@@ -345,7 +247,7 @@ def _process_landuse_for_lighting(building_zones: List[m.BuildingZone]) -> List[
             for ring in zone.interiors:
                 total_inner += 1
                 my_polygon = Polygon(ring)
-                if my_polygon.area > parameters.BUILT_UP_AREA_LIT_HOLES_MIN_AREA:
+                if my_polygon.area > parameters.OWBB_BUILT_UP_AREA_HOLES_MIN_AREA:
                     survived_inner += 1
                     inner_rings.append(ring)
             corrected_poly = Polygon(zone.exterior, inner_rings)
@@ -425,6 +327,66 @@ def _merge_buffers(original_list: List[Polygon]) -> List[Polygon]:
     return handled_list
 
 
+def _create_settlement_clusters(lit_areas: List[Polygon], urban_places: List[m.Place]) -> List[m.SettlementCluster]:
+    clusters = list()
+    for polygon in lit_areas:
+        candidate_places = list()
+        towns = 0
+        cities = 0
+        for place in urban_places:
+            if place.geometry.within(polygon):
+                candidate_places.append(place)
+                if place.type_ is m.PlaceType.city:
+                    cities += 1
+                else:
+                    towns += 1
+        if candidate_places:
+            logging.debug('New settlement cluster with %i cities and %i towns', cities, towns)
+            clusters.append(m.SettlementCluster(candidate_places, polygon))
+    return clusters
+
+
+def _link_building_zones_with_settlements(settlement_clusters: List[m.SettlementCluster],
+                                          building_zones: List[m.BuildingZone],
+                                          highways_dict: Dict[int, m.Highway]) -> None:
+    for settlement in settlement_clusters:
+        # create the settlement type circles
+        centre_circles = list()
+        block_circles = list()
+        dense_circles = list()
+        for place in settlement.linked_places:
+            centre_circle, block_circle, dense_circle = place.create_settlement_type_circles()
+            if not centre_circle.is_empty:
+                centre_circles.append(centre_circle)
+            block_circles.append(block_circle)
+            dense_circles.append(dense_circle)
+        for zone in building_zones:
+            # within because lit-areas are always
+            if zone.geometry.within(settlement.geometry):
+                # create city blocks
+                _assign_city_blocks(zone, highways_dict)
+                # Test for being within a settlement type circle beginning with the highest ranking circles.
+                # If yes, then assign settlement type to city block
+                for city_block in zone.linked_city_blocks:
+                    intersecting = False
+                    for circle in centre_circles:
+                        if not city_block.geometry.disjoint(circle):
+                            intersecting = True
+                            city_block.settlement_type = m.SettlementType.centre
+                            break
+                    if not intersecting:
+                        for circle in block_circles:
+                            if not city_block.geometry.disjoint(circle):
+                                intersecting = True
+                                city_block.settlement_type = m.SettlementType.block
+                                break
+                    if not intersecting:
+                        for circle in dense_circles:
+                            if not city_block.geometry.disjoint(circle):
+                                city_block.settlement_type = m.SettlementType.dense
+                                break
+
+
 def process(transformer: Transformation) -> Tuple[List[Polygon], List[m.BuildingZone]]:
     last_time = time.time()
 
@@ -447,7 +409,7 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[m.Building
 
     # =========== READ OSM DATA =============
     building_zones = m.process_osm_building_zone_refs(transformer)
-    places = m.process_osm_place_refs(transformer)
+    urban_places, farm_places = m.process_osm_place_refs(transformer)
     osm_buildings = m.process_osm_building_refs(transformer)
     highways_dict, nodes_dict = m.process_osm_highway_refs(transformer)
     railways_dict = m.process_osm_railway_refs(transformer)
@@ -458,7 +420,7 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[m.Building
     # =========== READ LAND-USE DATA FROM FLIGHTGEAR BTG-FILES =============
     btg_building_zones = list()
     if parameters.OWBB_USE_BTG_LANDUSE:
-        btg_building_zones, btg_water = _process_btg_building_zones(transformer)
+        # FIXME: btg_building_zones, btg_water = _process_btg_building_zones(transformer)
         last_time = time_logging("Time used in seconds for reading BTG zones", last_time)
 
     if len(btg_building_zones) > 0:
@@ -494,19 +456,20 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[m.Building
         # finally split generated zones by major transport lines
         building_zones = _split_generated_building_zones_by_major_lines(building_zones, highways_dict,
                                                                         railways_dict, waterways_dict)
+    last_time = time_logging("Time used in seconds for splitting building zones by major lines", last_time)
 
-    # =========== FIND CITY BLOCKS AND ASSIGN TO BUILDING_ZONES ==========================
-    _assign_city_blocks(building_zones, highways_dict)
-    last_time = time_logging('Time used in seconds for splitting into city blocks', last_time)
+    # =========== Link urban places with lit_area buffers ==================================
+    if parameters.FLAG_2018_2:
+        settlement_clusters = _create_settlement_clusters(lit_areas, urban_places)
+        last_time = time_logging('Time used in seconds for creating settlement_clusters', last_time)
 
-    # now assign the osm_buildings to the city blocks
-    for building_zone in building_zones:
-        building_zone.reassign_osm_buildings_to_city_blocks()
+        _link_building_zones_with_settlements(settlement_clusters, building_zones, highways_dict)
+        last_time = time_logging('Time used in seconds for linking building zones with settlement_clusters', last_time)
 
     # ============finally guess the land-use type ========================================
     for my_zone in building_zones:
         if isinstance(my_zone, m.GeneratedBuildingZone):
-            my_zone.guess_building_zone_type(places)
+            my_zone.guess_building_zone_type(farm_places)
     last_time = time_logging("Time used in seconds for guessing zone types", last_time)
 
     # =========== FINALIZE PROCESSING ====================================================
