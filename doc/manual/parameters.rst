@@ -97,8 +97,8 @@ Important Flags
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
-FLAG_2018_2                                     Boolean    False     If True then then the texture catalog and shader integration is for minimal
-                                                                     version of FlightGear 2018.2.
+FLAG_2018_3                                     Boolean    False     If True then then the texture catalog and shader integration is for minimal
+                                                                     version of FlightGear 2018.3.
 
 BUILDING_USE_SHARED_WORSHIP                     Boolean    False     Use a shared model for worship buildings instead of OSM floor plan and
                                                                      heuristics. The shared models will try to respect the type of building (e.g.

@@ -413,7 +413,7 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[m.Building
     last_time = time_logging("Time used in seconds for splitting building zones by major lines", last_time)
 
     # =========== Link urban places with lit_area buffers ==================================
-    if parameters.FLAG_2018_2:
+    if parameters.FLAG_2018_3:
         settlement_clusters = _create_settlement_clusters(lit_areas, urban_places)
         last_time = time_logging('Time used in seconds for creating settlement_clusters', last_time)
 

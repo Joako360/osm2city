@@ -76,7 +76,7 @@ USE_EXTERNAL_MODELS = False
 
 WRITE_CLUSTER_STATS = False
 
-FLAG_2018_2 = False  # Feature flag for 2018.1 or greater version of FG
+FLAG_2018_3 = False  # Feature flag for 2018.1 or greater version of FG
 
 # =============================================================================
 # PARAMETERS RELATED TO BUILDINGS IN osm2city

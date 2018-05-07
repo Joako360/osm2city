@@ -206,7 +206,7 @@ if __name__ == '__main__':
     configure_logging(my_log_level, args.log_to_file)
 
     parameters.read_from_file(args.filename)
-    if parameters.FLAG_2018_2:
+    if parameters.FLAG_2018_3:
         logging.info('Processing for 2018.2 version')
 
     exec_procedure = Procedures.all

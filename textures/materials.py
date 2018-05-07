@@ -67,7 +67,7 @@ def screen_osm_keys_for_colour_material_variants(tags: Dict[str, str]) -> None:
             del (tags[wrong])
 
     # now make sure that the values are correct
-    if parameters.FLAG_2018_2:
+    if parameters.FLAG_2018_3:
         if 'building:colour' in tags:
             tags['building:colour'] = map_osm_colour_value_to_hex(tags['building:colour'], True)
         if 'roof:colour' in tags:

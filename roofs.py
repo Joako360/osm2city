@@ -199,11 +199,11 @@ def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_
     # sides if inward_meters = 0, else inward roofs for hipped
     len_roof_hypo = (inward_meters**2 + roof_height**2)**0.5
     repeat_y = len_roof_hypo/roof_texture_size_y
-    if parameters.FLAG_2018_2 and inward_meters == 0.:
+    if parameters.FLAG_2018_3 and inward_meters == 0.:
         repeat_y = 0
 
     repeat_x = b.edge_length_pts[ind_X[1]]/roof_texture_size_x
-    if parameters.FLAG_2018_2 and inward_meters == 0.:
+    if parameters.FLAG_2018_3 and inward_meters == 0.:
         repeat_x = 0
     ac_object.face([(o + 1, t.x(0), t.y(0)),
                     (o + 2, t.x(repeat_x), t.y(0)),
@@ -211,7 +211,7 @@ def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_
                    mat_idx=facade_mat_idx)
 
     repeat_x = b.edge_length_pts[ind_X[3]]/roof_texture_size_x
-    if parameters.FLAG_2018_2 and inward_meters == 0.:
+    if parameters.FLAG_2018_3 and inward_meters == 0.:
         repeat_x = 0
     ac_object.face([(o + 3, t.x(0), t.y(0)),
                     (o + 0, t.x(repeat_x), t.y(0)),
