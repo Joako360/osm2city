@@ -129,10 +129,11 @@ class Building(object):
 
     def make_building_from_part(self) -> None:
         """Make sure a former building_part gets tagged correctly"""
-        part_value = self.tags['building:part']
-        del self.tags['building:part']
-        if 'building' not in self.tags:
-            self.tags['building'] = part_value
+        if 'building:part' in self.tags:
+            part_value = self.tags['building:part']
+            del self.tags['building:part']
+            if 'building' not in self.tags:
+                self.tags['building'] = part_value
 
     def update_geometry(self, outer_ring: shg.LinearRing, inner_rings_list=list(), refs: List[int]=list()) -> None:
         """Updates the geometry of the building. This can also happen after the building has been initialized.
@@ -880,7 +881,7 @@ class Building(object):
                     logging.warning("Roof type %s seems to be unsupported, but is mapped ", self.roof_shape.name)
                     roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, roof_mat_idx, stats)
             else:  # fall back to pyramidal
-                roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
+                roofs.separate_pyramidal(ac_object, self, roof_mat_idx, roofs.RoofShape.pyramidal)
 
     def __str__(self):
         return "<OSM_ID %d at %s>" % (self.osm_id, hex(id(self)))
@@ -974,12 +975,12 @@ def _parse_building_levels(tags: Dict[str, str]) -> float:
     if 'building:levels' in tags:
         if ';' in tags['building:levels']:
             proxy_levels = float(utils.osmparser.parse_multi_int_values(tags['building:levels']))
-        else:
+        elif utils.osmparser.is_parsable_float(tags['building:levels']):
             proxy_levels = float(tags['building:levels'])
     if 'levels' in tags:
         if ';' in tags['levels']:
             proxy_levels = float(utils.osmparser.parse_multi_int_values(tags['levels']))
-        else:
+        elif utils.osmparser.is_parsable_float(tags['levels']):
             proxy_levels = float(tags['levels'])
     return proxy_levels
 
