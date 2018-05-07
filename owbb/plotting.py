@@ -115,7 +115,6 @@ def _draw_osm_zones(building_zones: List[m.BuildingZone], ax: maxs.Axes) -> None
 
 
 def _draw_generated_zones(building_zones, ax: maxs.Axes) -> None:
-    edge_color = "red"
     for building_zone in building_zones:
         if isinstance(building_zone, m.GeneratedBuildingZone):
             face_color = "red"
@@ -135,19 +134,7 @@ def _draw_generated_zones(building_zones, ax: maxs.Axes) -> None:
                 face_color = "gold"
             elif m.BuildingZoneType.corine_discontinuous is building_zone.type_:
                 face_color = "yellow"
-            _add_patch_for_building_zone(building_zone, face_color, edge_color, ax)
-
-
-def _draw_btg_building_zones(btg_building_zones, ax: maxs.Axes) -> None:
-    for item in btg_building_zones:
-        if item.type_ in [m.BuildingZoneType.btg_builtupcover, m.BuildingZoneType.btg_urban]:
-            my_color = "cyan"
-        elif item.type_ in [m.BuildingZoneType.btg_town, m.BuildingZoneType.btg_suburban]:
-            my_color = "gold"
-        else:
-            my_color = "yellow"
-        patch = PolygonPatch(item.geometry, facecolor=my_color, edgecolor=my_color)
-        ax.add_patch(patch)
+            _add_patch_for_building_zone(building_zone, face_color, face_color, ax)
 
 
 def _draw_lit_areas(lit_areas: List[Polygon], ax: maxs.Axes) -> None:
@@ -246,9 +233,8 @@ def draw_buildings(building_zones, bounds) -> None:
     plt.close("all")
 
 
-def draw_zones(highways_dict: Dict[int, m.Highway], buildings: List[m.Building],
-               building_zones: List[m.BuildingZone], btg_building_zones: List[m.BTGBuildingZone],
-               lit_areas: List[Polygon], bounds: m.Bounds) -> None:
+def draw_zones(buildings: List[m.Building], building_zones: List[m.BuildingZone], lit_areas: List[Polygon],
+               bounds: m.Bounds) -> None:
     pdf_pages = _create_pdf_pages("landuse")
 
     # OSM building zones original
@@ -257,28 +243,6 @@ def draw_zones(highways_dict: Dict[int, m.Highway], buildings: List[m.Building],
 , magenta=residential, brown=farmyard, red=error]")
     ax = my_figure.add_subplot(111)
     _draw_osm_zones(building_zones, ax)
-    _set_ax_limits_from_bounds(ax, bounds)
-    pdf_pages.savefig(my_figure)
-
-    # External land use
-    if btg_building_zones:
-        my_figure = _create_a3_landscape_figure()
-        my_figure.suptitle("Land-use types from FlightGear BTG Files \n[cyan=builtupcover and urban\
-, gold=town and suburban, yellow=construction and industrial and port]")
-        ax = my_figure.add_subplot(111)
-        ax.grid(True, linewidth=1, linestyle="--", color="silver")
-        _draw_btg_building_zones(btg_building_zones, ax)
-        _draw_highways(highways_dict, ax)
-        _draw_buildings(buildings, ax)
-        _set_ax_limits_from_bounds(ax, bounds)
-        pdf_pages.savefig(my_figure)
-
-    # Lit areas
-    my_figure = _create_a3_landscape_figure()
-    my_figure.suptitle("Lit areas from building zones")
-    ax = my_figure.add_subplot(111)
-    ax.grid(True, linewidth=1, linestyle="--", color="silver")
-    _draw_lit_areas(lit_areas, ax)
     _set_ax_limits_from_bounds(ax, bounds)
     pdf_pages.savefig(my_figure)
 
@@ -291,6 +255,15 @@ def draw_zones(highways_dict: Dict[int, m.Highway], buildings: List[m.Building],
     _draw_osm_zones(building_zones, ax)
     _draw_generated_zones(building_zones, ax)
     _draw_buildings(buildings, ax)
+    _set_ax_limits_from_bounds(ax, bounds)
+    pdf_pages.savefig(my_figure)
+
+    # Lit areas
+    my_figure = _create_a3_landscape_figure()
+    my_figure.suptitle("Lit areas from building zones")
+    ax = my_figure.add_subplot(111)
+    ax.grid(True, linewidth=1, linestyle="--", color="silver")
+    _draw_lit_areas(lit_areas, ax)
     _set_ax_limits_from_bounds(ax, bounds)
     pdf_pages.savefig(my_figure)
 

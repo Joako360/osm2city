@@ -431,7 +431,7 @@ This operations complements land-use information from OSM based on some simple h
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
 OWBB_GENERATE_LANDUSE                           Boolean    False     Create land-use based on building clusters outside of existing land-use
-                                                                     information (OSM and/or BTG-files).
+                                                                     information (OSM).
 OWBB_GENERATE..._BUILDING_BUFFER_DISTANCE       Number     30        The minimum buffering distance around a building.
 OWBB_GENERATE..._BUILDING_BUFFER_DISTANCE_MAX   Number     50        The maximum buffering distance around a building. The actual value is a
                                                                      function of the previous parameter and the building's size (the larger the

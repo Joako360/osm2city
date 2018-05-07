@@ -19,42 +19,6 @@ from utils.coordinates import disjoint_bounds, Transformation
 from utils.utilities import time_logging
 
 
-def _generate_building_zones_from_external(building_zones: List[m.BuildingZone],
-                                           external_landuses: List[m.BTGBuildingZone]) -> None:
-    """Adds "missing" building_zones based on land-use info outside of OSM land-use"""
-    counter = 0
-    for external_landuse in external_landuses:
-        my_geoms = list()
-        my_geoms.append(external_landuse.geometry)
-
-        for building_zone in building_zones:
-            parts = list()
-            for geom in my_geoms:
-                if geom.within(building_zone.geometry) \
-                        or geom.touches(building_zone.geometry):
-                    continue
-                elif geom.intersects(building_zone.geometry):
-                    diff = geom.difference(building_zone.geometry)
-                    if isinstance(diff, Polygon):
-                        if diff.area >= parameters.OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA:
-                            parts.append(diff)
-                    elif isinstance(diff, MultiPolygon):
-                        for poly in diff:
-                            if poly.area >= parameters.OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA:
-                                parts.append(poly)
-                else:
-                    if geom.area >= parameters.OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA:
-                        parts.append(geom)
-            my_geoms = parts
-
-        for geom in my_geoms:
-            generated = m.GeneratedBuildingZone(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse),
-                                                geom, external_landuse.type_)
-            building_zones.append(generated)
-            counter += 1
-    logging.debug("Generated building zones from external land-use: %d", counter)
-
-
 def _generate_building_zones_from_buildings(building_zones: List[m.BuildingZone],
                                             buildings_outside: List[m.Building]) -> None:
     """Adds "missing" building_zones based on building clusters outside of OSM land-use.
@@ -417,16 +381,6 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[m.Building
 
     last_time = time_logging("Time used in seconds for parsing OSM data", last_time)
 
-    # =========== READ LAND-USE DATA FROM FLIGHTGEAR BTG-FILES =============
-    btg_building_zones = list()
-    if parameters.OWBB_USE_BTG_LANDUSE:
-        # FIXME: btg_building_zones, btg_water = _process_btg_building_zones(transformer)
-        last_time = time_logging("Time used in seconds for reading BTG zones", last_time)
-
-    if len(btg_building_zones) > 0:
-        _generate_building_zones_from_external(building_zones, btg_building_zones)
-    last_time = time_logging("Time used in seconds for processing external zones", last_time)
-
     # =========== GENERATE ADDITIONAL LAND-USE ZONES FOR AND/OR FROM BUILDINGS =============
     buildings_outside = list()  # buildings outside of OSM buildings zones
     for candidate in osm_buildings:
@@ -475,8 +429,7 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[m.Building
     # =========== FINALIZE PROCESSING ====================================================
     if parameters.DEBUG_PLOT:
         bounds = m.Bounds.create_from_parameters(transformer)
-        plotting.draw_zones(highways_dict, osm_buildings, building_zones, btg_building_zones,
-                            lit_areas, bounds)
+        plotting.draw_zones(osm_buildings, building_zones, lit_areas, bounds)
         time_logging("Time used in seconds for plotting", last_time)
 
     # =========== WRITE TO CACHE AND RETURN

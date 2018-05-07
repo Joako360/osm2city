@@ -179,7 +179,7 @@ class Place(OSMFeature):
             block_circle = self.geometry.buffer(radius)
             radius = self._calculate_circle_radius(population, parameters.OWBB_PLACE_RADIUS_EXPONENT_DENSE)
             dense_circle = self.geometry.buffer(radius)
-        return (centre_circle, block_circle, dense_circle)
+        return centre_circle, block_circle, dense_circle
 
 
 @unique
@@ -414,14 +414,6 @@ class BuildingZone(OSMFeatureArea):
                 if osm_building.geometry.within(city_block.geometry) or osm_building.geometry.intersects(
                         city_block.geometry):
                     city_block.osm_buildings.append(osm_building)
-
-
-class BTGBuildingZone(object):
-    """A land-use from materials in FlightGear read from BTG-files"""
-    def __init__(self, external_id, type_, geometry) -> None:
-        self.id = str(external_id)  # String
-        self.type_ = type_  # BuildingZoneType
-        self.geometry = geometry  # Polygon
 
 
 class GeneratedBuildingZone(BuildingZone):
@@ -1284,6 +1276,38 @@ def process_osm_place_refs(transformer: co.Transformation) -> Tuple[List[Place],
             else:
                 place.transform_to_point()
                 urban_places.append(place)
+
+    # relations
+    osm_relations_result = op.fetch_osm_db_data_relations_keys(osm_way_result, True)
+    osm_relations_dict = osm_relations_result.relations_dict
+    osm_nodes_dict = osm_relations_result.rel_nodes_dict
+    osm_rel_ways_dict = osm_relations_result.rel_ways_dict
+
+    for _, relation in osm_relations_dict.items():
+        largest_area = None  # in case there are several polygons in the relation, we just keep the largest
+        outer_ways = list()
+        for member in relation.members:
+            if member.type_ == 'way' and member.role == 'outer' and member.ref in osm_rel_ways_dict:
+                way = osm_rel_ways_dict[member.ref]
+                outer_ways.append(way)
+
+        outer_ways = op.closed_ways_from_multiple_ways(outer_ways)
+        for way in outer_ways:
+            polygon = way.polygon_from_osm_way(osm_nodes_dict, transformer)
+            if polygon.is_valid and not polygon.is_empty:
+                if largest_area is None:
+                    largest_area = polygon
+                else:
+                    if largest_area.area < polygon.area:
+                        largest_area = polygon
+
+        if largest_area is not None:
+            my_place = Place(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse), largest_area.centroid,
+                             PlaceType.city, True)
+            my_place.parse_tags(relation.tags)
+            my_place.parse_tags_additional(relation.tags)
+            if my_place.is_valid():
+                urban_places.append(my_place)
 
     logging.info("Number of valid places found: urban={}, farm={}".format(len(urban_places), len(farm_places)))
 

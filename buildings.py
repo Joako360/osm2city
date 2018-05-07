@@ -585,7 +585,7 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
     stats = utilities.Stats()
 
     osm_read_results = op.fetch_osm_db_data_ways_keys(["building", "building:part"])
-    osm_read_results = op.fetch_osm_db_data_relations_keys(["building", "building:part"], osm_read_results)
+    osm_read_results = op.fetch_osm_db_data_relations_keys(osm_read_results)
     osm_nodes_dict = osm_read_results.nodes_dict
     osm_ways_dict = osm_read_results.ways_dict
     osm_relations_dict = osm_read_results.relations_dict

@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Tuple
 import time
 import unittest
 
+import networkx as nx
 import psycopg2
 import shapely.geometry as shg
 
@@ -166,32 +167,23 @@ def closed_ways_from_multiple_ways(way_parts: List[Way]) -> List[Way]:
     """Create closed ways from multiple not closed ways where possible.
     See http://wiki.openstreetmap.org/wiki/Relation:multipolygon.
     If parts of ways cannot be used, they just get disregarded.
-    The new Way gets the osm_id from the first piece used and gets all tags merged.
+    The new Ways gets the osm_id from a way reused and all tags removed.
     """
-    remaining_parts = {way.osm_id: way for way in way_parts}
     closed_ways = list()
 
-    while remaining_parts:
-        matched_candidates = list()
-        match_found = False
-        starting = remaining_parts.popitem()[1]  # it does not matter, which one we pick
-        for key, candidate in remaining_parts.items():
-            # it does not matter whether we test the first or last node, as in the end there needs to be a connection
-            if starting.refs[-1] == candidate.refs[0]:
-                starting.refs.extend(candidate.refs[1:])
-                match_found = True
-            elif starting.refs[-1] == candidate.refs[-1]:  # the candidate's nodes need to be added in reverse order
-                starting.refs.extend(candidate.refs[-2::-1])
-                match_found = True
-            if match_found:
-                matched_candidates.append(key)
-                # combine the tags
-                starting.tags = dict(list(starting.tags.items()) + list(candidate.tags.items()))
-                if starting.refs[0] == starting.refs[-1]:  # we have found a closing ring and can stop searching
-                    closed_ways.append(starting)
-                    break
-        for matched in matched_candidates:
-            remaining_parts.pop(matched)
+    graph = nx.Graph()
+    for way in way_parts:
+        for i in range(len(way.refs) - 1):
+            graph.add_edge(way.refs[i], way.refs[i + 1])
+
+    cycles = nx.cycle_basis(graph)
+    index = 0
+    for cycle in cycles:  # we just reuse ways - it does not really matter
+        way = way_parts[index]
+        way.refs = cycle
+        way.refs.append(way.refs[0])  # cycles from networkx are not closed
+        closed_ways.append(way)
+        way.tags = dict()
 
     return closed_ways
 
@@ -487,17 +479,21 @@ def fetch_osm_db_data_ways_keys(req_keys: List[str]) -> OSMReadResult:
     return fetch_osm_db_data_ways(req_keys, False)
 
 
-def fetch_osm_db_data_relations_keys(req_keys: List[str], input_read_result: OSMReadResult) -> OSMReadResult:
+def fetch_osm_db_data_relations_keys(input_read_result: OSMReadResult, is_place: bool=False) -> OSMReadResult:
     """Updates an OSMReadResult with relation data based on required keys"""
     start_time = time.time()
 
     db_connection = make_db_connection()
 
     # common subquery
-    sub_query = "((r.tags @> 'type=>multipolygon'"
-    sub_query += " AND " + construct_tags_query(req_keys, list(), "r")
-    sub_query += ") OR r.tags @> 'type=>building')"
-    sub_query += " AND r.id = rm.relation_id"
+    if is_place:
+        first_part = "((r.tags @> 'type=>multipolygon' OR r.tags @> 'type=>boundary')"
+        first_part += " AND (r.tags @> 'place=>city' OR r.tags @> 'place=>town'))"
+    else:
+        first_part = "((r.tags @> 'type=>multipolygon'"
+        first_part += " AND " + construct_tags_query(["building", "building:part"], list(), "r")
+        first_part += ") OR r.tags @> 'type=>building')"
+    sub_query = first_part + " AND r.id = rm.relation_id"
     sub_query += " AND rm.member_type = 'W'"
     sub_query += " AND rm.member_id = w.id"
     sub_query += " AND "
@@ -555,7 +551,10 @@ def fetch_osm_db_data_relations_keys(req_keys: List[str], input_read_result: OSM
         my_node = Node(result[0], result[2], result[1])
         rel_nodes_dict[my_node.osm_id] = my_node
 
-    logging.info("Reading OSM relation data for {0!s} from db took {1:.4f} seconds.".format(req_keys,
+    rel_type = 'buildings'
+    if is_place:
+        rel_type = 'places'
+    logging.info("Reading OSM relation data for {0!s} from db took {1:.4f} seconds.".format(rel_type,
                                                                                             time.time() - start_time))
 
     return OSMReadResult(nodes_dict=input_read_result.nodes_dict, ways_dict=input_read_result.ways_dict,
@@ -753,4 +752,4 @@ class TestOSMParser(unittest.TestCase):
         first_dict = {'1': '1', '2': '2', '3': '3'}
         second_dict = {'3': '99', '4': '4'}
         combined_tags = combine_tags(first_dict, second_dict)
-        self.assertEquals(4, len(combined_tags))
+        self.assertEqual(4, len(combined_tags))
