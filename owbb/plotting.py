@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import datetime
 import random
-from typing import Dict, List
+from typing import List
 
 from descartes import PolygonPatch
 from matplotlib import axes as maxs
@@ -92,6 +92,8 @@ def _draw_settlement_zones(building_zones: List[m.BuildingZone], ax: maxs.Axes) 
                 colour = 'green'
             elif block.settlement_type is m.SettlementType.dense:
                 colour = 'magenta'
+            elif block.settlement_type is m.SettlementType.periphery:
+                colour = 'yellow'
             patch = PolygonPatch(block.geometry, facecolor=colour, edgecolor=colour)
             ax.add_patch(patch)
 
@@ -270,7 +272,7 @@ def draw_zones(buildings: List[m.Building], building_zones: List[m.BuildingZone]
     # Settlement type
     my_figure = _create_a3_landscape_figure()
     my_figure.suptitle("Built-up areas by settlement type \n[blue=centre (city), green=block, magenta=dense, \
-    ,  brown=farmyard]")
+    yellow=periphery, grey=rural, brown=farmyard]")
     ax = my_figure.add_subplot(111)
     _draw_settlement_zones(building_zones, ax)
     _set_ax_limits_from_bounds(ax, bounds)
