@@ -189,7 +189,7 @@ class SettlementType(IntEnum):
     block = 2
     dense = 3
     periphery = 4  # default within lit area
-    rural = 5  # only implicitely used for building zones without city blocks.
+    rural = 5  # only implicitly used for building zones without city blocks.
 
 
 class SettlementCluster:

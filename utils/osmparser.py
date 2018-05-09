@@ -179,11 +179,24 @@ def closed_ways_from_multiple_ways(way_parts: List[Way]) -> List[Way]:
     cycles = nx.cycle_basis(graph)
     index = 0
     for cycle in cycles:  # we just reuse ways - it does not really matter
-        way = way_parts[index]
+        way = Way(0)
         way.refs = cycle
         way.refs.append(way.refs[0])  # cycles from networkx are not closed
         closed_ways.append(way)
+
+        # now make sure we have the original tags
         way.tags = dict()
+        ways_set = set()
+        for node in cycle:
+            for wp in way_parts:
+                if node in wp.refs:
+                    ways_set.add(wp)
+                    if way.osm_id == 0:
+                        way.osm_id = wp.osm_id  # reuse the id from an existing way
+        for wp in ways_set:
+            for key, value in wp.tags.items():
+                if key not in way.tags:
+                    way.tags[key] = value
 
     return closed_ways
 
