@@ -78,6 +78,21 @@ City     1 000 000     1000      5623     10000
 
 I.e. all city blocks linked to building zones are tested against these circles and if intersecting/within, then the most "centric" one is linked to the city block.
 
+The following plots illustrate this around tile with 3088986 LSZH, where in most plots the city centre of Zurich is in the lower left corner and the smaller city of Winterthur is in the upper right corner.
+
+Lit areas:
+
+.. image:: lit_areas_lszh.png
+
+Settlement types (blue: centre, green: block, matenta: dense, yellow: periphery, grey: rural, brown: farmyard)
+
+.. image:: settlement_types_lszh.png
+
+Pattern of city blocks:
+
+.. image:: city_blocks_lszh.png
+
+
 
 .. _chapter-howto-generate-would-be-buildings-label:
 
