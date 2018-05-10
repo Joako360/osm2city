@@ -313,7 +313,11 @@ def _create_settlement_clusters(lit_areas: List[Polygon], urban_places: List[m.P
 def _link_building_zones_with_settlements(settlement_clusters: List[m.SettlementCluster],
                                           building_zones: List[m.BuildingZone],
                                           highways_dict: Dict[int, m.Highway]) -> None:
+    x = 0
+    x_number = len(settlement_clusters)
     for settlement in settlement_clusters:
+        x += 1
+        logging.debug('%i out of %i settlement clusters', x, x_number)
         # create the settlement type circles
         centre_circles = list()
         block_circles = list()
@@ -324,7 +328,12 @@ def _link_building_zones_with_settlements(settlement_clusters: List[m.Settlement
                 centre_circles.append(centre_circle)
             block_circles.append(block_circle)
             dense_circles.append(dense_circle)
+        z = 0
+        z_number = len(building_zones)
         for zone in building_zones:
+            z += 1
+            if z % 20 == 0:
+                logging.debug('%i out of %i building_zones', z, z_number)
             # within because lit-areas are always
             if zone.geometry.within(settlement.geometry):
                 # create city blocks
