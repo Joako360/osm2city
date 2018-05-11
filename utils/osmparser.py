@@ -16,7 +16,12 @@ import time
 import unittest
 
 import networkx as nx
-import psycopg2
+try:
+    import psycopg2
+except ImportError:
+    # Fall back to psycopg2cffi in case of using PyPy as interpreter
+    from psycopg2cffi import compat
+    compat.register()
 import shapely.geometry as shg
 
 import parameters
