@@ -113,8 +113,7 @@ def _process_rectify_buildings(nodes_dict: Dict[int, op.Node], rel_nodes_dict: D
 def _process_osm_relations(nodes_dict: Dict[int, op.Node], rel_ways_dict: Dict[int, op.Way],
                            relations_dict: Dict[int, op.Relation],
                            my_buildings: Dict[int, building_lib.Building],
-                           coords_transform: coordinates.Transformation,
-                           stats: utilities.Stats) -> None:
+                           coords_transform: coordinates.Transformation) -> None:
     """Adds buildings based on relation tags. There are two scenarios: multipolygon buildings and Simple3D tagging.
     Only multipolygon and simple 3D buildings are implemented currently. 
     The added buildings go into parameter my_buildings.
@@ -166,7 +165,7 @@ def _process_osm_relations(nodes_dict: Dict[int, op.Node], rel_ways_dict: Dict[i
         try:
             if 'type' in relation.tags and relation.tags['type'] == 'multipolygon':
                 added_buildings = _process_multipolygon_buildings(nodes_dict, rel_ways_dict, relation,
-                                                                  my_buildings, coords_transform, stats)
+                                                                  my_buildings, coords_transform)
                 number_of_created_buildings += added_buildings
             elif 'type' in relation.tags and relation.tags['type'] == 'building':
                 _process_simple_3d_building(relation, my_buildings)
@@ -178,8 +177,7 @@ def _process_osm_relations(nodes_dict: Dict[int, op.Node], rel_ways_dict: Dict[i
 
 def _process_multipolygon_buildings(nodes_dict: Dict[int, op.Node], rel_ways_dict: Dict[int, op.Way],
                                     relation: op.Relation, my_buildings: Dict[int, building_lib.Building],
-                                    coords_transform: coordinates.Transformation,
-                                    stats: utilities.Stats) -> int:
+                                    coords_transform: coordinates.Transformation) -> int:
     """Processes the members in a multipolygon relationship. Returns the number of buildings actually created.
     If there are several members of type 'outer', then multiple buildings are created.
     """
@@ -245,8 +243,7 @@ def _process_multipolygon_buildings(nodes_dict: Dict[int, op.Node], rel_ways_dic
         for inner_way in inner_ways:
             if polygons[inner_way.osm_id].within(polygons[outer_way.osm_id]):
                 inner_rings.append(inner_way)
-        a_building = _make_building_from_way(nodes_dict, all_tags, outer_way, coords_transform,
-                                             stats, inner_rings)
+        a_building = _make_building_from_way(nodes_dict, all_tags, outer_way, coords_transform, inner_rings)
         my_buildings[a_building.osm_id] = a_building
         added_buildings += 1
     return added_buildings
@@ -305,8 +302,7 @@ def _process_simple_3d_building(relation: op.Relation, my_buildings: Dict[int, b
 
 def _process_building_parts(nodes_dict: Dict[int, op.Node],
                             my_buildings: Dict[int, building_lib.Building],
-                            coords_transform: coordinates.Transformation,
-                            stats: utilities.Stats) -> None:
+                            coords_transform: coordinates.Transformation) -> None:
     """Process building parts, for which there is no relationship tagging and therefore there might be overlaps.
     I.e. methods related to _process_osm_relation do not help. Therefore some brute force searching is needed.
     """
@@ -427,7 +423,7 @@ def _process_building_parts(nodes_dict: Dict[int, op.Node],
                                 new_way.refs = new_refs
                                 new_tags = {'building_part': 'yes'}
                                 new_building_part = _make_building_from_way(nodes_dict, new_tags, new_way,
-                                                                            coords_transform, stats)
+                                                                            coords_transform)
                                 my_buildings[new_building_part.osm_id] = new_building_part
                                 building_parent.add_child(new_building_part)
 
@@ -462,8 +458,7 @@ def _clean_building_parents_with_one_child(my_buildings: List[building_lib.Build
 
 
 def _process_osm_building(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, op.Way],
-                          coords_transform: coordinates.Transformation,
-                          stats: utilities.Stats) -> Dict[int, building_lib.Building]:
+                          coords_transform: coordinates.Transformation) -> Dict[int, building_lib.Building]:
     my_buildings = dict()
     clipping_border = shg.Polygon(parameters.get_clipping_border())
 
@@ -488,10 +483,9 @@ def _process_osm_building(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, o
             logging.debug('SKIPPING building with osm_id=%i', way.osm_id)
             continue
 
-        my_building = _make_building_from_way(nodes_dict, way.tags, way, coords_transform, stats)
+        my_building = _make_building_from_way(nodes_dict, way.tags, way, coords_transform)
         if my_building is not None and my_building.polygon.is_valid:
             my_buildings[my_building.osm_id] = my_building
-            stats.objects += 1
         else:
             logging.info('Excluded building with osm_id=%d because of geometry problems', way.osm_id)
 
@@ -499,7 +493,7 @@ def _process_osm_building(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, o
 
 
 def _make_building_from_way(nodes_dict: Dict[int, op.Node], all_tags: Dict[str, str], way: op.Way,
-                            coords_transform: coordinates.Transformation, stats: utilities.Stats,
+                            coords_transform: coordinates.Transformation,
                             inner_ways=list()) -> Optional[building_lib.Building]:
     if way.refs[0] == way.refs[-1]:
         way.refs = way.refs[0:-1]  # -- kick last ref if it coincides with first
@@ -517,12 +511,10 @@ def _make_building_from_way(nodes_dict: Dict[int, op.Node], all_tags: Dict[str, 
     except KeyError as reason:
         logging.debug("ERROR: Failed to parse building referenced node missing clipped?(%s) WayID %d %s Refs %s" % (
             reason, way.osm_id, all_tags, way.refs))
-        stats.parse_errors += 1
         return None
     except Exception as reason:
         logging.debug("ERROR: Failed to parse building (%s)  WayID %d %s Refs %s" % (reason, way.osm_id, all_tags,
                                                                                      way.refs))
-        stats.parse_errors += 1
         return None
 
     return building_lib.Building(way.osm_id, all_tags, outer_ring, name, inner_rings_list=inner_rings_list,
@@ -577,13 +569,7 @@ def _write_obstruction_lights(path: str, file_name: str,
         return False
 
 
-def process_buildings(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
-                      blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
-                      generated_buildings: List[building_lib.Building],
-                      file_lock: mp.Lock=None) -> None:
-    random.seed(42)
-    stats = utilities.Stats()
-
+def construct_buildings_from_osm(coords_transform: coordinates.Transformation) -> List[building_lib.Building]:
     osm_read_results = op.fetch_osm_db_data_ways_keys(["building", "building:part"])
     osm_read_results = op.fetch_osm_db_data_relations_keys(osm_read_results)
     osm_nodes_dict = osm_read_results.nodes_dict
@@ -596,13 +582,23 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
     _process_rectify_buildings(osm_nodes_dict, osm_read_results.rel_nodes_dict, osm_ways_dict, coords_transform)
 
     # then create the actual building objects
-    the_buildings = _process_osm_building(osm_nodes_dict, osm_ways_dict, coords_transform, stats)
-    _process_osm_relations(osm_nodes_dict, osm_rel_ways_dict, osm_relations_dict, the_buildings, coords_transform,
-                           stats)
-    _process_building_parts(osm_nodes_dict, the_buildings, coords_transform, stats)
+    the_buildings = _process_osm_building(osm_nodes_dict, osm_ways_dict, coords_transform)
+    _process_osm_relations(osm_nodes_dict, osm_rel_ways_dict, osm_relations_dict, the_buildings, coords_transform)
+    _process_building_parts(osm_nodes_dict, the_buildings, coords_transform)
 
     # for convenience change to list from dict
-    the_buildings = list(the_buildings.values())
+    return list(the_buildings.values())
+
+
+def process_buildings(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
+                      blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
+                      generated_buildings: List[building_lib.Building],
+                      file_lock: mp.Lock=None) -> None:
+    random.seed(42)
+
+    # construct buildings from OSM data
+    the_buildings = construct_buildings_from_osm(coords_transform)
+
     # add generated buildings
     the_buildings.extend(generated_buildings)
 
@@ -616,7 +612,35 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
     for b in the_buildings:
         textures.materials.screen_osm_keys_for_colour_material_variants(b.tags)
 
-    # -- create (empty) clusters
+    # check for buildings on airport runways etc.
+    if blocked_areas:
+        the_buildings = building_lib.overlap_check_blocked_areas(the_buildings, blocked_areas)
+
+    if parameters.OVERLAP_CHECK_CONVEX_HULL:  # needs to be before building_lib.analyse to catch more at first hit
+        the_buildings = building_lib.overlap_check_convex_hull(the_buildings, stg_entries)
+
+    # final check on building parent hierarchy
+    _clean_building_parents_with_one_child(the_buildings)
+
+    if not the_buildings:
+        logging.info("No buildings after overlap check etc. Stopping further processing.")
+        return
+
+    stats = utilities.Stats()
+
+    prepare_textures.init(stats)
+
+    # -- initialize STGManager
+    path_to_output = parameters.get_output_path()
+    replacement_prefix = parameters.get_repl_prefix()
+    stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.buildings, OUR_MAGIC, replacement_prefix)
+
+    # the heavy lifting: analysis
+    the_buildings = building_lib.analyse(the_buildings, fg_elev, stg_manager, coords_transform,
+                                         prepare_textures.facades, prepare_textures.roofs, stats)
+    building_lib.decide_lod(the_buildings, stats)
+
+    # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
     cmin, cmax = parameters.get_extent_global()
     logging.info("min/max " + str(cmin) + " " + str(cmax))
     lmin = v.Vec2d(coords_transform.to_local(cmin))
@@ -629,39 +653,6 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
     clusters_building_mesh_rough = cluster.ClusterContainer(lmin, lmax,
                                                             stg_io2.STGVerbType.object_building_mesh_rough)
     handled_clusters.append(clusters_building_mesh_rough)
-
-    # check for buildings on airport runways etc.
-    if blocked_areas:
-        the_buildings = building_lib.overlap_check_blocked_areas(the_buildings, blocked_areas)
-
-    if parameters.OVERLAP_CHECK_CONVEX_HULL:  # needs to be before building_lib.analyse to catch more at first hit
-        the_buildings = building_lib.overlap_check_convex_hull(the_buildings, stg_entries, stats)
-
-    # final check on building parent hierarchy
-    _clean_building_parents_with_one_child(the_buildings)
-
-    # - analyze buildings
-    #   - calculate area
-    #   - location clash with stg static models? drop building
-    #   - TODO: analyze surrounding: similar shaped buildings nearby? will get same texture
-    #   - set building type, roof type etc
-
-    if not the_buildings:
-        logging.info("No buildings after overlap check etc. Stopping further processing.")
-        return
-
-    prepare_textures.init(stats)
-
-    # -- initialize STGManager
-    path_to_output = parameters.get_output_path()
-    replacement_prefix = parameters.get_repl_prefix()
-    stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.buildings, OUR_MAGIC, replacement_prefix)
-
-    the_buildings = building_lib.analyse(the_buildings, fg_elev, stg_manager, coords_transform,
-                                         prepare_textures.facades, prepare_textures.roofs, stats)
-    building_lib.decide_lod(the_buildings, stats)
-
-    # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
     for b in the_buildings:
         if b.LOD is stg_io2.LOD.detail:
             clusters_building_mesh_detailed.append(b.anchor, b, stats)

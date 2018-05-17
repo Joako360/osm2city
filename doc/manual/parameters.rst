@@ -145,6 +145,30 @@ LOD_PERCENTAGE_DETAIL                           Decimal    0.5       Of the rema
 =============================================   ========   =======   ==============================================================================
 
 
+--------------------------
+Building Levels and Height
+--------------------------
+
+In OSM the height of a building can be described using the following keys:
+* ``building:height``
+* ``roof:height``
+* ``height`` (the total of building_height and roof_height, but most often used alone)
+* ``building:levels``
+* ``roof:levels`` (not used in osm2city)
+* ``levels``
+
+Most often none of these features are tagged and then the number of levels are determined based on the settlement type and the corresponding ``BUILDING_NUMBER_LEVELS_* `` parameter. The height is always calculated as the product of the number of levels times parameter ``BUILDING_LEVEL_HEIGHT_*``. If only the height is given, then the levels are calculated by simple rounding — and this level value is then used for calculating the height. The reason for this is that some uniformity in building heights/values is normally observed in the real world — and because textures have a defined height per level.
+
+An exception to this is made for building parts in a relationship (`Simple 3D buildings`_), as the heights in this case might be necessary to be correct (e.g. a dome on a church).
+
+
+The distribution is using Python random triangular_, where low <= N <= high and the specified mode between those bounds.
+
+
+.. _triangular: https://docs.python.org/3.5/library/random.html#random.triangular
+.. _Simple 3D buildings: http://wiki.openstreetmap.org/wiki/Simple_3D_buildings
+
+
 .. _chapter-parameters-buildings-european-label:
 
 ------------------------------------------

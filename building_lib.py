@@ -106,7 +106,8 @@ class Building(object):
         self.inner_rings_list = None
         self.outer_nodes_closest = None
         self.anchor = None
-        self.polygon = None
+        self.polygon = None  # can have inner and outer rings, i.e. the real polygon
+        self.geometry = None  # only the outer ring - for convenience and faster processing in some analysis
         self.update_geometry(outer_ring, inner_rings_list, refs)
 
         # set in buildings.py for building relations prior to building_lib.analyse(...)
@@ -195,6 +196,7 @@ class Building(object):
 
     def _set_polygon(self, outer: shg.LinearRing, inner: List[shg.LinearRing]=list()) -> None:
         self.polygon = shg.Polygon(outer, inner)
+        self.geometry = shg.Polygon(outer)
 
     def _set_pts_all(self, cluster_offset: Vec2d) -> None:
         """Given an cluster middle point changes all coordinates in x/y space."""
@@ -238,7 +240,8 @@ class Building(object):
 
     @property
     def area(self):
-        return self.polygon.area
+        """The area of the building only taking into account the outer ring, not inside holes."""
+        return self.geometry.area
 
     @property
     def circumference(self):
@@ -501,7 +504,7 @@ class Building(object):
 
         # OSM key min_value is used to raise ("hover") a facade above ground
         # -- no complex roof on tiny buildings.
-        if "min_height" in self.tags:
+        if "min_height" in self.tags:  # FIXME: is it min_height or min:height?
             self.min_height = utils.osmparser.parse_length(self.tags['min_height'])
 
         # Now that we have all what OSM provides, use some heuristics, if we are missing height/levels
@@ -1263,7 +1266,7 @@ def overlap_check_blocked_areas(orig_buildings: List[Building], blocked_areas: L
     for building in orig_buildings:
         is_intersected = False
         for blocked_area in blocked_areas:
-            if building.polygon.intersects(blocked_area):
+            if building.geometry.intersects(blocked_area):
                 logging.debug("Building osm_id=%d intersects with blocked area.", building.osm_id)
                 is_intersected = True
                 break
@@ -1272,8 +1275,8 @@ def overlap_check_blocked_areas(orig_buildings: List[Building], blocked_areas: L
     return buildings_after_remove_with_parent_children(orig_buildings, buildings_to_remove)
 
 
-def overlap_check_convex_hull(orig_buildings: List[Building], stg_entries: List[utils.stg_io2.STGEntry],
-                              stats: utilities.Stats) -> List[Building]:
+def overlap_check_convex_hull(orig_buildings: List[Building], stg_entries: List[utils.stg_io2.STGEntry])\
+        -> List[Building]:
     """Checks for all buildings whether their polygon intersects with a static or shared object's convex hull."""
     buildings_to_remove = list()
 
@@ -1281,9 +1284,8 @@ def overlap_check_convex_hull(orig_buildings: List[Building], stg_entries: List[
         is_intersecting = False
         for entry in stg_entries:
             try:
-                if entry.convex_hull is not None and entry.convex_hull.intersects(building.polygon):
+                if entry.convex_hull is not None and entry.convex_hull.intersects(building.geometry):
                     is_intersecting = True
-                    stats.skipped_nearby += 1
                     if building.name is None or len(building.name) == 0:
                         logging.debug("Convex hull of object '%s' is intersecting. Skipping building with osm_id %d",
                                       entry.obj_filename, building.osm_id)
