@@ -269,68 +269,50 @@ class BuildingType(IntEnum):
     hangar = 100
 
 
-class Building(OSMFeatureArea):
-    """A generic building.
-    """
-    def __init__(self, osm_id: int, geometry: MPoly, feature_type, levels: int):
-        super().__init__(osm_id, geometry, feature_type)
-        self.levels = levels
+def parse_building_tags_for_type(tags_dict: KeyValueDict) -> Union[None, BuildingType]:
+    if ("parking" in tags_dict) and (tags_dict["parking"] == "multi-storey"):
+        return BuildingType.parking
+    else:
+        value = None
+        if BUILDING_KEY in tags_dict:
+            value = tags_dict[BUILDING_KEY]
+        elif BUILDING_PART_KEY in tags_dict:
+            value = tags_dict[BUILDING_PART_KEY]
+        if value is not None:
+            for member in BuildingType:
+                if value == member.name:
+                    return member
+            return BuildingType.yes
+    return None
 
-    @classmethod
-    def create_from_way(cls, way: op.Way, nodes_dict: Dict[int, op.Node],
-                        my_coord_transformator: co.Transformation) -> 'Building':
-        my_geometry = way.polygon_from_osm_way(nodes_dict, my_coord_transformator)
-        feature_type = cls.parse_tags(way.tags)
-        if "building:levels" in way.tags:
-            levels = op.parse_int(way.tags["building:levels"], 0)
-        else:
-            levels = 0
-        obj = Building(way.osm_id, my_geometry, feature_type, levels)
-        return obj
 
-    @staticmethod
-    def parse_tags(tags_dict: KeyValueDict) -> Union[None, BuildingType]:
-        if ("parking" in tags_dict) and (tags_dict["parking"] == "multi-storey"):
-            return BuildingType.parking
-        else:
-            value = None
-            if BUILDING_KEY in tags_dict:
-                value = tags_dict[BUILDING_KEY]
-            elif BUILDING_PART_KEY in tags_dict:
-                value = tags_dict[BUILDING_PART_KEY]
-            if value is not None:
-                for member in BuildingType:
-                    if value == member.name:
-                        return member
-                return BuildingType.yes
-        return None
-
-    def get_building_class(self) -> BuildingClass:
-        if self.type_ in [BuildingType.apartments, BuildingType.house, BuildingType.detached,
-                          BuildingType.residential, BuildingType.dormitory, BuildingType.terrace]:
-            return BuildingClass.residential
-        elif self.type_ in [BuildingType.bungalow, BuildingType.static_caravan, BuildingType.cabin, BuildingType.hut]:
-            return BuildingClass.residential_small
-        elif self.type_ in [BuildingType.commercial, BuildingType.office]:
-            return BuildingClass.commercial
-        elif self.type_ in [BuildingType.retail]:
-            return BuildingClass.retail
-        elif self.type_ in [BuildingType.industrial, BuildingType.warehouse]:
-            return BuildingClass.industrial
-        elif self.type_ in [BuildingType.parking]:
-            return BuildingClass.parking_house
-        elif self.type_ in [BuildingType.cathedral, BuildingType.chapel, BuildingType.church,
-                            BuildingType.mosque, BuildingType.temple, BuildingType.synagogue]:
-            return BuildingClass.religion
-        elif self.type_ in [BuildingType.public, BuildingType.civic, BuildingType.school, BuildingType.hospital,
-                            BuildingType.hotel, BuildingType.kiosk]:
-            return BuildingClass.public
-        elif self.type_ in [BuildingType.farm, BuildingType.barn, BuildingType.cowshed, BuildingType.farm_auxiliary,
-                            BuildingType.greenhouse, BuildingType.stable, BuildingType.sty, BuildingType.riding_hall]:
-            return BuildingClass.farm
-        elif self.type_ in [BuildingType.hangar]:
-            return BuildingClass.airport
-        return BuildingClass.default
+def get_building_class(building: building_lib.Building) -> BuildingClass:
+    type_ = parse_building_tags_for_type(building.tags)
+    if type_ in [BuildingType.apartments, BuildingType.house, BuildingType.detached,
+                      BuildingType.residential, BuildingType.dormitory, BuildingType.terrace]:
+        return BuildingClass.residential
+    elif type_ in [BuildingType.bungalow, BuildingType.static_caravan, BuildingType.cabin, BuildingType.hut]:
+        return BuildingClass.residential_small
+    elif type_ in [BuildingType.commercial, BuildingType.office]:
+        return BuildingClass.commercial
+    elif type_ in [BuildingType.retail]:
+        return BuildingClass.retail
+    elif type_ in [BuildingType.industrial, BuildingType.warehouse]:
+        return BuildingClass.industrial
+    elif type_ in [BuildingType.parking]:
+        return BuildingClass.parking_house
+    elif type_ in [BuildingType.cathedral, BuildingType.chapel, BuildingType.church,
+                        BuildingType.mosque, BuildingType.temple, BuildingType.synagogue]:
+        return BuildingClass.religion
+    elif type_ in [BuildingType.public, BuildingType.civic, BuildingType.school, BuildingType.hospital,
+                        BuildingType.hotel, BuildingType.kiosk]:
+        return BuildingClass.public
+    elif type_ in [BuildingType.farm, BuildingType.barn, BuildingType.cowshed, BuildingType.farm_auxiliary,
+                        BuildingType.greenhouse, BuildingType.stable, BuildingType.sty, BuildingType.riding_hall]:
+        return BuildingClass.farm
+    elif type_ in [BuildingType.hangar]:
+        return BuildingClass.airport
+    return BuildingClass.default
 
 
 @unique
@@ -432,7 +414,7 @@ class GeneratedBuildingZone(BuildingZone):
         retail_buildings = 0
         farm_buildings = 0
         for building in self.osm_buildings:
-            building_class = building.get_building_class()
+            building_class = get_building_class(building)
             if building_class in [BuildingClass.residential_small or BuildingClass.residential]:
                 residential_buildings += 1
             elif building_class == BuildingClass.commercial:
@@ -511,7 +493,7 @@ class OpenSpace(OSMFeatureArea):
 
     @staticmethod
     def parse_tags(tags_dict: KeyValueDict) -> Union[OpenSpaceType, None]:
-        if Building.parse_tags(tags_dict) is not None:
+        if parse_building_tags_for_type(tags_dict) is not None:
             return None
         elif "public_transport" in tags_dict:
             return OpenSpaceType.transport
@@ -1164,17 +1146,6 @@ def process_osm_building_zone_refs(transformer: co.Transformation) -> List[Build
         if my_way.is_valid():
             my_ways.append(my_way)
     logging.info("OSM land-uses found: %s", len(my_ways))
-    return my_ways
-
-
-def process_osm_building_refs(transformer: co.Transformation) -> List[Building]:
-    osm_result = op.fetch_osm_db_data_ways_keys([BUILDING_KEY, BUILDING_PART_KEY])
-    my_ways = list()
-    for way in list(osm_result.ways_dict.values()):
-        my_way = Building.create_from_way(way, osm_result.nodes_dict, transformer)
-        if my_way.is_valid():
-            my_ways.append(my_way)
-    logging.info("OSM buildings found: %s", len(my_ways))
     return my_ways
 
 

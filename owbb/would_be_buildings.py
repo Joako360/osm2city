@@ -75,7 +75,8 @@ def _process_open_spaces_as_blocked_areas(building_zone, open_spaces_dict):
 
 def _process_buildings_as_blocked_areas(building_zone):
     for building in building_zone.osm_buildings:
-        blocked = m.BlockedArea(m.BlockedAreaType.osm_building, building.geometry, building.type_)
+        blocked = m.BlockedArea(m.BlockedAreaType.osm_building, building.geometry,
+                                m.parse_building_tags_for_type(building.tags))
         building_zone.linked_blocked_areas.append(blocked)
 
 
@@ -332,7 +333,7 @@ def process(transformer: co.Transformation, building_zones: List[m.BuildingZone]
         if use_me:
             total_building_area = 0
             for building in b_zone.osm_buildings:
-                total_building_area += building.geometry.area
+                total_building_area += building.area
 
             if total_building_area > b_zone.geometry.area * parameters.OWBB_ZONE_AREA_MAX_GEN:
                 use_me = False
@@ -370,6 +371,7 @@ def process(transformer: co.Transformation, building_zones: List[m.BuildingZone]
     building_zones.extend(not_used_zones)  # lets add the not_used_zones again, so we have everything again
 
     if parameters.DEBUG_PLOT:
+        logging.info('Start of plotting buildings')
         plotting.draw_buildings(building_zones, bounds)
         time_logging("Time used in seconds for plotting", last_time)
 

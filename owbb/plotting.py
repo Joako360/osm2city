@@ -61,7 +61,7 @@ def _draw_highways(highways_dict, ax: maxs.Axes) -> None:
             _plot_line(ax, my_highway.geometry, "lime", 1)
 
 
-def _draw_buildings(buildings: List[m.Building], ax: maxs.Axes) -> None:
+def _draw_buildings(buildings: List[bl.Building], ax: maxs.Axes) -> None:
     for building in buildings:
         if isinstance(building.geometry, Polygon):
             patch = PolygonPatch(building.geometry, facecolor="black", edgecolor="black")
@@ -235,7 +235,7 @@ def draw_buildings(building_zones, bounds) -> None:
     plt.close("all")
 
 
-def draw_zones(buildings: List[m.Building], building_zones: List[m.BuildingZone], lit_areas: List[Polygon],
+def draw_zones(buildings: List[bl.Building], building_zones: List[m.BuildingZone], lit_areas: List[Polygon],
                bounds: m.Bounds) -> None:
     pdf_pages = _create_pdf_pages("landuse")
 

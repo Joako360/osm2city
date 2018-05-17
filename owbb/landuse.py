@@ -11,6 +11,8 @@ from typing import Dict, List, Tuple
 from shapely.geometry import MultiPolygon, Polygon, CAP_STYLE, JOIN_STYLE
 from shapely.ops import unary_union
 
+import buildings
+import building_lib as bl
 import parameters
 import owbb.models as m
 import owbb.plotting as plotting
@@ -20,14 +22,14 @@ from utils.utilities import time_logging
 
 
 def _generate_building_zones_from_buildings(building_zones: List[m.BuildingZone],
-                                            buildings_outside: List[m.Building]) -> None:
+                                            buildings_outside: List[bl.Building]) -> None:
     """Adds "missing" building_zones based on building clusters outside of OSM land-use.
     The calculated values are implicitly updated in the referenced parameter building_zones"""
     zones_candidates = dict()
     for my_building in buildings_outside:
         buffer_distance = parameters.OWBB_GENERATE_LANDUSE_BUILDING_BUFFER_DISTANCE
-        if my_building.geometry.area > parameters.OWBB_GENERATE_LANDUSE_BUILDING_BUFFER_DISTANCE**2:
-            factor = math.sqrt(my_building.geometry.area / parameters.OWBB_GENERATE_LANDUSE_BUILDING_BUFFER_DISTANCE**2)
+        if my_building.area > parameters.OWBB_GENERATE_LANDUSE_BUILDING_BUFFER_DISTANCE**2:
+            factor = math.sqrt(my_building.area / parameters.OWBB_GENERATE_LANDUSE_BUILDING_BUFFER_DISTANCE**2)
             buffer_distance = min(factor*parameters.OWBB_GENERATE_LANDUSE_BUILDING_BUFFER_DISTANCE,
                                   parameters.OWBB_GENERATE_LANDUSE_BUILDING_BUFFER_DISTANCE_MAX)
         buffer_polygon = my_building.geometry.buffer(buffer_distance)
@@ -383,7 +385,7 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[m.Building
     # =========== READ OSM DATA =============
     building_zones = m.process_osm_building_zone_refs(transformer)
     urban_places, farm_places = m.process_osm_place_refs(transformer)
-    osm_buildings = m.process_osm_building_refs(transformer)
+    osm_buildings = buildings.construct_buildings_from_osm(transformer)
     highways_dict, nodes_dict = m.process_osm_highway_refs(transformer)
     railways_dict = m.process_osm_railway_refs(transformer)
     waterways_dict = m.process_osm_waterway_refs(transformer)
@@ -438,6 +440,7 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[m.Building
     # =========== FINALIZE PROCESSING ====================================================
     if parameters.DEBUG_PLOT:
         bounds = m.Bounds.create_from_parameters(transformer)
+        logging.info('Start of plotting zones')
         plotting.draw_zones(osm_buildings, building_zones, lit_areas, bounds)
         time_logging("Time used in seconds for plotting", last_time)
 

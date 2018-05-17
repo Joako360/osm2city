@@ -90,6 +90,7 @@ def _process_rectify_buildings(nodes_dict: Dict[int, op.Node], rel_nodes_dict: D
 
     if parameters.DEBUG_PLOT:
         if change_candidates:
+            logging.info('Start plotting rectify')
             p.draw_rectify(change_candidates, parameters.RECTIFY_MAX_DRAW_SAMPLE,
                            parameters.RECTIFY_SEED_SAMPLE)
             last_time = utilities.time_logging("Time used in seconds for plotting", last_time)
