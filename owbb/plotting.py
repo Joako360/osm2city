@@ -99,7 +99,6 @@ def _draw_settlement_zones(building_zones: List[m.BuildingZone], ax: maxs.Axes) 
 
 
 def _draw_osm_zones(building_zones: List[m.BuildingZone], ax: maxs.Axes) -> None:
-    edge_color = "red"
     for building_zone in building_zones:
         if not isinstance(building_zone, m.GeneratedBuildingZone):
             face_color = "red"
@@ -113,7 +112,7 @@ def _draw_osm_zones(building_zones: List[m.BuildingZone], ax: maxs.Axes) -> None
                 face_color = "magenta"
             elif m.BuildingZoneType.farmyard is building_zone.type_:
                 face_color = "chocolate"
-            _add_patch_for_building_zone(building_zone, face_color, edge_color, ax)
+            _add_patch_for_building_zone(building_zone, face_color, face_color, ax)
 
 
 def _draw_generated_zones(building_zones, ax: maxs.Axes) -> None:

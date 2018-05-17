@@ -670,7 +670,7 @@ def plot_fit_offsets(hull: shg.Polygon, box_minus: shg.Polygon, box_plus: shg.Po
                      model_length_largest: bool,
                      centroid_x: float, centroid_y: float,
                      model_name: str, osm_id: int) -> None:
-    pdf_pages = pu.create_pdf_pages('fit_offset' + str(osm_id))
+    pdf_pages = pu.create_pdf_pages('fit_offset_' + str(osm_id))
 
     my_figure = pu.create_a4_landscape_figure()
     title = 'osm_id={},\n model={},\n angle={},\n length_largest={}'.format(osm_id, model_name, angle,
