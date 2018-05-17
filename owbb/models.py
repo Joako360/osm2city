@@ -302,13 +302,13 @@ def get_building_class(building: building_lib.Building) -> BuildingClass:
     elif type_ in [BuildingType.parking]:
         return BuildingClass.parking_house
     elif type_ in [BuildingType.cathedral, BuildingType.chapel, BuildingType.church,
-                        BuildingType.mosque, BuildingType.temple, BuildingType.synagogue]:
+                   BuildingType.mosque, BuildingType.temple, BuildingType.synagogue]:
         return BuildingClass.religion
     elif type_ in [BuildingType.public, BuildingType.civic, BuildingType.school, BuildingType.hospital,
-                        BuildingType.hotel, BuildingType.kiosk]:
+                   BuildingType.hotel, BuildingType.kiosk]:
         return BuildingClass.public
     elif type_ in [BuildingType.farm, BuildingType.barn, BuildingType.cowshed, BuildingType.farm_auxiliary,
-                        BuildingType.greenhouse, BuildingType.stable, BuildingType.sty, BuildingType.riding_hall]:
+                   BuildingType.greenhouse, BuildingType.stable, BuildingType.sty, BuildingType.riding_hall]:
         return BuildingClass.farm
     elif type_ in [BuildingType.hangar]:
         return BuildingClass.airport
@@ -336,6 +336,11 @@ class CityBlock:
         self.building_zone_type = feature_type
         self.osm_buildings = list()  # List of already existing osm buildings
         self.settlement_type = SettlementType.periphery
+
+    def relate_building(self, building: building_lib.Building) -> None:
+        """Link the building to this zone and link this zone to the building."""
+        self.osm_buildings.append(building)
+        building.zone = self
 
 
 class BuildingZone(OSMFeatureArea):
@@ -389,15 +394,22 @@ class BuildingZone(OSMFeatureArea):
         self.linked_blocked_areas.extend(temp_buildings.generated_blocked_areas)
         self.generated_buildings.extend(temp_buildings.generated_buildings)
 
+    def relate_building(self, building: building_lib.Building) -> None:
+        """Link the building to this zone and link this zone to the building."""
+        self.osm_buildings.append(building)
+        building.zone = self
+
     def add_city_block(self, city_block: CityBlock) -> None:
         self.linked_city_blocks.append(city_block)
 
     def reassign_osm_buildings_to_city_blocks(self) -> None:
+        """AS far as possible buildings are related to city_blocks.
+        If there is none, then the existing relation to the zone is kept also from the building."""
         for osm_building in self.osm_buildings:
             for city_block in self.linked_city_blocks:
                 if osm_building.geometry.within(city_block.geometry) or osm_building.geometry.intersects(
                         city_block.geometry):
-                    city_block.osm_buildings.append(osm_building)
+                    city_block.relate_building(osm_building)
 
 
 class GeneratedBuildingZone(BuildingZone):
@@ -1173,7 +1185,7 @@ def process_osm_railway_refs(transformer: co.Transformation) -> Dict[int, Railwa
     return my_ways
 
 
-def process_osm_highway_refs(transformer: co.Transformation) -> Tuple[Dict[int, Highway], Dict[int, op.Node]]:
+def process_osm_highway_refs(transformer: co.Transformation) -> Dict[int, Highway]:
     osm_result = op.fetch_osm_db_data_ways_keys([HIGHWAY_KEY])
     my_ways = dict()
     for way in list(osm_result.ways_dict.values()):
@@ -1181,7 +1193,7 @@ def process_osm_highway_refs(transformer: co.Transformation) -> Tuple[Dict[int, 
         if my_way.is_valid():
             my_ways[my_way.osm_id] = my_way
     logging.info("OSM highways found: %s", len(my_ways))
-    return my_ways, osm_result.nodes_dict
+    return my_ways
 
 
 def process_osm_waterway_refs(transformer: co.Transformation) -> Dict[int, Waterway]:

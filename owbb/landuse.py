@@ -11,11 +11,12 @@ from typing import Dict, List, Tuple
 from shapely.geometry import MultiPolygon, Polygon, CAP_STYLE, JOIN_STYLE
 from shapely.ops import unary_union
 
-import buildings
+import buildings as bu
 import building_lib as bl
 import parameters
 import owbb.models as m
 import owbb.plotting as plotting
+import owbb.would_be_buildings as wbb
 import utils.osmparser as op
 from utils.coordinates import disjoint_bounds, Transformation
 from utils.utilities import time_logging
@@ -37,14 +38,14 @@ def _generate_building_zones_from_buildings(building_zones: List[m.BuildingZone]
         for candidate in zones_candidates.values():
             if buffer_polygon.intersects(candidate.geometry):
                 candidate.geometry = candidate.geometry.union(buffer_polygon)
-                candidate.osm_buildings.append(my_building)
+                candidate.relate_building(my_building)
                 within_existing_building_zone = True
                 break
         if not within_existing_building_zone:
             my_candidate = m.GeneratedBuildingZone(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse),
                                                    buffer_polygon, m.BuildingZoneType.non_osm,
                                                    True)
-            my_candidate.osm_buildings.append(my_building)
+            my_candidate.relate_building(my_building)
             zones_candidates[my_candidate.osm_id] = my_candidate
     logging.debug("Candidate land-uses found: %s", len(zones_candidates))
     # Search once again for intersections in order to account for randomness in checks
@@ -56,7 +57,8 @@ def _generate_building_zones_from_buildings(building_zones: List[m.BuildingZone]
                 merged_candidate_ids.append(keys[i])
                 zones_candidates[keys[j]].geometry = zones_candidates[keys[j]].geometry.union(
                     zones_candidates[keys[i]].geometry)
-                zones_candidates[keys[j]].osm_buildings.extend(zones_candidates[keys[i]].osm_buildings)
+                for building in zones_candidates[keys[i]].osm_buildings:
+                    zones_candidates[keys[j]].relate_building(building)
                 break
     logging.debug("Candidate land-uses merged into others: %d", len(merged_candidate_ids))
     # check for minimum size and then simplify geometry
@@ -116,7 +118,7 @@ def _split_multipolygon_generated_building_zone(zone: m.GeneratedBuildingZone) -
             my_building = zone.osm_buildings.pop()
             for my_split_generated in new_generated:
                 if my_building.geometry.intersects(my_split_generated.geometry):
-                    my_split_generated.osm_buildings.append(my_building)
+                    my_split_generated.relate_building(my_building)
                     continue
         for my_split_generated in new_generated:
             if my_split_generated.from_buildings and len(my_split_generated.osm_buildings) == 0:
@@ -362,13 +364,13 @@ def _link_building_zones_with_settlements(settlement_clusters: List[m.Settlement
                                 break
 
 
-def process(transformer: Transformation) -> Tuple[List[Polygon], List[m.BuildingZone]]:
+def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Building]]:
     last_time = time.time()
 
     # =========== TRY TO READ CACHED DATA FIRST =======
     tile_index = parameters.get_tile_index()
     cache_file_la = str(tile_index) + '_lit_areas.pkl'
-    cache_file_bz = str(tile_index) + '_building_zones.pkl'
+    cache_file_bz = str(tile_index) + '_buildings.pkl'
     if parameters.OWBB_LANDUSE_CACHE:
         try:
             with open(cache_file_la, 'rb') as file_pickle:
@@ -376,17 +378,17 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[m.Building
             logging.info('Successfully loaded %i objects from %s', len(lit_areas), cache_file_la)
 
             with open(cache_file_bz, 'rb') as file_pickle:
-                building_zones = pickle.load(file_pickle)
-            logging.info('Successfully loaded %i objects from %s', len(building_zones), cache_file_bz)
-            return lit_areas, building_zones
+                osm_buildings = pickle.load(file_pickle)
+            logging.info('Successfully loaded %i objects from %s', len(osm_buildings), cache_file_bz)
+            return lit_areas, osm_buildings
         except (IOError, EOFError) as reason:
             logging.info("Loading of cache %s or %s failed (%s)", cache_file_la, cache_file_bz, reason)
 
     # =========== READ OSM DATA =============
     building_zones = m.process_osm_building_zone_refs(transformer)
     urban_places, farm_places = m.process_osm_place_refs(transformer)
-    osm_buildings = buildings.construct_buildings_from_osm(transformer)
-    highways_dict, nodes_dict = m.process_osm_highway_refs(transformer)
+    osm_buildings = bu.construct_buildings_from_osm(transformer)
+    highways_dict = m.process_osm_highway_refs(transformer)
     railways_dict = m.process_osm_railway_refs(transformer)
     waterways_dict = m.process_osm_waterway_refs(transformer)
 
@@ -399,7 +401,7 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[m.Building
         for building_zone in building_zones:
             if candidate.geometry.within(building_zone.geometry) or candidate.geometry.intersects(
                     building_zone.geometry):
-                building_zone.osm_buildings.append(candidate)
+                building_zone.relate_building(candidate)
                 found = True
                 break
         if not found:
@@ -431,18 +433,24 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[m.Building
         _link_building_zones_with_settlements(settlement_clusters, building_zones, highways_dict)
         last_time = time_logging('Time used in seconds for linking building zones with settlement_clusters', last_time)
 
-    # ============finally guess the land-use type ========================================
+    # ============ Finally guess the land-use type ========================================
     for my_zone in building_zones:
         if isinstance(my_zone, m.GeneratedBuildingZone):
             my_zone.guess_building_zone_type(farm_places)
     last_time = time_logging("Time used in seconds for guessing zone types", last_time)
 
-    # =========== FINALIZE PROCESSING ====================================================
+    # =========== FINALIZE Land-use PROCESSING =============================================
     if parameters.DEBUG_PLOT:
         bounds = m.Bounds.create_from_parameters(transformer)
         logging.info('Start of plotting zones')
         plotting.draw_zones(osm_buildings, building_zones, lit_areas, bounds)
         time_logging("Time used in seconds for plotting", last_time)
+
+    # =========== Now generate buildings if asked for ======================================
+    if parameters.OWBB_GENERATE_BUILDINGS:
+        generated_buildings = wbb.process(transformer, building_zones, highways_dict, railways_dict,
+                                          waterways_dict)
+        osm_buildings.extend(generated_buildings)
 
     # =========== WRITE TO CACHE AND RETURN
     if parameters.OWBB_LANDUSE_CACHE:
@@ -453,9 +461,9 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[m.Building
             logging.info('Successfully saved %i objects to %s', len(lit_areas), cache_file_la)
 
             with open(cache_file_bz, 'wb') as file_pickle:
-                pickle.dump(building_zones, file_pickle)
-            logging.info('Successfully saved %i objects to %s', len(building_zones), cache_file_bz)
+                pickle.dump(osm_buildings, file_pickle)
+            logging.info('Successfully saved %i objects to %s', len(osm_buildings), cache_file_bz)
         except (IOError, EOFError) as reason:
             logging.info("Saving of cache %s or %s failed (%s)", cache_file_la, cache_file_bz, reason)
 
-    return lit_areas, building_zones
+    return lit_areas, osm_buildings

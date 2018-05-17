@@ -593,15 +593,9 @@ def construct_buildings_from_osm(coords_transform: coordinates.Transformation) -
 
 def process_buildings(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
                       blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
-                      generated_buildings: List[building_lib.Building],
+                      the_buildings: List[building_lib.Building],
                       file_lock: mp.Lock=None) -> None:
     random.seed(42)
-
-    # construct buildings from OSM data
-    the_buildings = construct_buildings_from_osm(coords_transform)
-
-    # add generated buildings
-    the_buildings.extend(generated_buildings)
 
     if not the_buildings:
         logging.info("No buildings found in OSM data. Stopping further processing.")

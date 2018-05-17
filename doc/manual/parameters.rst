@@ -439,8 +439,8 @@ Land-use data is only used for built-up area in ``osm2city``. All other land-use
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
-OWBB_LANDUSE_CACHE                              Boolean    False     Instead of calculating land-use related stuff from scratch each time, use
-                                                                     cached (but possibly stale) data for speed-up.
+OWBB_LANDUSE_CACHE                              Boolean    False     Instead of calculating land-use related stuff including buildings from scratch
+                                                                     each time, use cached (but possibly stale) data for speed-up.
 
 =============================================   ========   =======   ==============================================================================
 

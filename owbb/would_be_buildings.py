@@ -5,7 +5,7 @@ import logging
 import pickle
 import random
 import time
-from typing import List
+from typing import Dict, List
 import sys
 
 from shapely import speedups
@@ -31,7 +31,7 @@ def _prepare_building_zone_for_building_generation(building_zone, open_spaces_di
     """Prepares a building zone with blocked areas and highway parts.
     As soon as an element is entirely within a building zone, it is removed
     from the lists in order to speedup by reducing the number of stuff to compare in the next
-    building zone (the lists area shared / passed by reference.
+    building zone (the lists area shared / passed by reference).
     In order to make these removals fast the data structures must be dicts instead of lists.
 
     Another possibility would be parallel processing, but that would lead to big
@@ -277,7 +277,9 @@ def _read_building_models_library() -> List[m.BuildingModel]:
     return models
 
 
-def process(transformer: co.Transformation, building_zones: List[m.BuildingZone]) -> List[building_lib.Building]:
+def process(transformer: co.Transformation, building_zones: List[m.BuildingZone],
+            highways_dict: Dict[int, m.Highway], railways_dict: Dict[int, m.RailwayLine],
+            waterways_dict: Dict[int, m.Waterway]) -> List[building_lib.Building]:
     last_time = time.time()
 
     # =========== TRY TO READ CACHED DATA FIRST =======
@@ -295,9 +297,6 @@ def process(transformer: co.Transformation, building_zones: List[m.BuildingZone]
     # =========== READ OSM DATA =============
 
     open_spaces_dict = m.process_osm_open_space_refs(transformer)
-    highways_dict, nodes_dict = m.process_osm_highway_refs(transformer)
-    railways_dict = m.process_osm_railway_refs(transformer)
-    waterways_dict = m.process_osm_waterway_refs(transformer)
     last_time = time_logging("Time used in seconds for parsing OSM data", last_time)
 
     bounds = m.Bounds.create_from_parameters(transformer)
