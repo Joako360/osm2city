@@ -314,7 +314,7 @@ def calc_point_angle_away(x: float, y: float, added_distance: float, angle: floa
     return new_x, new_y
 
 
-def calc_point_on_line_local(x1: float, y1: float, x2:float, y2:float, factor: float) -> Tuple[float, float]:
+def calc_point_on_line_local(x1: float, y1: float, x2: float, y2: float, factor: float) -> Tuple[float, float]:
     """Returns the x,y coordinates of a point along the line defined by the input coordinates factor away from first.
     """
     angle = calc_angle_of_line_local(x1, y1, x2, y2)

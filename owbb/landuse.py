@@ -173,7 +173,7 @@ def _assign_city_blocks(building_zone: m.BuildingZone, highways_dict: Dict[int, 
     if intersecting_highways:
         buffers = list()
         for highway in intersecting_highways:
-            buffers.append(highway.geometry.buffer(2, cap_style=CAP_STYLE.square,
+            buffers.append(highway.geometry.buffer(parameters.OWBB_CITY_BLOCK_HIGHWAY_BUFFER, cap_style=CAP_STYLE.square,
                                                    join_style=JOIN_STYLE.bevel))
         geometry_difference = building_zone.geometry.difference(unary_union(buffers))
         if isinstance(geometry_difference, Polygon) and geometry_difference.is_valid and \

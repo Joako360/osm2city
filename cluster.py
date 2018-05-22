@@ -15,6 +15,7 @@ import logging
 import os
 
 import parameters
+import utils.logging as ulog
 import utils.utilities
 from utils.vec2d import Vec2d
 from utils.stg_io2 import STGVerbType
@@ -117,7 +118,7 @@ class ClusterContainer(object):
         return the_cluster
 
     def write_statistics_for_buildings(self, clusters_name: str) -> None:
-        if utils.utilities.log_level_debug_or_lower() and parameters.WRITE_CLUSTER_STATS:
+        if ulog.log_level_debug_or_lower() and parameters.WRITE_CLUSTER_STATS:
             my_file = open(os.path.join(parameters.PREFIX, clusters_name + ".dat"), "w")
             for j in range(self.max_grid.iy):
                 for i in range(self.max_grid.ix):

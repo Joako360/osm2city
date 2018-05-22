@@ -23,6 +23,7 @@ import shapely.geometry as shg
 
 import parameters
 import utils.coordinates as co
+import utils.logging as ulog
 import utils.osmparser as op
 import utils.vec2d as ve
 
@@ -108,14 +109,6 @@ def replace_with_os_separator(path: str) -> str:
     my_string = path.replace("/", os.sep)
     my_string = my_string.replace("\\", os.sep)
     return my_string
-
-
-def log_level_info_or_lower():
-    return logging.getLogger().level <= logging.INFO
-
-
-def log_level_debug_or_lower():
-    return logging.getLogger().level <= logging.DEBUG
 
 
 def match_local_coords_with_global_nodes(local_list: List[Tuple[float, float]], ref_list: List[int],
@@ -276,7 +269,7 @@ class Stats(object):
             logging.info(" %5g m^2  %5i |%s" % (self.area_levels[i], self.area_above[i],
                          "#" * int(56. * self.area_above[i] / max_area_above)))
 
-        if log_level_debug_or_lower():
+        if ulog.log_level_debug_or_lower():
             for name in sorted(textures_used):
                 logging.info("%s" % name)
 
@@ -475,7 +468,7 @@ class FGElev(object):
 
 def progress(i, max_i):
     """progress indicator"""
-    if sys.stdout.isatty() and log_level_info_or_lower():
+    if sys.stdout.isatty() and ulog.log_level_info_or_lower():
         try:
             if i % (max_i / 100) > 0:
                 return

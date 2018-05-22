@@ -18,11 +18,13 @@ import re
 import sys
 import traceback
 import types
+import typing
+import unittest
 
 import textures.road
-from utils import vec2d as v
+import utils.vec2d as v
 import utils.calc_tile as ct
-import utils.utilities as utils
+import utils.logging as ulog
 
 # default_args_start # DO NOT MODIFY THIS LINE
 # -*- coding: utf-8 -*-
@@ -152,11 +154,11 @@ BUILDING_CITY_LEVEL_HEIGHT_LOW = 3.1
 BUILDING_CITY_LEVEL_HEIGHT_MODE = 3.3
 BUILDING_CITY_LEVEL_HEIGHT_HIGH = 3.6
 # FIXME: above should be removed after FLAG_2018_3
-BUILDING_NUMBER_LEVELS_CENTRE = [5.0, 5.4, 6.0]
-BUILDING_NUMBER_LEVELS_BLOCK = [4.5, 5.0, 5.1]
-BUILDING_NUMBER_LEVELS_DENSE = [3.0, 3.6, 4.0]
-BUILDING_NUMBER_LEVELS_PERIPHERY = [1.0, 1.9, 3.0]
-BUILDING_NUMBER_LEVELS_RURAL = [1.0, 1.5, 3.0]
+BUILDING_NUMBER_LEVELS_CENTRE = {4: 0.2, 5: 0.7, 6: 0.1}
+BUILDING_NUMBER_LEVELS_BLOCK = {4: 0.4, 5: 0.6}
+BUILDING_NUMBER_LEVELS_DENSE = {3: 0.2, 4: 0.6, 5: 0.15, 6: 0.05}
+BUILDING_NUMBER_LEVELS_PERIPHERY = {1: 0.3, 2: 0.65, 3: 0.05}
+BUILDING_NUMBER_LEVELS_RURAL = {1: 0.3, 2: 0.7}
 BUILDING_LEVEL_HEIGHT_URBAN = 3.5  # this value should not be changed unless special textures are used
 BUILDING_LEVEL_HEIGHT_RURAL = 2.5  # ditto
 
@@ -321,6 +323,7 @@ OWBB_GENERATE_BUILDINGS = False
 OWBB_STEP_DISTANCE = 2  # in meters
 OWBB_MIN_STREET_LENGTH = 10  # in meters
 OWBB_MIN_CITY_BLOCK_AREA = 200  # square meters
+OWBB_CITY_BLOCK_HIGHWAY_BUFFER = 3  # in metres buffer around highways to find city blocks
 
 OWBB_RESIDENTIAL_HIGHWAY_MIN_GEN_SHARE = 0.3
 OWBB_INDUSTRIAL_HIGHWAY_MIN_GEN_SHARE = 0.3  # FIXME: not yet used
@@ -399,11 +402,29 @@ def get_clipping_border():
     return rect
 
 
+def _check_ratio_dict_parameter(ratio_dict: typing.Optional[typing.Dict], name: str) -> None:
+    if ratio_dict is None:
+        raise ValueError('Parameter {} must not be None'.format(name))
+    if not isinstance(ratio_dict, dict):
+        raise ValueError('Parameter {} must be a dict'.format(name))
+    if len(ratio_dict) == 0:
+        raise ValueError('Parameter %s must not be an empty dict'.format(name))
+    total = 0.
+    for key, ratio in ratio_dict.items():
+        if not isinstance(key, int):
+            raise ValueError('key {} in parameter {} must be an int'.format(str(key), name))
+        if not isinstance(ratio, float):
+            raise ValueError('ratio {} for key {} in param {} must be a float'.format(str(ratio), str(key), name))
+        total += ratio
+    if abs(total - 1) > 0.001:
+        raise ValueError('The total of all ratios in param {} must be 1'.format(name))
+
+
 def show():
     """
     Prints all parameters as key = value if log level is INFO or lower
     """
-    if utils.log_level_info_or_lower():
+    if ulog.log_level_info_or_lower():
         print('--- Using the following parameters: ---')
         my_globals = globals()
         for k in sorted(my_globals.keys()):
@@ -453,6 +474,18 @@ def read_from_file(filename):
                 PATH_TO_SCENERY_OPT = None
             else:
                 PATH_TO_SCENERY_OPT = [PATH_TO_SCENERY_OPT]
+
+    # check the ratios in specific parameters
+    global BUILDING_NUMBER_LEVELS_CENTRE
+    global BUILDING_NUMBER_LEVELS_BLOCK
+    global BUILDING_NUMBER_LEVELS_DENSE
+    global BUILDING_NUMBER_LEVELS_PERIPHERY
+    global BUILDING_NUMBER_LEVELS_RURAL
+    _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_CENTRE, 'BUILDING_NUMBER_LEVELS_CENTRE')
+    _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_BLOCK, 'BUILDING_NUMBER_LEVELS_BLOCK')
+    _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_DENSE, 'BUILDING_NUMBER_LEVELS_DENSE')
+    _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_PERIPHERY, 'BUILDING_NUMBER_LEVELS_PERIPHERY')
+    _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_RURAL, 'BUILDING_NUMBER_LEVELS_RURAL')
 
 
 def show_default():
@@ -505,3 +538,30 @@ if __name__ == "__main__":
         show()
     if args.show_default:
         show_default()
+
+
+# ================ UNITTESTS =======================
+
+
+class TestParameters(unittest.TestCase):
+    def test_check_ratio_dict_parameter(self):
+        my_ratio_dict = None
+        with self.assertRaises(ValueError):
+            _check_ratio_dict_parameter(my_ratio_dict, 'my_ratio_dict')
+        my_ratio_dict = list()
+        with self.assertRaises(ValueError):
+            _check_ratio_dict_parameter(my_ratio_dict, 'my_ratio_dict')
+        my_ratio_dict = dict()
+        with self.assertRaises(ValueError):
+            _check_ratio_dict_parameter(my_ratio_dict, 'my_ratio_dict')
+        my_ratio_dict = {'A': 'B'}
+        with self.assertRaises(ValueError):
+            _check_ratio_dict_parameter(my_ratio_dict, 'my_ratio_dict')
+        my_ratio_dict = {1: 'b'}
+        with self.assertRaises(ValueError):
+            _check_ratio_dict_parameter(my_ratio_dict, 'my_ratio_dict')
+        my_ratio_dict = {1: 0.01, 2: 1.}
+        with self.assertRaises(ValueError):
+            _check_ratio_dict_parameter(my_ratio_dict, 'my_ratio_dict')
+        my_ratio_dict = {1: 0.01, 2: 0.99}
+        self.assertEqual(2, len(my_ratio_dict), 'Length correct and no exception')

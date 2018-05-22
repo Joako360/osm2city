@@ -289,7 +289,7 @@ def parse_building_tags_for_type(tags_dict: KeyValueDict) -> Union[None, Buildin
 def get_building_class(building: building_lib.Building) -> BuildingClass:
     type_ = parse_building_tags_for_type(building.tags)
     if type_ in [BuildingType.apartments, BuildingType.house, BuildingType.detached,
-                      BuildingType.residential, BuildingType.dormitory, BuildingType.terrace]:
+                 BuildingType.residential, BuildingType.dormitory, BuildingType.terrace]:
         return BuildingClass.residential
     elif type_ in [BuildingType.bungalow, BuildingType.static_caravan, BuildingType.cabin, BuildingType.hut]:
         return BuildingClass.residential_small
@@ -389,10 +389,17 @@ class BuildingZone(OSMFeatureArea):
     def get_osm_value(self) -> str:
         return self.type_.name
 
-    def commit_temp_gen_buildings(self, temp_buildings) -> None:  # temp_buildings: TempGenBuildings circular
+    def commit_temp_gen_buildings(self, temp_buildings, highway, is_reverse) -> None:
         """Commits a set of generated buildings to be definitively be part of a BuildingZone"""
         self.linked_blocked_areas.extend(temp_buildings.generated_blocked_areas)
-        self.generated_buildings.extend(temp_buildings.generated_buildings)
+        for building in temp_buildings.generated_buildings:
+            self.generated_buildings.append(building)
+            building.zone = self
+            if is_reverse and highway.reversed_city_block:
+                highway.reversed_city_block.relate_building(building)
+            elif not is_reverse:
+                if highway.along_city_block:
+                    highway.along_city_block.relate_building(building)
 
     def relate_building(self, building: building_lib.Building) -> None:
         """Link the building to this zone and link this zone to the building."""
@@ -410,6 +417,34 @@ class BuildingZone(OSMFeatureArea):
                 if osm_building.geometry.within(city_block.geometry) or osm_building.geometry.intersects(
                         city_block.geometry):
                     city_block.relate_building(osm_building)
+
+    def link_city_blocks_to_highways(self) -> None:
+        """Tries to link city blocks to highways for building generation.
+
+        Using the middle point of the highway and just the overall angle should give correct result in most of the
+        cases. And if not then no big harm, as city blocks close to each other will have similar types."""
+        linked = 0
+        for highway in self.linked_genways:
+            coords = list(highway.geometry.coords)
+            angle = co.calc_angle_of_line_local(coords[0][0], coords[0][1], coords[-1][0], coords[-1][1])
+            middle_point = highway.geometry.interpolate(highway.geometry.length / 2)
+            my_point = Point(co.calc_point_angle_away(middle_point.x, middle_point.y,
+                                                      2 * parameters.OWBB_CITY_BLOCK_HIGHWAY_BUFFER, angle + 90))
+            for city_block in self.linked_city_blocks:
+                if my_point.within(city_block.geometry):
+                    highway.along_city_block = city_block
+                    linked += 1
+                    break
+            my_point = Point(co.calc_point_angle_away(middle_point.x, middle_point.y,
+                                                      2 * parameters.OWBB_CITY_BLOCK_HIGHWAY_BUFFER, angle - 90))
+            for city_block in self.linked_city_blocks:
+                if my_point.within(city_block.geometry):
+                    highway.reversed_city_block = city_block
+                    linked += 1
+                    break
+
+        logging.debug('Linked around &i out of %i high ways to city blocks in building zone %i', linked,
+                      int(linked/len(self.linked_genways)), self.osm_id)
 
 
 class GeneratedBuildingZone(BuildingZone):
@@ -712,6 +747,8 @@ class Highway(OSMFeatureLinearWithTunnel):
         self.is_oneway = self._parse_tags_oneway(tags_dict)
         self.lanes = self._parse_tags_lanes(tags_dict)
         self.refs = refs
+        self.along_city_block = None  # for building generation city block along line on right side
+        self.reversed_city_block = None  # ditto reversed line
 
     @classmethod
     def create_from_scratch(cls, pseudo_id: int, existing_highway: 'Highway', linear: LineString) -> 'Highway':

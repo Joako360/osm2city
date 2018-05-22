@@ -168,14 +168,14 @@ def _generate_extra_buildings_residential(building_zone: m.BuildingZone, highway
         _generate_buildings_along_highway(building_zone, highway, row_houses_list, is_reverse, temp_buildings)
         if 0 < temp_buildings.validate_uninterrupted_sequence(parameters.OWBB_RESIDENTIAL_HIGHWAY_MIN_GEN_SHARE,
                                                               parameters.OWBB_RESIDENTIAL_TERRACE_MIN_NUMBER):
-            building_zone.commit_temp_gen_buildings(temp_buildings)
+            building_zone.commit_temp_gen_buildings(temp_buildings, highway, is_reverse)
             return  # we do not want to spoil row houses with other houses to fill up
 
     # start from scratch - either because terrace not chosen or not successfully validated
     temp_buildings = m.TempGenBuildings(bounding_box)
     _generate_buildings_along_highway(building_zone, highway, detached_houses_list, is_reverse, temp_buildings)
     if temp_buildings.validate_min_share_generated(parameters.OWBB_RESIDENTIAL_HIGHWAY_MIN_GEN_SHARE):
-        building_zone.commit_temp_gen_buildings(temp_buildings)
+        building_zone.commit_temp_gen_buildings(temp_buildings, highway, is_reverse)
 
 
 def _generate_extra_buildings_industrial(building_zone: m.BuildingZone, highway: m.Highway,
@@ -188,7 +188,7 @@ def _generate_extra_buildings_industrial(building_zone: m.BuildingZone, highway:
 
     shared_models_list = shared_models_library.industrial_buildings_small
     _generate_buildings_along_highway(building_zone, highway, shared_models_list, is_reverse, temp_buildings)
-    building_zone.commit_temp_gen_buildings(temp_buildings)
+    building_zone.commit_temp_gen_buildings(temp_buildings, highway, is_reverse)
 
 
 def _generate_buildings_along_highway(building_zone: m.BuildingZone, highway: m.Highway,
@@ -235,6 +235,7 @@ def _generate_buildings_along_highway(building_zone: m.BuildingZone, highway: m.
                 my_gen_building.set_location(point_on_line, angle, area_polygon, buffer_polygon)
                 temp_buildings.add_generated(my_gen_building, m.BlockedArea(m.BlockedAreaType.gen_building,
                                                                             area_polygon))
+                # prepare a new building, which might get added in the next loop
                 my_gen_building = m.GenBuilding(op.get_next_pseudo_osm_id(op.OSMFeatureType.building_owbb),
                                                 random.choice(shared_models_list), highway.get_width())
 
@@ -354,6 +355,7 @@ def process(transformer: co.Transformation, building_zones: List[m.BuildingZone]
     for b_zone in used_zones:
         _prepare_building_zone_for_building_generation(b_zone, open_spaces_dict,
                                                        waterways_dict, railways_dict, highways_dict)
+        b_zone.link_city_blocks_to_highways()
     last_time = time_logging("Time used in seconds for preparing building zones for building generation", last_time)
 
     building_zones = list()  # will be filled again with used_zones out of the parallel processes
