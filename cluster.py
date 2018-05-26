@@ -15,7 +15,7 @@ import logging
 import os
 
 import parameters
-import utils.logging as ulog
+import utils.log_helper as ulog
 import utils.utilities
 from utils.vec2d import Vec2d
 from utils.stg_io2 import STGVerbType

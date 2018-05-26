@@ -66,6 +66,34 @@ def _random_roof_shape() -> roofs.RoofShape:
         return roofs.RoofShape.pyramidal
 
 
+@unique
+class SettlementType(IntEnum):
+    centre = 1
+    block = 2
+    dense = 3
+    periphery = 4  # default within lit area
+    rural = 5  # only implicitly used for building zones without city blocks.
+
+def calc_levels_for_settlement_type(settlement_type: SettlementType) -> int:
+    if settlement_type is SettlementType.centre:
+        ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_CENTRE
+    elif settlement_type is SettlementType.block:
+        ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_BLOCK
+    elif settlement_type is SettlementType.dense:
+        ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_DENSE
+    elif settlement_type is SettlementType.periphery:
+        ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_PERIPHERY
+    else:
+        ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_RURAL
+    return utilities.random_value_from_ratio_dict_parameter(ratio_parameter)
+
+
+def calc_level_height_for_settlement_type(settlement_type: SettlementType) -> float:
+    if settlement_type in [SettlementType.periphery, SettlementType.rural]:
+        return parameters.BUILDING_LEVEL_HEIGHT_RURAL
+    return parameters.BUILDING_LEVEL_HEIGHT_URBAN
+
+
 class Building(object):
     """Central object class.
     Holds all data relevant for a building. Coordinates, type, area, ...
@@ -446,18 +474,17 @@ class Building(object):
             else:
                 self.roof_shape = roofs.RoofShape.flat
 
-    def analyse_height_and_levels(self):
+    def analyse_height_and_levels(self, building_parent: Optional['BuildingParent']) -> None:
         """Determines total height (and number of levels) of a building based on OSM values and other logic.
         Raises ValueError if the height is less than the building min height parameter or layer OSM attribute
         cannot be interpreted if needed.
         
         The OSM key 'height' is defined as: Distance between the lowest possible position with ground contact and 
-        the top of the roof of the building, excluding antennas, spires and other equipment mounted on the roof. 
+        the top of the roof of the building, excluding antennas, spires and other equipment mounted on the roof.
         
         The OSM key 'min_height' is for raising a facade. Even if this 'min_height' is > 0, then the height
         of the building remains the same - the facade just gets shorter.
-        See http://wiki.openstreetmap.org/wiki/Key:min_height and http://wiki.openstreetmap.org/wiki/Simple_3D_buildings        building_facade_material = None
-
+        See http://wiki.openstreetmap.org/wiki/Key:min_height and http://wiki.openstreetmap.org/wiki/Simple_3D_buildings
 
         In order to make stuff more obvious in processing, the code will use the following properties:
         * min_height - as described above and therefore mostly 0.0
@@ -467,75 +494,77 @@ class Building(object):
                         For flat roofs it is 0.0
 
         Therefore what is called 'height' is min_height + body_height + roof_height
-        """
-        layer = 9999
 
+        Simple (silly?) heuristics to 'respect' layers (http://wiki.openstreetmap.org/wiki/Key:layer) is NOT used,
+        as it would be wrong and only a last resort method like: proxy_levels = layer + 2
+        """
         proxy_total_height = 0.  # something that mimics the OSM 'height'
+        proxy_body_height = 0.
+        proxy_roof_height = 0.
         proxy_levels = 0.
 
         if 'height' in self.tags:
             proxy_total_height = utils.osmparser.parse_length(self.tags['height'])
-        elif 'building:height' in self.tags:
-            proxy_total_height = utils.osmparser.parse_length(self.tags['building:height'])
-        proxy_levels = _parse_building_levels(self.tags)
-        if 'layer' in self.tags:
-            layer = int(self.tags['layer'])
-
-        # For Czech republic there are special rules due to OSM building import from RUIAN:
-        # http://wiki.openstreetmap.org/wiki/RUIAN.
-        # A lot of times building:levels is set to 1 despite building:flats having a high number.
-        # http://wiki.openstreetmap.org/wiki/Key:building:ruian:type = 6 -> apartment house
-        if 'building:ruian:type' in self.tags and self.tags['building:ruian:type'] in ['3', '5', '6', '12', '19']:
-            if proxy_total_height == 0. and proxy_levels <= 1:
-                flats = 0
-                if 'building:flats' in self.tags:
-                    flats = utils.osmparser.parse_length(self.tags['building:flats'])
-                proxy_levels = 4
-                if flats > 10:
-                    proxy_levels = 5
-                if flats > 15:
-                    proxy_levels = 6
-
-        proxy_roof_height = 0.
+        if 'building:height' in self.tags:
+            proxy_body_height = utils.osmparser.parse_length(self.tags['building:height'])
         if 'roof:height' in self.tags:
             try:
                 proxy_roof_height = utils.osmparser.parse_length(self.tags['roof:height'])
             except:
                 proxy_roof_height = 0.
+
+        if "min_height" in self.tags:
+            self.min_height = utils.osmparser.parse_length(self.tags['min_height'])
+        elif 'min:height' in self.tags:  # very few values, wrong tagging
+            self.min_height = utils.osmparser.parse_length(self.tags['min:height'])
+
+        # a bit of sanity
         if proxy_roof_height == 0. and self.roof_complex:
             proxy_roof_height = parameters.BUILDING_SKEL_ROOF_DEFAULT_HEIGHT
+        if proxy_body_height > 0. and proxy_total_height == 0.:
+            proxy_total_height = proxy_roof_height + proxy_body_height + self.min_height
+        elif proxy_body_height == 0. and proxy_total_height > 0.:
+            proxy_body_height = proxy_total_height - proxy_roof_height - self.min_height
 
-        # OSM key min_value is used to raise ("hover") a facade above ground
-        # -- no complex roof on tiny buildings.
-        if "min_height" in self.tags:  # FIXME: is it min_height or min:height?
-            self.min_height = utils.osmparser.parse_length(self.tags['min_height'])
+        proxy_levels = _parse_building_levels(self.tags)
 
         # Now that we have all what OSM provides, use some heuristics, if we are missing height/levels
+        # The most important distinction is whether the building is in a relationship, because if yes then the
+        # height given needs to be respected to make sure that e.g. a building:part dome actually sits a the right
+        # position on the top
+        level_height = self._calculate_level_height()
+        if building_parent and proxy_body_height > 0.:
+            # set proxy levels as a float without rounding and disregard if level would be defined at all
+            proxy_levels = proxy_body_height / level_height
 
-        if proxy_total_height == 0. and proxy_levels == 0.:
-            # Simple (silly?) heuristics to 'respect' layers (http://wiki.openstreetmap.org/wiki/Key:layer)
-            # Basically the use of layers is wrong, so this is a last resort method
-            if 0 < layer < 99:
-                proxy_levels = layer + 2
-
-        if proxy_total_height == 0. or proxy_levels == 0:  # otherwise both are already set and therefore nothing to do
-            level_height = _random_level_height()
-            if proxy_total_height > 0.0:
-                # calculate body_height
-                self.body_height = proxy_total_height - proxy_roof_height - self.min_height
-                # handle levels
-                self.levels = int(self.body_height / level_height)
+        else:
+            if proxy_body_height == 0.:
+                if proxy_levels == 0:  # else just go with the existing levels
+                    proxy_levels = self._calculate_levels()
             else:
-                if proxy_levels == 0.:
-                    proxy_levels = _random_levels()
-                    if self.area < parameters.BUILDING_MIN_AREA:
-                        proxy_levels = min(proxy_levels, 2)
-                self.body_height = float(proxy_levels) * level_height  # no need for min_height and proxy_roof_height
-                self.levels = proxy_levels
+                # calculate the levels rounded based on height if levels is undefined
+                # else just use the existing levels as they have precedence over height
+                if proxy_levels == 0:
+                    proxy_levels = round(proxy_body_height / level_height)
+            proxy_body_height = level_height * proxy_levels
 
+        self.body_height = proxy_body_height
+        self.levels = proxy_levels
+
+        # now respect building min height parameter
         proxy_total_height = self.body_height + self.min_height + proxy_roof_height
         if parameters.BUILDING_MIN_HEIGHT > 0.0 and proxy_total_height < parameters.BUILDING_MIN_HEIGHT:
             raise ValueError('The height given or calculated is less then the BUILDING_MIN_HEIGHT parameter.')
+
+    def _calculate_levels(self) -> int:
+        import owbb.models
+        if isinstance(self.zone, owbb.models.CityBlock):
+            return self.zone.building_levels
+        else:
+            return calc_levels_for_settlement_type(self.zone.settlement_type)
+
+    def _calculate_level_height(self) -> float:
+        return calc_levels_for_settlement_type(self.zone.settlement_type)
 
     def analyse_roof_shape_check(self) -> None:
         """Check whether we actually may use something else than a flat roof."""
@@ -588,31 +617,17 @@ class Building(object):
             return False
         return True
 
-    def enforce_european_style(self) -> None:
+    def enforce_european_style(self, building_parent: Optional['BuildingParent']) -> None:
         """See description in manual for European Style parameters.
 
         Be aware that these tags could be overwritten later in the processing again. It just increases probability.
         """
         if self.neighbours:
             # exclude those with (pseudo)parents
-            if self.parent is not None:
+            if building_parent is not None:
                 return
             # exclude houses and terraces
             if 'building' in self.tags and self.tags['building'] in ['house', 'detached', 'terrace']:
-                return
-            # exclude based on levels
-            proxy_levels = 0
-            proxy_levels = _parse_building_levels(self.tags)
-            if proxy_levels > parameters.BUILDING_FORCE_EUROPEAN_MAX_LEVEL:
-                return
-            # exclude based on height
-            proxy_total_height = 0.
-            if 'height' in self.tags:
-                proxy_total_height = utils.osmparser.parse_length(self.tags['height'])
-            elif 'building:height' in self.tags:
-                proxy_total_height = utils.osmparser.parse_length(self.tags['building:height'])
-            max_height = parameters.BUILDING_FORCE_EUROPEAN_MAX_LEVEL * parameters.BUILDING_CITY_LEVEL_HEIGHT_HIGH
-            if proxy_total_height > max_height:
                 return
 
             # now apply some tags to increase European style
@@ -991,22 +1006,6 @@ def _parse_building_levels(tags: Dict[str, str]) -> float:
     return proxy_levels
 
 
-def _random_level_height() -> float:
-    """ Calculates the height for each level of a building based on place and random factor"""
-    # FIXME: other places (e.g. village)
-    return random.triangular(parameters.BUILDING_CITY_LEVEL_HEIGHT_LOW,
-                             parameters.BUILDING_CITY_LEVEL_HEIGHT_HIGH,
-                             parameters.BUILDING_CITY_LEVEL_HEIGHT_MODE)
-
-
-def _random_levels() -> int:
-    """ Calculates the number of building levels based on place and random factor"""
-    # FIXME: other places
-    return int(round(random.triangular(parameters.BUILDING_CITY_LEVELS_LOW,
-                                       parameters.BUILDING_CITY_LEVELS_HIGH,
-                                       parameters.BUILDING_CITY_LEVELS_MODE)))
-
-
 def _calculate_vertical_texture_coords(body_height: float, t: tex.Texture) -> Tuple[float, float]:
     """Check if a texture t fits the building' body_height (h) and return the bottom and top relative position of the tex.
     I.e. return numbers between 0 and 1, where 1 is at the top.
@@ -1126,7 +1125,7 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: u
                     continue
 
         if parameters.BUILDING_FORCE_EUROPEAN_INNER_CITY_STYLE:
-            b.enforce_european_style()
+            b.enforce_european_style(building_parent)
 
         if not b.is_external_model:
             try:
@@ -1150,7 +1149,7 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: u
         b.analyse_roof_shape()
 
         try:
-            b.analyse_height_and_levels()
+            b.analyse_height_and_levels(building_parent)
         except ValueError as e:
             logging.debug('Skipping building osm_id = {}: {}'.format(b.osm_id, e))
             stats.skipped_small += 1

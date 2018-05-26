@@ -24,7 +24,8 @@ import unittest
 import textures.road
 import utils.vec2d as v
 import utils.calc_tile as ct
-import utils.logging as ulog
+import utils.log_helper as ulog
+import utils.utilities as uu
 
 # default_args_start # DO NOT MODIFY THIS LINE
 # -*- coding: utf-8 -*-
@@ -139,28 +140,19 @@ RECTIFY_90_TOLERANCE = 0.1
 
 # Force European style inner cities with gables and red tiles
 BUILDING_FORCE_EUROPEAN_INNER_CITY_STYLE = False
-BUILDING_FORCE_EUROPEAN_MAX_LEVEL = 5  # If a building has more levels (or level*BUILDING_CITY_LEVEL_HEIGHT_HIGH height), then this is not applied
 
 BUILDING_FAKE_AMBIENT_OCCLUSION = True      # -- fake AO by darkening facade textures towards the ground, using
 BUILDING_FAKE_AMBIENT_OCCLUSION_HEIGHT = 6. #    1 - VALUE * exp(- AGL / HEIGHT )
 BUILDING_FAKE_AMBIENT_OCCLUSION_VALUE = 0.6
 
 # -- Parameters which influence the height of buildings if no info from OSM is available.
-#    It uses a triangular distribution (see http://en.wikipedia.org/wiki/Triangular_distribution)
-BUILDING_CITY_LEVELS_LOW = 2.0
-BUILDING_CITY_LEVELS_MODE = 3.5
-BUILDING_CITY_LEVELS_HIGH = 5.0
-BUILDING_CITY_LEVEL_HEIGHT_LOW = 3.1
-BUILDING_CITY_LEVEL_HEIGHT_MODE = 3.3
-BUILDING_CITY_LEVEL_HEIGHT_HIGH = 3.6
-# FIXME: above should be removed after FLAG_2018_3
 BUILDING_NUMBER_LEVELS_CENTRE = {4: 0.2, 5: 0.7, 6: 0.1}
 BUILDING_NUMBER_LEVELS_BLOCK = {4: 0.4, 5: 0.6}
 BUILDING_NUMBER_LEVELS_DENSE = {3: 0.2, 4: 0.6, 5: 0.15, 6: 0.05}
 BUILDING_NUMBER_LEVELS_PERIPHERY = {1: 0.3, 2: 0.65, 3: 0.05}
 BUILDING_NUMBER_LEVELS_RURAL = {1: 0.3, 2: 0.7}
 BUILDING_LEVEL_HEIGHT_URBAN = 3.5  # this value should not be changed unless special textures are used
-BUILDING_LEVEL_HEIGHT_RURAL = 2.5  # ditto
+BUILDING_LEVEL_HEIGHT_RURAL = 2.5  # ditto including periphery
 
 BUILDING_USE_SHARED_WORSHIP = False  # try to use shared models for worship buildings
 
@@ -294,7 +286,6 @@ TEXTURES_EMPTY_LM_RGB_VALUE = 35
 # ==================== BUILD-ZONES GENERATION ============
 
 OWBB_LANDUSE_CACHE = False
-OWBB_GENERATE_LANDUSE = False  # from buildings outside of existing land-use zones
 OWBB_GENERATE_LANDUSE_BUILDING_BUFFER_DISTANCE = 30
 OWBB_GENERATE_LANDUSE_BUILDING_BUFFER_DISTANCE_MAX = 50
 OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA = 5000
@@ -410,12 +401,16 @@ def _check_ratio_dict_parameter(ratio_dict: typing.Optional[typing.Dict], name: 
     if len(ratio_dict) == 0:
         raise ValueError('Parameter %s must not be an empty dict'.format(name))
     total = 0.
+    prev_key = -9999
     for key, ratio in ratio_dict.items():
         if not isinstance(key, int):
             raise ValueError('key {} in parameter {} must be an int'.format(str(key), name))
+        if prev_key > key:
+            raise ValueError('key {} in parameter {} must be larger than previous key'.format(str(key), name))
         if not isinstance(ratio, float):
             raise ValueError('ratio {} for key {} in param {} must be a float'.format(str(ratio), str(key), name))
         total += ratio
+        prev_key = key
     if abs(total - 1) > 0.001:
         raise ValueError('The total of all ratios in param {} must be 1'.format(name))
 
@@ -510,8 +505,8 @@ def set_boundary(boundary_west: float, boundary_south: float,
     In most situations should be called after method read_from_file().
     """
     try:
-        utils.check_boundary(boundary_west, boundary_south, boundary_east, boundary_north)
-    except utils.BoundaryError as be:
+        uu.check_boundary(boundary_west, boundary_south, boundary_east, boundary_north)
+    except uu.BoundaryError as be:
         logging.error(be.message)
         sys.exit(1)
 
@@ -561,6 +556,9 @@ class TestParameters(unittest.TestCase):
         with self.assertRaises(ValueError):
             _check_ratio_dict_parameter(my_ratio_dict, 'my_ratio_dict')
         my_ratio_dict = {1: 0.01, 2: 1.}
+        with self.assertRaises(ValueError):
+            _check_ratio_dict_parameter(my_ratio_dict, 'my_ratio_dict')
+        my_ratio_dict = {2: 0.01, 1: .99}
         with self.assertRaises(ValueError):
             _check_ratio_dict_parameter(my_ratio_dict, 'my_ratio_dict')
         my_ratio_dict = {1: 0.01, 2: 0.99}

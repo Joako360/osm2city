@@ -182,16 +182,6 @@ class Place(OSMFeature):
         return centre_circle, block_circle, dense_circle
 
 
-@unique
-class SettlementType(IntEnum):
-    """Only assigned to city blocks, not building zones."""
-    centre = 1
-    block = 2
-    dense = 3
-    periphery = 4  # default within lit area
-    rural = 5  # only implicitly used for building zones without city blocks.
-
-
 class SettlementCluster:
     """A polygon based on lit_area representing a settlement cluster.
     Built-up areas can sprawl and a coherent area can contain several cities and towns."""
@@ -335,12 +325,27 @@ class CityBlock:
         self.geometry = geometry
         self.building_zone_type = feature_type
         self.osm_buildings = list()  # List of already existing osm buildings
-        self.settlement_type = SettlementType.periphery
+        self.__settlement_type = None
+        self.settlement_type = building_lib.SettlementType.periphery
+        self.__building_levels = 0
 
     def relate_building(self, building: building_lib.Building) -> None:
         """Link the building to this zone and link this zone to the building."""
         self.osm_buildings.append(building)
         building.zone = self
+
+    @property
+    def building_levels(self) -> int:
+        return self.__building_levels
+
+    @property
+    def settlement_type(self) -> building_lib.SettlementType:
+        return self.__settlement_type
+
+    @settlement_type.setter
+    def settlement_type(self, value):
+        self.__settlement_type = value
+        self.__building_levels = building_lib.calc_levels_for_settlement_type(value)
 
 
 class BuildingZone(OSMFeatureArea):
@@ -362,6 +367,7 @@ class BuildingZone(OSMFeatureArea):
         self.generated_buildings = list()  # List of GenBuilding objects for generated non-osm buildings
         self.linked_genways = list()  # List of Highways that are available for generating buildings
         self.linked_city_blocks = list()
+        self.settlement_type = building_lib.SettlementType.rural
 
     @classmethod
     def create_from_way(cls, way: op.Way, nodes_dict: Dict[int, op.Node],
@@ -392,14 +398,17 @@ class BuildingZone(OSMFeatureArea):
     def commit_temp_gen_buildings(self, temp_buildings, highway, is_reverse) -> None:
         """Commits a set of generated buildings to be definitively be part of a BuildingZone"""
         self.linked_blocked_areas.extend(temp_buildings.generated_blocked_areas)
-        for building in temp_buildings.generated_buildings:
-            self.generated_buildings.append(building)
-            building.zone = self
-            if is_reverse and highway.reversed_city_block:
-                highway.reversed_city_block.relate_building(building)
-            elif not is_reverse:
+        for gen_building in temp_buildings.generated_buildings:
+            # relate to zone
+            self.generated_buildings.append(gen_building)
+            gen_building.zone = self
+            # relate to city block if available (we do not need to relate GenBuilding to CityBlock
+            if is_reverse:
+                if highway.reversed_city_block:
+                    gen_building.zone = highway.reversed_city_block
+            else:
                 if highway.along_city_block:
-                    highway.along_city_block.relate_building(building)
+                    gen_building.zone = highway.along_city_block
 
     def relate_building(self, building: building_lib.Building) -> None:
         """Link the building to this zone and link this zone to the building."""
@@ -444,7 +453,7 @@ class BuildingZone(OSMFeatureArea):
                     break
 
         logging.debug('Linked around &i out of %i high ways to city blocks in building zone %i', linked,
-                      int(linked/len(self.linked_genways)), self.osm_id)
+                      len(self.linked_genways), self.osm_id)
 
 
 class GeneratedBuildingZone(BuildingZone):
@@ -1074,6 +1083,7 @@ class GenBuilding(object):
         self.y = 0  # the y coordinate of the mid-point in relation to the local coordinate system
         self.angle = 0  # the angle in degrees from North (y-axis) in the local coordinate system for the building's
                         # static object local x-axis
+        self.zone = None  # either a BuildingZone or a CityBlock
 
     def _create_area_polygons(self, highway_width: float) -> None:
         """Creates polygons at (0,0) and no angle"""
@@ -1121,6 +1131,7 @@ class GenBuilding(object):
         moved = saf.translate(rotated, self.x, self.y)
         my_building = building_lib.Building(self.gen_id, self.shared_model.building_model.tags,
                                             moved.exterior, '')
+        my_building.zone = self.zone
         return my_building
 
 

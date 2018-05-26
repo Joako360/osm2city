@@ -157,15 +157,31 @@ In OSM the height of a building can be described using the following keys:
 * ``roof:levels`` (not used in osm2city)
 * ``levels``
 
-Most often none of these features are tagged and then the number of levels are determined based on the settlement type and the corresponding ``BUILDING_NUMBER_LEVELS_* `` parameter. The height is always calculated as the product of the number of levels times parameter ``BUILDING_LEVEL_HEIGHT_*``. If only the height is given, then the levels are calculated by simple rounding — and this level value is then used for calculating the height. The reason for this is that some uniformity in building heights/values is normally observed in the real world — and because textures have a defined height per level.
+Most often none of these features are tagged and then the number of levels are determined based on the settlement type and the corresponding ``BUILDING_NUMBER_LEVELS_* `` parameter. The height is always calculated as the product of the number of levels times parameter ``BUILDING_LEVEL_HEIGHT_*``. If only the height is given, then the levels are calculated by simple rounding — and this level value is then used for calculating the height. The reason for this is that some uniformity in building heights/values is normally observed in the real world — and because the generic textures used have a defined height per level.
 
 An exception to this is made for building parts in a relationship (`Simple 3D buildings`_), as the heights in this case might be necessary to be correct (e.g. a dome on a church).
 
+There is some randomness about the number of levels within the same settlement type, which is determinded by using a dictionary of level=ratio pairs, like:
 
-The distribution is using Python random triangular_, where low <= N <= high and the specified mode between those bounds.
+::
+
+    BUILDING_NUMBER_LEVELS_CENTRE = {4: 0.2, 5: 0.7, 6: 0.1}
+
+meaning that there is a ratio 0f 0.2 for 4 levels, a ratio of 0.7 for 5 levels and a ratio of 0.1 for 6 levels. I.e. the keys are integers for the number of levels and the values are the ratio, where the sum of ratios must be 1.
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+BUILDING_NUMBER_LEVELS_*                        Dict       .         A dictonary of level/ratio pairs per settlement type, which is used when a
+                                                                     building does not contain information about the number of levels.
+
+BUILDING_LEVEL_HEIGHT_URBAN                     Number     3.5       The height per level. This value should not be changed unless special textures
+                                                                     are used. For settlement types ``centre``, ``block`` and ``dense``.
+BUILDING_LEVEL_HEIGHT_RURAL                     Number     2.5       Ditto for settlement types ``periphery`` and ``rural``.
+
+=============================================   ========   =======   ==============================================================================
 
 
-.. _triangular: https://docs.python.org/3.5/library/random.html#random.triangular
 .. _Simple 3D buildings: http://wiki.openstreetmap.org/wiki/Simple_3D_buildings
 
 
@@ -176,7 +192,7 @@ European Style Inner Cities (Experimental)
 ------------------------------------------
 
 
-Given the available textures in ``osm2city-data`` and the limited tagging of buildings in OSM as of fall 2017, European cities look wrong, because there are too many modern facades used and too many flat roofs.
+Given the available textures in ``osm2city-data`` and the in general limited tagging of buildings in OSM as of 201x, European cities look wrong, because there are too many modern facades used and too many flat roofs.
 
 The following parameters try to "fix" this by adding OSM-tags ``roof:colour=red`` and ``roof:shape=gabled`` to all those buildings, which do not have parents or pseudo-parents (i.e. nor relationships or parts in OSM), but which share node references with other buildings. So typically what is happening in blocks in inner cities in Europe.
 
@@ -187,10 +203,6 @@ Parameter                                       Type       Default   Description
 =============================================   ========   =======   ==============================================================================
 BUILDING_FORCE_EUROPEAN_INNER_CITY_STYLE        Boolean    False     If True then some OSM tags are enforced to better simulate European style
                                                                      buildings - especially in inner cities.
-
-BUILDING_FORCE_EUROPEAN_MAX_LEVEL               Integer    5         If the buildings is tagged with more levels than this parameter or the
-                                                                     corresponding height of levels * BUILDING_CITY_LEVEL_HEIGHT_HIGH, then the
-                                                                     OSM tags are not enforced.
 
 =============================================   ========   =======   ==============================================================================
 
@@ -454,14 +466,10 @@ This operations complements land-use information from OSM based on some simple h
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
-OWBB_GENERATE_LANDUSE                           Boolean    False     Create land-use based on building clusters outside of existing land-use
-                                                                     information (OSM).
 OWBB_GENERATE..._BUILDING_BUFFER_DISTANCE       Number     30        The minimum buffering distance around a building.
 OWBB_GENERATE..._BUILDING_BUFFER_DISTANCE_MAX   Number     50        The maximum buffering distance around a building. The actual value is a
                                                                      function of the previous parameter and the building's size (the larger the
                                                                      building the larger the buffering distance - up to this max value.
-OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA          Number     5000      The minimum area in square metres of a generated land-use. Otherwise it is
-                                                                     discarded.
 OWBB_GENERATE_LANDUSE_LANDUSE_HOLES_MIN_AREA    Number     20000     The minimum area for a hole within a generated land-use that is kept as a
                                                                      hole (square metres).
 OWBB_GENERATE..._SIMPLIFICATION_TOLERANCE       Number     20        The tolerance in metres used for simplifying the geometry of the generated

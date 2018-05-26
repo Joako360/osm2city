@@ -65,22 +65,21 @@ def _generate_building_zones_from_buildings(building_zones: List[m.BuildingZone]
     kept_candidates = list()
     for candidate in zones_candidates.values():
         if candidate.osm_id in merged_candidate_ids:
-            continue
-        if candidate.geometry.area >= parameters.OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA:
-            candidate.geometry = candidate.geometry.simplify(parameters.OWBB_GENERATE_LANDUSE_SIMPLIFICATION_TOLERANCE)
-            # remove interior holes, which are too small
-            if len(candidate.geometry.interiors) > 0:
-                new_interiors = list()
-                for interior in candidate.geometry.interiors:
-                    interior_polygon = Polygon(interior)
-                    logging.debug("Hole area: %f", interior_polygon.area)
-                    if interior_polygon.area >= parameters.OWBB_GENERATE_LANDUSE_LANDUSE_HOLES_MIN_AREA:
-                        new_interiors.append(interior)
-                logging.debug("Number of holes reduced: from %d to %d",
-                              len(candidate.geometry.interiors), len(new_interiors))
-                replacement_polygon = Polygon(shell=candidate.geometry.exterior, holes=new_interiors)
-                candidate.geometry = replacement_polygon
-            kept_candidates.append(candidate)
+            continue  # do not keep merged candidates
+        candidate.geometry = candidate.geometry.simplify(parameters.OWBB_GENERATE_LANDUSE_SIMPLIFICATION_TOLERANCE)
+        # remove interior holes, which are too small
+        if len(candidate.geometry.interiors) > 0:
+            new_interiors = list()
+            for interior in candidate.geometry.interiors:
+                interior_polygon = Polygon(interior)
+                logging.debug("Hole area: %f", interior_polygon.area)
+                if interior_polygon.area >= parameters.OWBB_GENERATE_LANDUSE_LANDUSE_HOLES_MIN_AREA:
+                    new_interiors.append(interior)
+            logging.debug("Number of holes reduced: from %d to %d",
+                          len(candidate.geometry.interiors), len(new_interiors))
+            replacement_polygon = Polygon(shell=candidate.geometry.exterior, holes=new_interiors)
+            candidate.geometry = replacement_polygon
+        kept_candidates.append(candidate)
     logging.debug("Candidate land-uses with sufficient area found: %d", len(kept_candidates))
 
     # make sure that new generated buildings zones do not intersect with other building zones
@@ -122,8 +121,6 @@ def _split_multipolygon_generated_building_zone(zone: m.GeneratedBuildingZone) -
                     continue
         for my_split_generated in new_generated:
             if my_split_generated.from_buildings and len(my_split_generated.osm_buildings) == 0:
-                continue
-            if my_split_generated.geometry.area < parameters.OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA/2:
                 continue
             split_zones.append(my_split_generated)
             logging.debug("Added sub-polygon with area %d and %d buildings", my_split_generated.geometry.area,
@@ -173,7 +170,8 @@ def _assign_city_blocks(building_zone: m.BuildingZone, highways_dict: Dict[int, 
     if intersecting_highways:
         buffers = list()
         for highway in intersecting_highways:
-            buffers.append(highway.geometry.buffer(parameters.OWBB_CITY_BLOCK_HIGHWAY_BUFFER, cap_style=CAP_STYLE.square,
+            buffers.append(highway.geometry.buffer(parameters.OWBB_CITY_BLOCK_HIGHWAY_BUFFER,
+                                                   cap_style=CAP_STYLE.square,
                                                    join_style=JOIN_STYLE.bevel))
         geometry_difference = building_zone.geometry.difference(unary_union(buffers))
         if isinstance(geometry_difference, Polygon) and geometry_difference.is_valid and \
@@ -340,6 +338,7 @@ def _link_building_zones_with_settlements(settlement_clusters: List[m.Settlement
                 logging.debug('%i out of %i building_zones', z, z_number)
             # within because lit-areas are always
             if zone.geometry.within(settlement.geometry):
+                zone.settlement_type = bl.SettlementType.periphery
                 # create city blocks
                 _assign_city_blocks(zone, highways_dict)
                 # Test for being within a settlement type circle beginning with the highest ranking circles.
@@ -349,19 +348,29 @@ def _link_building_zones_with_settlements(settlement_clusters: List[m.Settlement
                     for circle in centre_circles:
                         if not city_block.geometry.disjoint(circle):
                             intersecting = True
-                            city_block.settlement_type = m.SettlementType.centre
+                            city_block.settlement_type = bl.SettlementType.centre
                             break
                     if not intersecting:
                         for circle in block_circles:
                             if not city_block.geometry.disjoint(circle):
                                 intersecting = True
-                                city_block.settlement_type = m.SettlementType.block
+                                city_block.settlement_type = bl.SettlementType.block
                                 break
                     if not intersecting:
                         for circle in dense_circles:
                             if not city_block.geometry.disjoint(circle):
-                                city_block.settlement_type = m.SettlementType.dense
+                                city_block.settlement_type = bl.SettlementType.dense
                                 break
+
+
+def count_zones_related_buildings(buildings: List[bl.Building], text: str) -> None:
+    total_related = 0
+
+    for building in buildings:
+        if building.zone:
+            total_related += 1
+
+    logging.info('%i out of %i buildings are related to zone for %s', total_related, len(buildings), text)
 
 
 def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Building]]:
@@ -408,15 +417,18 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Buildin
             buildings_outside.append(candidate)
     last_time = time_logging("Time used in seconds for assigning buildings to OSM zones", last_time)
 
-    if parameters.OWBB_GENERATE_LANDUSE:
-        _generate_building_zones_from_buildings(building_zones, buildings_outside)
+    _generate_building_zones_from_buildings(building_zones, buildings_outside)
     del buildings_outside
     last_time = time_logging("Time used in seconds for generating building zones", last_time)
+
+    count_zones_related_buildings(osm_buildings, 'after building generation')
 
     # =========== CREATE POLYGONS FOR LIGHTING OF STREETS ================================
     # Needs to be before finding city blocks as we need the boundary
     lit_areas = _process_landuse_for_lighting(building_zones)
     last_time = time_logging("Time used in seconds for finding lit areas", last_time)
+
+    count_zones_related_buildings(osm_buildings, 'after lighting')
 
     # =========== MAKE SURE GENERATED LAND-USE DOES NOT CROSS MAJOR LINEAR OBJECTS =======
     if parameters.OWBB_SPLIT_MADE_UP_LANDUSE_BY_MAJOR_LINES:
@@ -425,13 +437,18 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Buildin
                                                                         railways_dict, waterways_dict)
     last_time = time_logging("Time used in seconds for splitting building zones by major lines", last_time)
 
-    # =========== Link urban places with lit_area buffers ==================================
-    if parameters.FLAG_2018_3:
-        settlement_clusters = _create_settlement_clusters(lit_areas, urban_places)
-        last_time = time_logging('Time used in seconds for creating settlement_clusters', last_time)
+    count_zones_related_buildings(osm_buildings, 'after split major lines')
 
-        _link_building_zones_with_settlements(settlement_clusters, building_zones, highways_dict)
-        last_time = time_logging('Time used in seconds for linking building zones with settlement_clusters', last_time)
+    # =========== Link urban places with lit_area buffers ==================================
+    settlement_clusters = _create_settlement_clusters(lit_areas, urban_places)
+    last_time = time_logging('Time used in seconds for creating settlement_clusters', last_time)
+
+    count_zones_related_buildings(osm_buildings, 'after settlement clusters')
+
+    _link_building_zones_with_settlements(settlement_clusters, building_zones, highways_dict)
+    last_time = time_logging('Time used in seconds for linking building zones with settlement_clusters', last_time)
+
+    count_zones_related_buildings(osm_buildings, 'after settlement linking')
 
     # ============ Finally guess the land-use type ========================================
     for my_zone in building_zones:
@@ -451,6 +468,8 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Buildin
         generated_buildings = wbb.process(transformer, building_zones, highways_dict, railways_dict,
                                           waterways_dict)
         osm_buildings.extend(generated_buildings)
+
+    count_zones_related_buildings(osm_buildings, 'after generating buildings')
 
     # =========== WRITE TO CACHE AND RETURN
     if parameters.OWBB_LANDUSE_CACHE:

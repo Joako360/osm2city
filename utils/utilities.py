@@ -10,6 +10,7 @@ import math
 import os
 import os.path as osp
 import pickle
+import random
 import subprocess
 import sys
 import textwrap
@@ -23,7 +24,7 @@ import shapely.geometry as shg
 
 import parameters
 import utils.coordinates as co
-import utils.logging as ulog
+import utils.log_helper as ulog
 import utils.osmparser as op
 import utils.vec2d as ve
 
@@ -541,6 +542,23 @@ def bounds_from_list(bounds_list: List[Tuple[float, float, float, float]]) -> Tu
     return min_x, min_y, max_x, max_y
 
 
+def random_value_from_ratio_dict_parameter(ratio_parameter: Dict[int, float]) -> int:
+    target_ratio = random.random()
+    return value_from_ratio_dict_parameter(target_ratio, ratio_parameter)
+
+
+def value_from_ratio_dict_parameter(target_ratio: float, ratio_parameter: Dict[int, float]) -> int:
+    """Finds the key value closet to and below the target ratio."""
+    total_ratio = 0.
+    return_value = 0
+    for key, ratio in ratio_parameter.items():
+        if target_ratio <= total_ratio:
+            return return_value
+        return_value = key
+        total_ratio += ratio
+    return return_value
+
+
 def time_logging(message: str, last_time: float) -> float:
     current_time = time.time()
     logging.info(message + ": %f", current_time - last_time)
@@ -718,3 +736,11 @@ class TestUtilities(unittest.TestCase):
 
     def check_boundary_pass(self):
         self.assertEqual(None, check_boundary(-2, -3, 1, -2))
+
+    def test_value_from_ratio_dict_parameter(self):
+        ratio_parameter = {1: 0.2, 2: 0.3, 3: 0.5}
+        self.assertEqual(1, value_from_ratio_dict_parameter(0.1, ratio_parameter))
+        self.assertEqual(1, value_from_ratio_dict_parameter(0.2, ratio_parameter))
+        self.assertEqual(2, value_from_ratio_dict_parameter(0.3, ratio_parameter))
+        self.assertEqual(2, value_from_ratio_dict_parameter(0.5, ratio_parameter))
+        self.assertEqual(3, value_from_ratio_dict_parameter(1., ratio_parameter))

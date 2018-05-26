@@ -13,7 +13,7 @@ import numpy as np
 
 import parameters
 import pySkeleton.polygon as polygon
-import utils.logging as ulog
+import utils.log_helper as ulog
 from utils import utilities
 from utils.vec2d import Vec2d
 
