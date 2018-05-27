@@ -661,7 +661,7 @@ def fit_offsets_for_rectangle_with_hull(angle: float, hull: shg.Polygon, model_l
         new_x = hull.centroid.x + correction_x
         new_y = hull.centroid.y + correction_y
 
-    if parameters.DEBUG_PLOT:
+    if parameters.DEBUG_PLOT_OFFSETS:
         plot_fit_offsets(hull, box_minus, box_plus, angle, model_length_largest,
                          new_x, new_y, model_name, osm_id)
 

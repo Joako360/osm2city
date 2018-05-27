@@ -457,7 +457,7 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Buildin
     last_time = time_logging("Time used in seconds for guessing zone types", last_time)
 
     # =========== FINALIZE Land-use PROCESSING =============================================
-    if parameters.DEBUG_PLOT:
+    if parameters.DEBUG_PLOT_LANDUSE:
         bounds = m.Bounds.create_from_parameters(transformer)
         logging.info('Start of plotting zones')
         plotting.draw_zones(osm_buildings, building_zones, lit_areas, bounds)

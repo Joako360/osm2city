@@ -81,6 +81,13 @@ WRITE_CLUSTER_STATS = False
 
 FLAG_2018_3 = False  # Feature flag for 2018.1 or greater version of FG
 
+# Debugging by plotting with Matplotlib to pdfs. See description about its use in the appendix of the manual
+DEBUG_PLOT_RECTIFY = False
+DEBUG_PLOT_GENBUILDINGS = False
+DEBUG_PLOT_LANDUSE = False
+DEBUG_PLOT_ROADS = False
+DEBUG_PLOT_OFFSETS = False
+
 # =============================================================================
 # PARAMETERS RELATED TO BUILDINGS IN osm2city
 # =============================================================================
@@ -253,7 +260,6 @@ MAX_SLOPE_MOTORWAY = 0.03       # max slope for motorways
 MAX_SLOPE_ROAD = 0.08
 MAX_TRANSVERSE_GRADIENT = 0.1   #
 BRIDGE_MIN_LENGTH = 20.         # discard short bridges, draw road instead
-DEBUG_PLOT = False
 CREATE_BRIDGES_ONLY = 0         # create only bridges and embankments
 BRIDGE_LAYER_HEIGHT = 4.         # bridge height per layer
 BRIDGE_BODY_HEIGHT = 0.9         # height of bridge body

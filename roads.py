@@ -1037,7 +1037,7 @@ class Roads(object):
         self.ways_list = new_list
 
     def debug_plot_way(self, way, ls, lw, color=None, ends_marker='', show_label=False) -> None:
-        if not parameters.DEBUG_PLOT:
+        if not parameters.DEBUG_PLOT_ROADS:
             return
         col = ['b', 'r', 'y', 'g', '0.25', 'k', 'c']
         if not color:
@@ -1315,7 +1315,7 @@ def process_roads(coords_transform: coordinates.Transformation, fg_elev: utiliti
     _process_clusters(roads.roads_rough_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, False,
                       coords_transform, stats, True)
 
-    if parameters.DEBUG_PLOT:
+    if parameters.DEBUG_PLOT_ROADS:
         roads.debug_plot(show=True, clusters=roads.roads_clusters)
 
     stg_manager.write(file_lock)

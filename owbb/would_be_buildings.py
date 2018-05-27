@@ -371,7 +371,7 @@ def process(transformer: co.Transformation, building_zones: List[m.BuildingZone]
 
     building_zones.extend(not_used_zones)  # lets add the not_used_zones again, so we have everything again
 
-    if parameters.DEBUG_PLOT:
+    if parameters.DEBUG_PLOT_GENBUILDINGS:
         logging.info('Start of plotting buildings')
         plotting.draw_buildings(building_zones, bounds)
         time_logging("Time used in seconds for plotting", last_time)

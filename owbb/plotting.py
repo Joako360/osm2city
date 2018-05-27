@@ -86,13 +86,13 @@ def _draw_settlement_zones(building_zones: List[m.BuildingZone], ax: maxs.Axes) 
             colour = 'brown'
         _add_patch_for_building_zone(building_zone, colour, colour, ax)
         for block in building_zone.linked_city_blocks:
-            if block.settlement_type is m.SettlementType.centre:
+            if block.settlement_type is bl.SettlementType.centre:
                 colour = 'blue'
-            elif block.settlement_type is m.SettlementType.block:
+            elif block.settlement_type is bl.SettlementType.block:
                 colour = 'green'
-            elif block.settlement_type is m.SettlementType.dense:
+            elif block.settlement_type is bl.SettlementType.dense:
                 colour = 'magenta'
-            elif block.settlement_type is m.SettlementType.periphery:
+            elif block.settlement_type is bl.SettlementType.periphery:
                 colour = 'yellow'
             patch = PolygonPatch(block.geometry, facecolor=colour, edgecolor=colour)
             ax.add_patch(patch)
