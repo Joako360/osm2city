@@ -497,20 +497,14 @@ def fetch_osm_db_data_ways_keys(req_keys: List[str]) -> OSMReadResult:
     return fetch_osm_db_data_ways(req_keys, False)
 
 
-def fetch_osm_db_data_relations_keys(input_read_result: OSMReadResult, is_place: bool=False) -> OSMReadResult:
+def fetch_osm_db_data_relations_keys(input_read_result: OSMReadResult, first_part: str,
+                                     relation_debug_string: str) -> OSMReadResult:
     """Updates an OSMReadResult with relation data based on required keys"""
     start_time = time.time()
 
     db_connection = make_db_connection()
 
     # common subquery
-    if is_place:
-        first_part = "((r.tags @> 'type=>multipolygon' OR r.tags @> 'type=>boundary')"
-        first_part += " AND (r.tags @> 'place=>city' OR r.tags @> 'place=>town'))"
-    else:
-        first_part = "((r.tags @> 'type=>multipolygon'"
-        first_part += " AND " + construct_tags_query(["building", "building:part"], list(), "r")
-        first_part += ") OR r.tags @> 'type=>building')"
     sub_query = first_part + " AND r.id = rm.relation_id"
     sub_query += " AND rm.member_type = 'W'"
     sub_query += " AND rm.member_id = w.id"
@@ -569,14 +563,30 @@ def fetch_osm_db_data_relations_keys(input_read_result: OSMReadResult, is_place:
         my_node = Node(result[0], result[2], result[1])
         rel_nodes_dict[my_node.osm_id] = my_node
 
-    rel_type = 'buildings'
-    if is_place:
-        rel_type = 'places'
-    logging.info("Reading OSM relation data for {0!s} from db took {1:.4f} seconds.".format(rel_type,
+    logging.info("Reading OSM relation data for {0!s} from db took {1:.4f} seconds.".format(relation_debug_string,
                                                                                             time.time() - start_time))
 
     return OSMReadResult(nodes_dict=input_read_result.nodes_dict, ways_dict=input_read_result.ways_dict,
                          relations_dict=relations_dict, rel_nodes_dict=rel_nodes_dict, rel_ways_dict=rel_ways_dict)
+
+
+def fetch_osm_db_data_relations_places(input_read_result: OSMReadResult) -> OSMReadResult:
+    first_part = "((r.tags @> 'type=>multipolygon' OR r.tags @> 'type=>boundary')"
+    first_part += " AND (r.tags @> 'place=>city' OR r.tags @> 'place=>town'))"
+    return fetch_osm_db_data_relations_keys(input_read_result, first_part, 'places')
+
+
+def fetch_osm_db_data_relations_buildings(input_read_result: OSMReadResult) -> OSMReadResult:
+    first_part = "((r.tags @> 'type=>multipolygon'"
+    first_part += " AND " + construct_tags_query(["building", "building:part"], list(), "r")
+    first_part += ") OR r.tags @> 'type=>building')"
+    return fetch_osm_db_data_relations_keys(input_read_result, first_part, 'buildings')
+
+
+def fetch_osm_db_data_relations_riverbanks(input_read_result: OSMReadResult) -> OSMReadResult:
+    first_part = "(r.tags @> 'type=>multipolygon'"
+    first_part += " AND r.tags @> 'waterway=>riverbank')"
+    return fetch_osm_db_data_relations_keys(input_read_result, first_part, 'riverbanks')
 
 
 def make_db_connection():

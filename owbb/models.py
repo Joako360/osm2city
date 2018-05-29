@@ -1311,7 +1311,7 @@ def process_osm_place_refs(transformer: co.Transformation) -> Tuple[List[Place],
                 urban_places.append(place)
 
     # relations
-    osm_relations_result = op.fetch_osm_db_data_relations_keys(osm_way_result, True)
+    osm_relations_result = op.fetch_osm_db_data_relations_places(osm_way_result)
     osm_relations_dict = osm_relations_result.relations_dict
     osm_nodes_dict = osm_relations_result.rel_nodes_dict
     osm_rel_ways_dict = osm_relations_result.rel_ways_dict

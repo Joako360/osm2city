@@ -300,8 +300,10 @@ OWBB_GENERATE_LANDUSE_SIMPLIFICATION_TOLERANCE = 20
 
 OWBB_SPLIT_MADE_UP_LANDUSE_BY_MAJOR_LINES = True  # for external and generated
 
-OWBB_BUILT_UP_BUFFER = 50  # the buffer around built-up land-use areas to be used for lighting of streets
-OWBB_BUILT_UP_AREA_HOLES_MIN_AREA = 100000  # the minimum area a hole in a LIT_BUFFER needs to have to be not lit
+# the buffer around built-up land-use areas to be used for lighting of streets
+# also used for buffering around water areas in cities
+OWBB_BUILT_UP_BUFFER = 50
+OWBB_BUILT_UP_AREA_HOLES_MIN_AREA = 100000
 
 OWBB_PLACE_POPULATION_DEFAULT_CITY = 200000
 OWBB_PLACE_POPULATION_DEFAULT_TOWN = 20000

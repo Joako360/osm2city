@@ -50,7 +50,7 @@ Once the land-use zone for built-up areas are read from OSM and/or generated (ca
 
 Only settlement areas tagged in OSM with ``place=city`` or ``place=town`` are considered for further processing of built-up areas, where apartments etc. exist. This is because the rural types are used as default, ``place=farm`` is treated specially and values for ``place`` like ``quarter``, ``suburb``, ``neighbourhood`` do not provide extra information. For ``city`` and ``town`` feature types Node, Way and Relation are read from OSM, however Way and Relation are reduced to a node by using the area's centroid. Note that a pre-requisite for this to work is that the mapping in OSM has been done as instructed in `Key Place`_.
 
-In a first step all city or town places are linked to lit areas. Then the zones are split into city_block objects, i.e. areas surrounded by streets — some of the polygons will be real city blocks, others will be border areas (the "city" part is not really true here - even a hamlet could in osm2city get divided into several city_blocks). The city blocks take over the land-use type (type can be ``non-osm`` if generated and therefore without real meaning).
+In a first step all city or town places are linked to lit areas extended with specific water areas [#water]_. Then the zones are split into city_block objects, i.e. areas surrounded by streets — some of the polygons will be real city blocks, others will be border areas (the "city" part is not really true here - even a hamlet could in osm2city get divided into several city_blocks). The city blocks take over the land-use type (type can be ``non-osm`` if generated and therefore without real meaning).
 
 Finally depending on the place type and the distance to the centroid a given city block has, it is assigned one of the following settlement types:
 
@@ -92,6 +92,8 @@ Pattern of city blocks:
 
 .. image:: city_blocks_lszh.png
 
+
+.. [#water] In cities like Prague, Amsterdam, New York larger water areas split the city. And that would make it look like the zones on the other side of the water area are not part of the city anymore. To make sure that this is still the case OSM data for water areas (``river``, ``canal``, ``moat`` and ``riverbank``) are added to the clustering to simulate continuous city areas.
 
 
 .. _chapter-howto-generate-would-be-buildings-label:

@@ -425,10 +425,6 @@ MAX_SLOPE_ROAD, MAX_SLOPE_*                     Decimal    0.08      The maximum
 USE_TRAM_LINE                                   Boolean    False     Often tram lines are on top of existing roads or between. This can lead to
                                                                      roads being (partially) hidden etc.
 
-BUILT_UP_AREA_LIT_BUFFER                        Integer    50        The buffer around built-up land-use areas to be used for lighting of streets
-BUILT_UP_AREA_LIT_HOLES_MIN_AREA                Integer    100000    The minimum area a hole in a LIT_BUFFER needs to have, such that it is not
-                                                                     considered for lighting.
-
 =============================================   ========   =======   ==============================================================================
 
 With residuals:
@@ -506,7 +502,7 @@ Parameter                                       Type       Default   Description
 =============================================   ========   =======   ==============================================================================
 BUILT_UP_AREA_LIT_BUFFER                        Number     100       The buffer distance around built-up land-use areas to be used for lighting of
                                                                      streets. The number is chosen pretty large such that as many building zone
-                                                                     clusters as possible are connected. also it is not unusual that the lighting
+                                                                     clusters as possible are connected. Also it is not unusual that the lighting
                                                                      of streets starts a bit outside of a built-up area.
 BUILT_UP_AREA_LIT_HOLES_MIN_AREA                Number     100000    The minimum area in square metres a hole in a LIT_BUFFER needs to have to be
                                                                      not lit. In general this can be quite a large value and larger than e.g.

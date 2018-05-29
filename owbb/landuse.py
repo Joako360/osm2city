@@ -277,6 +277,45 @@ def _split_generated_building_zones_by_major_lines(before_list: List[m.BuildingZ
     return after_list
 
 
+def _fetch_water_areas(transformer: Transformation) -> List[Polygon]:
+    """Fetches specific water areas from OSM and then applies a buffer."""
+    water_areas = list()
+
+    # get riverbanks from relations
+    osm_relations_result = op.fetch_osm_db_data_relations_riverbanks(op.OSMReadResult(dict(), dict(), dict(), dict(),
+                                                                                      dict()))
+    osm_relations_dict = osm_relations_result.relations_dict
+    osm_nodes_dict = osm_relations_result.rel_nodes_dict
+    osm_rel_ways_dict = osm_relations_result.rel_ways_dict
+
+    for _, relation in osm_relations_dict.items():
+        outer_ways = list()
+        for member in relation.members:
+            if member.type_ == 'way' and member.role == 'outer' and member.ref in osm_rel_ways_dict:
+                way = osm_rel_ways_dict[member.ref]
+                outer_ways.append(way)
+
+        outer_ways = op.closed_ways_from_multiple_ways(outer_ways)
+        for way in outer_ways:
+            polygon = way.polygon_from_osm_way(osm_nodes_dict, transformer)
+            if polygon.is_valid and not polygon.is_empty:
+                water_areas.append(polygon.buffer(parameters.OWBB_BUILT_UP_BUFFER))
+
+    # then add water areas (mostly when natural=water, but not always consistent
+    osm_way_result = op.fetch_osm_db_data_ways_key_values(['water=>moat', 'water=>river', 'water=>canal',
+                                                           'waterway=>riverbank'])
+    osm_nodes_dict = osm_way_result.nodes_dict
+    osm_ways_dict = osm_way_result.ways_dict
+    for key, way in osm_ways_dict.items():
+        my_geometry = way.polygon_from_osm_way(osm_nodes_dict, transformer)
+        if my_geometry is not None and isinstance(my_geometry, Polygon):
+            if my_geometry.is_valid and not my_geometry.is_empty:
+                water_areas.append(my_geometry.buffer(parameters.OWBB_BUILT_UP_BUFFER))
+
+    logging.info('Fetched %i water areas from OSM', len(water_areas))
+    return water_areas
+
+
 def _merge_buffers(original_list: List[Polygon]) -> List[Polygon]:
     """Attempts to merge as many polygon buffers with each other as possible to return a reduced list."""
     multi_polygon = unary_union(original_list)
@@ -293,9 +332,12 @@ def _merge_buffers(original_list: List[Polygon]) -> List[Polygon]:
     return handled_list
 
 
-def _create_settlement_clusters(lit_areas: List[Polygon], urban_places: List[m.Place]) -> List[m.SettlementCluster]:
+def _create_settlement_clusters(lit_areas: List[Polygon], water_areas: List[Polygon],
+                                urban_places: List[m.Place]) -> List[m.SettlementCluster]:
     clusters = list()
-    for polygon in lit_areas:
+
+    all_areas = lit_areas + water_areas
+    for polygon in all_areas:
         candidate_places = list()
         towns = 0
         cities = 0
@@ -400,6 +442,7 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Buildin
     highways_dict = m.process_osm_highway_refs(transformer)
     railways_dict = m.process_osm_railway_refs(transformer)
     waterways_dict = m.process_osm_waterway_refs(transformer)
+    water_areas = _fetch_water_areas(transformer)
 
     last_time = time_logging("Time used in seconds for parsing OSM data", last_time)
 
@@ -440,7 +483,7 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Buildin
     count_zones_related_buildings(osm_buildings, 'after split major lines')
 
     # =========== Link urban places with lit_area buffers ==================================
-    settlement_clusters = _create_settlement_clusters(lit_areas, urban_places)
+    settlement_clusters = _create_settlement_clusters(lit_areas, water_areas, urban_places)
     last_time = time_logging('Time used in seconds for creating settlement_clusters', last_time)
 
     count_zones_related_buildings(osm_buildings, 'after settlement clusters')

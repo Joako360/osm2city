@@ -572,7 +572,7 @@ def _write_obstruction_lights(path: str, file_name: str,
 
 def construct_buildings_from_osm(coords_transform: coordinates.Transformation) -> List[building_lib.Building]:
     osm_read_results = op.fetch_osm_db_data_ways_keys(["building", "building:part"])
-    osm_read_results = op.fetch_osm_db_data_relations_keys(osm_read_results)
+    osm_read_results = op.fetch_osm_db_data_relations_buildings(osm_read_results)
     osm_nodes_dict = osm_read_results.nodes_dict
     osm_ways_dict = osm_read_results.ways_dict
     osm_relations_dict = osm_read_results.relations_dict
