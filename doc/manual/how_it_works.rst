@@ -93,7 +93,7 @@ Pattern of city blocks:
 .. image:: city_blocks_lszh.png
 
 
-.. [#water] In cities like Prague, Amsterdam, New York larger water areas split the city. And that would make it look like the zones on the other side of the water area are not part of the city anymore. To make sure that this is still the case OSM data for water areas (``river``, ``canal``, ``moat`` and ``riverbank``) are added to the clustering to simulate continuous city areas.
+.. [#water] In cities like Copenhagen, Prague, Amsterdam, New York etc. larger water areas split the city. And that would make it look like the zones on the other side of the water area are not part of the city anymore. To make sure that this is still the case OSM data for water areas (``river``, ``canal``, ``moat`` and ``riverbank``) are added to the clustering to simulate continuous city areas.
 
 
 .. _chapter-howto-generate-would-be-buildings-label:

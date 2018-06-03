@@ -226,6 +226,12 @@ def _process_landuse_for_lighting(building_zones: List[m.BuildingZone]) -> List[
     return lit_areas
 
 
+def _process_landuse_for_settlement_areas(lit_areas: List[Polygon], water_areas: List[Polygon]) -> List[Polygon]:
+    """Combines lit areas with water areas to get a proxy for settlement areas"""
+    all_areas = lit_areas + water_areas
+    return _merge_buffers(all_areas)
+
+
 def _split_generated_building_zones_by_major_lines(before_list: List[m.BuildingZone],
                                                    highways: Dict[int, m.Highway],
                                                    railways: Dict[int, m.RailwayLine],
@@ -336,13 +342,14 @@ def _create_settlement_clusters(lit_areas: List[Polygon], water_areas: List[Poly
                                 urban_places: List[m.Place]) -> List[m.SettlementCluster]:
     clusters = list()
 
-    all_areas = lit_areas + water_areas
-    for polygon in all_areas:
+    candidate_settlements = _process_landuse_for_settlement_areas(lit_areas, water_areas)
+    for polygon in candidate_settlements:
         candidate_places = list()
         towns = 0
         cities = 0
         for place in urban_places:
-            if place.geometry.within(polygon):
+            centre_circle, block_circle, dense_circle = place.create_settlement_type_circles()
+            if not dense_circle.disjoint(polygon):
                 candidate_places.append(place)
                 if place.type_ is m.PlaceType.city:
                     cities += 1

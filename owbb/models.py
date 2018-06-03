@@ -369,6 +369,18 @@ class BuildingZone(OSMFeatureArea):
         self.linked_city_blocks = list()
         self.settlement_type = building_lib.SettlementType.rural
 
+    @property
+    def density(self) -> float:
+        """The density of an area here is calculated as the ratio between the zone density and the total area
+        of all floor plans of buildings.
+        In land-use planning normally it is the floor plans on all levels, but we do not have it here.)
+        In order to approximate a bit better, therefore the 'geometry' instead of the 'polygon' attribute
+        of the building is taken, i.e. all inner ring area is also counted."""
+        total_floor_plans = 0.
+        for building in self.osm_buildings:
+            total_floor_plans += building.geometry.area
+        return total_floor_plans / self.geometry.area
+
     @classmethod
     def create_from_way(cls, way: op.Way, nodes_dict: Dict[int, op.Node],
                         my_coord_transformator: co.Transformation) -> 'BuildingZone':

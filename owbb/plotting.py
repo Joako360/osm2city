@@ -98,6 +98,31 @@ def _draw_settlement_zones(building_zones: List[m.BuildingZone], ax: maxs.Axes) 
             ax.add_patch(patch)
 
 
+def _draw_zones_density(building_zones: List[m.BuildingZone], ax: maxs.Axes) -> None:
+    for building_zone in building_zones:
+        density = building_zone.density  # keeping value in order not to calculate the property all the time
+        colour = 'black'
+        if density < .1:
+            colour = 'lightgrey'
+        elif density < .2:
+            colour = 'yellow'
+        elif density < .3:
+            colour = 'orange'
+        elif density < .4:
+            colour = 'red'
+        elif density < .5:
+            colour = 'darkred'
+        elif density < .6:
+            colour = 'lime'
+        elif density < .7:
+            colour = 'limegreen'
+        elif density < .8:
+            colour = 'green'
+        elif density < .9:
+            colour = 'darkgreen'
+        _add_patch_for_building_zone(building_zone, colour, colour, ax)
+
+
 def _draw_osm_zones(building_zones: List[m.BuildingZone], ax: maxs.Axes) -> None:
     for building_zone in building_zones:
         if not isinstance(building_zone, m.GeneratedBuildingZone):
@@ -274,6 +299,15 @@ def draw_zones(buildings: List[bl.Building], building_zones: List[m.BuildingZone
     yellow=periphery, grey=rural, brown=farmyard]")
     ax = my_figure.add_subplot(111)
     _draw_settlement_zones(building_zones, ax)
+    _set_ax_limits_from_bounds(ax, bounds)
+    pdf_pages.savefig(my_figure)
+
+    # Density of zones
+    my_figure = _create_a3_landscape_figure()
+    my_figure.suptitle("Density (ratio of building floor plan area to total area). Yellow to red up to .5, \
+    green afterwards")
+    ax = my_figure.add_subplot(111)
+    _draw_zones_density(building_zones, ax)
     _set_ax_limits_from_bounds(ax, bounds)
     pdf_pages.savefig(my_figure)
 
