@@ -14,7 +14,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from shapely.geometry import box, Point, LineString, Polygon, MultiPolygon
 import shapely.affinity as saf
 
-import building_lib
+import building_lib as bl
 import parameters
 import utils.osmparser as op
 import utils.coordinates as co
@@ -24,8 +24,6 @@ import utils.coordinates as co
 KeyValueDict = Dict[str, str]
 MPoly = Union[Polygon, MultiPolygon]
 
-BUILDING_KEY = 'building'
-BUILDING_PART_KEY = 'building:part'
 LANDUSE_KEY = 'landuse'
 PLACE_KEY = 'place'
 RAILWAY_KEY = 'railway'
@@ -201,111 +199,6 @@ class OSMFeatureArea(OSMFeature):
 
 
 @unique
-class BuildingClass(IntEnum):
-    """Used to classify buildings for processing on zone level"""
-    default = 10
-    residential = 100
-    residential_small = 110
-    commercial = 200
-    industrial = 300
-    retail = 400
-    parking_house = 1000
-    religion = 2000
-    public = 3000
-    farm = 4000
-    airport = 5000
-
-
-@unique
-class BuildingType(IntEnum):
-    """Mostly match value of a tag with k=building"""
-    yes = 1  # default
-    parking = 10  # k="parking" v="multi-storey"
-    apartments = 21
-    house = 22
-    detached = 23
-    residential = 24
-    dormitory = 25
-    terrace = 26
-    bungalow = 31
-    static_caravan = 32
-    cabin = 33
-    hut = 34
-    commercial = 41
-    office = 42
-    retail = 51
-    industrial = 61
-    warehouse = 62
-    cathedral = 71
-    chapel = 72
-    church = 73
-    mosque = 74
-    temple = 75
-    synagogue = 76
-    public = 81
-    civic = 82
-    school = 83
-    hospital = 84
-    hotel = 85
-    kiosk = 86
-    farm = 91
-    barn = 92
-    cowshed = 93
-    farm_auxiliary = 94
-    greenhouse = 95
-    stable = 96
-    sty = 97
-    riding_hall = 98
-    hangar = 100
-
-
-def parse_building_tags_for_type(tags_dict: KeyValueDict) -> Union[None, BuildingType]:
-    if ("parking" in tags_dict) and (tags_dict["parking"] == "multi-storey"):
-        return BuildingType.parking
-    else:
-        value = None
-        if BUILDING_KEY in tags_dict:
-            value = tags_dict[BUILDING_KEY]
-        elif BUILDING_PART_KEY in tags_dict:
-            value = tags_dict[BUILDING_PART_KEY]
-        if value is not None:
-            for member in BuildingType:
-                if value == member.name:
-                    return member
-            return BuildingType.yes
-    return None
-
-
-def get_building_class(building: building_lib.Building) -> BuildingClass:
-    type_ = parse_building_tags_for_type(building.tags)
-    if type_ in [BuildingType.apartments, BuildingType.house, BuildingType.detached,
-                 BuildingType.residential, BuildingType.dormitory, BuildingType.terrace]:
-        return BuildingClass.residential
-    elif type_ in [BuildingType.bungalow, BuildingType.static_caravan, BuildingType.cabin, BuildingType.hut]:
-        return BuildingClass.residential_small
-    elif type_ in [BuildingType.commercial, BuildingType.office]:
-        return BuildingClass.commercial
-    elif type_ in [BuildingType.retail]:
-        return BuildingClass.retail
-    elif type_ in [BuildingType.industrial, BuildingType.warehouse]:
-        return BuildingClass.industrial
-    elif type_ in [BuildingType.parking]:
-        return BuildingClass.parking_house
-    elif type_ in [BuildingType.cathedral, BuildingType.chapel, BuildingType.church,
-                   BuildingType.mosque, BuildingType.temple, BuildingType.synagogue]:
-        return BuildingClass.religion
-    elif type_ in [BuildingType.public, BuildingType.civic, BuildingType.school, BuildingType.hospital,
-                   BuildingType.hotel, BuildingType.kiosk]:
-        return BuildingClass.public
-    elif type_ in [BuildingType.farm, BuildingType.barn, BuildingType.cowshed, BuildingType.farm_auxiliary,
-                   BuildingType.greenhouse, BuildingType.stable, BuildingType.sty, BuildingType.riding_hall]:
-        return BuildingClass.farm
-    elif type_ in [BuildingType.hangar]:
-        return BuildingClass.airport
-    return BuildingClass.default
-
-
-@unique
 class BuildingZoneType(IntEnum):  # element names must match OSM values apart from non_osm
     residential = 10
     commercial = 20
@@ -323,14 +216,14 @@ class CityBlock:
     def __init__(self, osm_id: int, geometry: Polygon, feature_type: Union[None, BuildingZoneType]) -> None:
         self.osm_id = osm_id
         self.geometry = geometry
-        self.building_zone_type = feature_type
+        self.type_ = feature_type
         self.osm_buildings = list()  # List of already existing osm buildings
         self.__settlement_type = None
-        self.settlement_type = building_lib.SettlementType.periphery
+        self.settlement_type = bl.SettlementType.periphery
         self.settlement_type_changed = False
         self.__building_levels = 0
 
-    def relate_building(self, building: building_lib.Building) -> None:
+    def relate_building(self, building: bl.Building) -> None:
         """Link the building to this zone and link this zone to the building."""
         self.osm_buildings.append(building)
         building.zone = self
@@ -340,13 +233,13 @@ class CityBlock:
         return self.__building_levels
 
     @property
-    def settlement_type(self) -> building_lib.SettlementType:
+    def settlement_type(self) -> bl.SettlementType:
         return self.__settlement_type
 
     @settlement_type.setter
     def settlement_type(self, value):
         self.__settlement_type = value
-        self.__building_levels = building_lib.calc_levels_for_settlement_type(value)
+        self.__building_levels = bl.calc_levels_for_settlement_type(value, bl.BuildingClass.residential)
 
 
 class BuildingZone(OSMFeatureArea):
@@ -368,7 +261,7 @@ class BuildingZone(OSMFeatureArea):
         self.generated_buildings = list()  # List of GenBuilding objects for generated non-osm buildings
         self.linked_genways = list()  # List of Highways that are available for generating buildings
         self.linked_city_blocks = list()
-        self.settlement_type = building_lib.SettlementType.rural
+        self.settlement_type = bl.SettlementType.rural
 
     @property
     def density(self) -> float:
@@ -423,7 +316,7 @@ class BuildingZone(OSMFeatureArea):
                 if highway.along_city_block:
                     gen_building.zone = highway.along_city_block
 
-    def relate_building(self, building: building_lib.Building) -> None:
+    def relate_building(self, building: bl.Building) -> None:
         """Link the building to this zone and link this zone to the building."""
         self.osm_buildings.append(building)
         building.zone = self
@@ -483,16 +376,17 @@ class GeneratedBuildingZone(BuildingZone):
         retail_buildings = 0
         farm_buildings = 0
         for building in self.osm_buildings:
-            building_class = get_building_class(building)
-            if building_class in [BuildingClass.residential_small or BuildingClass.residential]:
+            building_class = bl.get_building_class(building.tags)
+            if building_class in [bl.BuildingClass.residential_small, bl.BuildingClass.residential,
+                                  bl.BuildingClass.terrace, bl.BuildingClass.public]:
                 residential_buildings += 1
-            elif building_class == BuildingClass.commercial:
+            elif building_class is bl.BuildingClass.commercial:
                 commercial_buildings += 1
-            elif building_class == BuildingClass.industrial:
+            elif building_class in [bl.BuildingClass.industrial, bl.BuildingClass.warehouse]:
                 industrial_buildings += 1
-            elif building_class == BuildingClass.retail:
+            elif building_class in [bl.BuildingClass.retail, bl.BuildingClass.parking_house]:
                 retail_buildings += 1
-            elif building_class == BuildingClass.farm:
+            elif building_class is bl.BuildingClass.farm:
                 farm_buildings += 1
 
         guessed_type = BuildingZoneType.residential  # default
@@ -562,7 +456,7 @@ class OpenSpace(OSMFeatureArea):
 
     @staticmethod
     def parse_tags(tags_dict: KeyValueDict) -> Union[OpenSpaceType, None]:
-        if parse_building_tags_for_type(tags_dict) is not None:
+        if bl.parse_building_tags_for_type(tags_dict) is not None:
             return None
         elif "public_transport" in tags_dict:
             return OpenSpaceType.transport
@@ -904,7 +798,7 @@ class BuildingModel(object):
 
     Tags contains e.g. roof type, number of levels etc. according to OSM tagging."""
 
-    def __init__(self, width: float, depth: float, model_type: BuildingType, regions: List[str], model: Optional[str],
+    def __init__(self, width: float, depth: float, model_type: bl.BuildingType, regions: List[str], model: Optional[str],
                  facade_id: int, roof_id: int, tags: KeyValueDict) -> None:
         self.width = width  # if you look at the building from its front, then you see the width between the sides
         self.depth = depth  # from the front to the back
@@ -935,7 +829,7 @@ class BuildingModel(object):
 
 
 class SharedModel(object):
-    def __init__(self, building_model: BuildingModel, building_type: BuildingType) -> None:
+    def __init__(self, building_model: BuildingModel, building_type: bl.BuildingType) -> None:
         self.building_model = building_model
         self.type_ = building_type
         self._front_buffer = 0
@@ -944,14 +838,14 @@ class SharedModel(object):
         self._calc_buffers()
 
     def _calc_buffers(self) -> None:
-        if self.type_ is BuildingType.detached:
+        if self.type_ is bl.BuildingType.detached:
             front_min = parameters.OWBB_RESIDENTIAL_HOUSE_FRONT_MIN
             front_max = parameters.OWBB_RESIDENTIAL_HOUSE_FRONT_MAX
             back_min = parameters.OWBB_RESIDENTIAL_HOUSE_BACK_MIN
             back_max = parameters.OWBB_RESIDENTIAL_HOUSE_BACK_MAX
             side_min = parameters.OWBB_RESIDENTIAL_HOUSE_SIDE_MIN
             side_max = parameters.OWBB_RESIDENTIAL_HOUSE_SIDE_MAX
-        elif self.type_ is BuildingType.terrace:
+        elif self.type_ is bl.BuildingType.terrace:
             front_min = parameters.OWBB_RESIDENTIAL_TERRACE_FRONT_MIN
             front_max = parameters.OWBB_RESIDENTIAL_TERRACE_FRONT_MAX
             back_min = parameters.OWBB_RESIDENTIAL_TERRACE_BACK_MIN
@@ -1049,17 +943,17 @@ class SharedModelsLibrary(object):
 
     def _populate_models_library(self, building_models: List[BuildingModel]) -> None:
         for building_model in building_models:
-            if building_model.model_type is BuildingType.residential:
+            if building_model.model_type is bl.BuildingType.residential:
                 pass  # FIXME: should somehow be translated based on parameters to apartments, detached, terrace, etc.
-            elif building_model.model_type is BuildingType.detached:
-                my_model = SharedModel(building_model, BuildingType.detached)
+            elif building_model.model_type is bl.BuildingType.detached:
+                my_model = SharedModel(building_model, bl.BuildingType.detached)
                 self._residential_detached.append(my_model)
 
-            elif building_model.model_type is BuildingType.terrace:
-                my_model = SharedModel(building_model, BuildingType.terrace)
+            elif building_model.model_type is bl.BuildingType.terrace:
+                my_model = SharedModel(building_model, bl.BuildingType.terrace)
                 self._residential_terraces.append(my_model)
-            elif building_model.model_type is BuildingType.industrial:
-                my_model = SharedModel(building_model, BuildingType.industrial)
+            elif building_model.model_type is bl.BuildingType.industrial:
+                my_model = SharedModel(building_model, bl.BuildingType.industrial)
                 if building_model.area > self.INDUSTRIAL_LARGE_MIN_AREA:
                     self._industrial_buildings_large.append(my_model)
                 else:
@@ -1136,13 +1030,13 @@ class GenBuilding(object):
         self.x = point_on_line.x + self.distance_to_street*math.sin(my_angle)
         self.y = point_on_line.y + self.distance_to_street*math.cos(my_angle)
 
-    def create_building_lib_building(self) -> building_lib.Building:
+    def create_building_lib_building(self) -> bl.Building:
         """Creates a building_lib building to be used in actually creating the FG scenery object"""
         floor_plan = box(-1 * self.shared_model.width / 2, -1 * self.shared_model.depth / 2,
                          self.shared_model.width / 2, self.shared_model.depth / 2)
         rotated = saf.rotate(floor_plan, -1 * self.angle, origin=(0, 0))
         moved = saf.translate(rotated, self.x, self.y)
-        my_building = building_lib.Building(self.gen_id, self.shared_model.building_model.tags,
+        my_building = bl.Building(self.gen_id, self.shared_model.building_model.tags,
                                             moved.exterior, '')
         my_building.zone = self.zone
         return my_building

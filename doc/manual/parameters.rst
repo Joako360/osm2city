@@ -161,7 +161,7 @@ Most often none of these features are tagged and then the number of levels are d
 
 An exception to this is made for building parts in a relationship (`Simple 3D buildings`_), as the heights in this case might be necessary to be correct (e.g. a dome on a church).
 
-There is some randomness about the number of levels within the same settlement type, which is determinded by using a dictionary of level=ratio pairs, like:
+There is some randomness about the number of levels within the same settlement type, which is determined by using a dictionary of level=ratio pairs, like:
 
 ::
 
@@ -172,12 +172,19 @@ meaning that there is a ratio 0f 0.2 for 4 levels, a ratio of 0.7 for 5 levels a
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
-BUILDING_NUMBER_LEVELS_*                        Dict       .         A dictonary of level/ratio pairs per settlement type, which is used when a
+BUILDING_NUMBER_LEVELS_*                        Dict       .         A dictionary of level/ratio pairs per settlement type, which is used when a
                                                                      building does not contain information about the number of levels.
+                                                                     If the building class is not ``residential`` or ``residential_small`` and the
+                                                                     settlement type is not ``centre`` or ``block``, then specific parameters
+                                                                     are used for apartments, industrial/warehouse and others.
 
 BUILDING_LEVEL_HEIGHT_URBAN                     Number     3.5       The height per level. This value should not be changed unless special textures
                                                                      are used. For settlement types ``centre``, ``block`` and ``dense``.
+                                                                     If a building is of class ``commercial``, ``retail``, ``public`` or
+                                                                     ``parking_house``, then this height is always used.
 BUILDING_LEVEL_HEIGHT_RURAL                     Number     2.5       Ditto for settlement types ``periphery`` and ``rural``.
+
+BUILDING_LEVEL_HEIGHT_INDUSTRIAL                Number     6.0       Ditto for buildings of class ``industrial`` or ``warehouse``.
 
 =============================================   ========   =======   ==============================================================================
 

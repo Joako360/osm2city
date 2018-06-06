@@ -152,14 +152,20 @@ BUILDING_FAKE_AMBIENT_OCCLUSION = True      # -- fake AO by darkening facade tex
 BUILDING_FAKE_AMBIENT_OCCLUSION_HEIGHT = 6. #    1 - VALUE * exp(- AGL / HEIGHT )
 BUILDING_FAKE_AMBIENT_OCCLUSION_VALUE = 0.6
 
-# -- Parameters which influence the height of buildings if no info from OSM is available.
+# Parameters which influence the height of buildings if no info from OSM is available.
 BUILDING_NUMBER_LEVELS_CENTRE = {4: 0.2, 5: 0.7, 6: 0.1}
 BUILDING_NUMBER_LEVELS_BLOCK = {4: 0.4, 5: 0.6}
-BUILDING_NUMBER_LEVELS_DENSE = {3: 0.2, 4: 0.6, 5: 0.15, 6: 0.05}
+BUILDING_NUMBER_LEVELS_DENSE = {3: 0.25, 4: 0.75}
 BUILDING_NUMBER_LEVELS_PERIPHERY = {1: 0.3, 2: 0.65, 3: 0.05}
 BUILDING_NUMBER_LEVELS_RURAL = {1: 0.3, 2: 0.7}
+# the following are used if settlement type is not centre or block and building class is not residential
+BUILDING_NUMBER_LEVELS_APARTMENTS = {2: 0.05, 3: 0.45, 4: 0.4, 5: 0.08, 6: 0.02}
+BUILDING_NUMBER_LEVELS_INDUSTRIAL = {1: 0.3, 2: 0.6, 3: 0.1}  # for both industrial and warehouse
+BUILDING_NUMBER_LEVELS_OTHER = {1: 0.2, 2: 0.4, 3: 0.3, 4: 0.1}  # e.g. commercial, public, retail
+
 BUILDING_LEVEL_HEIGHT_URBAN = 3.5  # this value should not be changed unless special textures are used
 BUILDING_LEVEL_HEIGHT_RURAL = 2.5  # ditto including periphery
+BUILDING_LEVEL_HEIGHT_INDUSTRIAL = 6.  # for industrial and warehouse
 
 BUILDING_USE_SHARED_WORSHIP = False  # try to use shared models for worship buildings
 
@@ -486,11 +492,18 @@ def read_from_file(filename):
     global BUILDING_NUMBER_LEVELS_DENSE
     global BUILDING_NUMBER_LEVELS_PERIPHERY
     global BUILDING_NUMBER_LEVELS_RURAL
+    global BUILDING_NUMBER_LEVELS_APARTMENTS
+    global BUILDING_NUMBER_LEVELS_INDUSTRIAL
+    global BUILDING_NUMBER_LEVELS_OTHER
+
     _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_CENTRE, 'BUILDING_NUMBER_LEVELS_CENTRE')
     _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_BLOCK, 'BUILDING_NUMBER_LEVELS_BLOCK')
     _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_DENSE, 'BUILDING_NUMBER_LEVELS_DENSE')
     _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_PERIPHERY, 'BUILDING_NUMBER_LEVELS_PERIPHERY')
     _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_RURAL, 'BUILDING_NUMBER_LEVELS_RURAL')
+    _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_APARTMENTS, 'BUILDING_NUMBER_LEVELS_APARTMENTS')
+    _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_INDUSTRIAL, 'BUILDING_NUMBER_LEVELS_INDUSTRIAL')
+    _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_OTHER, 'BUILDING_NUMBER_LEVELS_OTHER')
 
 
 def show_default():

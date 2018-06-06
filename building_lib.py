@@ -29,7 +29,7 @@ from enum import IntEnum, unique
 import logging
 import random
 from math import fabs, sin, cos, tan, sqrt, pi, radians
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Union
 
 import myskeleton
 import numpy as np
@@ -46,6 +46,13 @@ from utils import ac3d, utilities
 import utils.osmparser
 from utils.vec2d import Vec2d
 from utils.stg_io2 import STGVerbType
+
+
+BUILDING_KEY = 'building'
+BUILDING_PART_KEY = 'building:part'
+OWBB_GENERATED_KEY = 'owbb_generated'
+
+KeyValueDict = Dict[str, str]
 
 
 def _random_roof_shape() -> roofs.RoofShape:
@@ -67,6 +74,121 @@ def _random_roof_shape() -> roofs.RoofShape:
 
 
 @unique
+class BuildingClass(IntEnum):
+    """Used to classify buildings for processing on zone level and defining height per level in some cases"""
+    residential = 100
+    residential_small = 110
+    terrace = 120
+    apartments = 130
+    commercial = 200
+    industrial = 300
+    warehouse = 301
+    retail = 400
+    parking_house = 1000
+    religion = 2000
+    public = 3000
+    farm = 4000
+    airport = 5000
+    undefined = 9999  # mostly because BuildingType can only be approximated to "yes"
+
+
+@unique
+class BuildingType(IntEnum):
+    """Mostly match value of a tag with k=building"""
+    yes = 1  # default
+    parking = 10  # k="parking" v="multi-storey"
+    apartments = 21
+    house = 22
+    detached = 23
+    residential = 24
+    dormitory = 25
+    terrace = 26
+    bungalow = 31
+    static_caravan = 32
+    cabin = 33
+    hut = 34
+    commercial = 41
+    office = 42
+    retail = 51
+    industrial = 61
+    warehouse = 62
+    cathedral = 71
+    chapel = 72
+    church = 73
+    mosque = 74
+    temple = 75
+    synagogue = 76
+    public = 81
+    civic = 82
+    school = 83
+    hospital = 84
+    hotel = 85
+    kiosk = 86
+    farm = 91
+    barn = 92
+    cowshed = 93
+    farm_auxiliary = 94
+    greenhouse = 95
+    stable = 96
+    sty = 97
+    riding_hall = 98
+    hangar = 100
+
+
+def parse_building_tags_for_type(tags_dict: KeyValueDict) -> Union[None, BuildingType]:
+    if ("parking" in tags_dict) and (tags_dict["parking"] == "multi-storey"):
+        return BuildingType.parking
+    else:
+        value = None
+        if BUILDING_KEY in tags_dict:
+            value = tags_dict[BUILDING_KEY]
+        elif BUILDING_PART_KEY in tags_dict:
+            value = tags_dict[BUILDING_PART_KEY]
+        if value is not None:
+            for member in BuildingType:
+                if value == member.name:
+                    return member
+            return BuildingType.yes
+    return None
+
+
+def get_building_class(tags: KeyValueDict) -> BuildingClass:
+    type_ = parse_building_tags_for_type(tags)
+    if type_ is None:
+        return BuildingClass.undefined
+    if type_ in [BuildingType.house, BuildingType.detached, BuildingType.residential]:
+        return BuildingClass.residential
+    elif type_ in [BuildingType.bungalow, BuildingType.static_caravan, BuildingType.cabin, BuildingType.hut,
+                   BuildingType.kiosk]:
+        return BuildingClass.residential_small
+    elif type_ in [BuildingType.apartments, BuildingType.dormitory, BuildingType.hotel]:
+        return BuildingClass.apartments
+    elif type_ in [BuildingType.terrace]:
+        return BuildingClass.terrace
+    elif type_ in [BuildingType.commercial, BuildingType.office]:
+        return BuildingClass.commercial
+    elif type_ in [BuildingType.retail]:
+        return BuildingClass.retail
+    elif type_ in [BuildingType.industrial]:
+        return BuildingClass.industrial
+    elif type_ in [BuildingType.warehouse]:
+        return BuildingClass.warehouse
+    elif type_ in [BuildingType.parking]:
+        return BuildingClass.parking_house
+    elif type_ in [BuildingType.cathedral, BuildingType.chapel, BuildingType.church,
+                   BuildingType.mosque, BuildingType.temple, BuildingType.synagogue]:
+        return BuildingClass.religion
+    elif type_ in [BuildingType.public, BuildingType.civic, BuildingType.school, BuildingType.hospital]:
+        return BuildingClass.public
+    elif type_ in [BuildingType.farm, BuildingType.barn, BuildingType.cowshed, BuildingType.farm_auxiliary,
+                   BuildingType.greenhouse, BuildingType.stable, BuildingType.sty, BuildingType.riding_hall]:
+        return BuildingClass.farm
+    elif type_ in [BuildingType.hangar]:
+        return BuildingClass.airport
+    return BuildingClass.undefined # the default / fallback, e.g. for "yes"
+
+
+@unique
 class SettlementType(IntEnum):
     centre = 1
     block = 2
@@ -75,17 +197,26 @@ class SettlementType(IntEnum):
     rural = 5  # only implicitly used for building zones without city blocks.
 
 
-def calc_levels_for_settlement_type(settlement_type: SettlementType) -> int:
+def calc_levels_for_settlement_type(settlement_type: SettlementType, building_class: BuildingClass) -> int:
     if settlement_type is SettlementType.centre:
         ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_CENTRE
     elif settlement_type is SettlementType.block:
         ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_BLOCK
-    elif settlement_type is SettlementType.dense:
-        ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_DENSE
-    elif settlement_type is SettlementType.periphery:
-        ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_PERIPHERY
     else:
-        ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_RURAL
+        # now check residential vs. others
+        if building_class in [building_class.residential, building_class.residential_small]:
+            if settlement_type is SettlementType.dense:
+                ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_DENSE
+            elif settlement_type is SettlementType.periphery:
+                ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_PERIPHERY
+            else:
+                ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_RURAL
+        elif building_class is BuildingClass.apartments:
+                ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_APARTMENTS
+        elif building_class in [BuildingClass.industrial, BuildingClass.warehouse]:
+            ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_INDUSTRIAL
+        else:
+            ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_OTHER
     return utilities.random_value_from_ratio_dict_parameter(ratio_parameter)
 
 
@@ -121,7 +252,6 @@ class Building(object):
         self.name = name
         self.stg_typ = stg_typ  # STGVerbType
         self.stg_hdg = stg_hdg
-        self.building_type = _map_building_type(self.tags)
 
         # For definition of '*height' see method analyse_height_and_levels(..)
         self.body_height = 0.0
@@ -162,11 +292,11 @@ class Building(object):
 
     def make_building_from_part(self) -> None:
         """Make sure a former building_part gets tagged correctly"""
-        if 'building:part' in self.tags:
-            part_value = self.tags['building:part']
-            del self.tags['building:part']
-            if 'building' not in self.tags:
-                self.tags['building'] = part_value
+        if BUILDING_PART_KEY in self.tags:
+            part_value = self.tags[BUILDING_PART_KEY]
+            del self.tags[BUILDING_PART_KEY]
+            if BUILDING_KEY not in self.tags:
+                self.tags[BUILDING_KEY] = part_value
 
     def update_geometry(self, outer_ring: shg.LinearRing, inner_rings_list=list(), refs: List[int]=list()) -> None:
         """Updates the geometry of the building. This can also happen after the building has been initialized.
@@ -315,7 +445,7 @@ class Building(object):
             pass
         try:
             if 'building:material' not in self.tags:
-                if self.tags['building:part'] == "column":
+                if self.tags[BUILDING_PART_KEY] == "column":
                     facade_requires.append(str('facade:building:material:stone'))
         except KeyError:
             pass
@@ -475,6 +605,20 @@ class Building(object):
             else:
                 self.roof_shape = roofs.RoofShape.flat
 
+    def analyse_building_type(self) -> None:
+        building_class = get_building_class(self.tags)
+        if building_class.undefined:
+            # FIXME do stuff with amenities and land-use
+
+            # if still residential, then check floor area if in peripheral or rural area - > apartments
+            # what about terraces -> should we check how long vs. width?
+            if self.polygon.area > 250:
+                building_class = BuildingClass.apartments
+                if BUILDING_KEY in self.tags:
+                    self.tags[BUILDING_KEY] = 'apartments'
+                else:
+                    self.tags[BUILDING_PART_KEY] = 'apartments'
+
     def analyse_height_and_levels(self, building_parent: Optional['BuildingParent']) -> None:
         """Determines total height (and number of levels) of a building based on OSM values and other logic.
         Raises ValueError if the height is less than the building min height parameter or layer OSM attribute
@@ -551,31 +695,27 @@ class Building(object):
         self.body_height = proxy_body_height
         self.levels = proxy_levels
 
-        self._sanity_check_height_and_levels()
-
         # now respect building min height parameter
         proxy_total_height = self.body_height + self.min_height + proxy_roof_height
         if parameters.BUILDING_MIN_HEIGHT > 0.0 and proxy_total_height < parameters.BUILDING_MIN_HEIGHT:
             raise ValueError('The height given or calculated is less then the BUILDING_MIN_HEIGHT parameter.')
-
-    def _sanity_check_height_and_levels(self):
-        """Apply some sanity checks to make sure that analysed level_heights and levels are sensitive."""
-        if 'height' in self.tags or 'building:height' in self.tags or 'levels' in self.tags or 'building:levels' \
-            in self.tags:
-            return  # nothing to do, go with interpreted OSM values
-        else:
-            pass  # FIXME
-
 
     def _calculate_levels(self) -> int:
         import owbb.models
         if isinstance(self.zone, owbb.models.CityBlock):
             return self.zone.building_levels
         else:
-            return calc_levels_for_settlement_type(self.zone.settlement_type)
+            building_class = get_building_class(self.tags)
+            return calc_levels_for_settlement_type(self.zone.settlement_type, building_class)
 
     def _calculate_level_height(self) -> float:
-        return calc_levels_for_settlement_type(self.zone.settlement_type)
+        building_class = get_building_class(self.tags)
+        if building_class in [BuildingClass.industrial, BuildingClass.warehouse]:
+            return parameters.BUILDING_LEVEL_HEIGHT_INDUSTRIAL
+        elif building_class in [BuildingClass.commercial, BuildingClass.retail, BuildingClass.public,
+                                BuildingClass.parking_house]:
+            return parameters.BUILDING_LEVEL_HEIGHT_URBAN
+        return calc_level_height_for_settlement_type(self.zone.settlement_type)
 
     def analyse_roof_shape_check(self) -> None:
         """Check whether we actually may use something else than a flat roof."""
@@ -638,7 +778,7 @@ class Building(object):
             if building_parent is not None:
                 return
             # exclude houses and terraces
-            if 'building' in self.tags and self.tags['building'] in ['house', 'detached', 'terrace']:
+            if BUILDING_KEY in self.tags and self.tags[BUILDING_KEY] in ['house', 'detached', 'terrace']:
                 return
 
             # now apply some tags to increase European style
@@ -1115,14 +1255,14 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: u
         b.parent = None  # will be reset again if actually all is ok at end
 
         # exclude what is processed elsewhere
-        if 'building' in b.tags:  # not if 'building:part'
+        if BUILDING_KEY in b.tags:  # not if 'building:part'
             # temporarily exclude greenhouses / glasshouses
-            if b.tags['building'] in ['glasshouse', 'greenhouse'] or (
+            if b.tags[BUILDING_KEY] in ['glasshouse', 'greenhouse'] or (
                             'amenity' in b.tags and b.tags['amenity'] in ['glasshouse', 'greenhouse']):
                 logging.debug("Excluded greenhouse with osm_id={}".format(b.osm_id))
                 continue
             # exclude storage tanks -> pylons.py
-            if b.tags['building'] in ['storage_tank', 'tank'] or (
+            if b.tags[BUILDING_KEY] in ['storage_tank', 'tank'] or (
                     'man_made' in b.tags and b.tags['man_made'] in ['storage_tank', 'tank']):
                 logging.debug("Excluded storage tank with osm_id={}".format(b.osm_id))
                 continue
@@ -1158,6 +1298,8 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: u
         b.analyse_edge_lengths()
 
         b.analyse_roof_shape()
+
+        b.analyse_building_type()
 
         try:
             b.analyse_height_and_levels(building_parent)
@@ -1239,12 +1381,6 @@ def write(ac_file_name: str, buildings: List[Building], cluster_elev: float, clu
         b.write_to_ac(ac_object, cluster_elev, cluster_offset, roof_mgr, face_mat_idx, roof_mat_idx, stats)
 
     ac.write(ac_file_name)
-
-
-def _map_building_type(tags: Dict[str, str]) -> str:
-    if 'building' in tags and not tags['building'] == 'yes':
-        return tags['building']
-    return 'unknown'
 
 
 def buildings_after_remove_with_parent_children(orig_buildings: List[Building],
@@ -1439,10 +1575,10 @@ class WorshipBuilding(object):
     def deduct_worship_building_type(tags: Dict[str, str]) -> Optional['WorshipBuildingType']:
         """Return a type if the building is a worship building, Otherwise return None."""
         worship_building_type = None
-        if tags['building'] == 'cathedral':
-            tags['building'] = 'church'
+        if tags[BUILDING_KEY] == 'cathedral':
+            tags[BUILDING_KEY] = 'church'
         try:
-            worship_building_type = WorshipBuildingType.__members__[tags['building']]
+            worship_building_type = WorshipBuildingType.__members__[tags[BUILDING_KEY]]
         except KeyError:  # e.g. building=yes
             if 'amenity' in tags and tags['amenity'] == 'place_of_worship':
                 if 'religion' in tags and tags['religion'] == 'christian':

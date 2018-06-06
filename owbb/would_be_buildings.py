@@ -12,7 +12,7 @@ from shapely import speedups
 from shapely.geometry import box
 from shapely.geometry import LineString, MultiLineString, Polygon
 
-import building_lib
+import building_lib as bl
 import owbb.models as m
 import owbb.plotting as plotting
 import utils.coordinates as co
@@ -76,7 +76,7 @@ def _process_open_spaces_as_blocked_areas(building_zone, open_spaces_dict):
 def _process_buildings_as_blocked_areas(building_zone):
     for building in building_zone.osm_buildings:
         blocked = m.BlockedArea(m.BlockedAreaType.osm_building, building.geometry,
-                                m.parse_building_tags_for_type(building.tags))
+                                bl.parse_building_tags_for_type(building.tags))
         building_zone.linked_blocked_areas.append(blocked)
 
 
@@ -242,37 +242,44 @@ def _generate_buildings_along_highway(building_zone: m.BuildingZone, highway: m.
 
 def _read_building_models_library() -> List[m.BuildingModel]:
     # FIXME: hard-coded to be replaced
+    # The correct BUILDING_KEY has to be given
+    # always define the building:levels - and do NOT specify height
     models = list()
 
     # residential
-    detached_1_tags = {'building': 'owbb_floor',
+    detached_1_tags = {bl.BUILDING_KEY: 'detached',
                        'building:colour': 'white', 'building:levels': '2',
-                       'roof:colour': 'red', 'roof:shape': 'hipped', 'roof:height': '2'}
-    detached_1 = m.BuildingModel(15., 8., m.BuildingType.detached, list(), None, 0, 0, detached_1_tags)
+                       'roof:colour': 'red', 'roof:shape': 'hipped', 'roof:height': '2',
+                       bl.OWBB_GENERATED_KEY: 'yes'}
+    detached_1 = m.BuildingModel(15., 8., bl.BuildingType.detached, list(), None, 0, 0, detached_1_tags)
     models.append(detached_1)
-    detached_2_tags = {'building': 'owbb_floor',
+    detached_2_tags = {bl.BUILDING_KEY: 'detached',
                        'building:colour': 'yellow', 'building:levels': '1',
-                       'roof:colour': 'firebrick', 'roof:shape': 'gabled', 'roof:height': '3'}
-    detached_2 = m.BuildingModel(10., 10., m.BuildingType.detached, list(), None, 0, 0, detached_2_tags)
+                       'roof:colour': 'firebrick', 'roof:shape': 'gabled', 'roof:height': '3',
+                       bl.OWBB_GENERATED_KEY: 'yes'}
+    detached_2 = m.BuildingModel(10., 10., bl.BuildingType.detached, list(), None, 0, 0, detached_2_tags)
     models.append(detached_2)
 
     # terrace
-    terrace_1_tags = {'building': 'owbb_floor',
+    terrace_1_tags = {bl.BUILDING_KEY: 'terrace',
                       'building:colour': 'aqua', 'building:levels': '2',
-                      'roof:colour': 'darksalmon', 'roof:shape': 'skillion', 'roof:height': '1.5'}
-    terrace_1 = m.BuildingModel(5., 3., m.BuildingType.terrace, list(), None, 0, 0, terrace_1_tags)
+                      'roof:colour': 'darksalmon', 'roof:shape': 'skillion', 'roof:height': '1.5',
+                      bl.OWBB_GENERATED_KEY: 'yes'}
+    terrace_1 = m.BuildingModel(5., 3., bl.BuildingType.terrace, list(), None, 0, 0, terrace_1_tags)
     models.append(terrace_1)
 
     # industrial
-    industry_1_tags = {'building': 'owbb_floor',
+    industry_1_tags = {bl.BUILDING_KEY: 'industrial',
                        'building:colour': 'silver',  'building:levels': '4',
-                       'roof:colour': 'darkgray', 'roof:shape': 'flat', 'roof:height': '0'}
-    industry_1 = m.BuildingModel(20., 30., m.BuildingType.industrial, list(), None, 0, 0, industry_1_tags)
+                       'roof:colour': 'darkgray', 'roof:shape': 'flat', 'roof:height': '0',
+                       bl.OWBB_GENERATED_KEY: 'yes'}
+    industry_1 = m.BuildingModel(20., 30., bl.BuildingType.industrial, list(), None, 0, 0, industry_1_tags)
     models.append(industry_1)
-    industry_1_tags = {'building': 'owbb_floor',
+    industry_1_tags = {bl.BUILDING_KEY: 'industrial',
                        'building:colour': 'navy', 'building:levels': '3',
-                       'roof:colour': 'darkgray', 'roof:shape': 'gabled', 'roof:height': '3'}
-    industry_1 = m.BuildingModel(20., 15., m.BuildingType.industrial, list(), None, 0, 0, industry_1_tags)
+                       'roof:colour': 'darkgray', 'roof:shape': 'gabled', 'roof:height': '3',
+                       bl.OWBB_GENERATED_KEY: 'yes'}
+    industry_1 = m.BuildingModel(20., 15., bl.BuildingType.industrial, list(), None, 0, 0, industry_1_tags)
     models.append(industry_1)
 
     return models
@@ -280,7 +287,7 @@ def _read_building_models_library() -> List[m.BuildingModel]:
 
 def process(transformer: co.Transformation, building_zones: List[m.BuildingZone],
             highways_dict: Dict[int, m.Highway], railways_dict: Dict[int, m.RailwayLine],
-            waterways_dict: Dict[int, m.Waterway]) -> List[building_lib.Building]:
+            waterways_dict: Dict[int, m.Waterway]) -> List[bl.Building]:
     last_time = time.time()
 
     # =========== TRY TO READ CACHED DATA FIRST =======
