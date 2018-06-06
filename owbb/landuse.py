@@ -412,6 +412,31 @@ def _link_building_zones_with_settlements(settlement_clusters: List[m.Settlement
                                 break
 
 
+def _sanity_check_settlement_types(building_zones: List[m.BuildingZone], highways_dict: Dict[int, m.Highway]) -> None:
+    upgraded = 0
+    downgraded = 0
+    for zone in building_zones:
+        my_density = zone.density
+        if my_density < parameters.OWBB_PLACE_SANITY_DENSITY:
+            if zone.settlement_type in [bl.SettlementType.dense, bl.SettlementType.block]:
+                zone.settlement_type = bl.SettlementType.periphery
+                downgraded += 1
+                for city_block in zone.linked_city_blocks:
+                    city_block.settlement_type = bl.SettlementType.periphery
+                    city_block.settlement_type_changed = True
+        else:
+            if zone.settlement_type in [bl.SettlementType.rural, bl.SettlementType.periphery]:
+                zone.settlement_type = bl.SettlementType.dense
+                upgraded += 1
+                # now also make sure we actually have city blocks
+                _assign_city_blocks(zone, highways_dict)
+                for city_block in zone.linked_city_blocks:
+                    city_block.settlement_type = bl.SettlementType.dense
+                    city_block.settlement_type_changed = True
+    logging.debug('Upgraded %i and downgraded %i settlement types for %i total building zones', upgraded, downgraded,
+                  len(building_zones))
+
+
 def count_zones_related_buildings(buildings: List[bl.Building], text: str) -> None:
     total_related = 0
 
@@ -489,7 +514,7 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Buildin
 
     count_zones_related_buildings(osm_buildings, 'after split major lines')
 
-    # =========== Link urban places with lit_area buffers ==================================
+    # =========== Link urban places with settlement_area buffers ==================================
     settlement_clusters = _create_settlement_clusters(lit_areas, water_areas, urban_places)
     last_time = time_logging('Time used in seconds for creating settlement_clusters', last_time)
 
@@ -497,6 +522,9 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Buildin
 
     _link_building_zones_with_settlements(settlement_clusters, building_zones, highways_dict)
     last_time = time_logging('Time used in seconds for linking building zones with settlement_clusters', last_time)
+
+    _sanity_check_settlement_types(building_zones, highways_dict)
+    last_time = time_logging('Time used in seconds for sanity checking settlement types', last_time)
 
     count_zones_related_buildings(osm_buildings, 'after settlement linking')
 

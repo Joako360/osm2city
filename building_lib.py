@@ -74,6 +74,7 @@ class SettlementType(IntEnum):
     periphery = 4  # default within lit area
     rural = 5  # only implicitly used for building zones without city blocks.
 
+
 def calc_levels_for_settlement_type(settlement_type: SettlementType) -> int:
     if settlement_type is SettlementType.centre:
         ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_CENTRE
@@ -501,7 +502,6 @@ class Building(object):
         proxy_total_height = 0.  # something that mimics the OSM 'height'
         proxy_body_height = 0.
         proxy_roof_height = 0.
-        proxy_levels = 0.
 
         if 'height' in self.tags:
             proxy_total_height = utils.osmparser.parse_length(self.tags['height'])
@@ -522,13 +522,13 @@ class Building(object):
         if proxy_roof_height == 0. and self.roof_complex:
             proxy_roof_height = parameters.BUILDING_SKEL_ROOF_DEFAULT_HEIGHT
         if proxy_body_height > 0. and proxy_total_height == 0.:
-            proxy_total_height = proxy_roof_height + proxy_body_height + self.min_height
+            pass  # proxy_total_height = proxy_roof_height + proxy_body_height + self.min_height
         elif proxy_body_height == 0. and proxy_total_height > 0.:
             proxy_body_height = proxy_total_height - proxy_roof_height - self.min_height
 
         proxy_levels = _parse_building_levels(self.tags)
 
-        # Now that we have all what OSM provides, use some heuristics, if we are missing height/levels
+        # Now that we have all what OSM provides, use some heuristics, if we are missing height/levels.
         # The most important distinction is whether the building is in a relationship, because if yes then the
         # height given needs to be respected to make sure that e.g. a building:part dome actually sits a the right
         # position on the top
@@ -551,10 +551,21 @@ class Building(object):
         self.body_height = proxy_body_height
         self.levels = proxy_levels
 
+        self._sanity_check_height_and_levels()
+
         # now respect building min height parameter
         proxy_total_height = self.body_height + self.min_height + proxy_roof_height
         if parameters.BUILDING_MIN_HEIGHT > 0.0 and proxy_total_height < parameters.BUILDING_MIN_HEIGHT:
             raise ValueError('The height given or calculated is less then the BUILDING_MIN_HEIGHT parameter.')
+
+    def _sanity_check_height_and_levels(self):
+        """Apply some sanity checks to make sure that analysed level_heights and levels are sensitive."""
+        if 'height' in self.tags or 'building:height' in self.tags or 'levels' in self.tags or 'building:levels' \
+            in self.tags:
+            return  # nothing to do, go with interpreted OSM values
+        else:
+            pass  # FIXME
+
 
     def _calculate_levels(self) -> int:
         import owbb.models

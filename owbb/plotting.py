@@ -95,6 +95,8 @@ def _draw_settlement_zones(building_zones: List[m.BuildingZone], ax: maxs.Axes) 
             elif block.settlement_type is bl.SettlementType.periphery:
                 colour = 'yellow'
             patch = PolygonPatch(block.geometry, facecolor=colour, edgecolor=colour)
+            if block.settlement_type_changed:
+                patch.set_hatch('/')
             ax.add_patch(patch)
 
 
@@ -296,7 +298,7 @@ def draw_zones(buildings: List[bl.Building], building_zones: List[m.BuildingZone
     # Settlement type
     my_figure = _create_a3_landscape_figure()
     my_figure.suptitle("Built-up areas by settlement type \n[blue=centre (city), green=block, magenta=dense, \
-    yellow=periphery, grey=rural, brown=farmyard]")
+    yellow=periphery, grey=rural, brown=farmyard]. If hatched, then type upgraded or downgraded for sanity.")
     ax = my_figure.add_subplot(111)
     _draw_settlement_zones(building_zones, ax)
     _set_ax_limits_from_bounds(ax, bounds)

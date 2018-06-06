@@ -327,6 +327,7 @@ class CityBlock:
         self.osm_buildings = list()  # List of already existing osm buildings
         self.__settlement_type = None
         self.settlement_type = building_lib.SettlementType.periphery
+        self.settlement_type_changed = False
         self.__building_levels = 0
 
     def relate_building(self, building: building_lib.Building) -> None:
