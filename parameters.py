@@ -149,7 +149,7 @@ RECTIFY_90_TOLERANCE = 0.1
 BUILDING_FORCE_EUROPEAN_INNER_CITY_STYLE = False
 
 BUILDING_FAKE_AMBIENT_OCCLUSION = True      # -- fake AO by darkening facade textures towards the ground, using
-BUILDING_FAKE_AMBIENT_OCCLUSION_HEIGHT = 6. #    1 - VALUE * exp(- AGL / HEIGHT )
+BUILDING_FAKE_AMBIENT_OCCLUSION_HEIGHT = 6.  # 1 - VALUE * exp(- AGL / HEIGHT )
 BUILDING_FAKE_AMBIENT_OCCLUSION_VALUE = 0.6
 
 # Parameters which influence the height of buildings if no info from OSM is available.
@@ -321,7 +321,7 @@ OWBB_PLACE_RADIUS_FACTOR_TOWN = 1.
 
 OWBB_PLACE_TILE_BORDER_EXTENSION = 10000
 
-OWBB_PLACE_SANITY_DENSITY = 0.2
+OWBB_PLACE_SANITY_DENSITY = 0.15
 
 # ==================== BUILDING GENERATION ============
 

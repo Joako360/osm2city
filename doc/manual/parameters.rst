@@ -542,7 +542,7 @@ OWBB_PLACE_RADIUS_FACTOR_CITY                   Number     1.        Linear corr
 OWBB_PLACE_RADIUS_FACTOR_TOWN                   Number     1.        Ditto for ``place=town``.
 OWBB_PLACE_TILE_BORDER_EXTENSION                Integer    10000     Extension of the perimeter (tile borders) to read place information from, as
                                                                      e.g. a city might extend across til border areas.
-OWBB_PLACE_SANITY_DENSITY                       Number     0.2       Make sure that settlement type dense is assigned, if the density of a building
+OWBB_PLACE_SANITY_DENSITY                       Number     0.15      Make sure that settlement type dense is assigned, if the density of a building
                                                                      zone is larger than a given ratio and the settlement type is rural or
                                                                      periphery. The density is calculated as the total of
                                                                      all buildings' floor area (inner rings' areas do also count) divided by the
