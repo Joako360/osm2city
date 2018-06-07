@@ -391,24 +391,26 @@ def _link_building_zones_with_settlements(settlement_clusters: List[m.Settlement
                 # create city blocks
                 _assign_city_blocks(zone, highways_dict)
                 # Test for being within a settlement type circle beginning with the highest ranking circles.
+                # Make sure not to overwrite higher rankings, if already set from different cluster
                 # If yes, then assign settlement type to city block
                 for city_block in zone.linked_city_blocks:
-                    intersecting = False
-                    for circle in centre_circles:
-                        if not city_block.geometry.disjoint(circle):
-                            intersecting = True
-                            city_block.settlement_type = bl.SettlementType.centre
-                            break
-                    if not intersecting:
+                    if city_block.settlement_type.value < bl.SettlementType.centre.value:
+                        for circle in centre_circles:
+                            if not city_block.geometry.disjoint(circle):
+                                city_block.settlement_type = bl.SettlementType.centre
+                                zone.settlement_type = bl.SettlementType.centre
+                                break
+                    if city_block.settlement_type.value < bl.SettlementType.block.value:
                         for circle in block_circles:
                             if not city_block.geometry.disjoint(circle):
-                                intersecting = True
                                 city_block.settlement_type = bl.SettlementType.block
+                                zone.settlement_type = bl.SettlementType.block
                                 break
-                    if not intersecting:
+                    if city_block.settlement_type.value < bl.SettlementType.dense.value:
                         for circle in dense_circles:
                             if not city_block.geometry.disjoint(circle):
                                 city_block.settlement_type = bl.SettlementType.dense
+                                zone.settlement_type = bl.SettlementType.dense
                                 break
 
 

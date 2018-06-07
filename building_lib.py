@@ -190,10 +190,10 @@ def get_building_class(tags: KeyValueDict) -> BuildingClass:
 
 @unique
 class SettlementType(IntEnum):
-    centre = 1
-    block = 2
-    dense = 3
-    periphery = 4  # default within lit area
+    centre = 9  # elsewhere in the code the value is used for comparison, so centre should be highest
+    block = 8
+    dense = 7
+    periphery = 6  # default within lit area
     rural = 5  # only implicitly used for building zones without city blocks.
 
 
