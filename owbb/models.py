@@ -199,6 +199,86 @@ class OSMFeatureArea(OSMFeature):
 
 
 @unique
+class BlockedAreaType(IntEnum):
+    osm_building = 1
+    gen_building = 2
+    open_space = 3
+    highway = 11
+    waterway = 12
+    railway = 13
+
+
+class BlockedArea(object):
+    """An object representing a specific type of blocked area - blocked for new generated buildings"""
+    def __init__(self, type_: BlockedAreaType, polygon: Polygon, original_type=None) -> None:
+        self.type_ = type_
+        self.polygon = polygon
+        self.original_type = original_type
+
+
+@unique
+class OpenSpaceType(IntEnum):
+    default = 10
+    landuse = 20
+    amenity = 30
+    leisure = 40
+    natural = 50
+    transport = 60
+    pedestrian = 70
+
+
+class OpenSpace(OSMFeatureArea):
+    """Different OSM map features representing an open space, where no building can be placed.
+    It is important to keep parsing of these tags in synch (i.e. opposite) with the other parsed OSM map features.
+    """
+    # must be in line with method parse_tags
+    REQUESTED_TAGS = ['public_transport', 'railway', 'amenity', 'leisure', 'natural', 'highway']
+
+    def __init__(self, osm_id: int, geometry: MPoly, feature_type: Union[None, OpenSpaceType]) -> None:
+        super().__init__(osm_id, geometry, feature_type)
+
+    @classmethod
+    def create_from_way(cls, way: op.Way, nodes_dict: Dict[int, op.Node],
+                        my_coord_transformator: co.Transformation) -> Union[None, 'OpenSpace']:
+        my_geometry = way.polygon_from_osm_way(nodes_dict, my_coord_transformator)
+        feature_type = cls.parse_tags(way.tags)
+        if None is feature_type:
+            return None
+        obj = OpenSpace(way.osm_id, my_geometry, feature_type)
+        return obj
+
+    @staticmethod
+    def parse_tags(tags_dict: KeyValueDict) -> Union[OpenSpaceType, None]:
+        if bl.parse_building_tags_for_type(tags_dict) is not None:
+            return None
+        elif "public_transport" in tags_dict:
+            return OpenSpaceType.transport
+        elif ("railway" in tags_dict) and (tags_dict["railway"] == "station"):
+            return OpenSpaceType.transport
+        elif LANDUSE_KEY in tags_dict:  # must be in sync with BuildingZone
+            if tags_dict[LANDUSE_KEY] == "railway":
+                return OpenSpaceType.transport
+            elif BuildingZone.is_building_zone_value(tags_dict[LANDUSE_KEY]):
+                return None
+            else:
+                return OpenSpaceType.landuse
+        elif "amenity" in tags_dict:
+            if tags_dict["amenity"] in ["grave_yard", "parking"]:
+                return OpenSpaceType.amenity
+        elif "leisure" in tags_dict:
+            if tags_dict['leisure'] in ['beach_resort', 'common', 'dog_park', 'garden', 'horse_riding', 'marina',
+                                        'nature_reserve', 'park', 'pitch', 'playground', 'swimming_area', 'track']:
+                return OpenSpaceType.leisure
+        elif "natural" in tags_dict:
+            return OpenSpaceType.natural
+        elif "highway" in tags_dict:
+            if tags_dict["highway"] == "pedestrian":
+                if ("area" in tags_dict) and (tags_dict["area"] == "yes"):
+                    return OpenSpaceType.pedestrian
+        return None
+
+
+@unique
 class BuildingZoneType(IntEnum):  # element names must match OSM values apart from non_osm
     residential = 10
     commercial = 20
@@ -273,6 +353,7 @@ class BuildingZone(OSMFeatureArea):
         total_floor_plans = 0.
         for building in self.osm_buildings:
             total_floor_plans += building.geometry.area
+
         return total_floor_plans / self.geometry.area
 
     @classmethod
@@ -361,6 +442,30 @@ class BuildingZone(OSMFeatureArea):
         logging.debug('Linked around &i out of %i high ways to city blocks in building zone %i', linked,
                       len(self.linked_genways), self.osm_id)
 
+    def process_buildings_as_blocked_areas(self):
+        for building in self.osm_buildings:
+            blocked = BlockedArea(BlockedAreaType.osm_building, building.geometry,
+                                  bl.parse_building_tags_for_type(building.tags))
+            self.linked_blocked_areas.append(blocked)
+
+    def process_open_spaces_as_blocked_areas(self, open_spaces_dict: Dict[int, OpenSpace]) -> None:
+        """Adds open spaces (mostly leisure) to this zone as a blocked area.
+        All open_spaces, which are within the building_zone, will be removed from open_spaces
+        to speed up processing."""
+        to_be_removed = list()
+        for candidate in open_spaces_dict.values():
+            is_blocked = False
+            if candidate.geometry.within(self.geometry):
+                is_blocked = True
+                to_be_removed.append(candidate.osm_id)
+            elif candidate.geometry.intersects(self.geometry):
+                    is_blocked = True
+            if is_blocked:
+                blocked = BlockedArea(BlockedAreaType.open_space, candidate.geometry, candidate.type_)
+                self.linked_blocked_areas.append(blocked)
+        for key in to_be_removed:
+            del open_spaces_dict[key]
+
 
 class GeneratedBuildingZone(BuildingZone):
     """A fake OSM Land-use for buildings based on heuristics"""
@@ -421,66 +526,6 @@ class GeneratedBuildingZone(BuildingZone):
                 guessed_type = BuildingZoneType.retail
 
         self.type_ = guessed_type
-
-
-@unique
-class OpenSpaceType(IntEnum):
-    default = 10
-    landuse = 20
-    amenity = 30
-    leisure = 40
-    natural = 50
-    transport = 60
-    pedestrian = 70
-
-
-class OpenSpace(OSMFeatureArea):
-    """Different OSM map features representing an open space, where no building can be placed.
-    It is important to keep parsing of these tags in synch (i.e. opposite) with the other parsed OSM map features.
-    """
-    # must be in line with method parse_tags
-    REQUESTED_TAGS = ['public_transport', 'railway', 'amenity', 'leisure', 'natural', 'highway']
-
-    def __init__(self, osm_id: int, geometry: MPoly, feature_type: Union[None, OpenSpaceType]) -> None:
-        super().__init__(osm_id, geometry, feature_type)
-
-    @classmethod
-    def create_from_way(cls, way: op.Way, nodes_dict: Dict[int, op.Node],
-                        my_coord_transformator: co.Transformation) -> Union[None, 'OpenSpace']:
-        my_geometry = way.polygon_from_osm_way(nodes_dict, my_coord_transformator)
-        feature_type = cls.parse_tags(way.tags)
-        if None is feature_type:
-            return None
-        obj = OpenSpace(way.osm_id, my_geometry, feature_type)
-        return obj
-
-    @staticmethod
-    def parse_tags(tags_dict: KeyValueDict) -> Union[OpenSpaceType, None]:
-        if bl.parse_building_tags_for_type(tags_dict) is not None:
-            return None
-        elif "public_transport" in tags_dict:
-            return OpenSpaceType.transport
-        elif ("railway" in tags_dict) and (tags_dict["railway"] == "station"):
-            return OpenSpaceType.transport
-        elif LANDUSE_KEY in tags_dict:  # must be in sync with BuildingZone
-            if tags_dict[LANDUSE_KEY] == "railway":
-                return OpenSpaceType.transport
-            elif BuildingZone.is_building_zone_value(tags_dict[LANDUSE_KEY]):
-                return None
-            else:
-                return OpenSpaceType.landuse
-        elif "amenity" in tags_dict:
-            if tags_dict["amenity"] in ["grave_yard", "parking"]:
-                return OpenSpaceType.amenity
-        elif "leisure" in tags_dict:
-            return OpenSpaceType.leisure
-        elif "natural" in tags_dict:
-            return OpenSpaceType.natural
-        elif "highway" in tags_dict:
-            if tags_dict["highway"] == "pedestrian":
-                if ("area" in tags_dict) and (tags_dict["area"] == "yes"):
-                    return OpenSpaceType.pedestrian
-        return None
 
 
 class OSMFeatureLinear(OSMFeature):
@@ -772,24 +817,6 @@ class Highway(OSMFeatureLinearWithTunnel):
         return obj
 
 
-@unique
-class BlockedAreaType(IntEnum):
-    osm_building = 1
-    gen_building = 2
-    open_space = 3
-    highway = 11
-    waterway = 12
-    railway = 13
-
-
-class BlockedArea(object):
-    """An object representing a specific type of blocked area - blocked for new generated buildings"""
-    def __init__(self, type_: BlockedAreaType, polygon: Polygon, original_type=None) -> None:
-        self.type_ = type_
-        self.polygon = polygon
-        self.original_type = original_type
-
-
 class BuildingModel(object):
     """A model of a building used to replace OSM buildings or create buildings where there could be a building.
 
@@ -798,8 +825,8 @@ class BuildingModel(object):
 
     Tags contains e.g. roof type, number of levels etc. according to OSM tagging."""
 
-    def __init__(self, width: float, depth: float, model_type: bl.BuildingType, regions: List[str], model: Optional[str],
-                 facade_id: int, roof_id: int, tags: KeyValueDict) -> None:
+    def __init__(self, width: float, depth: float, model_type: bl.BuildingType, regions: List[str],
+                 model: Optional[str], facade_id: int, roof_id: int, tags: KeyValueDict) -> None:
         self.width = width  # if you look at the building from its front, then you see the width between the sides
         self.depth = depth  # from the front to the back
         self.model_type = model_type

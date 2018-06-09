@@ -26,8 +26,8 @@ else:
     speedups.disable()
 
 
-def _prepare_building_zone_for_building_generation(building_zone, open_spaces_dict,
-                                                   waterways_dict, railway_lines_dict, highways_dict):
+def _prepare_building_zone_for_building_generation(building_zone, waterways_dict, railway_lines_dict, highways_dict,
+                                                   open_spaces_dict: Dict[int, m.OpenSpace]):
     """Prepares a building zone with blocked areas and highway parts.
     As soon as an element is entirely within a building zone, it is removed
     from the lists in order to speedup by reducing the number of stuff to compare in the next
@@ -41,43 +41,20 @@ def _prepare_building_zone_for_building_generation(building_zone, open_spaces_di
     would be shared by all."""
     highways_dict_copy1 = highways_dict.copy()  # otherwise when using highways_dict in plotting it will be "used"
     highways_dict_copy2 = highways_dict.copy()
-    _prepare_building_zone_with_blocked_areas(building_zone, open_spaces_dict,
-                                              waterways_dict, railway_lines_dict, highways_dict_copy1)
+    _prepare_building_zone_with_blocked_areas(building_zone, waterways_dict, railway_lines_dict, highways_dict_copy1,
+                                              open_spaces_dict)
     _prepare_building_zone_with_highways(building_zone, highways_dict_copy2)
 
 
-def _prepare_building_zone_with_blocked_areas(building_zone, open_spaces_dict,
-                                              waterways_dict, railway_lines_dict, highways_dict):
+def _prepare_building_zone_with_blocked_areas(building_zone, waterways_dict, railway_lines_dict, highways_dict,
+                                              open_spaces_dict: Dict[int, m.OpenSpace]):
     """Adds BlockedArea objects to a given BuildingZone."""
-    _process_open_spaces_as_blocked_areas(building_zone, open_spaces_dict)
-    _process_buildings_as_blocked_areas(building_zone)
+    building_zone.process_open_spaces_as_blocked_areas(open_spaces_dict)
+    building_zone.process_buildings_as_blocked_areas()
 
     _process_linears_for_blocked_areas(building_zone, waterways_dict, m.BlockedAreaType.waterway)
     _process_linears_for_blocked_areas(building_zone, railway_lines_dict, m.BlockedAreaType.railway)
     _process_linears_for_blocked_areas(building_zone, highways_dict, m.BlockedAreaType.highway)
-
-
-def _process_open_spaces_as_blocked_areas(building_zone, open_spaces_dict):
-    to_be_removed = list()  # All open_spaces, which are within the building_zone, will be removed from open_spaces
-    for candidate in open_spaces_dict.values():
-        is_blocked = False
-        if candidate.geometry.within(building_zone.geometry):
-            is_blocked = True
-            to_be_removed.append(candidate.osm_id)
-        elif candidate.geometry.intersects(building_zone.geometry):
-                is_blocked = True
-        if is_blocked:
-            blocked = m.BlockedArea(m.BlockedAreaType.open_space, candidate.geometry, candidate.type_)
-            building_zone.linked_blocked_areas.append(blocked)
-    for key in to_be_removed:
-        del open_spaces_dict[key]
-
-
-def _process_buildings_as_blocked_areas(building_zone):
-    for building in building_zone.osm_buildings:
-        blocked = m.BlockedArea(m.BlockedAreaType.osm_building, building.geometry,
-                                bl.parse_building_tags_for_type(building.tags))
-        building_zone.linked_blocked_areas.append(blocked)
 
 
 def _process_linears_for_blocked_areas(building_zone, linears_dict, blocked_area_type):
@@ -303,7 +280,6 @@ def process(transformer: co.Transformation, building_zones: List[m.BuildingZone]
             logging.info("Loading of cache %s failed (%s)", cache_file, reason)
 
     # =========== READ OSM DATA =============
-
     open_spaces_dict = m.process_osm_open_space_refs(transformer)
     last_time = time_logging("Time used in seconds for parsing OSM data", last_time)
 
@@ -360,8 +336,8 @@ def process(transformer: co.Transformation, building_zones: List[m.BuildingZone]
     # =========== START GENERATION OF BUILDINGS =============
 
     for b_zone in used_zones:
-        _prepare_building_zone_for_building_generation(b_zone, open_spaces_dict,
-                                                       waterways_dict, railways_dict, highways_dict)
+        _prepare_building_zone_for_building_generation(b_zone, waterways_dict, railways_dict, highways_dict,
+                                                       open_spaces_dict)
         b_zone.link_city_blocks_to_highways()
     last_time = time_logging("Time used in seconds for preparing building zones for building generation", last_time)
 

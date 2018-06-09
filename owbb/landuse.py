@@ -8,7 +8,7 @@ import pickle
 import time
 from typing import Dict, List, Tuple
 
-from shapely.geometry import MultiPolygon, Polygon, CAP_STYLE, JOIN_STYLE
+from shapely.geometry import box, MultiPolygon, Polygon, CAP_STYLE, JOIN_STYLE
 from shapely.ops import unary_union
 
 import buildings as bu
@@ -439,6 +439,24 @@ def _sanity_check_settlement_types(building_zones: List[m.BuildingZone], highway
                   len(building_zones))
 
 
+def _check_clipping_border(building_zones: List[m.BuildingZone], bounds: m.Bounds) -> List[m.BuildingZone]:
+    kept_zones = list()
+    clipping_border = box(bounds.min_point.x, bounds.min_point.y, bounds.max_point.x, bounds.max_point.y)
+    for zone in building_zones:
+        if zone.geometry.within(clipping_border):
+            kept_zones.append(zone)
+        else:
+            clipped_geometry = clipping_border.intersection(zone.geometry)
+            if isinstance(clipped_geometry, Polygon) and clipped_geometry.is_valid and not clipped_geometry.is_empty:
+                zone.geometry = clipped_geometry
+            else:
+                # warn about it, but also keep it as is
+                logging.warning('Building zone %i could not be clipped to boundary', zone.osm_id)
+            # for now we keep them all
+            kept_zones.append(zone)
+    return kept_zones
+
+
 def count_zones_related_buildings(buildings: List[bl.Building], text: str) -> None:
     total_related = 0
 
@@ -451,6 +469,8 @@ def count_zones_related_buildings(buildings: List[bl.Building], text: str) -> No
 
 def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Building]]:
     last_time = time.time()
+
+    bounds = m.Bounds.create_from_parameters(transformer)
 
     # =========== TRY TO READ CACHED DATA FIRST =======
     tile_index = parameters.get_tile_index()
@@ -507,6 +527,10 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Buildin
 
     count_zones_related_buildings(osm_buildings, 'after lighting')
 
+    # =========== REDUCE THE BUILDING_ZONES TO BE WITHIN BOUNDS ==========================
+    building_zones = _check_clipping_border(building_zones, bounds)
+    last_time = time_logging("Time used in seconds for fclipping to boundary", last_time)
+
     # =========== MAKE SURE GENERATED LAND-USE DOES NOT CROSS MAJOR LINEAR OBJECTS =======
     if parameters.OWBB_SPLIT_MADE_UP_LANDUSE_BY_MAJOR_LINES:
         # finally split generated zones by major transport lines
@@ -538,7 +562,6 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Buildin
 
     # =========== FINALIZE Land-use PROCESSING =============================================
     if parameters.DEBUG_PLOT_LANDUSE:
-        bounds = m.Bounds.create_from_parameters(transformer)
         logging.info('Start of plotting zones')
         plotting.draw_zones(osm_buildings, building_zones, lit_areas, bounds)
         time_logging("Time used in seconds for plotting", last_time)
