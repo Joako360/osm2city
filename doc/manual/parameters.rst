@@ -661,9 +661,6 @@ E.g. ``SKIP_LIST = ['St. Leodegar im Hof (Hofkirche)', 87220999]``
    EMBANKMENT_TEXTURE = textures.road.EMBANKMENT_1  # Texture for the embankment
 
 
-.. [#] The only exception to the rule is the possibility to adjust the :ref:`Actual Distance of LOD Ranges <chapter-lod-label>`.
-
-
 .. _chapter-parameters-clipping:
 
 ---------------
