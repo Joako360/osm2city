@@ -9,6 +9,7 @@ import numpy as np
 import parameters
 import utils.ac3d as ac
 import utils.coordinates as coord
+import utils.osmstrings as s
 from utils.utilities import Stats
 from textures.texture import Texture, RoofManager
 
@@ -129,11 +130,11 @@ def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_
     
     # get orientation if exits :
     try:
-        roof_orientation = str(b.tags['roof:orientation'])
-        if not (roof_orientation in ['along', 'across']):
-            roof_orientation = 'along'
+        roof_orientation = str(b.tags[s.K_ROOF_ORIENTATION])
+        if not (roof_orientation in [s.V_ALONG, s.V_ACROSS]):
+            roof_orientation = s.V_ALONG
     except:
-        roof_orientation = 'along'
+        roof_orientation = s.V_ALONG
 
     # search smallest and longest sides
     i_small = 3
@@ -151,7 +152,7 @@ def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_
             i_small = i
             l_small = l_side2
             
-    if roof_orientation == 'across':
+    if roof_orientation == s.V_ACROSS:
         i_side = i_small
     else:
         i_side = i_long

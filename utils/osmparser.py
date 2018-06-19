@@ -26,6 +26,7 @@ import shapely.geometry as shg
 
 import parameters
 from utils.coordinates import Transformation
+import utils.osmstrings as s
 
 
 PSEUDO_OSM_ID = -1  # For those nodes and ways, which get added as part of processing. Not written back to OSM.
@@ -182,7 +183,6 @@ def closed_ways_from_multiple_ways(way_parts: List[Way]) -> List[Way]:
             graph.add_edge(way.refs[i], way.refs[i + 1])
 
     cycles = nx.cycle_basis(graph)
-    index = 0
     for cycle in cycles:  # we just reuse ways - it does not really matter
         way = Way(0)
         way.refs = cycle
@@ -352,7 +352,7 @@ def is_railway(way: Way) -> bool:
 
 
 def has_railway_tag(tags: Dict[str, str]) -> bool:
-    return 'railway' in tags
+    return s.K_RAILWAY in tags
 
 
 def parse_hstore_tags(tags_string: str, osm_id: int) -> Dict[str, str]:

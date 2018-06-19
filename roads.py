@@ -94,31 +94,29 @@ import parameters
 import textures.road
 import utils.osmparser as op
 from utils import coordinates, ac3d, stg_io2, utilities, graph
+import utils.osmstrings as s
 from utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 
 
-BRIDGE_KEY = 'bridge'  # the original OSM tag key
-MAN_MADE_KEY = 'man_made'
 REPLACED_BRIDGE_KEY = 'replaced_bridge'  # specifies a way that was originally a bridge, but due to length was changed
-LIT = 'lit'
 MIN_SEGMENT_LENGTH = 1.0
 
 
 def _is_bridge(way: op.Way) -> bool:
     """Returns true if the tags for this way contains the OSM key for bridge."""
-    if MAN_MADE_KEY in way.tags and way.tags[MAN_MADE_KEY] == BRIDGE_KEY:
+    if s.K_MAN_MADE in way.tags and way.tags[s.K_MAN_MADE] == s.V_BRIDGE:
         return True
-    return BRIDGE_KEY in way.tags
+    return s.K_BRIDGE in way.tags
 
 
 def _replace_bridge_tags(tags: Dict[str, str]) -> None:
-    if BRIDGE_KEY in tags:
-        tags.pop(BRIDGE_KEY)
-    if MAN_MADE_KEY in tags and tags[MAN_MADE_KEY] == BRIDGE_KEY:
-        tags.pop(MAN_MADE_KEY)
-    tags[REPLACED_BRIDGE_KEY] = 'yes'
+    if s.K_BRIDGE in tags:
+        tags.pop(s.K_BRIDGE)
+    if s.K_MAN_MADE in tags and tags[s.K_MAN_MADE] == s.V_BRIDGE:
+        tags.pop(s.K_MAN_MADE)
+    tags[REPLACED_BRIDGE_KEY] = s.V_YES
 
 
 def _is_replaced_bridge(way: op.Way) -> bool:
@@ -141,13 +139,13 @@ def _is_processed_railway(way):
     """
     if not op.is_railway(way):
         return False
-    if way.tags['railway'] in VALID_RAILWAYS:
+    if way.tags[s.K_RAILWAY] in VALID_RAILWAYS:
         return True
     return False
 
 
 def is_lit(tags: Dict[str, str]) -> bool:
-    if LIT in tags and tags[LIT] == 'yes':
+    if s.K_LIT in tags and tags[s.K_LIT] == s.V_YES:
         return True
     return False
 
@@ -155,16 +153,16 @@ def is_lit(tags: Dict[str, str]) -> bool:
 def _calc_railway_gauge(way) -> float:
     """Based on railway tags determine the width in meters (3.18 meters for normal gauge)."""
     width = 1435  # millimeters
-    if way.tags['railway'] in ['narrow_gauge']:
+    if way.tags[s.K_RAILWAY] in ['narrow_gauge']:
         width = 1000
-    if "gauge" in way.tags:
-        if op.is_parsable_float(way.tags['gauge']):
-            width = float(way.tags['gauge'])
+    if s.K_GAUGE in way.tags:
+        if op.is_parsable_float(way.tags[s.K_GAUGE]):
+            width = float(way.tags[s.K_GAUGE])
     return width / 1000 * 126 / 57  # in the texture roads.png the track uses 57 out of 126 pixels
 
 
 def _is_highway(way):
-    return "highway" in way.tags
+    return s.K_HIGHWAY in way.tags
 
 
 def _compatible_ways(way1: op.Way, way2: op.Way) -> bool:
@@ -192,7 +190,7 @@ def _compatible_ways(way1: op.Way, way2: op.Way) -> bool:
         if highway_lit1 != highway_lit2:
             return False
     elif op.is_railway(way1) and op.is_railway(way2):
-        if way1.tags['railway'] != way2.tags['railway']:
+        if way1.tags[s.K_RAILWAY] != way2.tags[s.K_RAILWAY]:
             logging.debug("Nope, both must be of same railway type")
             return False
     return True
@@ -293,13 +291,13 @@ def highway_type_from_osm_tags(value: str) -> Optional[HighwayType]:
 
 
 def max_slope_for_road(obj):
-    if 'highway' in obj.tags:
-        if obj.tags['highway'] in ['motorway']:
+    if s.K_HIGHWAY in obj.tags:
+        if obj.tags[s.K_HIGHWAY] in ['motorway']:
             return parameters.MAX_SLOPE_MOTORWAY
         else:
             return parameters.MAX_SLOPE_ROAD
     # must be aligned with accepted railways in Roads._create_linear_objects
-    elif 'railway' in obj.tags:
+    elif s.K_RAILWAY in obj.tags:
         return parameters.MAX_SLOPE_RAILWAY
 
 
@@ -410,7 +408,7 @@ class Roads(object):
 
     def process(self, blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
                 lit_areas: List[shg.Polygon], stats: utilities.Stats) -> None:
-        """Processes the OSM data until data can be clusterized.
+        """Processes the OSM data until data can be clusterised.
         """
         self._remove_tunnels()
         self._replace_short_bridges_with_ways()
@@ -559,8 +557,8 @@ class Roads(object):
         # Looping again might get even better splits, but is quite costly for the gained extra effect.
         # now replace 'gen' with 'yes'
         for way in self.ways_list:
-            if LIT in way.tags and way.tags[LIT] == 'gen':
-                way.tags[LIT] = 'yes'
+            if s.K_LIT in way.tags and way.tags[s.K_LIT] == s.V_GEN:
+                way.tags[s.K_LIT] = s.V_YES
 
     def _check_lighting_inner(self, ways_list: List[op.Way], lit_areas: List[shg.Polygon],
                               way_la_map: Dict[op.Way, shg.Polygon]) -> List[op.Way]:
@@ -604,7 +602,7 @@ class Roads(object):
 
                 # do more narrow intersection checks
                 if my_line.within(lit_area):
-                    way.tags[LIT] = 'gen'
+                    way.tags[s.K_LIT] = s.V_GEN
                     break  # it cannot be in more than one built_up area at a time
 
                 intersection_points = list()
@@ -636,31 +634,31 @@ class Roads(object):
                     for cut_way, distance in cut_ways_dict.items():
                         my_point = my_line.interpolate(distance)
                         if my_point.within(lit_area):
-                            cut_way.tags[LIT] = 'gen'
+                            cut_way.tags[s.K_LIT] = s.V_GEN
                         else:
-                            cut_way.tags[LIT] = 'no'
+                            cut_way.tags[s.K_LIT] = s.V_NO
                         already_checked_luls.append(lit_area)
                         if is_new_way:
                             new_ways.append(cut_way)
                         else:
                             is_new_way = True  # set at end of (first) loop
 
-            if LIT not in way.tags:
-                way.tags[LIT] = 'no'
+            if s.K_LIT not in way.tags:
+                way.tags[s.K_LIT] = s.V_NO
 
         number_lit = 0
         number_unlit = 0
         for way in ways_list:
             if not _is_highway(way):
                 continue
-            if way.tags[LIT] in ['yes', 'gen']:
+            if way.tags[s.K_LIT] in [s.V_YES, s.V_GEN]:
                 number_lit += 1
-            elif way.tags[LIT] == 'no':
+            elif way.tags[s.K_LIT] == s.V_NO:
                 number_unlit += 1
         for way in new_ways:
-            if way.tags[LIT] in ['yes', 'gen']:
+            if way.tags[s.K_LIT] in [s.V_YES, s.V_GEN]:
                 number_lit += 1
-            elif way.tags[LIT] == 'no':
+            elif way.tags[s.K_LIT] == s.V_NO:
                 number_unlit += 1
 
         logging.info('Originally lit {} - generated lit {} - no lit {}'.format(orig_lit, number_lit - orig_lit,
@@ -901,7 +899,7 @@ class Roads(object):
     def _remove_tunnels(self):
         """Remove tunnels."""
         for the_way in reversed(self.ways_list):
-            if "tunnel" in the_way.tags:
+            if s.K_TUNNEL in the_way.tags:
                 self.ways_list.remove(the_way)
 
     def _replace_short_bridges_with_ways(self):
@@ -961,25 +959,27 @@ class Roads(object):
 
         for the_way in self.ways_list:
             if _is_highway(the_way):
-                highway_type = highway_type_from_osm_tags(the_way.tags['highway'])
+                highway_type = highway_type_from_osm_tags(the_way.tags[s.K_HIGHWAY])
                 # in method Roads.store_way smaller highways already got removed
 
                 priority, tex, width = get_highway_attributes(highway_type)
 
             elif op.is_railway(the_way):
-                if the_way.tags['railway'] in ['rail', 'disused', 'preserved', 'subway']:
+                if the_way.tags[s.K_RAILWAY] in ['rail', 'disused', 'preserved', 'subway']:
                     priority = 20
                     tex = textures.road.TRACK
-                elif the_way.tags['railway'] in ['narrow_gauge']:
+                elif the_way.tags[s.K_RAILWAY] in ['narrow_gauge']:
                     priority = 19
                     tex = textures.road.TRACK  # FIXME: should use proper texture
-                elif the_way.tags['railway'] in ['tram', 'light_rail']:
+                elif the_way.tags[s.K_RAILWAY] in ['tram', 'light_rail']:
                     priority = 18
                     tex = textures.road.TRAMWAY
                 else:
                     priority = 0  # E.g. monorail, miniature
                 if priority > 0:
                     width = _calc_railway_gauge(the_way)
+            else:
+                continue
 
             if priority == 0:
                 continue
@@ -1193,7 +1193,7 @@ class Roads(object):
                                                             the_object, stats)
             else:
                 if _is_highway(the_object):
-                    if highway_type_from_osm_tags(the_object.tags["highway"]).value < parameters.HIGHWAY_TYPE_MIN_ROUGH_LOD:
+                    if highway_type_from_osm_tags(the_object.tags[s.K_HIGHWAY]).value < parameters.HIGHWAY_TYPE_MIN_ROUGH_LOD:
                         cluster_ref = self.roads_clusters.append(Vec2d(the_object.center.centroid.coords[0]),
                                                                  the_object, stats)
                     else:
@@ -1217,7 +1217,7 @@ def process_osm_ways(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, op.Way
             continue
 
         if _is_highway(way):
-            highway_type = highway_type_from_osm_tags(way.tags["highway"])
+            highway_type = highway_type_from_osm_tags(way.tags[s.K_HIGHWAY])
             if highway_type is None:
                 continue
             elif highway_type.value < parameters.HIGHWAY_TYPE_MIN:
@@ -1284,7 +1284,7 @@ def process_roads(coords_transform: coordinates.Transformation, fg_elev: utiliti
     random.seed(42)
     stats = utilities.Stats()
 
-    osm_way_result = op.fetch_osm_db_data_ways_keys(["highway", "railway"])
+    osm_way_result = op.fetch_osm_db_data_ways_keys([s.K_HIGHWAY, s.K_RAILWAY])
     osm_nodes_dict = osm_way_result.nodes_dict
     osm_ways_dict = osm_way_result.ways_dict
 

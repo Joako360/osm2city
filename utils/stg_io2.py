@@ -192,7 +192,7 @@ class STGManager(object):
         the_stg_file = self._find_create_stg_file(lon_lat)
         return the_stg_file.add_object(stg_verb_type.name.upper(), ac_file_name, lon_lat, elev, hdg, once)
 
-    def add_object_shared(self, ac_file_name: str, lon_lat: Vec2d, elev:float , hdg: float) -> None:
+    def add_object_shared(self, ac_file_name: str, lon_lat: Vec2d, elev: float , hdg: float) -> None:
         """Adds OBJECT_SHARED line."""
         the_stg_file = self._find_create_stg_file(lon_lat)
         the_stg_file.add_object('OBJECT_SHARED', ac_file_name, lon_lat, elev, hdg)

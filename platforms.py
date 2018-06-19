@@ -17,6 +17,7 @@ import shapely.geometry as shg
 from cluster import ClusterContainer
 import parameters
 from utils import osmparser, coordinates, ac3d, stg_io2, utilities
+import utils.osmstrings as s
 from utils.vec2d import Vec2d
 
 
@@ -37,7 +38,7 @@ class Platform(object):
                 self.osm_nodes.append(nodes_dict[r])
         self.nodes = np.array([transform.to_local((n.lon, n.lat)) for n in self.osm_nodes])
         self.is_area = False
-        if 'area' in tags and tags['area'] == 'yes' and len(self.nodes) > 2:
+        if s.K_AREA in tags and tags[s.K_AREA] == s.V_YES and len(self.nodes) > 2:
             self.is_area = True
         self.line_string = shg.LineString(self.nodes)
         self.anchor = Vec2d(self.nodes[0])
@@ -48,11 +49,11 @@ def _process_osm_platform(nodes_dict, ways_dict, my_coord_transformator) -> List
     clipping_border = shg.Polygon(parameters.get_clipping_border())
 
     for key, way in ways_dict.items():
-        if not ('railway' in way.tags and way.tags['railway'] == 'platform'):
+        if not (s.K_RAILWAY in way.tags and way.tags[s.K_RAILWAY] == s.V_PLATFORM):
             continue
 
-        if 'layer' in way.tags and int(way.tags['layer']) < 0:
-            logging.debug("layer %s %d", way.tags['layer'], key)
+        if s.K_LAYER in way.tags and int(way.tags[s.K_LAYER]) < 0:
+            logging.debug("layer %s %d", way.tags[s.K_LAYER], key)
             continue  # no underground platforms allowed
 
         first_node = nodes_dict[way.refs[0]]

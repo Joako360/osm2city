@@ -17,18 +17,13 @@ import shapely.affinity as saf
 import building_lib as bl
 import parameters
 import utils.osmparser as op
+import utils.osmstrings as s
 import utils.coordinates as co
 
 
 # type aliases
 KeyValueDict = Dict[str, str]
 MPoly = Union[Polygon, MultiPolygon]
-
-LANDUSE_KEY = 'landuse'
-PLACE_KEY = 'place'
-RAILWAY_KEY = 'railway'
-HIGHWAY_KEY = 'highway'
-WATERWAY_KEY = 'waterway'
 
 
 class Bounds(object):
@@ -251,29 +246,29 @@ class OpenSpace(OSMFeatureArea):
     def parse_tags(tags_dict: KeyValueDict) -> Union[OpenSpaceType, None]:
         if bl.parse_building_tags_for_type(tags_dict) is not None:
             return None
-        elif "public_transport" in tags_dict:
+        elif s.K_PUBLIC_TRANSPORT in tags_dict:
             return OpenSpaceType.transport
-        elif ("railway" in tags_dict) and (tags_dict["railway"] == "station"):
+        elif (s.K_RAILWAY in tags_dict) and (tags_dict[s.K_RAILWAY] == "station"):
             return OpenSpaceType.transport
-        elif LANDUSE_KEY in tags_dict:  # must be in sync with BuildingZone
-            if tags_dict[LANDUSE_KEY] == "railway":
+        elif s.K_LANDUSE in tags_dict:  # must be in sync with BuildingZone
+            if tags_dict[s.K_LANDUSE] == "railway":
                 return OpenSpaceType.transport
-            elif BuildingZone.is_building_zone_value(tags_dict[LANDUSE_KEY]):
+            elif BuildingZone.is_building_zone_value(tags_dict[s.K_LANDUSE]):
                 return None
             else:
                 return OpenSpaceType.landuse
-        elif "amenity" in tags_dict:
-            if tags_dict["amenity"] in ["grave_yard", "parking"]:
+        elif s.K_AMENITY in tags_dict:
+            if tags_dict[s.K_AMENITY] in ["grave_yard", "parking"]:
                 return OpenSpaceType.amenity
-        elif "leisure" in tags_dict:
-            if tags_dict['leisure'] in ['beach_resort', 'common', 'dog_park', 'garden', 'horse_riding', 'marina',
-                                        'nature_reserve', 'park', 'pitch', 'playground', 'swimming_area', 'track']:
+        elif s.K_LEISURE in tags_dict:
+            if tags_dict[s.K_LEISURE] in ['beach_resort', 'common', 'dog_park', 'garden', 'horse_riding', 'marina',
+                                          'nature_reserve', 'park', 'pitch', 'playground', 'swimming_area', 'track']:
                 return OpenSpaceType.leisure
-        elif "natural" in tags_dict:
+        elif s.K_NATURAL in tags_dict:
             return OpenSpaceType.natural
-        elif "highway" in tags_dict:
-            if tags_dict["highway"] == "pedestrian":
-                if ("area" in tags_dict) and (tags_dict["area"] == "yes"):
+        elif s.K_HIGHWAY in tags_dict:
+            if tags_dict[s.K_HIGHWAY] == "pedestrian":
+                if (s.K_AREA in tags_dict) and (tags_dict[s.K_AREA] == "yes"):
                     return OpenSpaceType.pedestrian
         return None
 
@@ -366,7 +361,7 @@ class BuildingZone(OSMFeatureArea):
 
     @staticmethod
     def parse_tags(tags_dict: KeyValueDict) -> Union[None, BuildingZoneType]:
-        value = tags_dict[LANDUSE_KEY]
+        value = tags_dict[s.K_LANDUSE]
         for member in BuildingZoneType:
             if value == member.name:
                 return member
@@ -575,7 +570,7 @@ class Waterway(OSMFeatureLinear):
 
     @staticmethod
     def parse_tags(tags_dict: KeyValueDict) -> Union[WaterwayType, None]:
-        value = tags_dict[WATERWAY_KEY]
+        value = tags_dict[s.K_WATERWAY]
         if value in ["river", "canal"]:
             return WaterwayType.large
         elif value in ["stream", "wadi", "drain", "ditch"]:
@@ -632,19 +627,19 @@ class RailwayLine(OSMFeatureLinearWithTunnel):
     @staticmethod
     def _parse_tags_tracks(tags_dict: KeyValueDict) -> int:
         my_tracks = 1
-        if "tracks" in tags_dict:
-            my_tracks = op.parse_int(tags_dict["tracks"], 1)
+        if s.K_TRACKS in tags_dict:
+            my_tracks = op.parse_int(tags_dict[s.K_TRACKS], 1)
         return my_tracks
 
     @staticmethod
     def _parse_tags_service_spur(tags_dict: KeyValueDict) -> bool:
-        if "service" in tags_dict and tags_dict["service"] == "spur":
+        if s.K_SERVICE in tags_dict and tags_dict[s.K_SERVICE] == "spur":
             return True
         return False
 
     @staticmethod
     def parse_tags(tags_dict: KeyValueDict) -> Union[RailwayLineType, None]:
-        value = tags_dict[RAILWAY_KEY]
+        value = tags_dict[s.K_RAILWAY]
         if value == "rail":
             return RailwayLineType.rail
         elif value == "subway":
@@ -722,8 +717,8 @@ class Highway(OSMFeatureLinearWithTunnel):
 
     @staticmethod
     def parse_tags(tags_dict: KeyValueDict) -> Union[None, HighwayType]:
-        if HIGHWAY_KEY in tags_dict:
-            value = tags_dict[HIGHWAY_KEY]
+        if s.K_HIGHWAY in tags_dict:
+            value = tags_dict[s.K_HIGHWAY]
             if value in ["motorway", "motorway_link"]:
                 return HighwayType.motorway
             elif value in ["trunk", "trunk_link"]:
@@ -752,25 +747,25 @@ class Highway(OSMFeatureLinearWithTunnel):
 
     @staticmethod
     def _parse_tags_roundabout(tags_dict: KeyValueDict) -> bool:
-        if ("junction" in tags_dict) and (tags_dict["junction"] == "roundabout"):
+        if (s.K_JUNCTION in tags_dict) and (tags_dict[s.K_JUNCTION] == "roundabout"):
             return True
         return False
 
     def _parse_tags_oneway(self, tags_dict: KeyValueDict) -> bool:
         if self.type_ == HighwayType.motorway:
-            if ("oneway" in tags_dict) and (tags_dict["oneway"] == "no"):
+            if (s.K_ONEWAY in tags_dict) and (tags_dict[s.K_ONEWAY] == "no"):
                 return False
             else:
                 return True  # in motorways oneway is implied
-        elif ("oneway" in tags_dict) and (tags_dict["oneway"] == "yes"):
+        elif (s.K_ONEWAY in tags_dict) and (tags_dict[s.K_ONEWAY] == "yes"):
             return True
         return False
 
     @staticmethod
     def _parse_tags_lanes(tags_dict: KeyValueDict) -> int:
         my_lanes = 1
-        if "lanes" in tags_dict:
-            my_lanes = op.parse_int(tags_dict["lanes"], 1)
+        if s.K_LANES in tags_dict:
+            my_lanes = op.parse_int(tags_dict[s.K_LANES], 1)
         return my_lanes
 
     def get_width(self) -> float:  # FIXME: replace with parameters
@@ -1133,7 +1128,7 @@ class TempGenBuildings(object):
 
 
 def process_osm_building_zone_refs(transformer: co.Transformation) -> List[BuildingZone]:
-    osm_result = op.fetch_osm_db_data_ways_keys([LANDUSE_KEY])
+    osm_result = op.fetch_osm_db_data_ways_keys([s.K_LANDUSE])
     my_ways = list()
     for way in list(osm_result.ways_dict.values()):
         my_way = BuildingZone.create_from_way(way, osm_result.nodes_dict, transformer)
@@ -1157,7 +1152,7 @@ def process_osm_open_space_refs(transformer: co.Transformation) -> Dict[int, Ope
 def process_osm_railway_refs(transformer: co.Transformation) -> Dict[int, RailwayLine]:
     # TODO: it must be possible to do this for highways and waterways abstract, as only logging, object
     # and key is different
-    osm_result = op.fetch_osm_db_data_ways_keys([RAILWAY_KEY])
+    osm_result = op.fetch_osm_db_data_ways_keys([s.K_RAILWAY])
     my_ways = dict()
     for way in list(osm_result.ways_dict.values()):
         my_way = RailwayLine.create_from_way(way, osm_result.nodes_dict, transformer)
@@ -1168,7 +1163,7 @@ def process_osm_railway_refs(transformer: co.Transformation) -> Dict[int, Railwa
 
 
 def process_osm_highway_refs(transformer: co.Transformation) -> Dict[int, Highway]:
-    osm_result = op.fetch_osm_db_data_ways_keys([HIGHWAY_KEY])
+    osm_result = op.fetch_osm_db_data_ways_keys([s.K_HIGHWAY])
     my_ways = dict()
     for way in list(osm_result.ways_dict.values()):
         my_way = Highway.create_from_way(way, osm_result.nodes_dict, transformer)
@@ -1179,7 +1174,7 @@ def process_osm_highway_refs(transformer: co.Transformation) -> Dict[int, Highwa
 
 
 def process_osm_waterway_refs(transformer: co.Transformation) -> Dict[int, Waterway]:
-    osm_result = op.fetch_osm_db_data_ways_keys([WATERWAY_KEY])
+    osm_result = op.fetch_osm_db_data_ways_keys([s.K_WATERWAY])
     my_ways = dict()
     for way in list(osm_result.ways_dict.values()):
         my_way = Waterway.create_from_way(way, osm_result.nodes_dict, transformer)

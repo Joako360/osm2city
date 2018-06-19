@@ -30,6 +30,7 @@ import parameters
 import roads
 import shapely.geometry as shg
 import utils.osmparser as op
+import utils.osmstrings as s
 from utils import vec2d, coordinates, stg_io2, utilities
 
 OUR_MAGIC = "pylons"  # Used in e.g. stg files to mark edits by osm2pylon
@@ -305,7 +306,7 @@ class SharedPylon(object):
         E.g. OBJECT_SHARED Models/Airport/ils.xml 5.313108 45.364122 374.49 268.92
         """
         if not self.needs_stg_entry:
-            return # no need to write a shared object
+            return  # no need to write a shared object
 
         direction_correction = 0
         if self.direction_type is PylonDirectionType.mirror:
@@ -330,11 +331,11 @@ class Chimney(SharedPylon):
         self.height = parameters.C2P_CHIMNEY_DEFAULT_HEIGHT  # the height of the chimney
         variation = random.uniform(0, parameters.C2P_CHIMNEY_DEFAULT_HEIGHT_VARIATION)
         self.height += variation
-        if 'height' in tags:
-            self.height = op.parse_length(tags['height'])
+        if s.K_HEIGHT in tags:
+            self.height = op.parse_length(tags[s.K_HEIGHT])
 
         bricks = False
-        if 'building:material' in tags and tags['building:material'] == 'brick':
+        if s.K_BUILDING_MATERIAL in tags and tags[s.K_BUILDING_MATERIAL] == 'brick':
             bricks = True
         else:  # determine brick material randomly
             ratio = random.uniform(0, 1)
@@ -367,7 +368,7 @@ class Chimney(SharedPylon):
 
 
 def _process_osm_chimneys_nodes(osm_nodes_dict: Dict[int, op.Node], coords_transform: coordinates.Transformation,
-                               fg_elev: utilities.FGElev) -> List[Chimney]:
+                                fg_elev: utilities.FGElev) -> List[Chimney]:
     chimneys = list()
 
     for key, node in osm_nodes_dict.items():
@@ -380,7 +381,7 @@ def _process_osm_chimneys_nodes(osm_nodes_dict: Dict[int, op.Node], coords_trans
 
 
 def _process_osm_chimneys_ways(nodes_dict, ways_dict, my_coord_transformator,
-                               fg_elev: utilities.FGElev) ->  List[Chimney]:
+                               fg_elev: utilities.FGElev) -> List[Chimney]:
     chimneys = list()
     for way in list(ways_dict.values()):
         for key in way.tags:
@@ -415,7 +416,7 @@ class StorageTank(SharedPylon):
 
         # try to guess a suitable shared model
         # in general we take the .ac models, even though some small detail ight be shown from far away
-        if 'content' in tags and tags['content'] == 'gas':
+        if s.K_CONTENT in tags and tags[s.K_CONTENT] == 'gas':
             self.pylon_model = 'GenericPressureVessel10m.ac'
             if 15 <= diameter < 25:
                 self.pylon_model = 'GenericPressureVessel20m.ac'
@@ -464,27 +465,27 @@ class WindTurbine(SharedPylon):
         self.lat = lat
         self.generator_output = generator_output
         self.generator_type_horizontal = True
-        if "generator:type" in tags and tags["generator:type"].lower() == "vertical_axis":
+        if s.K_GENERATOR_TYPE in tags and tags[s.K_GENERATOR_TYPE].lower() == "vertical_axis":
             self.generator_type_horizontal = False
-        self.offshore = "offshore" in tags and tags["offshore"].lower() == "yes"
+        self.offshore = s.K_OFFSHORE in tags and tags[s.K_OFFSHORE].lower() == s.V_YES
         self.height = 0.
-        if "height" in tags:
-            self.height = op.parse_length(tags["height"])
-        elif "seamark:landmark:height" in tags:
-            self.height = op.parse_length(tags["seamark:landmark:height"])
+        if s.K_HEIGHT in tags:
+            self.height = op.parse_length(tags[s.K_HEIGHT])
+        elif s.K_SEAMARK_LANDMARK_HEIGHT in tags:
+            self.height = op.parse_length(tags[s.K_SEAMARK_LANDMARK_HEIGHT])
         self.rotor_diameter = 0.0
-        if "rotor_diameter" in tags:
-            self.rotor_diameter = op.parse_length(tags["rotor_diameter"])
+        if s.K_ROTOR_DIAMETER in tags:
+            self.rotor_diameter = op.parse_length(tags[s.K_ROTOR_DIAMETER])
         self.manufacturer = None
-        if "manufacturer" in tags:
-            self.manufacturer = tags["manufacturer"]
+        if s.K_MANUFACTURER in tags:
+            self.manufacturer = tags[s.K_MANUFACTURER]
         self.manufacturer_type = None
-        if "manufacturer_type" in tags:
-            self.manufacturer_type = tags["manufacturer_type"]
+        if s.K_MANUFACTURER_TYPE in tags:
+            self.manufacturer_type = tags[s.K_MANUFACTURER_TYPE]
         # illumination
-        self.illuminated = "seamark:landmark:status" in tags and tags["seamark:landmark:status"] == "illuminated"
+        self.illuminated = s.K_SEAMARK_LANDMARK_STATUS in tags and tags[s.K_SEAMARK_LANDMARK_STATUS] == "illuminated"
         if not self.illuminated:
-            self.illuminated = "seamark:status" in tags and tags["seamark:status"] == "illuminated"
+            self.illuminated = s.K_SEAMARK_STATUS in tags and tags[s.K_SEAMARK_STATUS] == "illuminated"
         # wind farm id (artificial - see process_osm_wind_turbines)
         self.wind_farm = None
 
@@ -533,7 +534,7 @@ class WindTurbine(SharedPylon):
                     shared_model = "39m"
                 if is_illuminated:
                     shared_model += "_obst"
-                shared_model = "windturbine_LAG18_" + shared_model  + '.xml'
+                shared_model = "windturbine_LAG18_" + shared_model + '.xml'
         logging.debug("Wind turbine shared model chosen: {}".format(shared_model))
         return common_path + shared_model
 
@@ -1111,7 +1112,7 @@ def _process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev,
 
     railway_candidates = list()
     for way_key, way in ways_dict.items():
-        if "railway" in way.tags:
+        if s.K_RAILWAY in way.tags:
             split_ways = op.split_way_at_boundary(nodes_dict, way, clipping_border, op.OSMFeatureType.road)
             if split_ways:
                 railway_candidates.extend(split_ways)
@@ -1123,7 +1124,7 @@ def _process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev,
         is_challenged = False
         for key in way.tags:
             value = way.tags[key]
-            if "railway" == key:
+            if s.K_RAILWAY == key:
                 if value == "rail":
                     is_railway = True
                     my_line.type_ = RailLine.TYPE_RAILWAY_GAUGE_NORMAL
@@ -1132,10 +1133,10 @@ def _process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev,
                     my_line.type_ = RailLine.TYPE_RAILWAY_GAUGE_NARROW
                 elif value == "abandoned":
                     is_challenged = True
-            elif "electrified" == key:
-                if value in ("contact_line", "yes"):
+            elif s.K_ELECTRIFIED == key:
+                if value in ("contact_line", s.V_YES):
                     is_electrified = True
-            elif ("tunnel" == key) and ("yes" == value):
+            elif (s.K_TUNNEL == key) and (s.V_YES == value):
                 is_challenged = True
         if is_railway and is_electrified and (not is_challenged):
             # Process the Nodes
@@ -1149,9 +1150,9 @@ def _process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev,
                     my_rail_node.elevation = fg_elev.probe_elev(vec2d.Vec2d(my_rail_node.lon, my_rail_node.lat), True)
                     for key in my_node.tags:
                         value = my_node.tags[key]
-                        if "railway" == key and "switch" == value:
+                        if s.K_RAILWAY == key and "switch" == value:
                             my_rail_node.switch = True
-                        if "railway" == key and "buffer_stop" == value:
+                        if s.K_RAILWAY == key and "buffer_stop" == value:
                             my_rail_node.buffer_stop = True
                     if my_rail_node.elevation != -9999:  # if elevation is -9999, then point is outside of boundaries
                         my_line.nodes.append(my_rail_node)
@@ -1267,12 +1268,12 @@ def _process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGEle
         my_line = WayLine(way.osm_id)
         for key in way.tags:
             value = way.tags[key]
-            if "power" == key:
+            if s.K_POWER == key:
                 if "line" == value:
                     my_line.type_ = WayLineType.power_line
                 elif "minor_line" == value:
                     my_line.type_ = WayLineType.power_minor
-            elif "aerialway" == key:
+            elif s.K_AERIALWAY == key:
                 if "cable_car" == value:
                     my_line.type_ = WayLineType.aerialway_cable_car
                 elif value in ["chair_lift", "mixed_lift"]:
@@ -1284,11 +1285,11 @@ def _process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGEle
                 elif "goods" == value:
                     my_line.type_ = WayLineType.aerialway_goods
             #  special values
-            elif "cables" == key:
+            elif s.K_CABLES == key:
                 my_line.cables = op.parse_multi_int_values(value)
-            elif "voltage" == key:
+            elif s.K_VOLTAGE == key:
                 my_line.voltage = op.parse_multi_int_values(value)
-            elif "wires" == key:
+            elif s.K_WIRES == key:
                 my_line.wires = value  # is a string, cf. http://wiki.openstreetmap.org/wiki/Key:wires
         if my_line.type_ == 0:
             continue
@@ -1328,12 +1329,12 @@ def _process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGEle
                 my_pylon.elevation = fg_elev.probe_elev(vec2d.Vec2d(my_pylon.lon, my_pylon.lat), True)
                 for key in my_node.tags:
                     value = my_node.tags[key]
-                    if "power" == key:
+                    if s.K_POWER == key:
                         if "tower" == value:
                             my_pylon.type_ = PylonType.power_tower
                         elif "pole" == value:
                             my_pylon.type_ = PylonType.power_pole
-                    elif "aerialway" == key:
+                    elif s.K_AERIALWAY == key:
                         if "pylon" == value:
                             my_pylon.type_ = PylonType.aerialway_pylon
                         elif "station" == value:
@@ -1345,11 +1346,11 @@ def _process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGEle
                                     logging.debug('Station with osm_id = %s found within building reference',
                                                   my_pylon.osm_id)
                                     break
-                    elif "height" == key:
+                    elif s.K_HEIGHT == key:
                         my_pylon.height = op.parse_length(value)
-                    elif "structure" == key:
+                    elif s.K_STRUCTURE == key:
                         my_pylon.structure = value
-                    elif "material" == key:
+                    elif s.K_MATERIAL == key:
                         my_pylon.material = value
                 if my_pylon.elevation != -9999:  # if elevation is -9999, then point is outside of boundaries
                     my_line.shared_pylons.append(my_pylon)
@@ -1638,7 +1639,7 @@ def _process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator, fg
 
     for way in list(ways_dict.values()):
         for key in way.tags:
-            if "building" == key:
+            if s.K_BUILDING == key:
                 my_coordinates = list()
                 for ref in way.refs:
                     if ref in nodes_dict:
@@ -1650,8 +1651,9 @@ def _process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator, fg
                         my_buildings.append(my_polygon.convex_hull)
                         # process storage tanks
                         if parameters.C2P_PROCESS_STORAGE_TANKS:
-                            if way.tags['building'] in ['storage_tank', 'tank'] or (
-                                        'man_made' in way.tags and way.tags['man_made'] in ['storage_tank', 'tank']):
+                            if way.tags[s.K_BUILDING] in ['storage_tank', 'tank'] or (
+                                        s.K_MAN_MADE in way.tags and way.tags[s.K_MAN_MADE] in ['storage_tank',
+                                                                                                'tank']):
                                 my_centroid = my_polygon.centroid
                                 lon, lat = my_coord_transformator.to_global((my_centroid.x, my_centroid.y))
                                 if not clipping_border.contains(shg.Point(lon, lat)):
@@ -1723,17 +1725,17 @@ def _process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
         is_challenged = False
         for key in way.tags:
             value = way.tags[key]
-            if "highway" == key:
+            if s.K_HIGHWAY == key:
                 valid_highway = True
                 my_highway.type_ = roads.highway_type_from_osm_tags(value)
                 if None is my_highway.type_:
                     valid_highway = False
-            elif ("tunnel" == key) and ("yes" == value):
+            elif (s.K_TUNNEL == key) and (s.V_YES == value):
                 is_challenged = True
-            elif ("junction" == key) and ("roundabout" == value):
+            elif (s.K_JUNCTION == key) and ("roundabout" == value):
                 my_highway.is_roundabout = True
-            elif 'lit' == key:
-                if 'yes' == value:
+            elif s.K_LIT == key:
+                if s.V_YES == value:
                     my_highway.lit = HighwayLightingType.lit_yes
                 else:
                     my_highway.lit = HighwayLightingType.lit_no
@@ -2010,11 +2012,11 @@ class TestOSMPylons(unittest.TestCase):
         self.assertAlmostEqual(1034/100, a/100, 2)
 
     def test_merge_lines(self):
-        line_u = RailLine("u")
-        line_v = RailLine("v")
-        line_w = RailLine("w")
-        line_x = RailLine("x")
-        line_y = RailLine("y")
+        line_u = RailLine(1)
+        line_v = RailLine(2)
+        line_w = RailLine(3)
+        line_x = RailLine(4)
+        line_y = RailLine(5)
         node1 = RailNode("1")
         node2 = RailNode("2")
         node3 = RailNode("3")
@@ -2058,13 +2060,13 @@ class TestOSMPylons(unittest.TestCase):
         node4.x = 20
         node4.y = 20
 
-        line_u = RailLine("u")
+        line_u = RailLine(1)
         line_u.nodes.append(node1)
         line_u.nodes.append(node2)
-        line_v = RailLine("v")
+        line_v = RailLine(2)
         line_v.nodes.append(node2)
         line_v.nodes.append(node3)
-        line_w = RailLine("w")
+        line_w = RailLine(3)
         line_w.nodes.append(node4)
         line_w.nodes.append(node2)
 

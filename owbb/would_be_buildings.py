@@ -18,6 +18,7 @@ import owbb.plotting as plotting
 import utils.coordinates as co
 import parameters
 import utils.osmparser as op
+import utils.osmstrings as s
 from utils.utilities import time_logging
 
 if speedups.available:
@@ -224,38 +225,38 @@ def _read_building_models_library() -> List[m.BuildingModel]:
     models = list()
 
     # residential
-    detached_1_tags = {bl.BUILDING_KEY: 'detached',
+    detached_1_tags = {s.K_BUILDING: 'detached',
                        'building:colour': 'white', 'building:levels': '2',
                        'roof:colour': 'red', 'roof:shape': 'hipped', 'roof:height': '2',
-                       bl.OWBB_GENERATED_KEY: 'yes'}
+                       s.K_OWBB_GENERATED: 'yes'}
     detached_1 = m.BuildingModel(15., 8., bl.BuildingType.detached, list(), None, 0, 0, detached_1_tags)
     models.append(detached_1)
-    detached_2_tags = {bl.BUILDING_KEY: 'detached',
+    detached_2_tags = {s.K_BUILDING: 'detached',
                        'building:colour': 'yellow', 'building:levels': '1',
                        'roof:colour': 'firebrick', 'roof:shape': 'gabled', 'roof:height': '3',
-                       bl.OWBB_GENERATED_KEY: 'yes'}
+                       s.K_OWBB_GENERATED: 'yes'}
     detached_2 = m.BuildingModel(10., 10., bl.BuildingType.detached, list(), None, 0, 0, detached_2_tags)
     models.append(detached_2)
 
     # terrace
-    terrace_1_tags = {bl.BUILDING_KEY: 'terrace',
+    terrace_1_tags = {s.K_BUILDING: 'terrace',
                       'building:colour': 'aqua', 'building:levels': '2',
                       'roof:colour': 'darksalmon', 'roof:shape': 'skillion', 'roof:height': '1.5',
-                      bl.OWBB_GENERATED_KEY: 'yes'}
+                      s.K_OWBB_GENERATED: 'yes'}
     terrace_1 = m.BuildingModel(5., 3., bl.BuildingType.terrace, list(), None, 0, 0, terrace_1_tags)
     models.append(terrace_1)
 
     # industrial
-    industry_1_tags = {bl.BUILDING_KEY: 'industrial',
+    industry_1_tags = {s.K_BUILDING: 'industrial',
                        'building:colour': 'silver',  'building:levels': '4',
                        'roof:colour': 'darkgray', 'roof:shape': 'flat', 'roof:height': '0',
-                       bl.OWBB_GENERATED_KEY: 'yes'}
+                       s.K_OWBB_GENERATED: 'yes'}
     industry_1 = m.BuildingModel(20., 30., bl.BuildingType.industrial, list(), None, 0, 0, industry_1_tags)
     models.append(industry_1)
-    industry_1_tags = {bl.BUILDING_KEY: 'industrial',
+    industry_1_tags = {s.K_BUILDING: 'industrial',
                        'building:colour': 'navy', 'building:levels': '3',
                        'roof:colour': 'darkgray', 'roof:shape': 'gabled', 'roof:height': '3',
-                       bl.OWBB_GENERATED_KEY: 'yes'}
+                       s.K_OWBB_GENERATED: 'yes'}
     industry_1 = m.BuildingModel(20., 15., bl.BuildingType.industrial, list(), None, 0, 0, industry_1_tags)
     models.append(industry_1)
 

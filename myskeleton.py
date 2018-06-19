@@ -14,6 +14,7 @@ import numpy as np
 import parameters
 import pySkeleton.polygon as polygon
 import utils.log_helper as ulog
+import utils.osmstrings as s
 from utils import utilities
 from utils.vec2d import Vec2d
 
@@ -27,8 +28,8 @@ def myskel(out, b, stats: utilities.Stats, offset_xy=Vec2d(0, 0), offset_z=0., h
 
     try:
         poly = polygon.Polygon(vertices, edges, speeds)
-        if 'roof:angle' in b.tags:
-            angle = float(b.tags['roof:angle'])
+        if s.K_ROOF_ANGLE in b.tags:
+            angle = float(b.tags[s.K_ROOF_ANGLE])
         else:
             angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE, parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
         roof_height = 0.

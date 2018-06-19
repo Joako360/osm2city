@@ -44,13 +44,10 @@ import utils.stg_io2
 import utils.coordinates as co
 from utils import ac3d, utilities
 import utils.osmparser
+import utils.osmstrings as s
 from utils.vec2d import Vec2d
 from utils.stg_io2 import STGVerbType
 
-
-BUILDING_KEY = 'building'
-BUILDING_PART_KEY = 'building:part'
-OWBB_GENERATED_KEY = 'owbb_generated'
 
 KeyValueDict = Dict[str, str]
 
@@ -136,14 +133,14 @@ class BuildingType(IntEnum):
 
 
 def parse_building_tags_for_type(tags_dict: KeyValueDict) -> Union[None, BuildingType]:
-    if ("parking" in tags_dict) and (tags_dict["parking"] == "multi-storey"):
+    if (s.K_PARKING in tags_dict) and (tags_dict[s.K_PARKING] == s.V_MULTISTOREY):
         return BuildingType.parking
     else:
         value = None
-        if BUILDING_KEY in tags_dict:
-            value = tags_dict[BUILDING_KEY]
-        elif BUILDING_PART_KEY in tags_dict:
-            value = tags_dict[BUILDING_PART_KEY]
+        if s.K_BUILDING in tags_dict:
+            value = tags_dict[s.K_BUILDING]
+        elif s.K_BUILDING_PART in tags_dict:
+            value = tags_dict[s.K_BUILDING_PART]
         if value is not None:
             for member in BuildingType:
                 if value == member.name:
@@ -185,7 +182,7 @@ def get_building_class(tags: KeyValueDict) -> BuildingClass:
         return BuildingClass.farm
     elif type_ in [BuildingType.hangar]:
         return BuildingClass.airport
-    return BuildingClass.undefined # the default / fallback, e.g. for "yes"
+    return BuildingClass.undefined  # the default / fallback, e.g. for "yes"
 
 
 @unique
@@ -292,11 +289,11 @@ class Building(object):
 
     def make_building_from_part(self) -> None:
         """Make sure a former building_part gets tagged correctly"""
-        if BUILDING_PART_KEY in self.tags:
-            part_value = self.tags[BUILDING_PART_KEY]
-            del self.tags[BUILDING_PART_KEY]
-            if BUILDING_KEY not in self.tags:
-                self.tags[BUILDING_KEY] = part_value
+        if s.K_BUILDING_PART in self.tags:
+            part_value = self.tags[s.K_BUILDING_PART]
+            del self.tags[s.K_BUILDING_PART]
+            if s.K_BUILDING not in self.tags:
+                self.tags[s.K_BUILDING] = part_value
 
     def update_geometry(self, outer_ring: shg.LinearRing, inner_rings_list=list(), refs: List[int]=list()) -> None:
         """Updates the geometry of the building. This can also happen after the building has been initialized.
@@ -439,47 +436,47 @@ class Building(object):
             facade_requires.append('compat:roof-flat')
 
         try:
-            if 'terminal' in self.tags['aeroway'].lower():
+            if 'terminal' in self.tags[s.K_AEROWAY].lower():
                 facade_requires.append('facade:shape:terminal')
         except KeyError:
             pass
         try:
-            if 'building:material' not in self.tags:
-                if self.tags[BUILDING_PART_KEY] == "column":
+            if s.K_BUILDING_MATERIAL not in self.tags:
+                if self.tags[s.K_BUILDING_PART] == "column":
                     facade_requires.append(str('facade:building:material:stone'))
         except KeyError:
             pass
         try:
-            facade_requires.append('facade:building:colour:' + self.tags['building:colour'].lower())
+            facade_requires.append('facade:building:colour:' + self.tags[s.K_BUILDING_COLOUR].lower())
         except KeyError:
             pass
         try:
-            material_type = self.tags['building:material'].lower()
+            material_type = self.tags[s.K_BUILDING_MATERIAL].lower()
             if str(material_type) in ['stone', 'brick', 'timber_framing', 'concrete', 'glass']:
                 facade_requires.append(str('facade:building:material:' + str(material_type)))
 
             # stone white default
-            if str(material_type) == 'stone' and 'building:colour' not in self.tags:
-                self.tags['building:colour'] = 'white'
+            if str(material_type) == 'stone' and s.K_BUILDING_COLOUR not in self.tags:
+                self.tags[s.K_BUILDING_COLOUR] = 'white'
                 facade_requires.append(str('facade:building:colour:white'))
             try:
                 # stone use for
                 if str(material_type) in ['stone', 'concrete', ]:
                     try:
-                        _roof_material = str(self.tags['roof:material']).lower()
+                        _roof_material = str(self.tags[s.K_ROOF_MATERIAL]).lower()
                     except KeyError:
                         _roof_material = None
 
                     try:
-                        _roof_colour = str(self.tags['roof:colour']).lower()
+                        _roof_colour = str(self.tags[s.K_ROOF_COLOUR]).lower()
                     except KeyError:
                         _roof_colour = None
 
                     if not (_roof_colour or _roof_material):
-                        self.tags['roof:material'] = str(material_type)
+                        self.tags[s.K_ROOF_MATERIAL] = str(material_type)
                         self.roof_requires.append('roof:material:' + str(material_type))
                         try:
-                            self.roof_requires.append('roof:colour:' + str(self.tags['roof:colour']))
+                            self.roof_requires.append('roof:colour:' + str(self.tags[s.K_ROOF_COLOUR]))
                         except KeyError:
                             pass
             except:
@@ -518,18 +515,18 @@ class Building(object):
 
         # Try to match materials and colors defined in OSM with available roof textures
         try:
-            if 'roof:material' in self.tags:
-                if str(self.tags['roof:material']) in roof_mgr.available_materials:
-                    self.roof_requires.append(str('roof:material:') + str(self.tags['roof:material']))
+            if s.K_ROOF_MATERIAL in self.tags:
+                if str(self.tags[s.K_ROOF_MATERIAL]) in roof_mgr.available_materials:
+                    self.roof_requires.append(str('roof:material:') + str(self.tags[s.K_ROOF_MATERIAL]))
         except KeyError:
             pass
         try:
-            self.roof_requires.append('roof:colour:' + str(self.tags['roof:colour']))
+            self.roof_requires.append('roof:colour:' + str(self.tags[s.K_ROOF_COLOUR]))
         except KeyError:
             pass
 
         # force use of default roof texture, don't want too weird things
-        if ('roof:material' not in self.tags) and ('roof:colour' not in self.tags):
+        if (s.K_ROOF_MATERIAL not in self.tags) and (s.K_ROOF_COLOUR not in self.tags):
             self.roof_requires.append(str('roof:default'))
 
         self.roof_requires = list(set(self.roof_requires))
@@ -546,10 +543,10 @@ class Building(object):
         logging.debug("__done" + str(self.roof_texture) + str(self.roof_texture.provides))
 
         if parameters.FLAG_2018_3:
-            if 'building:colour' not in self.tags:
-                self.tags['building:colour'] = parameters.BUILDING_FACADE_DEFAULT_COLOUR
-            if 'roof:colour' not in self.tags:
-                self.tags['roof:colour'] = parameters.BUILDING_ROOF_DEFAULT_COLOUR
+            if s.K_BUILDING_COLOUR not in self.tags:
+                self.tags[s.K_BUILDING_COLOUR] = parameters.BUILDING_FACADE_DEFAULT_COLOUR
+            if s.K_ROOF_COLOUR not in self.tags:
+                self.tags[s.K_ROOF_COLOUR] = parameters.BUILDING_ROOF_DEFAULT_COLOUR
 
         return True
 
@@ -594,8 +591,8 @@ class Building(object):
                 self._set_polygon(pts_outer, self.inner_rings_list)
 
     def analyse_roof_shape(self) -> None:
-        if 'roof:shape' in self.tags:
-            self.roof_shape = roofs.map_osm_roof_shape(self.tags['roof:shape'])
+        if s.K_ROOF_SHAPE in self.tags:
+            self.roof_shape = roofs.map_osm_roof_shape(self.tags[s.K_ROOF_SHAPE])
         else:
             # use some parameters and randomize to assign optimistically a roof shape
             # in analyse_roof_shape_check it is double checked whether e.g. building height or area exceed limits
@@ -614,10 +611,10 @@ class Building(object):
             # what about terraces -> should we check how long vs. width?
             if self.polygon.area > 250:
                 building_class = BuildingClass.apartments
-                if BUILDING_KEY in self.tags:
-                    self.tags[BUILDING_KEY] = 'apartments'
+                if s.K_BUILDING in self.tags:
+                    self.tags[s.K_BUILDING] = 'apartments'
                 else:
-                    self.tags[BUILDING_PART_KEY] = 'apartments'
+                    self.tags[s.K_BUILDING_PART] = 'apartments'
 
     def analyse_height_and_levels(self, building_parent: Optional['BuildingParent']) -> None:
         """Determines total height (and number of levels) of a building based on OSM values and other logic.
@@ -647,20 +644,21 @@ class Building(object):
         proxy_body_height = 0.
         proxy_roof_height = 0.
 
-        if 'height' in self.tags:
-            proxy_total_height = utils.osmparser.parse_length(self.tags['height'])
-        if 'building:height' in self.tags:
-            proxy_body_height = utils.osmparser.parse_length(self.tags['building:height'])
-        if 'roof:height' in self.tags:
+        if s.K_HEIGHT in self.tags:
+            proxy_total_height = utils.osmparser.parse_length(self.tags[s.K_HEIGHT])
+        if s.K_BUILDING_HEIGHT in self.tags:
+            proxy_body_height = utils.osmparser.parse_length(self.tags[s.K_BUILDING_HEIGHT])
+        if s.K_ROOF_HEIGHT in self.tags:
             try:
-                proxy_roof_height = utils.osmparser.parse_length(self.tags['roof:height'])
+                proxy_roof_height = utils.osmparser.parse_length(self.tags[s.K_ROOF_HEIGHT])
             except:
                 proxy_roof_height = 0.
 
-        if "min_height" in self.tags:
-            self.min_height = utils.osmparser.parse_length(self.tags['min_height'])
-        elif 'min:height' in self.tags:  # very few values, wrong tagging
-            self.min_height = utils.osmparser.parse_length(self.tags['min:height'])
+        if s.K_MIN_HEIGHT_COLON in self.tags and (s.K_MIN_HEIGHT not in self.tags):  # very few values, wrong tagging
+            self.tags[s.K_MIN_HEIGHT] = self.tags[s.K_MIN_HEIGHT_COLON]
+            del self.tags[s.K_MIN_HEIGHT_COLON]
+        if s.K_MIN_HEIGHT in self.tags:
+            self.min_height = utils.osmparser.parse_length(self.tags[s.K_MIN_HEIGHT])
 
         # a bit of sanity
         if proxy_roof_height == 0. and self.roof_complex:
@@ -739,10 +737,10 @@ class Building(object):
                         parameters.BUILDING_COMPLEX_ROOFS_MAX_AREA) and (self.circumference > 3 * sqrt(2 * self.area)):
                     allow_complex_roofs = False
                 # no complex roof on tall buildings
-                elif self.levels > parameters.BUILDING_COMPLEX_ROOFS_MAX_LEVELS and 'roof:shape' not in self.tags:
+                elif self.levels > parameters.BUILDING_COMPLEX_ROOFS_MAX_LEVELS and s.K_ROOF_SHAPE not in self.tags:
                     allow_complex_roofs = False
                 # no complex roof on tiny buildings.
-                elif self.levels < parameters.BUILDING_COMPLEX_ROOFS_MIN_LEVELS and 'roof:shape' not in self.tags:
+                elif self.levels < parameters.BUILDING_COMPLEX_ROOFS_MIN_LEVELS and s.K_ROOF_SHAPE not in self.tags:
                     allow_complex_roofs = False
                 elif self.roof_shape not in [roofs.RoofShape.pyramidal, roofs.RoofShape.dome, roofs.RoofShape.onion,
                                              roofs.RoofShape.skillion] \
@@ -778,17 +776,17 @@ class Building(object):
             if building_parent is not None:
                 return
             # exclude houses and terraces
-            if BUILDING_KEY in self.tags and self.tags[BUILDING_KEY] in ['house', 'detached', 'terrace']:
+            if s.K_BUILDING in self.tags and self.tags[s.K_BUILDING] in ['house', 'detached', 'terrace']:
                 return
 
             # now apply some tags to increase European style
-            if 'roof:colour' not in self.tags:
+            if s.K_ROOF_COLOUR not in self.tags:
                 if parameters.FLAG_2018_3:
-                    self.tags['roof:colour'] = '#FF0000'
+                    self.tags[s.K_ROOF_COLOUR] = '#FF0000'
                 else:
-                    self.tags['roof:colour'] = 'red'
-            if 'roof:shape' not in self.tags:
-                self.tags['roof:shape'] = 'gabled'
+                    self.tags[s.K_ROOF_COLOUR] = 'red'
+            if s.K_ROOF_SHAPE not in self.tags:
+                self.tags[s.K_ROOF_SHAPE] = 'gabled'
 
     def _compute_roof_height(self) -> None:
         """Compute roof_height for each node"""
@@ -797,12 +795,12 @@ class Building(object):
 
         if self.roof_shape is roofs.RoofShape.skillion:
             # get global roof_height and height for each vertex
-            if 'roof:height' in self.tags:
+            if s.K_ROOF_HEIGHT in self.tags:
                 # force clean of tag if the unit is given
-                temp_roof_height = utils.osmparser.parse_length(self.tags['roof:height'])
+                temp_roof_height = utils.osmparser.parse_length(self.tags[s.K_ROOF_HEIGHT])
             else:
-                if 'roof:angle' in self.tags:
-                    angle = float(self.tags['roof:angle'])
+                if s.K_ROOF_ANGLE in self.tags:
+                    angle = float(self.tags[s.K_ROOF_ANGLE])
                 else:
                     angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE,
                                            parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
@@ -813,7 +811,7 @@ class Building(object):
                         break
                     angle -= 1
 
-            if 'roof:slope:direction' in self.tags:
+            if s.K_ROOF_SLOPE_DIRECTION in self.tags:
                 # Input angle
                 # angle are given clock wise with reference 0 as north
                 #
@@ -824,7 +822,7 @@ class Building(object):
                 # angle 360 north
                 #
                 # here we works with trigo angles
-                angle00 = pi / 2. - (((utils.osmparser.parse_direction(self.tags['roof:slope:direction'])) % 360.)
+                angle00 = pi / 2. - (((utils.osmparser.parse_direction(self.tags[s.K_ROOF_SLOPE_DIRECTION])) % 360.)
                                      * pi / 180.)
             else:
                 angle00 = 0
@@ -883,17 +881,17 @@ class Building(object):
             self.roof_height = temp_roof_height
 
         else:  # roof types other than skillion
-            if 'roof:height' in self.tags:
+            if s.K_ROOF_HEIGHT in self.tags:
                 # get roof:height given by osm
-                self.roof_height = utils.osmparser.parse_length(self.tags['roof:height'])
+                self.roof_height = utils.osmparser.parse_length(self.tags[s.K_ROOF_HEIGHT])
 
             else:
                 # random roof:height
                 if self.roof_shape is roofs.RoofShape.flat:
                     self.roof_height = 0.
                 else:
-                    if 'roof:angle' in self.tags:
-                        angle = float(self.tags['roof:angle'])
+                    if s.K_ROOF_ANGLE in self.tags:
+                        angle = float(self.tags[s.K_ROOF_ANGLE])
                     else:
                         angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE,
                                                parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
@@ -949,7 +947,8 @@ class Building(object):
             #
             if self.roof_height_pts:
                 for i in range(len(self.pts_all)):
-                    ac_object.node(-self.pts_all[i][1], self.beginning_of_roof_above_sea_level + self.roof_height_pts[i],
+                    ac_object.node(-self.pts_all[i][1],
+                                   self.beginning_of_roof_above_sea_level + self.roof_height_pts[i],
                                    -self.pts_all[i][0])
         else:
             # others roofs
@@ -1026,10 +1025,10 @@ class Building(object):
                 elif self.roof_shape is roofs.RoofShape.onion:
                     roofs.separate_pyramidal(ac_object, self, roof_mat_idx, roofs.RoofShape.onion)
                 else:
-                    s = myskeleton.myskel(ac_object, self, stats, offset_xy=cluster_offset,
-                                          offset_z=self.beginning_of_roof_above_sea_level,
-                                          max_height=parameters.BUILDING_SKEL_ROOF_MAX_HEIGHT)
-                    if s:
+                    skeleton = myskeleton.myskel(ac_object, self, stats, offset_xy=cluster_offset,
+                                                 offset_z=self.beginning_of_roof_above_sea_level,
+                                                 max_height=parameters.BUILDING_SKEL_ROOF_MAX_HEIGHT)
+                    if skeleton:
                         stats.have_complex_roof += 1
 
                     else:  # something went wrong - fall back to flat roof
@@ -1111,25 +1110,25 @@ class BuildingParent(object):
         for child in self.children:
             if default_child is None:
                 default_child = child
-                if 'building:colour' in child.tags:
-                    building_colour = child.tags['building:colour']
-                if 'building:material' in child.tags:
-                    building_material = child.tags['building:material']
+                if s.K_BUILDING_COLOUR in child.tags:
+                    building_colour = child.tags[s.K_BUILDING_COLOUR]
+                if s.K_BUILDING_MATERIAL in child.tags:
+                    building_material = child.tags[s.K_BUILDING_MATERIAL]
             else:
                 if child.longest_edge_length > default_child.longest_edge_length:
                     default_child = child
-                if 'building:colour' in child.tags:
+                if s.K_BUILDING_COLOUR in child.tags:
                     if building_colour is None:
                         difference_found = True
                         break
-                    elif building_colour != child.tags['building:colour']:
+                    elif building_colour != child.tags[s.K_BUILDING_COLOUR]:
                         difference_found = True
                         break
-                if 'building:material' in child.tags:
+                if s.K_BUILDING_MATERIAL in child.tags:
                     if building_material is None:
                         difference_found = True
                         break
-                    elif building_material != child.tags['building:material']:
+                    elif building_material != child.tags[s.K_BUILDING_MATERIAL]:
                         difference_found = True
                         break
 
@@ -1144,11 +1143,11 @@ class BuildingParent(object):
 
 def _parse_building_levels(tags: Dict[str, str]) -> float:
     proxy_levels = 0.
-    if 'building:levels' in tags:
-        if ';' in tags['building:levels']:
-            proxy_levels = float(utils.osmparser.parse_multi_int_values(tags['building:levels']))
-        elif utils.osmparser.is_parsable_float(tags['building:levels']):
-            proxy_levels = float(tags['building:levels'])
+    if s.K_BUILDING_LEVELS in tags:
+        if ';' in tags[s.K_BUILDING_LEVELS]:
+            proxy_levels = float(utils.osmparser.parse_multi_int_values(tags[s.K_BUILDING_LEVELS]))
+        elif utils.osmparser.is_parsable_float(tags[s.K_BUILDING_LEVELS]):
+            proxy_levels = float(tags[s.K_BUILDING_LEVELS])
     if 'levels' in tags:
         if ';' in tags['levels']:
             proxy_levels = float(utils.osmparser.parse_multi_int_values(tags['levels']))
@@ -1226,7 +1225,7 @@ def relate_neighbours(buildings: List[Building]) -> None:
     """Relates neighbour buildings based on shared references."""
     neighbours = 0
     for i in range(0, len(buildings)):
-        for j in range (i + 1, len(buildings)):
+        for j in range(i + 1, len(buildings)):
             if set(buildings[i].refs).isdisjoint(set(buildings[j].refs)) is False:
                 buildings[i].neighbours.add(buildings[j])
                 buildings[j].neighbours.add(buildings[i])
@@ -1255,19 +1254,19 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: u
         b.parent = None  # will be reset again if actually all is ok at end
 
         # exclude what is processed elsewhere
-        if BUILDING_KEY in b.tags:  # not if 'building:part'
+        if s.K_BUILDING in b.tags:  # not if 'building:part'
             # temporarily exclude greenhouses / glasshouses
-            if b.tags[BUILDING_KEY] in ['glasshouse', 'greenhouse'] or (
-                            'amenity' in b.tags and b.tags['amenity'] in ['glasshouse', 'greenhouse']):
+            if b.tags[s.K_BUILDING] in ['glasshouse', 'greenhouse'] or (
+                            s.K_AMENITY in b.tags and b.tags[s.K_AMENITY] in ['glasshouse', 'greenhouse']):
                 logging.debug("Excluded greenhouse with osm_id={}".format(b.osm_id))
                 continue
             # exclude storage tanks -> pylons.py
-            if b.tags[BUILDING_KEY] in ['storage_tank', 'tank'] or (
-                    'man_made' in b.tags and b.tags['man_made'] in ['storage_tank', 'tank']):
+            if b.tags[s.K_BUILDING] in ['storage_tank', 'tank'] or (
+                    s.K_MAN_MADE in b.tags and b.tags[s.K_MAN_MADE] in ['storage_tank', 'tank']):
                 logging.debug("Excluded storage tank with osm_id={}".format(b.osm_id))
                 continue
             # exclude chimneys -> pylons.py
-            if 'man_made' in b.tags and b.tags['man_made'] in ['chimney']:
+            if s.K_MAN_MADE in b.tags and b.tags[s.K_MAN_MADE] in ['chimney']:
                 logging.debug("Excluded chimney or with osm_id={}".format(b.osm_id))
                 continue
             # handle places of worship
@@ -1349,13 +1348,13 @@ def write(ac_file_name: str, buildings: List[Building], cluster_elev: float, clu
     colours = collections.OrderedDict()  # # hex_value: str, index: int
     colours_index = 0
     for building in buildings:
-        if 'building:colour' in building.tags:
-            if building.tags['building:colour'] not in colours:
-                colours[building.tags['building:colour']] = colours_index
+        if s.K_BUILDING_COLOUR in building.tags:
+            if building.tags[s.K_BUILDING_COLOUR] not in colours:
+                colours[building.tags[s.K_BUILDING_COLOUR]] = colours_index
                 colours_index += 1
-        if 'roof:colour' in building.tags:
-            if building.tags['roof:colour'] not in colours:
-                colours[building.tags['roof:colour']] = colours_index
+        if s.K_ROOF_COLOUR in building.tags:
+            if building.tags[s.K_ROOF_COLOUR] not in colours:
+                colours[building.tags[s.K_ROOF_COLOUR]] = colours_index
                 colours_index += 1
 
     materials_list = list()
@@ -1376,8 +1375,8 @@ def write(ac_file_name: str, buildings: List[Building], cluster_elev: float, clu
         face_mat_idx = 1  # needs to correspond with with a material that has r, g, b = 1.0
         roof_mat_idx = 1  # ditto
         if parameters.FLAG_2018_3:
-            face_mat_idx = colours[b.tags['building:colour']]
-            roof_mat_idx = colours[b.tags['roof:colour']]
+            face_mat_idx = colours[b.tags[s.K_BUILDING_COLOUR]]
+            roof_mat_idx = colours[b.tags[s.K_ROOF_COLOUR]]
         b.write_to_ac(ac_object, cluster_elev, cluster_offset, roof_mgr, face_mat_idx, roof_mat_idx, stats)
 
     ac.write(ac_file_name)
@@ -1462,8 +1461,8 @@ def _analyse_worship_building(building: Building, building_parent: BuildingParen
         return False
     worship_building_type = WorshipBuilding.screen_worship_building_type(building.tags)
     if worship_building_type:
-        if 'name' in building.tags:
-            name = building.tags['name']
+        if s.K_NAME in building.tags:
+            name = building.tags[s.K_NAME]
         else:
             name = 'No Name'
         # check dimensions and then whether we have an adequate building
@@ -1491,7 +1490,7 @@ def _analyse_worship_building(building: Building, building_parent: BuildingParen
                 return False
 
             logging.info('Found static model for worship building "%s" with osm_id %i: %s at angle %d',
-                          name, building.osm_id, model.file_name, angle)
+                         name, building.osm_id, model.file_name, angle)
             model.make_stg_entry(stg_manager)
             return True
         logging.debug('No static model found for worship building "%s" with osm_id %i', name, building.osm_id)
@@ -1575,15 +1574,15 @@ class WorshipBuilding(object):
     def deduct_worship_building_type(tags: Dict[str, str]) -> Optional['WorshipBuildingType']:
         """Return a type if the building is a worship building, Otherwise return None."""
         worship_building_type = None
-        if tags[BUILDING_KEY] == 'cathedral':
-            tags[BUILDING_KEY] = 'church'
+        if tags[s.K_BUILDING] == 'cathedral':
+            tags[s.K_BUILDING] = 'church'
         try:
-            worship_building_type = WorshipBuildingType.__members__[tags[BUILDING_KEY]]
+            worship_building_type = WorshipBuildingType.__members__[tags[s.K_BUILDING]]
         except KeyError:  # e.g. building=yes
-            if 'amenity' in tags and tags['amenity'] == 'place_of_worship':
-                if 'religion' in tags and tags['religion'] == 'christian':
+            if s.K_AMENITY in tags and tags[s.K_AMENITY] == 'place_of_worship':
+                if s.K_RELIGION in tags and tags[s.K_RELIGION] == 'christian':
                     worship_building_type = WorshipBuildingType.church
-                    if 'denomination' in tags and tags['denomination'].find('orthodox') > 0:
+                    if s.K_DENOMINATION in tags and tags[s.K_DENOMINATION].find('orthodox') > 0:
                         worship_building_type = WorshipBuildingType.church_orthodox
         return worship_building_type
 

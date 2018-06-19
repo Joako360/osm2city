@@ -29,6 +29,7 @@ import parameters
 import prepare_textures
 import textures.materials
 import utils.osmparser as op
+import utils.osmstrings as s
 import utils.vec2d as v
 from utils import coordinates, stg_io2, utilities
 
@@ -36,7 +37,7 @@ OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
 
 # Cf. https://taginfo.openstreetmap.org/keys/building%3Apart#values and
 # https://wiki.openstreetmap.org/wiki/Key%3Abuilding%3Apart
-ALLOWED_BUILDING_PART_VALUES = ['yes', 'residential', 'apartments', 'house', 'commercial', 'retail']
+ALLOWED_BUILDING_PART_VALUES = [s.V_YES, 'residential', 'apartments', 'house', 'commercial', 'retail']
 
 
 def _process_rectify_buildings(nodes_dict: Dict[int, op.Node], rel_nodes_dict: Dict[int, op.Node],
@@ -54,9 +55,9 @@ def _process_rectify_buildings(nodes_dict: Dict[int, op.Node], rel_nodes_dict: D
 
     rectify_buildings = list()
     for key, way in ways_dict.items():
-        if not ('building' in way.tags or 'building:part' in way.tags) or len(way.refs) == 0:
+        if not (s.K_BUILDING in way.tags or s.K_BUILDING_PART in way.tags) or len(way.refs) == 0:
             continue
-        if 'indoor' in way.tags and way.tags['indoor'] == 'yes':
+        if s.K_INDOOR in way.tags and way.tags[s.K_INDOOR] == s.V_YES:
             continue
         rectify_nodes_list = list()
         for ref in way.refs:
@@ -164,11 +165,11 @@ def _process_osm_relations(nodes_dict: Dict[int, op.Node], rel_ways_dict: Dict[i
     number_of_created_buildings = 0
     for key, relation in relations_dict.items():
         try:
-            if 'type' in relation.tags and relation.tags['type'] == 'multipolygon':
+            if s.K_TYPE in relation.tags and relation.tags[s.K_TYPE] == s.V_MULTIPOLYGON:
                 added_buildings = _process_multipolygon_buildings(nodes_dict, rel_ways_dict, relation,
                                                                   my_buildings, coords_transform)
                 number_of_created_buildings += added_buildings
-            elif 'type' in relation.tags and relation.tags['type'] == 'building':
+            elif s.K_TYPE in relation.tags and relation.tags[s.K_TYPE] == s.V_BUILDING:
                 _process_simple_3d_building(relation, my_buildings)
         except Exception:
             logging.exception('Unable to process building relation osm_id %d', relation.osm_id)
@@ -190,21 +191,21 @@ def _process_multipolygon_buildings(nodes_dict: Dict[int, op.Node], rel_ways_dic
     # find relationships
     for member in relation.members:
         relation_found = False
-        if member.type_ == 'way':
+        if member.type_ == s.V_WAY:
             if member.ref in rel_ways_dict:
                 way = rel_ways_dict[member.ref]
                 # because the member way already has been processed as normal way, we need to remove
                 # otherwise we might get flickering due to two buildings on top of each other
                 my_buildings.pop(way.osm_id, None)
                 relation_found = True
-                if member.role == 'outer':
+                if member.role == s.V_OUTER:
                     if way.refs[0] == way.refs[-1]:
                         outer_ways.append(way)
                         logging.debug("add way outer " + str(way.osm_id))
                     else:
                         outer_ways_multiple.append(way)
                         logging.debug("add way outer multiple " + str(way.osm_id))
-                elif member.role == 'inner':
+                elif member.role == s.V_INNER:
                     if way.refs[0] == way.refs[-1]:
                         inner_ways.append(way)
                         logging.debug("add way inner " + str(way.osm_id))
@@ -256,11 +257,11 @@ def _process_simple_3d_building(relation: op.Relation, my_buildings: Dict[int, b
     building_outlines_found = list()  # osm_id
     # make relations - we are only interested
     for member in relation.members:
-        if member.type_ == 'way':
+        if member.type_ == s.V_WAY:
             if member.ref in my_buildings:
                 related_building = my_buildings[member.ref]
-                if 'building' in related_building.tags:
-                    if member.role == 'outline':
+                if s.K_BUILDING in related_building.tags:
+                    if member.role == s.V_OUTLINE:
                         building_outlines_found.append(related_building.osm_id)
                     else:
                         buildings_found.append(related_building.osm_id)
@@ -296,8 +297,8 @@ def _process_simple_3d_building(relation: op.Relation, my_buildings: Dict[int, b
             for member in relation.members:
                 if member.ref in my_buildings:
                     building_part = my_buildings[member.ref]
-                    if 'building:part' in building_part.tags and \
-                            building_part.tags['building:part'] not in ALLOWED_BUILDING_PART_VALUES:
+                    if s.K_BUILDING_PART in building_part.tags and \
+                            building_part.tags[s.K_BUILDING_PART] not in ALLOWED_BUILDING_PART_VALUES:
                         parent.add_child(building_part)
 
 
@@ -315,13 +316,13 @@ def _process_building_parts(nodes_dict: Dict[int, op.Node],
     building_parents = dict()  # osm_id, BuildingParent object
     building_parts_to_remove = list()  # osm_ids
     for part_key, b_part in my_buildings.items():
-        if 'building:part' in b_part.tags and 'building' not in b_part.tags:
+        if s.K_BUILDING_PART in b_part.tags and s.K_BUILDING not in b_part.tags:
             stats_parts_tested += 1
-            if 'type' in b_part.tags and b_part.tags['type'] == 'multipolygon':
+            if s.K_TYPE in b_part.tags and b_part.tags[s.K_TYPE] == s.V_MULTIPOLYGON:
                 continue
             if b_part.parent is None:  # i.e. there is no relation tagging in OSM
                 # exclude parts, which we do not want
-                if b_part.tags['building:part'] not in ALLOWED_BUILDING_PART_VALUES:
+                if b_part.tags[s.K_BUILDING_PART] not in ALLOWED_BUILDING_PART_VALUES:
                     building_parts_to_remove.append(b_part.osm_id)
                     continue
                 if b_part.polygon is None or b_part.polygon.area < parameters.BUILDING_PART_MIN_AREA:
@@ -331,7 +332,7 @@ def _process_building_parts(nodes_dict: Dict[int, op.Node],
                 # do it by common nodes instead of geometry due to performance
                 parent_missing = True
                 for c_key, candidate in my_buildings.items():
-                    if part_key != c_key and 'building:part' not in candidate.tags and candidate.polygon is not None:
+                    if part_key != c_key and s.K_BUILDING_PART not in candidate.tags and candidate.polygon is not None:
                         # Not sure why it is not enough to just test for "within", but e.g. 511476571 is not
                         # within 30621689 (building in Prague). Therefore test for references to nodes
                         # and be satisfied if all references are found in candidate
@@ -397,7 +398,7 @@ def _process_building_parts(nodes_dict: Dict[int, op.Node],
                     # make the original building a building_part and update with the remaining geometry
                     original_building.update_geometry(geometry_difference.exterior, refs=new_refs)
                     original_building.tags = dict()
-                    original_building.tags['building_part'] = 'yes'
+                    original_building.tags[s.K_BUILDING_PART] = s.V_YES
                     building_parent.add_child(original_building)
                     original_building_still_used = True
             elif isinstance(geometry_difference, shg.MultiPolygon):
@@ -416,13 +417,13 @@ def _process_building_parts(nodes_dict: Dict[int, op.Node],
                                 # make the original building a building_part and update with the remaining geometry
                                 original_building.update_geometry(my_poly.exterior, refs=new_refs)
                                 original_building.tags = dict()
-                                original_building.tags['building_part'] = 'yes'
+                                original_building.tags[s.K_BUILDING_PART] = s.V_YES
                                 building_parent.add_child(original_building)
                                 original_building_still_used = True
                             else:
                                 new_way = op.Way(op.get_next_pseudo_osm_id(op.OSMFeatureType.building_relation))
                                 new_way.refs = new_refs
-                                new_tags = {'building_part': 'yes'}
+                                new_tags = {s.K_BUILDING_PART: s.V_YES}
                                 new_building_part = _make_building_from_way(nodes_dict, new_tags, new_way,
                                                                             coords_transform)
                                 my_buildings[new_building_part.osm_id] = new_building_part
@@ -464,10 +465,10 @@ def _process_osm_building(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, o
     clipping_border = shg.Polygon(parameters.get_clipping_border())
 
     for key, way in ways_dict.items():
-        if not ('building' in way.tags or 'building:part' in way.tags) or len(way.refs) == 0:
+        if not (s.K_BUILDING in way.tags or s.K_BUILDING_PART in way.tags) or len(way.refs) == 0:
             continue
 
-        if 'indoor' in way.tags and way.tags['indoor'] == 'yes':
+        if s.K_INDOOR in way.tags and way.tags[s.K_INDOOR] == s.V_YES:
             continue
 
         first_node = nodes_dict[way.refs[0]]
@@ -475,8 +476,8 @@ def _process_osm_building(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, o
             continue
 
         # checking in SKIP_LIST
-        if 'name' in way.tags:
-            name = way.tags['name']
+        if s.K_NAME in way.tags:
+            name = way.tags[s.K_NAME]
             if name in parameters.SKIP_LIST:
                 logging.debug('SKIPPING building with name tag=%s', name)
                 continue
@@ -571,7 +572,7 @@ def _write_obstruction_lights(path: str, file_name: str,
 
 
 def construct_buildings_from_osm(coords_transform: coordinates.Transformation) -> List[building_lib.Building]:
-    osm_read_results = op.fetch_osm_db_data_ways_keys(["building", "building:part"])
+    osm_read_results = op.fetch_osm_db_data_ways_keys([s.K_BUILDING, s.K_BUILDING_PART])
     osm_read_results = op.fetch_osm_db_data_relations_buildings(osm_read_results)
     osm_nodes_dict = osm_read_results.nodes_dict
     osm_ways_dict = osm_read_results.ways_dict
