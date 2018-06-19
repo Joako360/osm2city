@@ -41,9 +41,9 @@ def map_osm_roof_shape(osm_roof_shape: str) -> RoofShape:
         return RoofShape.flat
     if _shape == 'flat':
         return RoofShape.flat
-    if _shape == 'skillion':
+    if _shape in ['skillion', 'lean_to', 'pitched', 'shed']:
         return RoofShape.skillion
-    if _shape in ['gabled', 'half-hipped', 'gambrel', 'round', 'saltbox']:
+    if _shape in ['gabled', 'half-hipped', 'half_hipped', 'gambrel', 'round', 'saltbox']:
         return RoofShape.gabled
     if _shape in ['hipped', 'mansard']:
         return RoofShape.hipped
