@@ -55,8 +55,8 @@ def map_osm_roof_shape(osm_roof_shape: str) -> RoofShape:
         return RoofShape.onion
 
     # fall back for all not directly handled OSM types
-    logging.debug('Not handled roof shape found: %s. Therefore transformed to "flat".', _shape)
-    return RoofShape.flat
+    logging.debug('Not handled roof shape found: %s. Therefore transformed to "hipped".', _shape)
+    return RoofShape.hipped
 
 
 def flat(ac_object: ac.Object, index_first_node_in_ac_obj: int, b, roof_mgr: RoofManager, roof_mat_idx: int,
@@ -198,6 +198,7 @@ def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_
                    mat_idx=roof_mat_idx)
 
     # sides if inward_meters = 0, else inward roofs for hipped
+    # if roof is hipped, then facade_mat_idx is actually roof_mat_idx
     len_roof_hypo = (inward_meters**2 + roof_height**2)**0.5
     repeat_y = len_roof_hypo/roof_texture_size_y
     if parameters.FLAG_2018_3 and inward_meters == 0.:
