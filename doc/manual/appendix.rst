@@ -54,6 +54,7 @@ An unstructured list of stuff you might need to know as a developer:
 * The code has evolved over time by contributions from persons, who are not necessarily professional Python developers. Whenever you touch or even only read a piece of code, please leave the place in a better state by adding comments with your understanding, refactoring etc.
 * The level of unit testing is minimal and below what is achievable. There is no system testing. All system testing is done in a visual way - one of the reasons being that the scenery generation has randomising elements plus parametrisation, which means there is not deterministic right solution even from a regression point of view.
 * Apart from testing the results in FlightGear by flying around with e.g. the UFO_, a few operations make use of a parameter ``DEBUG_PLOT_*``, which plots results to a pdf-file:
+
   * ``DEBUG_PLOT_RECTIFY``: Examples of rectified building floor plans
   * ``DEBUG_PLOT_GENBUILDINGS``: Result of generating buildings
   * ``DEBUG_PLOT_LANDUSE``: Different aspects of land-use
@@ -64,6 +65,7 @@ An unstructured list of stuff you might need to know as a developer:
 * Try to stick to the Python version as referenced in :ref:`Python<chapter-python-label>`.
 * All code in utf-8. On Windows please make sure that line endings get correct in git (core.autocrlf)
 * Coordinate systems:
+
   * Flightgear uses a set of different `coordinate systems`_. The most important for referencing models in stg-files is WGS84_, which uses lon/lat.
   * OSM references WGS84_ as the datum.
   * The Ac3D format uses x-axis to the right, y-axis upwards and z-axis forward, meaning that the bottom of an object is in x-z space and the front is in x-y. I.e. a right-handed coordinate system.
