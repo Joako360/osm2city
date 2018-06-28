@@ -1036,7 +1036,7 @@ class Building(object):
                         roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, roof_mat_idx, stats)
             # -- pitched roof for exactly 4 ground nodes
             elif self.pts_all_count == 4:
-                if self.roof_shape is roofs.RoofShape.gabled:
+                if self.roof_shape in [roofs.RoofShape.gabled, roofs.RoofShape.gambrel]:
                     roofs.separate_gable(ac_object, self, roof_mat_idx, facade_mat_idx)
                 elif self.roof_shape is roofs.RoofShape.hipped:
                     roofs.separate_hipped(ac_object, self, roof_mat_idx)

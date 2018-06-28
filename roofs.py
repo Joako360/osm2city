@@ -1,17 +1,19 @@
 import copy
 from enum import IntEnum, unique
 import logging
-from math import sin, cos, atan2, radians
+from math import sin, cos, atan2, radians, tan
 from typing import List
 
 import numpy as np
 
-import parameters
 import utils.ac3d as ac
 import utils.coordinates as coord
 import utils.osmstrings as s
 from utils.utilities import Stats
 from textures.texture import Texture, RoofManager
+
+GAMBREL_ANGLE_LOWER_PART = 70
+GAMBREL_HEIGHT_RATIO_LOWER_PART = 0.75
 
 
 @unique
@@ -30,6 +32,7 @@ class RoofShape(IntEnum):
     pyramidal = 4
     dome = 5
     onion = 6
+    gambrel = 7
 
 
 def map_osm_roof_shape(osm_roof_shape: str) -> RoofShape:
@@ -43,8 +46,10 @@ def map_osm_roof_shape(osm_roof_shape: str) -> RoofShape:
         return RoofShape.flat
     if _shape in ['skillion', 'lean_to', 'pitched', 'shed']:
         return RoofShape.skillion
-    if _shape in ['gabled', 'half-hipped', 'half_hipped', 'gambrel', 'round', 'saltbox']:
+    if _shape in ['gabled', 'half-hipped', 'saltbox']:
         return RoofShape.gabled
+    if _shape in ['gambrel', 'round']:
+        return RoofShape.gambrel
     if _shape in ['hipped', 'mansard']:
         return RoofShape.hipped
     if _shape == 'pyramidal':
@@ -114,12 +119,11 @@ def flat(ac_object: ac.Object, index_first_node_in_ac_obj: int, b, roof_mgr: Roo
 
 
 def separate_hipped(ac_object: ac.Object, b, roof_mat_idx: int) -> None:
-    return separate_gable(ac_object, b, roof_mat_idx, roof_mat_idx, inward_meters=3.)
+    return separate_gable(ac_object, b, roof_mat_idx, roof_mat_idx, inward_meters=2.)
 
 
 def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_meters=0.) -> None:
-    """gable roof, 4 nodes, separate model. Inward_"""
-    # -- pitched roof for 4 ground nodes
+    """Gabled roof (or hipped if inward_meters > 0) with 4 nodes."""
     t = b.roof_texture
     
     if b.roof_height:
@@ -129,11 +133,11 @@ def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_
         return
     
     # get orientation if exits :
-    try:
+    if s.K_ROOF_ORIENTATION in b.tags:
         roof_orientation = str(b.tags[s.K_ROOF_ORIENTATION])
         if not (roof_orientation in [s.V_ALONG, s.V_ACROSS]):
             roof_orientation = s.V_ALONG
-    except:
+    else:
         roof_orientation = s.V_ALONG
 
     # search smallest and longest sides
@@ -157,68 +161,164 @@ def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_
     else:
         i_side = i_long
 
-    ind_X = []
+    seq_n = []  # the sequence of nodes such that 0-1 and 2-3 are along with ridge in parallel in the middle
     for i in range(0, 4):
-        ind_X.append((i_side + i) % 4)
-    
+        seq_n.append((i_side + i) % 4)
+
+    object_node_index = ac_object.next_node_index()  # must be before nodes are added!
     # -- 4 corners
-    o = ac_object.next_node_index()
     for i in range(0, 4):
-        ac_object.node(-b.pts_all[ind_X[i]][1], b.beginning_of_roof_above_sea_level, -b.pts_all[ind_X[i]][0])
-    # We don't want the hipped part to be greater than the height, which is 45 deg
+        ac_object.node(-b.pts_all[seq_n[i]][1], b.beginning_of_roof_above_sea_level, -b.pts_all[seq_n[i]][0])
+    # We don't want the hipped part to be larger than the height, which is 45 deg
     inward_meters = min(roof_height, inward_meters)
 
-    # -- tangential vector of long edge
-    tang = (b.pts_all[ind_X[1]]-b.pts_all[ind_X[0]])/b.edge_length_pts[ind_X[1]] * inward_meters
-    
-    len_roof_bottom = 1.*b.edge_length_pts[ind_X[0]]
+    if inward_meters > 0. and b.roof_shape is RoofShape.hipped:
+        # -- tangential vector of long edge (always [0, 0] if not hipped (because inward meters = 0)
+        tang = (b.pts_all[seq_n[1]]-b.pts_all[seq_n[0]])/b.edge_length_pts[seq_n[1]] * inward_meters
+    else:
+        tang = [0., 0.]
 
-    ac_object.node(-(0.5 * (b.pts_all[ind_X[3]][1] + b.pts_all[ind_X[0]][1]) + tang[1]), b.top_of_roof_above_sea_level,
-                   -(0.5*(b.pts_all[ind_X[3]][0] + b.pts_all[ind_X[0]][0]) + tang[0]))
-    ac_object.node(-(0.5 * (b.pts_all[ind_X[1]][1] + b.pts_all[ind_X[2]][1]) - tang[1]), b.top_of_roof_above_sea_level,
-                   -(0.5*(b.pts_all[ind_X[1]][0] + b.pts_all[ind_X[2]][0]) - tang[0]))
+    # nodes for the ridge with indexes 4 and 5
+    point_4 = coord.calc_point_on_line_local(b.pts_all[seq_n[0]][0], b.pts_all[seq_n[0]][1],
+                                             b.pts_all[seq_n[3]][0], b.pts_all[seq_n[3]][1],
+                                             0.5)
+    point_5 = coord.calc_point_on_line_local(b.pts_all[seq_n[1]][0], b.pts_all[seq_n[1]][1],
+                                             b.pts_all[seq_n[2]][0], b.pts_all[seq_n[2]][1],
+                                             0.5)
+    ac_object.node(-point_4[1], b.top_of_roof_above_sea_level, -point_4[0])
+    ac_object.node(-point_5[1], b.top_of_roof_above_sea_level, -point_5[0])
+
+    # after the nodes now the faces
+    # The front and back have not necessarily the same length, as the
+    # 4 sides might not make a perfect rectangle)
+    len_roof_bottom_front = b.edge_length_pts[seq_n[0]]
+    len_roof_bottom_back = b.edge_length_pts[seq_n[2]]
+    len_roof_ridge = (len_roof_bottom_front + len_roof_bottom_back) / 2.
 
     roof_texture_size_x = t.h_size_meters  # size of roof texture in meters
     roof_texture_size_y = t.v_size_meters
-    repeat_x = len_roof_bottom / roof_texture_size_x
-    len_roof_hypo = ((0.5*b.edge_length_pts[ind_X[1]])**2 + roof_height**2)**0.5
-    repeat_y = len_roof_hypo / roof_texture_size_y
+    repeat_x_front = ((len_roof_bottom_front + len_roof_ridge) / 2) / roof_texture_size_x
+    repeat_x_back = ((len_roof_bottom_back + len_roof_ridge) / 2) / roof_texture_size_x
 
-    # roofs
-    ac_object.face([(o + 0, t.x(0), t.y(0)),
-                    (o + 1, t.x(repeat_x), t.y(0)),
-                    (o + 5, t.x(repeat_x*(1-inward_meters/len_roof_bottom)), t.y(repeat_y)),
-                    (o + 4, t.x(repeat_x*(inward_meters/len_roof_bottom)), t.y(repeat_y))],
-                   mat_idx=roof_mat_idx)
+    if b.roof_shape in [RoofShape.gabled, RoofShape.hipped]:
+        # roofs
+        len_roof_hypo = ((0.5*b.edge_length_pts[seq_n[1]])**2 + roof_height**2)**0.5
+        repeat_y = len_roof_hypo / roof_texture_size_y
 
-    ac_object.face([(o + 2, t.x(0), t.y(0)),
-                    (o + 3, t.x(repeat_x), t.y(0)),
-                    (o + 4, t.x(repeat_x*(1-inward_meters/len_roof_bottom)), t.y(repeat_y)),
-                    (o + 5, t.x(repeat_x*(inward_meters/len_roof_bottom)), t.y(repeat_y))],
-                   mat_idx=roof_mat_idx)
+        ac_object.face([(object_node_index + 0, t.x(0), t.y(0)),
+                        (object_node_index + 1, t.x(repeat_x_front), t.y(0)),
+                        (object_node_index + 5, t.x(repeat_x_front*(1-inward_meters/len_roof_bottom_front)), t.y(repeat_y)),
+                        (object_node_index + 4, t.x(repeat_x_front*(inward_meters/len_roof_bottom_front)), t.y(repeat_y))],
+                       mat_idx=roof_mat_idx)
 
-    # sides if inward_meters = 0, else inward roofs for hipped
-    # if roof is hipped, then facade_mat_idx is actually roof_mat_idx
-    len_roof_hypo = (inward_meters**2 + roof_height**2)**0.5
-    repeat_y = len_roof_hypo/roof_texture_size_y
-    if parameters.FLAG_2018_3 and inward_meters == 0.:
-        repeat_y = 0
+        ac_object.face([(object_node_index + 2, t.x(0), t.y(0)),
+                        (object_node_index + 3, t.x(repeat_x_back), t.y(0)),
+                        (object_node_index + 4, t.x(repeat_x_back*(1-inward_meters/len_roof_bottom_back)), t.y(repeat_y)),
+                        (object_node_index + 5, t.x(repeat_x_back*(inward_meters/len_roof_bottom_back)), t.y(repeat_y))],
+                       mat_idx=roof_mat_idx)
 
-    repeat_x = b.edge_length_pts[ind_X[1]]/roof_texture_size_x
-    if parameters.FLAG_2018_3 and inward_meters == 0.:
-        repeat_x = 0
-    ac_object.face([(o + 1, t.x(0), t.y(0)),
-                    (o + 2, t.x(repeat_x), t.y(0)),
-                    (o + 5, t.x(0.5*repeat_x), t.y(repeat_y))],
-                   mat_idx=facade_mat_idx)
+        # sides
+        # if roof is hipped, then facade_mat_idx is actually roof_mat_idx
+        base_len = (inward_meters**2 + b.edge_length_pts[seq_n[1]]**2)**0.5
+        len_roof_hypo = (base_len**2 + roof_height**2)**0.5
+        repeat_y = len_roof_hypo/roof_texture_size_y
+        repeat_x = b.edge_length_pts[seq_n[1]]/roof_texture_size_x
+        ac_object.face([(object_node_index + 1, t.x(0), t.y(0)),
+                        (object_node_index + 2, t.x(repeat_x), t.y(0)),
+                        (object_node_index + 5, t.x(0.5*repeat_x), t.y(repeat_y))],
+                       mat_idx=facade_mat_idx)
 
-    repeat_x = b.edge_length_pts[ind_X[3]]/roof_texture_size_x
-    if parameters.FLAG_2018_3 and inward_meters == 0.:
-        repeat_x = 0
-    ac_object.face([(o + 3, t.x(0), t.y(0)),
-                    (o + 0, t.x(repeat_x), t.y(0)),
-                    (o + 4, t.x(0.5*repeat_x), t.y(repeat_y))],
-                   mat_idx=facade_mat_idx)
+        base_len = (inward_meters**2 + b.edge_length_pts[seq_n[3]]**2)**0.5
+        len_roof_hypo = (base_len**2 + roof_height**2)**0.5
+        repeat_y = len_roof_hypo/roof_texture_size_y
+        repeat_x = b.edge_length_pts[seq_n[3]]/roof_texture_size_x
+        ac_object.face([(object_node_index + 3, t.x(0), t.y(0)),
+                        (object_node_index + 0, t.x(repeat_x), t.y(0)),
+                        (object_node_index + 4, t.x(0.5*repeat_x), t.y(repeat_y))],
+                       mat_idx=facade_mat_idx)
+    else:  # b.roof_shape is RoofShape.gambrel. point_4 and point_5 on ridge still valid
+        away_from_edge = GAMBREL_HEIGHT_RATIO_LOWER_PART * roof_height / tan(radians(GAMBREL_ANGLE_LOWER_PART))
+        distance_across_left = coord.calc_distance_local(b.pts_all[seq_n[0]][1], b.pts_all[seq_n[0]][0],
+                                                         b.pts_all[seq_n[3]][1], b.pts_all[seq_n[3]][0])
+        distance_across_right = coord.calc_distance_local(b.pts_all[seq_n[1]][1], b.pts_all[seq_n[1]][0],
+                                                          b.pts_all[seq_n[2]][1], b.pts_all[seq_n[2]][0])
+        # indexes 6 and 7 on this side of the ridge and 8/9 on other side
+        factor_left = away_from_edge / distance_across_left
+        factor_right = away_from_edge / distance_across_right
+        point_6 = coord.calc_point_on_line_local(b.pts_all[seq_n[0]][0], b.pts_all[seq_n[0]][1],
+                                                 b.pts_all[seq_n[3]][0], b.pts_all[seq_n[3]][1],
+                                                 factor_left)
+        point_7 = coord.calc_point_on_line_local(b.pts_all[seq_n[1]][0], b.pts_all[seq_n[1]][1],
+                                                 b.pts_all[seq_n[2]][0], b.pts_all[seq_n[2]][1],
+                                                 factor_right)
+        point_8 = coord.calc_point_on_line_local(b.pts_all[seq_n[1]][0], b.pts_all[seq_n[1]][1],
+                                                 b.pts_all[seq_n[2]][0], b.pts_all[seq_n[2]][1],
+                                                 1 - factor_right)
+        point_9 = coord.calc_point_on_line_local(b.pts_all[seq_n[0]][0], b.pts_all[seq_n[0]][1],
+                                                 b.pts_all[seq_n[3]][0], b.pts_all[seq_n[3]][1],
+                                                 1 - factor_left)
+        ratio_upper = 1 - GAMBREL_HEIGHT_RATIO_LOWER_PART
+        ac_object.node(-point_6[1], b.top_of_roof_above_sea_level - ratio_upper * roof_height, -point_6[0])
+        ac_object.node(-point_7[1], b.top_of_roof_above_sea_level - ratio_upper * roof_height, -point_7[0])
+        ac_object.node(-point_8[1], b.top_of_roof_above_sea_level - ratio_upper * roof_height, -point_8[0])
+        ac_object.node(-point_9[1], b.top_of_roof_above_sea_level - ratio_upper * roof_height, -point_9[0])
+
+        # roofs
+        lower_hypo = GAMBREL_HEIGHT_RATIO_LOWER_PART * roof_height / sin(radians(GAMBREL_ANGLE_LOWER_PART))
+        top_hypo_left = ((distance_across_left / 2 - away_from_edge)**2 +
+                         ((1 - GAMBREL_HEIGHT_RATIO_LOWER_PART) * roof_height)**2)**0.5
+        top_hypo_right = ((distance_across_right / 2 - away_from_edge)**2 +
+                          ((1 - GAMBREL_HEIGHT_RATIO_LOWER_PART) * roof_height)**2)**0.5
+
+        # lower faces front and back
+        repeat_y = lower_hypo/roof_texture_size_y
+        ac_object.face([(object_node_index + 0, t.x(0), t.y(0)),
+                        (object_node_index + 1, t.x(repeat_x_front), t.y(0)),
+                        (object_node_index + 7, t.x(repeat_x_front), t.y(repeat_y)),
+                        (object_node_index + 6, t.x(0), t.y(repeat_y))],
+                       mat_idx=roof_mat_idx)
+        ac_object.face([(object_node_index + 2, t.x(0), t.y(0)),
+                        (object_node_index + 3, t.x(repeat_x_back), t.y(0)),
+                        (object_node_index + 9, t.x(repeat_x_back), t.y(repeat_y)),
+                        (object_node_index + 8, t.x(0), t.y(repeat_y))],
+                       mat_idx=roof_mat_idx)
+        # upper faces front and back
+        repeat_y = top_hypo_left/roof_texture_size_y
+        ac_object.face([(object_node_index + 6, t.x(0), t.y(0)),
+                        (object_node_index + 7, t.x(repeat_x_front), t.y(0)),
+                        (object_node_index + 5, t.x(repeat_x_front), t.y(repeat_y)),
+                        (object_node_index + 4, t.x(0), t.y(repeat_y))],
+                       mat_idx=roof_mat_idx)
+        repeat_y = top_hypo_right/roof_texture_size_y
+        ac_object.face([(object_node_index + 8, t.x(0), t.y(0)),
+                        (object_node_index + 9, t.x(repeat_x_back), t.y(0)),
+                        (object_node_index + 4, t.x(repeat_x_back), t.y(repeat_y)),
+                        (object_node_index + 5, t.x(0), t.y(repeat_y))],
+                       mat_idx=roof_mat_idx)
+
+        # side left
+        repeat_y = roof_height / roof_texture_size_y
+        repeat_x_base = b.edge_length_pts[seq_n[3]] / roof_texture_size_x
+        middle_factor = away_from_edge / b.edge_length_pts[seq_n[3]]
+        ac_object.face([(object_node_index + 3, t.x(0), t.y(0)),
+                        (object_node_index + 0, t.x(repeat_x_base), t.y(0)),
+                        (object_node_index + 6, t.x((1 - middle_factor) * repeat_x_base),
+                         t.y(GAMBREL_HEIGHT_RATIO_LOWER_PART * repeat_y)),
+                        (object_node_index + 4, t.x(0.5 * repeat_x_base), t.y(repeat_y)),
+                        (object_node_index + 9, t.x(middle_factor * repeat_x_base),
+                         t.y(GAMBREL_HEIGHT_RATIO_LOWER_PART * repeat_y))],
+                       mat_idx=roof_mat_idx)
+        # side right
+        repeat_x_base = b.edge_length_pts[seq_n[1]] / roof_texture_size_x
+        middle_factor = away_from_edge / b.edge_length_pts[seq_n[1]]
+        ac_object.face([(object_node_index + 1, t.x(0), t.y(0)),
+                        (object_node_index + 2, t.x(repeat_x_base), t.y(0)),
+                        (object_node_index + 8, t.x((1 - middle_factor) * repeat_x_base),
+                         t.y(GAMBREL_HEIGHT_RATIO_LOWER_PART * repeat_y)),
+                        (object_node_index + 5, t.x(0.5 * repeat_x_base), t.y(repeat_y)),
+                        (object_node_index + 7, t.x(middle_factor * repeat_x_base),
+                         t.y(GAMBREL_HEIGHT_RATIO_LOWER_PART * repeat_y))],
+                       mat_idx=roof_mat_idx)
 
 
 def separate_pyramidal(ac_object: ac.Object, b, roof_mat_idx: int, shape: RoofShape) -> None:
