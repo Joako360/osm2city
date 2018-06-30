@@ -120,6 +120,61 @@ NO_ELEV                                         Boolean    False     The only re
 Buildings
 =========
 
+.. _chapter-parameters-buildings-diverse
+
+------------------
+Diverse Parameters
+------------------
+
+Parameters which influence the number of buildings from OSM taken to output.
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+LOD_ALWAYS_DETAIL_BELOW_AREA                    Integer    150       Below this area, buildings will always be LOD detailed
+
+BUILDING_MIN_HEIGHT                             Number     0.0       Minimum height from bottom to top without roof height of a building to be
+                                                                     included in output (does not include roof). Different from OSM tag
+                                                                     "min_height", which states that the bottom of the building hovers min_height
+                                                                     over the ground. If set to 0.0, then not taken into consideration (default).
+BUILDING_MIN_AREA                               Number     50.0      Minimum area for a building to be included in output (not used for buildings
+                                                                     with parent).
+BUILDING_PART_MIN_AREA                          Number     10.0      Minimum area for building:parts.
+BUILDING_REDUCE_THRESHOLD                       Number     200.0     Threshold area of a building below which a rate of buildings gets reduced
+                                                                     from output.
+BUILDING_REDUCE_RATE                            Number     0.5       Rate (between 0 and 1) of buildings below a threshold which get reduced
+                                                                     randomly in output.
+BUILDING_REDUCE_CHECK_TOUCH                     Boolean    False     Before removing a building due to area, check whether it is touching another
+                                                                     building and therefore should be kept.
+BUILDING_NEVER_SKIP_LEVELS                      Integer    6         Buildings that tall will never be skipped.
+
+=============================================   ========   =======   ==============================================================================
+
+
+In order to reduce the total number of nodes of the buildings mesh and thereby reducing both disk space volume and rendering demands as well as to simplify the rendering of roofs, the geometry of buildings is simplified as follows:
+
+* Only if not part of a building parent
+* Only if no inner circles
+* Only if a multiple of 4 nodes gets reduced and always 4 neighbouring points are removed at the same time (e.g. something that looks like a balcony from above, but can also point inwards into the building)
+* If points get removed, which are also part of a neighbour building, then the simplification is not accepted.
+* The tolerance of the below parameters is respected.
+
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+
+BUILDING_SIMPLIFY_TOLERANCE_LINE                Number     1.0       The point on the base line may at most be this value away from the straight
+                                                                     line between the node before the balcony and the node after the balcony.
+                                                                     This in order to prevent that e.g. a stair-case feature is removed.
+
+BUILDING_SIMPLIFY_TOLERANCE_AWAY                Number     2.5       The 2 points sticking out (or in) may not be more than this value away from
+                                                                     the straight line between the node before the balcony and the node after the
+                                                                     balcony. This in order to prevent clearly visible "balconies" to be removed.
+
+=============================================   ========   =======   ==============================================================================
+
+
 .. _chapter-parameters-lod-label:
 
 -----------------------------

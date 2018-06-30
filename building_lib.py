@@ -346,12 +346,15 @@ class Building(object):
         self.outer_nodes_closest = [y for (y, x) in yx]
         self._set_polygon(self.polygon.exterior, self.inner_rings_list)
 
-    def simplify(self, tolerance):  # TODO: not used
-        original_nodes = self.pts_outer_count + len(self.pts_inner)
-        self.polygon = self.polygon.simplify(tolerance)
-        nnodes_simplified = original_nodes - (self.pts_outer_count + len(self.pts_inner))
-        # FIXME: simplify interiors
-        return nnodes_simplified
+    def simplify(self) -> int:
+        """Simplifies the geometry, but only if no inners and if 2 neighbouring points."""
+        if self.has_inner:
+            return 0
+        original_number = len(self.polygon.exterior.coords)
+        self.polygon = utilities.simplify_balconies(self.polygon, parameters.BUILDING_SIMPLIFY_TOLERANCE_LINE,
+                                                    parameters.BUILDING_SIMPLIFY_TOLERANCE_AWAY)
+        simplified_number = len(self.polygon.exterior.coords)
+        return original_number - simplified_number
 
     def _set_polygon(self, outer: shg.LinearRing, inner: List[shg.LinearRing]=list()) -> None:
         self.polygon = shg.Polygon(outer, inner)
@@ -381,6 +384,10 @@ class Building(object):
     @property
     def pts_outer(self) -> List[Tuple[float, float]]:
         return list(self.polygon.exterior.coords)[:-1]
+
+    @property
+    def has_inner(self) -> bool:
+        return len(self.polygon.interiors) > 0
 
     @property
     def pts_inner(self) -> List[Tuple[float, float]]:
@@ -724,7 +731,10 @@ class Building(object):
                 allow_complex_roofs = True
                 # no complex roof on buildings with inner rings
                 if self.polygon.interiors:
-                    allow_complex_roofs = False
+                    if len(self.polygon.interiors) == 1:
+                        self.roof_shape = roofs.RoofShape.skillion
+                    else:
+                        allow_complex_roofs = False
                 # no complex roof on large buildings
                 elif self.area > parameters.BUILDING_COMPLEX_ROOFS_MAX_AREA:
                     allow_complex_roofs = False
@@ -801,15 +811,13 @@ class Building(object):
             else:
                 if s.K_ROOF_ANGLE in self.tags:
                     angle = float(self.tags[s.K_ROOF_ANGLE])
+                    while angle > 0:
+                        temp_roof_height = tan(np.deg2rad(angle)) * (self.edge_length_pts[1] / 2)
+                        if temp_roof_height < parameters.BUILDING_SKILLION_ROOF_MAX_HEIGHT:
+                            break
+                        angle -= 1
                 else:
-                    angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE,
-                                           parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
-
-                while angle > 0:
-                    temp_roof_height = tan(np.deg2rad(angle)) * (self.edge_length_pts[1] / 2)
-                    if temp_roof_height < parameters.BUILDING_SKILLION_ROOF_MAX_HEIGHT:
-                        break
-                    angle -= 1
+                    temp_roof_height = calc_level_height_for_settlement_type(self.zone.settlement_type)
 
             if s.K_ROOF_SLOPE_DIRECTION in self.tags:
                 # Input angle
@@ -885,23 +893,21 @@ class Building(object):
                 # get roof:height given by osm
                 self.roof_height = utils.osmparser.parse_length(self.tags[s.K_ROOF_HEIGHT])
 
-            else:
-                # random roof:height
+            else:  # roof:height based on heuristics
                 if self.roof_shape is roofs.RoofShape.flat:
                     self.roof_height = 0.
                 else:
                     if s.K_ROOF_ANGLE in self.tags:
                         angle = float(self.tags[s.K_ROOF_ANGLE])
-                    else:
-                        angle = random.uniform(parameters.BUILDING_SKEL_ROOFS_MIN_ANGLE,
-                                               parameters.BUILDING_SKEL_ROOFS_MAX_ANGLE)
-                    while angle > 0:
-                        temp_roof_height = tan(np.deg2rad(angle)) * (self.edge_length_pts[1] / 2)
-                        if temp_roof_height < parameters.BUILDING_SKEL_ROOF_MAX_HEIGHT:
-                            break
-                        angle -= 5
-                    if temp_roof_height > parameters.BUILDING_SKEL_ROOF_MAX_HEIGHT:
-                        temp_roof_height = parameters.BUILDING_SKEL_ROOF_MAX_HEIGHT
+                        while angle > 0:
+                            temp_roof_height = tan(np.deg2rad(angle)) * (self.edge_length_pts[1] / 2)
+                            if temp_roof_height < parameters.BUILDING_SKEL_ROOF_MAX_HEIGHT:
+                                break
+                            angle -= 5
+                        if temp_roof_height > parameters.BUILDING_SKEL_ROOF_MAX_HEIGHT:
+                            temp_roof_height = parameters.BUILDING_SKEL_ROOF_MAX_HEIGHT
+                    else:  # use the same as level height
+                        temp_roof_height = calc_level_height_for_settlement_type(self.zone.settlement_type)
                     self.roof_height = temp_roof_height
 
     def write_to_ac(self, ac_object: ac3d.Object, cluster_elev: float, cluster_offset: Vec2d,
@@ -1278,11 +1284,12 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: u
             b.enforce_european_style(building_parent)
 
         if not b.is_external_model:
+            if building_parent is None:  # do not simplify if in parent/child relationship
+                stats.nodes_simplified += b.simplify()
             try:
-                # FIXME RICK stats.nodes_simplified += b.simplify(parameters.BUILDING_SIMPLIFY_TOLERANCE)
                 b.roll_inner_nodes()
             except Exception as reason:
-                logging.warning("simplify or roll_inner_nodes failed (OSM ID %i, %s)", b.osm_id, reason)
+                logging.warning("Roll_inner_nodes failed (OSM ID %i, %s)", b.osm_id, reason)
                 continue
 
         if not b.analyse_elev_and_water(fg_elev):

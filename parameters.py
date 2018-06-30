@@ -117,7 +117,8 @@ BUILDING_REDUCE_THRESHOLD = 200.0   # -- threshold area of a building below whic
 BUILDING_REDUCE_RATE = 0.5          # -- rate (between 0 and 1) of buildings below a threshold which get reduced randomly in output
 BUILDING_REDUCE_CHECK_TOUCH = False # -- before removing a building due to area, check whether it is touching another building and therefore should be kept
 BUILDING_NEVER_SKIP_LEVELS = 6      # -- buildings that tall will never be skipped
-BUILDING_SIMPLIFY_TOLERANCE = 1.0   # -- all points in the simplified building will be within the tolerance distance of the original geometry.
+BUILDING_SIMPLIFY_TOLERANCE_LINE = 1.0
+BUILDING_SIMPLIFY_TOLERANCE_AWAY = 2.5
 
 BUILDING_COMPLEX_ROOFS = True       # -- generate complex roofs on buildings? I.e. other shapes than horizontal and flat
 BUILDING_COMPLEX_ROOFS_MIN_LEVELS = 1  # don't put complex roof on buildings smaller than the specified value unless there is an explicit roof:shape flag
