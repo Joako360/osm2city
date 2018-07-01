@@ -15,7 +15,7 @@ import subprocess
 import sys
 import textwrap
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import unittest
 
 import numpy as np
@@ -543,15 +543,15 @@ def bounds_from_list(bounds_list: List[Tuple[float, float, float, float]]) -> Tu
     return min_x, min_y, max_x, max_y
 
 
-def random_value_from_ratio_dict_parameter(ratio_parameter: Dict[int, float]) -> int:
+def random_value_from_ratio_dict_parameter(ratio_parameter: Dict[Any, float]):
     target_ratio = random.random()
     return value_from_ratio_dict_parameter(target_ratio, ratio_parameter)
 
 
-def value_from_ratio_dict_parameter(target_ratio: float, ratio_parameter: Dict[int, float]) -> int:
+def value_from_ratio_dict_parameter(target_ratio: float, ratio_parameter: Dict[Any, float]):
     """Finds the key value closet to and below the target ratio."""
     total_ratio = 0.
-    return_value = 0
+    return_value = None
     for key, ratio in ratio_parameter.items():
         if target_ratio <= total_ratio:
             return return_value

@@ -53,22 +53,8 @@ KeyValueDict = Dict[str, str]
 
 
 def _random_roof_shape() -> roofs.RoofShape:
-    ratio = random.uniform(0, 1)
-    accumulated_ratio = parameters.BUILDING_ROOF_FLAT_RATIO
-    if ratio <= accumulated_ratio:
-        return roofs.RoofShape.flat
-    accumulated_ratio += parameters.BUILDING_ROOF_SKILLION_RATIO
-    if ratio <= accumulated_ratio:
-        return roofs.RoofShape.skillion
-    accumulated_ratio += parameters.BUILDING_ROOF_GABLED_RATIO
-    if ratio <= accumulated_ratio:
-        return roofs.RoofShape.gabled
-    accumulated_ratio += parameters.BUILDING_ROOF_HIPPED_RATIO
-    if ratio <= accumulated_ratio:
-        return roofs.RoofShape.hipped
-    else:
-        return roofs.RoofShape.pyramidal
-
+    random_shape = utilities.random_value_from_ratio_dict_parameter(parameters.BUILDING_ROOF_SHAPE_RATIO)
+    return roofs.map_osm_roof_shape(random_shape)
 
 @unique
 class BuildingClass(IntEnum):

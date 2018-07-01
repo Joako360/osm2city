@@ -311,19 +311,14 @@ BUILDING_SKEL_MAX_NODES                         Integer    10        The maximum
                                                                      the number, the longer the execution time but the more houses actually get
                                                                      realistic roofs.
 
+BUILDING_ROOF_SHAPE_RATIO                       Dict       .         If the ``roof:shape`` tag is missing in OSM (which it most often is), then
+                                                                     this parameter can help to make region specific decisions on what roof types
+                                                                     are to be applied randomly with a given ratio.
+                                                                     The sum of the ratios must give 1.0 and the values must be one of the values
+                                                                     defined for RoofShapes in roof.py.
+
 =============================================   ========   =======   ==============================================================================
 
-If the ``roof:shape`` tag is missing in OSM (which it most often is), then the following parameters can help to make region specific decisions on what roof types are to be applied randomly with a given ratio. The sum of the ratios must give 1.0.
-
-=============================================   ========   =======
-Parameter                                       Type       Default
-=============================================   ========   =======
-BUILDING_ROOF_FLAT_RATIO                        Decimal    0.2
-BUILDING_ROOF_SKILLION_RATIO                    Decimal    0.1
-BUILDING_ROOF_GABLED_RATIO                      Decimal    0.55
-BUILDING_ROOF_HIPPED_RATIO                      Decimal    0.1
-BUILDING_ROOF_PYRAMIDAL_RATIO                   Decimal    0.05
-=============================================   ========   =======
 
 Finally the following parameters let you play around with how complex roofs are done.
 

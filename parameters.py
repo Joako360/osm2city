@@ -133,11 +133,8 @@ BUILDING_SKEL_ROOF_MAX_HEIGHT = 6.  # -- skip skeleton roofs (gabled, pyramidal,
 BUILDING_SKEL_ROOF_DEFAULT_HEIGHT = 2.5  # if the roof_height is not given what we use to calculate real building heihgt temporarily
 
 # If the roof_type is missing, what shall be the distribution of roof_types (must sum up to 1.0)
-BUILDING_ROOF_FLAT_RATIO = 0.2
-BUILDING_ROOF_SKILLION_RATIO = 0.1
-BUILDING_ROOF_GABLED_RATIO = 0.55
-BUILDING_ROOF_HIPPED_RATIO = 0.1
-BUILDING_ROOF_PYRAMIDAL_RATIO = 0.05
+# The keys are the shapes and must correspond to valid RoofShape values in roofs.py
+BUILDING_ROOF_SHAPE_RATIO = {'flat': 0.1, 'skillion': 0.05, 'gabled': 0.75, 'hipped': 0.1}
 
 # ==================== RECTIFY BUILDINGS ============
 RECTIFY_ENABLED = True
@@ -410,7 +407,7 @@ def get_clipping_border():
     return rect
 
 
-def _check_ratio_dict_parameter(ratio_dict: typing.Optional[typing.Dict], name: str) -> None:
+def _check_ratio_dict_parameter(ratio_dict: typing.Optional[typing.Dict], name: str, is_int: bool=True) -> None:
     if ratio_dict is None:
         raise ValueError('Parameter {} must not be None'.format(name))
     if not isinstance(ratio_dict, dict):
@@ -420,14 +417,18 @@ def _check_ratio_dict_parameter(ratio_dict: typing.Optional[typing.Dict], name: 
     total = 0.
     prev_key = -9999
     for key, ratio in ratio_dict.items():
-        if not isinstance(key, int):
-            raise ValueError('key {} in parameter {} must be an int'.format(str(key), name))
-        if prev_key > key:
-            raise ValueError('key {} in parameter {} must be larger than previous key'.format(str(key), name))
+        if is_int:
+            if not isinstance(key, int):
+                raise ValueError('key {} in parameter {} must be an int'.format(str(key), name))
+            if prev_key > key:
+                raise ValueError('key {} in parameter {} must be larger than previous key'.format(str(key), name))
+            prev_key = key
+        else:
+            if not isinstance(key, str):
+                raise ValueError('key {} in parameter {} must be a string'.format(str(key), name))
         if not isinstance(ratio, float):
             raise ValueError('ratio {} for key {} in param {} must be a float'.format(str(ratio), str(key), name))
         total += ratio
-        prev_key = key
     if abs(total - 1) > 0.001:
         raise ValueError('The total of all ratios in param {} must be 1'.format(name))
 
@@ -497,6 +498,8 @@ def read_from_file(filename):
     global BUILDING_NUMBER_LEVELS_INDUSTRIAL
     global BUILDING_NUMBER_LEVELS_OTHER
 
+    global BUILDING_ROOF_SHAPE_RATIO
+
     _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_CENTRE, 'BUILDING_NUMBER_LEVELS_CENTRE')
     _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_BLOCK, 'BUILDING_NUMBER_LEVELS_BLOCK')
     _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_DENSE, 'BUILDING_NUMBER_LEVELS_DENSE')
@@ -505,6 +508,7 @@ def read_from_file(filename):
     _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_APARTMENTS, 'BUILDING_NUMBER_LEVELS_APARTMENTS')
     _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_INDUSTRIAL, 'BUILDING_NUMBER_LEVELS_INDUSTRIAL')
     _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_OTHER, 'BUILDING_NUMBER_LEVELS_OTHER')
+    _check_ratio_dict_parameter(BUILDING_ROOF_SHAPE_RATIO, 'BUILDING_ROOF_SHAPE_RATIO', False)
 
 
 def show_default():

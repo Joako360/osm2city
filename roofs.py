@@ -59,7 +59,9 @@ def map_osm_roof_shape(osm_roof_shape: str) -> RoofShape:
     if _shape == 'onion':
         return RoofShape.onion
 
-    # fall back for all not directly handled OSM types
+    # fall back for all not directly handled OSM types. The rational for using "hipped" as default is that most
+    # probably if someone actually has tried to specify a shape, then 'flat' is unliekly to be misspelled and
+    # most probably a form with a ridge was meant.
     logging.debug('Not handled roof shape found: %s. Therefore transformed to "hipped".', _shape)
     return RoofShape.hipped
 
