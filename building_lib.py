@@ -56,6 +56,7 @@ def _random_roof_shape() -> roofs.RoofShape:
     random_shape = utilities.random_value_from_ratio_dict_parameter(parameters.BUILDING_ROOF_SHAPE_RATIO)
     return roofs.map_osm_roof_shape(random_shape)
 
+
 @unique
 class BuildingClass(IntEnum):
     """Used to classify buildings for processing on zone level and defining height per level in some cases"""
@@ -244,7 +245,8 @@ class Building(object):
         self.roof_height = 0.0  # the height of the roof (0 if flat), not the elevation over ground of the roof
 
         # set during method called by init(...) through self.update_geometry and related sub-calls
-        self.refs = None
+        self.refs = None  # contains only the refs of the outer_ring
+        self.refs_shared = dict()  # refs shared with other buildings (dict of index position, value False or True)
         self.inner_rings_list = None
         self.outer_nodes_closest = None
         self.anchor = None
@@ -255,9 +257,6 @@ class Building(object):
         # set in buildings.py for building relations prior to building_lib.analyse(...)
         # - from building._process_building_parts(...)
         self.parent = None  # BuildingParent if available
-
-        # to know which buildings share references. Set in relate_neighbours(...)
-        self.neighbours = set()  # set of buildings
 
         # set after init(...)
         self.pts_all = None
@@ -286,9 +285,12 @@ class Building(object):
         Makes also sure, that inner and outer rings have correct orientation.
         """
         # make sure that outer ring is ccw
+        self.refs = refs
         if outer_ring.is_ccw is False:
             outer_ring.coords = list(outer_ring.coords)[::-1]
-        self.refs = refs
+            self.refs = self.refs[::-1]
+
+        # handle inner rings
         self.inner_rings_list = inner_rings_list
         if self.inner_rings_list:
             # make sure that inner rings are not ccw
@@ -333,12 +335,12 @@ class Building(object):
         self._set_polygon(self.polygon.exterior, self.inner_rings_list)
 
     def simplify(self) -> int:
-        """Simplifies the geometry, but only if no inners and if 2 neighbouring points."""
+        """Simplifies the geometry, but only if no inners."""
         if self.has_inner:
             return 0
         original_number = len(self.polygon.exterior.coords)
         self.polygon = utilities.simplify_balconies(self.polygon, parameters.BUILDING_SIMPLIFY_TOLERANCE_LINE,
-                                                    parameters.BUILDING_SIMPLIFY_TOLERANCE_AWAY)
+                                                    parameters.BUILDING_SIMPLIFY_TOLERANCE_AWAY, self.refs_shared)
         simplified_number = len(self.polygon.exterior.coords)
         return original_number - simplified_number
 
@@ -362,7 +364,7 @@ class Building(object):
     @property
     def roof_complex(self) -> bool:
         """Proxy to see whether the roof is flat or not.
-        Skillion is also kind of flat, but is not horisontal and therfore would also return false."""
+        Skillion is also kind of flat, but is not horizontal and therefore would also return false."""
         if self.roof_shape is roofs.RoofShape.flat:
             return False
         return True
@@ -370,6 +372,11 @@ class Building(object):
     @property
     def pts_outer(self) -> List[Tuple[float, float]]:
         return list(self.polygon.exterior.coords)[:-1]
+
+    @property
+    def has_neighbours(self) -> bool:
+        """To know whether this building shares references (nodes) with other buildings"""
+        return len(self.refs_shared) > 0
 
     @property
     def has_inner(self) -> bool:
@@ -384,7 +391,7 @@ class Building(object):
         return len(self.polygon.exterior.coords) - 1
 
     @property
-    def pts_all_count(self) -> int:  # FIXME: changed behavior. Keep _ until all bugs found
+    def pts_all_count(self) -> int:
         n = self.pts_outer_count
         for item in self.polygon.interiors:
             n += len(item.coords) - 1
@@ -767,7 +774,7 @@ class Building(object):
 
         Be aware that these tags could be overwritten later in the processing again. It just increases probability.
         """
-        if self.neighbours:
+        if self.has_neighbours:
             # exclude those with (pseudo)parents
             if building_parent is not None:
                 return
@@ -1219,9 +1226,12 @@ def relate_neighbours(buildings: List[Building]) -> None:
     for i in range(0, len(buildings)):
         for j in range(i + 1, len(buildings)):
             if set(buildings[i].refs).isdisjoint(set(buildings[j].refs)) is False:
-                buildings[i].neighbours.add(buildings[j])
-                buildings[j].neighbours.add(buildings[i])
-                neighbours += 1
+                for pos_i in range(len(buildings[i].refs)):
+                    for pos_j in range(len(buildings[j].refs)):
+                        if buildings[i].refs[pos_i] == buildings[j].refs[pos_j]:
+                            buildings[i].refs_shared[pos_i] = True
+                            buildings[j].refs_shared[pos_j] = True
+                            neighbours += 1
 
     logging.info('%d neighbour relations for %d buildings created (some buildings have several neighbours).',
                  neighbours, len(buildings))

@@ -172,6 +172,7 @@ class Stats(object):
         self.out = None
         self.LOD = np.zeros(3)
         self.nodes_simplified = 0
+        self.nodes_roof_simplified = 0
         self.nodes_ground = 0
         self.textures_total = defaultdict(int)
         self.textures_used = None
@@ -251,17 +252,18 @@ class Stats(object):
             logging.debug(textwrap.dedent("""
                  %i %s""" % (item[1], item[0])))
         logging.info(textwrap.dedent("""
-              complex       %i
+                  complex   %i
               roof_errors   %i
-            ground nodes    %i
-              simplified    %i
+             ground nodes   %i
+         simplified nodes   %i
+    roof nodes simplified   %i
             vertices        %i
             surfaces        %i
             LOD
                 LOD rough       %i (%2.0f %%)
                 LOD detail      %i (%2.0f %%)
             """ % (self.have_complex_roof, self.roof_errors,
-                   self.nodes_ground, self.nodes_simplified,
+                   self.nodes_ground, self.nodes_simplified, self.nodes_roof_simplified,
                    self.vertices, self.surfaces,
                    self.LOD[0], lodzero,
                    self.LOD[1], lodone)))
@@ -678,7 +680,7 @@ def _safe_index(index: int, number_of_elements: int) -> int:
 
 
 def simplify_balconies(original: shg.Polygon, distance_tolerance_line: float,
-                       distance_tolerance_away: float) -> shg.Polygon:
+                       distance_tolerance_away: float, refs_shared: Dict[int, bool]) -> shg.Polygon:
     """Removes edges from polygons, which look like balconies on a building.
     Removes always 4 points at a time.
 
@@ -688,6 +690,9 @@ def simplify_balconies(original: shg.Polygon, distance_tolerance_line: float,
     from the new front -> parameter distance_tolerance_line.
     Also to make sure it is not a too distinguishing feature by not letting the outer points 2 and 3 be too far
     away from the new front.
+
+    The refs_shared dictionary makes sure that no shared references (with other buildings) are simplified away.
+    The dictionary might get updated if points are taken away
     """
     if len(original.exterior.coords) < 8:  # at least a triangle with a balcony (plus an extra point to close)
         return original
@@ -697,21 +702,28 @@ def simplify_balconies(original: shg.Polygon, distance_tolerance_line: float,
     del my_coords[-1]  # we do not need the repeated first point closing the polygon
     num_coords = len(my_coords)
     while counter < len(my_coords):
-        valid_removal = False
-        base_line = shg.LineString([my_coords[counter], my_coords[_safe_index(counter + 5, num_coords)]])
-        my_point = shg.Point(my_coords[_safe_index(counter + 1, num_coords)])
-        if base_line.distance(my_point) < distance_tolerance_line:
-            my_point = shg.Point(my_coords[_safe_index(counter + 4, num_coords)])
+        if not (counter + 1 in refs_shared or counter + 2 in refs_shared or counter + 3 in refs_shared
+                or counter + 4 in refs_shared):
+            valid_removal = False
+            base_line = shg.LineString([my_coords[counter], my_coords[_safe_index(counter + 5, num_coords)]])
+            my_point = shg.Point(my_coords[_safe_index(counter + 1, num_coords)])
             if base_line.distance(my_point) < distance_tolerance_line:
-                my_point = shg.Point(my_coords[_safe_index(counter + 2, num_coords)])
-                if base_line.distance(my_point) < distance_tolerance_away:
-                    my_point = shg.Point(my_coords[_safe_index(counter + 3, num_coords)])
+                my_point = shg.Point(my_coords[_safe_index(counter + 4, num_coords)])
+                if base_line.distance(my_point) < distance_tolerance_line:
+                    my_point = shg.Point(my_coords[_safe_index(counter + 2, num_coords)])
                     if base_line.distance(my_point) < distance_tolerance_away:
-                        valid_removal = True
-        if valid_removal:
-            for i in range(1, 5):
-                to_remove_points.add(_safe_index(counter + i, num_coords))
-            counter += 4
+                        my_point = shg.Point(my_coords[_safe_index(counter + 3, num_coords)])
+                        if base_line.distance(my_point) < distance_tolerance_away:
+                            valid_removal = True
+            if valid_removal:
+                for i in range(1, 5):
+                    to_remove_points.add(_safe_index(counter + i, num_coords))
+                for i in range(counter + 5, num_coords):
+                    if i in refs_shared:
+                        refs_shared[i - 4] = True
+                        del refs_shared[i]
+                counter += 4
+
         counter += 1
 
     if len(to_remove_points) == 0:
@@ -804,23 +816,33 @@ class TestUtilities(unittest.TestCase):
 
     def test_simplify_balconies(self):
         # too few nodes
+        refs_shared = dict()
         six_node_polygon = shg.Polygon([(0, 0), (10, 0), (10, 5), (9, 5), (9, 6), (0, 6)])
-        simplified_poly = simplify_balconies(six_node_polygon, 0.5, 2.)
+        simplified_poly = simplify_balconies(six_node_polygon, 0.5, 2., refs_shared)
         self.assertEqual(6 + 1, len(simplified_poly.exterior.coords))
         # balcony to remove
         eight_node_polygon = shg.Polygon([(0, 0), (10, 0), (10, 5), (9, 5), (9, 6), (4, 6), (4, 5), (0, 5)])
-        simplified_poly = simplify_balconies(eight_node_polygon, 0.5, 2.)
+        simplified_poly = simplify_balconies(eight_node_polygon, 0.5, 2., refs_shared)
         self.assertEqual(4 + 1, len(simplified_poly.exterior.coords))
         # balcony too far away (also checking inward)
         eight_node_polygon = shg.Polygon([(0, 0), (1, 0), (1, 3), (3, 3), (3, 0), (10, 0), (10, 5), (0, 5)])
-        simplified_poly = simplify_balconies(eight_node_polygon, 0.5, 2.)
+        simplified_poly = simplify_balconies(eight_node_polygon, 0.5, 2., refs_shared)
         self.assertEqual(8 + 1, len(simplified_poly.exterior.coords))
         # balcony base not close to line (and testing index=0 in the balcony)
         eight_node_polygon = shg.Polygon([(4, 6), (0, 5), (0, 0), (10, 0), (10, 5), (9, 6), (9, 7), (4, 7)])
-        simplified_poly = simplify_balconies(eight_node_polygon, 0.5, 2.)
+        simplified_poly = simplify_balconies(eight_node_polygon, 0.5, 2., refs_shared)
         self.assertEqual(8 + 1, len(simplified_poly.exterior.coords))
         # two balconies to remove
         twelve_node_polygon = shg.Polygon([(0, 0), (1, 0), (1, 1), (3, 1), (3, 0), (10, 0), (10, 5), (9, 5), (9, 6),
                                            (4, 6), (4, 5), (0, 5)])
-        simplified_poly = simplify_balconies(twelve_node_polygon, 0.5, 2.)
+        simplified_poly = simplify_balconies(twelve_node_polygon, 0.5, 2., refs_shared)
         self.assertEqual(4 + 1, len(simplified_poly.exterior.coords))
+
+        # balcony to remove not locked by refs_shared
+        refs_shared = {0: True, 7: True}
+        eight_node_polygon = shg.Polygon([(0, 0), (10, 0), (10, 5), (9, 5), (9, 6), (4, 6), (4, 5), (0, 5)])
+        simplified_poly = simplify_balconies(eight_node_polygon, 0.5, 2., refs_shared)
+        self.assertEqual(4 + 1, len(simplified_poly.exterior.coords))
+        self.assertEqual(2, len(refs_shared))
+        self.assertTrue(3 in refs_shared)
+

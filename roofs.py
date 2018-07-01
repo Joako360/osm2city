@@ -108,8 +108,7 @@ def flat(ac_object: ac.Object, index_first_node_in_ac_obj: int, b, roof_mgr: Roo
     else:
         nodes = list(range(b.pts_outer_count))
 
-    # FIXME Rick uv = face_uv(nodes, b.pts_all, b.roof_texture, angle=None)
-    uv = face_uv_flat_roof(nodes, b.pts_all, b.roof_texture)
+    uv = _face_uv_flat_roof(nodes, b.pts_all, b.roof_texture)
     nodes = np.array(nodes) + b.pts_all_count
 
     assert(len(nodes) == b.pts_all_count + 2 * len(b.polygon.interiors))
@@ -517,7 +516,7 @@ def face_uv(nodes: List[int], pts_all, texture: Texture, angle=None):
     return uv
 
 
-def face_uv_flat_roof(nodes: List[int], pts_all, texture: Texture):
+def _face_uv_flat_roof(nodes: List[int], pts_all, texture: Texture):
     """Special handling for flat roofs."""
     pts_all = pts_all[nodes]
 
