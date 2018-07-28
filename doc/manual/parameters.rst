@@ -120,7 +120,7 @@ NO_ELEV                                         Boolean    False     The only re
 Buildings
 =========
 
-.. _chapter-parameters-buildings-diverse
+.. _chapter-parameters-buildings-diverse:
 
 ------------------
 Diverse Parameters
@@ -163,15 +163,12 @@ In order to reduce the total number of nodes of the buildings mesh and thereby r
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
-
 BUILDING_SIMPLIFY_TOLERANCE_LINE                Number     1.0       The point on the base line may at most be this value away from the straight
                                                                      line between the node before the balcony and the node after the balcony.
                                                                      This in order to prevent that e.g. a stair-case feature is removed.
-
 BUILDING_SIMPLIFY_TOLERANCE_AWAY                Number     2.5       The 2 points sticking out (or in) may not be more than this value away from
                                                                      the straight line between the node before the balcony and the node after the
                                                                      balcony. This in order to prevent clearly visible "balconies" to be removed.
-
 =============================================   ========   =======   ==============================================================================
 
 
@@ -316,6 +313,9 @@ BUILDING_ROOF_SHAPE_RATIO                       Dict       .         If the ``ro
                                                                      are to be applied randomly with a given ratio.
                                                                      The sum of the ratios must give 1.0 and the values must be one of the values
                                                                      defined for RoofShapes in roof.py.
+
+BUILDING_ROOF_SIMPLIFY_TOLERANCE                Number     0.5       All points in the simplified roof will be within the tolerance distance of
+                                                                     the original geometry.
 
 =============================================   ========   =======   ==============================================================================
 

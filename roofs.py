@@ -1,8 +1,9 @@
 import copy
 from enum import IntEnum, unique
 import logging
-from math import sin, cos, atan2, radians, tan
+from math import sin, cos, atan2, radians, tan, sqrt
 from typing import List
+import unittest
 
 import numpy as np
 
@@ -14,6 +15,16 @@ from textures.texture import Texture, RoofManager
 
 GAMBREL_ANGLE_LOWER_PART = 70
 GAMBREL_HEIGHT_RATIO_LOWER_PART = 0.75
+
+
+def roof_looks_square(circumference: float, area: float) -> bool:
+    """Determines if a roof's floor plan looks square.
+    The formula basically states that if it was a rectangle, then the ratio between the long side length
+    and the short side length should be at least 2.
+    """
+    if circumference < 3 * sqrt(2 * area):
+        return True
+    return False
 
 
 @unique
@@ -33,6 +44,7 @@ class RoofShape(IntEnum):
     dome = 5
     onion = 6
     gambrel = 7
+    skeleton = 99  # does not exist in OSM
 
 
 def map_osm_roof_shape(osm_roof_shape: str) -> RoofShape:
@@ -63,7 +75,7 @@ def map_osm_roof_shape(osm_roof_shape: str) -> RoofShape:
     # probably if someone actually has tried to specify a shape, then 'flat' is unliekly to be misspelled and
     # most probably a form with a ridge was meant.
     logging.debug('Not handled roof shape found: %s. Therefore transformed to "hipped".', _shape)
-    return RoofShape.hipped
+    return RoofShape.skeleton
 
 
 def flat(ac_object: ac.Object, index_first_node_in_ac_obj: int, b, roof_mgr: RoofManager, roof_mat_idx: int,
@@ -322,8 +334,9 @@ def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_
                        mat_idx=roof_mat_idx)
 
 
-def separate_pyramidal(ac_object: ac.Object, b, roof_mat_idx: int, shape: RoofShape) -> None:
+def separate_pyramidal(ac_object: ac.Object, b, roof_mat_idx: int) -> None:
     """Pyramidal, dome or onion roof."""
+    shape = b.roof_shape
     roof_texture = b.roof_texture
         
     # -- get roof height 
@@ -553,3 +566,22 @@ def _face_uv_flat_roof(nodes: List[int], pts_all, texture: Texture):
     uv[:, 0] = texture.x(uv[:, 0] / (texture.h_size_meters * scale_factor))
     uv[:, 1] = texture.y(uv[:, 1] / (texture.v_size_meters * scale_factor))
     return uv
+
+
+# ================ UNITTESTS =======================
+
+
+class TestRoofs(unittest.TestCase):
+    def test_roof_looks_square(self):
+        long_side = 1
+        short_side = 1
+        self.assertTrue(roof_looks_square(2*long_side + 2*short_side, long_side*short_side), "square")
+        long_side = 1.5
+        short_side = 1
+        self.assertTrue(roof_looks_square(2*long_side + 2*short_side, long_side*short_side), "almost square")
+        long_side = 2
+        short_side = 1
+        self.assertFalse(roof_looks_square(2*long_side + 2*short_side, long_side*short_side), "1:2 ratio")
+        long_side = 2.1
+        short_side = 1
+        self.assertFalse(roof_looks_square(2*long_side + 2*short_side, long_side*short_side), "ratio larger than 1:2")

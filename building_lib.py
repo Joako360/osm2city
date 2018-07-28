@@ -342,7 +342,10 @@ class Building(object):
         self.polygon = utilities.simplify_balconies(self.polygon, parameters.BUILDING_SIMPLIFY_TOLERANCE_LINE,
                                                     parameters.BUILDING_SIMPLIFY_TOLERANCE_AWAY, self.refs_shared)
         simplified_number = len(self.polygon.exterior.coords)
-        return original_number - simplified_number
+        difference = original_number - simplified_number
+        if difference > 0:
+            self.geometry = self.polygon
+        return difference
 
     def _set_polygon(self, outer: shg.LinearRing, inner: List[shg.LinearRing]=list()) -> None:
         self.polygon = shg.Polygon(outer, inner)
@@ -700,7 +703,7 @@ class Building(object):
 
     def _calculate_levels(self) -> int:
         import owbb.models
-        if isinstance(self.zone, owbb.models.CityBlock):
+        if isinstance(self.zone, owbb.models.CityBlock) and self.zone.building_levels > 0:
             return self.zone.building_levels
         else:
             building_class = get_building_class(self.tags)
@@ -725,20 +728,19 @@ class Building(object):
                 # no complex roof on buildings with inner rings
                 if self.polygon.interiors:
                     if len(self.polygon.interiors) == 1:
-                        self.roof_shape = roofs.RoofShape.skillion
+                        self.roof_shape = roofs.RoofShape.skeleton
                     else:
                         allow_complex_roofs = False
                 # no complex roof on large buildings
                 elif self.area > parameters.BUILDING_COMPLEX_ROOFS_MAX_AREA:
                     allow_complex_roofs = False
-                # if area between thresholds, then have a look at the ratio between area and circumference
-                # the smaller the ratio, the less deep the building is compared to its length
-                # it is more common to have long houses with complex roofs than a square once it is a big building
-                # the formula basically states that if it was a rectangle, then the ratio between the long side length
-                # and the short side length should be at least 2.
-                elif (parameters.BUILDING_COMPLEX_ROOFS_MIN_RATIO_AREA < self.area <
-                        parameters.BUILDING_COMPLEX_ROOFS_MAX_AREA) and (self.circumference > 3 * sqrt(2 * self.area)):
-                    allow_complex_roofs = False
+                # if the area is between thresholds, then have a look at the ratio between area and circumference:
+                # the smaller the ratio, the less deep the building is compared to its length.
+                # It is more common to have long houses with complex roofs than a square once it is a big building.
+                elif parameters.BUILDING_COMPLEX_ROOFS_MIN_RATIO_AREA < self.area < \
+                        parameters.BUILDING_COMPLEX_ROOFS_MAX_AREA:
+                    if roofs.roof_looks_square(self.circumference, self.area):
+                        allow_complex_roofs = False
                 # no complex roof on tall buildings
                 elif self.levels > parameters.BUILDING_COMPLEX_ROOFS_MAX_LEVELS and s.K_ROOF_SHAPE not in self.tags:
                     allow_complex_roofs = False
@@ -1011,23 +1013,22 @@ class Building(object):
         """Writes the roof vertices and faces to an ac3d object."""
         if self.roof_shape is roofs.RoofShape.flat:
             roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, roof_mat_idx, stats)
-
         else:
             # -- pitched roof for > 4 ground nodes
             if self.pts_all_count > 4:
                 if self.roof_shape is roofs.RoofShape.skillion:
                     roofs.separate_skillion(ac_object, self, roof_mat_idx)
                 elif self.roof_shape is roofs.RoofShape.pyramidal:
-                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx, roofs.RoofShape.pyramidal)
+                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
                 elif self.roof_shape is roofs.RoofShape.dome:
-                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx, roofs.RoofShape.dome)
+                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
                 elif self.roof_shape is roofs.RoofShape.onion:
-                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx, roofs.RoofShape.onion)
+                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
                 else:
-                    skeleton = myskeleton.myskel(ac_object, self, stats, offset_xy=cluster_offset,
-                                                 offset_z=self.beginning_of_roof_above_sea_level,
-                                                 max_height=parameters.BUILDING_SKEL_ROOF_MAX_HEIGHT)
-                    if skeleton:
+                    skeleton_possible = myskeleton.myskel(ac_object, self, stats, offset_xy=cluster_offset,
+                                                          offset_z=self.beginning_of_roof_above_sea_level,
+                                                          max_height=parameters.BUILDING_SKEL_ROOF_MAX_HEIGHT)
+                    if skeleton_possible:
                         stats.have_complex_roof += 1
 
                     else:  # something went wrong - fall back to flat roof
@@ -1040,18 +1041,19 @@ class Building(object):
                 elif self.roof_shape is roofs.RoofShape.hipped:
                     roofs.separate_hipped(ac_object, self, roof_mat_idx)
                 elif self.roof_shape is roofs.RoofShape.pyramidal:
-                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx, roofs.RoofShape.pyramidal)
+                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
                 elif self.roof_shape is roofs.RoofShape.dome:
-                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx, roofs.RoofShape.dome)
+                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
                 elif self.roof_shape is roofs.RoofShape.onion:
-                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx, roofs.RoofShape.onion)
+                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
                 elif self.roof_shape is roofs.RoofShape.skillion:
                     roofs.separate_skillion(ac_object, self, roof_mat_idx)
                 else:
                     logging.warning("Roof type %s seems to be unsupported, but is mapped ", self.roof_shape.name)
                     roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, roof_mat_idx, stats)
             else:  # fall back to pyramidal
-                roofs.separate_pyramidal(ac_object, self, roof_mat_idx, roofs.RoofShape.pyramidal)
+                self.roof_shape = roofs.RoofShape.pyramidal
+                roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
 
     def __str__(self):
         return "<OSM_ID %d at %s>" % (self.osm_id, hex(id(self)))

@@ -131,10 +131,11 @@ BUILDING_SKEL_MAX_NODES = 10        # -- max number of nodes for which we genera
 BUILDING_SKILLION_ROOF_MAX_HEIGHT = 2.
 BUILDING_SKEL_ROOF_MAX_HEIGHT = 6.  # -- skip skeleton roofs (gabled, pyramidal, ..) if the roof height is larger than this
 BUILDING_SKEL_ROOF_DEFAULT_HEIGHT = 2.5  # if the roof_height is not given what we use to calculate real building heihgt temporarily
+BUILDING_ROOF_SIMPLIFY_TOLERANCE = .5
 
 # If the roof_type is missing, what shall be the distribution of roof_types (must sum up to 1.0)
 # The keys are the shapes and must correspond to valid RoofShape values in roofs.py
-BUILDING_ROOF_SHAPE_RATIO = {'flat': 0.1, 'skillion': 0.05, 'gabled': 0.75, 'hipped': 0.1}
+BUILDING_ROOF_SHAPE_RATIO = {'flat': 0.1, 'gabled': 0.8, 'hipped': 0.1}
 
 # ==================== RECTIFY BUILDINGS ============
 RECTIFY_ENABLED = True
