@@ -1014,6 +1014,22 @@ class Building(object):
         if self.roof_shape is roofs.RoofShape.flat:
             roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, roof_mat_idx, stats)
         else:
+            my_cluster_offset = cluster_offset
+            # try to see whether we can reduce the number of nodes - and maybe get the count down - such that fewer
+            # gabled and gambrel get changed to skeleton.
+            # skillion may not be changed due to numbers from _compute_roof_height
+            if (self.pts_all_count > 4) and (self.has_inner is False) and \
+                    (self.roof_shape is not roofs.RoofShape.skillion):
+                roof_polygon = shg.Polygon(self.pts_all)  # because the current polygon is not current anymore
+                my_number = len(roof_polygon.exterior.coords) - 1
+                roof_polygon_new = roof_polygon.simplify(parameters.BUILDING_ROOF_SIMPLIFY_TOLERANCE, True)
+                my_new_number = len(roof_polygon_new.exterior.coords) - 1
+                if my_number > my_new_number:
+                    stats.nodes_roof_simplified += my_number - my_new_number
+                    self.pts_all = np.array(roof_polygon_new.exterior.coords)[:-1]
+                    self.polygon = roof_polygon_new  # needed to get correct .pts_all_count
+                    # reset cluster offset as we are using translated clusterss
+                    my_cluster_offset = Vec2d(0, 0)
             # -- pitched roof for > 4 ground nodes
             if self.pts_all_count > 4:
                 if self.roof_shape is roofs.RoofShape.skillion:
@@ -1025,7 +1041,7 @@ class Building(object):
                 elif self.roof_shape is roofs.RoofShape.onion:
                     roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
                 else:
-                    skeleton_possible = myskeleton.myskel(ac_object, self, stats, offset_xy=cluster_offset,
+                    skeleton_possible = myskeleton.myskel(ac_object, self, stats, offset_xy=my_cluster_offset,
                                                           offset_z=self.beginning_of_roof_above_sea_level,
                                                           max_height=parameters.BUILDING_SKEL_ROOF_MAX_HEIGHT)
                     if skeleton_possible:
