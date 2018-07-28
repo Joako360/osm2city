@@ -694,14 +694,15 @@ def simplify_balconies(original: shg.Polygon, distance_tolerance_line: float,
     The refs_shared dictionary makes sure that no shared references (with other buildings) are simplified away.
     The dictionary might get updated if points are taken away
     """
-    if len(original.exterior.coords) < 8:  # at least a triangle with a balcony (plus an extra point to close)
-        return original
     to_remove_points = set()  # index positions
     counter = 0
     my_coords = list(original.exterior.coords)
     del my_coords[-1]  # we do not need the repeated first point closing the polygon
     num_coords = len(my_coords)
     while counter < len(my_coords):
+        # check that there would be at least 3 nodes left
+        if num_coords - len(to_remove_points) < 7:
+            break
         if not (counter + 1 in refs_shared or counter + 2 in refs_shared or counter + 3 in refs_shared
                 or counter + 4 in refs_shared):
             valid_removal = False
