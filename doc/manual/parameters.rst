@@ -332,10 +332,6 @@ BUILDING_SKILLION_ROOF_MAX_HEIGHT               Decimal    2.        No matter t
                                                                      difference.
 BUILDING_SKEL_ROOF_MAX_HEIGHT                   Decimal    6.        Skip skeleton roofs (gabled, pyramidal, ..) if the roof height is larger than
                                                                      this value.
-BUILDING_SKEL_ROOF_DEFAULT_HEIGHT               Decimal    2.5       If the roof_height is not given in OSM this is what is used to calculate the
-                                                                     real building height temporarily - until the real roof is constructed.
-                                                                     Unless you know the code behind or see very odd effects, then you should
-                                                                     probably not change this value.
 =============================================   ========   =======   ==============================================================================
 
 

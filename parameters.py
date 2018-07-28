@@ -130,7 +130,6 @@ BUILDING_SKEL_ROOFS_MAX_ANGLE = 50  #    have a random angle between MIN and MAX
 BUILDING_SKEL_MAX_NODES = 10        # -- max number of nodes for which we generate pySkeleton roofs
 BUILDING_SKILLION_ROOF_MAX_HEIGHT = 2.
 BUILDING_SKEL_ROOF_MAX_HEIGHT = 6.  # -- skip skeleton roofs (gabled, pyramidal, ..) if the roof height is larger than this
-BUILDING_SKEL_ROOF_DEFAULT_HEIGHT = 2.5  # if the roof_height is not given what we use to calculate real building heihgt temporarily
 BUILDING_ROOF_SIMPLIFY_TOLERANCE = .5
 
 # If the roof_type is missing, what shall be the distribution of roof_types (must sum up to 1.0)
