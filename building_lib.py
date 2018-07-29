@@ -243,6 +243,7 @@ class Building(object):
         self.min_height = 0.0  # the height over ground relative to ground_elev of the facade. See min_height in OSM
         self.roof_shape = roofs.RoofShape.flat
         self.roof_height = 0.0  # the height of the roof (0 if flat), not the elevation over ground of the roof
+        self.roof_neighbour_orientation = -1.  # only valid if >= 0 and then finally used in roofs.py
 
         # set during method called by init(...) through self.update_geometry and related sub-calls
         self.refs = None  # contains only the refs of the outer_ring
@@ -756,6 +757,52 @@ class Building(object):
             if allow_complex_roofs is False:
                 self.roof_shape = roofs.RoofShape.flat
 
+    def analyse_roof_neighbour_orientation(self) -> None:
+        """Analyses the roof orientation for non-flat roofs and only if no inner rings and with neighbours.
+        If we have neighbours then it makes sense to try to orient the ridge such, that it is at right angles to
+        the neighbour - at least most of the time. Some times (like along canals in Amsterdam) it might be that
+        the gables actually look to the street instead to the neighbour - but then we must hope that the
+        key roof:orientation has been explicitly used."""
+        self.roof_neighbour_orientation = -1.
+        if self.roof_shape is roofs.RoofShape.flat or self.has_inner or (len(self.refs_shared) == 0):
+            return
+
+        outer_points = self.pts_outer
+        lop = len(outer_points)
+        prev_was_neighbour_line = False
+        orientations = []
+
+        for index in range(lop):
+            if prev_was_neighbour_line:  # we do not want to have lines reusing a node
+                prev_was_neighbour_line = False
+                continue
+
+            if index in self.refs_shared:
+                orientation = -1.
+                if index == 0 and lop - 1 in self.refs_shared:
+                    prev_was_neighbour_line = True
+                    orientation = co.calc_angle_of_line_local(outer_points[index][0], outer_points[index][1],
+                                                              outer_points[lop - 1][0], outer_points[lop - 1][1])
+                elif index > 0 and index -1 in self.refs_shared:
+                    prev_was_neighbour_line = True
+                    orientation = co.calc_angle_of_line_local(outer_points[index - 1][0], outer_points[index - 1][1],
+                                                              outer_points[index][0], outer_points[index][1])
+                if prev_was_neighbour_line:
+                    if orientation >= 180.:
+                        orientation -= 180.
+                    orientations.append(orientation)
+
+        if orientations:
+            # take the average orientation (often they will be parallel if there even is more than one)
+            final_orientation = 0.
+            for my_orient in orientations:
+                final_orientation += my_orient
+            self.roof_neighbour_orientation = final_orientation / len(orientations)
+            # now add 90 degrees to make the orientation at right angle
+            self.roof_neighbour_orientation += 90.
+            if self.roof_neighbour_orientation >= 180.:
+                self.roof_neighbour_orientation -= 180.
+
     def analyse_large_enough(self) -> bool:
         """Checks whether a given building's area is too small for inclusion.
         Never drop tall buildings.
@@ -1024,11 +1071,20 @@ class Building(object):
                 my_number = len(roof_polygon.exterior.coords) - 1
                 roof_polygon_new = roof_polygon.simplify(parameters.BUILDING_ROOF_SIMPLIFY_TOLERANCE, True)
                 my_new_number = len(roof_polygon_new.exterior.coords) - 1
+                # if the node to be removed would be the first, then topology would be changed. So change sequence
+                # and try again
+                if my_number == my_new_number:
+                    alternative_points = self.pts_all[1:].tolist()
+                    alternative_points.append(self.pts_all[0].tolist())
+                    roof_polygon = shg.Polygon(alternative_points)
+                    roof_polygon_new = roof_polygon.simplify(parameters.BUILDING_ROOF_SIMPLIFY_TOLERANCE, True)
+                    my_new_number = len(roof_polygon_new.exterior.coords) - 1
+
                 if my_number > my_new_number:
                     stats.nodes_roof_simplified += my_number - my_new_number
                     self.pts_all = np.array(roof_polygon_new.exterior.coords)[:-1]
                     self.polygon = roof_polygon_new  # needed to get correct .pts_all_count
-                    # reset cluster offset as we are using translated clusterss
+                    # reset cluster offset as we are using translated clusters
                     my_cluster_offset = Vec2d(0, 0)
             # -- pitched roof for > 4 ground nodes
             if self.pts_all_count > 4:
@@ -1334,6 +1390,8 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: u
                 stats.skipped_small += 1
                 continue
         b.analyse_roof_shape_check()
+
+        b.analyse_roof_neighbour_orientation()
 
         if not b.analyse_textures(facade_mgr, roof_mgr, stats):
             continue

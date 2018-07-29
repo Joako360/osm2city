@@ -1,7 +1,7 @@
 import copy
 from enum import IntEnum, unique
 import logging
-from math import sin, cos, atan2, radians, tan, sqrt
+from math import sin, cos, atan2, radians, tan, sqrt, fabs
 from typing import List
 import unittest
 
@@ -145,13 +145,16 @@ def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_
         logging.error("no roof_height in separate_gable for building %i" % b.osm_id)
         return
     
-    # get orientation if exits :
+    # get orientation if exits:
+    osm_roof_orientation_exists = False
     if s.K_ROOF_ORIENTATION in b.tags:
-        roof_orientation = str(b.tags[s.K_ROOF_ORIENTATION])
-        if not (roof_orientation in [s.V_ALONG, s.V_ACROSS]):
-            roof_orientation = s.V_ALONG
+        osm_roof_orientation_exists = True
+        osm_roof_orientation = str(b.tags[s.K_ROOF_ORIENTATION])
+        if not (osm_roof_orientation in [s.V_ALONG, s.V_ACROSS]):
+            osm_roof_orientation_exists = False
+            osm_roof_orientation = s.V_ALONG
     else:
-        roof_orientation = s.V_ALONG
+        osm_roof_orientation = s.V_ALONG
 
     # search smallest and longest sides
     i_small = 3
@@ -168,11 +171,23 @@ def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_
         elif l_side2 < l_small:
             i_small = i
             l_small = l_side2
-            
-    if roof_orientation == s.V_ACROSS:
-        i_side = i_small
-    else:
-        i_side = i_long
+
+    i_side = i_long  # i.e. "along"
+    if osm_roof_orientation_exists:
+        if osm_roof_orientation == s.V_ACROSS:
+            i_side = i_small
+    elif b.roof_neighbour_orientation >= 0.:  # only override if we have neighbours
+        # calculate the angle of the "along"
+        along_angle = coord.calc_angle_of_line_local(b.pts_all[i_long % 4][0],
+                                                     b.pts_all[i_long % 4][1],
+                                                     b.pts_all[(i_long + 1) % 4][0],
+                                                     b.pts_all[(i_long + 1)% 4][1])
+        if along_angle >= 180.:
+            along_angle -= 180.
+        difference = fabs(b.roof_neighbour_orientation - along_angle)
+        # if the difference is closer to 90 than parallel, then change the orientation
+        if 45 < difference < 135:
+            i_side = i_small
 
     seq_n = []  # the sequence of nodes such that 0-1 and 2-3 are along with ridge in parallel in the middle
     for i in range(0, 4):
