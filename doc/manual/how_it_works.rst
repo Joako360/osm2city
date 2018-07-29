@@ -108,6 +108,17 @@ As an example the following picture shows generated buildings (yellow) based on 
 .. image:: would_be_buildings.png
 
 
+-----
+Roofs
+-----
+
+The following are some pointers to how roofs work, and in particular code in roofs.py.
+
+Node numbering for ``gambrel`` roof type:
+
+.. image:: roof_gambrel.jpg
+
+
 .. _OpenStreetMap: https://www.openstreetmap.org/
 .. _World Scenery: http://wiki.flightgear.org/World_Scenery
 .. _heuristics: https://en.wikipedia.org/wiki/Heuristic
