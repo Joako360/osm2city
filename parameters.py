@@ -302,6 +302,8 @@ OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA = 5000
 OWBB_GENERATE_LANDUSE_LANDUSE_HOLES_MIN_AREA = 20000
 OWBB_GENERATE_LANDUSE_SIMPLIFICATION_TOLERANCE = 20
 
+OWBB_USE_BTG_LANDUSE = False  # does not work currently
+
 OWBB_SPLIT_MADE_UP_LANDUSE_BY_MAJOR_LINES = True  # for external and generated
 
 # the buffer around built-up land-use areas to be used for lighting of streets

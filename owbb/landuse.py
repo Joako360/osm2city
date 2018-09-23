@@ -4,10 +4,12 @@
 
 import logging
 import math
+import os.path
 import pickle
 import time
 from typing import Dict, List, Tuple
 
+import pyproj
 from shapely.geometry import box, MultiPolygon, Polygon, CAP_STYLE, JOIN_STYLE
 from shapely.ops import unary_union
 
@@ -18,8 +20,47 @@ import owbb.models as m
 import owbb.plotting as plotting
 import owbb.would_be_buildings as wbb
 import utils.osmparser as op
+import utils.btg_io as btg
+import utils.calc_tile as ct
 from utils.coordinates import disjoint_bounds, Transformation
+from utils.stg_io2 import scenery_directory_name, SceneryType
 from utils.utilities import time_logging
+
+
+def _generate_building_zones_from_external(building_zones: List[m.BuildingZone],
+                                           external_landuses: List[m.BTGBuildingZone]) -> None:
+    """Adds "missing" building_zones based on land-use info outside of OSM land-use"""
+    counter = 0
+    for external_landuse in external_landuses:
+        my_geoms = list()
+        my_geoms.append(external_landuse.geometry)
+
+        for building_zone in building_zones:
+            parts = list()
+            for geom in my_geoms:
+                if geom.within(building_zone.geometry) \
+                        or geom.touches(building_zone.geometry):
+                    continue
+                elif geom.intersects(building_zone.geometry):
+                    diff = geom.difference(building_zone.geometry)
+                    if isinstance(diff, Polygon):
+                        if diff.area >= parameters.OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA:
+                            parts.append(diff)
+                    elif isinstance(diff, MultiPolygon):
+                        for poly in diff:
+                            if poly.area >= parameters.OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA:
+                                parts.append(poly)
+                else:
+                    if geom.area >= parameters.OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA:
+                        parts.append(geom)
+            my_geoms = parts
+
+        for geom in my_geoms:
+            generated = m.GeneratedBuildingZone(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse),
+                                                geom, external_landuse.type_)
+            building_zones.append(generated)
+            counter += 1
+    logging.debug("Generated building zones from external land-use: %i", counter)
 
 
 def _generate_building_zones_from_buildings(building_zones: List[m.BuildingZone],
@@ -128,6 +169,125 @@ def _split_multipolygon_generated_building_zone(zone: m.GeneratedBuildingZone) -
     else:
         split_zones.append(zone)
     return split_zones
+
+
+def _process_btg_building_zones(transformer: Transformation) -> Tuple[List[m.BTGBuildingZone],
+                                                                      List[m.BTGBuildingZone]]:
+    """There is a need to do a local coordinate transformation, as BTG also has a local coordinate
+    transformation, but there the center will be in the middle of the tile, whereas here is can be
+     another place if the boundary is not a whole tile."""
+    lon_lat = parameters.get_center_global()
+    path_to_btg = ct.construct_path_to_files(parameters.PATH_TO_SCENERY, scenery_directory_name(SceneryType.terrain),
+                                             (lon_lat.lon, lon_lat.lat))
+    tile_index = parameters.get_tile_index()
+
+    # cartesian ellipsoid
+    in_proj = pyproj.Proj(proj='geocent', ellps='WGS84', datum='WGS84')
+    # geodetic flat
+    out_proj = pyproj.Proj(init='epsg:4326', ellps='WGS84', datum='WGS84')
+
+    btg_file_name = os.path.join(path_to_btg, ct.construct_btg_file_name_from_tile_index(tile_index))
+    logging.debug('Reading btg file: %s', btg_file_name)
+    btg_reader = btg.BTGReader(btg_file_name)
+    btg_lon, btg_lat = btg_reader.gbs_lon_lat
+    btg_x, btg_y = transformer.to_local((btg_lon, btg_lat))
+    logging.debug('Difference between BTG and transformer: x = %f, y = %f', btg_x, btg_y)
+
+    gbs_center = btg_reader.gbs_center
+
+    btg_zones = list()
+    vertices = btg_reader.vertices
+    v_max_x = 0
+    v_max_y = 0
+    v_max_z = 0
+    v_min_x = 0
+    v_min_y = 0
+    v_min_z = 0
+    for vertex in vertices:
+        if vertex.x >= 0:
+            v_max_x = max(v_max_x, vertex.x)
+        else:
+            v_min_x = min(v_min_x, vertex.x)
+        if vertex.y >= 0:
+            v_max_y = max(v_max_y, vertex.y)
+        else:
+            v_min_y = min(v_min_y, vertex.y)
+        if vertex.z >= 0:
+            v_max_z = max(v_max_z, vertex.z)
+        else:
+            v_min_z = min(v_min_z, vertex.z)
+
+        # translate to lon_lat and then to local coordinates
+        lon, lat, _alt = pyproj.transform(in_proj, out_proj,
+                                          vertex.x + gbs_center.x,
+                                          vertex.y + gbs_center.y,
+                                          vertex.z + gbs_center.z,
+                                          radians=False)
+
+        vertex.x, vertex.y = transformer.to_local((lon, lat))
+        vertex.z = _alt
+
+    min_x, min_y = transformer.to_local((parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH))
+    max_x, max_y = transformer.to_local((parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH))
+    bounds = (min_x, min_y, max_x, max_y)
+
+    disjoint = 0
+    accepted = 0
+    counter = 0
+
+    for key, faces_list in btg_reader.faces.items():
+        if key != btg.WATER_PROXY:
+            # find the corresponding BuildingZoneType
+            type_ = None
+            for member in m.BuildingZoneType:
+                btg_key = 'btg_' + key
+                if btg_key == member.name:
+                    type_ = member
+                    break
+            if type_ is None:
+                raise Exception('Unknown BTG material: {}. Most probably a programming mismatch.'.format(key))
+            # create building zones
+            temp_polys = list()
+            for face in faces_list:
+                counter += 1
+                v0 = vertices[face.vertices[0]]
+                v1 = vertices[face.vertices[1]]
+                v2 = vertices[face.vertices[2]]
+                # create the triangle polygon
+                my_geometry = Polygon([(v0.x - btg_x, v0.y - btg_y), (v1.x - btg_x, v1.y - btg_y),
+                                       (v2.x - btg_x, v2.y - btg_y), (v0.x - btg_x, v0.y - btg_y)])
+                if not my_geometry.is_valid:  # it might be self-touching or self-crossing polygons
+                    clean = my_geometry.buffer(0)  # cf. http://toblerity.org/shapely/manual.html#constructive-methods
+                    if clean.is_valid:
+                        my_geometry = clean  # it is now a Polygon or a MultiPolygon
+                    else:  # lets try with a different sequence of points
+                        my_geometry = Polygon([(v0.x - btg_x, v0.y - btg_y), (v2.x - btg_x, v2.y - btg_y),
+                                               (v1.x - btg_x, v1.y - btg_y), (v0.x - btg_x, v0.y - btg_y)])
+                        if not my_geometry.is_valid:
+                            clean = my_geometry.buffer(0)
+                            if clean.is_valid:
+                                my_geometry = clean
+                if my_geometry.is_valid and not my_geometry.is_empty:
+                    if not disjoint_bounds(bounds, my_geometry.bounds):
+                        temp_polys.append(my_geometry)
+                        accepted += 1
+                    else:
+                        disjoint += 1
+                else:
+                    pass  # just discard the triangle
+
+            # merge polygons as much as possible in order to reduce processing and not having polygons
+            # smaller than parameters.OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA
+            merged_list = _merge_buffers(temp_polys)
+            for merged_poly in merged_list:
+                my_zone = m.BTGBuildingZone(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse),
+                                            type_, merged_poly)
+                btg_zones.append(my_zone)
+
+    logging.debug('Out of %i faces %i were disjoint and %i were accepted with the bounds.',
+                  counter, disjoint, accepted)
+    logging.debug('Created a total of %i zones from BTG', len(btg_zones))
+    return btg_zones, btg_reader.faces[btg.WATER_PROXY]
 
 
 def _test_highway_intersecting_area(area: Polygon, highways_dict: Dict[int, m.Highway]) -> List[m.Highway]:
@@ -500,6 +660,16 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Buildin
 
     last_time = time_logging("Time used in seconds for parsing OSM data", last_time)
 
+    # =========== READ LAND-USE DATA FROM FLIGHTGEAR BTG-FILES =============
+    btg_building_zones = list()
+    if parameters.OWBB_USE_BTG_LANDUSE:
+        btg_building_zones, btg_water = _process_btg_building_zones(transformer)
+        last_time = time_logging("Time used in seconds for reading BTG zones", last_time)
+
+    if len(btg_building_zones) > 0:
+        _generate_building_zones_from_external(building_zones, btg_building_zones)
+    last_time = time_logging("Time used in seconds for processing external zones", last_time)
+
     # =========== GENERATE ADDITIONAL LAND-USE ZONES FOR AND/OR FROM BUILDINGS =============
     buildings_outside = list()  # buildings outside of OSM buildings zones
     for candidate in osm_buildings:
@@ -529,7 +699,7 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Buildin
 
     # =========== REDUCE THE BUILDING_ZONES TO BE WITHIN BOUNDS ==========================
     building_zones = _check_clipping_border(building_zones, bounds)
-    last_time = time_logging("Time used in seconds for fclipping to boundary", last_time)
+    last_time = time_logging("Time used in seconds for clipping to boundary", last_time)
 
     # =========== MAKE SURE GENERATED LAND-USE DOES NOT CROSS MAJOR LINEAR OBJECTS =======
     if parameters.OWBB_SPLIT_MADE_UP_LANDUSE_BY_MAJOR_LINES:
@@ -563,7 +733,7 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Buildin
     # =========== FINALIZE Land-use PROCESSING =============================================
     if parameters.DEBUG_PLOT_LANDUSE:
         logging.info('Start of plotting zones')
-        plotting.draw_zones(osm_buildings, building_zones, lit_areas, bounds)
+        plotting.draw_zones(osm_buildings, building_zones, btg_building_zones, lit_areas, bounds)
         time_logging("Time used in seconds for plotting", last_time)
 
     # =========== Now generate buildings if asked for ======================================

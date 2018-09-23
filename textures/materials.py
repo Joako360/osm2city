@@ -126,6 +126,7 @@ COLOUR_NAME_TO_HEX_MAP = {
     'aqua': '#00FFFF',
     # Additional named colours most used cf. https://taginfo.openstreetmap.org/keys/building%3Acolour#values
     # and https://taginfo.openstreetmap.org/keys/roof%3Acolour#values
+    # for colour card see https://www.w3.org/TR/css-color-3/#svg-color
     'brown': '#A52A2A',
     'beige': '#F5F5DC',
     'lightgray': '#D3D3D3',

@@ -285,6 +285,16 @@ class BuildingZoneType(IntEnum):  # element names must match OSM values apart fr
 
     non_osm = 100  # used for land-uses constructed with heuristics and not in original data from OSM
 
+    # FlightGear in BTG files
+    # must be in line with SUPPORTED_MATERIALS in btg_io.py (except from water)
+    btg_builtupcover = 201
+    btg_urban = 202
+    btg_town = 211
+    btg_suburban = 212
+    btg_construction = 221
+    btg_industrial = 222
+    btg_port = 223
+
 
 class CityBlock:
     """A special land-use derived from many kinds of land-use info and enclosed by streets (kind of)."""
@@ -460,6 +470,14 @@ class BuildingZone(OSMFeatureArea):
                 self.linked_blocked_areas.append(blocked)
         for key in to_be_removed:
             del open_spaces_dict[key]
+
+
+class BTGBuildingZone(object):
+    """A land-use from materials in FlightGear read from BTG-files"""
+    def __init__(self, external_id, type_, geometry) -> None:
+        self.id = str(external_id)  # String
+        self.type_ = type_  # BuildingZoneType
+        self.geometry = geometry  # Polygon
 
 
 class GeneratedBuildingZone(BuildingZone):
@@ -943,6 +961,7 @@ class SharedModelsLibrary(object):
     def __init__(self, building_models: List[BuildingModel]):
         self._residential_detached = list()
         self._residential_terraces = list()
+        self._residential_apartments = list()
         self._industrial_buildings_large = list()
         self._industrial_buildings_small = list()
         self._populate_models_library(building_models)
@@ -956,6 +975,10 @@ class SharedModelsLibrary(object):
         return self._residential_terraces
 
     @property
+    def residential_apartments(self):
+        return self._residential_apartments
+
+    @property
     def industrial_buildings_large(self):
         return self._industrial_buildings_large
 
@@ -965,12 +988,12 @@ class SharedModelsLibrary(object):
 
     def _populate_models_library(self, building_models: List[BuildingModel]) -> None:
         for building_model in building_models:
-            if building_model.model_type is bl.BuildingType.residential:
-                pass  # FIXME: should somehow be translated based on parameters to apartments, detached, terrace, etc.
+            if building_model.model_type is bl.BuildingType.apartments:
+                my_model = SharedModel(building_model, bl.BuildingType.apartments)
+                self._residential_apartments.append(my_model)
             elif building_model.model_type is bl.BuildingType.detached:
                 my_model = SharedModel(building_model, bl.BuildingType.detached)
                 self._residential_detached.append(my_model)
-
             elif building_model.model_type is bl.BuildingType.terrace:
                 my_model = SharedModel(building_model, bl.BuildingType.terrace)
                 self._residential_terraces.append(my_model)
@@ -987,6 +1010,9 @@ class SharedModelsLibrary(object):
             return False
         if 0 == len(self._residential_terraces):
             logging.warning("No residential terrace buildings found")
+            return False
+        if 0 == len(self._residential_apartments):
+            logging.warning("No residential apartment buildings found")
             return False
         if 0 == len(self._industrial_buildings_large):
             logging.warning("No large industrial buildings found")

@@ -3,7 +3,7 @@
 shamelessly translated from calc-tile.pl
 """
 import logging
-from math import floor
+from math import floor, radians
 import os
 from typing import List, Tuple
 import unittest
@@ -47,14 +47,6 @@ def format_lat(lat):
         return "s%02d" % int(0. - lat)
     else:
         return "n%02d" % int(lat)
-
-
-def root_directory_name(lon_lat: Tuple[float, float]) -> str:
-    """Generate the directory name for a location."""
-    (lon, lat) = lon_lat
-    lon_chunk = floor(lon/10.0) * 10
-    lat_chunk = floor(lat/10.0) * 10
-    return format_lon(lon_chunk) + format_lat(lat_chunk) + os.sep 
 
 
 def directory_name(lon_lat: Tuple[float, float]) -> str:

@@ -122,14 +122,14 @@ def _generate_extra_buildings(building_zone: m.BuildingZone, shared_models_libra
             detached_houses_list = shared_models_library.residential_detached
             # choose row house already now, so the same row house is potentially applied on both sides of street
             index = random.randint(0, len(shared_models_library.residential_terraces) - 1)
-            row_houses_list = shared_models_library.residential_terraces[index:index + 1]
+            terrace_houses_list = shared_models_library.residential_terraces[index:index + 1]
             if highway.is_sideway() and (random.random() <= parameters.OWBB_RESIDENTIAL_TERRACE_SHARE):
                 try_terrace = True
             else:
                 try_terrace = False
-            _generate_extra_buildings_residential(building_zone, highway, detached_houses_list, row_houses_list,
+            _generate_extra_buildings_residential(building_zone, highway, detached_houses_list, terrace_houses_list,
                                                   False, try_terrace, bounding_box)
-            _generate_extra_buildings_residential(building_zone, highway, detached_houses_list, row_houses_list,
+            _generate_extra_buildings_residential(building_zone, highway, detached_houses_list, terrace_houses_list,
                                                   True, try_terrace, bounding_box)
 
         else:  # elif landuse.type_ is Landuse.TYPE_INDUSTRIAL:
@@ -224,7 +224,7 @@ def _read_building_models_library() -> List[m.BuildingModel]:
     # always define the building:levels - and do NOT specify height
     models = list()
 
-    # residential
+    # residential detached
     detached_1_tags = {s.K_BUILDING: 'detached',
                        'building:colour': 'white', 'building:levels': '2',
                        'roof:colour': 'red', 'roof:shape': 'hipped', 'roof:height': '2',
@@ -232,33 +232,90 @@ def _read_building_models_library() -> List[m.BuildingModel]:
     detached_1 = m.BuildingModel(15., 8., bl.BuildingType.detached, list(), None, 0, 0, detached_1_tags)
     models.append(detached_1)
     detached_2_tags = {s.K_BUILDING: 'detached',
-                       'building:colour': 'yellow', 'building:levels': '1',
-                       'roof:colour': 'firebrick', 'roof:shape': 'gabled', 'roof:height': '3',
+                       'building:colour': 'tan', 'building:levels': '1',
+                       'roof:colour': 'firebrick', 'roof:shape': 'gabled', 'roof:height': '2',
                        s.K_OWBB_GENERATED: 'yes'}
     detached_2 = m.BuildingModel(10., 10., bl.BuildingType.detached, list(), None, 0, 0, detached_2_tags)
     models.append(detached_2)
+    detached_3_tags = {s.K_BUILDING: 'detached',
+                       'building:colour': 'pink', 'building:levels': '2',
+                       'roof:colour': 'firebrick', 'roof:shape': 'gabled', 'roof:height': '2',
+                       s.K_OWBB_GENERATED: 'yes'}
+    detached_3 = m.BuildingModel(16., 12., bl.BuildingType.detached, list(), None, 0, 0, detached_3_tags)
+    models.append(detached_3)
+    detached_4_tags = {s.K_BUILDING: 'detached',
+                       'building:colour': 'beige', 'building:levels': '2',
+                       'roof:colour': 'black', 'roof:shape': 'gambrel', 'roof:height': '2',
+                       s.K_OWBB_GENERATED: 'yes'}
+    detached_4 = m.BuildingModel(12., 9., bl.BuildingType.detached, list(), None, 0, 0, detached_4_tags)
+    models.append(detached_4)
+
+    # residential apartments
+    apartment_1_tags = {s.K_BUILDING: 'detached',
+                        'building:colour': 'white', 'building:levels': '3',
+                        'roof:colour': 'firebrick', 'roof:shape': 'gabled', 'roof:height': '2',
+                        s.K_OWBB_GENERATED: 'yes'}
+    apartment_1 = m.BuildingModel(30., 15, bl.BuildingType.apartments, list(), None, 0, 0, apartment_1_tags)
+    models.append(apartment_1)
+    apartment_2_tags = {s.K_BUILDING: 'detached',
+                        'building:colour': 'white', 'building:levels': '3',
+                        'roof:colour': 'red', 'roof:shape': 'gabled', 'roof:height': '2',
+                        s.K_OWBB_GENERATED: 'yes'}
+    apartment_2 = m.BuildingModel(35., 14, bl.BuildingType.apartments, list(), None, 0, 0, apartment_2_tags)
+    models.append(apartment_2)
+    apartment_3_tags = {s.K_BUILDING: 'detached',
+                        'building:colour': 'white', 'building:levels': '4',
+                        'roof:colour': 'red', 'roof:shape': 'gabled', 'roof:height': '2',
+                        s.K_OWBB_GENERATED: 'yes'}
+    apartment_3 = m.BuildingModel(26., 18, bl.BuildingType.apartments, list(), None, 0, 0, apartment_3_tags)
+    models.append(apartment_3)
 
     # terrace
     terrace_1_tags = {s.K_BUILDING: 'terrace',
-                      'building:colour': 'aqua', 'building:levels': '2',
+                      'building:colour': 'beige', 'building:levels': '2',
                       'roof:colour': 'darksalmon', 'roof:shape': 'skillion', 'roof:height': '1.5',
                       s.K_OWBB_GENERATED: 'yes'}
-    terrace_1 = m.BuildingModel(5., 3., bl.BuildingType.terrace, list(), None, 0, 0, terrace_1_tags)
+    terrace_1 = m.BuildingModel(8., 8., bl.BuildingType.terrace, list(), None, 0, 0, terrace_1_tags)
     models.append(terrace_1)
+    terrace_2_tags = {s.K_BUILDING: 'terrace',
+                      'building:colour': 'snow', 'building:levels': '2',
+                      'roof:colour': 'firebrick', 'roof:shape': 'gabled', 'roof:height': '1.5',
+                      s.K_OWBB_GENERATED: 'yes'}
+    terrace_2 = m.BuildingModel(10., 8., bl.BuildingType.terrace, list(), None, 0, 0, terrace_2_tags)
+    models.append(terrace_2)
 
-    # industrial
+    # industrial large
     industry_1_tags = {s.K_BUILDING: 'industrial',
                        'building:colour': 'silver',  'building:levels': '4',
                        'roof:colour': 'darkgray', 'roof:shape': 'flat', 'roof:height': '0',
                        s.K_OWBB_GENERATED: 'yes'}
     industry_1 = m.BuildingModel(20., 30., bl.BuildingType.industrial, list(), None, 0, 0, industry_1_tags)
     models.append(industry_1)
-    industry_1_tags = {s.K_BUILDING: 'industrial',
-                       'building:colour': 'navy', 'building:levels': '3',
-                       'roof:colour': 'darkgray', 'roof:shape': 'gabled', 'roof:height': '3',
+    industry_2_tags = {s.K_BUILDING: 'industrial',
+                       'building:colour': 'silver',  'building:levels': '3',
+                       'roof:colour': 'gray', 'roof:shape': 'flat', 'roof:height': '0',
                        s.K_OWBB_GENERATED: 'yes'}
-    industry_1 = m.BuildingModel(20., 15., bl.BuildingType.industrial, list(), None, 0, 0, industry_1_tags)
-    models.append(industry_1)
+    industry_2 = m.BuildingModel(40., 20., bl.BuildingType.industrial, list(), None, 0, 0, industry_2_tags)
+    models.append(industry_2)
+    industry_3_tags = {s.K_BUILDING: 'industrial',
+                       'building:colour': 'lightyellow',  'building:levels': '2',
+                       'roof:colour': 'darkgray', 'roof:gabled': 'flat', 'roof:height': '0',
+                       s.K_OWBB_GENERATED: 'yes'}
+    industry_3 = m.BuildingModel(26., 20., bl.BuildingType.industrial, list(), None, 0, 0, industry_3_tags)
+    models.append(industry_3)
+    # industrial small
+    industry_4_tags = {s.K_BUILDING: 'industrial',
+                       'building:colour': 'lightgreen', 'building:levels': '3',
+                       'roof:colour': 'red', 'roof:shape': 'gabled', 'roof:height': '2',
+                       s.K_OWBB_GENERATED: 'yes'}
+    industry_4 = m.BuildingModel(20., 15., bl.BuildingType.industrial, list(), None, 0, 0, industry_4_tags)
+    models.append(industry_4)
+    industry_5_tags = {s.K_BUILDING: 'industrial',
+                       'building:colour': 'white', 'building:levels': '2',
+                       'roof:colour': 'black', 'roof:shape': 'flat', 'roof:height': '0',
+                       s.K_OWBB_GENERATED: 'yes'}
+    industry_5 = m.BuildingModel(25., 10., bl.BuildingType.industrial, list(), None, 0, 0, industry_5_tags)
+    models.append(industry_5)
 
     return models
 
