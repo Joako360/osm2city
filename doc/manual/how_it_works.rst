@@ -59,7 +59,7 @@ Finally depending on the place type and the distance to the centroid a given cit
 * ``dense``: an area with dense population mostly living in apartments, but the apartment houses are not necessarily connected. Max distance = population^(2/3).
 * ``periphery``: an area with mostly (detached) houses. Outside of max distance for ``dense``.
 
-There is also settlement type ``rural``, which is the default for all those building zones, which re not within a lit area that is linked to a city or town place. In theory the main difference between ``periphery`` and ``rural`` is the ratio between ap property's lot size and the floor plan, where in rural regions the same family house size typically has more surrounding ground.
+There is also settlement type ``rural``, which is the default for all those building zones, which re not within a lit area that is linked to a city or town place. In theory the main difference between ``periphery`` and ``rural`` is the ratio between a property's lot size and the floor plan, where in rural regions the same family house size typically has more surrounding ground.
 
 Please be aware that there is no "science" behind the chosen concentric ring radii and the settlement types. It is just a heuristic / an observation that the farther away from the city centre you get, the less dense the area. Also the settlement area is "some" function of the population (and the commuting workers into a city/town from outside are neglected). Also in some areas of the world densities are higher. This can be corrected with a linear parameter. The population is taken as is from OSM - if missing a parametrised default population is used.
 

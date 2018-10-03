@@ -36,7 +36,7 @@ If you followed the :ref:`directory structure <chapter-creating-directory-struct
 Adjusting Visibility of Scenery Objects
 =======================================
 
-The ``osm2city`` related programs and especially ``buildings.py`` are using heuristics and parameters to determine at what level of detail (LOD) scenery objects should be visible. This is done by adding the objects to one of the three FlightGear LOD schemes: "rough" and "detailed".
+The ``osm2city`` related programs and especially ``buildings.py`` are using heuristics and parameters to determine at what level of detail (LOD) scenery objects should be visible. This is done by adding the objects to one of the three FlightGear LOD schemes: "rough" or "detailed" ("bare" is not used).
 
 For ``buildings.py`` before creating a scenery you can influence into which of the two LOD ranges the objects are placed by using the following :ref:`Parameters <chapter-parameters-lod-label>`:
 

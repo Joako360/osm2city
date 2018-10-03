@@ -162,7 +162,8 @@ def _draw_generated_zones(building_zones, ax: maxs.Axes) -> None:
                 face_color = "gold"
             elif m.BuildingZoneType.corine_discontinuous is building_zone.type_:
                 face_color = "yellow"
-            _add_patch_for_building_zone(building_zone, face_color, face_color, ax)
+            edge_color = face_color
+            _add_patch_for_building_zone(building_zone, face_color, edge_color, ax)
 
 
 def _draw_btg_building_zones(btg_building_zones, ax: maxs.Axes) -> None:
@@ -340,7 +341,7 @@ gold=town and suburban, yellow=construction and industrial and port]")
 
     # City blocks
     my_figure = _create_a3_landscape_figure()
-    my_figure.suptitle("City blocks")
+    my_figure.suptitle("City blocks random pattern")
     ax = my_figure.add_subplot(111)
     ax.grid(True, linewidth=1, linestyle="--", color="silver")
     _draw_city_blocks(building_zones, ax)

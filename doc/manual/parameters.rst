@@ -131,8 +131,6 @@ Parameters which influence the number of buildings from OSM taken to output.
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
-LOD_ALWAYS_DETAIL_BELOW_AREA                    Integer    150       Below this area, buildings will always be LOD detailed
-
 BUILDING_MIN_HEIGHT                             Number     0.0       Minimum height from bottom to top without roof height of a building to be
                                                                      included in output (does not include roof). Different from OSM tag
                                                                      "min_height", which states that the bottom of the building hovers min_height
@@ -509,12 +507,15 @@ OWBB_LANDUSE_CACHE                              Boolean    False     Instead of 
 Complement OSM Land-Use Information
 -----------------------------------
 
-This operations complements land-use information from OSM based on some simple heuristics, where there currently are no land-use zones for built-up areas in OSM: If there are clusters of buildings outside of registered OSM land-use zones, then zones are added based on clusters of buildings and buffers around them. The land-use type is based on information of building types, amenities etc. — if available.
+These operations complement land-use information from OSM based on some simple heuristics, where there currently are no land-use zones for built-up areas in OSM: If there are clusters of buildings outside of registered OSM land-use zones, then zones are added based on clusters of buildings and buffers around them. The land-use type is based on information of building types, amenities etc. — if available.
 
 
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
+OWBB_USE_BTG_LANDUSE                            Boolean    False     Read FlightGear scenery (BTG-files from existing TerraSync scenery) for
+                                                                     land-use data to complement (not replace) data from OSM.
+
 OWBB_GENERATE..._BUILDING_BUFFER_DISTANCE       Number     30        The minimum buffering distance around a building.
 OWBB_GENERATE..._BUILDING_BUFFER_DISTANCE_MAX   Number     50        The maximum buffering distance around a building. The actual value is a
                                                                      function of the previous parameter and the building's size (the larger the
@@ -588,6 +589,9 @@ OWBB_PLACE_RADIUS_FACTOR_CITY                   Number     1.        Linear corr
 OWBB_PLACE_RADIUS_FACTOR_TOWN                   Number     1.        Ditto for ``place=town``.
 OWBB_PLACE_TILE_BORDER_EXTENSION                Integer    10000     Extension of the perimeter (tile borders) to read place information from, as
                                                                      e.g. a city might extend across til border areas.
+OWBB_PLACE_CHECK_DENSITY                        Boolean    False     Should only be used if majority of all buildings are mapped in OSM.
+                                                                     Otherwise settlement type will be downgraded e.g. in areas based on BTG etc.
+                                                                     Mostly for testing purposes and prrof of concept.
 OWBB_PLACE_SANITY_DENSITY                       Number     0.15      Make sure that settlement type dense is assigned, if the density of a building
                                                                      zone is larger than a given ratio and the settlement type is rural or
                                                                      periphery. The density is calculated as the total of

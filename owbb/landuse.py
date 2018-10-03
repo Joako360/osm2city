@@ -405,7 +405,9 @@ def _split_generated_building_zones_by_major_lines(before_list: List[m.BuildingZ
     # create buffers around major transport
     line_buffers = list()
     for highway in highways.values():
-        if highway.type_ in [m.HighwayType.motorway, m.HighwayType.trunk] and not highway.is_tunnel:
+        if highway.type_ in [m.HighwayType.motorway, m.HighwayType.trunk,
+                             m.HighwayType.primary, m.HighwayType.secondary, m.HighwayType.tertiary,
+                             m.HighwayType.unclassified] and not highway.is_tunnel:
             line_buffers.append(highway.geometry.buffer(highway.get_width()/2))
 
     for railway in railways.values():
@@ -545,7 +547,8 @@ def _link_building_zones_with_settlements(settlement_clusters: List[m.Settlement
             z += 1
             if z % 20 == 0:
                 logging.debug('%i out of %i building_zones', z, z_number)
-            # within because lit-areas are always
+            # using "within" instead of "intersect" because lit-areas are always larger than zones due to buffering
+            # and therefore a zone can always only be within one lit-area/settlement and not another
             if zone.geometry.within(settlement.geometry):
                 zone.settlement_type = bl.SettlementType.periphery
                 # create city blocks
@@ -617,7 +620,7 @@ def _check_clipping_border(building_zones: List[m.BuildingZone], bounds: m.Bound
     return kept_zones
 
 
-def count_zones_related_buildings(buildings: List[bl.Building], text: str) -> None:
+def _count_zones_related_buildings(buildings: List[bl.Building], text: str) -> None:
     total_related = 0
 
     for building in buildings:
@@ -688,14 +691,14 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Buildin
     del buildings_outside
     last_time = time_logging("Time used in seconds for generating building zones", last_time)
 
-    count_zones_related_buildings(osm_buildings, 'after building generation')
+    _count_zones_related_buildings(osm_buildings, 'after building generation')
 
     # =========== CREATE POLYGONS FOR LIGHTING OF STREETS ================================
     # Needs to be before finding city blocks as we need the boundary
     lit_areas = _process_landuse_for_lighting(building_zones)
     last_time = time_logging("Time used in seconds for finding lit areas", last_time)
 
-    count_zones_related_buildings(osm_buildings, 'after lighting')
+    _count_zones_related_buildings(osm_buildings, 'after lighting')
 
     # =========== REDUCE THE BUILDING_ZONES TO BE WITHIN BOUNDS ==========================
     building_zones = _check_clipping_border(building_zones, bounds)
@@ -708,21 +711,22 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Buildin
                                                                         railways_dict, waterways_dict)
     last_time = time_logging("Time used in seconds for splitting building zones by major lines", last_time)
 
-    count_zones_related_buildings(osm_buildings, 'after split major lines')
+    _count_zones_related_buildings(osm_buildings, 'after split major lines')
 
     # =========== Link urban places with settlement_area buffers ==================================
     settlement_clusters = _create_settlement_clusters(lit_areas, water_areas, urban_places)
     last_time = time_logging('Time used in seconds for creating settlement_clusters', last_time)
 
-    count_zones_related_buildings(osm_buildings, 'after settlement clusters')
+    _count_zones_related_buildings(osm_buildings, 'after settlement clusters')
 
     _link_building_zones_with_settlements(settlement_clusters, building_zones, highways_dict)
     last_time = time_logging('Time used in seconds for linking building zones with settlement_clusters', last_time)
 
-    _sanity_check_settlement_types(building_zones, highways_dict)
-    last_time = time_logging('Time used in seconds for sanity checking settlement types', last_time)
+    if parameters.OWBB_PLACE_CHECK_DENSITY:
+        _sanity_check_settlement_types(building_zones, highways_dict)
+        last_time = time_logging('Time used in seconds for sanity checking settlement types', last_time)
 
-    count_zones_related_buildings(osm_buildings, 'after settlement linking')
+    _count_zones_related_buildings(osm_buildings, 'after settlement linking')
 
     # ============ Finally guess the land-use type ========================================
     for my_zone in building_zones:
@@ -742,7 +746,7 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Buildin
                                           waterways_dict)
         osm_buildings.extend(generated_buildings)
 
-    count_zones_related_buildings(osm_buildings, 'after generating buildings')
+    _count_zones_related_buildings(osm_buildings, 'after generating buildings')
 
     # =========== WRITE TO CACHE AND RETURN
     if parameters.OWBB_LANDUSE_CACHE:
