@@ -5,7 +5,7 @@ import logging
 import pickle
 import random
 import time
-from typing import Dict, List
+from typing import Dict, List, Optional
 import sys
 
 from shapely import speedups
@@ -119,18 +119,73 @@ def _generate_extra_buildings(building_zone: m.BuildingZone, shared_models_libra
                               bounding_box: Polygon):
     for highway in building_zone.linked_genways:
         if building_zone.type_ is m.BuildingZoneType.residential:
+            # apartment_houses_list = shared_models_library.residential_apartments
             detached_houses_list = shared_models_library.residential_detached
-            # choose row house already now, so the same row house is potentially applied on both sides of street
-            index = random.randint(0, len(shared_models_library.residential_terraces) - 1)
-            terrace_houses_list = shared_models_library.residential_terraces[index:index + 1]
-            if highway.is_sideway() and (random.random() <= parameters.OWBB_RESIDENTIAL_TERRACE_SHARE):
-                try_terrace = True
-            else:
-                try_terrace = False
-            _generate_extra_buildings_residential(building_zone, highway, detached_houses_list, terrace_houses_list,
-                                                  False, try_terrace, bounding_box)
-            _generate_extra_buildings_residential(building_zone, highway, detached_houses_list, terrace_houses_list,
-                                                  True, try_terrace, bounding_box)
+
+            # Some attribute errors are expected, because a highway might not have a city block on both sides
+            caught_errors = 0
+            # just use the along city_block to determine the settlement type, although the reverse could be different
+            terrace_share = parameters.OWBB_RESIDENTIAL_RURAL_TERRACE_SHARE
+            apartment_share = parameters.OWBB_RESIDENTIAL_RURAL_APARTMENT_SHARE
+            try:
+                if highway.along_city_block.settlement_type is not bl.SettlementType.rural:
+                    terrace_share = parameters.OWBB_RESIDENTIAL_PERIPHERY_TERRACE_SHARE
+                if highway.along_city_block.settlement_type is not bl.SettlementType.rural:
+                    apartment_share = parameters.OWBB_RESIDENTIAL_PERIPHERY_APARTMENT_SHARE
+            except AttributeError:
+                caught_errors += 1
+                try:
+                    if highway.reverse_city_block.settlement_type is not bl.SettlementType.rural:
+                        terrace_share = parameters.OWBB_RESIDENTIAL_PERIPHERY_TERRACE_SHARE
+                    if highway.reverse_city_block.settlement_type is not bl.SettlementType.rural:
+                        apartment_share = parameters.OWBB_RESIDENTIAL_PERIPHERY_APARTMENT_SHARE
+                except AttributeError:
+                    caught_errors += 1
+
+            if caught_errors == 2:
+                logging.warning('No city blocks on either side of highway in zone %i and settlement type %s',
+                                building_zone.osm_id, building_zone.settlement_type)
+            else:  # proceed with processing
+                if highway.is_sideway() and (random.random() <= terrace_share):
+                    # choose row house already now, so the same row house is potentially applied on both sides of street
+                    index = random.randint(0, len(shared_models_library.residential_terraces) - 1)
+                    alternatives_list = shared_models_library.residential_terraces[index:index + 1]
+                elif random.random() <= apartment_share:
+                    index = random.randint(0, len(shared_models_library.residential_apartments) - 1)
+                    alternatives_list = shared_models_library.residential_apartments[index:index + 1]
+                else:
+                    alternatives_list = None
+
+                # along
+                try:
+                    if highway.along_city_block.settlement_type in [bl.SettlementType.rural,
+                                                                    bl.SettlementType.periphery]:
+                        _generate_extra_buildings_residential(building_zone, highway, detached_houses_list,
+                                                              alternatives_list, False, bounding_box)
+                    else:  # do not accept alternatives and use apartment house list instead of detached
+                        primary_houses = shared_models_library.residential_attached
+                        if highway.along_city_block.settlement_type is bl.SettlementType.dense and \
+                            (random.random() <= parameters.OWBB_RESIDENTIAL_DENSE_SHARE_APARTMENT):
+                            primary_houses = shared_models_library.residential_apartments
+                        _generate_extra_buildings_residential(building_zone, highway, primary_houses, None,
+                                                              False, bounding_box)
+                except AttributeError:
+                    pass
+                # reverse
+                try:
+                    if highway.reverse_city_block.settlement_type in [bl.SettlementType.rural,
+                                                                      bl.SettlementType.periphery]:
+                        _generate_extra_buildings_residential(building_zone, highway, detached_houses_list,
+                                                              alternatives_list, True, bounding_box)
+                    else:
+                        primary_houses = shared_models_library.residential_attached
+                        if highway.reverse_city_block.settlement_type is bl.SettlementType.dense and \
+                            (random.random() <= parameters.OWBB_RESIDENTIAL_DENSE_SHARE_APARTMENT):
+                            primary_houses = shared_models_library.residential_apartments
+                        _generate_extra_buildings_residential(building_zone, highway, primary_houses, None,
+                                                              False, bounding_box)
+                except AttributeError:
+                    pass
 
         else:  # elif landuse.type_ is Landuse.TYPE_INDUSTRIAL:
             _generate_extra_buildings_industrial(building_zone, highway, shared_models_library, False, bounding_box)
@@ -138,12 +193,12 @@ def _generate_extra_buildings(building_zone: m.BuildingZone, shared_models_libra
 
 
 def _generate_extra_buildings_residential(building_zone: m.BuildingZone, highway: m.Highway,
-                                          detached_houses_list: List[m.SharedModel],
-                                          row_houses_list: List[m.SharedModel],
-                                          is_reverse: bool, try_terrace: bool, bounding_box: m.Polygon):
-    if try_terrace:
+                                          primary_houses_list: List[m.SharedModel],
+                                          alternatives_list: Optional[List[m.SharedModel]],
+                                          is_reverse: bool, bounding_box: m.Polygon):
+    if alternatives_list:
         temp_buildings = m.TempGenBuildings(bounding_box)
-        _generate_buildings_along_highway(building_zone, highway, row_houses_list, is_reverse, temp_buildings)
+        _generate_buildings_along_highway(building_zone, highway, alternatives_list, is_reverse, temp_buildings)
         if 0 < temp_buildings.validate_uninterrupted_sequence(parameters.OWBB_RESIDENTIAL_HIGHWAY_MIN_GEN_SHARE,
                                                               parameters.OWBB_RESIDENTIAL_TERRACE_MIN_NUMBER):
             building_zone.commit_temp_gen_buildings(temp_buildings, highway, is_reverse)
@@ -151,7 +206,7 @@ def _generate_extra_buildings_residential(building_zone: m.BuildingZone, highway
 
     # start from scratch - either because terrace not chosen or not successfully validated
     temp_buildings = m.TempGenBuildings(bounding_box)
-    _generate_buildings_along_highway(building_zone, highway, detached_houses_list, is_reverse, temp_buildings)
+    _generate_buildings_along_highway(building_zone, highway, primary_houses_list, is_reverse, temp_buildings)
     if temp_buildings.validate_min_share_generated(parameters.OWBB_RESIDENTIAL_HIGHWAY_MIN_GEN_SHARE):
         building_zone.commit_temp_gen_buildings(temp_buildings, highway, is_reverse)
 
@@ -250,25 +305,38 @@ def _read_building_models_library() -> List[m.BuildingModel]:
     detached_4 = m.BuildingModel(12., 9., bl.BuildingType.detached, list(), None, 0, 0, detached_4_tags)
     models.append(detached_4)
 
-    # residential apartments
-    apartment_1_tags = {s.K_BUILDING: 'detached',
+    # residential apartments (for rural, periphery and dense)
+    apartment_1_tags = {s.K_BUILDING: 'apartments',
                         'building:colour': 'white', 'building:levels': '3',
                         'roof:colour': 'firebrick', 'roof:shape': 'gabled', 'roof:height': '2',
                         s.K_OWBB_GENERATED: 'yes'}
-    apartment_1 = m.BuildingModel(30., 15, bl.BuildingType.apartments, list(), None, 0, 0, apartment_1_tags)
+    apartment_1 = m.BuildingModel(30., 20, bl.BuildingType.apartments, list(), None, 0, 0, apartment_1_tags)
     models.append(apartment_1)
-    apartment_2_tags = {s.K_BUILDING: 'detached',
-                        'building:colour': 'white', 'building:levels': '3',
+    apartment_2_tags = {s.K_BUILDING: 'apartments',
+                        'building:colour': 'beige', 'building:levels': '3',
                         'roof:colour': 'red', 'roof:shape': 'gabled', 'roof:height': '2',
                         s.K_OWBB_GENERATED: 'yes'}
     apartment_2 = m.BuildingModel(35., 14, bl.BuildingType.apartments, list(), None, 0, 0, apartment_2_tags)
     models.append(apartment_2)
-    apartment_3_tags = {s.K_BUILDING: 'detached',
-                        'building:colour': 'white', 'building:levels': '4',
+    apartment_3_tags = {s.K_BUILDING: 'apartments',
+                        'building:colour': 'tan', 'building:levels': '4',
                         'roof:colour': 'red', 'roof:shape': 'gabled', 'roof:height': '2',
                         s.K_OWBB_GENERATED: 'yes'}
-    apartment_3 = m.BuildingModel(26., 18, bl.BuildingType.apartments, list(), None, 0, 0, apartment_3_tags)
+    apartment_3 = m.BuildingModel(26., 22, bl.BuildingType.apartments, list(), None, 0, 0, apartment_3_tags)
     models.append(apartment_3)
+
+    # residential attached (for dense, block and centre)
+    # Will get roof type, number of levels etc. assigned automatically based on SettlementType and
+    # other parameters
+    attached_1_tags = {s.K_BUILDING: 'attached', 'building:colour': 'white', s.K_OWBB_GENERATED: 'yes'}
+    attached_1 = m.BuildingModel(30., 15, bl.BuildingType.attached, list(), None, 0, 0, attached_1_tags)
+    models.append(attached_1)
+    attached_2_tags = {s.K_BUILDING: 'attached', 'building:colour': 'tan', s.K_OWBB_GENERATED: 'yes'}
+    attached_2 = m.BuildingModel(35., 14, bl.BuildingType.attached, list(), None, 0, 0, attached_2_tags)
+    models.append(attached_2)
+    attached_3_tags = {s.K_BUILDING: 'attached', 'building:colour': 'snow', s.K_OWBB_GENERATED: 'yes'}
+    attached_3 = m.BuildingModel(26., 14, bl.BuildingType.attached, list(), None, 0, 0, attached_3_tags)
+    models.append(attached_3)
 
     # terrace
     terrace_1_tags = {s.K_BUILDING: 'terrace',

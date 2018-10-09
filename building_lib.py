@@ -82,6 +82,7 @@ class BuildingType(IntEnum):
     yes = 1  # default
     parking = 10  # k="parking" v="multi-storey"
     apartments = 21
+    attached = 210  # an apartment in a city block without space between buildings. Does not exist in OSM
     house = 22
     detached = 23
     residential = 24

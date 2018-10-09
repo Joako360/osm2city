@@ -343,7 +343,8 @@ def _process_building_parts(nodes_dict: Dict[int, op.Node],
                                 break
                         if all_refs_found:
                             parent_missing = False
-                        elif b_part.polygon.within(candidate.polygon):
+                        elif b_part.polygon.is_valid and candidate.polygon.is_valid and\
+                                b_part.polygon.within(candidate.polygon):
                             parent_missing = False
                         if not parent_missing:
                             if c_key in building_parents:

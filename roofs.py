@@ -142,8 +142,11 @@ def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_
     if b.roof_height:
         roof_height = b.roof_height
     else:
-        logging.error("no roof_height in separate_gable for building %i" % b.osm_id)
-        return
+        my_type = 'separate_gable'
+        if inward_meters > 0:
+            my_type = 'separate_hipped'
+        logging.warning("no roof_height in %s for building %i", my_type, b.osm_id)
+        roof_height = 2.0
     
     # get orientation if exits:
     osm_roof_orientation_exists = False

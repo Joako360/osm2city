@@ -156,11 +156,12 @@ def _draw_generated_zones(building_zones, ax: maxs.Axes) -> None:
                 face_color = "pink"
             elif m.BuildingZoneType.farmyard is building_zone.type_:
                 face_color = "sandybrown"
-            elif m.BuildingZoneType.corine_ind_com is building_zone.type_:
+            elif building_zone.type_ in [m.BuildingZoneType.btg_construction, m.BuildingZoneType.btg_industrial,
+                                         m.BuildingZoneType.btg_port]:
                 face_color = "cyan"
-            elif m.BuildingZoneType.corine_continuous is building_zone.type_:
+            elif building_zone.type_ in [m.BuildingZoneType.btg_urban, m.BuildingZoneType.btg_town]:
                 face_color = "gold"
-            elif m.BuildingZoneType.corine_discontinuous is building_zone.type_:
+            elif building_zone.type_ in [m.BuildingZoneType.btg_builtupcover, m.BuildingZoneType.btg_suburban]:
                 face_color = "yellow"
             edge_color = face_color
             _add_patch_for_building_zone(building_zone, face_color, edge_color, ax)
@@ -303,7 +304,7 @@ gold=town and suburban, yellow=construction and industrial and port]")
     my_figure = _create_a3_landscape_figure()
     my_figure.suptitle("Original OpenStreetMap and generated building zones \n[blue=commercial, green=industrial\
 , dark orange=retail, magenta=residential, brown=farmyard, red=error;\n lighter variants=generated from buildings;\
-\ncyan=commercial and industrial, gold=continuous urban fabric, yellow=discontinuous urban fabric]")
+\ncyan=commercial and industrial, gold=continuous urban, yellow=discontinuous urban]")
     ax = my_figure.add_subplot(111)
     _draw_osm_zones(building_zones, ax)
     _draw_generated_zones(building_zones, ax)

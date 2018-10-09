@@ -430,6 +430,53 @@ BUILDING_FAKE_AMBIENT_OCCLUSION_VALUE           Number     0.6       (see above)
 =============================================   ========   =======   ==============================================================================
 
 
+.. _chapter-parameters-building-generation:
+
+---------------------------------------------------
+Generating Buildings Where OSM is Missing Buildings
+---------------------------------------------------
+
+It is possible to let ``osm2city`` generate buildings, where it is plausible that there in reality would be buildings, but buildings were not mapped in OSM. The following set of parameters make some customisation to specific areas possible. However parts of the processing is rather hard-coded (e.g. the available buildings are defined in code in module ``owbb/would_be_buildings.py`` in function ``_read_building_models_library()``. Still the results are much better than an empty scene.
+
+A lot of processing is dependent on land-use information (see e.g. :ref:`Land-use Handling <chapter-howto-land-use-label>` and :ref:`Land-use Parameters <chapter-parameters-landuse-label>`). For a short explanation of the process used see :ref:`Generate Would-Be Buildings <chapter-howto-generate-would-be-buildings-label>`.
+
+In rural and periphery settlement areas an attempt is made to have the same terrace houses or apartment buildings along both sides of a way
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+OWBB_GENERATE_BUILDINGS                         Boolean    False     Set this to True to generate buildings.
+OWBB_USE_GENERATED_LANDUSE_FOR_B.._GENERATION   Boolean    False     Generated land use is based on existing OSM buildings but missing land-use
+                                                                     information. Therefore there is a fair chance that no additional buildings are
+                                                                     plausible.
+OWBB_USE_EXTERNAL_LANDUSE_FOR_B.._GENERATION    Boolean    True      External land-use is only added, where OSM is missing and no generated
+                                                                     land-use is available. Currently this only land-use from FlightGear (parameter
+                                                                     ``OWBB_USE_BTG_LANDUSE``), which is why most probably plausible buildings
+                                                                     should be generated.
+OWBB_RESIDENTIAL_RURAL_TERRACE_SHARE            Decimal    0.1       The share of terraces / row houses in rural settlement areas.
+OWBB_RESIDENTIAL_PERIPHERY_TERRACE_SHARE        Decimal    0.25      Ditto in periphery settlement areas.
+OWBB_RESIDENTIAL_RURAL_APARTMENT_SHARE          Decimal    0.1       The share of apartment buildings in rural settlement areas.
+OWBB_RESIDENTIAL_PERIPHERY_APARTMENT_SHARE      Decimal    0.3       Ditto in periphery settlement areas.
+OWBB_RESIDENTIAL_DENSE_SHARE_APARTMENT          Decimal    0.3       For generated buildings there are only apartments in residential areas in
+                                                                     dense, but there is still a share of detached instead of attached buildings.
+
+OWBB_STEP_DISTANCE                              Integer    2         How many meters along the way to travel before trying to set a building again.
+                                                                     Smaller values might be more accurate, but also increase processing time.
+OWBB_MIN_STREET_LENGTH                          Integer    10        How long a way needs to be at least to be considered for generating buildings
+                                                                     along.
+OWBB_MIN_CITY_BLOCK_AREA                        Integer    200       The minimal area of a city block along a way to be considered for generating
+                                                                     buildings.
+
+OWBB_RESIDENTIAL_HIGHWAY_MIN_GEN_SHARE          Decimal    0.3       If there are already buildings along the way: what is the minimal share of
+                                                                     an uninterrupted length along the way to consider for terraces or apartments
+                                                                     (detached houses might still be "built").
+OWBB_ZONE_AREA_MAX_GEN                          Decimal    0.1       If the share of floor area of exiting OSM buildings compared to the whole
+                                                                     area is above this value, then no extra buildings are placed.
+                                                                     In the future this value might need to be specific per settlement type.
+
+=============================================   ========   =======   ==============================================================================
+
+
 .. _chapter-parameters-roads:
 
 ================================

@@ -962,6 +962,7 @@ class SharedModelsLibrary(object):
         self._residential_detached = list()
         self._residential_terraces = list()
         self._residential_apartments = list()
+        self._residential_attached = list()
         self._industrial_buildings_large = list()
         self._industrial_buildings_small = list()
         self._populate_models_library(building_models)
@@ -979,6 +980,10 @@ class SharedModelsLibrary(object):
         return self._residential_apartments
 
     @property
+    def residential_attached(self):
+        return self._residential_attached
+
+    @property
     def industrial_buildings_large(self):
         return self._industrial_buildings_large
 
@@ -989,20 +994,23 @@ class SharedModelsLibrary(object):
     def _populate_models_library(self, building_models: List[BuildingModel]) -> None:
         for building_model in building_models:
             if building_model.model_type is bl.BuildingType.apartments:
-                my_model = SharedModel(building_model, bl.BuildingType.apartments)
-                self._residential_apartments.append(my_model)
+                a_model = SharedModel(building_model, bl.BuildingType.apartments)
+                self._residential_apartments.append(a_model)
+            elif building_model.model_type is bl.BuildingType.attached:
+                a_model = SharedModel(building_model, bl.BuildingType.attached)
+                self._residential_attached.append(a_model)
             elif building_model.model_type is bl.BuildingType.detached:
-                my_model = SharedModel(building_model, bl.BuildingType.detached)
-                self._residential_detached.append(my_model)
+                a_model = SharedModel(building_model, bl.BuildingType.detached)
+                self._residential_detached.append(a_model)
             elif building_model.model_type is bl.BuildingType.terrace:
-                my_model = SharedModel(building_model, bl.BuildingType.terrace)
-                self._residential_terraces.append(my_model)
+                a_model = SharedModel(building_model, bl.BuildingType.terrace)
+                self._residential_terraces.append(a_model)
             elif building_model.model_type is bl.BuildingType.industrial:
-                my_model = SharedModel(building_model, bl.BuildingType.industrial)
+                a_model = SharedModel(building_model, bl.BuildingType.industrial)
                 if building_model.area > self.INDUSTRIAL_LARGE_MIN_AREA:
-                    self._industrial_buildings_large.append(my_model)
+                    self._industrial_buildings_large.append(a_model)
                 else:
-                    self._industrial_buildings_small.append(my_model)
+                    self._industrial_buildings_small.append(a_model)
 
     def is_valid(self) -> bool:
         if 0 == len(self._residential_detached):
