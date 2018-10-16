@@ -9,6 +9,7 @@ import abc
 from enum import IntEnum, unique
 import logging
 import math
+import random
 from typing import Dict, List, Optional, Tuple, Union
 
 from shapely.geometry import box, Point, LineString, Polygon, MultiPolygon
@@ -407,6 +408,9 @@ class BuildingZone(OSMFeatureArea):
         self.osm_buildings.append(building)
         building.zone = self
 
+    def reset_city_blocks(self) -> None:
+        self.linked_city_blocks = list()
+
     def add_city_block(self, city_block: CityBlock) -> None:
         self.linked_city_blocks.append(city_block)
 
@@ -426,9 +430,12 @@ class BuildingZone(OSMFeatureArea):
         cases. And if not then no big harm, as city blocks close to each other will have similar types."""
         linked = 0
         for highway in self.linked_genways:
-            coords = list(highway.geometry.coords)
-            angle = co.calc_angle_of_line_local(coords[0][0], coords[0][1], coords[-1][0], coords[-1][1])
-            middle_point = highway.geometry.interpolate(highway.geometry.length / 2)
+            half_length = highway.geometry.length / 2
+            middle_point = highway.geometry.interpolate(half_length)
+            before_point = highway.geometry.interpolate(half_length - 1)
+            after_point = highway.geometry.interpolate(half_length + 1)
+            angle = co.calc_angle_of_line_local(before_point.x, before_point.y, after_point.x, after_point.y)
+            # one side
             my_point = Point(co.calc_point_angle_away(middle_point.x, middle_point.y,
                                                       2 * parameters.OWBB_CITY_BLOCK_HIGHWAY_BUFFER, angle + 90))
             for city_block in self.linked_city_blocks:
@@ -436,6 +443,7 @@ class BuildingZone(OSMFeatureArea):
                     highway.along_city_block = city_block
                     linked += 1
                     break
+            # opposite side
             my_point = Point(co.calc_point_angle_away(middle_point.x, middle_point.y,
                                                       2 * parameters.OWBB_CITY_BLOCK_HIGHWAY_BUFFER, angle - 90))
             for city_block in self.linked_city_blocks:
@@ -869,56 +877,50 @@ class BuildingModel(object):
 
 
 class SharedModel(object):
-    def __init__(self, building_model: BuildingModel, building_type: bl.BuildingType) -> None:
+    def __init__(self, building_model: BuildingModel) -> None:
         self.building_model = building_model
-        self.type_ = building_type
         self._front_buffer = 0
         self._back_buffer = 0
         self._side_buffer = 0
-        self._calc_buffers()
 
-    def _calc_buffers(self) -> None:
-        if self.type_ is bl.BuildingType.detached:
-            front_min = parameters.OWBB_RESIDENTIAL_HOUSE_FRONT_MIN
-            front_max = parameters.OWBB_RESIDENTIAL_HOUSE_FRONT_MAX
-            back_min = parameters.OWBB_RESIDENTIAL_HOUSE_BACK_MIN
-            back_max = parameters.OWBB_RESIDENTIAL_HOUSE_BACK_MAX
-            side_min = parameters.OWBB_RESIDENTIAL_HOUSE_SIDE_MIN
-            side_max = parameters.OWBB_RESIDENTIAL_HOUSE_SIDE_MAX
-        elif self.type_ is bl.BuildingType.terrace:
-            front_min = parameters.OWBB_RESIDENTIAL_TERRACE_FRONT_MIN
-            front_max = parameters.OWBB_RESIDENTIAL_TERRACE_FRONT_MAX
-            back_min = parameters.OWBB_RESIDENTIAL_TERRACE_BACK_MIN
-            back_max = parameters.OWBB_RESIDENTIAL_TERRACE_BACK_MAX
-            side_min = parameters.OWBB_RESIDENTIAL_TERRACE_SIDE_MIN
-            side_max = parameters.OWBB_RESIDENTIAL_TERRACE_SIDE_MAX
+    def calc_buffers(self, settlement_type: bl.SettlementType) -> None:
+        # industrial
+        if self.building_model.model_type is bl.BuildingType.industrial:
+            my_rand = random.random()
+            self._side_buffer = parameters.OWBB_INDUSTRIAL_BUILDING_SIDE_MIN + my_rand * (
+                parameters.OWBB_INDUSTRIAL_BUILDING_SIDE_MAX - parameters.OWBB_INDUSTRIAL_BUILDING_SIDE_MIN
+            )
+            self._back_buffer = self._side_buffer
+            self._front_buffer = self._side_buffer
+            if settlement_type in [bl.SettlementType.dense, bl.SettlementType.block, bl.SettlementType.centre]:
+                self._front_buffer = parameters.OWBB_FRONT_DENSE
         else:
-            front_min = parameters.OWBB_INDUSTRIAL_BUILDING_FRONT_MIN
-            front_max = parameters.OWBB_INDUSTRIAL_BUILDING_FRONT_MIN
-            back_min = parameters.OWBB_INDUSTRIAL_BUILDING_BACK_MIN
-            back_max = parameters.OWBB_INDUSTRIAL_BUILDING_BACK_MIN
-            side_min = parameters.OWBB_INDUSTRIAL_BUILDING_SIDE_MIN
-            side_max = parameters.OWBB_INDUSTRIAL_BUILDING_SIDE_MIN
-        my_buffer = self.width/2 + math.sqrt(self.width)
-        if my_buffer < front_min:
-            my_buffer = front_min
-        if my_buffer > front_max:
-            my_buffer = front_max
-        self._front_buffer = my_buffer
+            self._side_buffer = math.sqrt(self.width) * parameters.OWBB_RESIDENTIAL_SIDE_FACTOR_PERIPHERY
+            self._back_buffer = math.sqrt(self.depth) * parameters.OWBB_RESIDENTIAL_BACK_FACTOR_PERIPHERY
+            # terraces
+            if self.building_model.model_type is bl.BuildingType.terrace:
+                self._side_buffer = 0.0
+                # however we want to have some breaks in the continuous line of houses
+                if random.random() < (1 / parameters.OWBB_RESIDENTIAL_TERRACE_TYPICAL_NUMBER):
+                    self._side_buffer = math.sqrt(self.width) * parameters.OWBB_RESIDENTIAL_SIDE_FACTOR_PERIPHERY
+            # dense areas
+            if settlement_type in [bl.SettlementType.dense, bl.SettlementType.block, bl.SettlementType.centre]:
+                self._front_buffer = parameters.OWBB_FRONT_DENSE
+                self._side_buffer = 0.0
+                self._back_buffer = parameters.OWBB_FRONT_DENSE  # yes, it is small
+                if settlement_type is bl.SettlementType.dense:
+                    if self.building_model.model_type is bl.BuildingType.terrace:
+                        # however we want to have some breaks in the continuous line of houses
+                        if random.random() < (1 / parameters.OWBB_RESIDENTIAL_TERRACE_TYPICAL_NUMBER):
+                            self._side_buffer = math.sqrt(
+                                self.width) * parameters.OWBB_RESIDENTIAL_SIDE_FACTOR_DENSE
+                    elif self.building_model.model_type in [bl.BuildingType.apartments, bl.BuildingType.detached]:
+                        self._side_buffer = math.sqrt(self.width) * parameters.OWBB_RESIDENTIAL_SIDE_FACTOR_DENSE
+                        self._front_buffer = self._side_buffer
 
-        my_buffer = self.width/2 + math.sqrt(self.width)
-        if my_buffer < back_min:
-            my_buffer = back_min
-        if my_buffer > back_max:
-            my_buffer = back_max
-        self._back_buffer = my_buffer
-
-        my_buffer = self.width/2 + math.sqrt(self.width)
-        if my_buffer < side_min:
-            my_buffer = side_min
-        if my_buffer > side_max:
-            my_buffer = side_max
-        self._side_buffer = my_buffer
+    @property
+    def type_(self) -> bl.BuildingType:
+        return self.building_model.model_type
 
     @property
     def width(self) -> float:
@@ -934,7 +936,10 @@ class SharedModel(object):
 
     @property
     def min_front_buffer(self) -> float:
-        """The absolute minimal distance tolerable, e.g. in a curve at the edges of the lot"""
+        """The absolute minimal distance tolerable, e.g. in a curve at the edges of the lot.
+        The front_buffer will be used to place the building relative to the middle of the house along the street.
+        The min_front_buffer is a bit smaller and allows in a concave curve that the building still is placed,
+        because the buffer in the front of the house is only min_front_buffer and therefore smaller."""
         return math.sqrt(self._front_buffer)
 
     @property
@@ -948,10 +953,6 @@ class SharedModel(object):
     @property
     def building_type(self):
         return self.type_
-
-    @property
-    def world_model(self):
-        return self.building_model.model
 
 
 class SharedModelsLibrary(object):
@@ -994,19 +995,19 @@ class SharedModelsLibrary(object):
     def _populate_models_library(self, building_models: List[BuildingModel]) -> None:
         for building_model in building_models:
             if building_model.model_type is bl.BuildingType.apartments:
-                a_model = SharedModel(building_model, bl.BuildingType.apartments)
+                a_model = SharedModel(building_model)
                 self._residential_apartments.append(a_model)
             elif building_model.model_type is bl.BuildingType.attached:
-                a_model = SharedModel(building_model, bl.BuildingType.attached)
+                a_model = SharedModel(building_model)
                 self._residential_attached.append(a_model)
             elif building_model.model_type is bl.BuildingType.detached:
-                a_model = SharedModel(building_model, bl.BuildingType.detached)
+                a_model = SharedModel(building_model)
                 self._residential_detached.append(a_model)
             elif building_model.model_type is bl.BuildingType.terrace:
-                a_model = SharedModel(building_model, bl.BuildingType.terrace)
+                a_model = SharedModel(building_model)
                 self._residential_terraces.append(a_model)
             elif building_model.model_type is bl.BuildingType.industrial:
-                a_model = SharedModel(building_model, bl.BuildingType.industrial)
+                a_model = SharedModel(building_model)
                 if building_model.area > self.INDUSTRIAL_LARGE_MIN_AREA:
                     self._industrial_buildings_large.append(a_model)
                 else:
@@ -1022,6 +1023,9 @@ class SharedModelsLibrary(object):
         if 0 == len(self._residential_apartments):
             logging.warning("No residential apartment buildings found")
             return False
+        if 0 == len(self._residential_attached):
+            logging.warning("No residential attached buildings found")
+            return False
         if 0 == len(self._industrial_buildings_large):
             logging.warning("No large industrial buildings found")
             return False
@@ -1033,14 +1037,16 @@ class SharedModelsLibrary(object):
 
 class GenBuilding(object):
     """An object representing a generated non-OSM building"""
-    def __init__(self, gen_id: int, shared_model: SharedModel, highway_width: float) -> None:
+    def __init__(self, gen_id: int, shared_model: SharedModel, highway_width: float,
+                 settlement_type: bl.SettlementType) -> None:
         self.gen_id = gen_id
         self.shared_model = shared_model
+        self.shared_model.calc_buffers(settlement_type)
         # takes into account that ideal buffer_front is challenged in curve
         self.area_polygon = None  # A polygon representing only the building, not the buffer around
         self.buffer_polygon = None  # A polygon representing the building incl. front/back/side buffers
         self.distance_to_street = 0  # The distance from the building's midpoint to the middle of the street
-        self._create_area_polygons(highway_width)
+        self._create_my_polygons(highway_width)
         # below location attributes are set after population
         self.x = 0  # the x coordinate of the mid-point in relation to the local coordinate system
         self.y = 0  # the y coordinate of the mid-point in relation to the local coordinate system
@@ -1048,8 +1054,8 @@ class GenBuilding(object):
                         # static object local x-axis
         self.zone = None  # either a BuildingZone or a CityBlock
 
-    def _create_area_polygons(self, highway_width: float) -> None:
-        """Creates polygons at (0,0) and no angle"""
+    def _create_my_polygons(self, highway_width: float) -> None:
+        """Creates buffer and area polygons at (0,0) and no angle"""
         buffer_front = self.shared_model.front_buffer
         min_buffer_front = self.shared_model.min_front_buffer
         buffer_side = self.shared_model.side_buffer
@@ -1066,9 +1072,10 @@ class GenBuilding(object):
 
         self.distance_to_street = highway_width/2 + buffer_front + self.shared_model.depth/2
 
-    def get_area_polygon(self, has_buffer, highway_point, highway_angle):
+    def get_a_polygon(self, has_buffer: bool, highway_point, highway_angle):
         """
-        Create a polygon for the building and place it in relation to the point and angle of the highway.
+        Gets a polygon for the building and place it in relation to the point and angle of the highway.
+        Depending on parameter it takes the buffer or area polygon.
         """
         if has_buffer:
             my_box = self.buffer_polygon
@@ -1081,8 +1088,8 @@ class GenBuilding(object):
     def set_location(self, point_on_line, angle, area_polygon, buffer_polygon):
         self.area_polygon = area_polygon
         self.buffer_polygon = buffer_polygon
-        self.angle = angle
-        my_angle = math.radians(angle+90)  # angle plus 90 because the angle is along the street, not square from street
+        self.angle = angle + 90
+        my_angle = math.radians(angle)
         self.x = point_on_line.x + self.distance_to_street*math.sin(my_angle)
         self.y = point_on_line.y + self.distance_to_street*math.cos(my_angle)
 

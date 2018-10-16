@@ -19,7 +19,7 @@ import utils.coordinates as co
 import parameters
 import utils.osmparser as op
 import utils.osmstrings as s
-from utils.utilities import time_logging
+from utils.utilities import time_logging, random_value_from_ratio_dict_parameter
 
 if speedups.available:
     speedups.enable()
@@ -115,9 +115,14 @@ def _prepare_building_zone_with_highways(building_zone, highways_dict):
         del highways_dict[key]
 
 
+HIGHWAYS_FOR_ZONE_SPLIT = [m.HighwayType.motorway, m.HighwayType.trunk]
+
+
 def _generate_extra_buildings(building_zone: m.BuildingZone, shared_models_library: m.SharedModelsLibrary,
                               bounding_box: Polygon):
     for highway in building_zone.linked_genways:
+        if highway.type_ in HIGHWAYS_FOR_ZONE_SPLIT:
+            continue
         if building_zone.type_ is m.BuildingZoneType.residential:
             # apartment_houses_list = shared_models_library.residential_apartments
             detached_houses_list = shared_models_library.residential_detached
@@ -128,23 +133,21 @@ def _generate_extra_buildings(building_zone: m.BuildingZone, shared_models_libra
             terrace_share = parameters.OWBB_RESIDENTIAL_RURAL_TERRACE_SHARE
             apartment_share = parameters.OWBB_RESIDENTIAL_RURAL_APARTMENT_SHARE
             try:
-                if highway.along_city_block.settlement_type is not bl.SettlementType.rural:
+                if highway.along_city_block.settlement_type is bl.SettlementType.periphery:
                     terrace_share = parameters.OWBB_RESIDENTIAL_PERIPHERY_TERRACE_SHARE
-                if highway.along_city_block.settlement_type is not bl.SettlementType.rural:
                     apartment_share = parameters.OWBB_RESIDENTIAL_PERIPHERY_APARTMENT_SHARE
             except AttributeError:
                 caught_errors += 1
                 try:
-                    if highway.reverse_city_block.settlement_type is not bl.SettlementType.rural:
+                    if highway.reverse_city_block.settlement_type is not bl.SettlementType.periphery:
                         terrace_share = parameters.OWBB_RESIDENTIAL_PERIPHERY_TERRACE_SHARE
-                    if highway.reverse_city_block.settlement_type is not bl.SettlementType.rural:
                         apartment_share = parameters.OWBB_RESIDENTIAL_PERIPHERY_APARTMENT_SHARE
                 except AttributeError:
                     caught_errors += 1
 
             if caught_errors == 2:
-                logging.warning('No city blocks on either side of highway in zone %i and settlement type %s',
-                                building_zone.osm_id, building_zone.settlement_type)
+                logging.warning('No city blocks on either side of highway %i in zone %i and settlement type %s',
+                                highway.osm_id, building_zone.osm_id, building_zone.settlement_type)
             else:  # proceed with processing
                 if highway.is_sideway() and (random.random() <= terrace_share):
                     # choose row house already now, so the same row house is potentially applied on both sides of street
@@ -156,17 +159,26 @@ def _generate_extra_buildings(building_zone: m.BuildingZone, shared_models_libra
                 else:
                     alternatives_list = None
 
+                # prepare for not rural / periphery, so we can have the same along and reverse
+                primary_houses = shared_models_library.residential_attached
+                if highway.along_city_block.settlement_type is bl.SettlementType.dense:
+                    building_type = random_value_from_ratio_dict_parameter(parameters.OWBB_RESIDENTIAL_DENSE_TYPE_SHARE)
+                    if building_type == 'detached':
+                        primary_houses = shared_models_library.residential_detached
+                    elif building_type == 'terrace':
+                        index = random.randint(0, len(shared_models_library.residential_terraces) - 1)
+                        primary_houses = shared_models_library.residential_terraces[index:index + 1]
+                    elif building_type == 'apartments':
+                        index = random.randint(0, len(shared_models_library.residential_apartments) - 1)
+                        primary_houses = shared_models_library.residential_apartments[index:index + 1]
+
                 # along
                 try:
                     if highway.along_city_block.settlement_type in [bl.SettlementType.rural,
                                                                     bl.SettlementType.periphery]:
                         _generate_extra_buildings_residential(building_zone, highway, detached_houses_list,
                                                               alternatives_list, False, bounding_box)
-                    else:  # do not accept alternatives and use apartment house list instead of detached
-                        primary_houses = shared_models_library.residential_attached
-                        if highway.along_city_block.settlement_type is bl.SettlementType.dense and \
-                            (random.random() <= parameters.OWBB_RESIDENTIAL_DENSE_SHARE_APARTMENT):
-                            primary_houses = shared_models_library.residential_apartments
+                    else:
                         _generate_extra_buildings_residential(building_zone, highway, primary_houses, None,
                                                               False, bounding_box)
                 except AttributeError:
@@ -178,10 +190,6 @@ def _generate_extra_buildings(building_zone: m.BuildingZone, shared_models_libra
                         _generate_extra_buildings_residential(building_zone, highway, detached_houses_list,
                                                               alternatives_list, True, bounding_box)
                     else:
-                        primary_houses = shared_models_library.residential_attached
-                        if highway.reverse_city_block.settlement_type is bl.SettlementType.dense and \
-                            (random.random() <= parameters.OWBB_RESIDENTIAL_DENSE_SHARE_APARTMENT):
-                            primary_houses = shared_models_library.residential_apartments
                         _generate_extra_buildings_residential(building_zone, highway, primary_houses, None,
                                                               False, bounding_box)
                 except AttributeError:
@@ -196,9 +204,13 @@ def _generate_extra_buildings_residential(building_zone: m.BuildingZone, highway
                                           primary_houses_list: List[m.SharedModel],
                                           alternatives_list: Optional[List[m.SharedModel]],
                                           is_reverse: bool, bounding_box: m.Polygon):
+    my_settlement_type = highway.along_city_block.settlement_type
+    if is_reverse:
+        my_settlement_type = highway.reversed_city_block.settlement_type
     if alternatives_list:
         temp_buildings = m.TempGenBuildings(bounding_box)
-        _generate_buildings_along_highway(building_zone, highway, alternatives_list, is_reverse, temp_buildings)
+        _generate_buildings_along_highway(building_zone, my_settlement_type,
+                                          highway, alternatives_list, is_reverse, temp_buildings)
         if 0 < temp_buildings.validate_uninterrupted_sequence(parameters.OWBB_RESIDENTIAL_HIGHWAY_MIN_GEN_SHARE,
                                                               parameters.OWBB_RESIDENTIAL_TERRACE_MIN_NUMBER):
             building_zone.commit_temp_gen_buildings(temp_buildings, highway, is_reverse)
@@ -206,7 +218,8 @@ def _generate_extra_buildings_residential(building_zone: m.BuildingZone, highway
 
     # start from scratch - either because terrace not chosen or not successfully validated
     temp_buildings = m.TempGenBuildings(bounding_box)
-    _generate_buildings_along_highway(building_zone, highway, primary_houses_list, is_reverse, temp_buildings)
+    _generate_buildings_along_highway(building_zone, my_settlement_type,
+                                      highway, primary_houses_list, is_reverse, temp_buildings)
     if temp_buildings.validate_min_share_generated(parameters.OWBB_RESIDENTIAL_HIGHWAY_MIN_GEN_SHARE):
         building_zone.commit_temp_gen_buildings(temp_buildings, highway, is_reverse)
 
@@ -217,14 +230,17 @@ def _generate_extra_buildings_industrial(building_zone: m.BuildingZone, highway:
     temp_buildings = m.TempGenBuildings(bounding_box)
     if random.random() <= parameters.OWBB_INDUSTRIAL_LARGE_SHARE:
         shared_models_list = shared_models_library.industrial_buildings_large
-        _generate_buildings_along_highway(building_zone, highway, shared_models_list, is_reverse, temp_buildings)
+        _generate_buildings_along_highway(building_zone, building_zone.settlement_type,
+                                          highway, shared_models_list, is_reverse, temp_buildings)
 
     shared_models_list = shared_models_library.industrial_buildings_small
-    _generate_buildings_along_highway(building_zone, highway, shared_models_list, is_reverse, temp_buildings)
+    _generate_buildings_along_highway(building_zone, building_zone.settlement_type,
+                                      highway, shared_models_list, is_reverse, temp_buildings)
     building_zone.commit_temp_gen_buildings(temp_buildings, highway, is_reverse)
 
 
-def _generate_buildings_along_highway(building_zone: m.BuildingZone, highway: m.Highway,
+def _generate_buildings_along_highway(building_zone: m.BuildingZone, settlement_type: bl.SettlementType,
+                                      highway: m.Highway,
                                       shared_models_list: List[m.SharedModel], is_reverse: bool,
                                       temp_buildings: m.TempGenBuildings):
     """
@@ -232,12 +248,12 @@ def _generate_buildings_along_highway(building_zone: m.BuildingZone, highway: m.
     The to be populated buildings all bring their own constraints with regards to distance to road, distance to other
     buildings etc.
 
-    Returns a LanduseTempGenBuildings object with all potential new generated buildings
+    Returns a TempGenBuildings object with all potential new generated buildings
     """
     travelled_along = 0
     highway_length = highway.geometry.length
     my_gen_building = m.GenBuilding(op.get_next_pseudo_osm_id(op.OSMFeatureType.building_owbb),
-                                    random.choice(shared_models_list), highway.get_width())
+                                    random.choice(shared_models_list), highway.get_width(), settlement_type)
     if not is_reverse:
         point_on_line = highway.geometry.interpolate(0)
     else:
@@ -251,7 +267,7 @@ def _generate_buildings_along_highway(building_zone: m.BuildingZone, highway: m.
             point_on_line = highway.geometry.interpolate(highway_length - travelled_along)
         angle = co.calc_angle_of_line_local(prev_point_on_line.x, prev_point_on_line.y,
                                             point_on_line.x, point_on_line.y)
-        buffer_polygon = my_gen_building.get_area_polygon(True, point_on_line, angle)
+        buffer_polygon = my_gen_building.get_a_polygon(True, point_on_line, angle)
         if buffer_polygon.within(building_zone.geometry):
             valid_new_gen_building = True
             for blocked_area in building_zone.linked_blocked_areas:
@@ -264,19 +280,20 @@ def _generate_buildings_along_highway(building_zone: m.BuildingZone, highway: m.
                         valid_new_gen_building = False
                         break
             if valid_new_gen_building:
-                area_polygon = my_gen_building.get_area_polygon(False, point_on_line, angle)
+                area_polygon = my_gen_building.get_a_polygon(False, point_on_line, angle)
                 my_gen_building.set_location(point_on_line, angle, area_polygon, buffer_polygon)
                 temp_buildings.add_generated(my_gen_building, m.BlockedArea(m.BlockedAreaType.gen_building,
                                                                             area_polygon))
                 # prepare a new building, which might get added in the next loop
                 my_gen_building = m.GenBuilding(op.get_next_pseudo_osm_id(op.OSMFeatureType.building_owbb),
-                                                random.choice(shared_models_list), highway.get_width())
+                                                random.choice(shared_models_list), highway.get_width(), settlement_type)
 
 
 def _read_building_models_library() -> List[m.BuildingModel]:
     # FIXME: hard-coded to be replaced
     # The correct BUILDING_KEY has to be given
-    # always define the building:levels - and do NOT specify height
+    # Define the building:levels - and do NOT specify height
+    # TODO: the list of building types must correspond to models.SharedModelsLibrary
     models = list()
 
     # residential detached

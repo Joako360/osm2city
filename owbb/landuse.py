@@ -323,6 +323,7 @@ def _assign_city_blocks(building_zone: m.BuildingZone, highways_dict: Dict[int, 
     Could also be done by using e.g. networkx.algorithms.cycles.cycle_basis.html. However is a bit more complicated
     logic and programming wise, but might be faster.
     """
+    building_zone.reset_city_blocks()
     highways_dict_copy1 = highways_dict.copy()  # otherwise when using highways_dict in plotting it will be "used"
 
     polygons = list()
@@ -405,9 +406,7 @@ def _split_generated_building_zones_by_major_lines(before_list: List[m.BuildingZ
     # create buffers around major transport
     line_buffers = list()
     for highway in highways.values():
-        if highway.type_ in [m.HighwayType.motorway, m.HighwayType.trunk,
-                             m.HighwayType.primary, m.HighwayType.secondary, m.HighwayType.tertiary,
-                             m.HighwayType.unclassified] and not highway.is_tunnel:
+        if highway.type_ in [wbb.HIGHWAYS_FOR_ZONE_SPLIT] and not highway.is_tunnel:
             line_buffers.append(highway.geometry.buffer(highway.get_width()/2))
 
     for railway in railways.values():
@@ -526,11 +525,15 @@ def _create_settlement_clusters(lit_areas: List[Polygon], water_areas: List[Poly
 def _link_building_zones_with_settlements(settlement_clusters: List[m.SettlementCluster],
                                           building_zones: List[m.BuildingZone],
                                           highways_dict: Dict[int, m.Highway]) -> None:
+    """As the name says. Plus also creates city blocks.
+    A building zone can only be in one settlement cluster.
+    Per default a building zone has SettlementType = rural."""
+    zones_processed_in_settlement = list()
     x = 0
     x_number = len(settlement_clusters)
     for settlement in settlement_clusters:
         x += 1
-        logging.debug('%i out of %i settlement clusters', x, x_number)
+        logging.debug('Processing %i out of %i settlement clusters', x, x_number)
         # create the settlement type circles
         centre_circles = list()
         block_circles = list()
@@ -546,35 +549,42 @@ def _link_building_zones_with_settlements(settlement_clusters: List[m.Settlement
         for zone in building_zones:
             z += 1
             if z % 20 == 0:
-                logging.debug('%i out of %i building_zones', z, z_number)
-            # using "within" instead of "intersect" because lit-areas are always larger than zones due to buffering
-            # and therefore a zone can always only be within one lit-area/settlement and not another
-            if zone.geometry.within(settlement.geometry):
-                zone.settlement_type = bl.SettlementType.periphery
-                # create city blocks
-                _assign_city_blocks(zone, highways_dict)
-                # Test for being within a settlement type circle beginning with the highest ranking circles.
-                # Make sure not to overwrite higher rankings, if already set from different cluster
-                # If yes, then assign settlement type to city block
-                for city_block in zone.linked_city_blocks:
-                    if city_block.settlement_type.value < bl.SettlementType.centre.value:
-                        for circle in centre_circles:
-                            if not city_block.geometry.disjoint(circle):
-                                city_block.settlement_type = bl.SettlementType.centre
-                                zone.settlement_type = bl.SettlementType.centre
-                                break
-                    if city_block.settlement_type.value < bl.SettlementType.block.value:
-                        for circle in block_circles:
-                            if not city_block.geometry.disjoint(circle):
-                                city_block.settlement_type = bl.SettlementType.block
-                                zone.settlement_type = bl.SettlementType.block
-                                break
-                    if city_block.settlement_type.value < bl.SettlementType.dense.value:
-                        for circle in dense_circles:
-                            if not city_block.geometry.disjoint(circle):
-                                city_block.settlement_type = bl.SettlementType.dense
-                                zone.settlement_type = bl.SettlementType.dense
-                                break
+                logging.debug('Processing %i out of %i building_zones', z, z_number)
+            if zone not in zones_processed_in_settlement:
+                # using "within" instead of "intersect" because lit-areas are always larger than zones due to buffering
+                # and therefore a zone can always only be within one lit-area/settlement and not another
+                if zone.geometry.within(settlement.geometry):
+                    zones_processed_in_settlement.append(zone)
+                    zone.settlement_type = bl.SettlementType.periphery
+                    # create city blocks
+                    _assign_city_blocks(zone, highways_dict)
+                    # Test for being within a settlement type circle beginning with the highest ranking circles.
+                    # Make sure not to overwrite higher rankings, if already set from different cluster
+                    # If yes, then assign settlement type to city block
+                    for city_block in zone.linked_city_blocks:
+                        if city_block.settlement_type.value < bl.SettlementType.centre.value:
+                            for circle in centre_circles:
+                                if not city_block.geometry.disjoint(circle):
+                                    city_block.settlement_type = bl.SettlementType.centre
+                                    zone.settlement_type = bl.SettlementType.centre
+                                    break
+                        if city_block.settlement_type.value < bl.SettlementType.block.value:
+                            for circle in block_circles:
+                                if not city_block.geometry.disjoint(circle):
+                                    city_block.settlement_type = bl.SettlementType.block
+                                    zone.settlement_type = bl.SettlementType.block
+                                    break
+                        if city_block.settlement_type.value < bl.SettlementType.dense.value:
+                            for circle in dense_circles:
+                                if not city_block.geometry.disjoint(circle):
+                                    city_block.settlement_type = bl.SettlementType.dense
+                                    zone.settlement_type = bl.SettlementType.dense
+                                    break
+
+    # now make sure that also zones outside of settlements get city blocks
+    for zone in building_zones:
+        if zone not in zones_processed_in_settlement:
+            _assign_city_blocks(zone, highways_dict)
 
 
 def _sanity_check_settlement_types(building_zones: List[m.BuildingZone], highways_dict: Dict[int, m.Highway]) -> None:
