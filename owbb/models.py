@@ -1089,7 +1089,7 @@ class GenBuilding(object):
         self.area_polygon = area_polygon
         self.buffer_polygon = buffer_polygon
         self.angle = angle + 90
-        my_angle = math.radians(angle)
+        my_angle = math.radians(self.angle)
         self.x = point_on_line.x + self.distance_to_street*math.sin(my_angle)
         self.y = point_on_line.y + self.distance_to_street*math.cos(my_angle)
 
