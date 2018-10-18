@@ -440,7 +440,9 @@ It is possible to let ``osm2city`` generate buildings, where it is plausible tha
 
 A lot of processing is dependent on land-use information (see e.g. :ref:`Land-use Handling <chapter-howto-land-use-label>` and :ref:`Land-use Parameters <chapter-parameters-landuse-label>`). For a short explanation of the process used see :ref:`Generate Would-Be Buildings <chapter-howto-generate-would-be-buildings-label>`.
 
-In rural and periphery settlement areas an attempt is made to have the same terrace houses or apartment buildings along both sides of a way
+In rural and periphery settlement areas an attempt is made to have the same terrace houses or apartment buildings along both sides of a way.
+
+The first set of parameters determines the overall placement heuristics:
 
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
@@ -453,26 +455,72 @@ OWBB_USE_EXTERNAL_LANDUSE_FOR_B.._GENERATION    Boolean    True      External la
                                                                      land-use is available. Currently this only land-use from FlightGear (parameter
                                                                      ``OWBB_USE_BTG_LANDUSE``), which is why most probably plausible buildings
                                                                      should be generated.
-OWBB_RESIDENTIAL_RURAL_TERRACE_SHARE            Decimal    0.1       The share of terraces / row houses in rural settlement areas.
-OWBB_RESIDENTIAL_PERIPHERY_TERRACE_SHARE        Decimal    0.25      Ditto in periphery settlement areas.
-OWBB_RESIDENTIAL_RURAL_APARTMENT_SHARE          Decimal    0.1       The share of apartment buildings in rural settlement areas.
-OWBB_RESIDENTIAL_PERIPHERY_APARTMENT_SHARE      Decimal    0.3       Ditto in periphery settlement areas.
-OWBB_RESIDENTIAL_DENSE_SHARE_APARTMENT          Decimal    0.3       For generated buildings there are only apartments in residential areas in
-                                                                     dense, but there is still a share of detached instead of attached buildings.
-
 OWBB_STEP_DISTANCE                              Integer    2         How many meters along the way to travel before trying to set a building again.
                                                                      Smaller values might be more accurate, but also increase processing time.
 OWBB_MIN_STREET_LENGTH                          Integer    10        How long a way needs to be at least to be considered for generating buildings
                                                                      along.
 OWBB_MIN_CITY_BLOCK_AREA                        Integer    200       The minimal area of a city block along a way to be considered for generating
                                                                      buildings.
-
 OWBB_RESIDENTIAL_HIGHWAY_MIN_GEN_SHARE          Decimal    0.3       If there are already buildings along the way: what is the minimal share of
                                                                      an uninterrupted length along the way to consider for terraces or apartments
                                                                      (detached houses might still be "built").
 OWBB_ZONE_AREA_MAX_GEN                          Decimal    0.1       If the share of floor area of exiting OSM buildings compared to the whole
                                                                      area is above this value, then no extra buildings are placed.
                                                                      In the future this value might need to be specific per settlement type.
+
+=============================================   ========   =======   ==============================================================================
+
+The second set of parameters determines the type of residential buildings to use and the distances between the buildings and the street as well as what happens in the backyard. The ``width`` of a building is along the street, the ``depth`` of a building is away from the street (front door to back door).
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+OWBB_RESIDENTIAL_RURAL_TERRACE_SHARE            Decimal    0.1       The share of terraces / row houses in rural settlement areas. Most houses are
+                                                                     detached, which is the default.
+OWBB_RESIDENTIAL_PERIPHERY_TERRACE_SHARE        Decimal    0.25      Ditto in periphery settlement areas.
+OWBB_RESIDENTIAL_RURAL_APARTMENT_SHARE          Decimal    0.1       The share of apartment buildings in rural settlement areas.
+OWBB_RESIDENTIAL_PERIPHERY_APARTMENT_SHARE      Decimal    0.3       Ditto in periphery settlement areas.
+OWBB_RESIDENTIAL_DENSE_TYPE_SHARE               Dict                 In dense areas not everything is attached like in block or centre settlement
+                                                                     areas. It can be quite region specific. Therefore there is quite a choice for
+                                                                     specifying the distribution. E.g.
+                                                                     ``{'detached': 0.1, 'terraces': 0.1, 'apartments': 0.3, 'attached': 0.5}``.
+OWBB_RESIDENTIAL_TERRACE_MIN_NUMBER             Integer    4         The minimum number of terrace houses to fit along a street before it is
+                                                                     considered to build terraces along the way.
+OWBB_RESIDENTIAL_TERRACE_TYPICAL_NUMBER         Integer    5         The typical number of terrace houses attached to each other before there will
+                                                                     be a break. The actual number is randomized around this value.
+OWBB_RESIDENTIAL_SIDE_FACTOR_PERIPHERY          Decimal    1.0       The default buffer on the side of detached houses and apartment houses is
+                                                                     the sqaure root of the house's width. So the distance between two houses gets
+                                                                     the square root of the one house's width plus the square root of the other
+                                                                     house's width. This factor is multiplied to allow some linear correction for
+                                                                     region specific adaptation. E.g. in Switzerland the houses tend to be farther
+                                                                     apart along the street than in Denmark (the opposite is true for the
+                                                                     backyard). This factor is used for rural and periphery settlement types.
+OWBB_RESIDENTIAL_SIDE_FACTOR_DENSE              Decimal    0.8       Ditto for dense settlement type. Attached houses and terrace houses have a
+                                                                     distance of ca. 0 (it is not exactly 0 due to the way placements are made
+                                                                     in the heuristics - but close enough; you can play with the step distance).
+OWBB_RESIDENTIAL_BACK_FACTOR_PERIPHERY          Decimal    2.0       Same as the ..SIDE_FACTOR.., but now for the back. Again the starting point
+                                                                     is a square root - this time of the building's depth.
+OWBB_RESIDENTIAL_FRONT_FACTOR_PERIPHERY         Decimal    1.0       Same as the ..SIDE_FACTOR.., but now for the back. The starting point is
+                                                                     the square root of the building's width.
+OWBB_FRONT_DENSE                                Decimal    3.0       The distance in metres between the street and the front. Same for settlement
+                                                                     types ``dense``, ``block`` and ``centre``.
+
+=============================================   ========   =======   ==============================================================================
+
+
+Finally a set of parameters for industrial buildings:
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+OWBB_INDUSTRIAL_LARGE_MIN_AREA                  Integer    500       The minimal number of square metres for an industrial building being
+                                                                     considered large.
+OWBB_INDUSTRIAL_LARGE_SHARE                     Decimal    0.4       If the building zone type is industrial, then this share is used between
+                                                                     large buildings and smaller buildings.
+OWBB_INDUSTRIAL_BUILDING_SIDE_MIN               Decimal    2.0       The minimal buffer around a building - so the total distance between two
+                                                                     industrial buildings is at least twice this value. The actual value used is
+                                                                     chosen randomly between the .._SIDE_MIN and .._SIDE_MAX.
+OWBB_INDUSTRIAL_BUILDING_SIDE_MAX               Decimal    5.0       See above.
 
 =============================================   ========   =======   ==============================================================================
 

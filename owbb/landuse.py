@@ -84,8 +84,7 @@ def _generate_building_zones_from_buildings(building_zones: List[m.BuildingZone]
                 break
         if not within_existing_building_zone:
             my_candidate = m.GeneratedBuildingZone(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse),
-                                                   buffer_polygon, m.BuildingZoneType.non_osm,
-                                                   True)
+                                                   buffer_polygon, m.BuildingZoneType.non_osm)
             my_candidate.relate_building(my_building)
             zones_candidates[my_candidate.osm_id] = my_candidate
     logging.debug("Candidate land-uses found: %s", len(zones_candidates))
@@ -151,8 +150,7 @@ def _split_multipolygon_generated_building_zone(zone: m.GeneratedBuildingZone) -
         logging.debug("Handling a generated land-use Multipolygon with %d polygons", len(zone.geometry.geoms))
         for split_polygon in zone.geometry.geoms:
             my_split_generated = m.GeneratedBuildingZone(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse),
-                                                         split_polygon,
-                                                         zone.type_, zone.from_buildings)
+                                                         split_polygon, zone.type_)
             new_generated.append(my_split_generated)
         while len(zone.osm_buildings) > 0:
             my_building = zone.osm_buildings.pop()

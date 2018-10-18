@@ -490,12 +490,28 @@ class BTGBuildingZone(object):
 
 class GeneratedBuildingZone(BuildingZone):
     """A fake OSM Land-use for buildings based on heuristics"""
-    def __init__(self, generated_id, geometry, building_zone_type, from_buildings=False) -> None:
+    def __init__(self, generated_id, geometry, building_zone_type) -> None:
         super().__init__(generated_id, geometry, building_zone_type)
-        self.from_buildings = from_buildings  # False for e.g. external land-use
+        self.from_buildings = self.type_ is BuildingZoneType.non_osm
 
     def guess_building_zone_type(self, farm_places: List[Place]):
         """Based on some heuristics of linked buildings guess the building zone type"""
+        # first we try to map directly BTG zones to OSM zones
+        if self.type_ in [BuildingZoneType.btg_suburban, BuildingZoneType.btg_town, BuildingZoneType.btg_urban,
+                          BuildingZoneType.btg_builtupcover]:
+            self.type_ = BuildingZoneType.residential
+            return
+
+        if self.type_ in [BuildingZoneType.btg_port, BuildingZoneType.btg_industrial,
+                          BuildingZoneType.btg_construction]:
+            self.type_ = BuildingZoneType.industrial
+            return
+
+        # now we should only have non_osm based on lonely buildings
+        if self.type_ is not BuildingZoneType.non_osm:
+            logging.error('Should be of type "non_osm", but actually is: %s. Programming logic error!',
+                          self.type_.name)
+            exit(1)
         residential_buildings = 0
         commercial_buildings = 0
         industrial_buildings = 0
@@ -897,6 +913,7 @@ class SharedModel(object):
         else:
             self._side_buffer = math.sqrt(self.width) * parameters.OWBB_RESIDENTIAL_SIDE_FACTOR_PERIPHERY
             self._back_buffer = math.sqrt(self.depth) * parameters.OWBB_RESIDENTIAL_BACK_FACTOR_PERIPHERY
+            self._front_buffer = math.sqrt(self.width) * parameters.OWBB_RESIDENTIAL_FRONT_FACTOR_PERIPHERY
             # terraces
             if self.building_model.model_type is bl.BuildingType.terrace:
                 self._side_buffer = 0.0
@@ -956,9 +973,6 @@ class SharedModel(object):
 
 
 class SharedModelsLibrary(object):
-
-    INDUSTRIAL_LARGE_MIN_AREA = 500  # FIXME: should be a parameter
-
     def __init__(self, building_models: List[BuildingModel]):
         self._residential_detached = list()
         self._residential_terraces = list()
@@ -1008,7 +1022,7 @@ class SharedModelsLibrary(object):
                 self._residential_terraces.append(a_model)
             elif building_model.model_type is bl.BuildingType.industrial:
                 a_model = SharedModel(building_model)
-                if building_model.area > self.INDUSTRIAL_LARGE_MIN_AREA:
+                if building_model.area > parameters.OWBB_INDUSTRIAL_LARGE_MIN_AREA:
                     self._industrial_buildings_large.append(a_model)
                 else:
                     self._industrial_buildings_small.append(a_model)
