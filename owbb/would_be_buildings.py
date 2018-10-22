@@ -120,6 +120,8 @@ HIGHWAYS_FOR_ZONE_SPLIT = [m.HighwayType.motorway, m.HighwayType.trunk]
 
 def _generate_extra_buildings(building_zone: m.BuildingZone, shared_models_library: m.SharedModelsLibrary,
                               bounding_box: Polygon):
+    """AttributeErrors are expected because not all highways have settlement zones on both sides.
+    Therefore they can get ignored."""
     for highway in building_zone.linked_genways:
         if highway.type_ in HIGHWAYS_FOR_ZONE_SPLIT:
             continue
@@ -139,7 +141,7 @@ def _generate_extra_buildings(building_zone: m.BuildingZone, shared_models_libra
             except AttributeError:
                 caught_errors += 1
                 try:
-                    if highway.reverse_city_block.settlement_type is not bl.SettlementType.periphery:
+                    if highway.reversed_city_block.settlement_type is not bl.SettlementType.periphery:
                         terrace_share = parameters.OWBB_RESIDENTIAL_PERIPHERY_TERRACE_SHARE
                         apartment_share = parameters.OWBB_RESIDENTIAL_PERIPHERY_APARTMENT_SHARE
                 except AttributeError:
@@ -161,16 +163,19 @@ def _generate_extra_buildings(building_zone: m.BuildingZone, shared_models_libra
 
                 # prepare for not rural / periphery, so we can have the same along and reverse
                 primary_houses = shared_models_library.residential_attached
-                if highway.along_city_block.settlement_type is bl.SettlementType.dense:
-                    building_type = random_value_from_ratio_dict_parameter(parameters.OWBB_RESIDENTIAL_DENSE_TYPE_SHARE)
-                    if building_type == 'detached':
-                        primary_houses = shared_models_library.residential_detached
-                    elif building_type == 'terrace':
-                        index = random.randint(0, len(shared_models_library.residential_terraces) - 1)
-                        primary_houses = shared_models_library.residential_terraces[index:index + 1]
-                    elif building_type == 'apartments':
-                        index = random.randint(0, len(shared_models_library.residential_apartments) - 1)
-                        primary_houses = shared_models_library.residential_apartments[index:index + 1]
+                try:
+                    if highway.along_city_block.settlement_type is bl.SettlementType.dense:
+                        building_type = random_value_from_ratio_dict_parameter(parameters.OWBB_RESIDENTIAL_DENSE_TYPE_SHARE)
+                        if building_type == 'detached':
+                            primary_houses = shared_models_library.residential_detached
+                        elif building_type == 'terrace':
+                            index = random.randint(0, len(shared_models_library.residential_terraces) - 1)
+                            primary_houses = shared_models_library.residential_terraces[index:index + 1]
+                        elif building_type == 'apartments':
+                            index = random.randint(0, len(shared_models_library.residential_apartments) - 1)
+                            primary_houses = shared_models_library.residential_apartments[index:index + 1]
+                except AttributeError:
+                    pass
 
                 # along
                 try:
@@ -181,18 +186,18 @@ def _generate_extra_buildings(building_zone: m.BuildingZone, shared_models_libra
                     else:
                         _generate_extra_buildings_residential(building_zone, highway, primary_houses, None,
                                                               False, bounding_box)
-                except AttributeError:
+                except AttributeError as e:
                     pass
                 # reverse
                 try:
-                    if highway.reverse_city_block.settlement_type in [bl.SettlementType.rural,
+                    if highway.reversed_city_block.settlement_type in [bl.SettlementType.rural,
                                                                       bl.SettlementType.periphery]:
                         _generate_extra_buildings_residential(building_zone, highway, detached_houses_list,
                                                               alternatives_list, True, bounding_box)
                     else:
                         _generate_extra_buildings_residential(building_zone, highway, primary_houses, None,
                                                               False, bounding_box)
-                except AttributeError:
+                except AttributeError as e:
                     pass
 
         else:  # elif landuse.type_ is Landuse.TYPE_INDUSTRIAL:
