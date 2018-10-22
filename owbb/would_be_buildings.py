@@ -196,7 +196,7 @@ def _generate_extra_buildings(building_zone: m.BuildingZone, shared_models_libra
                                                               alternatives_list, True, bounding_box)
                     else:
                         _generate_extra_buildings_residential(building_zone, highway, primary_houses, None,
-                                                              False, bounding_box)
+                                                              True, bounding_box)
                 except AttributeError as e:
                     pass
 
