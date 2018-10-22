@@ -161,6 +161,7 @@ class Place(OSMFeature):
             else:
                 population = parameters.OWBB_PLACE_POPULATION_DEFAULT_TOWN
         centre_circle = Polygon()
+        block_circle = Polygon()
         if self.type_ is PlaceType.city:
             radius = self._calculate_circle_radius(population, parameters.OWBB_PLACE_RADIUS_EXPONENT_CENTRE)
             centre_circle = self.geometry.buffer(radius)
@@ -169,8 +170,9 @@ class Place(OSMFeature):
             radius = self._calculate_circle_radius(population, parameters.OWBB_PLACE_RADIUS_EXPONENT_DENSE)
             dense_circle = self.geometry.buffer(radius)
         else:
-            radius = self._calculate_circle_radius(population, parameters.OWBB_PLACE_RADIUS_EXPONENT_BLOCK)
-            block_circle = self.geometry.buffer(radius)
+            if self.population > 0 and population > parameters.OWBB_PLACE_POPULATION_MIN_BLOCK:
+                radius = self._calculate_circle_radius(population, parameters.OWBB_PLACE_RADIUS_EXPONENT_BLOCK)
+                block_circle = self.geometry.buffer(radius)
             radius = self._calculate_circle_radius(population, parameters.OWBB_PLACE_RADIUS_EXPONENT_DENSE)
             dense_circle = self.geometry.buffer(radius)
         return centre_circle, block_circle, dense_circle

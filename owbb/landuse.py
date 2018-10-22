@@ -540,7 +540,8 @@ def _link_building_zones_with_settlements(settlement_clusters: List[m.Settlement
             centre_circle, block_circle, dense_circle = place.create_settlement_type_circles()
             if not centre_circle.is_empty:
                 centre_circles.append(centre_circle)
-            block_circles.append(block_circle)
+            if not block_circle.is_empty:
+                block_circles.append(block_circle)
             dense_circles.append(dense_circle)
         z = 0
         z_number = len(building_zones)

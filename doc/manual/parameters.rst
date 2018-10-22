@@ -676,6 +676,9 @@ Parameter                                       Type       Default   Description
 OWBB_PLACE_POPULATION_DEFAULT_CITY              Integer    200000    The default population for a settlement tagged with ``place=city``, where the
                                                                      population size is not tagged.
 OWBB_PLACE_POPULATION_DEFAULT_TOWN              Integer    20000     Ditto for ``place=town``.
+OWBB_PLACE_POPULATION_MIN_BLOCK                 Integer    15000     The minimum amount of people living in a ``place=town`` for it to have a
+                                                                     settlement type ``block`` (i.e. where all builings are attached).
+                                                                     If the population is based on default, then no ``block`` will be assigned.
 OWBB_PLACE_RADIUS_EXPONENT_CENTRE               Number     0.5       The exponent for calculating the radius for settlement type ``centre``, i.e.
                                                                      1/2.
 OWBB_PLACE_RADIUS_EXPONENT_BLOCK                Number     0.6       Ditto for type ``block``, i.e. 5/8.
