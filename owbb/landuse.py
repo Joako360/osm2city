@@ -185,6 +185,9 @@ def _process_btg_building_zones(transformer: Transformation) -> Tuple[List[m.BTG
     out_proj = pyproj.Proj(init='epsg:4326', ellps='WGS84', datum='WGS84')
 
     btg_file_name = os.path.join(path_to_btg, ct.construct_btg_file_name_from_tile_index(tile_index))
+    if not os.path.isfile(btg_file_name):
+        logging.warning('File %s does not exist. Ocean or missing in Terrasync?', btg_file_name)
+        return list(), list()
     logging.debug('Reading btg file: %s', btg_file_name)
     btg_reader = btg.BTGReader(btg_file_name)
     btg_lon, btg_lat = btg_reader.gbs_lon_lat
