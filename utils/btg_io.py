@@ -224,21 +224,21 @@ class BTGReader(object):
 
             # Object header
             try:
-                obj_data = btg_file.read(5)
+                obj_data = btg_file.read(struct.calcsize(object_fmt))
             except IOError as e:
                 raise MyException('Error in file format (object header)') from e
 
             (object_type, object_properties, object_elements) = struct.unpack(object_fmt, obj_data)
 
-            # print "Properties", object_properties
             # Read properties
+            property_fmt = "<BI"
             for a_property in range(0, object_properties):
                 try:
-                    prop_data = btg_file.read(5)
+                    prop_data = btg_file.read(struct.calcsize(property_fmt))
                 except IOError as e:
                     raise MyException('Error in file format (object properties)') from e
 
-                (property_type, data_bytes) = struct.unpack("<BI", prop_data)
+                (property_type, data_bytes) = struct.unpack(property_fmt, prop_data)
 
                 try:
                     data = btg_file.read(data_bytes)
@@ -248,7 +248,6 @@ class BTGReader(object):
                 # Parse property if this is a geometry object
                 self.parse_property(object_type, property_type, data)
 
-            # print "Elements", object_elements
             # Read elements
             for element in range(0, object_elements):
                 try:
@@ -291,23 +290,24 @@ class BTGReader(object):
             btg_file.seek(0)
 
             # Read and unpack header
+            binary_format = "<HHI"
             try:
-                header = btg_file.read(8)
-                number_objects_ushort = btg_file.read(2)
+                header = btg_file.read(struct.calcsize(binary_format))
             except IOError as e:
                 raise MyException('File in wrong format') from e
 
-            (version, magic, creation_time) = struct.unpack("<HHI", header)
+            (version, magic, creation_time) = struct.unpack(binary_format, header)
 
             if version < 7:
                 raise MyException('The BTG version must be 7 or higher')
             if version >= 10:
-                fmt = "<i"
+                binary_format = "<I"
                 object_fmt = "<BII"
             else:
-                fmt = "<h"
+                binary_format = "<H"
                 object_fmt = "<BHH"
-            (number_top_level_objects,) = struct.unpack(fmt, number_objects_ushort)
+            number_objects_ushort = btg_file.read(struct.calcsize(binary_format))
+            (number_top_level_objects,) = struct.unpack(binary_format, number_objects_ushort)
 
             if not magic == 0x5347:
                 raise MyException("Magic is not correct ('SG'): {} instead of 0x5347".format(magic))
@@ -341,5 +341,6 @@ class BTGReader(object):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    btg_reader = BTGReader('/home/vanosten/bin/terrasync/Terrain/e000n40/e008n47/3088961.btg.gz')
+    btg_reader = BTGReader('/home/vanosten/bin/terrasync/Terrain/w160n20/w159n21/351207.btg.gz')  # version 10
+    btg_reader = BTGReader('/home/vanosten/bin/terrasync/Terrain/e000n40/e008n47/3088961.btg.gz')  # old version
     logging.info("Done")
