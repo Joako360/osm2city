@@ -406,18 +406,35 @@ class Roads(object):
         return "%i ways, %i roads, %i railways, %i bridges" % (len(self.ways_list), len(self.roads_list),
                                                                len(self.railway_list), len(self.bridges_list))
 
+    def _check_ways_sanity(self, where: str) -> None:
+        """Makes sure all ways have at least 2 nodes.
+        If one is found with less nodes, it is discarded. Should not happen, but does."""
+        for way in reversed(self.ways_list):
+            if len(way.refs) < 2:
+                logging.warning('Removing way with osm_id=%i due to only %i after %s', way.osm_id, len(way.refs), where)
+                self.ways_list.remove(way)
+
     def process(self, blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
                 lit_areas: List[shg.Polygon], stats: utilities.Stats) -> None:
         """Processes the OSM data until data can be clusterised.
         """
+        self._check_ways_sanity('initialisation')
         self._remove_tunnels()
+        self._check_ways_sanity('_remove_tunnels')
         self._replace_short_bridges_with_ways()
+        self._check_ways_sanity('_replace_short_bridges_with_ways')
         self._check_ways_in_water()
+        self._check_ways_sanity('_check_ways_in_water')
         self._check_against_blocked_areas(blocked_areas)
+        self._check_ways_sanity('_check_against_blocked_areas')
         self._check_against_stg_entries(stg_entries)
+        self._check_ways_sanity('_check_against_stg_entries')
         self._check_lighting(lit_areas)
+        self._check_ways_sanity('_check_lightning')
         self._cleanup_topology()
+        self._check_ways_sanity('_cleanup_topology')
         self._check_points_on_line_distance()
+        self._check_ways_sanity('_check_points_on_line_distance')
 
         self._remove_unused_nodes()
         self._probe_elev_at_nodes()
