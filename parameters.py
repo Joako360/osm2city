@@ -182,7 +182,8 @@ LOD_PERCENTAGE_DETAIL = 0.5         # -- of the remaining buildings, this percen
 
 OBSTRUCTION_LIGHT_MIN_LEVELS = 15   # -- put obstruction lights on buildings with >= given levels. 0 for no lights.
 
-CLUSTER_MIN_OBJECTS = 5             # -- discard cluster if too few objects
+# discard cluster if too few objects. Do not go below 1, otherwise lots of empty ac-objects and useless STG entries.
+CLUSTER_MIN_OBJECTS = 5
 
 BUILDING_TOLERANCE_MATCH_NODE = 0.5  # when searching for a OSM node based on distance: what is the allowed tolerance
 
