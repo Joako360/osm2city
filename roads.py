@@ -418,23 +418,15 @@ class Roads(object):
                 lit_areas: List[shg.Polygon], stats: utilities.Stats) -> None:
         """Processes the OSM data until data can be clusterised.
         """
-        self._check_ways_sanity('initialisation')
         self._remove_tunnels()
-        self._check_ways_sanity('_remove_tunnels')
         self._replace_short_bridges_with_ways()
-        self._check_ways_sanity('_replace_short_bridges_with_ways')
         self._check_ways_in_water()
-        self._check_ways_sanity('_check_ways_in_water')
         self._check_against_blocked_areas(blocked_areas)
-        self._check_ways_sanity('_check_against_blocked_areas')
         self._check_against_stg_entries(stg_entries)
         self._check_ways_sanity('_check_against_stg_entries')
         self._check_lighting(lit_areas)
-        self._check_ways_sanity('_check_lightning')
         self._cleanup_topology()
-        self._check_ways_sanity('_cleanup_topology')
         self._check_points_on_line_distance()
-        self._check_ways_sanity('_check_points_on_line_distance')
 
         self._remove_unused_nodes()
         self._probe_elev_at_nodes()
