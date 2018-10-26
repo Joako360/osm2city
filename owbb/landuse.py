@@ -7,7 +7,7 @@ import math
 import os.path
 import pickle
 import time
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import pyproj
 from shapely.geometry import box, MultiPolygon, Polygon, CAP_STYLE, JOIN_STYLE
@@ -268,7 +268,7 @@ def _process_btg_building_zones(transformer: Transformation) -> Tuple[List[m.BTG
                             clean = my_geometry.buffer(0)
                             if clean.is_valid:
                                 my_geometry = clean
-                if my_geometry.is_valid and not my_geometry.is_empty:
+                if isinstance(my_geometry, Polygon) and my_geometry.is_valid and not my_geometry.is_empty:
                     if not disjoint_bounds(bounds, my_geometry.bounds):
                         temp_polys.append(my_geometry)
                         accepted += 1
@@ -485,18 +485,34 @@ def _fetch_water_areas(transformer: Transformation) -> List[Polygon]:
 
 
 def _merge_buffers(original_list: List[Polygon]) -> List[Polygon]:
-    """Attempts to merge as many polygon buffers with each other as possible to return a reduced list."""
-    multi_polygon = unary_union(original_list)
+    """Attempts to merge as many polygon buffers with each other as possible to return a reduced list.
+    The try/catch are needed due to maybe issues in Shapely with huge amounts of polys.
+    See https://github.com/Toblerity/Shapely/issues/47. Seen problems with BTG-data, but then in the slow method
+    actually no poly got discarded."""
+    if len(original_list) < 2:
+        return original_list
+
+    multi_polygon = original_list[0]
+    try:
+        multi_polygon = unary_union(original_list)
+    except ValueError as e:  # No Shapely geometry can be created from null value
+        for other_poly in original_list[1:]:  # lets do it slowly one at a time
+            try:
+                new_multi_polygon = unary_union(other_poly)
+                multi_polygon = new_multi_polygon
+            except ValueError as e:
+                pass  # just forget about this one polygon
     if isinstance(multi_polygon, Polygon):
         return [multi_polygon]
 
     handled_list = list()
-    for polygon in multi_polygon.geoms:
-        if isinstance(polygon, Polygon):
-            handled_list.append(polygon)
-        else:
-            logging.debug("Unary union of transport buffers resulted in an object of type %s instead of Polygon",
-                          type(polygon))
+    if multi_polygon is not None:
+        for polygon in multi_polygon.geoms:
+            if isinstance(polygon, Polygon):
+                handled_list.append(polygon)
+            else:
+                logging.debug("Unary union of transport buffers resulted in an object of type %s instead of Polygon",
+                              type(polygon))
     return handled_list
 
 
@@ -642,7 +658,7 @@ def _count_zones_related_buildings(buildings: List[bl.Building], text: str) -> N
     logging.info('%i out of %i buildings are related to zone for %s', total_related, len(buildings), text)
 
 
-def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Building]]:
+def process(transformer: Transformation) -> Tuple[Optional[List[Polygon]], Optional[List[bl.Building]]]:
     last_time = time.time()
 
     bounds = m.Bounds.create_from_parameters(transformer)
@@ -684,6 +700,12 @@ def process(transformer: Transformation) -> Tuple[List[Polygon], List[bl.Buildin
     if len(btg_building_zones) > 0:
         _generate_building_zones_from_external(building_zones, btg_building_zones)
     last_time = time_logging("Time used in seconds for processing external zones", last_time)
+
+    # =========== CHECK WHETHER WE ARE IN A BUILT-UP AREA AT ALL ===========================
+    if len(building_zones) == 0 and len(osm_buildings) == 0 and len(highways_dict) == 0 and len(railways_dict) == 0:
+        logging.info('No zones, buildings and highways/railways in tile = %i', tile_index)
+        # there is no need to save a cache, so just do nothing
+        return None, None
 
     # =========== GENERATE ADDITIONAL LAND-USE ZONES FOR AND/OR FROM BUILDINGS =============
     buildings_outside = list()  # buildings outside of OSM buildings zones

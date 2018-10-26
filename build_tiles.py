@@ -136,10 +136,13 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
 
         # run programs
         lit_areas, osm_buildings = ol.process(the_coords_transform)
-        if exec_argument in [Procedures.buildings, Procedures.main, Procedures.all]:
+        process_built_stuff = True  # only relevant for buildings.py and roads.py. E.g. pylons.py can still run
+        if lit_areas is None and osm_buildings is None:
+            process_built_stuff = False
+        if exec_argument in [Procedures.buildings, Procedures.main, Procedures.all] and process_built_stuff:
             buildings.process_buildings(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries,
                                         osm_buildings, file_lock)
-        if exec_argument in [Procedures.roads, Procedures.main, Procedures.all]:
+        if exec_argument in [Procedures.roads, Procedures.main, Procedures.all] and process_built_stuff:
             roads.process_roads(the_coords_transform, my_fg_elev, my_blocked_areas, lit_areas,
                                 my_stg_entries, file_lock)
         if exec_argument in [Procedures.pylons, Procedures.main, Procedures.all]:
