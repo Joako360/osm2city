@@ -550,7 +550,7 @@ def _link_building_zones_with_settlements(settlement_clusters: List[m.Settlement
     x_number = len(settlement_clusters)
     for settlement in settlement_clusters:
         x += 1
-        logging.debug('Processing %i out of %i settlement clusters', x, x_number)
+        logging.info('Processing %i out of %i settlement clusters', x, x_number)
         # create the settlement type circles
         centre_circles = list()
         block_circles = list()

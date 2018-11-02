@@ -1454,7 +1454,6 @@ def write(ac_file_name: str, buildings: List[Building], cluster_elev: float, clu
     lod_objects.append(ac.new_object('LOD_detail', texture_name, default_mat_idx=ac3d.MAT_IDX_LIT))
 
     for ib, b in enumerate(buildings):
-        utilities.progress(ib, len(buildings))
         ac_object = lod_objects[b.LOD]
         face_mat_idx = 1  # needs to correspond with with a material that has r, g, b = 1.0
         roof_mat_idx = 1  # ditto
