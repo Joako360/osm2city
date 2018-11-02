@@ -279,6 +279,8 @@ def read_stg_entries(stg_path_and_name: str, consider_shared: bool = True, our_m
 
                 if line.startswith('#') or line.lstrip() == "":
                     continue
+                if line.startswith('OBJECT_SIGN'):
+                    continue
                 if consider_shared is False and line.startswith("OBJECT_SHARED"):
                     continue
                 try:
