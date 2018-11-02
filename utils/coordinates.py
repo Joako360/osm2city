@@ -262,13 +262,18 @@ def disjoint_bounds(bounds_1: Tuple[float, float, float, float], bounds_2: Tuple
     """Returns True if the two input bounds are disjoint. False otherwise.
     Bounds are Shapely (minx, miny, maxx, maxy) tuples (float values) that bounds the object -> geom.bounds.
     """
-    x_overlap = bounds_1[0] <= bounds_2[0] <= bounds_1[2] or bounds_1[0] <= bounds_2[2] <= bounds_1[2] or \
-        bounds_2[0] <= bounds_1[0] <= bounds_2[2] or bounds_2[0] <= bounds_1[2] <= bounds_2[2]
-    y_overlap = bounds_1[1] <= bounds_2[1] <= bounds_1[3] or bounds_1[1] <= bounds_2[3] <= bounds_1[3] or \
-        bounds_2[1] <= bounds_1[1] <= bounds_2[3] or bounds_2[1] <= bounds_1[3] <= bounds_2[3]
-    if x_overlap and y_overlap:
-        return False
-    return True
+    try:
+        x_overlap = bounds_1[0] <= bounds_2[0] <= bounds_1[2] or bounds_1[0] <= bounds_2[2] <= bounds_1[2] or \
+            bounds_2[0] <= bounds_1[0] <= bounds_2[2] or bounds_2[0] <= bounds_1[2] <= bounds_2[2]
+        y_overlap = bounds_1[1] <= bounds_2[1] <= bounds_1[3] or bounds_1[1] <= bounds_2[3] <= bounds_1[3] or \
+            bounds_2[1] <= bounds_1[1] <= bounds_2[3] or bounds_2[1] <= bounds_1[3] <= bounds_2[3]
+        if x_overlap and y_overlap:
+            return False
+        return True
+    except IndexError as e:
+        logging.exception('Something wrong with the tuples in input')
+        logging.warning('bounds_1 has %i values, bounds_2 has %i values', len(bounds_1), len(bounds_2))
+        return True
 
 
 # ================ UNITTESTS =======================
