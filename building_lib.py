@@ -1298,8 +1298,12 @@ def decide_lod(buildings: List[Building], stats: utilities.Stats) -> None:
 def relate_neighbours(buildings: List[Building]) -> None:
     """Relates neighbour buildings based on shared references."""
     neighbours = 0
-    for i in range(0, len(buildings)):
-        for j in range(i + 1, len(buildings)):
+    len_buildings = len(buildings)
+    for i in range(0, len_buildings):
+        if i % 10000 == 0:
+            logging.info('Checked building relations for %i out of %i buildings', i, len_buildings)
+        potential_attached = buildings[i].zone.osm_buildings
+        for j in range(0, len(potential_attached)):
             if set(buildings[i].refs).isdisjoint(set(buildings[j].refs)) is False:
                 for pos_i in range(len(buildings[i].refs)):
                     for pos_j in range(len(buildings[j].refs)):
@@ -1309,7 +1313,7 @@ def relate_neighbours(buildings: List[Building]) -> None:
                             neighbours += 1
 
     logging.info('%d neighbour relations for %d buildings created (some buildings have several neighbours).',
-                 neighbours, len(buildings))
+                 neighbours // 2, len(buildings))
 
 
 def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: utils.stg_io2.STGManager,

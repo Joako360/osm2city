@@ -597,6 +597,7 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
                       blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
                       the_buildings: List[building_lib.Building],
                       file_lock: mp.Lock=None) -> None:
+    last_time = time.time()
     random.seed(42)
 
     if not the_buildings:
@@ -632,9 +633,12 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
     replacement_prefix = parameters.get_repl_prefix()
     stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.buildings, OUR_MAGIC, replacement_prefix)
 
+    last_time = utilities.time_logging("Time used in seconds until before analyse", last_time)
+
     # the heavy lifting: analysis
     the_buildings = building_lib.analyse(the_buildings, fg_elev, stg_manager, coords_transform,
                                          prepare_textures.facades, prepare_textures.roofs, stats)
+    last_time = utilities.time_logging("Time used in seconds for analyse", last_time)
     building_lib.decide_lod(the_buildings, stats)
 
     # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
