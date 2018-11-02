@@ -655,7 +655,7 @@ def _count_zones_related_buildings(buildings: List[bl.Building], text: str) -> N
         if building.zone:
             total_related += 1
 
-    logging.info('%i out of %i buildings are related to zone for %s', total_related, len(buildings), text)
+    logging.info('%i out of %i buildings are related to zone %s', total_related, len(buildings), text)
 
 
 def process(transformer: Transformation) -> Tuple[Optional[List[Polygon]], Optional[List[bl.Building]]]:
