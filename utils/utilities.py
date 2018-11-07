@@ -21,6 +21,8 @@ import unittest
 import numpy as np
 from shapely import affinity
 import shapely.geometry as shg
+from shapely.geometry import Polygon
+from shapely.ops import unary_union
 
 import parameters
 import utils.coordinates as co
@@ -738,6 +740,38 @@ def simplify_balconies(original: shg.Polygon, distance_tolerance_line: float,
         return reduced_poly
 
 
+def merge_buffers(original_list: List[Polygon]) -> List[Polygon]:
+    """Attempts to merge as many polygon buffers with each other as possible to return a reduced list.
+    The try/catch are needed due to maybe issues in Shapely with huge amounts of polys.
+    See https://github.com/Toblerity/Shapely/issues/47. Seen problems with BTG-data, but then in the slow method
+    actually no poly got discarded."""
+    if len(original_list) < 2:
+        return original_list
+
+    multi_polygon = original_list[0]
+    try:
+        multi_polygon = unary_union(original_list)
+    except ValueError as e:  # No Shapely geometry can be created from null value
+        for other_poly in original_list[1:]:  # lets do it slowly one at a time
+            try:
+                new_multi_polygon = unary_union(other_poly)
+                multi_polygon = new_multi_polygon
+            except ValueError as e:
+                pass  # just forget about this one polygon
+    if isinstance(multi_polygon, Polygon):
+        return [multi_polygon]
+
+    handled_list = list()
+    if multi_polygon is not None:
+        for polygon in multi_polygon.geoms:
+            if isinstance(polygon, Polygon):
+                handled_list.append(polygon)
+            else:
+                logging.debug("Unary union of transport buffers resulted in an object of type %s instead of Polygon",
+                              type(polygon))
+    return handled_list
+
+
 # ================ PLOTTING FOR VISUAL TESTING =====
 
 import utils.plot_utilities as pu
@@ -846,4 +880,3 @@ class TestUtilities(unittest.TestCase):
         self.assertEqual(4 + 1, len(simplified_poly.exterior.coords))
         self.assertEqual(2, len(refs_shared))
         self.assertTrue(3 in refs_shared)
-

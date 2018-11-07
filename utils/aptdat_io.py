@@ -18,13 +18,48 @@ import logging
 import math
 import os
 import time
-from typing import List
+from typing import List, Optional
 
 from shapely.geometry import CAP_STYLE, LineString, Point, Polygon
 
 from utils import coordinates
 from utils import utilities
 from utils.vec2d import Vec2d
+
+
+class AirportBoundary:
+    def __init__(self) -> None:
+        self.nodes_lists = list()  # a list of list of Nodes, where a Node is a tuple (lon, lat)
+
+    def append_nodes_list(self, nodes_list) -> None:
+        self.nodes_lists.append(nodes_list)
+
+    def within_boundary(self, min_lon, min_lat, max_lon, max_lat):
+        """If no node within - or there are no nodes - then return False.
+        That is ok, because at least the runways will be checked."""
+        if len(self.nodes_lists) == 0:
+            return False
+        for my_list in self.nodes_lists:
+            for lon_lat in my_list:
+                if (min_lon <= lon_lat[0] <= max_lon) and (min_lat <= lon_lat[1] <= max_lat):
+                    return True
+        return False
+
+    def create_polygon_buffer(self, transformer: coordinates.Transformation) -> Optional[List[Polygon]]:
+        if self.not_empty:
+            boundaries = list()
+            for my_list in self.nodes_lists:
+                my_boundary = Polygon([transformer.to_local(n) for n in my_list])
+                if my_boundary.is_valid:
+                    boundaries.append(my_boundary)
+            return utilities.merge_buffers(boundaries)
+        return None
+
+    @property
+    def not_empty(self) -> bool:
+        if self.nodes_lists:
+            return True
+        return False
 
 
 class Runway(metaclass=ABCMeta):
@@ -76,14 +111,21 @@ class Airport(object):
     def __init__(self, code: str) -> None:
         self.code = code
         self.runways = list()  # LandRunways, Helipads
+        self.airport_boundary = None
 
     def append_runway(self, runway: Runway) -> None:
         self.runways.append(runway)
+
+    def append_airport_boundary(self, airport_boundary: AirportBoundary) -> None:
+        self.airport_boundary = airport_boundary
 
     def within_boundary(self, min_lon: float, min_lat: float, max_lon: float, max_lat: float) -> bool:
         for runway in self.runways:
             if runway.within_boundary(min_lon, min_lat, max_lon, max_lat):
                 return True
+        if self.airport_boundary is not None \
+                and self.airport_boundary.within_boundary(min_lon, min_lat, max_lon, max_lat):
+            return True
         return False
 
     def create_blocked_areas(self, coords_transform: coordinates.Transformation) -> List[Polygon]:
@@ -91,6 +133,12 @@ class Airport(object):
         for runway in self.runways:
             blocked_areas.append(runway.create_blocked_area(coords_transform))
         return blocked_areas
+
+    def create_boundary_polygons(self, coords_transform: coordinates.Transformation) -> Optional[List[Polygon]]:
+        if self.airport_boundary is None:
+            return None
+        else:
+            return self.airport_boundary.create_polygon_buffer(coords_transform)
 
 
 def read_apt_dat_gz_file(min_lon: float, min_lat: float,
@@ -101,13 +149,26 @@ def read_apt_dat_gz_file(min_lon: float, min_lat: float,
     total_airports = 0
     with gzip.open(apt_dat_gz_file, 'rt', encoding="latin-1") as f:
         my_airport = None
+        airport_boundary = None
+        current_boundary_nodes = list()
+        in_airport_boundary = False
         for line in f:
             parts = line.split()
             if not parts:
                 continue
+            if in_airport_boundary:
+                if parts[0] not in ['111', '112', '113', '114', '115', '116']:
+                    in_airport_boundary = False
+                else:
+                    current_boundary_nodes.append((float(parts[2]), float(parts[1])))
+                    if parts[0] in ['113', '114']:  # closed loop
+                        airport_boundary.append_nodes_list(current_boundary_nodes)
+                        current_boundary_nodes = list()
             if parts[0] in ['1', '16', '17', '99']:
+                # first actually append the previously read airport data to the collection if within bounds
                 if (my_airport is not None) and (my_airport.within_boundary(min_lon, min_lat, max_lon, max_lat)):
                     airports.append(my_airport)
+                # and then create a new empty airport
                 if not parts[0] == '99':
                     my_airport = Airport(parts[4])
                     total_airports += 1
@@ -118,6 +179,10 @@ def read_apt_dat_gz_file(min_lon: float, min_lat: float,
             elif parts[0] == '102':
                 my_helipad = Helipad(float(parts[5]), float(parts[6]), Vec2d(float(parts[3]), float(parts[2])))
                 my_airport.append_runway(my_helipad)
+            elif parts[0] == '130':
+                airport_boundary = AirportBoundary()
+                in_airport_boundary = True
+                my_airport.airport_boundary = airport_boundary
 
     logging.info("Read %d airports, %d having runways/helipads within the boundary", total_airports, len(airports))
     utilities.time_logging("Execution time", start_time)

@@ -24,7 +24,7 @@ import utils.btg_io as btg
 import utils.calc_tile as ct
 from utils.coordinates import disjoint_bounds, Transformation
 from utils.stg_io2 import scenery_directory_name, SceneryType
-from utils.utilities import time_logging
+from utils.utilities import time_logging, merge_buffers
 
 
 def _generate_building_zones_from_external(building_zones: List[m.BuildingZone],
@@ -279,7 +279,7 @@ def _process_btg_building_zones(transformer: Transformation) -> Tuple[List[m.BTG
 
             # merge polygons as much as possible in order to reduce processing and not having polygons
             # smaller than parameters.OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA
-            merged_list = _merge_buffers(temp_polys)
+            merged_list = merge_buffers(temp_polys)
             for merged_poly in merged_list:
                 my_zone = m.BTGBuildingZone(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse),
                                             type_, merged_poly)
@@ -363,7 +363,7 @@ def _process_landuse_for_lighting(building_zones: List[m.BuildingZone]) -> List[
     for zone in building_zones:
         buffered_polygons.append(zone.geometry.buffer(parameters.OWBB_BUILT_UP_BUFFER))
 
-    merged_polygons = _merge_buffers(buffered_polygons)
+    merged_polygons = merge_buffers(buffered_polygons)
 
     lit_areas = list()
     # check for minimal area of inner holes and create final list of polygons
@@ -391,7 +391,7 @@ def _process_landuse_for_lighting(building_zones: List[m.BuildingZone]) -> List[
 def _process_landuse_for_settlement_areas(lit_areas: List[Polygon], water_areas: List[Polygon]) -> List[Polygon]:
     """Combines lit areas with water areas to get a proxy for settlement areas"""
     all_areas = lit_areas + water_areas
-    return _merge_buffers(all_areas)
+    return merge_buffers(all_areas)
 
 
 def _split_generated_building_zones_by_major_lines(before_list: List[m.BuildingZone],
@@ -419,7 +419,7 @@ def _split_generated_building_zones_by_major_lines(before_list: List[m.BuildingZ
         if waterway.type_ is m.WaterwayType.large:
             line_buffers.append(waterway.geometry.buffer(10))
 
-    merged_buffers = _merge_buffers(line_buffers)
+    merged_buffers = merge_buffers(line_buffers)
     if len(merged_buffers) == 0:
         return before_list
 
@@ -482,38 +482,6 @@ def _fetch_water_areas(transformer: Transformation) -> List[Polygon]:
 
     logging.info('Fetched %i water areas from OSM', len(water_areas))
     return water_areas
-
-
-def _merge_buffers(original_list: List[Polygon]) -> List[Polygon]:
-    """Attempts to merge as many polygon buffers with each other as possible to return a reduced list.
-    The try/catch are needed due to maybe issues in Shapely with huge amounts of polys.
-    See https://github.com/Toblerity/Shapely/issues/47. Seen problems with BTG-data, but then in the slow method
-    actually no poly got discarded."""
-    if len(original_list) < 2:
-        return original_list
-
-    multi_polygon = original_list[0]
-    try:
-        multi_polygon = unary_union(original_list)
-    except ValueError as e:  # No Shapely geometry can be created from null value
-        for other_poly in original_list[1:]:  # lets do it slowly one at a time
-            try:
-                new_multi_polygon = unary_union(other_poly)
-                multi_polygon = new_multi_polygon
-            except ValueError as e:
-                pass  # just forget about this one polygon
-    if isinstance(multi_polygon, Polygon):
-        return [multi_polygon]
-
-    handled_list = list()
-    if multi_polygon is not None:
-        for polygon in multi_polygon.geoms:
-            if isinstance(polygon, Polygon):
-                handled_list.append(polygon)
-            else:
-                logging.debug("Unary union of transport buffers resulted in an object of type %s instead of Polygon",
-                              type(polygon))
-    return handled_list
 
 
 def _create_settlement_clusters(lit_areas: List[Polygon], water_areas: List[Polygon],
