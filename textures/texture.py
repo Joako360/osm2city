@@ -9,6 +9,7 @@ import numpy as np
 
 import parameters
 from textures.materials import screen_texture_tags_for_colour_spelling, map_hex_colour
+import utils.osmstrings as s
 from utils.utilities import replace_with_os_separator, Stats
 
 
@@ -252,6 +253,12 @@ class RoofManager(object):
         self.__l.append(texture)
         return
 
+    def find_by_file_name(self, file_name: str) -> Optional[Texture]:
+        for candidate in self.__l:
+            if file_name in candidate.filename:
+                return candidate
+        return None  # nothing found
+
     def _screen_exclude_texture_by_name(self, texture: Texture) -> bool:
         if isinstance(self, FacadeManager):
             if parameters.TEXTURES_FACADES_NAME_EXCLUDE:
@@ -423,6 +430,9 @@ class RoofManager(object):
 class FacadeManager(RoofManager):
     def find_matching_facade(self, requires: List[str], tags: Dict[str, str], height: float, width: float,
                              stats: Stats=None) -> Optional[Texture]:
+        if s.K_AEROWAY in tags:
+            return self._find_aeroway_facade(tags)
+
         exclusions = []
         # if 'roof:colour' in tags: FIXME why would we need this at all?
         # exclusions.append("%s:%s" % ('roof:colour', tags['roof:colour']))
@@ -463,6 +473,23 @@ class FacadeManager(RoofManager):
 
             new_candidates.append(t)
         return new_candidates
+
+    TERMINAL_TEX = 'facade_modern_commercial_35x20m.jpg'
+    HANGAR_TEX = 'facade_industrial_red_white_24x18m.jpg'
+    OTHER_TEX = 'facade_modern_commercial_red_gray_20x14m.jpg'
+
+    def _find_aeroway_facade(self, tags: Dict[str, str]) -> Optional[Texture]:
+        """A little hack to get facades that match a bit an airport."""
+        if s.V_HANGAR in tags:
+            chosen_tex = self.HANGAR_TEX
+        elif s.V_TERMINAL in tags:
+            chosen_tex = self.TERMINAL_TEX
+        else:
+            if random.randint(0, 1) == 0:
+                chosen_tex = self.TERMINAL_TEX
+            else:
+                chosen_tex = self.OTHER_TEX
+        return RoofManager.find_by_file_name(self, chosen_tex)
 
 
 class SpecialManager(RoofManager):

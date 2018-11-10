@@ -128,3 +128,14 @@ Node numbering for ``gambrel`` roof type:
 .. _Simple 3D Buildings: https://wiki.openstreetmap.org/wiki/Simple_3D_buildings
 .. _Place: https://wiki.openstreetmap.org/wiki/Places
 .. _Key Place: https://wiki.openstreetmap.org/wiki/Key:place
+
+
+.. _chapter-aerodromes:
+
+----------
+Aerodromes
+----------
+
+Data for runways and helipads are read from the ``apt.dat file`` in ``$FG_ROOT/Airports/apt.dat.gz``. This information is used to avoid having crossing OSM roads to be visible and potentially creating a considerable bump when a plane rolls over.
+
+Data for airport boundaries are also read from the ``apt.dat`` file (not all airports have information about boundaries). This data is then merged with OSM data for ``aeroway=aerodrome`` (again not all airports might be modelled with a zone). The resulting land-use is making sure that buildings within these zones will look more like airport buildings: using flat roofs (unless the roof type is explicitely modelled in OSM) and using a modern facade texture. Also: no buildings are generated inside zones for aerodromes.

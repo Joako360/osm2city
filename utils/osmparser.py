@@ -679,6 +679,11 @@ def split_way_at_boundary(nodes_dict: Dict[int, Node], complete_way: Way, clippi
     return split_ways
 
 
+def create_key_value_pair(key: str, value: str) -> str:
+    """A string combining a key and a value for query in PostGIS"""
+    return '{}=>{}'.format(key, value)
+
+
 # ================ UNITTESTS =======================
 
 class TestOSMParser(unittest.TestCase):

@@ -1,14 +1,9 @@
 """Handles reading from apt.dat airport files and read/write to pickle file for minimized representation.
 See http://developer.x-plane.com/?article=airport-data-apt-dat-file-format-specification for the specification.
 
-Currently only reading runway data in order to avoid roads/railways to cross a runway.
-
-There is also data available in apt.dat for taxiways an apron, but is not used at current point in time.
-
 Flightgear 2016.4 can read multiple apt.data files - see e.g. http://wiki.flightgear.org/FFGo
 and https://sourceforge.net/p/flightgear/flightgear/ci/516a5cf016a7d504b09aaac2e0e66c7e9efd42b2/.
-However this module does only support reading from one apt.dat.gz by the user's choice (normally in
-$FG_ROOT/Airports/apt.dat.gz).
+However this module does only support reading from the apt.dat.gz in $FG_ROOT/Airports/apt.dat.gz).
 
 """
 

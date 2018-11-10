@@ -620,6 +620,8 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
     # final check on building parent hierarchy
     _clean_building_parents_with_one_child(the_buildings)
 
+    building_lib.update_building_tags_in_aerodromes(the_buildings)
+
     if not the_buildings:
         logging.info("No buildings after overlap check etc. Stopping further processing.")
         return

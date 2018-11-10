@@ -707,11 +707,19 @@ class Building(object):
         import owbb.models
         if isinstance(self.zone, owbb.models.CityBlock) and self.zone.building_levels > 0:
             return self.zone.building_levels
+        elif isinstance(self.zone, owbb.models.BuildingZone) \
+                and self.zone.type_ is owbb.models.BuildingZoneType.aerodrome:
+            return parameters.BUILDING_NUMBER_LEVELS_AEROWAY
         else:
             building_class = get_building_class(self.tags)
             return calc_levels_for_settlement_type(self.zone.settlement_type, building_class)
 
     def _calculate_level_height(self) -> float:
+        import owbb.models
+        if isinstance(self.zone, owbb.models.BuildingZone) \
+                and self.zone.type_ is owbb.models.BuildingZoneType.aerodrome:
+            return parameters.BUILDING_LEVEL_HEIGHT_AEROWAY
+
         building_class = get_building_class(self.tags)
         if building_class in [BuildingClass.industrial, BuildingClass.warehouse]:
             return parameters.BUILDING_LEVEL_HEIGHT_INDUSTRIAL
@@ -1531,6 +1539,40 @@ def overlap_check_convex_hull(orig_buildings: List[Building], stg_entries: List[
         if is_intersecting:
             buildings_to_remove.append(building)
     return buildings_after_remove_with_parent_children(orig_buildings, buildings_to_remove)
+
+
+def update_building_tags_in_aerodromes(my_buildings: List[Building]) -> None:
+    """Make sure that buildings in aerodromes are tagged such that they look kind of modern."""
+    import owbb.models
+
+    # first run the parents to make sure that all buildings below a building parent get same aeroway tag
+    my_parents = set()
+    for building in my_buildings:
+        if building.parent is not None and isinstance(building.zone, owbb.models.BuildingZone) \
+                and building.zone.type_ is owbb.models.BuildingZoneType.aerodrome:
+            my_parents.add(building.parent)
+
+    for building_parent in my_parents:
+        aeroway_values = list()
+        for child in building_parent.children:
+            if s.K_AEROWAY in child.tags:
+                aeroway_values.append(child.tags[s.K_AEROWAY])
+
+        settled_value = s.V_AERO_OTHER
+        if len(aeroway_values) == 1:
+            settled_value = aeroway_values[0]  # in all other situations (0 or > 1) we do not know what to apply
+        for child in building_parent.children:
+            if s.K_AEROWAY not in child.tags:
+                child.tags[s.K_AEROWAY] = settled_value
+
+    # now do all buildings including roof to make stuff easy in processing
+    for building in my_buildings:
+        if isinstance(building.zone, owbb.models.BuildingZone) \
+                and building.zone.type_ is owbb.models.BuildingZoneType.aerodrome:
+            if s.K_ROOF_SHAPE not in building.tags:
+                building.tags[s.K_ROOF_SHAPE] = s.V_FLAT
+            if s.K_AEROWAY not in building.tags:
+                building.tags[s.K_AEROWAY] = s.V_AERO_OTHER
 
 
 def _analyse_worship_building(building: Building, building_parent: BuildingParent,

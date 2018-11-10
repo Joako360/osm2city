@@ -66,9 +66,13 @@ K_WIRES = 'wires'
 
 # ======================= VALUES ==================================
 V_ACROSS = 'across'
+V_AERODROME = 'aerodrome'
+V_AERO_OTHER = 'aero_other'  # does not exist in OSM - used when it is unsure whether terminal, hangar or different
 V_ALONG = 'along'
 V_BRIDGE = 'bridge'
 V_BUILDING = 'building'
+V_FLAT = 'flat'
+V_HANGAR = 'hangar'
 V_INNER = 'inner'
 V_MULTIPOLYGON = 'multipolygon'
 V_MULTISTOREY = 'multi-storey'
@@ -77,6 +81,7 @@ V_OUTER = 'outer'
 V_OUTLINE = 'outline'
 V_PIER = 'pier'
 V_PLATFORM = 'platform'
+V_TERMINAL = 'terminal'
 V_WAY = 'way'
 V_YES = 'yes'
 

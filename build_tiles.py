@@ -135,7 +135,7 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
                                                                                  my_airports)
 
         # run programs
-        lit_areas, osm_buildings = ol.process(the_coords_transform)
+        lit_areas, osm_buildings = ol.process(the_coords_transform, my_airports)
         process_built_stuff = True  # only relevant for buildings.py and roads.py. E.g. pylons.py can still run
         if lit_areas is None and osm_buildings is None:
             process_built_stuff = False

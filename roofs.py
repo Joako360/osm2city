@@ -54,7 +54,7 @@ def map_osm_roof_shape(osm_roof_shape: str) -> RoofShape:
     _shape = osm_roof_shape.strip()
     if len(_shape) == 0:
         return RoofShape.flat
-    if _shape == 'flat':
+    if _shape == s.V_FLAT:
         return RoofShape.flat
     if _shape in ['skillion', 'lean_to', 'pitched', 'shed']:
         return RoofShape.skillion

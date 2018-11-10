@@ -438,9 +438,11 @@ Generating Buildings Where OSM is Missing Buildings
 
 It is possible to let ``osm2city`` generate buildings, where it is plausible that there in reality would be buildings, but buildings were not mapped in OSM. The following set of parameters make some customisation to specific areas possible. However parts of the processing is rather hard-coded (e.g. the available buildings are defined in code in module ``owbb/would_be_buildings.py`` in function ``_read_building_models_library()``. Still the results are much better than an empty scene.
 
+No additional buildings are generated inside zones for aerodromes.
+
 A lot of processing is dependent on land-use information (see e.g. :ref:`Land-use Handling <chapter-howto-land-use-label>` and :ref:`Land-use Parameters <chapter-parameters-landuse-label>`). For a short explanation of the process used see :ref:`Generate Would-Be Buildings <chapter-howto-generate-would-be-buildings-label>`.
 
-In rural and periphery settlement areas an attempt is made to have the same terrace houses or apartment buildings along both sides of a way.
+In settlement areas an attempt is made to have the same terrace houses or apartment buildings along both sides of a way.
 
 The first set of parameters determines the overall placement heuristics:
 
@@ -649,13 +651,16 @@ The resulting built-up areas are also used for finding city and town areas — a
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
-BUILT_UP_AREA_LIT_BUFFER                        Number     100       The buffer distance around built-up land-use areas to be used for lighting of
+OWBB_BUILT_UP_BUFFER                            Number     50        The buffer distance around built-up land-use areas to be used for lighting of
                                                                      streets. The number is chosen pretty large such that as many building zone
                                                                      clusters as possible are connected. Also it is not unusual that the lighting
                                                                      of streets starts a bit outside of a built-up area.
-BUILT_UP_AREA_LIT_HOLES_MIN_AREA                Number     100000    The minimum area in square metres a hole in a LIT_BUFFER needs to have to be
+OWBB_BUILT_UP_AREA_HOLES_MIN_AREA               Number     100000    The minimum area in square metres a hole in a LIT_BUFFER needs to have to be
                                                                      not lit. In general this can be quite a large value and larger than e.g.
                                                                      parameter OWBB_GENERATE_LANDUSE_LANDUSE_HOLES_MIN_AREA.
+OWBB_BUILT_UP_MIN_LIT_AREA                      Number     100000    The minimum area of a lit area, such that it is actually used for lighting of
+                                                                     streets. Given buffering with ``OWBB_BUILT_UP_BUFFER`` alone is already a
+                                                                     large area, this value must not be chosen too small.
 =============================================   ========   =======   ==============================================================================
 
 

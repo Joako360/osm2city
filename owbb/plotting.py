@@ -139,6 +139,8 @@ def _draw_osm_zones(building_zones: List[m.BuildingZone], ax: maxs.Axes) -> None
                 face_color = "magenta"
             elif m.BuildingZoneType.farmyard is building_zone.type_:
                 face_color = "chocolate"
+            elif m.BuildingZoneType.aerodrome is building_zone.type_:
+                face_color = 'purple'
             _add_patch_for_building_zone(building_zone, face_color, face_color, ax)
 
 
@@ -282,7 +284,7 @@ def draw_zones(buildings: List[bl.Building], building_zones: List[m.BuildingZone
     # OSM building zones original
     my_figure = _create_a3_landscape_figure()
     my_figure.suptitle("Original OpenStreetMap building zones \n[blue=commercial, green=industrial, dark orange=retail\
-, magenta=residential, brown=farmyard, red=error]")
+, magenta=residential, brown=farmyard, purple=aerodrome, red=error]")
     ax = my_figure.add_subplot(111)
     _draw_osm_zones(building_zones, ax)
     _set_ax_limits_from_bounds(ax, bounds)
@@ -303,7 +305,8 @@ gold=town and suburban, yellow=construction and industrial and port]")
     # All land-use
     my_figure = _create_a3_landscape_figure()
     my_figure.suptitle("Original OpenStreetMap and generated building zones \n[blue=commercial, green=industrial\
-, dark orange=retail, magenta=residential, brown=farmyard, red=error;\n lighter variants=generated from buildings;\
+, dark orange=retail, magenta=residential, brown=farmyard, purple=aerodrome, red=error;\n \
+lighter variants=generated from buildings;\
 \ncyan=commercial and industrial, gold=continuous urban, yellow=discontinuous urban]")
     ax = my_figure.add_subplot(111)
     _draw_osm_zones(building_zones, ax)

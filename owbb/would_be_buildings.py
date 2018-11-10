@@ -459,8 +459,10 @@ def process(transformer: co.Transformation, building_zones: List[m.BuildingZone]
                 use_me = parameters.OWBB_USE_GENERATED_LANDUSE_FOR_BUILDING_GENERATION
             else:
                 use_me = parameters.OWBB_USE_EXTERNAL_LANDUSE_FOR_BUILDING_GENERATION
+        elif b_zone.type_ is m.BuildingZoneType.aerodrome:
+            use_me = False
 
-        # check whether density is already all right
+        # check whether density is already all right if we still thing we are going to use the zone
         if use_me:
             total_building_area = 0
             for building in b_zone.osm_buildings:

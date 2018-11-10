@@ -286,6 +286,8 @@ class BuildingZoneType(IntEnum):  # element names must match OSM values apart fr
     # interpreted as one. See GeneratedBuildingZone.guess_building_zone_type
     port = 60
 
+    aerodrome = 90  # key = aeroway, not landuse
+
     non_osm = 100  # used for land-uses constructed with heuristics and not in original data from OSM
 
     # FlightGear in BTG files
@@ -374,6 +376,8 @@ class BuildingZone(OSMFeatureArea):
 
     @staticmethod
     def parse_tags(tags_dict: KeyValueDict) -> Union[None, BuildingZoneType]:
+        if s.K_AEROWAY in tags_dict and tags_dict[s.K_AEROWAY] == s.V_AERODROME:
+            return BuildingZoneType.aerodrome
         value = tags_dict[s.K_LANDUSE]
         for member in BuildingZoneType:
             if value == member.name:
@@ -480,6 +484,10 @@ class BuildingZone(OSMFeatureArea):
                 self.linked_blocked_areas.append(blocked)
         for key in to_be_removed:
             del open_spaces_dict[key]
+
+    @property
+    def is_aerodrome(self) -> bool:
+        return self.type_ is BuildingZoneType.aerodrome
 
 
 class BTGBuildingZone(object):
@@ -1182,6 +1190,17 @@ class TempGenBuildings(object):
         if my_share > 0 and (count_temp_generated / my_share) >= min_share:
             return True
         return False
+
+
+def process_aerodrome_refs(transformer: co.Transformation) -> List[BuildingZone]:
+    osm_result = op.fetch_osm_db_data_ways_key_values([op.create_key_value_pair(s.K_AEROWAY, s.V_AERODROME)])
+    my_ways = list()
+    for way in list(osm_result.ways_dict.values()):
+        my_way = BuildingZone.create_from_way(way, osm_result.nodes_dict, transformer)
+        if my_way.is_valid():
+            my_ways.append(my_way)
+    logging.info("Aerodrome land-uses found: %s", len(my_ways))
+    return my_ways
 
 
 def process_osm_building_zone_refs(transformer: co.Transformation) -> List[BuildingZone]:

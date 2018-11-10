@@ -19,12 +19,52 @@ import parameters
 import owbb.models as m
 import owbb.plotting as plotting
 import owbb.would_be_buildings as wbb
-import utils.osmparser as op
+import utils.aptdat_io as aptdat_io
 import utils.btg_io as btg
 import utils.calc_tile as ct
+import utils.osmparser as op
 from utils.coordinates import disjoint_bounds, Transformation
 from utils.stg_io2 import scenery_directory_name, SceneryType
 from utils.utilities import time_logging, merge_buffers
+
+
+def _process_aerodromes(building_zones: List[m.BuildingZone], aerodrome_zones: List[m.BuildingZone],
+                        airports: List[aptdat_io.Airport], transformer: Transformation) -> None:
+    """Merges aerodromes from OSM and apt.dat and then cuts the areas from buildings zones.
+    Aerodromes might be missing in apt.dat or OSM (or both - which we cannot correct)"""
+    apt_dat_polygons = list()
+
+    # get polygons from apt.dat in local coordinates
+    for airport in airports:
+        if airport.within_boundary(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
+                                   parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH):
+            my_polys = airport.create_boundary_polygons(transformer)
+            if my_polys is not None:
+                apt_dat_polygons.extend(my_polys)
+    # see whether some polygons can be merged to reduce the list
+    apt_dat_polygons = merge_buffers(apt_dat_polygons)
+
+    # merge these polygons with existing aerodrome_zones
+    for aerodrome_zone in aerodrome_zones:
+        for poly in reversed(apt_dat_polygons):
+            if poly.disjoint(aerodrome_zone.geometry) is False:
+                aerodrome_zone.geometry = aerodrome_zone.geometry.union(poly)
+                apt_dat_polygons.remove(poly)
+
+    # for the remaining polygons create new aerodrome_zones
+    for poly in apt_dat_polygons:
+        new_aerodrome_zone = m.BuildingZone(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse),
+                                            poly, m.BuildingZoneType.aerodrome)
+        aerodrome_zones.append(new_aerodrome_zone)
+
+    # make sure that if a building zone is overlapping with a aerodrome that it is clipped
+    for building_zone in building_zones:
+        for aerodrome_zone in aerodrome_zones:
+            if building_zone.geometry.disjoint(aerodrome_zone.geometry) is False:
+                building_zone.geometry = building_zone.geometry.difference(aerodrome_zone.geometry)
+
+    # finally add all aerodrome_zones to the building_zones as regular zone
+    building_zones.extend(aerodrome_zones)
 
 
 def _generate_building_zones_from_external(building_zones: List[m.BuildingZone],
@@ -533,6 +573,8 @@ def _link_building_zones_with_settlements(settlement_clusters: List[m.Settlement
         z = 0
         z_number = len(building_zones)
         for zone in building_zones:
+            if zone.type_ is m.BuildingZoneType.aerodrome:
+                continue
             z += 1
             if z % 20 == 0:
                 logging.debug('Processing %i out of %i building_zones', z, z_number)
@@ -569,7 +611,7 @@ def _link_building_zones_with_settlements(settlement_clusters: List[m.Settlement
 
     # now make sure that also zones outside of settlements get city blocks
     for zone in building_zones:
-        if zone not in zones_processed_in_settlement:
+        if zone not in zones_processed_in_settlement and zone.type_ is not m.BuildingZoneType.aerodrome:
             _assign_city_blocks(zone, highways_dict)
 
 
@@ -577,6 +619,8 @@ def _sanity_check_settlement_types(building_zones: List[m.BuildingZone], highway
     upgraded = 0
     downgraded = 0
     for zone in building_zones:
+        if zone.type_ is m.BuildingZoneType.aerodrome:
+            continue
         my_density = zone.density
         if my_density < parameters.OWBB_PLACE_SANITY_DENSITY:
             if zone.settlement_type in [bl.SettlementType.dense, bl.SettlementType.block]:
@@ -626,7 +670,8 @@ def _count_zones_related_buildings(buildings: List[bl.Building], text: str) -> N
     logging.info('%i out of %i buildings are related to zone %s', total_related, len(buildings), text)
 
 
-def process(transformer: Transformation) -> Tuple[Optional[List[Polygon]], Optional[List[bl.Building]]]:
+def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> Tuple[Optional[List[Polygon]],
+                                                                                        Optional[List[bl.Building]]]:
     last_time = time.time()
 
     bounds = m.Bounds.create_from_parameters(transformer)
@@ -649,6 +694,7 @@ def process(transformer: Transformation) -> Tuple[Optional[List[Polygon]], Optio
             logging.info("Loading of cache %s or %s failed (%s)", cache_file_la, cache_file_bz, reason)
 
     # =========== READ OSM DATA =============
+    aerodrome_zones = m.process_aerodrome_refs(transformer)
     building_zones = m.process_osm_building_zone_refs(transformer)
     urban_places, farm_places = m.process_osm_place_refs(transformer)
     osm_buildings = bu.construct_buildings_from_osm(transformer)
@@ -658,6 +704,10 @@ def process(transformer: Transformation) -> Tuple[Optional[List[Polygon]], Optio
     water_areas = _fetch_water_areas(transformer)
 
     last_time = time_logging("Time used in seconds for parsing OSM data", last_time)
+
+    # =========== PROCESS AERODROME INFORMATION ============================
+    _process_aerodromes(building_zones, aerodrome_zones, airports, transformer)
+    last_time = time_logging("Time used in seconds for processing aerodromes", last_time)
 
     # =========== READ LAND-USE DATA FROM FLIGHTGEAR BTG-FILES =============
     btg_building_zones = list()
@@ -703,6 +753,7 @@ def process(transformer: Transformation) -> Tuple[Optional[List[Polygon]], Optio
     _count_zones_related_buildings(osm_buildings, 'after lighting')
 
     # =========== REDUCE THE BUILDING_ZONES TO BE WITHIN BOUNDS ==========================
+    # This is needed such that no additional buildings would be generated outside of the tile boundary.
     building_zones = _check_clipping_border(building_zones, bounds)
     last_time = time_logging("Time used in seconds for clipping to boundary", last_time)
 
@@ -729,6 +780,13 @@ def process(transformer: Transformation) -> Tuple[Optional[List[Polygon]], Optio
         last_time = time_logging('Time used in seconds for sanity checking settlement types', last_time)
 
     _count_zones_related_buildings(osm_buildings, 'after settlement linking')
+
+    # now that settlement areas etc. are done, we can reduce the lit areas to those having a minimum area
+    before_lit = len(lit_areas)
+    for lit_area in reversed(lit_areas):
+        if lit_area.area < parameters.OWBB_BUILT_UP_MIN_LIT_AREA:
+            lit_areas.remove(lit_area)
+    logging.info('Reduced the number of lit areas from %i to %i.', before_lit, len(lit_areas))
 
     # ============ Finally guess the land-use type ========================================
     for my_zone in building_zones:

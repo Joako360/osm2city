@@ -171,6 +171,9 @@ BUILDING_USE_SHARED_WORSHIP = False  # try to use shared models for worship buil
 BUILDING_FACADE_DEFAULT_COLOUR = '#D3D3D3'  # e.g. #d3d3d3 - light grey
 BUILDING_ROOF_DEFAULT_COLOUR = '#B22222'  # e.g. #b22222 - firebrick
 
+BUILDING_NUMBER_LEVELS_AEROWAY = 2
+BUILDING_LEVEL_HEIGHT_AEROWAY = 3.5
+
 # -- The more buildings end up in LOD rough, the more work for your GPU.
 #    Increasing any of the following parameters will decrease GPU load.
 LOD_ALWAYS_DETAIL_BELOW_AREA = 150  # -- below this area, buildings will always be LOD detail
@@ -311,6 +314,7 @@ OWBB_SPLIT_MADE_UP_LANDUSE_BY_MAJOR_LINES = True  # for external and generated
 # also used for buffering around water areas in cities
 OWBB_BUILT_UP_BUFFER = 50
 OWBB_BUILT_UP_AREA_HOLES_MIN_AREA = 100000
+OWBB_BUILT_UP_MIN_LIT_AREA = 100000
 
 OWBB_PLACE_POPULATION_DEFAULT_CITY = 200000
 OWBB_PLACE_POPULATION_DEFAULT_TOWN = 20000
