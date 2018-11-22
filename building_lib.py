@@ -547,7 +547,7 @@ class Building(object):
 
         logging.debug("__done" + str(self.roof_texture) + str(self.roof_texture.provides))
 
-        if parameters.FLAG_2018_3:
+        if parameters.FLAG_COLOUR_TEX:
             if s.K_BUILDING_COLOUR not in self.tags:
                 self.tags[s.K_BUILDING_COLOUR] = parameters.BUILDING_FACADE_DEFAULT_COLOUR
             if s.K_ROOF_COLOUR not in self.tags:
@@ -842,7 +842,7 @@ class Building(object):
 
             # now apply some tags to increase European style
             if s.K_ROOF_COLOUR not in self.tags:
-                if parameters.FLAG_2018_3:
+                if parameters.FLAG_COLOUR_TEX:
                     self.tags[s.K_ROOF_COLOUR] = '#FF0000'
                 else:
                     self.tags[s.K_ROOF_COLOUR] = 'red'
@@ -1450,7 +1450,7 @@ def write(ac_file_name: str, buildings: List[Building], cluster_elev: float, clu
                 colours_index += 1
 
     materials_list = list()
-    if parameters.FLAG_2018_3:
+    if parameters.FLAG_COLOUR_TEX:
         texture_name = 'FIXME'  # FIXME: this is only temporary until we have new textures
         materials_list = mat.create_materials_list_from_hex_colours(colours)
 
@@ -1465,7 +1465,7 @@ def write(ac_file_name: str, buildings: List[Building], cluster_elev: float, clu
         ac_object = lod_objects[b.LOD]
         face_mat_idx = 1  # needs to correspond with with a material that has r, g, b = 1.0
         roof_mat_idx = 1  # ditto
-        if parameters.FLAG_2018_3:
+        if parameters.FLAG_COLOUR_TEX:
             face_mat_idx = colours[b.tags[s.K_BUILDING_COLOUR]]
             roof_mat_idx = colours[b.tags[s.K_ROOF_COLOUR]]
         b.write_to_ac(ac_object, cluster_elev, cluster_offset, roof_mgr, face_mat_idx, roof_mat_idx, stats)

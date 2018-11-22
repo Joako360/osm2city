@@ -97,8 +97,11 @@ Important Flags
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
-FLAG_2018_3                                     Boolean    False     If True then then the texture catalog and shader integration is for minimal
-                                                                     version of FlightGear 2018.3.
+FLAG_COLOUR_TEX                                 Boolean    False     Experimental code. If True then the texture and OSM tags can use
+                                                                     colouring. For later versions of FlightGear (2019.x?).
+
+FLAG_STG_BUILDING_LIST                          Boolean    False     Experimental code. If True then some buildings use the Random Building
+                                                                     code in FlightGear instead of a building mesh.
 
 BUILDING_USE_SHARED_WORSHIP                     Boolean    False     Use a shared model for worship buildings instead of OSM floor plan and
                                                                      heuristics. The shared models will try to respect the type of building (e.g.
