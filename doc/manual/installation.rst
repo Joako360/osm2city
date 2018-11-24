@@ -176,9 +176,11 @@ On Ubuntu 17.10 the following packages have amongst others been installed (not e
 * postgis
 * python3-psycopg2
 
-On top of that you also need a 0.6+ version of Osmosis_. Please be aware of the fact that you also need a related version of Java and that e.g. in Ubuntu 17.10 Osmosis is out of date — i.e. you should NOT use a (Linux) distribution package and instead use the one from the source.
+---------------------
+Installing on Windows
+---------------------
 
-.. _Osmosis: http://wiki.openstreetmap.org/wiki/Osmosis
+For windows, the best way to get PostgreSQL and PostGI is to use this download page: https://www.enterprisedb.com/downloads/postgres-postgresql-downloads: version 9.6 was tested and works well on Windows. After installation of PostgreSQL, use the Stackbuilder tool included with PostgreSQL to download and install PostGIS version 2.5, which is found under "spatial extensions".
 
 
 ------------------------------------
@@ -244,6 +246,16 @@ You might want to check out Sławek Mikuła's scripts_ for osm2city parsing and 
 
 
 .. _chapter-josm-label:
+
+
+-------
+OSMOSIS
+-------
+
+You might also need a 0.6+ version of Osmosis_. Please be aware of the fact that you also need a related version of Java and that e.g. in Ubuntu 17.10 Osmosis is out of date — i.e. you should NOT use a (Linux) distribution package and instead use the one from the source.
+
+.. _Osmosis: http://wiki.openstreetmap.org/wiki/Osmosis
+
 
 ----
 JOSM
