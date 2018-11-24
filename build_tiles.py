@@ -108,16 +108,16 @@ def pool_initializer(log_level: str, log_to_file: bool):
 
 def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
                          exec_argument: Procedures, my_airports: List[aptdat_io.Airport],
-                         file_lock: mp.Lock) -> None:
+                         file_lock: mp.Lock, my_progress: str) -> None:
     try:
         parameters.read_from_file(params_file_name)
         # adapt boundary
         parameters.set_boundary(scenery_tile.boundary_west, scenery_tile.boundary_south,
                                 scenery_tile.boundary_east, scenery_tile.boundary_north)
         parameters.PREFIX = scenery_tile.prefix
-        logging.info("Processing tile {} in prefix {} with process id = {}".format(scenery_tile.tile_index,
-                                                                                   parameters.PREFIX,
-                                                                                   os.getpid()))
+        logging.info("Processing tile {} in prefix {} with process id = {} - {}".format(scenery_tile.tile_index,
+                                                                                        parameters.PREFIX,
+                                                                                        os.getpid(), my_progress))
 
         the_coords_transform = coordinates.Transformation(parameters.get_center_global())
 
@@ -169,7 +169,7 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
             exc_type, exc_value, exc_traceback = sys.exc_info()
             f.write(''.join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
 
-    logging.info("******* Finished tile {} *******".format(scenery_tile.tile_index))
+    logging.info("******* Finished tile {} - {} *******".format(scenery_tile.tile_index, my_progress))
 
 
 if __name__ == '__main__':
@@ -282,9 +282,13 @@ if __name__ == '__main__':
     pool = mp.Pool(processes=args.processes, maxtasksperchild=max_tasks_per_child,
                    initializer=pool_initializer, initargs=(my_log_level, args.log_to_file))
     the_file_lock = mp.Manager().Lock()
+    total = len(scenery_tiles_list)
+    progress = 1
     for my_scenery_tile in scenery_tiles_list:
+        progress_str = '{}/{}'.format(progress, total)
         pool.apply_async(process_scenery_tile, (my_scenery_tile, args.filename,
-                                                exec_procedure, airports, the_file_lock))
+                                                exec_procedure, airports, the_file_lock, progress_str))
+        progress += 1
     pool.close()
     pool.join()
 
