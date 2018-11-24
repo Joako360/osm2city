@@ -384,6 +384,12 @@ class Building(object):
         return len(self.refs_shared) > 0
 
     @property
+    def has_parent(self) -> bool:
+        if self.parent is None:
+            return False
+        return True
+
+    @property
     def has_inner(self) -> bool:
         return len(self.polygon.interiors) > 0
 
@@ -614,7 +620,7 @@ class Building(object):
 
             # if still residential, then check floor area if in peripheral or rural area - > apartments
             # what about terraces -> should we check how long vs. width?
-            if self.polygon.area > 250:
+            if self.area > 250:
                 building_class = BuildingClass.apartments
                 if s.K_BUILDING in self.tags:
                     self.tags[s.K_BUILDING] = 'apartments'
@@ -821,7 +827,7 @@ class Building(object):
             return True
         if self.inner_rings_list:  # never skip a building with inner rings
             return True
-        if self.area < parameters.BUILDING_MIN_AREA and self.parent is None:
+        if self.area < parameters.BUILDING_MIN_AREA and self.has_parent is False:
             return False
         if self.area < parameters.BUILDING_REDUCE_THRESHOLD and random.uniform(0, 1) < parameters.BUILDING_REDUCE_RATE:
             return False

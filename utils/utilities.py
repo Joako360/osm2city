@@ -176,6 +176,7 @@ class Stats(object):
         self.nodes_simplified = 0
         self.nodes_roof_simplified = 0
         self.nodes_ground = 0
+        self.random_buildings = 0
         self.textures_total = defaultdict(int)
         self.textures_used = None
 
@@ -219,14 +220,15 @@ class Stats(object):
         logging.info(textwrap.dedent("""
             total buildings %i
             parse errors    %i
-            written         %i
+            random_builds   %i
+            written mesh    %i
               four-sided    %i
             skipped
               small         %i
               nearby        %i
               no elevation  %i
               no texture    %i
-            """ % (self.objects, self.parse_errors, total_written, self.corners[4],
+            """ % (self.objects, self.parse_errors, self.random_buildings, total_written, self.corners[4],
                    self.skipped_small, self.skipped_nearby, self.skipped_no_elev, self.skipped_texture)))
         roof_line = "        roof-types"
         for roof_shape in self.roof_shapes:
@@ -246,7 +248,7 @@ class Stats(object):
         logging.debug(textwrap.dedent("""
             Used Textures : """))
         for item in sorted(list(textures_used.items()), key=lambda item: item[1], reverse=True):
-            logging.info(textwrap.dedent("""
+            logging.debug(textwrap.dedent("""
                  %i %s""" % (item[1], item[0])))
         logging.debug(textwrap.dedent("""
             Unused Textures : """))

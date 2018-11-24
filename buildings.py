@@ -585,12 +585,121 @@ def construct_buildings_from_osm(coords_transform: coordinates.Transformation) -
     _process_rectify_buildings(osm_nodes_dict, osm_read_results.rel_nodes_dict, osm_ways_dict, coords_transform)
 
     # then create the actual building objects
+    last_time = time.time()
     the_buildings = _process_osm_building(osm_nodes_dict, osm_ways_dict, coords_transform)
+    last_time = utilities.time_logging('Time used in seconds for processing OSM buildings', last_time)
     _process_osm_relations(osm_nodes_dict, osm_rel_ways_dict, osm_relations_dict, the_buildings, coords_transform)
+    last_time = utilities.time_logging('Time used in seconds for processing OSM relations', last_time)
     _process_building_parts(osm_nodes_dict, the_buildings, coords_transform)
+    _ = utilities.time_logging('Time used in seconds for processing building parts', last_time)
 
     # for convenience change to list from dict
     return list(the_buildings.values())
+
+
+def write_buildings_in_lists(coords_transform: coordinates.Transformation,
+                             list_buildings: List[building_lib.Building],
+                             stg_manager: stg_io2.STGManager,
+                             stats: utilities.Stats) -> None:
+    handled_index = 0
+    material_name = 'Urban'
+    file_name = "buildings_%02i.txt" % handled_index
+    min_elevation = 9999
+    max_elevation = -9999
+    for b in list_buildings:
+        min_elevation = min(min_elevation, b.ground_elev)
+        max_elevation = max(max_elevation, b.ground_elev)
+    list_elev = (max_elevation - min_elevation) / 2 + min_elevation
+
+    path_to_stg = stg_manager.add_building_list(file_name, material_name, coords_transform.anchor, list_elev)
+
+    try:
+        with open(os.path.join(path_to_stg, file_name), 'w') as my_file:
+            for b in list_buildings:
+                line = '{:.1f} {:.1f} {:.1f} {:.0f}\n'.format(-b.anchor.y, b.anchor.x, b.ground_elev - list_elev, 0.0)
+                my_file.write(line)
+
+    except IOError as e:
+        logging.warning('Could not write buildings in list to file %s', e)
+    logging.debug("Total number of buildings written to a building_list: %d", len(list_buildings))
+    stats.random_buildings = len(list_buildings)
+
+
+def write_buildings_in_meshes(coords_transform: coordinates.Transformation,
+                              mesh_buildings: List[building_lib.Building],
+                              stg_manager: stg_io2.STGManager,
+                              stats: utilities.Stats) -> None:
+    building_lib.decide_lod(mesh_buildings, stats)
+
+    # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
+    cmin, cmax = parameters.get_extent_global()
+    logging.info("min/max " + str(cmin) + " " + str(cmax))
+    lmin = v.Vec2d(coords_transform.to_local(cmin))
+    lmax = v.Vec2d(coords_transform.to_local(cmax))
+
+    handled_clusters = list()  # cluster.ClusterContainer objects
+    clusters_building_mesh_detailed = cluster.ClusterContainer(lmin, lmax,
+                                                               stg_io2.STGVerbType.object_building_mesh_detailed)
+    handled_clusters.append(clusters_building_mesh_detailed)
+    clusters_building_mesh_rough = cluster.ClusterContainer(lmin, lmax,
+                                                            stg_io2.STGVerbType.object_building_mesh_rough)
+    handled_clusters.append(clusters_building_mesh_rough)
+    for b in mesh_buildings:
+        if b.LOD is stg_io2.LOD.detail:
+            clusters_building_mesh_detailed.append(b.anchor, b, stats)
+        elif b.LOD is stg_io2.LOD.rough:
+            clusters_building_mesh_rough.append(b.anchor, b, stats)
+
+    # -- write clusters
+    handled_index = 0
+    total_buildings_written = 0
+    for my_clusters in handled_clusters:
+        my_clusters.write_statistics_for_buildings("cluster_%d" % handled_index)
+
+        for ic, cl in enumerate(my_clusters):
+            number_of_buildings = len(cl.objects)
+            if number_of_buildings < parameters.CLUSTER_MIN_OBJECTS:
+                continue  # skip almost empty clusters
+
+            # calculate relative positions within cluster
+            min_elevation = 9999
+            max_elevation = -9999
+            min_x = 1000000000
+            min_y = 1000000000
+            max_x = -1000000000
+            max_y = -1000000000
+            for b in cl.objects:
+                min_elevation = min(min_elevation, b.ground_elev)
+                max_elevation = max(max_elevation, b.ground_elev)
+                min_x = min(min_x, b.anchor.x)
+                min_y = min(min_y, b.anchor.y)
+                max_x = max(max_x, b.anchor.x)
+                max_y = max(max_y, b.anchor.y)
+            cluster_elev = (max_elevation - min_elevation) / 2 + min_elevation
+            cluster_offset = v.Vec2d((max_x - min_x) / 2 + min_x, (max_y - min_y) / 2 + min_y)
+            center_global = v.Vec2d(coords_transform.to_global((cluster_offset.x, cluster_offset.y)))
+            logging.debug("Cluster center -> elevation: %d, position: %s", cluster_elev, cluster_offset)
+
+            file_name = stg_manager.prefix + "city" + str(handled_index) + "%02i%02i" % (cl.grid_index.ix,
+                                                                                         cl.grid_index.iy)
+            logging.info("writing cluster %s with %d buildings" % (file_name, len(cl.objects)))
+
+            path_to_stg = stg_manager.add_object_static(file_name + '.ac', center_global, cluster_elev, 0,
+                                                        my_clusters.stg_verb_type)
+
+            # -- write .ac and .xml
+            building_lib.write(os.path.join(path_to_stg, file_name + ".ac"), cl.objects,
+                               cluster_elev, cluster_offset, prepare_textures.roofs, stats)
+            if parameters.OBSTRUCTION_LIGHT_MIN_LEVELS > 0:
+                obstr_file_name = file_name + '_obstrlights.xml'
+                has_models = _write_obstruction_lights(path_to_stg, obstr_file_name, cl.objects, cluster_offset)
+                if has_models:
+                    stg_manager.add_object_static(obstr_file_name, center_global, cluster_elev, 0,
+                                                  stg_io2.STGVerbType.object_static)
+            total_buildings_written += len(cl.objects)
+
+        handled_index += 1
+    logging.debug("Total number of buildings written to a cluster *.ac files: %d", total_buildings_written)
 
 
 def process_buildings(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
@@ -641,78 +750,28 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
     the_buildings = building_lib.analyse(the_buildings, fg_elev, stg_manager, coords_transform,
                                          prepare_textures.facades, prepare_textures.roofs, stats)
     last_time = utilities.time_logging("Time used in seconds for analyse", last_time)
-    building_lib.decide_lod(the_buildings, stats)
 
-    # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
-    cmin, cmax = parameters.get_extent_global()
-    logging.info("min/max " + str(cmin) + " " + str(cmax))
-    lmin = v.Vec2d(coords_transform.to_local(cmin))
-    lmax = v.Vec2d(coords_transform.to_local(cmax))
-
-    handled_clusters = list()  # cluster.ClusterContainer objects
-    clusters_building_mesh_detailed = cluster.ClusterContainer(lmin, lmax,
-                                                               stg_io2.STGVerbType.object_building_mesh_detailed)
-    handled_clusters.append(clusters_building_mesh_detailed)
-    clusters_building_mesh_rough = cluster.ClusterContainer(lmin, lmax,
-                                                            stg_io2.STGVerbType.object_building_mesh_rough)
-    handled_clusters.append(clusters_building_mesh_rough)
-    for b in the_buildings:
-        if b.LOD is stg_io2.LOD.detail:
-            clusters_building_mesh_detailed.append(b.anchor, b, stats)
-        elif b.LOD is stg_io2.LOD.rough:
-            clusters_building_mesh_rough.append(b.anchor, b, stats)
-
-    # -- write clusters
-    handled_index = 0
-    total_buildings_written = 0
-    for my_clusters in handled_clusters:
-        my_clusters.write_statistics_for_buildings("cluster_%d" % handled_index)
-
-        for ic, cl in enumerate(my_clusters):
-            number_of_buildings = len(cl.objects)
-            if number_of_buildings < parameters.CLUSTER_MIN_OBJECTS:
-                continue  # skip almost empty clusters
-
-            # calculate relative positions within cluster
-            min_elevation = 9999
-            max_elevation = -9999
-            min_x = 1000000000
-            min_y = 1000000000
-            max_x = -1000000000
-            max_y = -1000000000
-            for b in cl.objects:
-                min_elevation = min(min_elevation, b.ground_elev)
-                max_elevation = max(max_elevation, b.ground_elev)
-                min_x = min(min_x, b.anchor.x)
-                min_y = min(min_y, b.anchor.y)
-                max_x = max(max_x, b.anchor.x)
-                max_y = max(max_y, b.anchor.y)
-            cluster_elev = (max_elevation - min_elevation) / 2 + min_elevation
-            cluster_offset = v.Vec2d((max_x - min_x)/2 + min_x, (max_y - min_y)/2 + min_y)
-            center_global = v.Vec2d(coords_transform.to_global((cluster_offset.x, cluster_offset.y)))
-            logging.debug("Cluster center -> elevation: %d, position: %s", cluster_elev, cluster_offset)
-
-            file_name = replacement_prefix + "city" + str(handled_index) + "%02i%02i" % (cl.grid_index.ix,
-                                                                                         cl.grid_index.iy)
-            logging.info("writing cluster %s with %d buildings" % (file_name, len(cl.objects)))
-
-            path_to_stg = stg_manager.add_object_static(file_name + '.ac', center_global, cluster_elev, 0,
-                                                        my_clusters.stg_verb_type)
-
-            # -- write .ac and .xml
-            building_lib.write(os.path.join(path_to_stg, file_name + ".ac"), cl.objects,
-                               cluster_elev, cluster_offset, prepare_textures.roofs, stats)
-            if parameters.OBSTRUCTION_LIGHT_MIN_LEVELS > 0:
-                obstr_file_name = file_name + '_obstrlights.xml'
-                has_models = _write_obstruction_lights(path_to_stg, obstr_file_name, cl.objects, cluster_offset)
-                if has_models:
-                    stg_manager.add_object_static(obstr_file_name, center_global, cluster_elev, 0,
-                                                  stg_io2.STGVerbType.object_static)
-            total_buildings_written += len(cl.objects)
-
-        handled_index += 1
-    logging.debug("Total number of buildings written to a cluster *.ac files: %d", total_buildings_written)
+    # split between buildings in meshes and in buildings lists
+    buildings_in_meshes = list()
+    buildings_in_lists = list()
+    if parameters.FLAG_STG_BUILDING_LIST:
+        for building in the_buildings:
+            if building.has_neighbours or building.has_parent:
+                buildings_in_meshes.append(building)
+            elif s.K_AEROWAY in building.tags:
+                buildings_in_meshes.append(building)
+            elif building.area > 200:  # FIXME needs parametrisation
+                buildings_in_meshes.append(building)
+            else:
+                buildings_in_lists.append(building)
+        write_buildings_in_lists(coords_transform, buildings_in_lists, stg_manager, stats)
+        last_time = utilities.time_logging("Time used in seconds to write buildings in lists", last_time)
+    else:
+        buildings_in_meshes = the_buildings[:]
+    write_buildings_in_meshes(coords_transform, buildings_in_meshes, stg_manager, stats)
+    last_time = utilities.time_logging("Time used in seconds to write buildings in meshes", last_time)
 
     stg_manager.write(file_lock)
+    _ = utilities.time_logging("Time used in seconds to write stg file", last_time)
     stats.print_summary()
     utilities.troubleshoot(stats)

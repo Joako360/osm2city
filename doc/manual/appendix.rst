@@ -66,7 +66,7 @@ An unstructured list of stuff you might need to know as a developer:
 * All code in utf-8. On Windows please make sure that line endings get correct in git (core.autocrlf)
 * Coordinate systems:
 
-  * Flightgear uses a set of different `coordinate systems`_. The most important for referencing models in stg-files is WGS84_, which uses lon/lat.
+  * Flightgear uses a set of different `coordinate systems`_. The most important for referencing models in stg-files is WGS84_, which uses lon/lat. In the Cartesian coordinate system in a tile +X is North, +Y is East and +Z is up.
   * OSM references WGS84_ as the datum.
   * The Ac3D format uses x-axis to the right, y-axis upwards and z-axis forward, meaning that the bottom of an object is in x-z space and the front is in x-y. I.e. a right-handed coordinate system.
   * osm2city uses a local cartesian coordinate system in meters close enough for measurements within a tile, where x is lon-direction and y is lat-direction. The object height is then in z-direction (see module ``utils/coordinates.py``). I.e. x pointing to the right and y pointing inwards in a right-handed coordinate system. Meaning the bottom of an object i in x-y space. Therefore a node in the local (cartographic) coordinate system gets translated as follows to a node in a AC3D object in osm2city: x_ac3d = - y_local, y_ac3d = height_above_ground, z_ac3d = - x_local

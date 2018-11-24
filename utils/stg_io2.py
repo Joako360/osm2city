@@ -43,6 +43,7 @@ class STGVerbType(enum.IntEnum):  # must be the same as actual string in lowerca
     object_road_detailed = 6
     object_railway_rough = 7
     object_railway_detailed = 8
+    building_list = 10
 
 
 @enum.unique
@@ -118,7 +119,7 @@ class STGFile(object):
             self.other_list = self.other_list + lines[:ours_start]
             lines = lines[ours_end + 1:]
 
-    def add_object(self, stg_verb: str, ac_file_name: str, lon_lat, elev: float, hdg: float, once=False) -> str:
+    def add_object(self, stg_verb: str, ac_file_name: str, lon_lat, elev: float, hdg: float, once: bool=False) -> str:
         """add OBJECT_XXXXX line to our_list. Returns path to stg."""
         line = "%s %s %1.5f %1.5f %1.2f %g\n" % (stg_verb.upper(),
                                                  ac_file_name, lon_lat.lon, lon_lat.lat, elev, hdg)
@@ -127,6 +128,11 @@ class STGFile(object):
             self.our_ac_file_name_list.append(ac_file_name)
             logging.debug(self.file_name + ':' + line)
         # Make sure the path exists. Needs to be done already now, because e.g. ac-files might be written to the path
+        _make_path_to_stg(self.path_to_stg)
+        return self.path_to_stg
+
+    def add_line(self, line: str) -> str:
+        self.our_list.append(line + '\n')
         _make_path_to_stg(self.path_to_stg)
         return self.path_to_stg
 
@@ -187,7 +193,7 @@ class STGManager(object):
         return the_stg_file
 
     def add_object_static(self, ac_file_name: str, lon_lat: Vec2d, elev: float, hdg: float,
-                          stg_verb_type: STGVerbType=STGVerbType.object_static, once=False) -> str:
+                          stg_verb_type: STGVerbType=STGVerbType.object_static, once: bool=False) -> str:
         """Adds OBJECT_STATIC line. Returns path to stg."""
         the_stg_file = self._find_create_stg_file(lon_lat)
         return the_stg_file.add_object(stg_verb_type.name.upper(), ac_file_name, lon_lat, elev, hdg, once)
@@ -196,6 +202,13 @@ class STGManager(object):
         """Adds OBJECT_SHARED line."""
         the_stg_file = self._find_create_stg_file(lon_lat)
         the_stg_file.add_object('OBJECT_SHARED', ac_file_name, lon_lat, elev, hdg)
+
+    def add_building_list(self, building_list_name: str, material_name: str, lon_lat: Vec2d, elev: float) -> str:
+        """Adds a BUILDING_LIST line"""
+        the_stg_file = self._find_create_stg_file(lon_lat)
+        line = 'BUILDING_LIST %s %s %1.5f %1.5f %1.2f' % (building_list_name, material_name,
+                                                          lon_lat.lon, lon_lat.lat, elev)
+        return the_stg_file.add_line(line)
 
     def write(self, file_lock: mp.Lock=None):
         """Writes all new scenery objects including the already existing back to stg-files.

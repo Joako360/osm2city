@@ -55,8 +55,10 @@ See also http://wiki.flightgear.org/Geographic_Coordinate_Systems
 import copy
 from math import asin, atan2, sin, cos, sqrt, radians, degrees, pi, fabs
 import logging
-from typing import List, Tuple
+from typing import Tuple
 import unittest
+
+from utils.vec2d import Vec2d
 
 
 NAUTICAL_MILES_METERS = 1852
@@ -83,6 +85,10 @@ class Transformation(object):
         self._lon = lon
         self._lat = lat
         self._update()
+
+    @property
+    def anchor(self) -> Vec2d:
+        return Vec2d(self._lon, self._lat)
 
     @property
     def cos_lat_factor(self) -> float:
