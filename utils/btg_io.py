@@ -327,9 +327,9 @@ class BTGReader(object):
         lat_deg = math.degrees(lat_rad)
         logging.debug('GBS center: lon = %f, lat = %f', lon_deg, lat_deg)
 
-        logging.info('Parsed %i vertices and found the following materials:', len(self.vertices))
+        logging.debug('Parsed %i vertices and found the following materials:', len(self.vertices))
         for key, faces_list in self.faces.items():
-            logging.info('Material: %s has %i faces', key, len(faces_list))
+            logging.debug('Material: %s has %i faces', key, len(faces_list))
 
     def _clean_data(self):
         """Clean up and remove data that is not usable"""
@@ -341,7 +341,7 @@ class BTGReader(object):
                     removed += 1
                     faces_list.remove(face)
             if removed > 0:
-                logging.info('Removed %i faces for material %s', removed, material)
+                logging.debug('Removed %i faces for material %s', removed, material)
 
 
 if __name__ == '__main__':
