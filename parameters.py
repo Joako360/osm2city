@@ -81,6 +81,8 @@ WRITE_CLUSTER_STATS = False
 
 FLAG_COLOUR_TEX = False  # Feature flag for using colour codes in textures and OSM tags
 FLAG_STG_BUILDING_LIST = False  # use BUILDING_LIST in stg-files
+FLAG_BUILDINGS_LIST_SKIP = False
+FLAG_BUILDINGS_MESH_SKIP = False
 
 # Debugging by plotting with Matplotlib to pdfs. See description about its use in the appendix of the manual
 DEBUG_PLOT_RECTIFY = False

@@ -764,12 +764,14 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
                 buildings_in_meshes.append(building)
             else:
                 buildings_in_lists.append(building)
-        write_buildings_in_lists(coords_transform, buildings_in_lists, stg_manager, stats)
-        last_time = utilities.time_logging("Time used in seconds to write buildings in lists", last_time)
+        if parameters.FLAG_BUILDINGS_LIST_SKIP is False:
+            write_buildings_in_lists(coords_transform, buildings_in_lists, stg_manager, stats)
+            last_time = utilities.time_logging("Time used in seconds to write buildings in lists", last_time)
     else:
         buildings_in_meshes = the_buildings[:]
-    write_buildings_in_meshes(coords_transform, buildings_in_meshes, stg_manager, stats)
-    last_time = utilities.time_logging("Time used in seconds to write buildings in meshes", last_time)
+    if parameters.FLAG_BUILDINGS_MESH_SKIP is False:
+        write_buildings_in_meshes(coords_transform, buildings_in_meshes, stg_manager, stats)
+        last_time = utilities.time_logging("Time used in seconds to write buildings in meshes", last_time)
 
     stg_manager.write(file_lock)
     _ = utilities.time_logging("Time used in seconds to write stg file", last_time)
