@@ -282,6 +282,14 @@ def disjoint_bounds(bounds_1: Tuple[float, float, float, float], bounds_2: Tuple
         return True
 
 
+def calc_horizon_elev(distance_1: float, distance_2) -> float:
+    """Calculates how much a given pint a distance away is elevated over the round world.
+    The distance_1 and distance_2 are right-angled in a cartesian coordinate system."""
+    distance_square = distance_1**2 + distance_2**2
+    hypotenuse = sqrt(distance_square + EQURAD**2)
+    return hypotenuse - EQURAD
+
+
 # ================ UNITTESTS =======================
 
 
@@ -375,3 +383,8 @@ class TestCoordinates(unittest.TestCase):
         x, y = calc_point_on_line_local(1, -1, 2, -1, -1)
         self.assertAlmostEqual(0, x)
         self.assertAlmostEqual(-1., y)
+
+    def test_calc_horizon_elev(self):
+        elev_1 = calc_horizon_elev(2000, 2000)
+        elev_2 = calc_horizon_elev(2000, 0)
+        self.assertGreater(elev_1, elev_2)

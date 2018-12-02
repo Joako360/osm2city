@@ -620,7 +620,8 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
         with open(os.path.join(path_to_stg, file_urban), 'w') as urban, \
                 open(os.path.join(path_to_stg, file_urban), 'w') as town:
             for b in list_buildings:
-                line = '{:.1f} {:.1f} {:.1f} {:.0f}\n'.format(-b.anchor.y, b.anchor.x, b.ground_elev - list_elev, 0.0)
+                elev = b.ground_elev - list_elev - coordinates.calc_horizon_elev(b.anchor.x, b.anchor.y)
+                line = '{:.1f} {:.1f} {:.1f} {:.0f}\n'.format(-b.anchor.y, b.anchor.x, elev, 0.0)
                 if b.building_list_type is building_lib.BuildingListType.urban:
                     urban.write(line)
                 else:
@@ -635,8 +636,6 @@ def write_buildings_in_meshes(coords_transform: coordinates.Transformation,
                               mesh_buildings: List[building_lib.Building],
                               stg_manager: stg_io2.STGManager,
                               stats: utilities.Stats) -> None:
-    building_lib.decide_lod(mesh_buildings, stats)
-
     # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
     cmin, cmax = parameters.get_extent_global()
     logging.info("min/max " + str(cmin) + " " + str(cmax))
@@ -758,6 +757,7 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
     last_time = utilities.time_logging("Time used in seconds for analyse", last_time)
 
     # split between buildings in meshes and in buildings lists
+    building_lib.decide_lod(the_buildings, stats)
     buildings_in_meshes = list()
     buildings_in_lists = list()
     if parameters.FLAG_STG_BUILDING_LIST:
@@ -766,7 +766,7 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
                 buildings_in_meshes.append(building)
             elif s.K_AEROWAY in building.tags:
                 buildings_in_meshes.append(building)
-            elif building.area > 200:  # FIXME needs parametrisation
+            elif building.LOD is stg_io2.LOD.rough:
                 buildings_in_meshes.append(building)
             # FIXME: something based on complexity of geometry?
             else:

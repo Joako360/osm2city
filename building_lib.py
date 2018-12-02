@@ -236,11 +236,6 @@ class Building(object):
         self.osm_id = osm_id
         self.tags = tags
         self.is_external_model = False
-        if parameters.USE_EXTERNAL_MODELS:
-            if 'model3d' in tags:
-                self.is_external_model = True
-                self.model3d = tags['model3d']
-                self.angle3d = tags['angle3d']
         self.name = name
         self.stg_typ = stg_typ  # STGVerbType
         self.stg_hdg = stg_hdg
@@ -369,9 +364,10 @@ class Building(object):
 
     def set_ground_elev_and_offset(self, cluster_elev: float, cluster_offset: Vec2d) -> None:
         """Sets the ground elevations as difference between real elevation and cluster elevation.
+        Additionally it takes into consideration that the world is round.
         Also translates x/y coordinates"""
         self._set_pts_all(cluster_offset)
-        self.ground_elev -= cluster_elev
+        self.ground_elev -= (cluster_elev + co.calc_horizon_elev(self.pts_all[0,0], self.pts_all[0, 1]))
 
     @property
     def building_list_type(self) -> BuildingListType:

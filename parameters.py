@@ -75,8 +75,6 @@ PROBE_FOR_WATER = True  # only possible with FGElev version after 9th of Novembe
 
 TILE_SIZE = 2000            # -- tile size in meters for clustering of buildings, roads, ...
 
-USE_EXTERNAL_MODELS = False
-
 WRITE_CLUSTER_STATS = False
 
 FLAG_COLOUR_TEX = False  # Feature flag for using colour codes in textures and OSM tags
