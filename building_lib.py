@@ -120,6 +120,13 @@ class BuildingType(IntEnum):
     hangar = 100
 
 
+@unique
+class BuildingListType(IntEnum):
+    """Available Random Building BUILDING_LIST types."""
+    urban = 1  # In global-summer.xml: BuiltUpCover, Urban
+    town = 2  # ditto: Town, SubURban
+
+
 def parse_building_tags_for_type(tags_dict: KeyValueDict) -> Union[None, BuildingType]:
     if (s.K_PARKING in tags_dict) and (tags_dict[s.K_PARKING] == s.V_MULTISTOREY):
         return BuildingType.parking
@@ -365,6 +372,12 @@ class Building(object):
         Also translates x/y coordinates"""
         self._set_pts_all(cluster_offset)
         self.ground_elev -= cluster_elev
+
+    @property
+    def building_list_type(self) -> BuildingListType:
+        if self.zone.settlement_type in [SettlementType.centre, SettlementType.dense, SettlementType.dense]:
+            return BuildingListType.urban
+        return BuildingListType.town
 
     @property
     def roof_complex(self) -> bool:

@@ -601,9 +601,6 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
                              list_buildings: List[building_lib.Building],
                              stg_manager: stg_io2.STGManager,
                              stats: utilities.Stats) -> None:
-    handled_index = 0
-    material_name = 'Urban'
-    file_name = "buildings_%02i.txt" % handled_index
     min_elevation = 9999
     max_elevation = -9999
     for b in list_buildings:
@@ -611,14 +608,23 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
         max_elevation = max(max_elevation, b.ground_elev)
     list_elev = (max_elevation - min_elevation) / 2 + min_elevation
 
-    path_to_stg = stg_manager.add_building_list(file_name, material_name, coords_transform.anchor, list_elev)
+    material_name_urban = 'Urban'
+    file_urban = "buildings_urban.txt"
+    material_name_town = 'Town'
+    file_town = "buildings_town.txt"
+
+    _ = stg_manager.add_building_list(file_urban, material_name_urban, coords_transform.anchor, list_elev)
+    path_to_stg = stg_manager.add_building_list(file_town, material_name_town, coords_transform.anchor, list_elev)
 
     try:
-        with open(os.path.join(path_to_stg, file_name), 'w') as my_file:
+        with open(os.path.join(path_to_stg, file_urban), 'w') as urban, \
+                open(os.path.join(path_to_stg, file_urban), 'w') as town:
             for b in list_buildings:
                 line = '{:.1f} {:.1f} {:.1f} {:.0f}\n'.format(-b.anchor.y, b.anchor.x, b.ground_elev - list_elev, 0.0)
-                my_file.write(line)
-
+                if b.building_list_type is building_lib.BuildingListType.urban:
+                    urban.write(line)
+                else:
+                    town.write(line)
     except IOError as e:
         logging.warning('Could not write buildings in list to file %s', e)
     logging.debug("Total number of buildings written to a building_list: %d", len(list_buildings))
@@ -762,6 +768,7 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
                 buildings_in_meshes.append(building)
             elif building.area > 200:  # FIXME needs parametrisation
                 buildings_in_meshes.append(building)
+            # FIXME: something based on complexity of geometry?
             else:
                 buildings_in_lists.append(building)
         if parameters.FLAG_BUILDINGS_LIST_SKIP is False:
