@@ -1123,7 +1123,8 @@ class GenBuilding(object):
                          self.shared_model.width / 2, self.shared_model.depth / 2)
         rotated = saf.rotate(floor_plan, -1 * self.angle, origin=(0, 0))
         moved = saf.translate(rotated, self.x, self.y)
-        my_building = bl.Building(self.gen_id, self.shared_model.building_model.tags, moved.exterior, '')
+        my_building = bl.Building(self.gen_id, self.shared_model.building_model.tags, moved.exterior, '',
+                                  street_angle=self.angle, is_owbb_model=True)
         my_building.zone = self.zone
         return my_building
 

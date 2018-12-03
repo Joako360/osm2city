@@ -621,7 +621,7 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
                 open(os.path.join(path_to_stg, file_urban), 'w') as town:
             for b in list_buildings:
                 elev = b.ground_elev - list_elev - coordinates.calc_horizon_elev(b.anchor.x, b.anchor.y)
-                line = '{:.1f} {:.1f} {:.1f} {:.0f}\n'.format(-b.anchor.y, b.anchor.x, elev, 0.0)
+                line = '{:.1f} {:.1f} {:.1f} {:.0f}\n'.format(-b.anchor.y, b.anchor.x, elev, b.street_angle)
                 if b.building_list_type is building_lib.BuildingListType.urban:
                     urban.write(line)
                 else:

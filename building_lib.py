@@ -230,15 +230,15 @@ class Building(object):
     """
 
     def __init__(self, osm_id: int, tags: Dict[str, str], outer_ring: shg.LinearRing, name: str,
-                 stg_typ: STGVerbType=None, stg_hdg=None, inner_rings_list=list(),
-                 refs: List[int]=list()) -> None:
+                 stg_typ: STGVerbType=None, street_angle=0, inner_rings_list=list(),
+                 refs: List[int]=list(), is_owbb_model: bool=False) -> None:
         # set during init and methods called by init
         self.osm_id = osm_id
         self.tags = tags
-        self.is_external_model = False
+        self.is_owbb_model = is_owbb_model
         self.name = name
         self.stg_typ = stg_typ  # STGVerbType
-        self.stg_hdg = stg_hdg
+        self.street_angle = street_angle  # the angle from the front-door looking at the street
 
         # For definition of '*height' see method analyse_height_and_levels(..)
         self.body_height = 0.0
@@ -609,6 +609,21 @@ class Building(object):
                 pts_outer = np.roll(pts_outer, 1, axis=0)
                 self.edge_length_pts = np.roll(self.edge_length_pts, 1)
                 self._set_polygon(pts_outer, self.inner_rings_list)
+
+    def analyse_street_angle(self) -> None:
+        if self.is_owbb_model:
+            # the angle is already given by the model
+            return
+
+        pts_outer = np.array(self.pts_outer)
+        longest_edge_length = 0
+        for i in range(self.pts_outer_count - 1):
+            my_edge_length = ((pts_outer[i + 1, 0] - pts_outer[i, 0]) ** 2 +
+                                       (pts_outer[i + 1, 1] - pts_outer[i, 1]) ** 2) ** 0.5
+            if my_edge_length > longest_edge_length:
+                longest_edge_length = my_edge_length
+                self.street_angle = co.calc_angle_of_line_local(pts_outer[i, 0], pts_outer[i, 1],
+                                                                pts_outer[i + 1, 0], pts_outer[i + 1, 1])
 
     def analyse_roof_shape(self) -> None:
         if s.K_ROOF_SHAPE in self.tags:
@@ -1381,25 +1396,22 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: u
         if parameters.BUILDING_FORCE_EUROPEAN_INNER_CITY_STYLE:
             b.enforce_european_style(building_parent)
 
-        if not b.is_external_model:
-            if building_parent is None:  # do not simplify if in parent/child relationship
-                stats.nodes_simplified += b.simplify()
-            try:
-                b.roll_inner_nodes()
-            except Exception as reason:
-                logging.warning("Roll_inner_nodes failed (OSM ID %i, %s)", b.osm_id, reason)
-                continue
-
-        if not b.analyse_elev_and_water(fg_elev):
+        if building_parent is None:  # do not simplify if in parent/child relationship
+            stats.nodes_simplified += b.simplify()
+        try:
+            b.roll_inner_nodes()
+        except Exception as reason:
+            logging.warning("Roll_inner_nodes failed (OSM ID %i, %s)", b.osm_id, reason)
             continue
 
-        if b.is_external_model:
-            new_buildings.append(b)
+        if not b.analyse_elev_and_water(fg_elev):
             continue
 
         stats.nodes_ground += b.pts_all_count
 
         b.analyse_edge_lengths()
+
+        b.analyse_street_angle()
 
         b.analyse_roof_shape()
 
