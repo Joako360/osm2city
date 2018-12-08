@@ -609,9 +609,9 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
     list_elev = (max_elevation - min_elevation) / 2 + min_elevation
 
     material_name_urban = 'Urban'
-    file_urban = "buildings_urban.txt"
+    file_urban = stg_manager.prefix + "_buildings_urban.txt"
     material_name_town = 'Town'
-    file_town = "buildings_town.txt"
+    file_town = stg_manager.prefix + "_buildings_town.txt"
 
     _ = stg_manager.add_building_list(file_urban, material_name_urban, coords_transform.anchor, list_elev)
     path_to_stg = stg_manager.add_building_list(file_town, material_name_town, coords_transform.anchor, list_elev)
