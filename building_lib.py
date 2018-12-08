@@ -371,7 +371,7 @@ class Building(object):
 
     @property
     def building_list_type(self) -> BuildingListType:
-        if self.zone.settlement_type in [SettlementType.centre, SettlementType.dense, SettlementType.dense]:
+        if self.zone.settlement_type in [SettlementType.centre, SettlementType.block]:
             return BuildingListType.urban
         return BuildingListType.town
 
