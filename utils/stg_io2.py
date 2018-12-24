@@ -193,7 +193,7 @@ class STGManager(object):
         return the_stg_file
 
     def add_object_static(self, ac_file_name: str, lon_lat: Vec2d, elev: float, hdg: float,
-                          stg_verb_type: STGVerbType=STGVerbType.object_static, once: bool=False) -> str:
+                          stg_verb_type: STGVerbType = STGVerbType.object_static, once: bool = False) -> str:
         """Adds OBJECT_STATIC line. Returns path to stg."""
         the_stg_file = self._find_create_stg_file(lon_lat)
         return the_stg_file.add_object(stg_verb_type.name.upper(), ac_file_name, lon_lat, elev, hdg, once)

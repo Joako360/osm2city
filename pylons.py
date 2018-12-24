@@ -1527,7 +1527,7 @@ def _write_cable_clusters(cluster_container: cluster.ClusterContainer, coords_tr
         cluster_y = y_max - (y_max - y_min)/2.0
         cluster_elevation = elevation_max - (elevation_max - elevation_min)/2.0
         center_global = coords_transform.to_global((cluster_x, cluster_y))
-        cluster_filename = parameters.get_repl_prefix()
+        cluster_filename = parameters.PREFIX
         # it is important to have the ac-file names for cables different in "Pylons" and "Details/Objects",
         # because otherwise FG does not know which information to take from which stg-files, which results
         # in that e.g. the ac-file is taken from the Pylons stg - but the lat/lon/angle from the
@@ -1815,7 +1815,7 @@ def process_pylons(coords_transform: coordinates.Transformation, fg_elev: utilit
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
     stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.pylons, OUR_MAGIC,
-                                     parameters.get_repl_prefix())
+                                     parameters.PREFIX)
 
     # Write to FlightGear
     cmin, cmax = parameters.get_extent_global()
@@ -1913,7 +1913,7 @@ def process_details(coords_transform: coordinates.Transformation, lit_areas: Lis
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
     stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.details, OUT_MAGIC_DETAILS,
-                                     parameters.get_repl_prefix())
+                                     parameters.PREFIX)
 
     # Write to FlightGear
     cmin, cmax = parameters.get_extent_global()

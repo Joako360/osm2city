@@ -746,8 +746,7 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
 
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
-    replacement_prefix = parameters.get_repl_prefix()
-    stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.buildings, OUR_MAGIC, replacement_prefix)
+    stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.buildings, OUR_MAGIC, parameters.PREFIX)
 
     last_time = utilities.time_logging("Time used in seconds until before analyse", last_time)
 

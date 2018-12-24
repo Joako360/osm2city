@@ -382,11 +382,6 @@ def get_output_path():
     return PATH_TO_SCENERY
 
 
-def get_repl_prefix():
-    """If the PREFIX contains '/' or '\' characters due to batch processing, then they get replaced with underscore."""
-    return re.sub('[\/]', '_', PREFIX)
-
-
 def get_center_global():
     cmin = v.Vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
     cmax = v.Vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)

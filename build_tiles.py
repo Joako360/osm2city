@@ -261,7 +261,7 @@ if __name__ == '__main__':
                         tile_boundary_north = boundary_north
 
                     tile_index = calc_tile.calc_tile_index((tile_boundary_west, tile_boundary_south))
-                    tile_prefix = ("%s%s%s" % (calc_tile.directory_name((full_lon, full_lat)), os.sep, tile_index))
+                    tile_prefix = ("%s%s%s" % (calc_tile.directory_name((full_lon, full_lat), '_'), '_', tile_index))
                     a_scenery_tile = SceneryTile(tile_boundary_west, tile_boundary_south,
                                                  tile_boundary_east, tile_boundary_north,
                                                  tile_index, tile_prefix)

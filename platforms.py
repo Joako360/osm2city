@@ -66,12 +66,12 @@ def _process_osm_platform(nodes_dict, ways_dict, my_coord_transformator) -> List
     return my_platforms
 
 
-def _write(fg_elev: utilities.FGElev, stg_manager, replacement_prefix, clusters,
+def _write(fg_elev: utilities.FGElev, stg_manager, clusters,
            coords_transform: coordinates.Transformation, stats: utilities.Stats):
     for cl in clusters:
         if cl.objects:
             center_tile = Vec2d(coords_transform.to_global(cl.center))
-            ac_file_name = "%splatforms%02i%02i.ac" % (replacement_prefix, cl.grid_index.ix, cl.grid_index.iy)
+            ac_file_name = "%splatforms%02i%02i.ac" % (parameters.PREFIX, cl.grid_index.ix, cl.grid_index.iy)
             ac = ac3d.File(stats=stats)
             obj = ac.new_object('platforms', 'Textures/Terrain/asphalt.png', default_mat_idx=ac3d.MAT_IDX_UNLIT)
             for platform in cl.objects[:]:
@@ -230,10 +230,9 @@ def process_details(coords_transform: coordinates.Transformation, fg_elev: utili
 
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
-    replacement_prefix = parameters.get_repl_prefix()
-    stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.details, OUR_MAGIC, replacement_prefix)
+    stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.details, OUR_MAGIC, parameters.PREFIX)
 
-    _write(fg_elev, stg_manager, replacement_prefix, clusters, coords_transform, stats)
+    _write(fg_elev, stg_manager, clusters, coords_transform, stats)
 
     # -- write stg
     stg_manager.write(file_lock)

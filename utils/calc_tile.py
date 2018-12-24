@@ -49,13 +49,16 @@ def format_lat(lat):
         return "n%02d" % int(lat)
 
 
-def directory_name(lon_lat: Tuple[float, float]) -> str:
+def directory_name(lon_lat: Tuple[float, float], separator: str = None) -> str:
     """Generate the directory name for a location."""
     (lon, lat) = lon_lat
     lon_floor = floor(lon)
     lat_floor = floor(lat)
     lon_chunk = floor(lon/10.0) * 10
     lat_chunk = floor(lat/10.0) * 10
+    if separator:
+        return '{}{}{}{}{}'.format(format_lon(lon_chunk), format_lat(lat_chunk), separator,
+                                   format_lon(lon_floor), format_lat(lat_floor))
     return os.path.join(format_lon(lon_chunk) + format_lat(lat_chunk), format_lon(lon_floor) + format_lat(lat_floor))
 
 

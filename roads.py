@@ -1242,7 +1242,7 @@ def process_osm_ways(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, op.Way
     return my_ways
 
 
-def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, stg_manager, stg_paths, is_railway,
+def _process_clusters(clusters, fg_elev: utilities.FGElev, stg_manager, stg_paths, is_railway,
                       coords_transform: coordinates.Transformation, stats: utilities.Stats, is_rough_LOD: bool) -> None:
     for cl in clusters:
         if len(cl.objects) < parameters.CLUSTER_MIN_OBJECTS:
@@ -1254,7 +1254,7 @@ def _process_clusters(clusters, replacement_prefix, fg_elev: utilities.FGElev, s
             file_start = "roads"
         if is_rough_LOD:
             file_start += "_rough"
-        file_name = replacement_prefix + file_start + "%02i%02i" % (cl.grid_index.ix, cl.grid_index.iy)
+        file_name = parameters.PREFIX + file_start + "%02i%02i" % (cl.grid_index.ix, cl.grid_index.iy)
         center_global = Vec2d(coords_transform.to_global(cl.center))
         offset_local = cl.center
         cluster_elev = fg_elev.probe_elev(center_global, True)
@@ -1311,17 +1311,16 @@ def process_roads(coords_transform: coordinates.Transformation, fg_elev: utiliti
 
     roads.process(blocked_areas, stg_entries, lit_areas, stats)  # does the heavy lifting incl. clustering
 
-    replacement_prefix = parameters.get_repl_prefix()
-    stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.roads, OUR_MAGIC, replacement_prefix)
+    stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.roads, OUR_MAGIC, parameters.PREFIX)
 
     # -- write stg
     stg_paths = set()
 
-    _process_clusters(roads.railways_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, True,
+    _process_clusters(roads.railways_clusters, fg_elev, stg_manager, stg_paths, True,
                       coords_transform, stats, True)
-    _process_clusters(roads.roads_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, False,
+    _process_clusters(roads.roads_clusters, fg_elev, stg_manager, stg_paths, False,
                       coords_transform, stats, False)
-    _process_clusters(roads.roads_rough_clusters, replacement_prefix, fg_elev, stg_manager, stg_paths, False,
+    _process_clusters(roads.roads_rough_clusters, fg_elev, stg_manager, stg_paths, False,
                       coords_transform, stats, True)
 
     if parameters.DEBUG_PLOT_ROADS:
