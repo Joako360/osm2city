@@ -52,7 +52,6 @@ Created on Sat Jun  7 22:38:59 2014
 See also http://wiki.flightgear.org/Geographic_Coordinate_Systems
 """
 
-import copy
 from math import asin, atan2, sin, cos, sqrt, radians, degrees, pi, fabs
 import logging
 from typing import Tuple

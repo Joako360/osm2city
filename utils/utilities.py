@@ -452,12 +452,14 @@ class FGElev(object):
                 self._save_cache()
             return elev_is_solid_tuple
 
-    def probe_list_of_points(self, points: List[Tuple[float, float]]) -> float:
+    def probe_list_of_points(self, points: List[Tuple[float, float]]) -> (float, float):
         """Get the elevation of the node lowest node of a list of points.
         If a node is in water or at -9999, then return -9999
+        Second returned value is the difference between the highest and the lowest point.
         """
         elev_water_ok = True
-        temp_ground_elev = 9999
+        min_ground_elev = 9999
+        max_ground_elev = -999
         for point in points:
             elev_is_solid_tuple = self.probe(ve.Vec2d(point))
             if elev_is_solid_tuple[0] == -9999:
@@ -468,10 +470,13 @@ class FGElev(object):
                 logging.debug("in water")
                 elev_water_ok = False
                 break
-            temp_ground_elev = min([temp_ground_elev, elev_is_solid_tuple[0]])  # we are looking for the lowest value
+            if min_ground_elev > elev_is_solid_tuple[0]:
+                min_ground_elev = elev_is_solid_tuple[0]
+            if max_ground_elev < elev_is_solid_tuple[0]:
+                max_ground_elev = elev_is_solid_tuple[0]
         if not elev_water_ok:
-            return -9999
-        return temp_ground_elev
+            return -9999, 0
+        return min_ground_elev, max_ground_elev - min_ground_elev
 
 
 def progress(i, max_i):

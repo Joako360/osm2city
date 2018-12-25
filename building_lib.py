@@ -272,6 +272,7 @@ class Building(object):
         self.LOD = None  # see utils.utilities.LOD for values
 
         self.ground_elev = 0.0  # the lowest elevation over sea of any point in the outer ring of the building
+        self.diff_elev = 0.0  # the difference between the lowest elevation and the highest ground elevation og building
 
         # set during owbb land-use zone processing or owbb building generation
         self.zone = None  # either a owbb.model.(Generated)BuildingZone or owbb.model.CityBlock
@@ -573,9 +574,10 @@ class Building(object):
     def analyse_elev_and_water(self, fg_elev: utilities.FGElev) -> bool:
         """Get the elevation of the node lowest node on the outer ring.
         If a node is in water or at -9999, then return False."""
-        temp_ground_elev = fg_elev.probe_list_of_points(self.pts_outer)
-        if temp_ground_elev != -9999:
-            self.ground_elev = temp_ground_elev
+        min_ground_elev, diff_elev = fg_elev.probe_list_of_points(self.pts_outer)
+        if min_ground_elev != -9999:
+            self.ground_elev = min_ground_elev
+            self.diff_elev = diff_elev
             return True
         return False
 
@@ -742,7 +744,14 @@ class Building(object):
             return parameters.BUILDING_NUMBER_LEVELS_AEROWAY
         else:
             building_class = get_building_class(self.tags)
-            return calc_levels_for_settlement_type(self.zone.settlement_type, building_class)
+            my_levels = calc_levels_for_settlement_type(self.zone.settlement_type, building_class)
+            # make corrections for steep slopes
+            if building_class in [BuildingClass.residential, BuildingClass.residential_small, BuildingClass.apartments]:
+                if self.diff_elev >= 0.5 and my_levels == 1:
+                    my_levels += 1
+                elif self.diff_elev >= 1.0 and my_levels > 1:
+                    my_levels += 1
+            return my_levels
 
     def _calculate_level_height(self) -> float:
         import owbb.models
@@ -1634,7 +1643,7 @@ def _analyse_worship_building(building: Building, building_parent: BuildingParen
             model.lon = lon
             model.lat = lat
             model.angle = angle
-            model.elevation = fg_elev.probe_list_of_points(list(hull.exterior.coords)[:-1])
+            model.elevation, _ = fg_elev.probe_list_of_points(list(hull.exterior.coords)[:-1])
             model.elevation -= model.height_offset
             if model.elevation == -9999:
                 logging.debug('Worship building "%s" with osm_id %i is in water or unknown elevation',
