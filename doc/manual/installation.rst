@@ -20,7 +20,7 @@ Python
 
 ``osm2city`` is written in Python and needs Python for execution. Python is available on all major desktop operating systems — including but not limited to Windows, Linux and Mac OS X. See http://www.python.org.
 
-Currently Python version 3.5 is used for development and is therefore the recommended version.
+Currently Python version 3.6 is used for development and is therefore the recommended version.
 
 
 -------------------------
@@ -35,13 +35,14 @@ osm2city uses the following Python extension packages, which must be installed o
 * numpy (on Windows you need Numpy+MKL)
 * pil (Pillow)
 * pyproj
+* requests
 * scipy
 * shapely
 * psycopg2-binary
 * psycopg2cffi (this and the next one are only needed when using PyPy (see below)
 * psycopg2cffi-compat
 
-Please make sure to use Python 3.5+ compatible extensions. Often Python 3 compatible packages have a "3" in their name. Most Linux distributions come by default with the necessary packages — often they are prefixed with ``python-`` (e.g. ``python-numpy``). On Windows WinPython (https://winpython.github.io/) together with Christoph Gohlke's unofficial Windows binaries for Python extension packages (http://www.lfd.uci.edu/~gohlke/pythonlibs/) works well.
+Please make sure to use Python 3.6+ compatible extensions. Often Python 3 compatible packages have a "3" in their name. Most Linux distributions come by default with the necessary packages — often they are prefixed with ``python-`` (e.g. ``python-numpy``). On Windows WinPython (https://winpython.github.io/) together with Christoph Gohlke's unofficial Windows binaries for Python extension packages (http://www.lfd.uci.edu/~gohlke/pythonlibs/) works well.
 
 
 --------------------

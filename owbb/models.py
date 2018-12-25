@@ -20,6 +20,7 @@ import parameters
 import utils.osmparser as op
 import utils.osmstrings as s
 import utils.coordinates as co
+import utils.wikidata_io as wio
 
 
 # type aliases
@@ -109,16 +110,22 @@ class Place(OSMFeature):
         return obj
 
     def parse_tags_additional(self, tags_dict: KeyValueDict) -> None:
-        if "population" in tags_dict:
-            self.population = op.parse_int(tags_dict["population"], 0)
-        if "name" in tags_dict:
-            self.name = tags_dict["name"]
-        elif "place_name" in tags_dict:  # only use it if name was not included
-            self.name = tags_dict["place_name"]
+        if s.K_POPULATION in tags_dict:
+            self.population = op.parse_int(tags_dict[s.K_POPULATION], 0)
+        elif s.K_WIKIDATA in tags_dict:
+            my_id = tags_dict[s.K_WIKIDATA]
+            my_population = wio.query_population(my_id)
+            if my_population > 0:
+                self.population = my_population
+
+        if s.K_NAME in tags_dict:
+            self.name = tags_dict[s.K_NAME]
+        elif s.K_PLACE_NAME in tags_dict:  # only use it if name was not included
+            self.name = tags_dict[s.K_PLACE_NAME]
 
     @staticmethod
     def parse_tags(tags_dict: KeyValueDict) -> Union[None, PlaceType]:
-        value = tags_dict["place"]
+        value = tags_dict[s.K_PLACE]
         for member in PlaceType:
             if value == member.name:
                 return member
