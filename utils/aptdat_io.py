@@ -22,7 +22,7 @@ from utils import utilities
 from utils.vec2d import Vec2d
 
 
-class AirportBoundary:
+class Boundary:
     def __init__(self) -> None:
         self.nodes_lists = list()  # a list of list of Nodes, where a Node is a tuple (lon, lat)
 
@@ -107,12 +107,16 @@ class Airport(object):
         self.code = code
         self.runways = list()  # LandRunways, Helipads
         self.airport_boundary = None
+        self.pavements = list()  # Pavement of type Boundary
 
     def append_runway(self, runway: Runway) -> None:
         self.runways.append(runway)
 
-    def append_airport_boundary(self, airport_boundary: AirportBoundary) -> None:
+    def append_airport_boundary(self, airport_boundary: Boundary) -> None:
         self.airport_boundary = airport_boundary
+
+    def append_pavement(self, pavement_boundary: Boundary) -> None:
+        self.pavements.append(pavement_boundary)
 
     def within_boundary(self, min_lon: float, min_lat: float, max_lon: float, max_lat: float) -> bool:
         for runway in self.runways:
@@ -127,6 +131,10 @@ class Airport(object):
         blocked_areas = list()
         for runway in self.runways:
             blocked_areas.append(runway.create_blocked_area(coords_transform))
+        for pavement in self.pavements:
+            pavement_buffers = pavement.create_polygon_buffer(coords_transform)
+            for pb in pavement_buffers:
+                blocked_areas.append(pb)
         return blocked_areas
 
     def create_boundary_polygons(self, coords_transform: coordinates.Transformation) -> Optional[List[Polygon]]:
@@ -144,20 +152,20 @@ def read_apt_dat_gz_file(min_lon: float, min_lat: float,
     total_airports = 0
     with gzip.open(apt_dat_gz_file, 'rt', encoding="latin-1") as f:
         my_airport = None
-        airport_boundary = None
+        boundary = None
         current_boundary_nodes = list()
-        in_airport_boundary = False
+        in_boundary = False
         for line in f:
             parts = line.split()
             if not parts:
                 continue
-            if in_airport_boundary:
+            if in_boundary:
                 if parts[0] not in ['111', '112', '113', '114', '115', '116']:
-                    in_airport_boundary = False
+                    in_boundary = False
                 else:
                     current_boundary_nodes.append((float(parts[2]), float(parts[1])))
                     if parts[0] in ['113', '114']:  # closed loop
-                        airport_boundary.append_nodes_list(current_boundary_nodes)
+                        boundary.append_nodes_list(current_boundary_nodes)
                         current_boundary_nodes = list()
             if parts[0] in ['1', '16', '17', '99']:
                 # first actually append the previously read airport data to the collection if within bounds
@@ -174,10 +182,14 @@ def read_apt_dat_gz_file(min_lon: float, min_lat: float,
             elif parts[0] == '102':
                 my_helipad = Helipad(float(parts[5]), float(parts[6]), Vec2d(float(parts[3]), float(parts[2])))
                 my_airport.append_runway(my_helipad)
+            elif parts[0] == '110':
+                boundary = Boundary()
+                in_boundary = True
+                my_airport.append_pavement(boundary)
             elif parts[0] == '130':
-                airport_boundary = AirportBoundary()
-                in_airport_boundary = True
-                my_airport.airport_boundary = airport_boundary
+                boundary = Boundary()
+                in_boundary = True
+                my_airport.append_airport_boundary(boundary)
 
     logging.info("Read %d airports, %d having runways/helipads within the boundary", total_airports, len(airports))
     utilities.time_logging("Execution time", start_time)
