@@ -501,22 +501,47 @@ class Roads(object):
 
     def _check_against_blocked_areas(self, blocked_areas: List[shg.Polygon]) -> None:
         """Makes sure that there are no ways, which go across a blocked area (e.g. airport runway).
-        Ways are clipped over into two ways if intersecting."""
+        Ways are clipped over into two ways if intersecting. If they are contained, then they are removed."""
         if not blocked_areas:
             return
         new_ways = list()
-        for way in self.ways_list:
-            my_line = self._line_string_from_way(way)
-            for blocked_area in blocked_areas:
-                if my_line.intersects(blocked_area):
-                    my_line_difference = my_line.difference(blocked_area)
-                    if isinstance(my_line_difference, shg.LineString):
-                        self._change_way_for_object(my_line_difference, way)
-                        continue
-                    if isinstance(my_line_difference, shg.MultiLineString) and len(my_line_difference.geoms) == 2:
-                        new_ways.append(self._split_way_for_object(my_line_difference, way))
+        for way in reversed(self.ways_list):
+            my_list = [way]
+            continue_loop = True
+            while continue_loop and my_list:
+                continue_loop = False  # only set to true if something changed
+                continue_intersect = True
+                for a_way in reversed(my_list):
+                    my_line = self._line_string_from_way(a_way)
+                    for blocked_area in blocked_areas:
+                        if my_line.within(blocked_area):
+                            my_list.remove(a_way)
+                            logging.info('removed %d', a_way.osm_id)
+                            continue_intersect = False
+                            continue_loop = True
+                            break
+                    if continue_intersect:
+                        for blocked_area in blocked_areas:
+                            if my_line.intersects(blocked_area):
+                                my_line_difference = my_line.difference(blocked_area)
+                                length_diff = my_line.length - my_line_difference.length
+                                if isinstance(my_line_difference, shg.LineString) and \
+                                        length_diff > parameters.TOLERANCE_MATCH_NODE:
+                                    self._change_way_for_object(my_line_difference, a_way)
+                                    continue_loop = True
+                                    logging.info('reduced %d', a_way.osm_id)
+                                    break
+                                elif isinstance(my_line_difference, shg.MultiLineString):
+                                    split_ways = self._split_way_for_object(my_line_difference, a_way)
+                                    if split_ways:
+                                        my_list.extend(split_ways)
+                                        continue_loop = True
+                                        logging.info('split %d into %d ways', a_way.osm_id, len(split_ways) + 1)
+                                        break
+            if my_list:
+                new_ways.extend(my_list)
 
-        self.ways_list.extend(new_ways)
+        self.ways_list = new_ways
 
     def _check_against_stg_entries(self, stg_entries: List[stg_io2.STGEntry]) -> None:
         """Makes sure that there are no ways tagged as bridges, which go across a STGEntry.
@@ -548,11 +573,14 @@ class Roads(object):
                                 pass
                             logging.debug("Remove way (osm_id=%d) due to static object.", way.osm_id)
                             continue
-                        self._change_way_for_object(my_line_difference, way)
-                        logging.debug("Reduced way length (osm_id=%d) due to static object.", way.osm_id)
-                        continue
+                        elif (my_line.length - my_line_difference.length) > parameters.TOLERANCE_MATCH_NODE:
+                            self._change_way_for_object(my_line_difference, way)
+                            logging.debug("Reduced way length (osm_id=%d) due to static object.", way.osm_id)
+                            continue
                     if isinstance(my_line_difference, shg.MultiLineString) and len(my_line_difference.geoms) == 2:
-                        new_ways.append(self._split_way_for_object(my_line_difference, way))
+                        split_ways = self._split_way_for_object(my_line_difference, way)
+                        if split_ways:
+                            new_ways.extend(split_ways)
 
         self.ways_list.extend(new_ways)
 
@@ -782,32 +810,31 @@ class Roads(object):
 
     def _change_way_for_object(self, my_line: shg.LineString, original_way: op.Way) -> None:
         """Processes an original way and replaces its coordinates with the coordinates of a LineString."""
-        original_way.refs = list()
+        prev_refs = original_way.refs[:]
         the_coordinates = list(my_line.coords)
-        for coords in the_coordinates:
-            lon_lat = self.transform.to_global(coords)
-            new_node = op.Node(op.get_next_pseudo_osm_id(op.OSMFeatureType.road), lon_lat[1], lon_lat[0])
-            self.nodes_dict[new_node.osm_id] = new_node
-            original_way.refs.append(new_node.osm_id)
+        original_way.refs = utilities.match_local_coords_with_global_nodes(the_coordinates, prev_refs, self.nodes_dict,
+                                                                           self.transform, original_way.osm_id, True)
 
-    def _split_way_for_object(self, my_multiline: shg.MultiLineString, original_way: op.Way) -> op.Way:
-        """Processes an original way split by an object (blocked area, stg_entry) and creates additional way"""
-        # last node in first line is "new" node not found in original line
-        index = len(list(my_multiline.geoms[0].coords)) - 2
-        original_refs = original_way.refs
-        original_way.refs = original_refs[:index + 1]
-        new_way = _init_way_from_existing(original_way, original_refs[index + 1:])
-        # now add new nodes from intersection
-        lon_lat = self.transform.to_global(list(my_multiline.geoms[0].coords)[-1])
-        new_node = op.Node(op.get_next_pseudo_osm_id(op.OSMFeatureType.road), lon_lat[1], lon_lat[0])
-        self.nodes_dict[new_node.osm_id] = new_node
-        original_way.refs.append(new_node.osm_id)
-        lon_lat = self.transform.to_global(list(my_multiline.geoms[1].coords)[0])
-        new_node = op.Node(op.get_next_pseudo_osm_id(op.OSMFeatureType.road), lon_lat[1], lon_lat[0])
-        self.nodes_dict[new_node.osm_id] = new_node
-        new_way.refs.insert(0, new_node.osm_id)
-        logging.debug("Split way (osm_id=%d) into 2 ways due to blocked area.", original_way.osm_id)
-        return new_way
+    def _split_way_for_object(self, my_multiline: shg.MultiLineString, original_way: op.Way) -> List[op.Way]:
+        """Processes an original way split by an object (blocked area, stg_entry) and creates additional way.
+        If one of the linestrings is shorter than parameter, then it is discarded to reduce the number of residuals.
+        The list of returned ways can be empty."""
+        is_first = True
+        additional_ways = list()
+        prev_refs = original_way.refs[:]
+        for line in my_multiline.geoms:
+            if line.length > parameters.TOLERANCE_MATCH_NODE:
+                the_coordinates = list(line.coords)
+                new_refs = utilities.match_local_coords_with_global_nodes(the_coordinates, prev_refs, self.nodes_dict,
+                                                                          self.transform, original_way.osm_id, True)
+                if is_first:
+                    is_first = False
+                    original_way.refs = new_refs
+                else:
+                    new_way = _init_way_from_existing(original_way, list())
+                    new_way.refs = new_refs
+                    additional_ways.append(new_way)
+        return additional_ways
 
     def _remove_unused_nodes(self):
         """Remove all nodes which are not used in ways in order not to do elevation probing in vane."""
@@ -1158,7 +1185,7 @@ class Roads(object):
                         logging.warning("Way with osm-id={} has not valid position {} for node {}.".format(way.osm_id,
                                                                                                            position,
                                                                                                            ref))
-                except ValueError as e:
+                except ValueError:
                     logging.exception('Rejoin not possible for way {} and position {}.'.format(way.osm_id, position))
                     # nothing more to do - most probably rounding error or zero segment length
             # for each in end_dict search in start_dict the one with the closest angle and which is a compatible way
@@ -1287,15 +1314,27 @@ def _process_clusters(clusters, fg_elev: utilities.FGElev, stg_manager, stg_path
             the_way.junction1.reset()
 
 
+def _process_aprons_as_blocked_areas(coords_transform: coordinates.Transformation,
+                                     blocked_areas: List[shg.Polygon]) -> List[shg.Polygon]:
+    osm_result = op.fetch_osm_db_data_ways_key_values([op.create_key_value_pair(s.K_AEROWAY, s.V_APRON)])
+    my_apron_polys = list()
+    for way in list(osm_result.ways_dict.values()):
+        my_geometry = way.polygon_from_osm_way(osm_result.nodes_dict, coords_transform)
+        my_apron_polys.append(my_geometry)
+    my_apron_polys.extend(blocked_areas)
+    return utilities.merge_buffers(my_apron_polys)
+
+
 def process_roads(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
                   blocked_areas: List[shg.Polygon], lit_areas: List[shg.Polygon],
-                  stg_entries: List[stg_io2.STGEntry], file_lock: mp.Lock=None) -> None:
+                  stg_entries: List[stg_io2.STGEntry], file_lock: mp.Lock = None) -> None:
     random.seed(42)
     stats = utilities.Stats()
 
     osm_way_result = op.fetch_osm_db_data_ways_keys([s.K_HIGHWAY, s.K_RAILWAY])
     osm_nodes_dict = osm_way_result.nodes_dict
     osm_ways_dict = osm_way_result.ways_dict
+    the_blocked_areas = _process_aprons_as_blocked_areas(coords_transform, blocked_areas)
 
     logging.info("Number of ways before basic processing: %i", len(osm_ways_dict))
     filtered_osm_ways_list = process_osm_ways(osm_nodes_dict, osm_ways_dict)
@@ -1309,7 +1348,7 @@ def process_roads(coords_transform: coordinates.Transformation, fg_elev: utiliti
     path_to_output = parameters.get_output_path()
     logging.debug("before linear " + str(roads))
 
-    roads.process(blocked_areas, stg_entries, lit_areas, stats)  # does the heavy lifting incl. clustering
+    roads.process(the_blocked_areas, stg_entries, lit_areas, stats)  # does the heavy lifting incl. clustering
 
     stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.roads, OUR_MAGIC, parameters.PREFIX)
 

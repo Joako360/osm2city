@@ -117,7 +117,7 @@ def replace_with_os_separator(path: str) -> str:
 def match_local_coords_with_global_nodes(local_list: List[Tuple[float, float]], ref_list: List[int],
                                          all_nodes: Dict[int, op.Node],
                                          coords_transform: co.Transformation, osm_id: int,
-                                         create_node: bool=False) -> List[int]:
+                                         create_node: bool = False) -> List[int]:
     """Given a set of coordinates in local space find matching Node objects in global space.
     Matching is using a bit of tolerance (cf. parameter), which should be enough to account for conversion precision
     resp. float precision.
@@ -137,7 +137,7 @@ def match_local_coords_with_global_nodes(local_list: List[Tuple[float, float]], 
             distance = co.calc_distance_local(local[0], local[1], node_local[0], node_local[1])
             if distance < closest_distance:
                 closest_distance = distance
-            if distance < parameters.BUILDING_TOLERANCE_MATCH_NODE:
+            if distance < parameters.TOLERANCE_MATCH_NODE:
                 found_key = key
                 break
         if found_key < 0:

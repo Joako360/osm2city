@@ -189,7 +189,9 @@ OBSTRUCTION_LIGHT_MIN_LEVELS = 15   # -- put obstruction lights on buildings wit
 # discard cluster if too few objects. Do not go below 1, otherwise lots of empty ac-objects and useless STG entries.
 CLUSTER_MIN_OBJECTS = 5
 
-BUILDING_TOLERANCE_MATCH_NODE = 0.5  # when searching for a OSM node based on distance: what is the allowed tolerance
+# When searching for an existing OSM node based on distance: what is the allowed tolerance.
+# Also used in roads.py to make sure blocked areas do not generate tiny differences.
+TOLERANCE_MATCH_NODE = 0.5
 
 DETAILS_PROCESS_PIERS = True
 DETAILS_PROCESS_PLATFORMS = True

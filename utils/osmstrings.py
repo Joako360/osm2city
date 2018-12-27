@@ -72,6 +72,7 @@ V_ACROSS = 'across'
 V_AERODROME = 'aerodrome'
 V_AERO_OTHER = 'aero_other'  # does not exist in OSM - used when it is unsure whether terminal, hangar or different
 V_ALONG = 'along'
+V_APRON = 'apron'
 V_BRIDGE = 'bridge'
 V_BUILDING = 'building'
 V_FLAT = 'flat'
