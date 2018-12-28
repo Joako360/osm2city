@@ -10,12 +10,12 @@ However this module does only support reading from the apt.dat.gz in $FG_ROOT/Ai
 from abc import ABCMeta, abstractmethod
 import gzip
 import logging
-import math
 import os
 import time
 from typing import List, Optional
 
-from shapely.geometry import CAP_STYLE, LineString, Point, Polygon
+from shapely.affinity import rotate
+from shapely.geometry import box, CAP_STYLE, LineString, Point, Polygon
 
 from utils import coordinates
 from utils import utilities
@@ -87,10 +87,11 @@ class LandRunway(Runway):
 
 
 class Helipad(Runway):
-    def __init__(self, length: float, width: float, center: Vec2d) -> None:
+    def __init__(self, length: float, width: float, center: Vec2d, orientation: float) -> None:
         self.length = length
         self.width = width
         self.center = center  # global coordinates
+        self.orientation = orientation
 
     def within_boundary(self, min_lon, min_lat, max_lon, max_lat):
         if (min_lon <= self.center.x <= max_lon) and (min_lat <= self.center.y <= max_lat):
@@ -99,7 +100,9 @@ class Helipad(Runway):
 
     def create_blocked_area(self, coords_transform):
         my_point = Point(coords_transform.to_local((self.center.x, self.center.y)))
-        return my_point.buffer(math.sqrt(self.length + self.width) / 2)
+        my_box = box(my_point.x - self.length / 2, my_point.y - self.width / 2,
+                     my_point.x + self.length / 2, my_point.y + self.width / 2)
+        return rotate(my_box, self.orientation)
 
 
 class Airport(object):
@@ -180,7 +183,8 @@ def read_apt_dat_gz_file(min_lon: float, min_lat: float,
                                        Vec2d(float(parts[19]), float(parts[18])))
                 my_airport.append_runway(my_runway)
             elif parts[0] == '102':
-                my_helipad = Helipad(float(parts[5]), float(parts[6]), Vec2d(float(parts[3]), float(parts[2])))
+                my_helipad = Helipad(float(parts[5]), float(parts[6]), Vec2d(float(parts[3]), float(parts[2])),
+                                     float(parts[4]))
                 my_airport.append_runway(my_helipad)
             elif parts[0] == '110':
                 boundary = Boundary()
