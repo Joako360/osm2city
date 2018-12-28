@@ -237,7 +237,7 @@ class BTGReader(object):
                         self.material_name = WATER_PROXY
                     else:
                         self.material_name = data
-                    logging.info('Material name "%s"', self.material_name)  # FIXME_DEBUG
+                    logging.debug('Material name "%s"', self.material_name)
 
                 elif property_type == PROPERTY_TYPE_INDEX:
                     (idx,) = struct.unpack("<B", data[:1])

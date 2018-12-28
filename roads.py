@@ -516,7 +516,7 @@ class Roads(object):
                     for blocked_area in blocked_areas:
                         if my_line.within(blocked_area):
                             my_list.remove(a_way)
-                            logging.info('removed %d', a_way.osm_id)
+                            logging.debug('removed %d', a_way.osm_id)
                             continue_intersect = False
                             continue_loop = True
                             break
@@ -529,14 +529,14 @@ class Roads(object):
                                         length_diff > parameters.TOLERANCE_MATCH_NODE:
                                     self._change_way_for_object(my_line_difference, a_way)
                                     continue_loop = True
-                                    logging.info('reduced %d', a_way.osm_id)
+                                    logging.debug('reduced %d', a_way.osm_id)
                                     break
                                 elif isinstance(my_line_difference, shg.MultiLineString):
                                     split_ways = self._split_way_for_object(my_line_difference, a_way)
                                     if split_ways:
                                         my_list.extend(split_ways)
                                         continue_loop = True
-                                        logging.info('split %d into %d ways', a_way.osm_id, len(split_ways) + 1)
+                                        logging.debug('split %d into %d ways', a_way.osm_id, len(split_ways) + 1)
                                         break
             if my_list:
                 new_ways.extend(my_list)
