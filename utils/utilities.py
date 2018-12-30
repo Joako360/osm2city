@@ -328,7 +328,7 @@ class FGElev(object):
        save the cache to disk before freeing the object.
     """
     def __init__(self, coords_transform: co.Transformation, tile_index: int,
-                 auto_save_every: int=50000) -> None:
+                 auto_save_every: int = 50000) -> None:
         """Open pipe to fgelev.
            Unless disabled by cache=False, initialize the cache and try to read
            it from disk. Automatically save the cache to disk every auto_save_every misses.
@@ -409,6 +409,8 @@ class FGElev(object):
                 while line == "" and empty_lines < 20:
                     empty_lines += 1
                     line = self.fgelev_pipe.stdout.readline().strip()
+                    if line.startswith('Now checking'):  # New in FG Git version end of Dec 2018
+                        line = ""
                 parts = line.split()
                 elev = float(parts[1]) + self.h_offset
                 is_solid = True
