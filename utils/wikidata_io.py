@@ -50,8 +50,11 @@ def query_population(entity_id: str) -> int:
     try:
         data = json.loads(r.content.decode())
         bindings = data['results']['bindings']
-        value_dict = bindings[0]
-        return int(value_dict['o']['value'])
+        if bindings:  # the result can also be empty when the place exists but does not have population data
+            value_dict = bindings[0]
+            return int(value_dict['o']['value'])
+        else:
+            return error_value
     except (ValueError, KeyError):
         logging.warning('Error in interpreting data from WikiData with id=' + entity_id, exc_info=1)
         return error_value

@@ -365,8 +365,9 @@ OVERLAP_CHECK_CONSIDER_SHARED                   Bool       True      Whether onl
                                                                      models reused in different places like a church model).
                                                                      For this to work ``PATH_TO_SCENERY`` must point to the TerraSync directory.
 
-OVERLAP_CHECK_BRIDGE_MIN_REMAINING              Integer    10        When a static bridge model intersect with a way, how much must at least be
-                                                                     left so the way is kept after intersection.
+OVERLAP_CHECK_ROAD_MIN_REMAINING                Integer    10        When a static bridge model or other blocked area (e.g. airport object)
+                                                                     intersect with a way, how much must at least be left so the way is kept after
+                                                                     intersection.
 =============================================   ========   =======   ==============================================================================
 
 Examples of overlap objects based on static objects at LSZS (light grey structures at bottom of buildings):
