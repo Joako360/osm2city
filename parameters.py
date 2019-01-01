@@ -99,8 +99,6 @@ OVERLAP_CHECK_CH_BUFFER_STATIC = 0.0
 OVERLAP_CHECK_CH_BUFFER_SHARED = 0.0
 
 OVERLAP_CHECK_CONSIDER_SHARED = True
-# when a static bridge model intersect with a way, how much must at least be left so the way is kept after intersection
-OVERLAP_CHECK_BRIDGE_MIN_REMAINING = 10
 
 # -- Skip buildings based on their OSM name tag or OSM ID, e.g. in case there's already
 #    a static model for these, and the overlap check fails.
@@ -281,6 +279,10 @@ HIGHWAY_TYPE_MIN_ROUGH_LOD = 6  # the minimum type tobe added to the rough LOD c
 POINTS_ON_LINE_DISTANCE_MAX = 1000  # the maximum distance between two points on a line. If longer, then new points are added
 
 USE_TRAM_LINES = False  # whether to build tram lines (OSM railway=tram). Often they do not merge well with roads
+
+# when a static bridge model or another blocked area (e.g. on airport) intersect with a way,
+# how much must at least be left so the way is kept after intersection
+OVERLAP_CHECK_ROAD_MIN_REMAINING = 10
 
 
 # =============================================================================

@@ -414,15 +414,13 @@ class Roads(object):
                 logging.warning('Removing way with osm_id=%i due to only %i after %s', way.osm_id, len(way.refs), where)
                 self.ways_list.remove(way)
 
-    def process(self, blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
-                lit_areas: List[shg.Polygon], stats: utilities.Stats) -> None:
+    def process(self, blocked_areas: List[shg.Polygon], lit_areas: List[shg.Polygon], stats: utilities.Stats) -> None:
         """Processes the OSM data until data can be clusterised.
         """
         self._remove_tunnels()
         self._replace_short_bridges_with_ways()
         self._check_ways_in_water()
         self._check_against_blocked_areas(blocked_areas)
-        self._check_against_stg_entries(stg_entries)
         self._check_ways_sanity('_check_against_stg_entries')
         self._check_lighting(lit_areas)
         self._cleanup_topology()
@@ -516,7 +514,7 @@ class Roads(object):
                     for blocked_area in blocked_areas:
                         if my_line.within(blocked_area):
                             my_list.remove(a_way)
-                            logging.debug('removed %d', a_way.osm_id)
+                            logging.debug('removed %d because within', a_way.osm_id)
                             continue_intersect = False
                             continue_loop = True
                             break
@@ -527,62 +525,28 @@ class Roads(object):
                                 length_diff = my_line.length - my_line_difference.length
                                 if isinstance(my_line_difference, shg.LineString) and \
                                         length_diff > parameters.TOLERANCE_MATCH_NODE:
-                                    self._change_way_for_object(my_line_difference, a_way)
+                                    if my_line_difference.length < parameters.OVERLAP_CHECK_ROAD_MIN_REMAINING:
+                                        my_list.remove(a_way)
+                                        logging.debug(('removed %d because too short', a_way.osm_id))
+                                    else:
+                                        self._change_way_for_object(my_line_difference, a_way)
+                                        logging.debug('reduced %d', a_way.osm_id)
                                     continue_loop = True
-                                    logging.debug('reduced %d', a_way.osm_id)
                                     break
                                 elif isinstance(my_line_difference, shg.MultiLineString):
                                     split_ways = self._split_way_for_object(my_line_difference, a_way)
-                                    if split_ways:
-                                        my_list.extend(split_ways)
+                                    if len(split_ways) > 0:
+                                        for x in range(1, len(split_ways)- 1):
+                                            my_list.append(x)
+                                            logging.debug('split %d into %d ways', a_way.osm_id, len(split_ways) + 1)
+                                    else:
+                                        my_list.remove(a_way)
                                         continue_loop = True
-                                        logging.debug('split %d into %d ways', a_way.osm_id, len(split_ways) + 1)
                                         break
             if my_list:
                 new_ways.extend(my_list)
 
         self.ways_list = new_ways
-
-    def _check_against_stg_entries(self, stg_entries: List[stg_io2.STGEntry]) -> None:
-        """Makes sure that there are no ways tagged as bridges, which go across a STGEntry.
-        Ways are clipped over into two ways if intersecting."""
-        if not stg_entries:
-            return
-        new_ways = list()
-        for way in reversed(self.ways_list):
-            if not _is_bridge(way):
-                continue
-            my_line = self._line_string_from_way(way)
-            for stg_entry in stg_entries:
-                if stg_entry.verb_type is not stg_io2.STGVerbType.object_static:
-                    continue
-                if my_line.intersects(stg_entry.convex_hull):
-                    my_line_difference = my_line.difference(stg_entry.convex_hull)
-                    if isinstance(my_line_difference, shg.GeometryCollection) and my_line_difference.is_empty:
-                        try:
-                            self.ways_list.remove(way)
-                            logging.debug("Remove way (osm_id=%d) due to static object.", way.osm_id)
-                        except ValueError:
-                            pass
-                        continue
-                    if isinstance(my_line_difference, shg.LineString):
-                        if my_line_difference.length < parameters.OVERLAP_CHECK_BRIDGE_MIN_REMAINING:
-                            try:
-                                self.ways_list.remove(way)
-                            except ValueError:
-                                pass
-                            logging.debug("Remove way (osm_id=%d) due to static object.", way.osm_id)
-                            continue
-                        elif (my_line.length - my_line_difference.length) > parameters.TOLERANCE_MATCH_NODE:
-                            self._change_way_for_object(my_line_difference, way)
-                            logging.debug("Reduced way length (osm_id=%d) due to static object.", way.osm_id)
-                            continue
-                    if isinstance(my_line_difference, shg.MultiLineString) and len(my_line_difference.geoms) == 2:
-                        split_ways = self._split_way_for_object(my_line_difference, way)
-                        if split_ways:
-                            new_ways.extend(split_ways)
-
-        self.ways_list.extend(new_ways)
 
     def _check_lighting(self, lit_areas: List[shg.Polygon]) -> None:
         """Checks ways for lighting and maybe splits at borders for built-up areas."""
@@ -818,12 +782,12 @@ class Roads(object):
     def _split_way_for_object(self, my_multiline: shg.MultiLineString, original_way: op.Way) -> List[op.Way]:
         """Processes an original way split by an object (blocked area, stg_entry) and creates additional way.
         If one of the linestrings is shorter than parameter, then it is discarded to reduce the number of residuals.
-        The list of returned ways can be empty."""
+        The list of returned ways can be empty, in which case the original way should be removed after the call."""
         is_first = True
         additional_ways = list()
         prev_refs = original_way.refs[:]
         for line in my_multiline.geoms:
-            if line.length > parameters.TOLERANCE_MATCH_NODE:
+            if line.length > parameters.OVERLAP_CHECK_ROAD_MIN_REMAINING:
                 the_coordinates = list(line.coords)
                 new_refs = utilities.match_local_coords_with_global_nodes(the_coordinates, prev_refs, self.nodes_dict,
                                                                           self.transform, original_way.osm_id, True)
@@ -1314,14 +1278,21 @@ def _process_clusters(clusters, fg_elev: utilities.FGElev, stg_manager, stg_path
             the_way.junction1.reset()
 
 
-def _process_aprons_as_blocked_areas(coords_transform: coordinates.Transformation,
-                                     blocked_areas: List[shg.Polygon]) -> List[shg.Polygon]:
+def _process_additional_blocked_areas(coords_transform: coordinates.Transformation, stg_entries: List[stg_io2.STGEntry],
+                                      blocked_areas: List[shg.Polygon]) -> List[shg.Polygon]:
+    # APRONS
     osm_result = op.fetch_osm_db_data_ways_key_values([op.create_key_value_pair(s.K_AEROWAY, s.V_APRON)])
     my_apron_polys = list()
     for way in list(osm_result.ways_dict.values()):
         my_geometry = way.polygon_from_osm_way(osm_result.nodes_dict, coords_transform)
         my_apron_polys.append(my_geometry)
     my_apron_polys.extend(blocked_areas)
+
+    # STG entries
+    for stg_entry in stg_entries:
+        if stg_entry.verb_type is not stg_io2.STGVerbType.object_static:
+            my_apron_polys.append(stg_entry.convex_hull)
+
     return utilities.merge_buffers(my_apron_polys)
 
 
@@ -1334,7 +1305,7 @@ def process_roads(coords_transform: coordinates.Transformation, fg_elev: utiliti
     osm_way_result = op.fetch_osm_db_data_ways_keys([s.K_HIGHWAY, s.K_RAILWAY])
     osm_nodes_dict = osm_way_result.nodes_dict
     osm_ways_dict = osm_way_result.ways_dict
-    the_blocked_areas = _process_aprons_as_blocked_areas(coords_transform, blocked_areas)
+    the_blocked_areas = _process_additional_blocked_areas(coords_transform, stg_entries, blocked_areas)
 
     logging.info("Number of ways before basic processing: %i", len(osm_ways_dict))
     filtered_osm_ways_list = process_osm_ways(osm_nodes_dict, osm_ways_dict)
@@ -1348,7 +1319,7 @@ def process_roads(coords_transform: coordinates.Transformation, fg_elev: utiliti
     path_to_output = parameters.get_output_path()
     logging.debug("before linear " + str(roads))
 
-    roads.process(the_blocked_areas, stg_entries, lit_areas, stats)  # does the heavy lifting incl. clustering
+    roads.process(the_blocked_areas, lit_areas, stats)  # does the heavy lifting incl. clustering
 
     stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.roads, OUR_MAGIC, parameters.PREFIX)
 
