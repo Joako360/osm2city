@@ -62,7 +62,7 @@ def directory_name(lon_lat: Tuple[float, float], separator: str = None) -> str:
     return os.path.join(format_lon(lon_chunk) + format_lat(lat_chunk), format_lon(lon_floor) + format_lat(lat_floor))
 
 
-def calc_tile_index(lon_lat: Tuple[float, float], x: int=0, y: int=0) -> int:
+def calc_tile_index(lon_lat: Tuple[float, float], x: int = 0, y: int = 0) -> int:
     """See  http://wiki.flightgear.org/Tile_Index_Scheme"""
     (lon, lat) = lon_lat
     if x == 0 and y == 0:

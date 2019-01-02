@@ -119,7 +119,7 @@ class STGFile(object):
             self.other_list = self.other_list + lines[:ours_start]
             lines = lines[ours_end + 1:]
 
-    def add_object(self, stg_verb: str, ac_file_name: str, lon_lat, elev: float, hdg: float, once: bool=False) -> str:
+    def add_object(self, stg_verb: str, ac_file_name: str, lon_lat, elev: float, hdg: float, once: bool = False) -> str:
         """add OBJECT_XXXXX line to our_list. Returns path to stg."""
         line = "%s %s %1.5f %1.5f %1.2f %g\n" % (stg_verb.upper(),
                                                  ac_file_name, lon_lat.lon, lon_lat.lat, elev, hdg)
@@ -175,7 +175,7 @@ class STGManager(object):
     """manages STG objects. Knows about scenery path.
        prefix separates different writers to work around two PREFIX areas interleaving 
     """
-    def __init__(self, path_to_scenery: str, scenery_type: SceneryType, magic: str, prefix: str=None) -> None:
+    def __init__(self, path_to_scenery: str, scenery_type: SceneryType, magic: str, prefix: str = None) -> None:
         self.stg_dict = dict()  # key: tile index, value: STGFile
         self.path_to_scenery = path_to_scenery
         self.magic = magic
@@ -198,7 +198,7 @@ class STGManager(object):
         the_stg_file = self._find_create_stg_file(lon_lat)
         return the_stg_file.add_object(stg_verb_type.name.upper(), ac_file_name, lon_lat, elev, hdg, once)
 
-    def add_object_shared(self, ac_file_name: str, lon_lat: Vec2d, elev: float , hdg: float) -> None:
+    def add_object_shared(self, ac_file_name: str, lon_lat: Vec2d, elev: float, hdg: float) -> None:
         """Adds OBJECT_SHARED line."""
         the_stg_file = self._find_create_stg_file(lon_lat)
         the_stg_file.add_object('OBJECT_SHARED', ac_file_name, lon_lat, elev, hdg)
@@ -210,7 +210,7 @@ class STGManager(object):
                                                           lon_lat.lon, lon_lat.lat, elev)
         return the_stg_file.add_line(line)
 
-    def write(self, file_lock: mp.Lock=None):
+    def write(self, file_lock: mp.Lock = None):
         """Writes all new scenery objects including the already existing back to stg-files.
         The file_lock object makes sure that only the current process is reading and writing stg-files in order
         to avoid conflicts.
@@ -253,7 +253,7 @@ class STGEntry(object):
             chosen_index = max([slash_index, backslash_index])
             self.obj_filename = self.obj_filename[:chosen_index + 1] + new_name
 
-    def get_obj_path_and_name(self, scenery_path: str=None) -> str:
+    def get_obj_path_and_name(self, scenery_path: str = None) -> str:
         """Parameter scenery_path is most probably parameters.SCENERY_PATH.
         It can be useful to try a different path for shared_objects, which might be from Terrasync."""
         if self.verb_type is STGVerbType.object_shared:
@@ -326,32 +326,46 @@ def read_stg_entries(stg_path_and_name: str, consider_shared: bool = True, our_m
     return entries
 
 
-def read_stg_entries_in_boundary(consider_shared: bool=True, my_coord_transform: Transformation=None) -> List[STGEntry]:
+def read_stg_entries_in_boundary(consider_shared: bool = True,
+                                 my_coord_transform: Transformation = None) -> List[STGEntry]:
     """Returns a list of all STGEntries within the boundary according to parameters.
+    Adds all tiles bordering the chosen tile in order to make sure that objects crossing tile borders but
+    maybe located outside also are taken into account.
     It uses the PATH_TO_SCENERY and PATH_TO_SCENERY_OPT (which are static), not PATH_TO_OUTPUT.
     If my_cord_transform is set, then for each entry the convex hull is calculated in local coordinates.
     """
+    bucket_span = calc_tile.bucket_span(parameters.BOUNDARY_NORTH - (
+            parameters.BOUNDARY_NORTH - parameters.BOUNDARY_SOUTH) / 2)
+    boundary_west = parameters.BOUNDARY_WEST - bucket_span
+    boundary_east = parameters.BOUNDARY_EAST + bucket_span
+    boundary_north = parameters.BOUNDARY_NORTH + 1./8.
+    boundary_south = parameters.BOUNDARY_SOUTH - 1./8.
     stg_entries = list()
-    stg_files = calc_tile.get_stg_files_in_boundary(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
-                                                    parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH,
+    stg_files = calc_tile.get_stg_files_in_boundary(boundary_west, boundary_south,
+                                                    boundary_east, boundary_north,
                                                     parameters.PATH_TO_SCENERY, "Objects")
 
     if parameters.PATH_TO_SCENERY_OPT:
         for my_path in parameters.PATH_TO_SCENERY_OPT:
-            stg_files_opt = calc_tile.get_stg_files_in_boundary(parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH,
-                                                                parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH,
+            stg_files_opt = calc_tile.get_stg_files_in_boundary(boundary_west, boundary_south,
+                                                                boundary_east, boundary_north,
                                                                 my_path, "Objects")
             stg_files.extend(stg_files_opt)
 
     for filename in stg_files:
         stg_entries.extend(read_stg_entries(filename, consider_shared))
 
+    # the border of the original tile in local coordinates
+    south_west = my_coord_transform.to_local((parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH))
+    north_east = my_coord_transform.to_local((parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH))
+    tile_box = shg.box(south_west[0], south_west[1], north_east[0], north_east[1])
     if my_coord_transform is not None:
-        _parse_stg_entries_for_convex_hull(stg_entries, my_coord_transform)
+        _parse_stg_entries_for_convex_hull(stg_entries, my_coord_transform, tile_box)
     return stg_entries
 
 
-def _parse_stg_entries_for_convex_hull(stg_entries: List[STGEntry], my_coord_transformation: Transformation) -> None:
+def _parse_stg_entries_for_convex_hull(stg_entries: List[STGEntry], my_coord_transformation: Transformation,
+                                       tile_box: shg.Polygon) -> None:
     """
     Parses the ac-file content for a set of STGEntry objects and sets their boundary attribute
     to be the convex hull of all points in the ac-file in the specified local coordinate system.
@@ -381,14 +395,16 @@ def _parse_stg_entries_for_convex_hull(stg_entries: List[STGEntry], my_coord_tra
                     entry.convex_hull = translated_polygon
             except IOError as reason:
                 logging.warning("Ignoring unreadable stg_entry %s", reason)
-            except ValueError as e:
+            except ValueError:
                 # Happens e.g. for waterfalls, where the xml-file only references a <particlesystem>
                 logging.debug("AC-filename could be wrong in xml-file %s - or just no ac-file referenced", ac_filename)
             if entry.convex_hull is None:
                 stg_entries.remove(entry)
+            elif entry.convex_hull.disjoint(tile_box):  # only keep entries which are somehow intersecting the tile
+                stg_entries.remove(entry)
 
 
-def _extract_boundary(ac_filename: str, alternative_ac_filename: str=None) -> shg.Polygon:
+def _extract_boundary(ac_filename: str, alternative_ac_filename: str = None) -> shg.Polygon:
     """Reads an ac-file and constructs a convex hull as a proxy to the real boundary.
     No attempt is made to follow rotations and translations.
     Returns a tuple (x_min, y_min, x_max, y_max) in meters.
@@ -426,7 +442,7 @@ def _parse_ac_file_name(xml_string: str) -> str:
     return ac_file_name
 
 
-def _extract_ac_from_xml(xml_filename: str, alternative_xml_filename: str=None) -> str:
+def _extract_ac_from_xml(xml_filename: str, alternative_xml_filename: str = None) -> str:
     """Reads the *.ac filename out of an xml-file"""
     checked_filename = xml_filename
     if not os.path.isfile(checked_filename) and alternative_xml_filename is not None:

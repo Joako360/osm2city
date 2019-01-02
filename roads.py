@@ -335,7 +335,8 @@ def _attached_ways_dict_remove(attached_ways_dict: Dict[int, List[Tuple[op.Way, 
                                the_way: op.Way) -> None:
     """Remove given way from given node in attached_ways_dict"""
     if the_ref not in attached_ways_dict:
-        logging.warning("not removing way from the ref %i because the ref is not in attached_ways_dict", the_ref)
+        logging.warning("not removing way %i from the ref %i because the ref is not in attached_ways_dict",
+                        the_way.osm_id, the_ref)
         return
     for way_pos_tuple in attached_ways_dict[the_ref]:
         if way_pos_tuple[0] == the_way:
@@ -527,7 +528,7 @@ class Roads(object):
                                         length_diff > parameters.TOLERANCE_MATCH_NODE:
                                     if my_line_difference.length < parameters.OVERLAP_CHECK_ROAD_MIN_REMAINING:
                                         my_list.remove(a_way)
-                                        logging.debug(('removed %d because too short', a_way.osm_id))
+                                        logging.debug('removed %d because too short', a_way.osm_id)
                                     else:
                                         self._change_way_for_object(my_line_difference, a_way)
                                         logging.debug('reduced %d', a_way.osm_id)
@@ -1282,18 +1283,18 @@ def _process_additional_blocked_areas(coords_transform: coordinates.Transformati
                                       blocked_areas: List[shg.Polygon]) -> List[shg.Polygon]:
     # APRONS
     osm_result = op.fetch_osm_db_data_ways_key_values([op.create_key_value_pair(s.K_AEROWAY, s.V_APRON)])
-    my_apron_polys = list()
+    my_blocked_polys = list()
     for way in list(osm_result.ways_dict.values()):
         my_geometry = way.polygon_from_osm_way(osm_result.nodes_dict, coords_transform)
-        my_apron_polys.append(my_geometry)
-    my_apron_polys.extend(blocked_areas)
+        my_blocked_polys.append(my_geometry)
+    my_blocked_polys.extend(blocked_areas)
 
     # STG entries
     for stg_entry in stg_entries:
-        if stg_entry.verb_type is not stg_io2.STGVerbType.object_static:
-            my_apron_polys.append(stg_entry.convex_hull)
+        if stg_entry.verb_type is stg_io2.STGVerbType.object_static:
+            my_blocked_polys.append(stg_entry.convex_hull)
 
-    return utilities.merge_buffers(my_apron_polys)
+    return utilities.merge_buffers(my_blocked_polys)
 
 
 def process_roads(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
