@@ -412,7 +412,7 @@ class Roads(object):
         If one is found with less nodes, it is discarded. Should not happen, but does."""
         for way in reversed(self.ways_list):
             if len(way.refs) < 2:
-                logging.warning('Removing way with osm_id=%i due to only %i after %s', way.osm_id, len(way.refs), where)
+                logging.warning('Removing way with osm_id=%i due to only %i nodes after %s', way.osm_id, len(way.refs), where)
                 self.ways_list.remove(way)
 
     def process(self, blocked_areas: List[shg.Polygon], lit_areas: List[shg.Polygon], stats: utilities.Stats) -> None:
@@ -422,7 +422,7 @@ class Roads(object):
         self._replace_short_bridges_with_ways()
         self._check_ways_in_water()
         self._check_against_blocked_areas(blocked_areas)
-        self._check_ways_sanity('_check_against_stg_entries')
+        self._check_ways_sanity('_check_against_blocked_areas')
         self._check_lighting(lit_areas)
         self._cleanup_topology()
         self._check_points_on_line_distance()
@@ -538,7 +538,7 @@ class Roads(object):
                                     split_ways = self._split_way_for_object(my_line_difference, a_way)
                                     if len(split_ways) > 0:
                                         for x in range(1, len(split_ways)- 1):
-                                            my_list.append(x)
+                                            my_list.append(split_ways[x])
                                             logging.debug('split %d into %d ways', a_way.osm_id, len(split_ways) + 1)
                                     else:
                                         my_list.remove(a_way)
