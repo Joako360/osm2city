@@ -186,11 +186,11 @@ def read_apt_dat_gz_file(min_lon: float, min_lat: float,
                 my_helipad = Helipad(float(parts[5]), float(parts[6]), Vec2d(float(parts[3]), float(parts[2])),
                                      float(parts[4]))
                 my_airport.append_runway(my_helipad)
-            elif parts[0] == '110':
+            elif parts[0] == '110':  # Pavement
                 boundary = Boundary()
                 in_boundary = True
                 my_airport.append_pavement(boundary)
-            elif parts[0] == '130':
+            elif parts[0] == '130':  # Airport boundary header
                 boundary = Boundary()
                 in_boundary = True
                 my_airport.append_airport_boundary(boundary)

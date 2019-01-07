@@ -537,7 +537,7 @@ class Roads(object):
                                 elif isinstance(my_line_difference, shg.MultiLineString):
                                     split_ways = self._split_way_for_object(my_line_difference, a_way)
                                     if len(split_ways) > 0:
-                                        for x in range(1, len(split_ways)- 1):
+                                        for x in range(1, len(split_ways) - 1):
                                             my_list.append(split_ways[x])
                                             logging.debug('split %d into %d ways', a_way.osm_id, len(split_ways) + 1)
                                     else:
