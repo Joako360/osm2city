@@ -520,7 +520,7 @@ def _make_building_from_way(nodes_dict: Dict[int, op.Node], all_tags: Dict[str, 
                                                                                      way.refs))
         return None
 
-    return building_lib.Building(way.osm_id, all_tags, outer_ring, name, inner_rings_list=inner_rings_list,
+    return building_lib.Building(way.osm_id, all_tags, outer_ring, name, None, inner_rings_list=inner_rings_list,
                                  refs=way.refs)
 
 

@@ -230,8 +230,9 @@ class Building(object):
     """
 
     def __init__(self, osm_id: int, tags: Dict[str, str], outer_ring: shg.LinearRing, name: str,
-                 stg_typ: STGVerbType=None, street_angle=0, inner_rings_list=list(),
-                 refs: List[int]=list(), is_owbb_model: bool=False) -> None:
+                 anchor: Optional[Vec2d],
+                 stg_typ: STGVerbType = None, street_angle=0, inner_rings_list=list(),
+                 refs: List[int] = list(), is_owbb_model: bool = False) -> None:
         # set during init and methods called by init
         self.osm_id = osm_id
         self.tags = tags
@@ -253,7 +254,7 @@ class Building(object):
         self.refs_shared = dict()  # refs shared with other buildings (dict of index position, value False or True)
         self.inner_rings_list = None
         self.outer_nodes_closest = None
-        self.anchor = None
+        self.anchor = anchor  # local Vec2d object
         self.polygon = None  # can have inner and outer rings, i.e. the real polygon
         self.geometry = None  # only the outer ring - for convenience and faster processing in some analysis
         self.update_geometry(outer_ring, inner_rings_list, refs)
@@ -285,7 +286,7 @@ class Building(object):
             if s.K_BUILDING not in self.tags:
                 self.tags[s.K_BUILDING] = part_value
 
-    def update_geometry(self, outer_ring: shg.LinearRing, inner_rings_list=list(), refs: List[int]=list()) -> None:
+    def update_geometry(self, outer_ring: shg.LinearRing, inner_rings_list = list(), refs: List[int] = list()) -> None:
         """Updates the geometry of the building. This can also happen after the building has been initialized.
         Makes also sure, that inner and outer rings have correct orientation.
         """
@@ -303,13 +304,30 @@ class Building(object):
                 if inner_ring.is_ccw:
                     inner_ring.coords = list(inner_ring.coords)[::-1]
         self.outer_nodes_closest = []
-        self.anchor = Vec2d(list(outer_ring.coords[0]))
         if len(outer_ring.coords) > 2:
             self._set_polygon(outer_ring, self.inner_rings_list)
         else:
             self.polygon = None
         if self.inner_rings_list:
             self.roll_inner_nodes()
+        self.calculate_anchor(None)
+
+    def calculate_anchor(self, a_street: Optional[shg.LineString]) -> None:
+        """Determines the anchor point of a building.
+        The anchor point is used in 2 situations:
+        * For buildings in meshes it just determines in which cluster a building is. Therefore it does basically not
+          matter.
+        * For (random) buildings in lists, it matters a lot, because it determines the orientation. Here 0,0,0 is
+          defined as the bottom center of the front face of the building. The "front face" is the facade of the
+          building facing the street. "Bottom center" is on ground level vertically and centre means that it is
+          horizontally between the left and right edge of the front face. Still: the rotation is relative to this
+          point and not the geometric or centre of gravity.
+        """
+        if self.anchor is not None:  # keep what we have. Even after a simplification for a mesh it is good enough
+            return
+
+        if a_street is None:  # just use the first point of the outside of the building
+            self.anchor = Vec2d(self.pts_outer[0])
 
     def roll_inner_nodes(self) -> None:
         """Roll inner rings such that the node closest to an outer node goes first.

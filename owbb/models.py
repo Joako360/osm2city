@@ -1079,8 +1079,9 @@ class GenBuilding(object):
         self.distance_to_street = 0  # The distance from the building's midpoint to the middle of the street
         self._create_my_polygons(highway_width)
         # below location attributes are set after population
-        self.x = 0  # the x coordinate of the mid-point in relation to the local coordinate system
-        self.y = 0  # the y coordinate of the mid-point in relation to the local coordinate system
+        # x/y; see building_lib.calculate_anchor -> mid-point of the front facade seen from street in local coords
+        self.x = 0
+        self.y = 0
         self.angle = 0  # the angle in degrees from North (y-axis) in the local coordinate system for the building's
                         # static object local x-axis
         self.zone = None  # either a BuildingZone or a CityBlock
@@ -1101,7 +1102,7 @@ class GenBuilding(object):
                                 self.shared_model.width/2,
                                 highway_width/2 + buffer_front + self.shared_model.depth)
 
-        self.distance_to_street = highway_width/2 + buffer_front + self.shared_model.depth/2
+        self.distance_to_street = highway_width/2 + buffer_front
 
     def get_a_polygon(self, has_buffer: bool, highway_point, highway_angle):
         """
@@ -1112,8 +1113,9 @@ class GenBuilding(object):
             my_box = self.buffer_polygon
         else:
             my_box = self.area_polygon
-        rotated_box = saf.rotate(my_box, -1 * (90 + highway_angle), (0, 0))  # plus 90 degrees because right side of
-                                                                             # street along; -1 to go clockwise
+        # plus 90 degrees because right side street, street along; -1 to go clockwise
+        rotated_box = saf.rotate(my_box, -1 * (90 + highway_angle), (0, -1*self.shared_model.depth))
+
         return saf.translate(rotated_box, highway_point.x, highway_point.y)
 
     def set_location(self, point_on_line, angle, area_polygon, buffer_polygon):
@@ -1131,6 +1133,7 @@ class GenBuilding(object):
         rotated = saf.rotate(floor_plan, -1 * self.angle, origin=(0, 0))
         moved = saf.translate(rotated, self.x, self.y)
         my_building = bl.Building(self.gen_id, self.shared_model.building_model.tags, moved.exterior, '',
+                                  co.Vec2d(self.x, self.y),
                                   street_angle=self.angle, is_owbb_model=True)
         my_building.zone = self.zone
         return my_building
