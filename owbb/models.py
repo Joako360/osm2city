@@ -1128,8 +1128,8 @@ class GenBuilding(object):
 
     def create_building_lib_building(self) -> bl.Building:
         """Creates a building_lib building to be used in actually creating the FG scenery object"""
-        floor_plan = box(-1 * self.shared_model.width / 2, -1 * self.shared_model.depth / 2,
-                         self.shared_model.width / 2, self.shared_model.depth / 2)
+        floor_plan = box(-1 * self.shared_model.width / 2, 0,
+                         self.shared_model.width / 2, self.shared_model.depth)
         rotated = saf.rotate(floor_plan, -1 * self.angle, origin=(0, 0))
         moved = saf.translate(rotated, self.x, self.y)
         my_building = bl.Building(self.gen_id, self.shared_model.building_model.tags, moved.exterior, '',
