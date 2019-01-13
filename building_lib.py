@@ -123,8 +123,9 @@ class BuildingType(IntEnum):
 @unique
 class BuildingListType(IntEnum):
     """Available Random Building BUILDING_LIST types."""
-    urban = 1  # In global-summer.xml: BuiltUpCover, Urban
-    town = 2  # ditto: Town, SubURban
+    small = 0  # typically a family house
+    medium = 1  # large house or smaller apartment
+    large = 2  # larger apartment or industrial/commercial/retail ...
 
 
 def parse_building_tags_for_type(tags_dict: KeyValueDict) -> Union[None, BuildingType]:
@@ -390,9 +391,38 @@ class Building(object):
 
     @property
     def building_list_type(self) -> BuildingListType:
-        if self.zone.settlement_type in [SettlementType.centre, SettlementType.block]:
-            return BuildingListType.urban
-        return BuildingListType.town
+        list_type = BuildingListType.small
+        if self.area > 150:
+            if self.levels > 1:
+                list_type = BuildingListType.medium
+            building_class = get_building_class(self.tags)
+            if self.levels > 3 or building_class not in [BuildingClass.residential, BuildingClass.residential_small,
+                                                         BuildingClass.terrace]:
+                list_type = BuildingListType.large
+
+        return list_type
+
+    def is_building_list_candidate(self) -> bool:
+        if self.has_neighbours or self.has_parent:
+            return False
+        if s.K_AEROWAY in self.tags:
+            return False
+        if self.LOD is utils.stg_io2.LOD.rough:
+            return False
+        # let os assume that large buildings in general have an interesting geometry or are otherwise
+        # best represented in meshes
+        if self.area > 400:  # must correspond to definition of OSM_Building material large
+            return False
+        if self.pts_outer_count >= 8:
+            return False
+        if s.K_MIN_HEIGHT in self.tags:
+            return False
+        if s.K_MAN_MADE in self.tags and self.tags[s.K_MAN_MADE] == s.V_TOWER:
+            return False
+        if s.K_BUILDING in self.tags and self.tags[s.K_BUILDING] == s.V_WATER_TOWER:
+            return False
+
+        return True
 
     @property
     def roof_complex(self) -> bool:

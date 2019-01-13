@@ -608,24 +608,18 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
         max_elevation = max(max_elevation, b.ground_elev)
     list_elev = (max_elevation - min_elevation) / 2 + min_elevation
 
-    material_name_urban = 'Urban'
-    file_urban = stg_manager.prefix + "_buildings_urban.txt"
-    material_name_town = 'Town'
-    file_town = stg_manager.prefix + "_buildings_town.txt"
+    material_name_shader = 'OSM_Buildings'
+    file_shader = stg_manager.prefix + "_buildings_shader.txt"
 
-    _ = stg_manager.add_building_list(file_urban, material_name_urban, coords_transform.anchor, list_elev)
-    path_to_stg = stg_manager.add_building_list(file_town, material_name_town, coords_transform.anchor, list_elev)
+    path_to_stg = stg_manager.add_building_list(file_shader, material_name_shader, coords_transform.anchor, list_elev)
 
     try:
-        with open(os.path.join(path_to_stg, file_urban), 'w') as urban, \
-                open(os.path.join(path_to_stg, file_town), 'w') as town:
+        with open(os.path.join(path_to_stg, file_shader), 'w') as shader:
             for b in list_buildings:
                 elev = b.ground_elev - list_elev - coordinates.calc_horizon_elev(b.anchor.x, b.anchor.y)
-                line = '{:.1f} {:.1f} {:.1f} {:.0f}\n'.format(-b.anchor.y, b.anchor.x, elev, b.street_angle)
-                if b.building_list_type is building_lib.BuildingListType.urban:
-                    urban.write(line)
-                else:
-                    town.write(line)
+                line = '{:.1f} {:.1f} {:.1f} {:.0f} {}\n'.format(-b.anchor.y, b.anchor.x, elev, b.street_angle,
+                                                                 b.building_list_type.value)
+                shader.write(line)
     except IOError as e:
         logging.warning('Could not write buildings in list to file %s', e)
     logging.debug("Total number of buildings written to a building_list: %d", len(list_buildings))
@@ -710,7 +704,7 @@ def write_buildings_in_meshes(coords_transform: coordinates.Transformation,
 def process_buildings(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
                       blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
                       the_buildings: List[building_lib.Building],
-                      file_lock: mp.Lock=None) -> None:
+                      file_lock: mp.Lock = None) -> None:
     last_time = time.time()
     random.seed(42)
 
@@ -761,15 +755,10 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
     buildings_in_lists = list()
     if parameters.FLAG_STG_BUILDING_LIST:
         for building in the_buildings:
-            if building.has_neighbours or building.has_parent:
-                buildings_in_meshes.append(building)
-            elif s.K_AEROWAY in building.tags:
-                buildings_in_meshes.append(building)
-            elif building.LOD is stg_io2.LOD.rough:
-                buildings_in_meshes.append(building)
-            # FIXME: something based on complexity of geometry?
-            else:
+            if building.is_building_list_candidate():
                 buildings_in_lists.append(building)
+            else:
+                buildings_in_meshes.append(building)
         if parameters.FLAG_BUILDINGS_LIST_SKIP is False:
             write_buildings_in_lists(coords_transform, buildings_in_lists, stg_manager, stats)
             last_time = utilities.time_logging("Time used in seconds to write buildings in lists", last_time)

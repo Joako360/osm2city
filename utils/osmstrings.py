@@ -86,6 +86,8 @@ V_OUTLINE = 'outline'
 V_PIER = 'pier'
 V_PLATFORM = 'platform'
 V_TERMINAL = 'terminal'
+V_TOWER = 'tower'
+V_WATER_TOWER = 'water_tower'
 V_WAY = 'way'
 V_YES = 'yes'
 
