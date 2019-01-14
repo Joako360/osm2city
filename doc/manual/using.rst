@@ -135,4 +135,55 @@ Depending on your region and your shader settings you might want to search for e
 .. image:: fgfs_materials_grass.png
 
 
+
+.. _chapter-building_lists:
+
+===========================================================
+Change Materials to Use Buildings by Shaders (Experimental)
+===========================================================
+
+This is an experimental feature not available in FlightGear version 2018.3.x or earlier. Most people can just ignore this.
+
+Add the following  after the last material in ``$FG_ROOT/Materials/default/global.xml``:
+
+
+  ...
+    <material>
+      <name>OSM_Buildings</name>
+      <light-coverage>0</light-coverage>
+      <building-coverage>2500.0</building-coverage>
+      <building-small-ratio>0.4</building-small-ratio>
+      <building-medium-ratio>0.5</building-medium-ratio>
+      <building-large-ratio>0.1</building-large-ratio>
+      <building-small-pitch>0.8<building-small-pitch>
+      <building-medium-pitch>0.8</building-medium-pitch>
+      <building-large-pitch>0.7</building-large-pitch>
+
+      <building-small-min-floors>1</building-small-min-floors>
+      <building-small-max-floors>2</building-small-max-floors>
+
+      <building-medium-min-floors>2</building-medium-min-floors>
+      <building-medium-max-floors>3</building-medium-max-floors>
+
+      <building-large-min-floors>3</building-large-min-floors>
+      <building-large-max-floors>5</building-large-max-floors>
+
+      <building-small-min-width-m>9</building-small-min-width-m>
+      <building-small-max-width-m>14</building-small-max-width-m>
+      <building-small-min-depth-m>8</building-small-min-depth-m>
+      <building-small-max-depth-m>12</building-small-max-depth-m>
+
+      <building-medium-min-width-m>15</building-medium-min-width-m>
+      <building-medium-max-width-m>20</building-medium-max-width-m>
+      <building-medium-min-depth-m>10</building-medium-min-depth-m>
+      <building-medium-max-depth-m>15</building-medium-max-depth-m>
+
+      <building-large-min-width-m>15</building-large-min-width-m>
+      <building-large-max-width-m>22</building-large-max-width-m>
+      <building-large-min-depth-m>12</building-large-min-depth-m>
+      <building-large-max-depth-m>18</building-large-max-depth-m>
+    </material>
+  ...
+
+
 .. _ALS: http://wiki.flightgear.org/Atmospheric_light_scattering

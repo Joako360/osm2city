@@ -1088,21 +1088,22 @@ class GenBuilding(object):
 
     def _create_my_polygons(self, highway_width: float) -> None:
         """Creates buffer and area polygons at (0,0) and no angle"""
+        distance_from_highway = math.pow(highway_width/2, parameters.OWBB_HIGHWAY_WIDTH_FACTOR)
         buffer_front = self.shared_model.front_buffer
         min_buffer_front = self.shared_model.min_front_buffer
         buffer_side = self.shared_model.side_buffer
         buffer_back = self.shared_model.back_buffer
 
         self.buffer_polygon = box(-1*(self.shared_model.width/2 + buffer_side),
-                                  highway_width/2 + (buffer_front - min_buffer_front),
+                                  distance_from_highway + (buffer_front - min_buffer_front),
                                   self.shared_model.width/2 + buffer_side,
-                                  highway_width/2 + buffer_front + self.shared_model.depth + buffer_back)
+                                  distance_from_highway + buffer_front + self.shared_model.depth + buffer_back)
         self.area_polygon = box(-1*(self.shared_model.width/2),
-                                highway_width/2 + buffer_front,
+                                distance_from_highway + buffer_front,
                                 self.shared_model.width/2,
-                                highway_width/2 + buffer_front + self.shared_model.depth)
+                                distance_from_highway + buffer_front + self.shared_model.depth)
 
-        self.distance_to_street = highway_width/2 + buffer_front
+        self.distance_to_street = distance_from_highway + buffer_front
 
     def get_a_polygon(self, has_buffer: bool, highway_point, highway_angle):
         """

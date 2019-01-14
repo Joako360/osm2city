@@ -39,8 +39,6 @@ osm2city uses the following Python extension packages, which must be installed o
 * scipy
 * shapely
 * psycopg2-binary
-* psycopg2cffi (this and the next one are only needed when using PyPy (see below)
-* psycopg2cffi-compat
 
 Please make sure to use Python 3.6+ compatible extensions. Often Python 3 compatible packages have a "3" in their name. Most Linux distributions come by default with the necessary packages — often they are prefixed with ``python-`` (e.g. ``python-numpy``). On Windows WinPython (https://winpython.github.io/) together with Christoph Gohlke's unofficial Windows binaries for Python extension packages (http://www.lfd.uci.edu/~gohlke/pythonlibs/) works well.
 
@@ -72,10 +70,7 @@ Then:
     numpy==1.14.3
     Pillow==5.1.0
     pkg-resources==0.0.0
-    psycopg2==2.7.4
     psycopg2-binary==2.7.4
-    psycopg2cffi==2.7.7
-    psycopg2cffi-compat==1.1
     pycparser==2.18
     pyparsing==2.2.0
     python-dateutil==2.7.3
@@ -85,26 +80,7 @@ Then:
     six==1.11.0
 
 
------------------------------------------
-PyPy as an Alternative Python Interpreter
------------------------------------------
-
-NB: Experiments in Spring 2018 with Python 3.6 on Linux and PyPy3.6 version 6.0 showed that PyPy does not improve speed, actually it decreases run-time in ``osm2city``.
-
-PyPy_ is a fast, compliant alternative implementation of Python. Thanks to its Just-in-Time compiler, Python programs often run faster on PyPy. You download it from its website. In many cases you need to choose the portable_ version on Linux. Once this is done, create a virtual environment, activate it and install the extensions using ``pip`` like in the previous chapter (for ``scipy`` you might need to install ``gfortran`` into your OS before).
-
-::
-
-    user$ /home/vanosten/bin/pypy3.5-6.0.0-linux_x86_64-portable/bin/virtualenv-pypy /home/vanosten/bin/virtualenvs/o2cpypy3560
-    user$ source /home/vanosten/bin/virtualenvs/o2cpypy3560/bin/activate
-    (o2cpypy3560) user$ pip install matplotlib
-    ...
-
-
-
 .. _Virtualenv: https://virtualenv.pypa.io/en/stable/
-.. _PyPy: http://pypy.org/
-.. _portable: https://github.com/squeaky-pl/portable-pypy#portable-pypy-distribution-for-linux
 
 
 .. _chapter-osm2city-install:

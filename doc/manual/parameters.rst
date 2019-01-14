@@ -473,6 +473,8 @@ OWBB_RESIDENTIAL_HIGHWAY_MIN_GEN_SHARE          Decimal    0.3       If there ar
 OWBB_ZONE_AREA_MAX_GEN                          Decimal    0.1       If the share of floor area of exiting OSM buildings compared to the whole
                                                                      area is above this value, then no extra buildings are placed.
                                                                      In the future this value might need to be specific per settlement type.
+OWBB_HIGHWAY_WIDTH_FACTOR                       Decimal    1.3       Factor applied to highway width in order to push buildings exponential more
+                                                                     away from high level highways (highway.width ** factor)
 
 =============================================   ========   =======   ==============================================================================
 
