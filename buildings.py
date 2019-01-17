@@ -24,6 +24,7 @@ import shapely.ops as sho
 import building_lib
 import cluster
 import numpy as np
+import owbb.models as m
 import owbb.plotting as p
 import parameters
 import prepare_textures
@@ -608,7 +609,7 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
         max_elevation = max(max_elevation, b.ground_elev)
     list_elev = (max_elevation - min_elevation) / 2 + min_elevation
 
-    material_name_shader = 'OSM_Buildings'
+    material_name_shader = 'Urban'
     file_shader = stg_manager.prefix + "_buildings_shader.txt"
 
     path_to_stg = stg_manager.add_building_list(file_shader, material_name_shader, coords_transform.anchor, list_elev)
@@ -616,6 +617,8 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
     try:
         with open(os.path.join(path_to_stg, file_shader), 'w') as shader:
             for b in list_buildings:
+                if not b.is_owbb_model:
+                    b.update_anchor(True)
                 elev = b.ground_elev - list_elev - coordinates.calc_horizon_elev(b.anchor.x, b.anchor.y)
                 line = '{:.1f} {:.1f} {:.1f} {:.0f} {}\n'.format(-b.anchor.y, b.anchor.x, elev, b.street_angle,
                                                                  b.building_list_type.value)

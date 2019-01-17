@@ -240,7 +240,10 @@ class Building(object):
         self.is_owbb_model = is_owbb_model
         self.name = name
         self.stg_typ = stg_typ  # STGVerbType
+
+        # For buildings drawn by shader in BUILDING_LIST
         self.street_angle = street_angle  # the angle from the front-door looking at the street
+        self.anchor = anchor  # local Vec2d object
 
         # For definition of '*height' see method analyse_height_and_levels(..)
         self.body_height = 0.0
@@ -255,7 +258,6 @@ class Building(object):
         self.refs_shared = dict()  # refs shared with other buildings (dict of index position, value False or True)
         self.inner_rings_list = None
         self.outer_nodes_closest = None
-        self.anchor = anchor  # local Vec2d object
         self.polygon = None  # can have inner and outer rings, i.e. the real polygon
         self.geometry = None  # only the outer ring - for convenience and faster processing in some analysis
         self.update_geometry(outer_ring, inner_rings_list, refs)
@@ -311,9 +313,9 @@ class Building(object):
             self.polygon = None
         if self.inner_rings_list:
             self.roll_inner_nodes()
-        self.calculate_anchor(None)
+        self.update_anchor(False)
 
-    def calculate_anchor(self, a_street: Optional[shg.LineString]) -> None:
+    def update_anchor(self, recalculate: bool) -> None:
         """Determines the anchor point of a building.
         The anchor point is used in 2 situations:
         * For buildings in meshes it just determines in which cluster a building is. Therefore it does basically not
@@ -324,11 +326,32 @@ class Building(object):
           horizontally between the left and right edge of the front face. Still: the rotation is relative to this
           point and not the geometric or centre of gravity.
         """
-        if self.anchor is not None:  # keep what we have. Even after a simplification for a mesh it is good enough
-            return
+        if not recalculate:
+            if self.anchor is not None:  # keep what we have. Even after a simplification for a mesh it is good enough
+                return
 
-        if a_street is None:  # just use the first point of the outside of the building
-            self.anchor = Vec2d(self.pts_outer[0])
+            if self.zone is None:  # zone is first set after building has been created
+                # just use the first point of the outside of the building
+                self.anchor = Vec2d(self.pts_outer[0])
+                self.street_angle = 0
+                return
+
+        # Apparently we deal with a OSM building that is not to be drawn in a mesh. As anchor candidates we choose
+        # the middle points of the sides of the convex hull of the building. Then we search for the candidate which has
+        # the shortest distance to the zone/block border. The candidate with the shortest distance is chosen and the
+        # street angle is based on the side of the convex hull, where the chosen candidate is situated.
+        hull = self.polygon.convex_hull
+        hull_points = list(hull.exterior.coords)
+        shortest_distance = 99999.
+        for i in range(len(hull_points) - 1):
+            x, y = co.calc_point_on_line_local(hull_points[i][0], hull_points[i][1],
+                                               hull_points[i+1][0], hull_points[i+1][1], 0.5)
+            distance = shg.Point(x, y).distance(self.zone.geometry.exterior)
+            if distance < shortest_distance:
+                shortest_distance = distance
+                self.anchor = Vec2d(x, y)
+                self.street_angle = 90 + co.calc_angle_of_line_local(hull_points[i][0], hull_points[i][1],
+                                                                hull_points[i+1][0], hull_points[i+1][1])
 
     def roll_inner_nodes(self) -> None:
         """Roll inner rings such that the node closest to an outer node goes first.
