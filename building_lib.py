@@ -245,6 +245,9 @@ class Building(object):
         self.street_angle = street_angle  # the angle from the front-door looking at the street
         self.anchor = anchor  # local Vec2d object
 
+        # set during owbb land-use zone processing or owbb building generation
+        self.zone = None  # either a owbb.model.(Generated)BuildingZone or owbb.model.CityBlock
+
         # For definition of '*height' see method analyse_height_and_levels(..)
         self.body_height = 0.0
         self.levels = 0
@@ -277,9 +280,6 @@ class Building(object):
 
         self.ground_elev = 0.0  # the lowest elevation over sea of any point in the outer ring of the building
         self.diff_elev = 0.0  # the difference between the lowest elevation and the highest ground elevation og building
-
-        # set during owbb land-use zone processing or owbb building generation
-        self.zone = None  # either a owbb.model.(Generated)BuildingZone or owbb.model.CityBlock
 
     def make_building_from_part(self) -> None:
         """Make sure a former building_part gets tagged correctly"""
