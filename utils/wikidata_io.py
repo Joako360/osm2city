@@ -46,6 +46,9 @@ def query_population(entity_id: str) -> int:
     except requests.HTTPError:
         logging.warning('Response error in fetching data from WikiData: code = %i, reason = %s', status_code, reason)
         return error_value
+    except requests.ReadTimeout:
+        logging.warning('Read timeout error occured in fetching data from WikiData')
+        return error_value
     # We should be good to parse the content
     try:
         data = json.loads(r.content.decode())
