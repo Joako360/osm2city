@@ -44,6 +44,15 @@ Chapter :ref:`Textures <chapter-parameters-textures>` has an overview of how roo
 .. _FGData: http://wiki.flightgear.org/FGData
 
 
+================================
+Internet Connection for WikiData
+================================
+
+OSM data can contain links to WikiData_, where more information can be stored. This is used in ``osm2city`` for fetching population data used in determining the settlement type. This improves the accuracy of the heuristics, but you can run the scripts without internet connection.
+
+.. _WikiData: https://www.wikidata.org/
+
+
 ==================================================
 Running the Generation Scripts with build_tiles.py
 ==================================================

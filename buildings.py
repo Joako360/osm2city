@@ -609,7 +609,7 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
         max_elevation = max(max_elevation, b.ground_elev)
     list_elev = (max_elevation - min_elevation) / 2 + min_elevation
 
-    material_name_shader = 'Urban'
+    material_name_shader = 'OSMBuildings'
     file_shader = stg_manager.prefix + "_buildings_shader.txt"
 
     path_to_stg = stg_manager.add_building_list(file_shader, material_name_shader, coords_transform.anchor, list_elev)

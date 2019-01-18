@@ -660,18 +660,25 @@ def _check_clipping_border(building_zones: List[m.BuildingZone], bounds: m.Bound
     return kept_zones
 
 
-def _count_zones_related_buildings(buildings: List[bl.Building], text: str) -> None:
+def _count_zones_related_buildings(buildings: List[bl.Building], text: str, check_block: bool = False) -> None:
     total_related = 0
+    total_not_block = 0
 
     for building in buildings:
         if building.zone:
             total_related += 1
+            if check_block and not isinstance(building.zone, m.CityBlock):
+                total_not_block += 1
+                logging.info('type = %s, settlement type = %s', building.zone, building.zone.settlement_type)
+        else:
+            raise SystemExit('Building with osm_id=%d has no associated zone - %s', building.osm_id, text)
 
-    logging.info('%i out of %i buildings are related to zone %s', total_related, len(buildings), text)
+    logging.info('%i out of %i buildings are related to zone %s - %i not in block', total_related, len(buildings),
+                 text, total_not_block)
 
 
 def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> Tuple[Optional[List[Polygon]],
-                                                                                        Optional[List[bl.Building]]]:
+                                                                                     Optional[List[bl.Building]]]:
     last_time = time.time()
 
     bounds = m.Bounds.create_from_parameters(transformer)
@@ -743,7 +750,7 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     del buildings_outside
     last_time = time_logging("Time used in seconds for generating building zones", last_time)
 
-    _count_zones_related_buildings(osm_buildings, 'after building generation')
+    _count_zones_related_buildings(osm_buildings, 'after generating zones from buildings')
 
     # =========== CREATE POLYGONS FOR LIGHTING OF STREETS ================================
     # Needs to be before finding city blocks as we need the boundary
@@ -779,7 +786,7 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
         _sanity_check_settlement_types(building_zones, highways_dict)
         last_time = time_logging('Time used in seconds for sanity checking settlement types', last_time)
 
-    _count_zones_related_buildings(osm_buildings, 'after settlement linking')
+    _count_zones_related_buildings(osm_buildings, 'after settlement linking', True)
 
     # now that settlement areas etc. are done, we can reduce the lit areas to those having a minimum area
     before_lit = len(lit_areas)
