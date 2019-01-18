@@ -340,18 +340,22 @@ class Building(object):
         # the middle points of the sides of the convex hull of the building. Then we search for the candidate which has
         # the shortest distance to the zone/block border. The candidate with the shortest distance is chosen and the
         # street angle is based on the side of the convex hull, where the chosen candidate is situated.
-        hull = self.polygon.convex_hull
-        hull_points = list(hull.exterior.coords)
-        shortest_distance = 99999.
-        for i in range(len(hull_points) - 1):
-            x, y = co.calc_point_on_line_local(hull_points[i][0], hull_points[i][1],
-                                               hull_points[i+1][0], hull_points[i+1][1], 0.5)
-            distance = shg.Point(x, y).distance(self.zone.geometry.exterior)
-            if distance < shortest_distance:
-                shortest_distance = distance
-                self.anchor = Vec2d(x, y)
-                self.street_angle = 90 + co.calc_angle_of_line_local(hull_points[i][0], hull_points[i][1],
-                                                                hull_points[i+1][0], hull_points[i+1][1])
+        try:
+            hull = self.polygon.convex_hull
+            hull_points = list(hull.exterior.coords)
+            shortest_distance = 99999.
+            for i in range(len(hull_points) - 1):
+                x, y = co.calc_point_on_line_local(hull_points[i][0], hull_points[i][1],
+                                                   hull_points[i+1][0], hull_points[i+1][1], 0.5)
+                distance = shg.Point(x, y).distance(self.zone.geometry.exterior)
+                if distance < shortest_distance:
+                    shortest_distance = distance
+                    self.anchor = Vec2d(x, y)
+                    self.street_angle = 90 + co.calc_angle_of_line_local(hull_points[i][0], hull_points[i][1],
+                                                                    hull_points[i+1][0], hull_points[i+1][1])
+        except AttributeError:
+            logging.warning('Problem to calc anchor for building osm_id=%i in zone of type=%s and settlement type=%s',
+                            self.osm_id, self.zone, self.zone.settlement_type)
 
     def roll_inner_nodes(self) -> None:
         """Roll inner rings such that the node closest to an outer node goes first.
