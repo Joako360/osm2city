@@ -18,7 +18,7 @@ Some overall pointers:
 * PostGIS on OSM wiki: http://wiki.openstreetmap.org/wiki/PostGIS
 * Book PostGIS in Action, especially chapter 4.4 of the 2nd edition: http://www.postgis.us/
 * PostgreSQL on Ubuntu: https://help.ubuntu.com/community/PostgreSQL
-* Volker Schatz's online manual of OSM tools: http://www.volkerschatz.com/net/osm/osmman.html
+* Volker Schatz's online manual of OSM tools: http://www.volkerschatz.com/net/osm/osmman.html, e.g. osm2pgsql `database format <http://www.volkerschatz.com/net/osm/osm2pgsql-db.html>`_ and `usage <http://www.volkerschatz.com/net/osm/osm2pgsql-usage.html>`_.
 * HStore information in PostgreSQL: https://www.postgresql.org/docs/devel/static/hstore.html
 * HStore and minutely OSM planet dump info in German: http://wiki.openstreetmap.org/wiki/DE:HowTo_minutely_hstore
 

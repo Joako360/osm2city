@@ -109,6 +109,7 @@ def pool_initializer(log_level: str, log_to_file: bool):
 def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
                          exec_argument: Procedures, my_airports: List[aptdat_io.Airport],
                          file_lock: mp.Lock, my_progress: str) -> None:
+    my_fg_elev = None
     try:
         parameters.read_from_file(params_file_name)
         # adapt boundary
@@ -152,9 +153,6 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
             platforms.process_details(the_coords_transform, my_fg_elev, file_lock)
             piers.process_details(the_coords_transform, my_fg_elev, file_lock)
 
-        # clean-up
-        my_fg_elev.close()
-
     except:
         logging.exception('Exception occurred while processing tile {}.'.format(scenery_tile.tile_index))
         msg = "******* Exception in tile {} - to reprocess use boundaries: {}_{}_{}_{} *******".format(
@@ -168,6 +166,11 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
             # print exception
             exc_type, exc_value, exc_traceback = sys.exc_info()
             f.write(''.join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+
+    finally:
+        # clean-up
+        if my_fg_elev:
+            my_fg_elev.close()
 
     logging.info("******* Finished tile {} - {} *******".format(scenery_tile.tile_index, my_progress))
 

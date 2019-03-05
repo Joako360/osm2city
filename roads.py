@@ -120,15 +120,15 @@ def _replace_bridge_tags(tags: Dict[str, str]) -> None:
 
 
 def _is_replaced_bridge(way: op.Way) -> bool:
-    """Returns true is this way was originally a bridge, but was changed to a non-bridge due to lenght.
+    """Returns true is this way was originally a bridge, but was changed to a non-bridge due to length.
     See method Roads._replace_short_bridges_with_ways.
     The reason to keep a replaced_tag is because else the way might be split if a node is in the water."""
     return REPLACED_BRIDGE_KEY in way.tags
 
 
-VALID_RAILWAYS = ['rail', 'disused', 'preserved', 'subway', 'narrow_gauge', 'light_rail']
+VALID_RAILWAYS = [s.V_RAIL, s.V_DISUSED, s.V_PRESERVED, s.V_SUBWAY, s.V_NARROW_GAUGE, s.V_LIGHT_RAIL]
 if parameters.USE_TRAM_LINES:
-    VALID_RAILWAYS.append('tram')
+    VALID_RAILWAYS.append(s.V_TRAM)
 
 
 def _is_processed_railway(way):
@@ -153,7 +153,7 @@ def is_lit(tags: Dict[str, str]) -> bool:
 def _calc_railway_gauge(way) -> float:
     """Based on railway tags determine the width in meters (3.18 meters for normal gauge)."""
     width = 1435  # millimeters
-    if way.tags[s.K_RAILWAY] in ['narrow_gauge']:
+    if way.tags[s.K_RAILWAY] in [s.V_NARROW_GAUGE]:
         width = 1000
     if s.K_GAUGE in way.tags:
         if op.is_parsable_float(way.tags[s.K_GAUGE]):
@@ -179,8 +179,8 @@ def _compatible_ways(way1: op.Way, way2: op.Way) -> bool:
         return False
     elif _is_highway(way1) and _is_highway(way2):
         # check type
-        highway_type1 = highway_type_from_osm_tags(way1.tags["highway"])
-        highway_type2 = highway_type_from_osm_tags(way2.tags["highway"])
+        highway_type1 = highway_type_from_osm_tags(way1.tags[s.K_HIGHWAY])
+        highway_type2 = highway_type_from_osm_tags(way2.tags[s.K_HIGHWAY])
         if highway_type1 != highway_type2:
             logging.debug("Nope, both must be of same highway type")
             return False
@@ -262,7 +262,7 @@ def highway_type_from_osm_tags(value: str) -> Optional[HighwayType]:
 
     FIXME: Shouldn't we also take care of "junction" and "roundabout"?
     """
-    if value in ["motorway"]:
+    if value in [s.V_MOTORWAY]:
         return HighwayType.motorway
     elif value in ["trunk"]:
         return HighwayType.trunk
@@ -292,7 +292,7 @@ def highway_type_from_osm_tags(value: str) -> Optional[HighwayType]:
 
 def max_slope_for_road(obj):
     if s.K_HIGHWAY in obj.tags:
-        if obj.tags[s.K_HIGHWAY] in ['motorway']:
+        if obj.tags[s.K_HIGHWAY] in [s.V_MOTORWAY]:
             return parameters.MAX_SLOPE_MOTORWAY
         else:
             return parameters.MAX_SLOPE_ROAD
@@ -966,13 +966,13 @@ class Roads(object):
                 priority, tex, width = get_highway_attributes(highway_type)
 
             elif op.is_railway(the_way):
-                if the_way.tags[s.K_RAILWAY] in ['rail', 'disused', 'preserved', 'subway']:
+                if the_way.tags[s.K_RAILWAY] in [s.V_RAIL, s.V_DISUSED, s.V_PRESERVED, s.V_SUBWAY]:
                     priority = 20
                     tex = textures.road.TRACK
-                elif the_way.tags[s.K_RAILWAY] in ['narrow_gauge']:
+                elif the_way.tags[s.K_RAILWAY] in [s.V_NARROW_GAUGE]:
                     priority = 19
                     tex = textures.road.TRACK  # FIXME: should use proper texture
-                elif the_way.tags[s.K_RAILWAY] in ['tram', 'light_rail']:
+                elif the_way.tags[s.K_RAILWAY] in [s.V_TRAM, s.V_LIGHT_RAIL]:
                     priority = 18
                     tex = textures.road.TRAMWAY
                 else:

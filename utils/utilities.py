@@ -368,9 +368,12 @@ class FGElev(object):
                                             bufsize=1, universal_newlines=True)
 
     def close(self) -> None:
-        if self.fgelev_pipe is not None:
-            self.fgelev_pipe.kill()
-        self._save_cache()
+        try:
+            if self.fgelev_pipe is not None:
+                self.fgelev_pipe.kill()
+            self._save_cache()
+        except:
+            logging.warning('Unable to close FGElev process. You might have to kill it manually at the very end.')
 
     def _save_cache(self) -> None:
         if parameters.NO_ELEV or not parameters.FG_ELEV_CACHE:
