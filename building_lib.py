@@ -29,7 +29,7 @@ from enum import IntEnum, unique
 import logging
 import random
 from math import fabs, sin, cos, tan, sqrt, pi, radians
-from typing import List, Dict, Optional, Tuple, Union
+from typing import List, Dict, Optional, Set, Tuple, Union
 
 import myskeleton
 import numpy as np
@@ -352,7 +352,7 @@ class Building(object):
                     shortest_distance = distance
                     self.anchor = Vec2d(x, y)
                     self.street_angle = 90 + co.calc_angle_of_line_local(hull_points[i][0], hull_points[i][1],
-                                                                    hull_points[i+1][0], hull_points[i+1][1])
+                                                                         hull_points[i+1][0], hull_points[i+1][1])
         except AttributeError:
             logging.warning('Problem to calc anchor for building osm_id=%i in zone of type=%s and settlement type=%s',
                             self.osm_id, self.zone, self.zone.settlement_type)
@@ -398,7 +398,7 @@ class Building(object):
             self.geometry = self.polygon
         return difference
 
-    def _set_polygon(self, outer: shg.LinearRing, inner: List[shg.LinearRing]=list()) -> None:
+    def _set_polygon(self, outer: shg.LinearRing, inner: List[shg.LinearRing] = list()) -> None:
         self.polygon = shg.Polygon(outer, inner)
         self.geometry = shg.Polygon(outer)
 
@@ -414,7 +414,7 @@ class Building(object):
         Additionally it takes into consideration that the world is round.
         Also translates x/y coordinates"""
         self._set_pts_all(cluster_offset)
-        self.ground_elev -= (cluster_elev + co.calc_horizon_elev(self.pts_all[0,0], self.pts_all[0, 1]))
+        self.ground_elev -= (cluster_elev + co.calc_horizon_elev(self.pts_all[0, 0], self.pts_all[0, 1]))
 
     @property
     def building_list_type(self) -> BuildingListType:
@@ -906,7 +906,7 @@ class Building(object):
                     prev_was_neighbour_line = True
                     orientation = co.calc_angle_of_line_local(outer_points[index][0], outer_points[index][1],
                                                               outer_points[lop - 1][0], outer_points[lop - 1][1])
-                elif index > 0 and index -1 in self.refs_shared:
+                elif index > 0 and index - 1 in self.refs_shared:
                     prev_was_neighbour_line = True
                     orientation = co.calc_angle_of_line_local(outer_points[index - 1][0], outer_points[index - 1][1],
                                                               outer_points[index][0], outer_points[index][1])
@@ -1276,16 +1276,6 @@ class BuildingParent(object):
         used as a parent for building_parts, if not relation was given."""
         self.tags = tags
 
-    def _sanitize_children(self):
-        """Make sure all children have a reference to parent - otherwise delete them.
-        They might have been removed during building_lib.analyse(...)."""
-        for child in reversed(self.children):
-            if child.parent is None:
-                self.children.remove(child)
-        if len(self.children) == 1:
-            self.children[0].parent = None
-            self.children = list()
-
     def align_textures_children(self) -> None:
         """Aligns the facade and roof textures for all the children belonging to this parent.
         Unless there are deviations in the use of tags, then the textures of the child with
@@ -1295,7 +1285,6 @@ class BuildingParent(object):
         a texture matching the longest edge.
         If there is at least one deviation, then all parts keep their textures.
         """
-        self._sanitize_children()
         if len(self.children) == 0:  # might be sanitize_children() has removed them all
             return
 
@@ -1336,6 +1325,36 @@ class BuildingParent(object):
             child.facade_texture = default_child.facade_texture
             child.roof_texture = default_child.roof_texture
 
+    @staticmethod
+    def get_building_parents(my_buildings: List[Building]) -> Set['BuildingParent']:
+        building_parents = set()
+        for building in my_buildings:
+            if building.parent:
+                building_parents.add(building.parent)
+        return building_parents
+
+    @staticmethod
+    def clean_building_parents_dangling_children(my_buildings: List[Building]) -> None:
+        """Make sure that buildings with a parent, which only has this child, gets no parent.
+        There is no point in BuildingParent, if there is only one child."""
+        building_parents = BuildingParent.get_building_parents(my_buildings)
+
+        for parent in building_parents:
+            # remove no longer valid children
+            for child in reversed(parent.children):
+                if child not in my_buildings:
+                    child.parent = None
+                    parent.children.remove(child)
+
+            # if only one child left, then inherit tags from parent
+            if len(parent.children) == 1:
+                building = parent.children[0]
+                building.make_building_from_part()
+                for key, value in building.parent.tags.items():
+                    if key not in building.tags:
+                        building.tags[key] = value
+                building.parent = None
+
 
 def _parse_building_levels(tags: Dict[str, str]) -> float:
     proxy_levels = 0.
@@ -1353,7 +1372,7 @@ def _parse_building_levels(tags: Dict[str, str]) -> float:
 
 
 def _calculate_vertical_texture_coords(body_height: float, t: tex.Texture) -> Tuple[float, float]:
-    """Check if a texture t fits the building' body_height (h) and return the bottom and top relative position of the tex.
+    """Check if a texture t fits the building's body_height (h) and return bottom and top relative position of the tex.
     I.e. return numbers between 0 and 1, where 1 is at the top.
     v-repeatable textures are repeated to fit h
     For non-repeatable textures,
@@ -1417,7 +1436,7 @@ def decide_lod(buildings: List[Building], stats: utilities.Stats) -> None:
         stats.count_LOD(lod)
 
 
-def relate_neighbours(buildings: List[Building]) -> None:
+def _relate_neighbours(buildings: List[Building]) -> None:
     """Relates neighbour buildings based on shared references."""
     neighbours = 0
     len_buildings = len(buildings)
@@ -1447,11 +1466,10 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: u
     Some OSM buildings are excluded from analysis, as they get processed in pylons.py.
     """
     # run a neighbour analysis
-    relate_neighbours(buildings)
+    _relate_neighbours(buildings)
 
     # do the analysis
     new_buildings = []
-    building_parents = dict()
     for b in buildings:
         building_parent = b.parent
         b.parent = None  # will be reset again if actually all is ok at end
@@ -1524,10 +1542,12 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: u
         new_buildings.append(b)
         if building_parent is not None:
             b.parent = building_parent
-            building_parents[building_parent.osm_id] = building_parent
 
-    # align textures etc. for buildings with parents or pseudo-parents
-    for key, parent in building_parents.items():
+    # work with parents to align textures and stuff
+    BuildingParent.clean_building_parents_dangling_children(new_buildings)
+
+    building_parents = BuildingParent.get_building_parents(new_buildings)
+    for parent in building_parents:
         parent.align_textures_children()
 
     # make sure that min_height is only used if there is a real parent (not pseudo_parents)
@@ -1770,7 +1790,7 @@ class WorshipBuilding(object):
     """
     def __init__(self, file_name: str, has_texture: bool, type_: WorshipBuildingType, style: ArchitectureStyle,
                  number_towers: int, length: float, width: float, height: float,
-                 length_offset: float=0., width_offset: float=0., height_offset: float=0.) -> None:
+                 length_offset: float = 0., width_offset: float = 0., height_offset: float = 0.) -> None:
         self.file_name = file_name  # without path - see property shared_model
         self.has_texture = has_texture
         self.type_ = type_

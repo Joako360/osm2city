@@ -24,7 +24,6 @@ import shapely.ops as sho
 import building_lib
 import cluster
 import numpy as np
-import owbb.models as m
 import owbb.plotting as p
 import parameters
 import prepare_textures
@@ -447,20 +446,6 @@ def _process_building_parts(nodes_dict: Dict[int, op.Node],
                  len(building_parents), stats_original_removed)
 
 
-def _clean_building_parents_with_one_child(my_buildings: List[building_lib.Building]) -> None:
-    """Make sure that buildings with a parent, which only has this child, gets no parent.
-
-    There is no point in BuildingParent, if there is only one child."""
-    for building in my_buildings:
-        if building.parent is not None:
-            if len(building.parent.children) < 2:
-                building.make_building_from_part()
-                for key, value in building.parent.tags.items():
-                    if key not in building.tags:
-                        building.tags[key] = value
-                building.parent = None
-
-
 def _process_osm_building(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, op.Way],
                           coords_transform: coordinates.Transformation) -> Dict[int, building_lib.Building]:
     my_buildings = dict()
@@ -535,6 +520,20 @@ def _refs_to_ring(coords_transform: coordinates.Transformation, refs,
 
     ring = shg.polygon.LinearRing(coords)
     return ring
+
+
+def _clean_building_zones_dangling_children(my_buildings: List[building_lib.Building]) -> None:
+    """Make sure that building zones / city blocks do not have linked buildings, which are not used anymore."""
+    building_zones = set()
+    for building in my_buildings:
+        if building.zone:
+            building_zones.add(building.zone)
+
+    for zone in building_zones:
+        # remove no longer valid children
+        for building in reversed(zone.osm_buildings):
+            if building not in my_buildings:
+                zone.osm_buildings.remove(building)
 
 
 def _write_obstruction_lights(path: str, file_name: str,
@@ -728,8 +727,9 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
     if parameters.OVERLAP_CHECK_CONVEX_HULL:  # needs to be before building_lib.analyse to catch more at first hit
         the_buildings = building_lib.overlap_check_convex_hull(the_buildings, stg_entries)
 
-    # final check on building parent hierarchy
-    _clean_building_parents_with_one_child(the_buildings)
+    # final check on building parent hierarchy and zones linked to buildings > remove dangling stuff
+    building_lib.BuildingParent.clean_building_parents_dangling_children(the_buildings)
+    _clean_building_zones_dangling_children(the_buildings)
 
     building_lib.update_building_tags_in_aerodromes(the_buildings)
 
