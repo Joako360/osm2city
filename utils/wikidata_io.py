@@ -51,6 +51,7 @@ def query_population(entity_id: str) -> int:
         return error_value
     except Exception:  # now we just give up, but want to continue - most probably just no connection
         logging.warning('Some error occured in fetching data from WikData')
+        return error_value
     # We should be good to parse the content
     try:
         data = json.loads(r.content.decode())
