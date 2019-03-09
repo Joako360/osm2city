@@ -342,7 +342,8 @@ def _test_highway_intersecting_area(area: Polygon, highways_dict: Dict[int, m.Hi
     for my_highway in highways_dict.values():
         if not my_highway.populate_buildings_along():
             continue
-        if not disjoint_bounds(my_highway.geometry.bounds, area.bounds):  # a bit speed up
+        is_disjoint = disjoint_bounds(my_highway.geometry.bounds, area.bounds)
+        if not is_disjoint:  # a bit speed up
             if my_highway.geometry.within(area):
                 linked_highways.append(my_highway)
                 to_be_removed.append(my_highway.osm_id)
@@ -669,12 +670,33 @@ def _count_zones_related_buildings(buildings: List[bl.Building], text: str, chec
             total_related += 1
             if check_block and not isinstance(building.zone, m.CityBlock):
                 total_not_block += 1
-                logging.info('type = %s, settlement type = %s', building.zone, building.zone.settlement_type)
+                logging.debug('type = %s, settlement type = %s', building.zone, building.zone.settlement_type)
         else:
             raise SystemExit('Building with osm_id=%d has no associated zone - %s', building.osm_id, text)
 
     logging.info('%i out of %i buildings are related to zone %s - %i not in block', total_related, len(buildings),
                  text, total_not_block)
+
+
+def _sanitize_building_zones(building_zones: List[m.BuildingZone], text: str) -> None:
+    """Make sure that the geometry of the BuildingZones is valid."""
+    number_deleted = 0
+    for zone in reversed(building_zones):
+        if zone.geometry is None:
+            logging.info('Geometry is None')
+        elif not zone.geometry.is_valid:
+            logging.info('Geometry is not valid')
+        elif zone.geometry.is_empty:
+            logging.info('Geometry is not valid')
+        elif len(zone.geometry.bounds) < 4:
+            logging.info('Bounds is only len %i', len(zone.geometry.bounds))
+        else:
+            continue
+        # now collect info
+        logging.info('REMOVED: type = %s, osm_id = %i, buildings = %i', zone, zone.osm_id, len(zone.osm_buildings))
+        building_zones.remove(zone)
+        number_deleted += 1
+    logging.info('Sanitize %s has deleted %i building zones', text, number_deleted)
 
 
 def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> Tuple[Optional[List[Polygon]],
@@ -772,6 +794,7 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     last_time = time_logging("Time used in seconds for splitting building zones by major lines", last_time)
 
     _count_zones_related_buildings(osm_buildings, 'after split major lines')
+    _sanitize_building_zones(building_zones, 'after split major lines')
 
     # =========== Link urban places with settlement_area buffers ==================================
     settlement_clusters = _create_settlement_clusters(lit_areas, water_areas, urban_places)
