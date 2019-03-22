@@ -360,7 +360,7 @@ class Chimney(SharedPylon):
                 else:
                     if self.height > 500:
                         self.height = 500.
-                    self.poly_model = 'generic_chimney_01.xml'
+                    self.pylon_model = 'generic_chimney_01.xml'
                     model_height = 500.
         # correct elevation to account for model height vs. chimney height
         self.elevation = elevation - (model_height - self.height)
