@@ -775,6 +775,8 @@ class Building(object):
         # a bit of sanity
         if proxy_roof_height == 0. and self.roof_complex:
             proxy_roof_height = calc_level_height_for_settlement_type(self.zone.settlement_type)
+            if proxy_total_height > 0.:  # a bit of sanity
+                proxy_roof_height = min(proxy_roof_height, proxy_total_height / 2)
         if proxy_body_height > 0. and proxy_total_height == 0.:
             pass  # proxy_total_height = proxy_roof_height + proxy_body_height + self.min_height
         elif proxy_body_height == 0. and proxy_total_height > 0.:
