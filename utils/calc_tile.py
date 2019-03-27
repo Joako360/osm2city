@@ -3,7 +3,7 @@
 shamelessly translated from calc-tile.pl
 """
 import logging
-from math import floor, radians
+from math import floor
 import os
 from typing import List, Tuple
 import unittest

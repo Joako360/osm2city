@@ -14,7 +14,6 @@ Ludomotico contributed a cleaner version of read_from_file().
 
 import argparse
 import logging
-import re
 import sys
 import traceback
 import types
@@ -25,7 +24,6 @@ import textures.road
 import utils.vec2d as v
 import utils.calc_tile as ct
 import utils.log_helper as ulog
-import utils.utilities as uu
 
 # default_args_start # DO NOT MODIFY THIS LINE
 # -*- coding: utf-8 -*-
@@ -540,6 +538,7 @@ def set_boundary(boundary_west: float, boundary_south: float,
     """Overrides the geographical boundary values (either default values or read from file).
     In most situations should be called after method read_from_file().
     """
+    import utils.utilities as uu
     try:
         uu.check_boundary(boundary_west, boundary_south, boundary_east, boundary_north)
     except uu.BoundaryError as be:

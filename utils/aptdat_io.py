@@ -44,6 +44,8 @@ class Boundary:
         if self.not_empty:
             boundaries = list()
             for my_list in self.nodes_lists:
+                if len(my_list) < 3:
+                    continue
                 my_boundary = Polygon([transformer.to_local(n) for n in my_list])
                 if my_boundary.is_valid:
                     boundaries.append(my_boundary)
