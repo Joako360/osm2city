@@ -1896,7 +1896,7 @@ def process_details(coords_transform: coordinates.Transformation, lit_areas: Lis
             rail_line.calc_and_map(fg_elev, coords_transform, rail_lines)
     # street lamps
     streetlamp_ways = list()
-    if parameters.C2P_PROCESS_STREETLAMPS:
+    if False:  # FIXME parameters.C2P_PROCESS_STREETLAMPS:
         osm_way_result = op.fetch_osm_db_data_ways_keys(["highway"])
         osm_nodes_dict = osm_way_result.nodes_dict
         osm_ways_dict = osm_way_result.ways_dict

@@ -773,7 +773,7 @@ C2P_PROCESS_POWERLINES_MINOR                    Boolean    False     ``details``
 C2P_PROCESS_AERIALWAYS                          Boolean    False     ``details``: Aerial ways is currently experimental and depends on local shared
                                                                      objects.
 C2P_PROCESS_OVERHEAD_LINES                      Boolean    False     ``details``: Railway overhead lines (pylons and cables)
-C2P_PROCESS_STREETLAMPS                         Boolean    False     ``details``: Only proof of concept. It will drain your resources in larger
+C2P_PROCESS_STREETLAMPS                         Boolean    False     ``details``: Always disabled. It would drain your resources in larger
                                                                      sceneries.
 DETAILS_PROCESS_PIERS                           Boolean    True      ``details``: Generate piers and boats
 DETAILS_PROCESS_PLATFORMS                       Boolean    True      ``details``: Generate railway platforms
