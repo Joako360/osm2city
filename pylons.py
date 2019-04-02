@@ -22,7 +22,7 @@ import math
 import multiprocessing as mp
 import os
 import random
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 import unittest
 
 import cluster
@@ -1843,7 +1843,7 @@ def process_pylons(coords_transform: coordinates.Transformation, fg_elev: utilit
     stg_manager.write(file_lock)
 
 
-def process_details(coords_transform: coordinates.Transformation, lit_areas: List[shg.Polygon],
+def process_details(coords_transform: coordinates.Transformation, lit_areas: Optional[List[shg.Polygon]],
                     fg_elev: utilities.FGElev, file_lock: mp.Lock=None) -> None:
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects -> details")
