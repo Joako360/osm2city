@@ -289,7 +289,8 @@ class Building(object):
             if s.K_BUILDING not in self.tags:
                 self.tags[s.K_BUILDING] = part_value
 
-    def update_geometry(self, outer_ring: shg.LinearRing, inner_rings_list = list(), refs: List[int] = list()) -> None:
+    def update_geometry(self, outer_ring: shg.LinearRing, inner_rings_list: List[shg.LinearRing] = list(),
+                        refs: List[int] = list()) -> None:
         """Updates the geometry of the building. This can also happen after the building has been initialized.
         Makes also sure, that inner and outer rings have correct orientation.
         """
@@ -358,15 +359,17 @@ class Building(object):
                             self.osm_id, self.zone, self.zone.settlement_type)
 
     def roll_inner_nodes(self) -> None:
-        """Roll inner rings such that the node closest to an outer node goes first.
+        """Roll inner rings such that for each inner ring the node closest to an outer node goes first.
 
-           Also, create a list of outer corresponding outer nodes.
+        Also, create a list of outer corresponding outer nodes.
         """
         new_inner_rings_list = []
         self.outer_nodes_closest = []
         outer_nodes_avail = list(range(self.pts_outer_count))
         for inner in self.polygon.interiors:
-            min_r = 1e99
+            min_r = 1e99  # minimum distance between inner node i and outer node o
+            min_i = 0  # index position of the inner node
+            min_o = 0  # index position of the outer node
             for i, node_i in enumerate(list(inner.coords)[:-1]):
                 node_i = Vec2d(node_i)
                 for o in outer_nodes_avail:
@@ -379,6 +382,8 @@ class Building(object):
             new_inner_rings_list.append(new_inner)
             self.outer_nodes_closest.append(min_o)
             outer_nodes_avail.remove(min_o)
+            if len(outer_nodes_avail) == 0:
+                break  # cannot have more inner rings than outer points. So just discard the other inner rings
         # -- sort inner rings by index of closest outer node
         yx = sorted(zip(self.outer_nodes_closest, new_inner_rings_list))
         self.inner_rings_list = [x for (y, x) in yx]
