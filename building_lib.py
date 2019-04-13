@@ -1173,7 +1173,7 @@ class Building(object):
                 if not (tex_coord_right <= 1.):
                     logging.debug('FIXME: v_can_repeat: need to check in analyse')
 
-            if self.roof_shape is roofs.RoofShape.skillion:
+            if self.roof_shape is roofs.RoofShape.skillion and tex_coord_top_input != 0:
                 tex_y12 = self.facade_texture.y((self.body_height + self.roof_height_pts[i]) /
                                                 self.body_height * tex_coord_top_input)
                 tex_y11 = self.facade_texture.y((self.body_height + self.roof_height_pts[ipp]) /
