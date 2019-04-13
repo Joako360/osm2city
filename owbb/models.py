@@ -84,6 +84,7 @@ class Place(OSMFeature):
     Cf. http://wiki.openstreetmap.org/wiki/Key:place
     Cf. http://wiki.openstreetmap.org/wiki/Map_Features#Places
     """
+    __slots__ = ('is_point', 'population', 'name')
 
     def __init__(self, osm_id, geometry, feature_type, is_point) -> None:
         super().__init__(osm_id, geometry, feature_type)
@@ -348,6 +349,9 @@ class BuildingZone(OSMFeatureArea):
     Cf. http://wiki.openstreetmap.org/wiki/Landuse
     Cf. http://wiki.openstreetmap.org/wiki/Map_Features#Landuse
     """
+    __slots__ = ('linked_blocked_areas', 'osm_buildings', 'generated_buildings', 'linked_genways',
+                 'linked_city_blocks', 'settlement_type')
+
     def __init__(self, osm_id: int, geometry: MPoly, feature_type: Union[None, BuildingZoneType]) -> None:
         super().__init__(osm_id, geometry, feature_type)
 

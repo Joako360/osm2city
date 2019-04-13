@@ -205,7 +205,7 @@ def calc_levels_for_settlement_type(settlement_type: SettlementType, building_cl
             else:
                 ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_RURAL
         elif building_class is BuildingClass.apartments:
-                ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_APARTMENTS
+            ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_APARTMENTS
         elif building_class in [BuildingClass.industrial, BuildingClass.warehouse]:
             ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_INDUSTRIAL
         else:
@@ -229,6 +229,14 @@ class Building(object):
         * Vertex: in ac-file
         * Point (abbreviated to pt and pts): local coordinates for points on building (inner and outer)
     """
+    __slots__ = ('osm_id', 'tags', 'is_owbb_model', 'name', 'stg_typ',
+                 'street_angle', 'anchor', 'zone',
+                 'body_height', 'levels', 'min_height', 'roof_shape', 'roof_height', 'roof_neighbour_orientation',
+                 'refs', 'refs_shared', 'inner_rings_list', 'outer_nodes_closest', 'polygon', 'geometry',
+                 'parent', 'pts_all', 'roof_height_pts', 'edge_length_pts','facade_texture',
+                 'roof_texture', 'roof_requires', 'LOD',
+                 'ground_elev', 'diff_elev'
+                 )
 
     def __init__(self, osm_id: int, tags: Dict[str, str], outer_ring: shg.LinearRing, name: str,
                  anchor: Optional[Vec2d],
@@ -881,7 +889,7 @@ class Building(object):
                 elif self.roof_shape not in [roofs.RoofShape.pyramidal, roofs.RoofShape.dome, roofs.RoofShape.onion,
                                              roofs.RoofShape.skillion] \
                         and self.pts_all_count > parameters.BUILDING_SKEL_MAX_NODES:
-                        allow_complex_roofs = False
+                    allow_complex_roofs = False
 
             # make sure roof shape is flat if we are not allowed to use it
             if allow_complex_roofs is False:
@@ -1267,6 +1275,8 @@ class BuildingParent(object):
     Mostly used to coordinate textures for facades and roofs.
     The parts determine the common textures by a simple rule: the first to set the values wins the race.
     """
+    __slots__ = ('osm_id', 'outline', 'children', 'tags')
+
     def __init__(self, osm_id: int, outline: bool) -> None:
         self.osm_id = osm_id  # By convention the osm_id of the outline building, not the relation id from OSM!
         self.outline = outline  # True if based on a Simple3D building. False if based on building:part
@@ -1947,6 +1957,8 @@ class RectifyBlockedType(IntEnum):
 
 
 class RectifyNode(object):
+    __slots__ = ('osm_id', 'x', 'original_x', 'y', 'original_y', 'is_updated', 'rectify_building_refs')
+
     """Represents a OSM Node feature used for rectifying building angles."""
     def __init__(self, osm_id: int, local_x: float, local_y: float) -> None:
         self.osm_id = osm_id
@@ -1974,6 +1986,8 @@ class RectifyNode(object):
 
 
 class NodeInRectifyBuilding(object):
+    __slots__ = ('angle', 'my_node', 'prev_node', 'next_node', 'blocked_types')
+
     """Links RectifyNode and RectifyBuilding because a RectifyNode can be linked to multiple buildings."""
     def __init__(self, rectify_node: RectifyNode) -> None:
         self.angle = 0.0  # in degrees. Not guaranteed to be up to date
@@ -2014,6 +2028,8 @@ class NodeInRectifyBuilding(object):
 
 
 class RectifyBuilding(object):
+    __slots__ = ('osm_id', 'node_refs')
+
     def __init__(self, osm_id: int, node_refs: List[RectifyNode]) -> None:
         self.osm_id = osm_id
         self.node_refs = list()  # NodeInRectifyBuilding objects
