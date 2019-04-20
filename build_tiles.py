@@ -181,12 +181,12 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="build-tiles DB generates a whole scenery of osm2city objects \
+    parser = argparse.ArgumentParser(description="build-tiles generates a whole scenery of osm2city objects \
     based on a lon/lat defined area")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
     parser.add_argument("-b", "--boundary", dest="boundary",
-                        help="set the boundary as WEST_SOUTH_EAST_NORTH like 9.1_47.0_11_48.8 (. as decimal)",
+                        help="set the boundary as WEST_SOUTH_EAST_NORTH like *9.1_47.0_11_48.8 (. as decimal)",
                         required=True)
     parser.add_argument("-p", "--processes", dest="processes", type=int,
                         help="number of parallel processes (should not be more than number of cores/CPUs)",

@@ -91,13 +91,20 @@ V_PIER = 'pier'
 V_PLATFORM = 'platform'
 V_PRESERVED = 'preserved'
 V_RAIL = 'rail'
+V_ROUNDABOUT = 'roundabout'
+V_STORAGE_TANK = 'storage_tank'
 V_SUBWAY = 'subway'
+V_TANK = 'tank'
 V_TERMINAL = 'terminal'
 V_TOWER = 'tower'
 V_TRAM = 'tram'
 V_WATER_TOWER = 'water_tower'
 V_WAY = 'way'
 V_YES = 'yes'
+
+# ======================= KEY-VALUE PAIRS ==================================
+KV_MAN_MADE_CHIMNEY = 'man_made=>chimney'
+KV_ROUTE_FERRY = 'route=>ferry'
 
 
 # ========================= NON OSM KEYS AND VALUES ===============

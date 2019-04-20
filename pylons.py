@@ -40,7 +40,7 @@ OUT_MAGIC_DETAILS = "pylonsDetails"
 class CableVertex(object):
     __slots__ = ('out', 'height', 'top_cable', 'no_catenary', 'x', 'y', 'elevation')
 
-    def __init__(self, out: float, height: float, top_cable: bool=False, no_catenary: bool=False) -> None:
+    def __init__(self, out: float, height: float, top_cable: bool = False, no_catenary: bool = False) -> None:
         self.out = out  # the distance from the middle vertical line of the pylon
         self.height = height  # the distance above ground relative to the pylon's ground level (y-axis in ac-file)
         self.top_cable = top_cable  # for the cables at the top, which are not executing the main task
@@ -1500,7 +1500,7 @@ def _distribute_way_segments_to_clusters(lines: List[Line], cluster_container: c
 
 
 def _write_cable_clusters(cluster_container: cluster.ClusterContainer, coords_transform: coordinates.Transformation,
-                          my_stg_mgr: stg_io2.STGManager, details: bool=False) -> None:
+                          my_stg_mgr: stg_io2.STGManager, details: bool = False) -> None:
     cluster_index = 0
     for ic, cl in enumerate(cluster_container):
         cluster_index += 1
@@ -1651,9 +1651,9 @@ def _process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator, fg
                         my_buildings.append(my_polygon.convex_hull)
                         # process storage tanks
                         if parameters.C2P_PROCESS_STORAGE_TANKS:
-                            if way.tags[s.K_BUILDING] in ['storage_tank', 'tank'] or (
-                                        s.K_MAN_MADE in way.tags and way.tags[s.K_MAN_MADE] in ['storage_tank',
-                                                                                                'tank']):
+                            if way.tags[s.K_BUILDING] in [s.V_STORAGE_TANK, s.V_TANK] or (
+                                        s.K_MAN_MADE in way.tags and way.tags[s.K_MAN_MADE] in [s.V_STORAGE_TANK,
+                                                                                                s.V_TANK]):
                                 my_centroid = my_polygon.centroid
                                 lon, lat = my_coord_transformator.to_global((my_centroid.x, my_centroid.y))
                                 if not clipping_border.contains(shg.Point(lon, lat)):
@@ -1732,7 +1732,7 @@ def _process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
                     valid_highway = False
             elif (s.K_TUNNEL == key) and (s.V_YES == value):
                 is_challenged = True
-            elif (s.K_JUNCTION == key) and ("roundabout" == value):
+            elif (s.K_JUNCTION == key) and (s.V_ROUNDABOUT == value):
                 my_highway.is_roundabout = True
             elif s.K_LIT == key:
                 if s.V_YES == value:
@@ -1755,7 +1755,7 @@ def _process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
 
 
 def process_pylons(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
-                   stg_entries: List[stg_io2.STGEntry], file_lock: mp.Lock=None) -> None:
+                   stg_entries: List[stg_io2.STGEntry], file_lock: mp.Lock = None) -> None:
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
 
@@ -1763,7 +1763,7 @@ def process_pylons(coords_transform: coordinates.Transformation, fg_elev: utilit
     building_refs = list()
     storage_tanks = list()
     if parameters.C2P_PROCESS_POWERLINES or parameters.C2P_PROCESS_STORAGE_TANKS:
-        osm_way_result = op.fetch_osm_db_data_ways_keys(['building'])
+        osm_way_result = op.fetch_osm_db_data_ways_keys([s.K_BUILDING])
         osm_nodes_dict = osm_way_result.nodes_dict
         osm_ways_dict = osm_way_result.ways_dict
         building_refs = _process_osm_building_refs(osm_nodes_dict, osm_ways_dict, coords_transform, fg_elev,
@@ -1774,7 +1774,7 @@ def process_pylons(coords_transform: coordinates.Transformation, fg_elev: utilit
     if parameters.C2P_PROCESS_POWERLINES:
         req_keys = list()
         if parameters.C2P_PROCESS_POWERLINES:
-            req_keys.append('power')
+            req_keys.append(s.K_POWER)
         osm_way_result = op.fetch_osm_db_data_ways_keys(req_keys)
         osm_nodes_dict = osm_way_result.nodes_dict
         osm_ways_dict = osm_way_result.ways_dict
@@ -1800,10 +1800,10 @@ def process_pylons(coords_transform: coordinates.Transformation, fg_elev: utilit
     chimneys = list()
     if parameters.C2P_PROCESS_CHIMNEYS:
         # start with chimneys tagged as node
-        osm_nodes_dict = op.fetch_db_nodes_isolated(list(), ['man_made=>chimney'])
+        osm_nodes_dict = op.fetch_db_nodes_isolated(list(), [s.KV_MAN_MADE_CHIMNEY])
         chimneys = _process_osm_chimneys_nodes(osm_nodes_dict, coords_transform, fg_elev)
         # add chimneys tagged as way
-        osm_way_result = op.fetch_osm_db_data_ways_key_values(['man_made=>chimney'])
+        osm_way_result = op.fetch_osm_db_data_ways_key_values([s.KV_MAN_MADE_CHIMNEY])
         osm_nodes_dict = osm_way_result.nodes_dict
         osm_ways_dict = osm_way_result.ways_dict
         chimneys.extend(_process_osm_chimneys_ways(osm_nodes_dict, osm_ways_dict, coords_transform, fg_elev))
@@ -1844,7 +1844,7 @@ def process_pylons(coords_transform: coordinates.Transformation, fg_elev: utilit
 
 
 def process_details(coords_transform: coordinates.Transformation, lit_areas: Optional[List[shg.Polygon]],
-                    fg_elev: utilities.FGElev, file_lock: mp.Lock=None) -> None:
+                    fg_elev: utilities.FGElev, file_lock: mp.Lock = None) -> None:
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects -> details")
 

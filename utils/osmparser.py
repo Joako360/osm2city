@@ -463,7 +463,7 @@ def fetch_all_query_into_tuple(query: str, db_connection) -> List[Tuple]:
     return cur.fetchall()
 
 
-def fetch_osm_db_data_ways(required: List[str], is_key_values: bool=False) -> OSMReadResult:
+def fetch_osm_db_data_ways(required: List[str], is_key_values: bool = False) -> OSMReadResult:
     """Given a list of required keys or key/value pairs get the ways plus the linked nodes from an OSM database."""
     start_time = time.time()
 
@@ -584,6 +584,12 @@ def fetch_osm_db_data_relations_riverbanks(input_read_result: OSMReadResult) -> 
     return fetch_osm_db_data_relations_keys(input_read_result, first_part, 'riverbanks')
 
 
+def fetch_osm_db_data_relations_routes(input_read_result: OSMReadResult) -> OSMReadResult:
+    first_part = "(r.tags @> 'type=>route'"
+    first_part += " AND r.tags @> 'route=>ferry')"
+    return fetch_osm_db_data_relations_keys(input_read_result, first_part, 'ferry_route')
+
+
 def make_db_connection():
     """"Create connection to the database based on parameters."""
     connection = psycopg2.connect(database=parameters.DB_NAME, host=parameters.DB_HOST, port=parameters.DB_PORT,
@@ -591,7 +597,7 @@ def make_db_connection():
     return connection
 
 
-def construct_intersect_bbox_query(is_way: bool=True) -> str:
+def construct_intersect_bbox_query(is_way: bool = True) -> str:
     """Constructs the part of a sql where clause, which constrains to bounding box."""
     query_part = "ST_Intersects("
     if is_way:
@@ -603,7 +609,7 @@ def construct_intersect_bbox_query(is_way: bool=True) -> str:
                              parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH)
 
 
-def construct_tags_query(req_tag_keys: List[str], req_tag_key_values: List[str], table_alias: str="w") -> str:
+def construct_tags_query(req_tag_keys: List[str], req_tag_key_values: List[str], table_alias: str = "w") -> str:
     """Constructs the part of a sql WHERE clause, which constrains the result based on required tag keys.
     In req_tag_keys at least one of the key needs to be present in the tags of a given record.
     In req_tag_key_values at least one key/value pair must be present (e.g. 'railway=>platform') - the key

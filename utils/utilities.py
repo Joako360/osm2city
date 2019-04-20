@@ -327,7 +327,7 @@ class FGElev(object):
        By default, queries are cached. Call save_cache() to
        save the cache to disk before freeing the object.
     """
-    def __init__(self, coords_transform: co.Transformation, tile_index: int,
+    def __init__(self, coords_transform: Optional[co.Transformation], tile_index: int,
                  auto_save_every: int = 50000) -> None:
         """Open pipe to fgelev.
            Unless disabled by cache=False, initialize the cache and try to read
@@ -382,15 +382,15 @@ class FGElev(object):
         pickle.dump(self._cache, fpickle, -1)
         fpickle.close()
 
-    def probe_elev(self, position: ve.Vec2d, is_global: bool=False) -> float:
+    def probe_elev(self, position: ve.Vec2d, is_global: bool = False) -> float:
         elev_is_solid_tuple = self.probe(position, is_global)
         return elev_is_solid_tuple[0]
 
-    def probe_solid(self, position: ve.Vec2d, is_global: bool=False) -> bool:
+    def probe_solid(self, position: ve.Vec2d, is_global: bool = False) -> bool:
         elev_is_solid_tuple = self.probe(position, is_global)
         return elev_is_solid_tuple[1]
 
-    def probe(self, position: ve.Vec2d, is_global: bool=False) -> Tuple[float, bool]:
+    def probe(self, position: ve.Vec2d, is_global: bool = False) -> Tuple[float, bool]:
         """Return elevation and ground solidness at (x,y). We try our cache first. Failing that, call Fgelev.
         Elevation is in meters as float. Solid is True, in water is False
         """
