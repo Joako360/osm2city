@@ -474,6 +474,7 @@ def read_from_file(filename):
         logging.error("Error while reading " + filename + ". Perhaps an unquoted string in your parameters file?")
         sys.exit(1)
 
+    has_unknown_parameters = False
     for k, v in file_globals.items():
         if k.startswith('_'):
             continue
@@ -481,7 +482,10 @@ def read_from_file(filename):
         if k in default_globals:
             default_globals[k] = v
         else:
-            logging.warning('Unknown parameter: %s=%s' % (k, v))
+            logging.error('Unknown parameter: %s=%s' % (k, v))
+            has_unknown_parameters = True
+    if has_unknown_parameters:
+        sys.exit(1)
 
     # correct use of parameter PATH_TO_SCENERY_OPT: earlier only string, now list of strings (or None)
     global PATH_TO_SCENERY_OPT
