@@ -56,7 +56,7 @@ def _process_ferry_routes(fg_elev: FGElev) -> nx.Graph:
             osm_node = osm_nodes_dict[ref]
             elev, solid = fg_elev.probe(Vec2d(osm_node.lon, osm_node.lat), True)
             network_node = NetworkNode.create_from_osm(osm_node)
-            network_node.elev = elev if elev < 0 else elev  # nodes might be outside of the boundary
+            network_node.elev = elev if elev < 0 else 0  # nodes might be outside of the boundary
             if solid:
                 if position not in [0, 1, len(way.refs) - 2, len(way.refs) - 1]:
                     network_nodes.append(network_node)
