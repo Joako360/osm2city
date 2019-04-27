@@ -1,0 +1,10 @@
+descartes
+matplotlib
+networkx
+numpy
+requests
+pillow
+pyproj
+scipy
+shapely
+psycopg2-binary
