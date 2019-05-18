@@ -1380,11 +1380,11 @@ def _parse_building_levels(tags: Dict[str, str]) -> float:
             proxy_levels = float(utils.osmparser.parse_multi_int_values(tags[s.K_BUILDING_LEVELS]))
         elif utils.osmparser.is_parsable_float(tags[s.K_BUILDING_LEVELS]):
             proxy_levels = float(tags[s.K_BUILDING_LEVELS])
-    if 'levels' in tags:
-        if ';' in tags['levels']:
-            proxy_levels = float(utils.osmparser.parse_multi_int_values(tags['levels']))
-        elif utils.osmparser.is_parsable_float(tags['levels']):
-            proxy_levels = float(tags['levels'])
+    if s.K_LEVELS in tags:
+        if ';' in tags[s.K_LEVELS]:
+            proxy_levels = float(utils.osmparser.parse_multi_int_values(tags[s.K_LEVELS]))
+        elif utils.osmparser.is_parsable_float(tags[s.K_LEVELS]):
+            proxy_levels = float(tags[s.K_LEVELS])
     return proxy_levels
 
 
