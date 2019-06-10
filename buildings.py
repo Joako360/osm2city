@@ -40,6 +40,42 @@ OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
 ALLOWED_BUILDING_PART_VALUES = [s.V_YES, 'residential', 'apartments', 'house', 'commercial', 'retail']
 
 
+def _in_skip_list(way: op.Way) -> bool:
+    """Checking if the way's name or osm_id are SKIP_LIST"""
+    if s.K_NAME in way.tags:
+        name = way.tags[s.K_NAME]
+        if name in parameters.SKIP_LIST:
+            logging.debug('SKIPPING building with name tag=%s', name)
+            return True
+    if way.osm_id in parameters.SKIP_LIST:
+        logging.debug('SKIPPING building with osm_id=%i', way.osm_id)
+        return True
+    return False
+
+
+def _is_underground(tags: Dict[str, str]) -> bool:
+    """Check in tags of building if something looks like underground - depending on parameters."""
+    if parameters.BUILDING_UNDERGROUND_LOCATION:
+        if s.K_LOCATION in tags and tags[s.K_LOCATION] in (s.V_UNDERGROUND, s.V_INDOOR):
+            return True
+    if parameters.BUILDING_UNDERGROUND_INDOOR:
+        if s.K_INDOOR in tags and tags[s.K_INDOOR] != s.V_NO:
+            return True
+    if parameters.BUILDING_UNDERGROUND_TUNNEL:
+        if s.K_TUNNEL in tags and tags[s.K_TUNNEL] != s.V_NO:
+            return True
+    if parameters.BUILDING_UNDERGROUND_LEVEL_NEGATIVE:
+        if s.K_LEVEL in tags and op.parse_int(tags[s.K_LEVEL], 0) < 0:
+            non_negative_levels = False
+            if s.K_LEVELS in tags and op.parse_int(tags[s.K_LEVELS], 0) >= 0:
+                non_negative_levels = True
+            if s.K_BUILDING_LEVELS in tags and op.parse_int(tags[s.K_BUILDING_LEVELS], 0) >= 0:
+                non_negative_levels = True
+            if non_negative_levels is False:
+                return True
+    return False
+
+
 def _process_rectify_buildings(nodes_dict: Dict[int, op.Node], rel_nodes_dict: Dict[int, op.Node],
                                ways_dict: Dict[int, op.Way], coords_transform: coordinates.Transformation) -> None:
     if not parameters.RECTIFY_ENABLED:
@@ -194,6 +230,9 @@ def _process_multipolygon_buildings(nodes_dict: Dict[int, op.Node], rel_ways_dic
         if member.type_ == s.V_WAY:
             if member.ref in rel_ways_dict:
                 way = rel_ways_dict[member.ref]
+                # check whether we really want to have this member
+                if _in_skip_list(way) or _is_underground(way.tags):
+                    continue
                 # because the member way already has been processed as normal way, we need to remove
                 # otherwise we might get flickering due to two buildings on top of each other
                 my_buildings.pop(way.osm_id, None)
@@ -462,14 +501,8 @@ def _process_osm_building(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, o
         if not clipping_border.contains(shg.Point(first_node.lon, first_node.lat)):
             continue
 
-        # checking in SKIP_LIST
-        if s.K_NAME in way.tags:
-            name = way.tags[s.K_NAME]
-            if name in parameters.SKIP_LIST:
-                logging.debug('SKIPPING building with name tag=%s', name)
-                continue
-        if way.osm_id in parameters.SKIP_LIST:
-            logging.debug('SKIPPING building with osm_id=%i', way.osm_id)
+        # checking whether a building should be left out
+        if _in_skip_list(way) or _is_underground(way.tags):
             continue
 
         my_building = _make_building_from_way(nodes_dict, way.tags, way, coords_transform)
@@ -483,7 +516,7 @@ def _process_osm_building(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, o
 
 def _make_building_from_way(nodes_dict: Dict[int, op.Node], all_tags: Dict[str, str], way: op.Way,
                             coords_transform: coordinates.Transformation,
-                            inner_ways=list()) -> Optional[building_lib.Building]:
+                            inner_ways=None) -> Optional[building_lib.Building]:
     if way.refs[0] == way.refs[-1]:
         way.refs = way.refs[0:-1]  # -- kick last ref if it coincides with first
 
@@ -494,9 +527,9 @@ def _make_building_from_way(nodes_dict: Dict[int, op.Node], all_tags: Dict[str, 
         # -- make outer and inner rings from refs
         outer_ring = _refs_to_ring(coords_transform, way.refs, nodes_dict)
         inner_rings_list = list()
-
-        for _way in inner_ways:
-            inner_rings_list.append(_refs_to_ring(coords_transform, _way.refs, nodes_dict))
+        if inner_ways:
+            for _way in inner_ways:
+                inner_rings_list.append(_refs_to_ring(coords_transform, _way.refs, nodes_dict))
     except KeyError as reason:
         logging.debug("ERROR: Failed to parse building referenced node missing clipped?(%s) WayID %d %s Refs %s" % (
             reason, way.osm_id, all_tags, way.refs))

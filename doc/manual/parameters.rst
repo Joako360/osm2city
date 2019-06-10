@@ -198,11 +198,14 @@ LOD_PERCENTAGE_DETAIL                           Decimal    0.5       Of the rema
 =============================================   ========   =======   ==============================================================================
 
 
+.. _chapter-parameters-buildings-level-height:
+
 --------------------------
 Building Levels and Height
 --------------------------
 
 In OSM the height of a building can be described using the following keys:
+
 * ``building:height``
 * ``roof:height``
 * ``height`` (the total of building_height and roof_height, but most often used alone)
@@ -210,7 +213,7 @@ In OSM the height of a building can be described using the following keys:
 * ``roof:levels`` (not used in osm2city)
 * ``levels``
 
-Most often none of these features are tagged and then the number of levels are determined based on the settlement type and the corresponding ``BUILDING_NUMBER_LEVELS_* `` parameter. The height is always calculated as the product of the number of levels times parameter ``BUILDING_LEVEL_HEIGHT_*``. If only the height is given, then the levels are calculated by simple rounding — and this level value is then used for calculating the height. The reason for this is that some uniformity in building heights/values is normally observed in the real world — and because the generic textures used have a defined height per level.
+Most often none of these features are tagged and then the number of levels are determined based on the settlement type and the corresponding ``BUILDING_NUMBER_LEVELS_*`` parameter. The height is always calculated as the product of the number of levels times parameter ``BUILDING_LEVEL_HEIGHT_*``. If only the height is given, then the levels are calculated by simple rounding — and this level value is then used for calculating the height. The reason for this is that some uniformity in building heights/values is normally observed in the real world — and because the generic textures used have a defined height per level.
 
 An exception to this is made for building parts in a relationship (`Simple 3D buildings`_), as the heights in this case might be necessary to be correct (e.g. a dome on a church).
 
@@ -243,6 +246,42 @@ BUILDING_LEVEL_HEIGHT_INDUSTRIAL                Number     6.0       Ditto for b
 
 
 .. _Simple 3D buildings: http://wiki.openstreetmap.org/wiki/Simple_3D_buildings
+
+
+.. _chapter-parameters-buildings-underground:
+
+--------------------------------
+Visibility Underground Buildings
+--------------------------------
+
+There seem to be challenges with consistency etc. in OSM in terms of deciding, whether something is under the ground and therefore ``osm2city`` should not render it.
+
+According to findings in the `FG Forum <https://forum.flightgear.org/viewtopic.php?f=5&t=22809&start=1080#p347959>`_ and OSM there are different tags used, some of them better suited than others according to OSM documentation:
+
+* ``location=underground`` or ``location=indoor`` seems to be a correct way (`key:location <https://wiki.openstreetmap.org/wiki/Key:location>`_)
+* ``indoor`` has also some usage (`key:indoor <https://wiki.openstreetmap.org/wiki/Key:indoor>`_)
+* ``tunnel`` is according to taginfo (`taginfo tunnel combinations <https://taginfo.openstreetmap.org/keys/?key=tunnel#combinations>`_) used max 1000 times together with buildings
+* ``level`` with negative values. NB: not to be confused with ``levels`` and ``building:levels`` (see chapter :ref:`Building Levels and Height <chapter-parameters-buildings-level-height>`)
+* ``layer`` is not to be used to determine visibility (`key:layer <https://wiki.openstreetmap.org/wiki/Key:layer>`_)
+
+
+=============================================   ========   =======   ==============================================================================
+Parameter                                       Type       Default   Description / Example
+=============================================   ========   =======   ==============================================================================
+BUILDING_UNDERGROUND_LOCATION                   Boolean    True      Do not show buildings or building:parts if key ``location`` has value
+                                                                     ``underground`` or ``indoor``.
+
+BUILDING_UNDERGROUND_INDOOR                     Boolean    True      Do not show buildings or building:parts if key ``indoor`` is present and its
+                                                                     value is not ``no``.
+
+BUILDING_UNDERGROUND_TUNNEL                     Boolean    True      Do not show buildings or building:parts if key ``tunnel`` is present and its
+                                                                     value is not ``no``.
+
+BUILDING_UNDERGROUND_LEVEL_NEGATIVE             Boolean    True      Do not show buildings or building:parts if key ``level`` has a negative value
+                                                                     and neither key ``levels`` or ``building:levels`` have a non-negative value.
+
+=============================================   ========   =======   ==============================================================================
+
 
 
 .. _chapter-parameters-buildings-european-label:

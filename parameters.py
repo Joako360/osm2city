@@ -162,6 +162,12 @@ BUILDING_LEVEL_HEIGHT_URBAN = 3.5  # this value should not be changed unless spe
 BUILDING_LEVEL_HEIGHT_RURAL = 2.5  # ditto including periphery
 BUILDING_LEVEL_HEIGHT_INDUSTRIAL = 6.  # for industrial and warehouse
 
+# make sure not visible buildings or building parts are excluded
+BUILDING_UNDERGROUND_LOCATION = True
+BUILDING_UNDERGROUND_INDOOR = True
+BUILDING_UNDERGROUND_TUNNEL = True
+BUILDING_UNDERGROUND_LEVEL_NEGATIVE = True
+
 BUILDING_USE_SHARED_WORSHIP = False  # try to use shared models for worship buildings
 
 # a hex value for the colour to be used if the colour value in OSM is missing or cannot be interpreted
