@@ -350,7 +350,7 @@ def has_railway_tag(tags: Dict[str, str]) -> bool:
     return s.K_RAILWAY in tags
 
 
-def parse_hstore_tags(tags_string: str, osm_id: int) -> Dict[str, str]:
+def _parse_hstore_tags(tags_string: str, osm_id: int) -> Dict[str, str]:
     """Parses the content of a string representation of a PostGIS hstore content for tags.
     Returns a dict of key value pairs as string."""
     tags_dict = dict()
@@ -358,11 +358,20 @@ def parse_hstore_tags(tags_string: str, osm_id: int) -> Dict[str, str]:
         elements = tags_string.strip().split('", "')
         for element in elements:
             if element.strip():
-                sub_elements = element.strip().split("=>")
-                if len(sub_elements) == 2 and len(sub_elements[0].strip()) > 1 and len(sub_elements[1].strip()) > 1:
-                    key = sub_elements[0].strip().strip('"')
+                subs = element.strip().split("=>")
+                if len(subs) in [2, 3] and len(subs[0].strip()) > 1:
+                    key = subs[0].strip().strip('"')
                     if key not in tags_dict:
-                        tags_dict[key] = sub_elements[1].strip().strip('"')
+                        if len(subs) == 2 and len(subs[1].strip()) > 1:
+                            tags_dict[key] = subs[1].strip().strip('"')
+                        elif len(subs) == 3 and len((subs[1] + subs[2]).strip()) > 1:
+                            tags_dict[key] = (subs[1] + '=>' + subs[2]).strip('"')
+                        else:
+                            msg = "hstore for osm_id={} has not valid key/value pair: '{}' in '{}'.".format(osm_id,
+                                                                                                            subs,
+                                                                                                            tags_string)
+                            logging.warning(msg)
+
                     else:
                         message = "hstore for osm_id={} has same key twice: key={}, tags='{}'.".format(osm_id,
                                                                                                        key,
@@ -370,7 +379,7 @@ def parse_hstore_tags(tags_string: str, osm_id: int) -> Dict[str, str]:
                         logging.warning(message)
                 else:
                     message = "hstore for osm_id={} has not valid key/value pair: '{}' in '{}'.".format(osm_id,
-                                                                                                        sub_elements,
+                                                                                                        subs,
                                                                                                         tags_string)
                     logging.warning(message)
     return tags_dict
@@ -392,7 +401,7 @@ def fetch_db_way_data(req_way_keys: List[str], req_way_key_values: List[str], db
     ways_dict = dict()
     for result in result_tuples:
         my_way = Way(result[0])
-        my_way.tags = parse_hstore_tags(result[1], my_way.osm_id)
+        my_way.tags = _parse_hstore_tags(result[1], my_way.osm_id)
         my_way.refs = result[2]
         ways_dict[my_way.osm_id] = my_way
 
@@ -442,7 +451,7 @@ def fetch_db_nodes_isolated(req_node_keys: List[str], req_node_key_values: List[
     nodes_dict = dict()
     for result in result_tuples:
         my_node = Node(result[0], result[2], result[1])
-        my_node.tags = parse_hstore_tags(result[3], my_node.osm_id)
+        my_node.tags = _parse_hstore_tags(result[3], my_node.osm_id)
         nodes_dict[my_node.osm_id] = my_node
     db_connection.close()
 
@@ -527,7 +536,7 @@ def fetch_osm_db_data_relations_keys(input_read_result: OSMReadResult, first_par
         member_id = result[2]
         if relation_id not in relations_dict:
             relation = Relation(relation_id)
-            relation.tags = parse_hstore_tags(result[1], relation_id)
+            relation.tags = _parse_hstore_tags(result[1], relation_id)
             relations_dict[relation_id] = relation
         else:
             relation = relations_dict[relation_id]
@@ -538,7 +547,7 @@ def fetch_osm_db_data_relations_keys(input_read_result: OSMReadResult, first_par
         if member_id not in rel_ways_dict:
             my_way = Way(member_id)
             my_way.refs = result[4]
-            my_way.tags = parse_hstore_tags(result[5], my_way.osm_id)
+            my_way.tags = _parse_hstore_tags(result[5], my_way.osm_id)
             rel_ways_dict[my_way.osm_id] = my_way
 
     # == Nodes for the ways
@@ -733,24 +742,26 @@ class TestOSMParser(unittest.TestCase):
         self.assertTrue(is_parsable_int('1'))
 
     def test_parse_hstore_tags(self):
-        self.assertEqual(0, len(parse_hstore_tags('', 1)), "Empty string")
-        self.assertEqual(0, len(parse_hstore_tags('  ', 1)), "Empty truncated string")
-        my_dict = parse_hstore_tags('"foo"=>"goo"', 1)
+        self.assertEqual(0, len(_parse_hstore_tags('', 1)), "Empty string")
+        self.assertEqual(0, len(_parse_hstore_tags('  ', 1)), "Empty truncated string")
+        my_dict = _parse_hstore_tags('"foo"=>"goo"', 1)
         self.assertEqual(1, len(my_dict), "One element tags")
         self.assertEqual("goo", my_dict["foo"], "One element tags validate value")
-        my_dict = parse_hstore_tags('"foo"=>"goo", "alpha"=> "1"', 1)
+        my_dict = _parse_hstore_tags('"foo"=>"goo", "alpha"=> "1"', 1)
         self.assertEqual(2, len(my_dict), "Two element tags")
         self.assertEqual("1", my_dict["alpha"])
-        my_dict = parse_hstore_tags('"foo"=>"goo", "alpha"=> "1", ', 1)
+        my_dict = _parse_hstore_tags('"foo"=>"goo", "alpha"=> "1", ', 1)
         self.assertEqual(2, len(my_dict), "Last element empty")
-        my_dict = parse_hstore_tags('"foo"=>"goo", "foo"=> "1"', 1)
+        my_dict = _parse_hstore_tags('"foo"=>"goo", "foo"=> "1"', 1)
         self.assertEqual(1, len(my_dict), "Repeated key ignored")
-        my_dict = parse_hstore_tags('"foo"=>"goo", "foo"=> ""', 1)
+        my_dict = _parse_hstore_tags('"foo"=>"goo", "foo"=> ""', 1)
         self.assertEqual(1, len(my_dict), "Invalid value ignored")
-        my_dict = parse_hstore_tags('"foo"=>"go,o", "ho,o"=>"i,"', 1)
+        my_dict = _parse_hstore_tags('"foo"=>"go,o", "ho,o"=>"i,"', 1)
         self.assertEqual(2, len(my_dict), "Keys and values with comma")
         self.assertEqual("go,o", my_dict["foo"], "Keys and values with comma validate first value")
         self.assertEqual("i,", my_dict["ho,o"], "Keys and values with comma validate first value")
+        my_dict = _parse_hstore_tags('"note"=>"parking => rework required", "highway"=>"service"', 1)
+        self.assertEqual(2, len(my_dict), '=> inside value')
 
     def test_closed_ways_from_multiple_ways(self):
         way_unrelated = Way(1)
