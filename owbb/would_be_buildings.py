@@ -8,7 +8,6 @@ import time
 from typing import Dict, List, Optional
 import sys
 
-from shapely import speedups
 from shapely.geometry import box
 from shapely.geometry import LineString, MultiLineString, Polygon
 
@@ -20,11 +19,6 @@ import parameters
 import utils.osmparser as op
 import utils.osmstrings as s
 from utils.utilities import time_logging, random_value_from_ratio_dict_parameter
-
-if speedups.available:
-    speedups.enable()
-else:
-    speedups.disable()
 
 
 def _prepare_building_zone_for_building_generation(building_zone, waterways_dict, railway_lines_dict, highways_dict,
