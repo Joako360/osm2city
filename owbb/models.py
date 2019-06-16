@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 from shapely.geometry import box, Point, LineString, Polygon, MultiPolygon
 import shapely.affinity as saf
+from shapely.prepared import prep
 
 import building_lib as bl
 import parameters
@@ -314,6 +315,7 @@ class CityBlock:
     def __init__(self, osm_id: int, geometry: Polygon, feature_type: Union[None, BuildingZoneType]) -> None:
         self.osm_id = osm_id
         self.geometry = geometry
+        self.prep_geom = None  # temp Shapely PreparedGeometry - only valid in a specific context, where it is set
         self.type_ = feature_type
         self.osm_buildings = list()  # List of already existing osm buildings
         self.__settlement_type = None
@@ -434,11 +436,15 @@ class BuildingZone(OSMFeatureArea):
     def reassign_osm_buildings_to_city_blocks(self) -> None:
         """AS far as possible buildings are related to city_blocks.
         If there is none, then the existing relation to the zone is kept also from the building."""
+        for city_block in self.linked_city_blocks:
+            city_block.prep_geom = prep(city_block.geometry)
+
         for osm_building in self.osm_buildings:
             for city_block in self.linked_city_blocks:
-                if osm_building.geometry.within(city_block.geometry) or osm_building.geometry.intersects(
-                        city_block.geometry):
+                if city_block.prep_geom.contains_properly(osm_building.geometry) or city_block.prep_geom.intersects(
+                        osm_building.geometry):
                     city_block.relate_building(osm_building)
+                    break
 
     def link_city_blocks_to_highways(self) -> None:
         """Tries to link city blocks to highways for building generation.

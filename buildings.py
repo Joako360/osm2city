@@ -20,6 +20,7 @@ from typing import Dict, List, Optional
 
 import shapely.geometry as shg
 import shapely.ops as sho
+from shapely.prepared import prep
 
 import building_lib
 import cluster
@@ -354,6 +355,7 @@ def _process_building_parts(nodes_dict: Dict[int, op.Node],
     # first relate all parts to parent buildings
     building_parents = dict()  # osm_id, BuildingParent object
     building_parts_to_remove = list()  # osm_ids
+    building_prepared_geoms = dict()  # osm_id, PreparedGeometry
     for part_key, b_part in my_buildings.items():
         if s.K_BUILDING_PART in b_part.tags and s.K_BUILDING not in b_part.tags:
             stats_parts_tested += 1
@@ -369,9 +371,17 @@ def _process_building_parts(nodes_dict: Dict[int, op.Node],
                     continue
                 # need to find all buildings, which have at least one node in common
                 # do it by common nodes instead of geometry due to performance
+                b_part_valid_poly = b_part.polygon.is_valid
                 parent_missing = True
                 for c_key, candidate in my_buildings.items():
                     if part_key != c_key and s.K_BUILDING_PART not in candidate.tags and candidate.polygon is not None:
+                        if c_key not in building_prepared_geoms:
+                            prep_geom = None
+                            if candidate.polygon.is_valid:
+                                prep_geom = prep(candidate.polygon)
+                            building_prepared_geoms[c_key] = prep_geom
+                        else:
+                            prep_geom = building_prepared_geoms[c_key]
                         # Not sure why it is not enough to just test for "within", but e.g. 511476571 is not
                         # within 30621689 (building in Prague). Therefore test for references to nodes
                         # and be satisfied if all references are found in candidate
@@ -382,8 +392,8 @@ def _process_building_parts(nodes_dict: Dict[int, op.Node],
                                 break
                         if all_refs_found:
                             parent_missing = False
-                        elif b_part.polygon.is_valid and candidate.polygon.is_valid and\
-                                b_part.polygon.within(candidate.polygon):
+                        elif b_part_valid_poly and prep_geom and\
+                                prep_geom.contains_properly(b_part.polygon):
                             parent_missing = False
                         if not parent_missing:
                             if c_key in building_parents:

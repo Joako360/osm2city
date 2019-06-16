@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Tuple
 import pyproj
 from shapely.geometry import box, MultiPolygon, Polygon, CAP_STYLE, JOIN_STYLE
 from shapely.ops import unary_union
+from shapely.prepared import prep
 
 import buildings as bu
 import building_lib as bl
@@ -337,18 +338,20 @@ def _test_highway_intersecting_area(area: Polygon, highways_dict: Dict[int, m.Hi
     Highways_dict gets reduced by those highways, which were within, such that searching in other
     areas gets quicker due to reduced volume.
     """
+    prep_area = prep(area)
     linked_highways = list()
     to_be_removed = list()
     for my_highway in highways_dict.values():
         if not my_highway.populate_buildings_along():
             continue
+        # a bit speed up by looking at bounds first
         is_disjoint = disjoint_bounds(my_highway.geometry.bounds, area.bounds)
-        if not is_disjoint:  # a bit speed up
-            if my_highway.geometry.within(area):
+        if not is_disjoint:
+            if prep_area.contains_properly(my_highway.geometry):
                 linked_highways.append(my_highway)
                 to_be_removed.append(my_highway.osm_id)
 
-            elif my_highway.geometry.intersects(area):
+            elif prep_area.intersects(my_highway.geometry):
                 linked_highways.append(my_highway)
 
     for key in to_be_removed:
@@ -591,21 +594,22 @@ def _link_building_zones_with_settlements(settlement_clusters: List[m.Settlement
                     # Make sure not to overwrite higher rankings, if already set from different cluster
                     # If yes, then assign settlement type to city block
                     for city_block in zone.linked_city_blocks:
+                        prep_geom = prep(city_block.geometry)
                         if city_block.settlement_type.value < bl.SettlementType.centre.value:
                             for circle in centre_circles:
-                                if not city_block.geometry.disjoint(circle):
+                                if prep_geom.intersects(circle):
                                     city_block.settlement_type = bl.SettlementType.centre
                                     zone.settlement_type = bl.SettlementType.centre
                                     break
                         if city_block.settlement_type.value < bl.SettlementType.block.value:
                             for circle in block_circles:
-                                if not city_block.geometry.disjoint(circle):
+                                if prep_geom.intersects(circle):
                                     city_block.settlement_type = bl.SettlementType.block
                                     zone.settlement_type = bl.SettlementType.block
                                     break
                         if city_block.settlement_type.value < bl.SettlementType.dense.value:
                             for circle in dense_circles:
-                                if not city_block.geometry.disjoint(circle):
+                                if prep_geom.intersects(circle):
                                     city_block.settlement_type = bl.SettlementType.dense
                                     zone.settlement_type = bl.SettlementType.dense
                                     break
