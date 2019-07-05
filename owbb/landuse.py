@@ -210,8 +210,7 @@ def _split_multipolygon_generated_building_zone(zone: m.GeneratedBuildingZone) -
     return split_zones
 
 
-def _process_btg_building_zones(transformer: Transformation) -> Tuple[List[m.BTGBuildingZone],
-                                                                      List[m.BTGBuildingZone]]:
+def _process_btg_building_zones(transformer: Transformation) -> List[m.BTGBuildingZone]:
     """There is a need to do a local coordinate transformation, as BTG also has a local coordinate
     transformation, but there the center will be in the middle of the tile, whereas here is can be
      another place if the boundary is not a whole tile."""
@@ -228,7 +227,7 @@ def _process_btg_building_zones(transformer: Transformation) -> Tuple[List[m.BTG
     btg_file_name = os.path.join(path_to_btg, ct.construct_btg_file_name_from_tile_index(tile_index))
     if not os.path.isfile(btg_file_name):
         logging.warning('File %s does not exist. Ocean or missing in Terrasync?', btg_file_name)
-        return list(), list()
+        return list()
     logging.debug('Reading btg file: %s', btg_file_name)
     btg_reader = btg.BTGReader(btg_file_name)
     btg_lon, btg_lat = btg_reader.gbs_lon_lat
@@ -278,7 +277,7 @@ def _process_btg_building_zones(transformer: Transformation) -> Tuple[List[m.BTG
     counter = 0
 
     for key, faces_list in btg_reader.faces.items():
-        if key != btg.WATER_PROXY:
+        if key in btg.URBAN_MATERIALS:
             # find the corresponding BuildingZoneType
             type_ = None
             for member in m.BuildingZoneType:
@@ -329,7 +328,7 @@ def _process_btg_building_zones(transformer: Transformation) -> Tuple[List[m.BTG
     logging.debug('Out of %i faces %i were disjoint and %i were accepted with the bounds.',
                   counter, disjoint, accepted)
     logging.debug('Created a total of %i zones from BTG', len(btg_zones))
-    return btg_zones, btg_reader.faces[btg.WATER_PROXY]
+    return btg_zones
 
 
 def _test_highway_intersecting_area(area: Polygon, highways_dict: Dict[int, m.Highway]) -> List[m.Highway]:
@@ -745,7 +744,7 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     # =========== READ LAND-USE DATA FROM FLIGHTGEAR BTG-FILES =============
     btg_building_zones = list()
     if parameters.OWBB_USE_BTG_LANDUSE:
-        btg_building_zones, btg_water = _process_btg_building_zones(transformer)
+        btg_building_zones = _process_btg_building_zones(transformer)
         last_time = time_logging("Time used in seconds for reading BTG zones", last_time)
 
     if len(btg_building_zones) > 0:

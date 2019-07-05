@@ -8,7 +8,7 @@ by Lauri Peltonen a.k.a. Zan
 Updated based on information in https://sourceforge.net/projects/xdraconian-fgscenery/
 and https://forum.flightgear.org/viewtopic.php?f=5&t=34736,
 especially FGBlenderTools/io_scene_flightgear/verticesfg_btg_io.py
-Materials actually read (see also http://wiki.flightgear.org/CORINE_to_materials_mapping):
+Materials interpreted as urban (see also http://wiki.flightgear.org/CORINE_to_materials_mapping):
   <name>BuiltUpCover</name>
   <name>Urban</name>
 
@@ -19,14 +19,12 @@ Materials actually read (see also http://wiki.flightgear.org/CORINE_to_materials
   <name>Town</name>
   <name>SubUrban</name>
 
-Materials for different water types are also saved in order to exclude land-use.
+Materials for different water types are saved as a proxy "water" material in order to exclude land-use.
 
 Fans and strips do not seem to be used for the supported materials. Therefore no attempt is done to
 save faces of a given fan or stripe in a separate structure instead of together with other triangles.
 
 """
-
-# version: https://gitlab.com/fg-radi/osm2city/commit/a21a23ab24c5db3b9edc88570431944c8d8f311f#d469dca24933e693d2fa031a97e8cc6d9b162cac
 
 import gzip
 import logging
@@ -38,12 +36,15 @@ import utils.calc_tile as ca
 import utils.coordinates as coord
 from utils.exceptions import MyException
 
+# materials get set to lower in reading BTG files
 WATER_PROXY = 'water'
 
-SUPPORTED_MATERIALS = ['builtupcover', 'urban',
-                       'construction', 'industrial', 'port',
-                       'town', 'suburban',
-                       WATER_PROXY]
+URBAN_MATERIALS = ['builtupcover', 'urban',
+                   'construction', 'industrial', 'port',
+                   'town', 'suburban']
+
+TRANSPORT_MATERIALS = ['freeway', 'road', 'railroad', 'transport']
+
 WATER_MATERIALS = ['ocean', 'lake', 'pond', 'reservoir', 'stream', 'canal',
                    'lagoon', 'estuary', 'watercourse', 'saline']
 
@@ -95,8 +96,6 @@ class BTGReader(object):
         self.vertices = list()  # corresponds to wgs84_nodes in simgear/io/sg_binobj.hxx. List of Vec3d objects
         self.bounding_sphere = None
         self.faces = dict()  # material: str, list of faces
-        for material in SUPPORTED_MATERIALS:
-            self.faces[material] = list()
         self.material_name = None  # byte string
 
         self.btg_version = 0
@@ -121,9 +120,9 @@ class BTGReader(object):
         return lon_deg, lat_deg
 
     def add_face(self, face: Face) -> None:
-        """Adds a face if it is one of the supported material types"""
-        if face.material in SUPPORTED_MATERIALS:
-            self.faces[face.material].append(face)
+        if face.material not in self.faces:
+            self.faces[face.material] = list()
+        self.faces[face.material].append(face)
 
     def parse_element(self, object_type: int, number_bytes: int, data: bytes) -> None:
         if object_type == OBJECT_TYPE_BOUNDING_SPHERE:
@@ -198,7 +197,7 @@ class BTGReader(object):
                 face = Face(self.material_name, [geom_verts[3 * n], geom_verts[3 * n + 1], geom_verts[3 * n + 2]])
                 self.add_face(face)
         else:
-            logging.warning('Not used obejct data for type = %i', object_type)
+            logging.warning('Not used object data for type = %i', object_type)
 
     def read_objects(self, btg_file, number_objects: int, object_fmt: str) -> None:
         """Reads all top level objects"""
@@ -240,7 +239,7 @@ class BTGReader(object):
                     logging.debug('Material name "%s"', self.material_name)
 
                 elif property_type == PROPERTY_TYPE_INDEX:
-                    (idx,) = struct.unpack("<B", data[:1])
+                    (_,) = struct.unpack("<B", data[:1])
                     has_vertices = (data[0]) & 1 == 1
                     has_normals = (data[0]) & 2 == 2
                     has_colors = (data[0] & 4) == 4
@@ -347,5 +346,9 @@ class BTGReader(object):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     btg_reader_7 = BTGReader('/home/vanosten/bin/terrasync/Terrain/e000n40/e008n47/3088961.btg.gz')  # old version
+    if not btg_reader_7.is_version_7:
+        raise ValueError('BTG file used is not version 7')
     btg_reader_10 = BTGReader('/home/vanosten/bin/terrasync/Terrain/w160n20/w159n21/351207.btg.gz')  # version 10
+    if btg_reader_10.is_version_7:
+        raise ValueError('BTG file used is version 7 instead of higher')
     logging.info("Done")
