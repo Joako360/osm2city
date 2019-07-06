@@ -210,7 +210,7 @@ def _split_multipolygon_generated_building_zone(zone: m.GeneratedBuildingZone) -
     return split_zones
 
 
-def _process_btg_building_zones(transformer: Transformation) -> List[m.BTGBuildingZone]:
+def _read_btg_file(transformer: Transformation) -> Optional[btg.BTGReader]:
     """There is a need to do a local coordinate transformation, as BTG also has a local coordinate
     transformation, but there the center will be in the middle of the tile, whereas here is can be
      another place if the boundary is not a whole tile."""
@@ -227,24 +227,19 @@ def _process_btg_building_zones(transformer: Transformation) -> List[m.BTGBuildi
     btg_file_name = os.path.join(path_to_btg, ct.construct_btg_file_name_from_tile_index(tile_index))
     if not os.path.isfile(btg_file_name):
         logging.warning('File %s does not exist. Ocean or missing in Terrasync?', btg_file_name)
-        return list()
+        return None
     logging.debug('Reading btg file: %s', btg_file_name)
     btg_reader = btg.BTGReader(btg_file_name)
-    btg_lon, btg_lat = btg_reader.gbs_lon_lat
-    btg_x, btg_y = transformer.to_local((btg_lon, btg_lat))
-    logging.debug('Difference between BTG and transformer: x = %f, y = %f', btg_x, btg_y)
 
     gbs_center = btg_reader.gbs_center
 
-    btg_zones = list()
-    vertices = btg_reader.vertices
     v_max_x = 0
     v_max_y = 0
     v_max_z = 0
     v_min_x = 0
     v_min_y = 0
     v_min_z = 0
-    for vertex in vertices:
+    for vertex in btg_reader.vertices:
         if vertex.x >= 0:
             v_max_x = max(v_max_x, vertex.x)
         else:
@@ -268,6 +263,17 @@ def _process_btg_building_zones(transformer: Transformation) -> List[m.BTGBuildi
         vertex.x, vertex.y = transformer.to_local((lon, lat))
         vertex.z = _alt
 
+    return btg_reader
+
+
+def _process_polygons_from_btg_faces(btg_reader: btg.BTGReader, materials: List[str],
+                                     transformer: Transformation) -> Dict[str, List[Polygon]]:
+    """For a given set of BTG materials merge the faces read from BTG into as few polygons as possible"""
+    btg_lon, btg_lat = btg_reader.gbs_lon_lat
+    btg_x, btg_y = transformer.to_local((btg_lon, btg_lat))
+    logging.debug('Difference between BTG and transformer: x = %f, y = %f', btg_x, btg_y)
+
+    btg_polys = dict()
     min_x, min_y = transformer.to_local((parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH))
     max_x, max_y = transformer.to_local((parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH))
     bounds = (min_x, min_y, max_x, max_y)
@@ -277,23 +283,13 @@ def _process_btg_building_zones(transformer: Transformation) -> List[m.BTGBuildi
     counter = 0
 
     for key, faces_list in btg_reader.faces.items():
-        if key in btg.URBAN_MATERIALS:
-            # find the corresponding BuildingZoneType
-            type_ = None
-            for member in m.BuildingZoneType:
-                btg_key = 'btg_' + key
-                if btg_key == member.name:
-                    type_ = member
-                    break
-            if type_ is None:
-                raise Exception('Unknown BTG material: {}. Most probably a programming mismatch.'.format(key))
-            # create building zones
+        if key in materials:
             temp_polys = list()
             for face in faces_list:
                 counter += 1
-                v0 = vertices[face.vertices[0]]
-                v1 = vertices[face.vertices[1]]
-                v2 = vertices[face.vertices[2]]
+                v0 = btg_reader.vertices[face.vertices[0]]
+                v1 = btg_reader.vertices[face.vertices[1]]
+                v2 = btg_reader.vertices[face.vertices[2]]
                 # create the triangle polygon
                 my_geometry = Polygon([(v0.x - btg_x, v0.y - btg_y), (v1.x - btg_x, v1.y - btg_y),
                                        (v2.x - btg_x, v2.y - btg_y), (v0.x - btg_x, v0.y - btg_y)])
@@ -320,13 +316,32 @@ def _process_btg_building_zones(transformer: Transformation) -> List[m.BTGBuildi
             # merge polygons as much as possible in order to reduce processing and not having polygons
             # smaller than parameters.OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA
             merged_list = merge_buffers(temp_polys)
-            for merged_poly in merged_list:
-                my_zone = m.BTGBuildingZone(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse),
-                                            type_, merged_poly)
-                btg_zones.append(my_zone)
+            btg_polys[key] = merged_list
 
     logging.debug('Out of %i faces %i were disjoint and %i were accepted with the bounds.',
                   counter, disjoint, accepted)
+    return btg_polys
+
+
+def _create_btg_buildings_zones(btg_polys: Dict[str, List[Polygon]]) -> List[m.BTGBuildingZone]:
+    btg_zones = list()
+
+    for key, polys in btg_polys.items():
+        # find the corresponding BuildingZoneType
+        type_ = None
+        for member in m.BuildingZoneType:
+            btg_key = 'btg_' + key
+            if btg_key == member.name:
+                type_ = member
+                break
+        if type_ is None:
+            raise Exception('Unknown BTG material: {}. Most probably a programming mismatch.'.format(key))
+
+        for poly in polys:
+            my_zone = m.BTGBuildingZone(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse),
+                                        type_, poly)
+            btg_zones.append(my_zone)
+
     logging.debug('Created a total of %i zones from BTG', len(btg_zones))
     return btg_zones
 
@@ -742,9 +757,12 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     last_time = time_logging("Time used in seconds for processing aerodromes", last_time)
 
     # =========== READ LAND-USE DATA FROM FLIGHTGEAR BTG-FILES =============
+    btg_reader = _read_btg_file(transformer)
     btg_building_zones = list()
+
     if parameters.OWBB_USE_BTG_LANDUSE:
-        btg_building_zones = _process_btg_building_zones(transformer)
+        btg_polygons = _process_polygons_from_btg_faces(btg_reader, btg.URBAN_MATERIALS, transformer)
+        btg_building_zones = _create_btg_buildings_zones(btg_polygons)
         last_time = time_logging("Time used in seconds for reading BTG zones", last_time)
 
     if len(btg_building_zones) > 0:
