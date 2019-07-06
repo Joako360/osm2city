@@ -104,6 +104,7 @@ OVERLAP_CHECK_CONSIDER_SHARED = True
 #    E.g. SKIP_LIST = ["Theologische Fakultät", "Rhombergpassage", 55875208]
 #    For roads/railways OSM ID is checked.
 SKIP_LIST = []
+SKIP_LIST_OVERLAP = []  # list of .ac or .xml file names which should not be used for overlap tests
 
 # -- Parameters which influence the number of buildings from OSM taken to output
 BUILDING_MIN_HEIGHT = 0.0           # -- minimum height from bottom to top without roof height of a building to be included in output (does not include roof). Different from OSM tag "min_height", which states that the bottom of the building hovers min_height over the ground

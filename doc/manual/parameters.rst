@@ -840,6 +840,8 @@ DB_USER_PASSWORD                                String     n/a       The passwor
 =============================================   ========   =======   ==============================================================================
 
 
+.. _chapter-parameters-skipping:
+
 ----------------------------------------------
 Skipping Specific Buildings and Roads/Railways
 ----------------------------------------------
@@ -858,6 +860,7 @@ E.g. ``SKIP_LIST = ['St. Leodegar im Hof (Hofkirche)', 87220999]``
    BRIDGE_BODY_HEIGHT = 0.9         # height of bridge body
    EMBANKMENT_TEXTURE = textures.road.EMBANKMENT_1  # Texture for the embankment
 
+On the other hand side there might be situations, where certain STG-entries should not be checked for overlap checking. For that situation parameter ``SKIP_LIST_OVERLAP`` can be used as a list of ``*.ac`` or ``*.xml`` file names which should not be used for overlap tests
 
 .. _chapter-parameters-clipping:
 

@@ -355,6 +355,11 @@ def read_stg_entries_in_boundary(consider_shared: bool = True,
     for filename in stg_files:
         stg_entries.extend(read_stg_entries(filename, consider_shared))
 
+    # exclude entries in skip list
+    for entry in reversed(stg_entries):
+        if entry.obj_filename in parameters.SKIP_LIST_OVERLAP:
+            stg_entries.remove(entry)
+
     # the border of the original tile in local coordinates
     south_west = my_coord_transform.to_local((parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH))
     north_east = my_coord_transform.to_local((parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH))
