@@ -10,7 +10,7 @@ import time
 from typing import Dict, List, Optional, Tuple
 
 import pyproj
-from shapely.geometry import box, MultiPolygon, Polygon, CAP_STYLE, JOIN_STYLE
+from shapely.geometry import box, LineString, MultiPolygon, Polygon, CAP_STYLE, JOIN_STYLE
 from shapely.ops import unary_union
 from shapely.prepared import prep
 
@@ -267,7 +267,7 @@ def _read_btg_file(transformer: Transformation) -> Optional[btg.BTGReader]:
 
 
 def _process_polygons_from_btg_faces(btg_reader: btg.BTGReader, materials: List[str],
-                                     transformer: Transformation) -> Dict[str, List[Polygon]]:
+                                     transformer: Transformation, merge_polys: bool = True) -> Dict[str, List[Polygon]]:
     """For a given set of BTG materials merge the faces read from BTG into as few polygons as possible"""
     btg_lon, btg_lat = btg_reader.gbs_lon_lat
     btg_x, btg_y = transformer.to_local((btg_lon, btg_lat))
@@ -315,8 +315,11 @@ def _process_polygons_from_btg_faces(btg_reader: btg.BTGReader, materials: List[
 
             # merge polygons as much as possible in order to reduce processing and not having polygons
             # smaller than parameters.OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA
-            merged_list = merge_buffers(temp_polys)
-            btg_polys[key] = merged_list
+            if merge_polys:
+                merged_list = merge_buffers(temp_polys)
+                btg_polys[key] = merged_list
+            else:
+                btg_polys[key] = temp_polys
 
     logging.debug('Out of %i faces %i were disjoint and %i were accepted with the bounds.',
                   counter, disjoint, accepted)
@@ -344,6 +347,41 @@ def _create_btg_buildings_zones(btg_polys: Dict[str, List[Polygon]]) -> List[m.B
 
     logging.debug('Created a total of %i zones from BTG', len(btg_zones))
     return btg_zones
+
+
+def _merge_btg_transport_in_water(water_polys: Dict[str, List[Polygon]],
+                                  transport_polys: Dict[str, List[Polygon]]) -> List[Polygon]:
+    """Tests whether a BTG transport face intersects mostly with water and merges as many as possible.
+
+    This amongst others to prevent that probing for water would find a non-water place - just because the land-use
+    is actually transport from a bridge.
+
+    Not merging the geometries across materials in order to keep the polygons' geometry simple.
+    """
+    # get all water (Italian = acqua) polygons into one list - after processing we are not interested
+    # in the specific materials anymore
+    acqua_list = list()
+    for poly_list in water_polys.values():
+        for poly in poly_list:
+            acqua_list.append(poly)
+
+    # get all faces of different transport materials into on list of prepared geometries
+    for poly_list in transport_polys.values():
+        for poly in poly_list:
+            prep_poly = prep(poly)
+
+            merged_poly = None
+            acqua_poly = None
+            for acqua_poly in acqua_list:
+                if prep_poly.intersects(acqua_poly):
+                    geom = acqua_poly.intersection(prep_poly)
+                    if isinstance(geom, LineString):
+                        merged_poly = acqua_poly.union(prep_poly)
+                        break
+            if merged_poly:
+                acqua_list.remove(acqua_poly)
+                acqua_list.append(merged_poly)
+    return acqua_list
 
 
 def _test_highway_intersecting_area(area: Polygon, highways_dict: Dict[int, m.Highway]) -> List[m.Highway]:
@@ -759,11 +797,22 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     # =========== READ LAND-USE DATA FROM FLIGHTGEAR BTG-FILES =============
     btg_reader = _read_btg_file(transformer)
     btg_building_zones = list()
+    btg_water_areas = list()
 
-    if parameters.OWBB_USE_BTG_LANDUSE:
-        btg_polygons = _process_polygons_from_btg_faces(btg_reader, btg.URBAN_MATERIALS, transformer)
-        btg_building_zones = _create_btg_buildings_zones(btg_polygons)
-        last_time = time_logging("Time used in seconds for reading BTG zones", last_time)
+    if btg_reader is None:
+        if len(osm_buildings) + len(highways_dict) + len(railways_dict) > 0:
+            raise ValueError('No BTG available in area, where there are OSM buildings or roads/rails')
+    else:
+        if parameters.OWBB_USE_BTG_LANDUSE:
+            btg_polygons = _process_polygons_from_btg_faces(btg_reader, btg.URBAN_MATERIALS, transformer)
+            btg_building_zones = _create_btg_buildings_zones(btg_polygons)
+            last_time = time_logging("Time used in seconds for processing BTG building zones", last_time)
+
+        btg_polygons = _process_polygons_from_btg_faces(btg_reader, btg.WATER_MATERIALS, transformer)
+        btg_transport = _process_polygons_from_btg_faces(btg_reader, btg.TRANSPORT_MATERIALS, transformer, False)
+        btg_water_areas = _merge_btg_transport_in_water(btg_polygons, btg_transport)
+        last_time = time_logging("Time used in seconds for processing BTG water polygons", last_time)
+        logging.info('Final count of BTG water polygons is: %i', len(btg_water_areas))
 
     if len(btg_building_zones) > 0:
         _generate_building_zones_from_external(building_zones, btg_building_zones)

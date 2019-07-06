@@ -43,7 +43,7 @@ URBAN_MATERIALS = ['builtupcover', 'urban',
                    'construction', 'industrial', 'port',
                    'town', 'suburban']
 
-TRANSPORT_MATERIALS = ['freeway', 'road', 'railroad', 'transport']
+TRANSPORT_MATERIALS = ['freeway', 'road', 'railroad', 'transport', 'asphalt']
 
 WATER_MATERIALS = ['ocean', 'lake', 'pond', 'reservoir', 'stream', 'canal',
                    'lagoon', 'estuary', 'watercourse', 'saline']
