@@ -484,9 +484,9 @@ def _process_landuse_for_lighting(building_zones: List[m.BuildingZone]) -> List[
     return lit_areas
 
 
-def _process_landuse_for_settlement_areas(lit_areas: List[Polygon], water_areas: List[Polygon]) -> List[Polygon]:
+def _process_landuse_for_settlement_areas(lit_areas: List[Polygon], osm_water_areas: List[Polygon]) -> List[Polygon]:
     """Combines lit areas with water areas to get a proxy for settlement areas"""
-    all_areas = lit_areas + water_areas
+    all_areas = lit_areas + osm_water_areas
     return merge_buffers(all_areas)
 
 
@@ -541,9 +541,9 @@ def _split_generated_building_zones_by_major_lines(before_list: List[m.BuildingZ
     return after_list
 
 
-def _fetch_water_areas(transformer: Transformation) -> List[Polygon]:
+def _fetch_osm_water_areas(transformer: Transformation) -> List[Polygon]:
     """Fetches specific water areas from OSM and then applies a buffer."""
-    water_areas = list()
+    osm_water_areas = list()
 
     # get riverbanks from relations
     osm_relations_result = op.fetch_osm_db_data_relations_riverbanks(op.OSMReadResult(dict(), dict(), dict(), dict(),
@@ -563,7 +563,7 @@ def _fetch_water_areas(transformer: Transformation) -> List[Polygon]:
         for way in outer_ways:
             polygon = way.polygon_from_osm_way(osm_nodes_dict, transformer)
             if polygon.is_valid and not polygon.is_empty:
-                water_areas.append(polygon.buffer(parameters.OWBB_BUILT_UP_BUFFER))
+                osm_water_areas.append(polygon.buffer(parameters.OWBB_BUILT_UP_BUFFER))
 
     # then add water areas (mostly when natural=water, but not always consistent
     osm_way_result = op.fetch_osm_db_data_ways_key_values(['water=>moat', 'water=>river', 'water=>canal',
@@ -574,17 +574,23 @@ def _fetch_water_areas(transformer: Transformation) -> List[Polygon]:
         my_geometry = way.polygon_from_osm_way(osm_nodes_dict, transformer)
         if my_geometry is not None and isinstance(my_geometry, Polygon):
             if my_geometry.is_valid and not my_geometry.is_empty:
-                water_areas.append(my_geometry.buffer(parameters.OWBB_BUILT_UP_BUFFER))
+                osm_water_areas.append(my_geometry.buffer(parameters.OWBB_BUILT_UP_BUFFER))
 
-    logging.info('Fetched %i water areas from OSM', len(water_areas))
-    return water_areas
+    logging.info('Fetched %i water areas from OSM', len(osm_water_areas))
+    return osm_water_areas
 
 
-def _create_settlement_clusters(lit_areas: List[Polygon], water_areas: List[Polygon],
+def _create_settlement_clusters(lit_areas: List[Polygon], osm_water_areas: List[Polygon],
                                 urban_places: List[m.Place]) -> List[m.SettlementCluster]:
+    """Settlement clusters based lit areas and specific water areas.
+
+    The reason for using specific water areas is that in cities with much water like Stockholm otherwise
+    the parts of the city would get too isolated and less density - often there is only one clear city center
+    from OSM data, but the city stretches longer.
+    The reason to use OSM water data instead of BTG data is that the OSM data has better tagging."""
     clusters = list()
 
-    candidate_settlements = _process_landuse_for_settlement_areas(lit_areas, water_areas)
+    candidate_settlements = _process_landuse_for_settlement_areas(lit_areas, osm_water_areas)
     for polygon in candidate_settlements:
         candidate_places = list()
         towns = 0
@@ -786,7 +792,7 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     highways_dict = m.process_osm_highway_refs(transformer)
     railways_dict = m.process_osm_railway_refs(transformer)
     waterways_dict = m.process_osm_waterway_refs(transformer)
-    water_areas = _fetch_water_areas(transformer)
+    osm_water_areas = _fetch_osm_water_areas(transformer)
 
     last_time = time_logging("Time used in seconds for parsing OSM data", last_time)
 
@@ -867,7 +873,7 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     _sanitize_building_zones(building_zones, 'after split major lines')
 
     # =========== Link urban places with settlement_area buffers ==================================
-    settlement_clusters = _create_settlement_clusters(lit_areas, water_areas, urban_places)
+    settlement_clusters = _create_settlement_clusters(lit_areas, osm_water_areas, urban_places)
     last_time = time_logging('Time used in seconds for creating settlement_clusters', last_time)
 
     _count_zones_related_buildings(osm_buildings, 'after settlement clusters')
