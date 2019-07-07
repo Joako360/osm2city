@@ -68,8 +68,44 @@ def _process_aerodromes(building_zones: List[m.BuildingZone], aerodrome_zones: L
     building_zones.extend(aerodrome_zones)
 
 
-def _generate_building_zones_from_external(building_zones: List[m.BuildingZone],
-                                           external_landuses: List[m.BTGBuildingZone]) -> None:
+def _reduce_building_zones_with_btg_water(building_zones: List[m.BuildingZone], btg_water_areas: List[Polygon]) -> None:
+    """Adds "missing" building_zones based on land-use info outside of OSM land-use"""
+    counter = 0
+    for water_area in btg_water_areas:
+        prep_geom = prep(water_area)
+
+        parts = list()
+        for building_zone in reversed(building_zones):
+            if prep_geom.contains_properly(building_zone.geometry):
+                counter += 1
+                building_zones.remove(building_zone)
+            elif prep_geom.intersects(building_zone.geometry):
+                counter += 1
+                diff = building_zone.geometry.difference(water_area)
+                if isinstance(diff, Polygon):
+                    if diff.area >= parameters.OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA:
+                        building_zone.geometry = diff
+                    else:
+                        building_zones.remove(building_zone)
+                elif isinstance(diff, MultiPolygon):
+                    building_zones.remove(building_zone)
+                    is_first = True
+                    for poly in diff:
+                        if poly.area >= parameters.OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA:
+                            if is_first:
+                                building_zone.geometry = poly
+                                parts.append(building_zone)
+                            else:
+                                new_zone = m.BuildingZone(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse), poly,
+                                                          building_zone.type_)
+                                parts.append(new_zone)
+        building_zones.extend(parts)
+
+    logging.info("Corrected %i building zones with BTG water areas", counter)
+
+
+def _extend_osm_building_zones_with_btg_zones(building_zones: List[m.BuildingZone],
+                                              external_landuses: List[m.BTGBuildingZone]) -> None:
     """Adds "missing" building_zones based on land-use info outside of OSM land-use"""
     counter = 0
     for external_landuse in external_landuses:
@@ -382,6 +418,21 @@ def _merge_btg_transport_in_water(water_polys: Dict[str, List[Polygon]],
                 acqua_list.remove(acqua_poly)
                 acqua_list.append(merged_poly)
     return acqua_list
+
+
+def _remove_osm_buildings_in_water(osm_buildings: List[bl.Building], btg_water_areas: List[Polygon]) -> None:
+    counter = 0
+    for water_area in btg_water_areas:
+        prep_geom = prep(water_area)
+        for building in reversed(osm_buildings):
+            if prep_geom.contains_properly or prep_geom.intersects(building.geometry):
+                counter += 1
+                osm_buildings.remove(building)
+                if building.has_parent:
+                    parent = building.parent
+                    parent.make_sure_lone_building_in_parent_stands_alone()
+                break
+    logging.info('Removed %i buildings based on BTG water', counter)
 
 
 def _test_highway_intersecting_area(area: Polygon, highways_dict: Dict[int, m.Highway]) -> List[m.Highway]:
@@ -820,8 +871,12 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
         last_time = time_logging("Time used in seconds for processing BTG water polygons", last_time)
         logging.info('Final count of BTG water polygons is: %i', len(btg_water_areas))
 
-    if len(btg_building_zones) > 0:
-        _generate_building_zones_from_external(building_zones, btg_building_zones)
+        if btg_water_areas:
+            _remove_osm_buildings_in_water(osm_buildings, btg_water_areas)
+            _reduce_building_zones_with_btg_water(building_zones, btg_water_areas)
+
+    if btg_building_zones:
+        _extend_osm_building_zones_with_btg_zones(building_zones, btg_building_zones)
     last_time = time_logging("Time used in seconds for processing external zones", last_time)
 
     # =========== CHECK WHETHER WE ARE IN A BUILT-UP AREA AT ALL ===========================

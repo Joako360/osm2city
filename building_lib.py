@@ -1363,14 +1363,17 @@ class BuildingParent(object):
                     child.parent = None
                     parent.children.remove(child)
 
-            # if only one child left, then inherit tags from parent
-            if len(parent.children) == 1:
-                building = parent.children[0]
-                building.make_building_from_part()
-                for key, value in building.parent.tags.items():
-                    if key not in building.tags:
-                        building.tags[key] = value
-                building.parent = None
+            parent.make_sure_lone_building_in_parent_stands_alone()
+
+    def make_sure_lone_building_in_parent_stands_alone(self) -> None:
+        """If only one child left, then inherit tags from parent and make it stand alone"""
+        if len(self.children) == 1:
+            building = self.children[0]
+            building.make_building_from_part()
+            for key, value in building.parent.tags.items():
+                if key not in building.tags:
+                    building.tags[key] = value
+            building.parent = None
 
 
 def _parse_building_levels(tags: Dict[str, str]) -> float:
