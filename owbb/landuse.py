@@ -903,7 +903,7 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     # =========== FINALIZE Land-use PROCESSING =============================================
     if parameters.DEBUG_PLOT_LANDUSE:
         logging.info('Start of plotting zones')
-        plotting.draw_zones(osm_buildings, building_zones, btg_building_zones, lit_areas, bounds)
+        plotting.draw_zones(osm_buildings, building_zones, btg_building_zones, btg_water_areas, lit_areas, bounds)
         time_logging("Time used in seconds for plotting", last_time)
 
     # =========== Now generate buildings if asked for ======================================

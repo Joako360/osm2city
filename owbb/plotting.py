@@ -172,12 +172,19 @@ def _draw_generated_zones(building_zones, ax: maxs.Axes) -> None:
 def _draw_btg_building_zones(btg_building_zones, ax: maxs.Axes) -> None:
     for item in btg_building_zones:
         if item.type_ in [m.BuildingZoneType.btg_builtupcover, m.BuildingZoneType.btg_urban]:
-            my_color = "cyan"
+            my_color = "magenta"
         elif item.type_ in [m.BuildingZoneType.btg_town, m.BuildingZoneType.btg_suburban]:
             my_color = "gold"
         else:
             my_color = "yellow"
         patch = PolygonPatch(item.geometry, facecolor=my_color, edgecolor=my_color)
+        ax.add_patch(patch)
+
+
+def _draw_btg_water_areas(btg_water_areas: List[Polygon], ax: maxs.Axes) -> None:
+    for item in btg_water_areas:
+        my_color = 'lightskyblue'
+        patch = PolygonPatch(item, facecolor=my_color, edgecolor=my_color)
         ax.add_patch(patch)
 
 
@@ -278,7 +285,8 @@ def draw_buildings(building_zones, bounds) -> None:
 
 
 def draw_zones(buildings: List[bl.Building], building_zones: List[m.BuildingZone],
-               btg_building_zones: List[m.BTGBuildingZone], lit_areas: List[Polygon], bounds: m.Bounds) -> None:
+               btg_building_zones: List[m.BTGBuildingZone], btg_water_areas: List[Polygon],
+               lit_areas: List[Polygon], bounds: m.Bounds) -> None:
     pdf_pages = _create_pdf_pages("landuse")
 
     # OSM building zones original
@@ -293,10 +301,11 @@ def draw_zones(buildings: List[bl.Building], building_zones: List[m.BuildingZone
     # External land use from BTG
     if btg_building_zones:
         my_figure = _create_a3_landscape_figure()
-        my_figure.suptitle("Land-use types from FlightGear BTG Files \n[cyan=builtupcover and urban, \
-gold=town and suburban, yellow=construction and industrial and port]")
+        my_figure.suptitle("Land-use types from FlightGear BTG Files \n[magenta=builtupcover and urban, \
+gold=town and suburban, yellow=construction and industrial and port, light blue=water]")
         ax = my_figure.add_subplot(111)
         ax.grid(True, linewidth=1, linestyle="--", color="silver")
+        _draw_btg_water_areas(btg_water_areas, ax)
         _draw_btg_building_zones(btg_building_zones, ax)
         _draw_buildings(buildings, ax)
         _set_ax_limits_from_bounds(ax, bounds)
@@ -309,6 +318,7 @@ gold=town and suburban, yellow=construction and industrial and port]")
 lighter variants=generated from buildings;\
 \ncyan=commercial and industrial, gold=continuous urban, yellow=discontinuous urban]")
     ax = my_figure.add_subplot(111)
+    _draw_btg_water_areas(btg_water_areas, ax)
     _draw_osm_zones(building_zones, ax)
     _draw_generated_zones(building_zones, ax)
     _draw_buildings(buildings, ax)
@@ -320,6 +330,7 @@ lighter variants=generated from buildings;\
     my_figure.suptitle("Lit areas from building zones")
     ax = my_figure.add_subplot(111)
     ax.grid(True, linewidth=1, linestyle="--", color="silver")
+    _draw_btg_water_areas(btg_water_areas, ax)
     _draw_lit_areas(lit_areas, ax)
     _set_ax_limits_from_bounds(ax, bounds)
     pdf_pages.savefig(my_figure)
@@ -329,6 +340,7 @@ lighter variants=generated from buildings;\
     my_figure.suptitle("Built-up areas by settlement type \n[blue=centre (city), green=block, magenta=dense, \n \
     yellow=periphery, grey=rural, brown=farmyard]. If hatched, then type upgraded or downgraded for sanity.")
     ax = my_figure.add_subplot(111)
+    _draw_btg_water_areas(btg_water_areas, ax)
     _draw_settlement_zones(building_zones, ax)
     _set_ax_limits_from_bounds(ax, bounds)
     pdf_pages.savefig(my_figure)
@@ -339,6 +351,7 @@ lighter variants=generated from buildings;\
     Light grey up to .05, Yellow up to .1, orange up to 0.15, red up to .2,\n \
     dark red up to .25, lime up to .3, green up to .4, dark green up to .45, black afterwards")
     ax = my_figure.add_subplot(111)
+    _draw_btg_water_areas(btg_water_areas, ax)
     _draw_zones_density(building_zones, ax)
     _set_ax_limits_from_bounds(ax, bounds)
     pdf_pages.savefig(my_figure)
