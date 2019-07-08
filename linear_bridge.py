@@ -45,9 +45,9 @@ class DeckShapePoly(object):
 
 
 class LinearBridge(linear.LinearObject):
-    def __init__(self, transform, fg_elev: FGElev, osm_id, tags, refs, nodes_dict, width=9,
-                 tex=textures.road.EMBANKMENT_2, AGL=0.5):
-        super().__init__(transform, osm_id, tags, refs, nodes_dict, width, tex, AGL)
+    def __init__(self, transform, fg_elev: FGElev, osm_id, tags, refs, nodes_dict, width: float,
+                 above_ground_level: float, tex=textures.road.EMBANKMENT_2):
+        super().__init__(transform, osm_id, tags, refs, nodes_dict, width, above_ground_level, tex)
         # -- prepare elevation spline
         #    probe elev at n_probes locations
         n_probes = max(int(self.center.length / 5.), 3)
@@ -65,7 +65,7 @@ class LinearBridge(linear.LinearObject):
         self.pillar_nnodes = 0
         # self.deck_shape_poly = None
 
-    def elev(self, l, normalized: bool=True):
+    def elev(self, l, normalized: bool = True):
         """given linear distance [m], interpolate and return terrain elevation"""
         if not normalized:
             l /= self.center.length

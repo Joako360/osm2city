@@ -67,10 +67,10 @@ class LinearObject(object):
           - if not, write our node and store node indices in junction
           - if yes, use stored node indices
     """
-    def __init__(self, transform, osm_id: int, tags: Dict[str, str], refs: List[int], nodes_dict, width: float=9.,
-                 tex=textures.road.EMBANKMENT_1, AGL: float=0.5):
+    def __init__(self, transform, osm_id: int, tags: Dict[str, str], refs: List[int], nodes_dict, width: float,
+                 above_ground_level: float, tex=textures.road.EMBANKMENT_1):
         self.width = width
-        self.AGL = AGL  # drape distance above terrain
+        self.AGL = above_ground_level  # drape distance above terrain
         self.osm_id = osm_id
         self.refs = refs
         self.tags = tags

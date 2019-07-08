@@ -940,14 +940,12 @@ class Roads(object):
                 if _is_bridge(the_way):
                     obj = linear_bridge.LinearBridge(self.transform, self.fg_elev, the_way.osm_id,
                                                      the_way.tags, the_way.refs, self.nodes_dict,
-                                                     width=width, tex=tex,
-                                                     AGL=above_ground_level)
+                                                     width, above_ground_level, tex=tex)
                     self.bridges_list.append(obj)
                 else:
                     obj = linear.LinearObject(self.transform, the_way.osm_id,
                                               the_way.tags, the_way.refs,
-                                              self.nodes_dict, width=width, tex=tex,
-                                              AGL=above_ground_level)
+                                              self.nodes_dict, width, above_ground_level, tex=tex)
                     if op.is_railway(the_way):
                         self.railway_list.append(obj)
                     else:
@@ -1102,7 +1100,6 @@ class Roads(object):
             for end_way, end_angle in end_dict.items():
                 candidate_way = None
                 candidate_angle = 999
-                start_way = None
                 for start_way, start_angle in start_dict.items():
                     if _compatible_ways(end_way, start_way):
                         if abs(start_angle - end_angle) >= 90:
