@@ -426,6 +426,8 @@ class Roads(object):
         self._check_against_blocked_areas(blocked_areas)
         self._check_ways_sanity('_check_against_blocked_areas')
         self._check_lighting(lit_areas)
+
+        self._remove_short_way_segments()
         self._cleanup_topology()
         self._check_points_on_line_distance()
 
@@ -804,11 +806,8 @@ class Roads(object):
         nodes = np.array([self.transform.to_local((n.lon, n.lat)) for n in osm_nodes])
         return shg.LineString(nodes)
 
-    def _cleanup_topology(self):
-        """Cleans up the topology for junctions etc."""
-        logging.debug("Number of ways before cleaning topology: %i" % len(self.ways_list))
-
-        # make sure there are no almost zero length segments
+    def _remove_short_way_segments(self) -> None:
+        """Make sure there are no almost zero length segments"""
         # FIXME: this should not be necessary and is most probably residual from _check_lighting
         for way in self.ways_list:
             refs_to_remove = list()
@@ -830,7 +829,11 @@ class Roads(object):
                     way.refs.remove(ref)  # FIXME: this is a hack for something that actually happens, but should not
                     logging.debug('Removing ref %d from way %d due to too short segment', ref, way.osm_id)
 
-        # create a dict referencing for every node those ways, which are using this node in their references
+    def _cleanup_topology(self) -> None:
+        """Cleans up the topology for junctions etc."""
+        logging.debug("Number of ways before cleaning topology: %i" % len(self.ways_list))
+
+        # create a dict referencing for every node for those ways, which are using this node in their references
         # key = node ref, value = List((way, pos)), where pos=-1 for start, pos=0 for inner, pos=1 for end
         attached_ways_dict = _find_junctions(self.ways_list)
 
