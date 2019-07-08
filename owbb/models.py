@@ -446,6 +446,10 @@ class BuildingZone(OSMFeatureArea):
                     city_block.relate_building(osm_building)
                     break
 
+        # need to set back again - otherwise cannot pickle
+        for city_block in self.linked_city_blocks:
+            city_block.prep_geom = None
+
     def link_city_blocks_to_highways(self) -> None:
         """Tries to link city blocks to highways for building generation.
 

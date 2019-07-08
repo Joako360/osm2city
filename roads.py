@@ -144,7 +144,7 @@ def _is_processed_railway(way):
     return False
 
 
-def is_lit(tags: Dict[str, str]) -> bool:
+def _is_lit(tags: Dict[str, str]) -> bool:
     if s.K_LIT in tags and tags[s.K_LIT] == s.V_YES:
         return True
     return False
@@ -185,8 +185,8 @@ def _compatible_ways(way1: op.Way, way2: op.Way) -> bool:
             logging.debug("Nope, both must be of same highway type")
             return False
         # check lit
-        highway_lit1 = is_lit(way1.tags)
-        highway_lit2 = is_lit(way2.tags)
+        highway_lit1 = _is_lit(way1.tags)
+        highway_lit2 = _is_lit(way2.tags)
         if highway_lit1 != highway_lit2:
             return False
     elif op.is_railway(way1) and op.is_railway(way2):
@@ -415,12 +415,14 @@ class Roads(object):
                 logging.warning('Removing way with osm_id=%i due to only %i nodes after %s', way.osm_id, len(way.refs), where)
                 self.ways_list.remove(way)
 
-    def process(self, blocked_areas: List[shg.Polygon], lit_areas: List[shg.Polygon], stats: utilities.Stats) -> None:
+    def process(self, blocked_areas: List[shg.Polygon], lit_areas: List[shg.Polygon], water_areas: List[shg.Polygon],
+                stats: utilities.Stats) -> None:
         """Processes the OSM data until data can be clusterised.
         """
         self._remove_tunnels()
         self._replace_short_bridges_with_ways()
-        self._check_ways_in_water()
+        self._check_against_blocked_areas(water_areas, True)
+        self._check_ways_sanity('_check_against_blocked_areas_water')
         self._check_against_blocked_areas(blocked_areas)
         self._check_ways_sanity('_check_against_blocked_areas')
         self._check_lighting(lit_areas)
@@ -441,70 +443,15 @@ class Roads(object):
 
         self._clusterize(stats)
 
-    def _check_ways_in_water(self) -> None:
-        """Checks whether a way or parts of a way is in water and removes those parts.
-        Water in relation to the FlightGear scenery, not OSM data (can be different).
-        Bridges and replaced bridges need to be kept.
-        It does performance wise not matter, that _probe_elev_at_nodes also checks the scenery as stuff is cached."""
-        extra_ways = list()  # new ways to be added based on split ways
-        removed_ways = list()  # existing ways to be removed because at most one node outside of water
-        for way in self.ways_list:
-            if _is_bridge(way) or _is_replaced_bridge(way):
-                continue
-            current_part_refs = list()
-            list_of_parts = [current_part_refs]  # a list of "current_parts". A way is split in parts if there is water
-            node_refs_in_water = list()
-            for ref in way.refs:
-                the_node = self.nodes_dict[ref]
-                if self.fg_elev.probe_solid(Vec2d(the_node.lon, the_node.lat), is_global=True):
-                    current_part_refs.append(ref)
-                else:
-                    current_part_refs = list()
-                    list_of_parts.append(current_part_refs)
-                    node_refs_in_water.append(ref)
-
-            if not node_refs_in_water:  # all on land - just continue
-                continue
-            elif len(node_refs_in_water) == 1 and len(way.refs) > 2:  # only 1 point in water for way with 2+ nodes
-                if way.refs[0] is not node_refs_in_water[0] and way.refs[-1] is not node_refs_in_water[0]:
-                    if logging.getLogger().isEnabledFor(logging.DEBUG):
-                        my_string = """Accepting way with only 1 point in water at odm_id = {};
-                         first node = {}, last node = {}, removed node {}"""
-                        logging.debug(my_string.format(way.osm_id, way.refs[0], way.refs[-1], node_refs_in_water[0]))
-                    continue  # only 1 point somewhere in the middle is accepted
-
-            whole_way_found = False
-            for part_refs in list_of_parts:
-                if len(part_refs) < 2:
-                    continue
-                else:
-                    if not whole_way_found:  # let us re-use the existing way
-                        whole_way_found = True
-                        way.refs = part_refs
-                        logging.debug("Shortening existing way partly in water - osm_id = {}".format(way.osm_id))
-                    else:
-                        new_way = _init_way_from_existing(way, part_refs)
-                        extra_ways.append(new_way)
-                        logging.debug("Adding new way from partly in water - osm_id = {}".format(way.osm_id))
-            if not whole_way_found:
-                removed_ways.append(way)
-                logging.debug("Removing way because in water - osm_id = {}".format(way.osm_id))
-
-        # update ways list
-        for way in removed_ways:
-            try:
-                self.ways_list.remove(way)
-            except ValueError as e:
-                logging.warning("Unable to remove way with osm_id = {}".format(way.osm_id))
-        self.ways_list.extend(extra_ways)
-
-    def _check_against_blocked_areas(self, blocked_areas: List[shg.Polygon]) -> None:
+    def _check_against_blocked_areas(self, blocked_areas: List[shg.Polygon], is_water: bool = False) -> None:
         """Makes sure that there are no ways, which go across a blocked area (e.g. airport runway).
         Ways are clipped over into two ways if intersecting. If they are contained, then they are removed."""
         if not blocked_areas:
             return
         new_ways = list()
         for way in reversed(self.ways_list):
+            if is_water and (_is_bridge(way) or _is_replaced_bridge(way)):
+                continue
             my_list = [way]
             continue_loop = True
             while continue_loop and my_list:
@@ -577,7 +524,7 @@ class Roads(object):
             if not _is_highway(way):
                 non_highway += 1
                 continue
-            if is_lit(way.tags):
+            if _is_lit(way.tags):
                 orig_lit += 1
                 continue  # nothing further to do with this way
 
@@ -1206,7 +1153,7 @@ class Roads(object):
             the_object.cluster_ref = cluster_ref
 
 
-def process_osm_ways(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, op.Way]) -> List[op.Way]:
+def _process_osm_ways(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, op.Way]) -> List[op.Way]:
     """Processes the values returned from OSM and does a bit of filtering.
     Transformation to roads, railways and bridges is only done later in Roads.process()."""
     my_ways = list()
@@ -1298,7 +1245,7 @@ def _process_additional_blocked_areas(coords_transform: coordinates.Transformati
 
 
 def process_roads(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
-                  blocked_areas: List[shg.Polygon], lit_areas: List[shg.Polygon],
+                  blocked_areas: List[shg.Polygon], lit_areas: List[shg.Polygon], water_areas: List[shg.Polygon],
                   stg_entries: List[stg_io2.STGEntry], file_lock: mp.Lock = None) -> None:
     random.seed(42)
     stats = utilities.Stats()
@@ -1309,7 +1256,7 @@ def process_roads(coords_transform: coordinates.Transformation, fg_elev: utiliti
     the_blocked_areas = _process_additional_blocked_areas(coords_transform, stg_entries, blocked_areas)
 
     logging.info("Number of ways before basic processing: %i", len(osm_ways_dict))
-    filtered_osm_ways_list = process_osm_ways(osm_nodes_dict, osm_ways_dict)
+    filtered_osm_ways_list = _process_osm_ways(osm_nodes_dict, osm_ways_dict)
     logging.info("Number of ways after basic processing: %i", len(filtered_osm_ways_list))
     if not filtered_osm_ways_list:
         logging.info("No roads and railways found -> aborting")
@@ -1320,7 +1267,7 @@ def process_roads(coords_transform: coordinates.Transformation, fg_elev: utiliti
     path_to_output = parameters.get_output_path()
     logging.debug("before linear " + str(roads))
 
-    roads.process(the_blocked_areas, lit_areas, stats)  # does the heavy lifting incl. clustering
+    roads.process(the_blocked_areas, lit_areas, water_areas, stats)  # does the heavy lifting incl. clustering
 
     stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.roads, OUR_MAGIC, parameters.PREFIX)
 

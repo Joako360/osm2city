@@ -813,6 +813,7 @@ def _sanitize_building_zones(building_zones: List[m.BuildingZone], text: str) ->
 
 
 def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> Tuple[Optional[List[Polygon]],
+                                                                                     Optional[List[Polygon]],
                                                                                      Optional[List[bl.Building]]]:
     last_time = time.time()
 
@@ -821,6 +822,7 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     # =========== TRY TO READ CACHED DATA FIRST =======
     tile_index = parameters.get_tile_index()
     cache_file_la = str(tile_index) + '_lit_areas.pkl'
+    cache_file_wa = str(tile_index) + '_water_areas.pkl'
     cache_file_bz = str(tile_index) + '_buildings.pkl'
     if parameters.OWBB_LANDUSE_CACHE:
         try:
@@ -828,10 +830,14 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
                 lit_areas = pickle.load(file_pickle)
             logging.info('Successfully loaded %i objects from %s', len(lit_areas), cache_file_la)
 
+            with open(cache_file_wa, 'rb') as file_pickle:
+                water_areas = pickle.load(file_pickle)
+            logging.info('Successfully loaded %i objects from %s', len(water_areas), cache_file_wa)
+
             with open(cache_file_bz, 'rb') as file_pickle:
                 osm_buildings = pickle.load(file_pickle)
             logging.info('Successfully loaded %i objects from %s', len(osm_buildings), cache_file_bz)
-            return lit_areas, osm_buildings
+            return lit_areas, water_areas, osm_buildings
         except (IOError, EOFError) as reason:
             logging.info("Loading of cache %s or %s failed (%s)", cache_file_la, cache_file_bz, reason)
 
@@ -854,7 +860,7 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     # =========== READ LAND-USE DATA FROM FLIGHTGEAR BTG-FILES =============
     btg_reader = _read_btg_file(transformer)
     btg_building_zones = list()
-    btg_water_areas = list()
+    water_areas = list()
 
     if btg_reader is None:
         if len(osm_buildings) + len(highways_dict) + len(railways_dict) > 0:
@@ -867,13 +873,13 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
 
         btg_polygons = _process_polygons_from_btg_faces(btg_reader, btg.WATER_MATERIALS, transformer)
         btg_transport = _process_polygons_from_btg_faces(btg_reader, btg.TRANSPORT_MATERIALS, transformer, False)
-        btg_water_areas = _merge_btg_transport_in_water(btg_polygons, btg_transport)
+        water_areas = _merge_btg_transport_in_water(btg_polygons, btg_transport)
         last_time = time_logging("Time used in seconds for processing BTG water polygons", last_time)
-        logging.info('Final count of BTG water polygons is: %i', len(btg_water_areas))
+        logging.info('Final count of BTG water polygons is: %i', len(water_areas))
 
-        if btg_water_areas:
-            _remove_osm_buildings_in_water(osm_buildings, btg_water_areas)
-            _reduce_building_zones_with_btg_water(building_zones, btg_water_areas)
+        if water_areas:
+            _remove_osm_buildings_in_water(osm_buildings, water_areas)
+            _reduce_building_zones_with_btg_water(building_zones, water_areas)
 
     if btg_building_zones:
         _extend_osm_building_zones_with_btg_zones(building_zones, btg_building_zones)
@@ -883,7 +889,7 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     if len(building_zones) == 0 and len(osm_buildings) == 0 and len(highways_dict) == 0 and len(railways_dict) == 0:
         logging.info('No zones, buildings and highways/railways in tile = %i', tile_index)
         # there is no need to save a cache, so just do nothing
-        return None, None
+        return None, None, None
 
     # =========== GENERATE ADDITIONAL LAND-USE ZONES FOR AND/OR FROM BUILDINGS =============
     buildings_outside = list()  # buildings outside of OSM buildings zones
@@ -958,7 +964,7 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     # =========== FINALIZE Land-use PROCESSING =============================================
     if parameters.DEBUG_PLOT_LANDUSE:
         logging.info('Start of plotting zones')
-        plotting.draw_zones(osm_buildings, building_zones, btg_building_zones, btg_water_areas, lit_areas, bounds)
+        plotting.draw_zones(osm_buildings, building_zones, btg_building_zones, water_areas, lit_areas, bounds)
         time_logging("Time used in seconds for plotting", last_time)
 
     # =========== Now generate buildings if asked for ======================================
@@ -972,10 +978,13 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     # =========== WRITE TO CACHE AND RETURN
     if parameters.OWBB_LANDUSE_CACHE:
         try:
-
             with open(cache_file_la, 'wb') as file_pickle:
                 pickle.dump(lit_areas, file_pickle)
             logging.info('Successfully saved %i objects to %s', len(lit_areas), cache_file_la)
+
+            with open(cache_file_wa, 'wb') as file_pickle:
+                pickle.dump(water_areas, file_pickle)
+            logging.info('Successfully saved %i objects to %s', len(water_areas), cache_file_wa)
 
             with open(cache_file_bz, 'wb') as file_pickle:
                 pickle.dump(osm_buildings, file_pickle)
@@ -983,4 +992,4 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
         except (IOError, EOFError) as reason:
             logging.info("Saving of cache %s or %s failed (%s)", cache_file_la, cache_file_bz, reason)
 
-    return lit_areas, osm_buildings
+    return lit_areas, water_areas, osm_buildings
