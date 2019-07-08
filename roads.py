@@ -903,8 +903,6 @@ class Roads(object):
         """
         self.G = graph.Graph()
 
-        priority = 0  # Used both to indicate whether it should be drawn and the priority when crossing
-
         for the_way in self.ways_list:
             if _is_highway(the_way):
                 highway_type = highway_type_from_osm_tags(the_way.tags[s.K_HIGHWAY])
@@ -919,13 +917,10 @@ class Roads(object):
                 elif the_way.tags[s.K_RAILWAY] in [s.V_NARROW_GAUGE]:
                     priority = 19
                     tex = textures.road.TRACK  # FIXME: should use proper texture
-                elif the_way.tags[s.K_RAILWAY] in [s.V_TRAM, s.V_LIGHT_RAIL]:
+                else:  # in [s.V_TRAM, s.V_LIGHT_RAIL] -> cf. VALID_RAILWAYS incl. parameter extension
                     priority = 18
                     tex = textures.road.TRAMWAY
-                else:
-                    priority = 0  # E.g. monorail, miniature
-                if priority > 0:
-                    width = _calc_railway_gauge(the_way)
+                width = _calc_railway_gauge(the_way)
             else:
                 continue
 
