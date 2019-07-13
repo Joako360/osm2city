@@ -410,9 +410,9 @@ def _merge_btg_transport_in_water(water_polys: Dict[str, List[Polygon]],
             acqua_poly = None
             for acqua_poly in acqua_list:
                 if prep_poly.intersects(acqua_poly):
-                    geom = acqua_poly.intersection(prep_poly)
+                    geom = acqua_poly.intersection(poly)
                     if isinstance(geom, LineString):
-                        merged_poly = acqua_poly.union(prep_poly)
+                        merged_poly = acqua_poly.union(poly)
                         break
             if merged_poly:
                 acqua_list.remove(acqua_poly)

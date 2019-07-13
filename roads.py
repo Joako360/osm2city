@@ -835,10 +835,11 @@ class Roads(object):
 
         # create a dict referencing for every node for those ways, which are using this node in their references
         # key = node ref, value = List((way, pos)), where pos=-1 for start, pos=0 for inner, pos=1 for end
-        attached_ways_dict = _find_junctions(self.ways_list)
+        # TODO: why do we previously even split ways at inner?
+        # attached_ways_dict = _find_junctions(self.ways_list)
 
         # split ways where a node not being at start or end is referenced by another way
-        self._split_ways_at_inner_junctions(attached_ways_dict)
+        # self._split_ways_at_inner_junctions(attached_ways_dict)
 
         # do it again, because the references and positions have changed
         attached_ways_dict = _find_junctions(self.ways_list)
@@ -934,18 +935,18 @@ class Roads(object):
             # The reason to include the type is that when (highways) are crossing, then the higher level way
             # should have priority in visibility.
             # In earlier code the following was added to give some variance: random.uniform(0.01, 0.1)
-            above_ground_level = parameters.MIN_ABOVE_GROUND_LEVEL + 0.005*priority
+            above_ground_level = parameters.MIN_ABOVE_GROUND_LEVEL + parameters.DISTANCE_BETWEEN_LAYERS * priority
 
             try:
                 if _is_bridge(the_way):
                     obj = linear_bridge.LinearBridge(self.transform, self.fg_elev, the_way.osm_id,
                                                      the_way.tags, the_way.refs, self.nodes_dict,
-                                                     width, above_ground_level, tex=tex)
+                                                     width, above_ground_level, tex_coords=tex)
                     self.bridges_list.append(obj)
                 else:
                     obj = linear.LinearObject(self.transform, the_way.osm_id,
                                               the_way.tags, the_way.refs,
-                                              self.nodes_dict, width, above_ground_level, tex=tex)
+                                              self.nodes_dict, width, above_ground_level, tex_coords=tex)
                     if op.is_railway(the_way):
                         self.railway_list.append(obj)
                     else:

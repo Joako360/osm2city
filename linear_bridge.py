@@ -8,12 +8,14 @@ TODO: linear deck: limit slope
 """
 import numpy as np
 import scipy.interpolate
+from typing import Dict
 
 import linear
 import parameters
 import textures.road
 from utils.utilities import FGElev
 import utils.ac3d
+import utils.osmparser as op
 
 
 class DeckShapeLinear(object):
@@ -45,9 +47,9 @@ class DeckShapePoly(object):
 
 
 class LinearBridge(linear.LinearObject):
-    def __init__(self, transform, fg_elev: FGElev, osm_id, tags, refs, nodes_dict, width: float,
-                 above_ground_level: float, tex=textures.road.EMBANKMENT_2):
-        super().__init__(transform, osm_id, tags, refs, nodes_dict, width, above_ground_level, tex)
+    def __init__(self, transform, fg_elev: FGElev, osm_id: int, tags, refs, nodes_dict: Dict[int, op.Node],
+                 width: float, above_ground_level: float, tex_coords: float = textures.road.EMBANKMENT_2):
+        super().__init__(transform, osm_id, tags, refs, nodes_dict, width, above_ground_level, tex_coords)
         # -- prepare elevation spline
         #    probe elev at n_probes locations
         n_probes = max(int(self.center.length / 5.), 3)
@@ -57,7 +59,7 @@ class LinearBridge(linear.LinearObject):
             local_point = self.center.interpolate(l, normalized=True)
             elevs[i] = fg_elev.probe_elev(local_point.coords[0])  # fixme: have elev do the transform?
         self.elev_spline = scipy.interpolate.interp1d(probe_locations_nondim, elevs)
-        self.prep_height(nodes_dict, fg_elev)
+        self._prep_height(nodes_dict, fg_elev)
 
         # properties
         self.pillar_r0 = 0.
@@ -65,13 +67,13 @@ class LinearBridge(linear.LinearObject):
         self.pillar_nnodes = 0
         # self.deck_shape_poly = None
 
-    def elev(self, l, normalized: bool = True):
+    def _elev(self, l, normalized: bool = True):
         """given linear distance [m], interpolate and return terrain elevation"""
         if not normalized:
             l /= self.center.length
         return self.elev_spline(l)
 
-    def prep_height(self, nodes_dict, fg_elev: FGElev):
+    def _prep_height(self, nodes_dict, fg_elev: FGElev):
         """Preliminary deck shape depending on elevation. Write required h_add to end nodes"""
         # deck slope more or less continuous!
         # d2z/dx2 limit
@@ -100,7 +102,7 @@ class LinearBridge(linear.LinearObject):
         node0 = nodes_dict[self.refs[0]]
         node1 = nodes_dict[self.refs[-1]]
 
-        MSL_mid = self.elev([0.5])  # FIXME: use elev interpolator instead?
+        MSL_mid = self._elev([0.5])  # FIXME: use elev interpolator instead?
         
         MSL = np.array([fg_elev.probe_elev(the_node) for the_node in self.center.coords])
 
@@ -138,7 +140,7 @@ class LinearBridge(linear.LinearObject):
 
         h_add = np.maximum(deck_MSL - MSL, np.zeros_like(deck_MSL))
         
-        left_z, right_z, h_add = self.level_out(fg_elev, h_add)
+        left_z, right_z, h_add = self._level_out(fg_elev, h_add)
         deck_MSL = MSL + h_add
             
         self.deck_shape_poly = DeckShapeLinear(deck_MSL[0], deck_MSL[-1])
@@ -146,13 +148,13 @@ class LinearBridge(linear.LinearObject):
         node0.h_add = h_add[0]
         node1.h_add = h_add[-1]
 
-    def deck_height(self, l: float, normalized: bool=True):
+    def _deck_height(self, l: float, normalized: bool = True):
         """given linear distance [m], interpolate and return deck height"""
         if not normalized and self.center.length != 0:
             l /= self.center.length
         return self.deck_shape_poly(l)
 
-    def pillar(self, obj: utils.ac3d.Object, x, y, h0, h1, angle):
+    def _pillar(self, obj: utils.ac3d.Object, x, y, h0, h1, angle):
         self.pillar_r0 = 1.
         self.pillar_r1 = 0.5
         self.pillar_nnodes = 8
@@ -207,48 +209,48 @@ class LinearBridge(linear.LinearObject):
         - deck elev
         -
         """
-        n_nodes = len(self.edge[0].coords)
+        n_nodes = len(self.left.coords)
         # -- deck height
         z = np.zeros(n_nodes)
         l = 0.
         for i in range(n_nodes):
-            z[i] = self.deck_height(l, normalized=False) + self.AGL
+            z[i] = self._deck_height(l, normalized=False) + self.AGL
             l += self.segment_len[i]
             
-        left_top_nodes = self.write_nodes(obj, self.edge[0], z, elev_offset,
-                                          offset, join=True, is_left=True)
-        right_top_nodes = self.write_nodes(obj, self.edge[1], z, elev_offset,
-                                           offset, join=True, is_left=False)
+        left_top_nodes = self._write_nodes(obj, self.left, z, elev_offset,
+                                           offset, join=True, is_left=True)
+        right_top_nodes = self._write_nodes(obj, self.right, z, elev_offset,
+                                            offset, join=True, is_left=False)
                                            
-        left_bottom_edge, right_bottom_edge = self.compute_offset(self.width/2 * 0.85)
-        left_bottom_nodes = self.write_nodes(obj, left_bottom_edge, z-parameters.BRIDGE_BODY_HEIGHT,
-                                             elev_offset, offset)
-        right_bottom_nodes = self.write_nodes(obj, right_bottom_edge, z-parameters.BRIDGE_BODY_HEIGHT, 
+        left_bottom_edge, right_bottom_edge = self._compute_offset(self.width / 2 * 0.85)
+        left_bottom_nodes = self._write_nodes(obj, left_bottom_edge, z - parameters.BRIDGE_BODY_HEIGHT,
                                               elev_offset, offset)
+        right_bottom_nodes = self._write_nodes(obj, right_bottom_edge, z - parameters.BRIDGE_BODY_HEIGHT,
+                                               elev_offset, offset)
         # -- top
         mat_idx = utils.ac3d.MAT_IDX_UNLIT
         if 'lit' in self.tags and self.tags['lit'] == 'yes':
             mat_idx = utils.ac3d.MAT_IDX_LIT
-        self.write_quads(obj, left_top_nodes, right_top_nodes, self.tex[0], self.tex[1], mat_idx)
+        self._write_quads(obj, left_top_nodes, right_top_nodes, self.tex_coords[0], self.tex_coords[1], mat_idx)
         
         # -- right
-        self.write_quads(obj, right_top_nodes, right_bottom_nodes, textures.road.BRIDGE_1[1], textures.road.BRIDGE_1[0],
-                         utils.ac3d.MAT_IDX_UNLIT)
+        self._write_quads(obj, right_top_nodes, right_bottom_nodes, textures.road.BRIDGE_1[1], textures.road.BRIDGE_1[0],
+                          utils.ac3d.MAT_IDX_UNLIT)
         
         # -- left
-        self.write_quads(obj, left_bottom_nodes, left_top_nodes, textures.road.BRIDGE_1[0], textures.road.BRIDGE_1[1],
-                         utils.ac3d.MAT_IDX_UNLIT)
+        self._write_quads(obj, left_bottom_nodes, left_top_nodes, textures.road.BRIDGE_1[0], textures.road.BRIDGE_1[1],
+                          utils.ac3d.MAT_IDX_UNLIT)
 
         # -- bottom
-        self.write_quads(obj, right_bottom_nodes, left_bottom_nodes, textures.road.BOTTOM[0], textures.road.BOTTOM[1],
-                         utils.ac3d.MAT_IDX_UNLIT)
+        self._write_quads(obj, right_bottom_nodes, left_bottom_nodes, textures.road.BOTTOM[0], textures.road.BOTTOM[1],
+                          utils.ac3d.MAT_IDX_UNLIT)
 
         # -- end wall 1
-        the_node = self.edge[0].coords[0]
+        the_node = self.left.coords[0]
         e = fg_elev.probe_elev(the_node) - elev_offset
         left_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 
-        the_node = self.edge[1].coords[0]
+        the_node = self.right.coords[0]
         e = fg_elev.probe_elev(the_node) - elev_offset
         right_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 
@@ -259,11 +261,11 @@ class LinearBridge(linear.LinearObject):
         obj.face(face)
 
         # -- end wall 2
-        the_node = self.edge[0].coords[-1]
+        the_node = self.left.coords[-1]
         e = fg_elev.probe_elev(the_node) - elev_offset
         left_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 
-        the_node = self.edge[1].coords[-1]
+        the_node = self.right.coords[-1]
         e = fg_elev.probe_elev(the_node) - elev_offset
         right_bottom_node = obj.node(-(the_node[1] - offset.y), e, -(the_node[0] - offset.x))
 
@@ -278,4 +280,4 @@ class LinearBridge(linear.LinearObject):
         for i in range(1, n_nodes-1):
             z0 = fg_elev.probe_elev(self.center.coords[i]) - elev_offset - 1.
             point = self.center.coords[i]
-            self.pillar(obj, point[0]-offset.x, point[1]-offset.y, z0, z[i], self.angle[i])
+            self._pillar(obj, point[0] - offset.x, point[1] - offset.y, z0, z[i], self.angle[i])
