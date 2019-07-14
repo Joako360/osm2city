@@ -453,6 +453,7 @@ class Roads(object):
         new_ways = list()
         for way in reversed(self.ways_list):
             if is_water and (_is_bridge(way) or _is_replaced_bridge(way)):
+                new_ways.append(way)
                 continue
             my_list = [way]
             continue_loop = True

@@ -95,6 +95,7 @@ def _reduce_building_zones_with_btg_water(building_zones: List[m.BuildingZone], 
                             if is_first:
                                 building_zone.geometry = poly
                                 parts.append(building_zone)
+                                is_first = False
                             else:
                                 new_zone = m.BuildingZone(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse), poly,
                                                           building_zone.type_)
@@ -317,6 +318,7 @@ def _process_polygons_from_btg_faces(btg_reader: btg.BTGReader, materials: List[
     disjoint = 0
     accepted = 0
     counter = 0
+    merged_counter = 0
 
     for key, faces_list in btg_reader.faces.items():
         if key in materials:
@@ -353,12 +355,16 @@ def _process_polygons_from_btg_faces(btg_reader: btg.BTGReader, materials: List[
             # smaller than parameters.OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA
             if merge_polys:
                 merged_list = merge_buffers(temp_polys)
+                merged_counter += len(merged_list)
                 btg_polys[key] = merged_list
             else:
                 btg_polys[key] = temp_polys
 
     logging.debug('Out of %i faces %i were disjoint and %i were accepted with the bounds.',
                   counter, disjoint, accepted)
+    logging.info('Number of polygons found: %i. Used materials: %s', counter, str(materials))
+    if merge_polys:
+        logging.info('These were reduced to %i polygons', merged_counter)
     return btg_polys
 
 
@@ -425,7 +431,7 @@ def _remove_osm_buildings_in_water(osm_buildings: List[bl.Building], btg_water_a
     for water_area in btg_water_areas:
         prep_geom = prep(water_area)
         for building in reversed(osm_buildings):
-            if prep_geom.contains_properly or prep_geom.intersects(building.geometry):
+            if prep_geom.contains_properly(building.geometry) or prep_geom.intersects(building.geometry):
                 counter += 1
                 osm_buildings.remove(building)
                 if building.has_parent:
@@ -877,9 +883,8 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
         last_time = time_logging("Time used in seconds for processing BTG water polygons", last_time)
         logging.info('Final count of BTG water polygons is: %i', len(water_areas))
 
-        if water_areas:
-            _remove_osm_buildings_in_water(osm_buildings, water_areas)
-            _reduce_building_zones_with_btg_water(building_zones, water_areas)
+    if water_areas:
+        _remove_osm_buildings_in_water(osm_buildings, water_areas)
 
     if btg_building_zones:
         _extend_osm_building_zones_with_btg_zones(building_zones, btg_building_zones)
@@ -910,6 +915,10 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     last_time = time_logging("Time used in seconds for generating building zones", last_time)
 
     _count_zones_related_buildings(osm_buildings, 'after generating zones from buildings')
+
+    # =========== Finally make sure that no land-use is in water ========================
+    if water_areas:
+        _reduce_building_zones_with_btg_water(building_zones, water_areas)
 
     # =========== CREATE POLYGONS FOR LIGHTING OF STREETS ================================
     # Needs to be before finding city blocks as we need the boundary

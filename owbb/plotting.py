@@ -50,7 +50,7 @@ def _set_ax_limits(ax: maxs.Axes, x_min: float, x_max:  float, y_min: float, y_m
     h = y_max - y_min
     ax.set_xlim(x_min - 0.2*w, x_max + 0.2*w)
     ax.set_ylim(y_min - 0.2*h, y_max + 0.2*h)
-    ax.set_aspect(1)
+    ax.set_aspect('equal')
 
 
 def _draw_highways(highways_dict, ax: maxs.Axes) -> None:
@@ -298,10 +298,18 @@ def draw_zones(buildings: List[bl.Building], building_zones: List[m.BuildingZone
     _set_ax_limits_from_bounds(ax, bounds)
     pdf_pages.savefig(my_figure)
 
+    # Only water from BTG
+    my_figure = _create_a3_landscape_figure()
+    my_figure.suptitle("Water from FlightGear BTG files")
+    ax = my_figure.add_subplot(111)
+    _draw_btg_water_areas(btg_water_areas, ax)
+    _set_ax_limits_from_bounds(ax, bounds)
+    pdf_pages.savefig(my_figure)
+
     # External land use from BTG
     if btg_building_zones:
         my_figure = _create_a3_landscape_figure()
-        my_figure.suptitle("Land-use types from FlightGear BTG Files \n[magenta=builtupcover and urban, \
+        my_figure.suptitle("Land-use types from FlightGear BTG files \n[magenta=builtupcover and urban, \
 gold=town and suburban, yellow=construction and industrial and port, light blue=water]")
         ax = my_figure.add_subplot(111)
         ax.grid(True, linewidth=1, linestyle="--", color="silver")
