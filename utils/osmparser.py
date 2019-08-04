@@ -343,14 +343,6 @@ def is_parsable_int(str_int: str) -> bool:
         return False
 
 
-def is_railway(way: Way) -> bool:
-    return has_railway_tag(way.tags)
-
-
-def has_railway_tag(tags: Dict[str, str]) -> bool:
-    return s.K_RAILWAY in tags
-
-
 def _parse_hstore_tags(tags_string: str, osm_id: int) -> Dict[str, str]:
     """Parses the content of a string representation of a PostGIS hstore content for tags.
     Returns a dict of key value pairs as string."""

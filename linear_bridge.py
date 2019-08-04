@@ -49,7 +49,7 @@ class DeckShapePoly(object):
 
 class LinearBridge(linear.LinearObject):
     def __init__(self, transform, fg_elev: FGElev, osm_id, tags, refs, nodes_dict: Dict[int, op.Node], width: float,
-                 above_ground_level: float, tex_coords: Tuple[float] = textures.road.EMBANKMENT_2):
+                 above_ground_level: float, tex_coords: Tuple[float, float] = textures.road.EMBANKMENT_2):
         super().__init__(transform, osm_id, tags, refs, nodes_dict, width, above_ground_level, tex_coords)
         # -- prepare elevation spline
         #    probe elev at n_probes locations

@@ -71,7 +71,7 @@ class LinearObject(object):
     """
 
     def __init__(self, transform, osm_id: int, tags: Dict[str, str], refs: List[int], nodes_dict:  Dict[int, op.Node],
-                 width: float, above_ground_level: float, tex_coords: Tuple[float] = textures.road.EMBANKMENT_1):
+                 width: float, above_ground_level: float, tex_coords: Tuple[float, float] = textures.road.EMBANKMENT_1):
         self.width = width
         self.AGL = above_ground_level  # drape distance above terrain
         self.osm_id = osm_id

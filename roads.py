@@ -100,6 +100,10 @@ from utils.vec2d import Vec2d
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 
 
+def is_tunnel(tags: Dict[str, str]) -> bool:
+    return s.K_TUNNEL in tags and tags[s.K_TUNNEL] not in [s.V_NO]
+
+
 REPLACED_BRIDGE_KEY = 'replaced_bridge'  # specifies a way that was originally a bridge, but due to length was changed
 MIN_SEGMENT_LENGTH = 1.0
 
@@ -126,49 +130,24 @@ def _is_replaced_bridge(way: op.Way) -> bool:
     return REPLACED_BRIDGE_KEY in way.tags
 
 
-VALID_RAILWAYS = [s.V_RAIL, s.V_DISUSED, s.V_PRESERVED, s.V_SUBWAY, s.V_NARROW_GAUGE, s.V_LIGHT_RAIL]
-if parameters.USE_TRAM_LINES:
-    VALID_RAILWAYS.append(s.V_TRAM)
-
-
-def _is_processed_railway(way):
-    """Check whether this is not only a railway, but one that gets processed.
-
-    E.g. funiculars are currently not processed.
-    Must be aligned with accepted railways in Roads._create_linear_objects.
-    """
-    if not op.is_railway(way):
-        return False
-    if way.tags[s.K_RAILWAY] in VALID_RAILWAYS:
-        return True
-    return False
-
-
 def _is_lit(tags: Dict[str, str]) -> bool:
     if s.K_LIT in tags and tags[s.K_LIT] == s.V_YES:
         return True
     return False
 
 
-def _calc_railway_gauge(way) -> float:
-    """Based on railway tags determine the width in meters (3.18 meters for normal gauge)."""
-    width = 1435  # millimeters
-    if way.tags[s.K_RAILWAY] in [s.V_NARROW_GAUGE]:
-        width = 1000
-    if s.K_GAUGE in way.tags:
-        if op.is_parsable_float(way.tags[s.K_GAUGE]):
-            width = float(way.tags[s.K_GAUGE])
-    return width / 1000 * 126 / 57  # in the texture roads.png the track uses 57 out of 126 pixels
-
-
-def _is_highway(way):
+def _is_highway(way: op.Way) -> bool:
     return s.K_HIGHWAY in way.tags
+
+
+def is_railway(way: op.Way) -> bool:
+    return s.K_RAILWAY in way.tags
 
 
 def _compatible_ways(way1: op.Way, way2: op.Way) -> bool:
     """Returns True if both ways are either a railway, a bridge or a highway - and have common type attributes"""
     logging.debug("trying join %i %i", way1.osm_id, way2.osm_id)
-    if op.is_railway(way1) != op.is_railway(way2):
+    if is_railway(way1) != is_railway(way2):
         logging.debug("Nope, either both or none must be railway")
         return False
     elif _is_bridge(way1) != _is_bridge(way2):
@@ -179,8 +158,8 @@ def _compatible_ways(way1: op.Way, way2: op.Way) -> bool:
         return False
     elif _is_highway(way1) and _is_highway(way2):
         # check type
-        highway_type1 = highway_type_from_osm_tags(way1.tags[s.K_HIGHWAY])
-        highway_type2 = highway_type_from_osm_tags(way2.tags[s.K_HIGHWAY])
+        highway_type1 = highway_type_from_osm_tags(way1.tags)
+        highway_type2 = highway_type_from_osm_tags(way2.tags)
         if highway_type1 != highway_type2:
             logging.debug("Nope, both must be of same highway type")
             return False
@@ -189,7 +168,7 @@ def _compatible_ways(way1: op.Way, way2: op.Way) -> bool:
         highway_lit2 = _is_lit(way2.tags)
         if highway_lit1 != highway_lit2:
             return False
-    elif op.is_railway(way1) and op.is_railway(way2):
+    elif is_railway(way1) and is_railway(way2):
         if way1.tags[s.K_RAILWAY] != way2.tags[s.K_RAILWAY]:
             logging.debug("Nope, both must be of same railway type")
             return False
@@ -211,6 +190,56 @@ def _has_duplicate_nodes(refs):
             return True
 
 
+def _calc_railway_gauge(tags: Dict[str, str]) -> float:
+    """Based on railway tags determine the width in meters (3.18 meters for normal gauge)."""
+    width = 1435  # millimeters
+    if tags[s.K_RAILWAY] in [s.V_NARROW_GAUGE]:
+        width = 1000
+    if s.K_GAUGE in tags:
+        if op.is_parsable_float(tags[s.K_GAUGE]):
+            width = float(tags[s.K_GAUGE])
+    return width / 1000 * 126 / 57  # in the texture roads.png the track uses 57 out of 126 pixels
+
+
+@enum.unique
+class RailwayType(enum.IntEnum):
+    normal = 5
+    narrow = 3
+    light = 1
+
+
+def _get_railway_attributes(railway_type: RailwayType, tags: Dict[str, str]) -> Tuple[Tuple[float, float], float]:
+    if railway_type is RailwayType.normal:
+        tex = textures.road.TRACK
+    elif railway_type is RailwayType.narrow:
+        tex = textures.road.TRACK  # FIXME: should use proper narrow texture
+    else:
+        tex = textures.road.TRAMWAY
+    return tex, _calc_railway_gauge(tags)
+
+
+def railway_type_from_osm_tags(tags: Dict[str, str]) -> Optional[RailwayType]:
+    """Based on OSM tags deducts the RailwayType.
+    Returns None if not a highway are unknown value.
+    """
+    if s.K_RAILWAY in tags:
+        value = tags[s.K_RAILWAY]
+    else:
+        return None
+
+    if value in [s.V_RAIL, s.V_DISUSED, s.V_PRESERVED, s.V_SUBWAY]:
+        # disused != abandoned cf. https://wiki.openstreetmap.org/wiki/Key:abandoned:
+        return RailwayType.normal
+    elif value in [s.V_NARROW_GAUGE]:
+        return RailwayType.narrow
+    elif value in [s.V_LIGHT_RAIL]:
+        return RailwayType.light
+    elif parameters.USE_TRAM_LINES and value == s.V_TRAM:
+        return RailwayType.light
+    else:
+        return None
+
+
 @enum.unique
 class HighwayType(enum.IntEnum):
     motorway = 12
@@ -227,41 +256,40 @@ class HighwayType(enum.IntEnum):
     slow = 1  # cycle ways, tracks, footpaths etc
 
 
-def get_highway_attributes(highway_type: HighwayType) -> Tuple[int, Tuple[float, float], float]:
+def get_highway_attributes(highway_type: HighwayType) -> Tuple[Tuple[float, float], float]:
     """This must be aligned with HighwayType as well as textures.road and Roads.create_linear_objects."""
     if highway_type in [HighwayType.motorway]:
-        priority = 6  # highest of all, but should be 1 less than for railway
         tex = textures.road.ROAD_3
         width = 6.
     elif highway_type in [HighwayType.primary, HighwayType.trunk]:
-        priority = 5
         tex = textures.road.ROAD_2
         width = 6.
     elif highway_type in [HighwayType.secondary]:
-        priority = 4
         tex = textures.road.ROAD_2
         width = 6.
     elif highway_type in [HighwayType.tertiary, HighwayType.unclassified, HighwayType.road]:
-        priority = 3
         tex = textures.road.ROAD_1
         width = 6.
     elif highway_type in [HighwayType.residential, HighwayType.service]:
-        priority = 2
         tex = textures.road.ROAD_1
         width = 4.
     else:
-        priority = 1
         tex = textures.road.ROAD_1
         width = 4.
-    return priority, tex, width
+    return tex, width
 
 
-def highway_type_from_osm_tags(value: str) -> Optional[HighwayType]:
-    """Based on OSM tags deducts the HighWayType.
+def highway_type_from_osm_tags(tags: Dict[str, str]) -> Optional[HighwayType]:
+    """Based on OSM tags deducts the HighwayType.
     Returns None if not a highway are unknown value.
 
     FIXME: Shouldn't we also take care of "junction" and "roundabout"?
     """
+    if s.K_HIGHWAY in tags:
+        value = tags[s.K_HIGHWAY]
+    else:
+        return None
+
     if value in [s.V_MOTORWAY]:
         return HighwayType.motorway
     elif value in ["trunk"]:
@@ -852,7 +880,7 @@ class Roads(object):
     def _remove_tunnels(self):
         """Remove tunnels."""
         for the_way in reversed(self.ways_list):
-            if s.K_TUNNEL in the_way.tags:
+            if is_tunnel(the_way.tags):
                 self.ways_list.remove(the_way)
 
     def _replace_short_bridges_with_ways(self):
@@ -910,26 +938,17 @@ class Roads(object):
 
         for the_way in self.ways_list:
             if _is_highway(the_way):
-                highway_type = highway_type_from_osm_tags(the_way.tags[s.K_HIGHWAY])
+                highway_type = highway_type_from_osm_tags(the_way.tags)
                 # in method Roads.store_way smaller highways already got removed
 
-                priority, tex, width = get_highway_attributes(highway_type)
+                tex, width = get_highway_attributes(highway_type)
+                priority = highway_type.value
 
-            elif op.is_railway(the_way):
-                if the_way.tags[s.K_RAILWAY] in [s.V_RAIL, s.V_DISUSED, s.V_PRESERVED, s.V_SUBWAY]:
-                    priority = 20
-                    tex = textures.road.TRACK
-                elif the_way.tags[s.K_RAILWAY] in [s.V_NARROW_GAUGE]:
-                    priority = 19
-                    tex = textures.road.TRACK  # FIXME: should use proper texture
-                else:  # in [s.V_TRAM, s.V_LIGHT_RAIL] -> cf. VALID_RAILWAYS incl. parameter extension
-                    priority = 18
-                    tex = textures.road.TRAMWAY
-                width = _calc_railway_gauge(the_way)
+            elif is_railway(the_way):
+                railway_type = railway_type_from_osm_tags(the_way.tags)
+                tex, width = _get_railway_attributes(railway_type, the_way.tags)
+                priority = railway_type.value
             else:
-                continue
-
-            if priority == 0:
                 continue
 
             # The above the ground level determines how much the way will be hovering above the ground.
@@ -948,7 +967,7 @@ class Roads(object):
                     obj = linear.LinearObject(self.transform, the_way.osm_id,
                                               the_way.tags, the_way.refs,
                                               self.nodes_dict, width, above_ground_level, tex_coords=tex)
-                    if op.is_railway(the_way):
+                    if is_railway(the_way):
                         self.railway_list.append(obj)
                     else:
                         self.roads_list.append(obj)
@@ -1133,12 +1152,12 @@ class Roads(object):
         self.railways_clusters = ClusterContainer(lmin, lmax)
 
         for the_object in self.bridges_list + self.roads_list + self.railway_list:
-            if op.is_railway(the_object):
+            if is_railway(the_object):
                 cluster_ref = self.railways_clusters.append(Vec2d(the_object.center.centroid.coords[0]),
                                                             the_object, stats)
             else:
                 if _is_highway(the_object):
-                    if highway_type_from_osm_tags(the_object.tags[s.K_HIGHWAY]).value < parameters.HIGHWAY_TYPE_MIN_ROUGH_LOD:
+                    if highway_type_from_osm_tags(the_object.tags).value < parameters.HIGHWAY_TYPE_MIN_ROUGH_LOD:
                         cluster_ref = self.roads_clusters.append(Vec2d(the_object.center.centroid.coords[0]),
                                                                  the_object, stats)
                     else:
@@ -1162,13 +1181,14 @@ def _process_osm_ways(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, op.Wa
             continue
 
         if _is_highway(way):
-            highway_type = highway_type_from_osm_tags(way.tags[s.K_HIGHWAY])
+            highway_type = highway_type_from_osm_tags(way.tags)
             if highway_type is None:
                 continue
             elif highway_type.value < parameters.HIGHWAY_TYPE_MIN:
                 continue
-        elif op.is_railway(way):
-            if not _is_processed_railway(way):
+        elif is_railway(way):
+            railway_type = railway_type_from_osm_tags(way.tags)
+            if railway_type is None:
                 continue
 
         split_ways = op.split_way_at_boundary(nodes_dict, way, clipping_border, op.OSMFeatureType.road)

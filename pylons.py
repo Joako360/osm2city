@@ -231,13 +231,16 @@ def _create_drag_lift_in_osm_building() -> List[CableVertex]:
     return vertices
 
 
+RAIL_MAST_DIST = 1.95
+
+
 def _create_rail_power_vertices(direction_type) -> List[CableVertex]:
     if direction_type is PylonDirectionType.mirror:
-        vertices = [CableVertex(-1.95, 5.85),
-                    CableVertex(-1.95, 4.95, no_catenary=True)]
+        vertices = [CableVertex(-1*RAIL_MAST_DIST, 5.85),
+                    CableVertex(-1*RAIL_MAST_DIST, 4.95, no_catenary=True)]
     else:
-        vertices = [CableVertex(1.95, 5.85),
-                    CableVertex(1.95, 4.95, no_catenary=True)]
+        vertices = [CableVertex(RAIL_MAST_DIST, 5.85),
+                    CableVertex(RAIL_MAST_DIST, 4.95, no_catenary=True)]
     return vertices
 
 
@@ -971,9 +974,9 @@ class RailMast(SharedPylon):
 
 
 class RailLine(Line):
-    TYPE_RAILWAY_GAUGE_NARROW = 11
-    TYPE_RAILWAY_GAUGE_NORMAL = 12
+    """Used to create electrical lines.
 
+    No difference is made between normal and narrow gauges"""
     DEFAULT_MAST_DISTANCE = 60  # if this is changed then mast algorithm for radius below must be adapted
     OFFSET = 20  # the offset from end points
     MAX_DEVIATION = 1  # The distance the overhead line can be off from the center
@@ -981,7 +984,6 @@ class RailLine(Line):
 
     def __init__(self, osm_id):
         super().__init__(osm_id)
-        self.type_ = 0
         self.nodes = []  # RailNodes
         self.linear = None  # The LineaString of the line
 
@@ -990,9 +992,9 @@ class RailLine(Line):
         current_distance = 0  # the distance from the origin of the current mast
         my_length = self.linear.length  # omit recalculating length all the time
         # offset must be same as create_rail_power_vertices()
-        my_right_parallel = self.linear.parallel_offset(1.95, 'right', join_style=1)
+        my_right_parallel = self.linear.parallel_offset(-1*RAIL_MAST_DIST, 'right', join_style=1)
         my_right_parallel_length = my_right_parallel.length
-        my_left_parallel = self.linear.parallel_offset(1.95, 'left', join_style=1)
+        my_left_parallel = self.linear.parallel_offset(-1*RAIL_MAST_DIST, 'left', join_style=1)
         my_left_parallel_length = my_left_parallel.length
 
         # virtual start point
@@ -1112,33 +1114,30 @@ def _process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev,
 
     railway_candidates = list()
     for way_key, way in ways_dict.items():
-        if s.K_RAILWAY in way.tags:
+        if roads.is_railway(way):
+            railway_type = roads.railway_type_from_osm_tags(way.tags)
+            if railway_type is None:
+                continue
             split_ways = op.split_way_at_boundary(nodes_dict, way, clipping_border, op.OSMFeatureType.road)
             if split_ways:
                 railway_candidates.extend(split_ways)
 
     for way in railway_candidates:
         my_line = RailLine(way.osm_id)
-        is_railway = False
         is_electrified = False
         is_challenged = False
         for key in way.tags:
             value = way.tags[key]
             if s.K_RAILWAY == key:
-                if value == "rail":
-                    is_railway = True
-                    my_line.type_ = RailLine.TYPE_RAILWAY_GAUGE_NORMAL
-                elif value == "narrow_gauge":
-                    is_railway = True
-                    my_line.type_ = RailLine.TYPE_RAILWAY_GAUGE_NARROW
-                elif value == "abandoned":
+                railway_type = roads.railway_type_from_osm_tags(way.tags)
+                if railway_type is None:
                     is_challenged = True
             elif s.K_ELECTRIFIED == key:
-                if value in ("contact_line", s.V_YES):
+                if value in (s.V_CONTACT_LINE, s.V_YES):
                     is_electrified = True
-            elif (s.K_TUNNEL == key) and (s.V_YES == value):
+            elif roads.is_tunnel(way.tags):
                 is_challenged = True
-        if is_railway and is_electrified and (not is_challenged):
+        if is_electrified and (not is_challenged):
             # Process the Nodes
             for ref in way.refs:
                 if ref in nodes_dict:
@@ -1150,9 +1149,9 @@ def _process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev,
                     my_rail_node.elevation = fg_elev.probe_elev(vec2d.Vec2d(my_rail_node.lon, my_rail_node.lat), True)
                     for key in my_node.tags:
                         value = my_node.tags[key]
-                        if s.K_RAILWAY == key and "switch" == value:
+                        if s.K_RAILWAY == key and s.V_SWITCH == value:
                             my_rail_node.switch = True
-                        if s.K_RAILWAY == key and "buffer_stop" == value:
+                        if s.K_RAILWAY == key and s.V_BUFFER_STOP == value:
                             my_rail_node.buffer_stop = True
                     if my_rail_node.elevation != -9999:  # if elevation is -9999, then point is outside of boundaries
                         my_line.nodes.append(my_rail_node)
@@ -1696,8 +1695,8 @@ class Highway(LinearOSMFeature):
         self._lighting_type = HighwayLightingType.undefined
 
     def get_width(self) -> float:
-        highway_attributes = roads.get_highway_attributes(self.type_)
-        return highway_attributes[2]
+        _, width = roads.get_highway_attributes(self.type_)
+        return width
 
     @property
     def lit(self) -> bool:
@@ -1727,7 +1726,7 @@ def _process_osm_highway(nodes_dict, ways_dict, my_coord_transformator):
             value = way.tags[key]
             if s.K_HIGHWAY == key:
                 valid_highway = True
-                my_highway.type_ = roads.highway_type_from_osm_tags(value)
+                my_highway.type_ = roads.highway_type_from_osm_tags(way.tags)
                 if None is my_highway.type_:
                     valid_highway = False
             elif (s.K_TUNNEL == key) and (s.V_YES == value):
