@@ -108,11 +108,13 @@ REPLACED_BRIDGE_KEY = 'replaced_bridge'  # specifies a way that was originally a
 MIN_SEGMENT_LENGTH = 1.0
 
 
-def _is_bridge(way: op.Way) -> bool:
+def _is_bridge(tags: Dict[str, str]) -> bool:
     """Returns true if the tags for this way contains the OSM key for bridge."""
-    if s.K_MAN_MADE in way.tags and way.tags[s.K_MAN_MADE] == s.V_BRIDGE:
+    if s.K_MAN_MADE in tags and tags[s.K_MAN_MADE] == s.V_BRIDGE:
         return True
-    return s.K_BRIDGE in way.tags
+    if s.K_BRIDGE in tags and tags not in [s.V_NO]:
+        return True
+    return False
 
 
 def _replace_bridge_tags(tags: Dict[str, str]) -> None:
@@ -123,11 +125,11 @@ def _replace_bridge_tags(tags: Dict[str, str]) -> None:
     tags[REPLACED_BRIDGE_KEY] = s.V_YES
 
 
-def _is_replaced_bridge(way: op.Way) -> bool:
+def _is_replaced_bridge(tags: Dict[str, str]) -> bool:
     """Returns true is this way was originally a bridge, but was changed to a non-bridge due to length.
     See method Roads._replace_short_bridges_with_ways.
     The reason to keep a replaced_tag is because else the way might be split if a node is in the water."""
-    return REPLACED_BRIDGE_KEY in way.tags
+    return REPLACED_BRIDGE_KEY in tags
 
 
 def _is_lit(tags: Dict[str, str]) -> bool:
@@ -150,7 +152,7 @@ def _compatible_ways(way1: op.Way, way2: op.Way) -> bool:
     if is_railway(way1) != is_railway(way2):
         logging.debug("Nope, either both or none must be railway")
         return False
-    elif _is_bridge(way1) != _is_bridge(way2):
+    elif _is_bridge(way1.tags) != _is_bridge(way2.tags):
         logging.debug("Nope, either both or none must be a bridge")
         return False
     elif _is_highway(way1) != _is_highway(way2):
@@ -480,7 +482,7 @@ class Roads(object):
             return
         new_ways = list()
         for way in reversed(self.ways_list):
-            if is_water and (_is_bridge(way) or _is_replaced_bridge(way)):
+            if is_water and (_is_bridge(way.tags) or _is_replaced_bridge(way.tags)):
                 new_ways.append(way)
                 continue
             my_list = [way]
@@ -886,7 +888,7 @@ class Roads(object):
     def _replace_short_bridges_with_ways(self):
         """Remove bridge tag from short bridges, making them a simple way."""
         for the_way in self.ways_list:
-            if _is_bridge(the_way):
+            if _is_bridge(the_way.tags):
                 bridge = self._line_string_from_way(the_way)
                 if bridge.length < parameters.BRIDGE_MIN_LENGTH:
                     _replace_bridge_tags(the_way.tags)
@@ -958,7 +960,7 @@ class Roads(object):
             above_ground_level = parameters.MIN_ABOVE_GROUND_LEVEL + parameters.DISTANCE_BETWEEN_LAYERS * priority
 
             try:
-                if _is_bridge(the_way):
+                if _is_bridge(the_way.tags):
                     obj = linear_bridge.LinearBridge(self.transform, self.fg_elev, the_way.osm_id,
                                                      the_way.tags, the_way.refs, self.nodes_dict,
                                                      width, above_ground_level, tex_coords=tex)
