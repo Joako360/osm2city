@@ -437,13 +437,20 @@ class Roads(object):
         return "%i ways, %i roads, %i railways, %i bridges" % (len(self.ways_list), len(self.roads_list),
                                                                len(self.railway_list), len(self.bridges_list))
 
-    def _check_ways_sanity(self, where: str) -> None:
+    def _check_ways_sanity(self, prev_method_name: str) -> None:
         """Makes sure all ways have at least 2 nodes.
         If one is found with less nodes, it is discarded. Should not happen, but does."""
+        num_removed = 0
         for way in reversed(self.ways_list):
             if len(way.refs) < 2:
-                logging.warning('Removing way with osm_id=%i due to only %i nodes after %s', way.osm_id, len(way.refs), where)
+                logging.warning('Removing way with osm_id=%i due to only %i nodes after "%s"',
+                                way.osm_id, len(way.refs), prev_method_name)
                 self.ways_list.remove(way)
+                num_removed += 1
+        if num_removed > 0:
+            logging.info('Removed %i ways due to only 1 node after "%s"', num_removed, prev_method_name)
+        else:
+            logging.info('No ways with only one node after "%s"', prev_method_name)
 
     def process(self, blocked_areas: List[shg.Polygon], lit_areas: List[shg.Polygon], water_areas: List[shg.Polygon],
                 stats: utilities.Stats) -> None:
@@ -456,8 +463,10 @@ class Roads(object):
         self._check_against_blocked_areas(blocked_areas)
         self._check_ways_sanity('_check_against_blocked_areas')
         self._check_lighting(lit_areas)
+        self._check_ways_sanity('_check_lighting')
 
         self._remove_short_way_segments()
+        self._check_ways_sanity('_remove_short_way_segments')
         self._cleanup_topology()
         self._check_points_on_line_distance()
 
@@ -838,27 +847,37 @@ class Roads(object):
         return shg.LineString(nodes)
 
     def _remove_short_way_segments(self) -> None:
-        """Make sure there are no almost zero length segments"""
-        # FIXME: this should not be necessary and is most probably residual from _check_lighting
+        """Make sure there are no almost zero length segments.
+
+        In the tile 3088961 around Luzern in Switzerland for around 10000 ways there were 106 nodes removed.
+        """
+        num_refs_removed = 0
         for way in self.ways_list:
+            if len(way.refs) == 2:
+                continue
             refs_to_remove = list()
-            for i in range(1, len(way.refs)):
+            ref_len = len(way.refs)
+            for i in range(1, ref_len):
                 first_node = self.nodes_dict[way.refs[i - 1]]
                 second_node = self.nodes_dict[way.refs[i]]
                 distance = coordinates.calc_distance_global(first_node.lon, first_node.lat,
                                                             second_node.lon, second_node.lat)
                 if distance < MIN_SEGMENT_LENGTH:
-                    if len(way.refs) == 2:
-                        break  # nothing to do - need to keep it
-                    elif i == 1:
-                        refs_to_remove.append(way.refs[i])
+                    if i == ref_len - 1:
+                        refs_to_remove.append(way.refs[i - 1])  # shall not remove the last node
                     else:
-                        refs_to_remove.append(way.refs[i - 1])
+                        refs_to_remove.append(way.refs[i])
 
             for ref in refs_to_remove:
-                if ref in way.refs:
-                    way.refs.remove(ref)  # FIXME: this is a hack for something that actually happens, but should not
+                if len(way.refs) == 2:
+                    break
+                if ref in way.refs:  # This is a hack for something that actually happens (closed way?), but should not
+                    way.refs.remove(ref)
+                    num_refs_removed += 1
                     logging.debug('Removing ref %d from way %d due to too short segment', ref, way.osm_id)
+                else:
+                    logging.warning('Removing ref %d from way %d not possible because ref not there', ref, way.osm_id)
+        logging.debug('Removed %i refs in %i ways due to too short segments', num_refs_removed, len(self.ways_list))
 
     def _cleanup_topology(self) -> None:
         """Cleans up the topology for junctions etc."""
@@ -1284,7 +1303,6 @@ def process_roads(coords_transform: coordinates.Transformation, fg_elev: utiliti
     roads = Roads(filtered_osm_ways_list, osm_nodes_dict, coords_transform, fg_elev)
 
     path_to_output = parameters.get_output_path()
-    logging.debug("before linear " + str(roads))
 
     roads.process(the_blocked_areas, lit_areas, water_areas, stats)  # does the heavy lifting incl. clustering
 
@@ -1306,7 +1324,6 @@ def process_roads(coords_transform: coordinates.Transformation, fg_elev: utiliti
     stg_manager.write(file_lock)
 
     utilities.troubleshoot(stats)
-    logging.debug("final " + str(roads))
 
 
 # ================ UNITTESTS =======================
