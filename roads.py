@@ -871,6 +871,8 @@ class Roads(object):
                 if len(way.refs) == 2:
                     break
                 if ref in way.refs:  # This is a hack for something that actually happens (closed way?), but should not
+                    if way.refs.count(ref) > 1:
+                        continue  # in seldom cases the same node might also be used several times (e.g. for an 8-form)
                     way.refs.remove(ref)
                     num_refs_removed += 1
                     logging.debug('Removing ref %d from way %d due to too short segment', ref, way.osm_id)
