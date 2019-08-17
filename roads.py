@@ -159,19 +159,20 @@ def _compatible_ways(way1: op.Way, way2: op.Way) -> bool:
         return False
     elif _is_highway(way1) and _is_highway(way2):
         # check type
-        highway_type1 = highway_type_from_osm_tags(way1.tags)
-        highway_type2 = highway_type_from_osm_tags(way2.tags)
-        if highway_type1 != highway_type2:
+        if highway_type_from_osm_tags(way1.tags) != highway_type_from_osm_tags(way2.tags):
             logging.debug("Nope, both must be of same highway type")
             return False
         # check lit
-        highway_lit1 = _is_lit(way1.tags)
-        highway_lit2 = _is_lit(way2.tags)
-        if highway_lit1 != highway_lit2:
+        if _is_lit(way1.tags) != _is_lit(way2.tags):
+            logging.debug("Nope, both must be lit or not")
             return False
     elif is_railway(way1) and is_railway(way2):
-        if way1.tags[s.K_RAILWAY] != way2.tags[s.K_RAILWAY]:
+        if railway_type_from_osm_tags(way1.tags) != railway_type_from_osm_tags(way2.tags):
             logging.debug("Nope, both must be of same railway type")
+            return False
+        # check electrified
+        if is_electrified_railway(way1.tags) != is_electrified_railway(way2.tags):
+            logging.debug("Nope, both must be electrified or not")
             return False
     return True
 
@@ -200,6 +201,12 @@ def _calc_railway_gauge(tags: Dict[str, str]) -> float:
         if op.is_parsable_float(tags[s.K_GAUGE]):
             width = float(tags[s.K_GAUGE])
     return width / 1000 * 126 / 57  # in the texture roads.png the track uses 57 out of 126 pixels
+
+
+def is_electrified_railway(tags: Dict[str, str]) -> bool:
+    if s.K_ELECTRIFIED in tags and tags[s.K_ELECTRIFIED] in [s.V_CONTACT_LINE, s.V_YES]:
+        return True
+    return False
 
 
 @enum.unique
@@ -427,7 +434,7 @@ class Roads(object):
         self.railway_list = list()
         self.roads_list = list()
         self.nodes_dict = nodes_dict
-        self.graph = None  # network graph of ways
+        self.G = None  # network graph of ways
         self.roads_clusters = None
         self.roads_rough_clusters = None
         self.railways_clusters = None
@@ -993,11 +1000,12 @@ class Roads(object):
                         self.railway_list.append(obj)
                     else:
                         self.roads_list.append(obj)
+
+                self.G.add_linear_object_edge(obj)
             except ValueError as reason:
                 logging.warning("skipping OSM_ID %i: %s" % (the_way.osm_id, reason))
                 continue
 
-            self.G.add_linear_object_edge(obj)
 
     def _split_ways_at_inner_junctions(self, attached_ways_dict: Dict[int, List[Tuple[op.Way, int]]]) -> None:
         """Split ways such that none of the interior nodes are junctions to other ways.

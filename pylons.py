@@ -1124,17 +1124,13 @@ def _process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev,
 
     for way in railway_candidates:
         my_line = RailLine(way.osm_id)
-        is_electrified = False
+        is_electrified = roads.is_electrified_railway(way.tags)
         is_challenged = False
         for key in way.tags:
-            value = way.tags[key]
             if s.K_RAILWAY == key:
                 railway_type = roads.railway_type_from_osm_tags(way.tags)
                 if railway_type is None:
                     is_challenged = True
-            elif s.K_ELECTRIFIED == key:
-                if value in (s.V_CONTACT_LINE, s.V_YES):
-                    is_electrified = True
             elif roads.is_tunnel(way.tags):
                 is_challenged = True
         if is_electrified and (not is_challenged):
