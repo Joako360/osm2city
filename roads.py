@@ -1149,9 +1149,13 @@ class Roads(object):
                     # nothing more to do - most probably rounding error or zero segment length
             # for each in end_dict search in start_dict the one with the closest angle and which is a compatible way
             for end_way, end_angle in end_dict.items():
+                if end_way.is_closed():
+                    continue  # never combine ways which are closed (e.g. roundabouts)
                 candidate_way = None
                 candidate_angle = 999
                 for start_way, start_angle in start_dict.items():
+                    if start_way.is_closed():
+                        continue
                     if _compatible_ways(end_way, start_way):
                         if abs(start_angle - end_angle) >= 90:
                             continue  # larger angles lead to strange visuals

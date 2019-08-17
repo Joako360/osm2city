@@ -144,6 +144,13 @@ class Way(OSMElement):
                 return my_geometry
         return None
 
+    def is_closed(self) -> bool:
+        if len(self.refs) < 3:
+            return False
+        if self.refs[0] == self.refs[-1]:
+            return True
+        return False
+
 
 class Member(object):
     __slots__ = ('ref', 'type_', 'role')
