@@ -105,7 +105,6 @@ def is_tunnel(tags: Dict[str, str]) -> bool:
 
 
 REPLACED_BRIDGE_KEY = 'replaced_bridge'  # specifies a way that was originally a bridge, but due to length was changed
-MIN_SEGMENT_LENGTH = 1.0
 
 
 def _is_bridge(tags: Dict[str, str]) -> bool:
@@ -682,7 +681,7 @@ class Roads(object):
             for ref in way.refs:
                 ref_node = self.nodes_dict[ref]
                 segment_length = coordinates.calc_distance_global(lon, lat, ref_node.lon, ref_node.lat)
-                if segment_length < MIN_SEGMENT_LENGTH:
+                if segment_length < parameters.MIN_ROAD_SEGMENT_LENGTH:
                     if ref == way.refs[0] or ref == way.refs[-1]:  # ignore because it is almost at either start or end
                         add_intersection = False
                         break
@@ -862,7 +861,7 @@ class Roads(object):
                 second_node = self.nodes_dict[way.refs[i]]
                 distance = coordinates.calc_distance_global(first_node.lon, first_node.lat,
                                                             second_node.lon, second_node.lat)
-                if distance < MIN_SEGMENT_LENGTH:
+                if distance < parameters.MIN_ROAD_SEGMENT_LENGTH:
                     if i == ref_len - 1:
                         refs_to_remove.append(way.refs[i - 1])  # shall not remove the last node
                     else:
@@ -1405,7 +1404,7 @@ class TestUtilities(unittest.TestCase):
         msg = 'line with 1 intersection point almost at start -> 1 way orig'
         way.refs = [1, 2, 3, 4, 5, 6]
         my_line = shg.LineString([(0, 0), (0, 300), (0, 500), (0, 600), (0, 900), (0, 1000)])
-        intersection_points = [shg.Point(0, MIN_SEGMENT_LENGTH * 0.1)]
+        intersection_points = [shg.Point(0, parameters.MIN_ROAD_SEGMENT_LENGTH * 0.1)]
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
         self.assertEqual(1, len(cut_ways_dict), 'number of ways: ' + msg)
         self.assertEqual(6, len(way.refs), 'references of orig way: ' + msg)
@@ -1413,7 +1412,7 @@ class TestUtilities(unittest.TestCase):
         msg = 'line with 1 intersection point almost at end -> 1 way orig'
         way.refs = [1, 2, 3, 4, 5, 6]
         my_line = shg.LineString([(0, 0), (0, 300), (0, 500), (0, 600), (0, 900), (0, 1000)])
-        intersection_points = [shg.Point(0, MIN_SEGMENT_LENGTH * 0.1)]
+        intersection_points = [shg.Point(0, parameters.MIN_ROAD_SEGMENT_LENGTH * 0.1)]
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
         self.assertEqual(1, len(cut_ways_dict), 'number of ways: ' + msg)
         self.assertEqual(6, len(way.refs), 'references of orig way: ' + msg)
@@ -1421,7 +1420,7 @@ class TestUtilities(unittest.TestCase):
         msg = 'line with 1 intersection point almost at inner-reference -> 1 way orig'
         way.refs = [1, 2, 3, 4, 5, 6]
         my_line = shg.LineString([(0, 0), (0, 300), (0, 500), (0, 600), (0, 900), (0, 1000)])
-        intersection_points = [shg.Point(0, 500 + MIN_SEGMENT_LENGTH * 0.1)]
+        intersection_points = [shg.Point(0, 500 + parameters.MIN_ROAD_SEGMENT_LENGTH * 0.1)]
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
         self.assertEqual(2, len(cut_ways_dict), 'number of ways: ' + msg)
         self.assertEqual(3, len(way.refs), 'references of orig way: ' + msg)

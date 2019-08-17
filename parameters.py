@@ -282,7 +282,8 @@ MIN_ABOVE_GROUND_LEVEL = 0.03    # how much a highway / railway is at least hove
 DISTANCE_BETWEEN_LAYERS = 0.05  # ow much different layers of roads/railways at the same node are separated
 HIGHWAY_TYPE_MIN = 4  # The lower the number, the more ways are added. See roads.HighwayType
 HIGHWAY_TYPE_MIN_ROUGH_LOD = 6  # the minimum type tobe added to the rough LOD clusters
-POINTS_ON_LINE_DISTANCE_MAX = 1000  # the maximum distance between two points on a line. If longer, then new points are added
+POINTS_ON_LINE_DISTANCE_MAX = 1000  # the max dist between two points on a line. If longer, then new points are added
+MIN_ROAD_SEGMENT_LENGTH = 1.0         # if segment length is smaller than this, then remove point
 
 USE_TRAM_LINES = False  # whether to build tram lines (OSM railway=tram). Often they do not merge well with roads
 
