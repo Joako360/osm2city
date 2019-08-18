@@ -78,6 +78,7 @@ import enum
 import logging
 import math
 import multiprocessing as mp
+from operator import itemgetter
 import os
 import random
 from typing import Dict, List, MutableMapping, Optional, Tuple
@@ -346,12 +347,12 @@ def _find_junctions(attached_ways_dict: Dict[int, List[Tuple[op.Way, bool]]],
                     ways_list: List[op.Way]) -> None:
     """Finds nodes, which are shared by at least 2 ways at the start or end of the way.
 
-    The node may be only referenced one, otherwise unclear how to join (e.g. circular).
+    The node may only be referenced one, otherwise unclear how to join (e.g. circular)
     """
     logging.info('Finding junctions...')
     for the_way in ways_list:
         start_ref = the_way.refs[0]
-        if the_way.refs.count(start_ref) == 1:
+        if the_way.refs.count(start_ref) == 1:  # check only once in list
             _attached_ways_dict_append(attached_ways_dict, start_ref, the_way, True)
         end_ref = the_way.refs[-1]
         if the_way.refs.count(end_ref) == 1:
@@ -473,6 +474,7 @@ class Roads(object):
 
         # -- no change in topology beyond create_linear_objects() !
         logging.debug("before linear " + str(self))
+        self._calculate_way_layers_at_node()
         self._create_linear_objects()
         self._propagate_v_add()
         logging.debug("after linear " + str(self))
@@ -943,6 +945,48 @@ class Roads(object):
                     my_new_refs.append(the_way.refs[index])
 
             the_way.refs = my_new_refs
+
+    def _calculate_way_layers_at_node(self) -> None:
+        """At each node shared between ways determine, which layer a way should belong to.
+
+        Otherwise the different textures at a given point might be fighting in the z-layer in rendering.
+
+        A way where the node is not at the start/end gets priority over a way, where it is at the start/end.
+        Then a railway gets priority over a road
+        Then within a railway or road the priority is based on the value of the type
+        Last a higher osm_id wins anything else equal.
+        """
+        # first just make sure that we have a reference for all ways
+        for the_way in self.ways_list:
+            for ref in the_way.refs:
+                node = self.nodes_dict[ref]
+                if the_way not in node.layers:  # the same node can be several times in a way
+                    node.layers[the_way] = 0
+
+        # now we need to do the sorting. If a node has none or 1 reference, then it is easy.
+        # otherwise create a tuple to do the sorting (cf. https://docs.python.org/3/howto/sorting.html#key-functions)
+        for key, node in self.nodes_dict.items():
+            if len(node.layers) > 1:
+                # build up a tuple with the relevant attributes for sorting (higher values = more priority)
+                way_tuples = list()
+                for the_way in node.layers.keys():
+                    if key == the_way.refs[0] or key == the_way.refs[-1]:
+                        between = 0
+                    else:
+                        between = 1
+                    if _is_highway(the_way):
+                        type_factor = highway_type_from_osm_tags(the_way.tags)
+                    else:
+                        type_factor = railway_type_from_osm_tags(the_way.tags) * 100  # 100 -> railway on top of roads
+                    way_tuples.append((the_way, between, type_factor, the_way.osm_id))
+
+                # now do the sorting in steps
+                way_tuples.sort(key=itemgetter(1, 2, 3))
+
+                # based on this we can now
+                node.layers = dict()
+                for i, my_tuple in enumerate(way_tuples):
+                    node.layers[my_tuple[0]] = i
 
     def _create_linear_objects(self) -> None:
         """Creates the linear objects, which will be created as scenery objects.
