@@ -250,6 +250,7 @@ def railway_type_from_osm_tags(tags: Dict[str, str]) -> Optional[RailwayType]:
 
 @enum.unique
 class HighwayType(enum.IntEnum):
+    roundabout = 13
     motorway = 12
     trunk = 11
     primary = 10
@@ -266,7 +267,10 @@ class HighwayType(enum.IntEnum):
 
 def get_highway_attributes(highway_type: HighwayType) -> Tuple[Tuple[float, float], float]:
     """This must be aligned with HighwayType as well as textures.road and Roads.create_linear_objects."""
-    if highway_type in [HighwayType.motorway]:
+    if highway_type is HighwayType.roundabout:
+        tex = textures.road.ROAD_1
+        width = 6.
+    elif highway_type is HighwayType.motorway:
         tex = textures.road.ROAD_3
         width = 6.
     elif highway_type in [HighwayType.primary, HighwayType.trunk]:
@@ -290,13 +294,14 @@ def get_highway_attributes(highway_type: HighwayType) -> Tuple[Tuple[float, floa
 def highway_type_from_osm_tags(tags: Dict[str, str]) -> Optional[HighwayType]:
     """Based on OSM tags deducts the HighwayType.
     Returns None if not a highway are unknown value.
-
-    FIXME: Shouldn't we also take care of "junction" and "roundabout"?
     """
     if s.K_HIGHWAY in tags:
         value = tags[s.K_HIGHWAY]
     else:
         return None
+
+    if s.K_JUNCTION in tags and tags[s.K_JUNCTION] in [s.V_ROUNDABOUT, s.V_CIRCULAR]:
+        return HighwayType.roundabout
 
     if value in [s.V_MOTORWAY]:
         return HighwayType.motorway
