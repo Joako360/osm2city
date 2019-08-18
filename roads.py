@@ -337,55 +337,42 @@ def max_slope_for_road(obj):
         return parameters.MAX_SLOPE_RAILWAY
 
 
-def _find_junctions(ways_list: List[op.Way]) -> Dict[int, List[Tuple[op.Way, int]]]:
-    """Finds nodes, which are shared by at least 2 ways.
-    N = number of nodes
-    find junctions by brute force:
-    - for each node, store attached ways in a dict                O(N)
-    - if a node has 2 ways, store that node as a candidate
-    - remove entries/nodes that have less than 2 ways attached    O(N)
-    - one way ends, other way starts: also a junction
+def _find_junctions(attached_ways_dict: Dict[int, List[Tuple[op.Way, bool]]],
+                    ways_list: List[op.Way]) -> None:
+    """Finds nodes, which are shared by at least 2 ways at the start or end of the way.
+
+    The node may be only referenced one, otherwise unclear how to join (e.g. circular).
     """
-
     logging.info('Finding junctions...')
-    attached_ways_dict = {}  # a dict: for each ref (aka node) hold a list of attached ways
-    for j, the_way in enumerate(ways_list):
-        utilities.progress(j, len(ways_list))
-        for i, ref in enumerate(the_way.refs):
-            if i == 0:  # start
-                position = -1
-            elif i == len(the_way.refs) - 1:  # last
-                position = 1
-            else:
-                position = 0
-            _attached_ways_dict_append(attached_ways_dict, ref, the_way, position)
-
-    # kick nodes that belong to one way only
-    for ref, the_ways in list(attached_ways_dict.items()):
-        if len(the_ways) < 2:
-            attached_ways_dict.pop(ref)
-    return attached_ways_dict
+    for the_way in ways_list:
+        start_ref = the_way.refs[0]
+        if the_way.refs.count(start_ref) == 1:
+            _attached_ways_dict_append(attached_ways_dict, start_ref, the_way, True)
+        end_ref = the_way.refs[-1]
+        if the_way.refs.count(end_ref) == 1:
+            _attached_ways_dict_append(attached_ways_dict, end_ref, the_way, False)
 
 
-def _attached_ways_dict_remove(attached_ways_dict: Dict[int, List[Tuple[op.Way, int]]], the_ref: int,
-                               the_way: op.Way) -> None:
+def _attached_ways_dict_remove(attached_ways_dict: Dict[int, List[Tuple[op.Way, bool]]], the_ref: int,
+                               the_way: op.Way, is_start: bool) -> None:
     """Remove given way from given node in attached_ways_dict"""
     if the_ref not in attached_ways_dict:
         logging.warning("not removing way %i from the ref %i because the ref is not in attached_ways_dict",
                         the_way.osm_id, the_ref)
         return
     for way_pos_tuple in attached_ways_dict[the_ref]:
-        if way_pos_tuple[0] == the_way:
+        if way_pos_tuple[0] == the_way and way_pos_tuple[1] is is_start:
             logging.debug("removing way %s from node %i", the_way, the_ref)
             attached_ways_dict[the_ref].remove(way_pos_tuple)
+            break
 
 
-def _attached_ways_dict_append(attached_ways_dict: Dict[int, List[Tuple[op.Way, int]]], the_ref: int,
-                               the_way: op.Way, position: int) -> None:
+def _attached_ways_dict_append(attached_ways_dict: Dict[int, List[Tuple[op.Way, bool]]], the_ref: int,
+                               the_way: op.Way, is_start: bool) -> None:
     """Append given way to attached_ways_dict."""
     if the_ref not in attached_ways_dict:
         attached_ways_dict[the_ref] = list()
-    attached_ways_dict[the_ref].append((the_way, position))
+    attached_ways_dict[the_ref].append((the_way, is_start))
 
 
 def cut_line_at_points(line: shg.LineString, points: List[shg.Point]) -> List[shg.LineString]:
@@ -891,16 +878,12 @@ class Roads(object):
         """Cleans up the topology for junctions etc."""
         logging.debug("Number of ways before cleaning topology: %i" % len(self.ways_list))
 
-        # create a dict referencing for every node for those ways, which are using this node in their references
-        # key = node ref, value = List((way, pos)), where pos=-1 for start, pos=0 for inner, pos=1 for end
-        # TODO: why do we previously even split ways at inner?
-        # attached_ways_dict = _find_junctions(self.ways_list)
-
-        # split ways where a node not being at start or end is referenced by another way
-        # self._split_ways_at_inner_junctions(attached_ways_dict)
+        # a dictionary with a Node id as key. Each node has one or several ways using it in a list.
+        # The entry per way is a tuple of the way object as well as whether the node is at the start
+        attached_ways_dict = dict()  # Dict[int, List[Tuple[op.Way, bool]]]
 
         # do it again, because the references and positions have changed
-        attached_ways_dict = _find_junctions(self.ways_list)
+        _find_junctions(attached_ways_dict, self.ways_list)
 
         self._rejoin_ways(attached_ways_dict)
 
@@ -1006,31 +989,6 @@ class Roads(object):
                 logging.warning("skipping OSM_ID %i: %s" % (the_way.osm_id, reason))
                 continue
 
-
-    def _split_ways_at_inner_junctions(self, attached_ways_dict: Dict[int, List[Tuple[op.Way, int]]]) -> None:
-        """Split ways such that none of the interior nodes are junctions to other ways.
-        I.e., each way object connects to at most two junctions at start and end.
-        """
-        logging.info('Splitting ways at inner junctions...')
-        new_list = []
-        the_ref = 0
-        for i, the_way in enumerate(self.ways_list):
-            utilities.progress(i, len(self.ways_list))
-            self.debug_plot_way(the_way, '-', lw=2, color='0.90', show_label=False)
-
-            new_way = _init_way_from_existing(the_way, [the_way.refs[0]])
-            for the_ref in the_way.refs[1:]:
-                new_way.refs.append(the_ref)
-                if the_ref in attached_ways_dict:
-                    new_list.append(new_way)
-                    self.debug_plot_way(new_way, '-', lw=1)
-                    new_way = _init_way_from_existing(the_way, [the_ref])
-            if the_ref not in attached_ways_dict:
-                new_list.append(new_way)
-                self.debug_plot_way(new_way, '--', lw=1)
-
-        self.ways_list = new_list
-
     def debug_plot_way(self, way, ls, lw, color=None, ends_marker='', show_label=False) -> None:
         if not parameters.DEBUG_PLOT_ROADS:
             return
@@ -1052,7 +1010,9 @@ class Roads(object):
         plt.plot(node.lon, node.lat, 'rs', mfc='None', ms=10)
         plt.text(node.lon+0.0001, node.lat, str(node.osm_id) + " h" + str(text))
 
-    def debug_plot(self, save=False, show=False, label_nodes=list(), clusters=None):
+    def debug_plot(self, save=False, show=False, label_nodes=None, clusters=None):
+        if label_nodes is None:
+            label_nodes = list()
         plt.clf()
         for ref in label_nodes:
             self.debug_label_node(ref)
@@ -1096,18 +1056,19 @@ class Roads(object):
             plt.show()
 
     def _join_ways(self, way1: op.Way, way2: op.Way,
-                   attached_ways_dict: Dict[int, List[Tuple[op.Way, int]]]) -> None:
+                   attached_ways_dict: Dict[int, List[Tuple[op.Way, bool]]]) -> None:
         """Join ways of compatible type, where way1's last node is way2's first node."""
         logging.debug("Joining %i and %i", way1.osm_id, way2.osm_id)
         if way1.osm_id == way2.osm_id:
             logging.debug("WARNING: Not joining way %i with itself", way1.osm_id)
             return
+        _attached_ways_dict_remove(attached_ways_dict, way1.refs[-1], way1, False)
+        _attached_ways_dict_remove(attached_ways_dict, way2.refs[0], way2, True)
+        _attached_ways_dict_remove(attached_ways_dict, way2.refs[-1], way2, False)
+
         way1.refs.extend(way2.refs[1:])
 
-        _attached_ways_dict_remove(attached_ways_dict, way1.refs[-1], way1)
-        _attached_ways_dict_remove(attached_ways_dict, way2.refs[0], way2)
-        _attached_ways_dict_remove(attached_ways_dict, way2.refs[-1], way2)
-        _attached_ways_dict_append(attached_ways_dict, way1.refs[-1], way1, 1)
+        _attached_ways_dict_append(attached_ways_dict, way1.refs[-1], way1, False)
 
         try:
             self.ways_list.remove(way2)
@@ -1119,34 +1080,31 @@ class Roads(object):
                 logging.warning('Way with osm_id={} cannot be removed because cannot be found'.format(way2.osm_id))
             logging.debug("2not")
 
-    def _rejoin_ways(self, attached_ways_dict: Dict[int, List[Tuple[op.Way, int]]]) -> None:
+    def _rejoin_ways(self, attached_ways_dict: Dict[int, List[Tuple[op.Way, bool]]]) -> None:
+        number_merged_ways = 0
         for ref in list(attached_ways_dict.keys()):  # dict is changed during looping, so using list of keys
             way_pos_list = attached_ways_dict[ref]
+            if len(way_pos_list) < 2:
+                continue
+
             start_dict = dict()  # dict of ways where node is start point with key = way, value = degree from north
             end_dict = dict()  # ditto for node is end point
-            for way, position in way_pos_list:
-                try:
-                    if position == -1:  # start
-                        first_node = self.nodes_dict[way.refs[0]]
-                        second_node = self.nodes_dict[way.refs[1]]
-                        angle = coordinates.calc_angle_of_line_global(first_node.lon, first_node.lat,
-                                                                      second_node.lon, second_node.lat,
-                                                                      self.transform)
-                        start_dict[way] = angle
-                    elif position == 1:  # end
-                        first_node = self.nodes_dict[way.refs[-2]]
-                        second_node = self.nodes_dict[way.refs[-1]]
-                        angle = coordinates.calc_angle_of_line_global(first_node.lon, first_node.lat,
-                                                                      second_node.lon, second_node.lat,
-                                                                      self.transform)
-                        end_dict[way] = angle
-                    else:  # should never happen
-                        logging.warning("Way with osm-id={} has not valid position {} for node {}.".format(way.osm_id,
-                                                                                                           position,
-                                                                                                           ref))
-                except ValueError:
-                    logging.exception('Rejoin not possible for way {} and position {}.'.format(way.osm_id, position))
-                    # nothing more to do - most probably rounding error or zero segment length
+            for way, is_start in way_pos_list:
+                if is_start:
+                    first_node = self.nodes_dict[way.refs[0]]
+                    second_node = self.nodes_dict[way.refs[1]]
+                    angle = coordinates.calc_angle_of_line_global(first_node.lon, first_node.lat,
+                                                                  second_node.lon, second_node.lat,
+                                                                  self.transform)
+                    start_dict[way] = angle
+                else:
+                    first_node = self.nodes_dict[way.refs[-2]]
+                    second_node = self.nodes_dict[way.refs[-1]]
+                    angle = coordinates.calc_angle_of_line_global(first_node.lon, first_node.lat,
+                                                                  second_node.lon, second_node.lat,
+                                                                  self.transform)
+                    end_dict[way] = angle
+
             # for each in end_dict search in start_dict the one with the closest angle and which is a compatible way
             for end_way, end_angle in end_dict.items():
                 if end_way.is_closed():
@@ -1169,6 +1127,10 @@ class Roads(object):
                 if candidate_way is not None:
                     self._join_ways(end_way, candidate_way, attached_ways_dict)
                     del start_dict[candidate_way]
+                    number_merged_ways += 1
+                    logging.info('Merging at %i ways %i and %i', ref, end_way.osm_id, candidate_way.osm_id)
+
+        logging.info('Merged %i ways', number_merged_ways)
 
     def _find_way_by_osm_id(self, osm_id):
         for the_way in self.ways_list:
@@ -1232,13 +1194,13 @@ def _process_osm_ways(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, op.Wa
     return my_ways
 
 
-def _process_clusters(clusters, fg_elev: utilities.FGElev, stg_manager, stg_paths, is_railway,
+def _process_clusters(clusters, fg_elev: utilities.FGElev, stg_manager, stg_paths, do_railway,
                       coords_transform: coordinates.Transformation, stats: utilities.Stats, is_rough_LOD: bool) -> None:
     for cl in clusters:
         if len(cl.objects) < parameters.CLUSTER_MIN_OBJECTS:
             continue  # skip almost empty clusters
 
-        if is_railway:
+        if do_railway:
             file_start = "railways"
         else:
             file_start = "roads"
@@ -1258,12 +1220,12 @@ def _process_clusters(clusters, fg_elev: utilities.FGElev, stg_manager, stg_path
         for rd in cl.objects:
             rd.write_to(ac3d_obj, fg_elev, cluster_elev, offset=offset_local)
 
-        if is_railway:
+        if do_railway:
             stg_verb_type = stg_io2.STGVerbType.object_railway_detailed
         else:
             stg_verb_type = stg_io2.STGVerbType.object_road_detailed
         if is_rough_LOD:
-            if is_railway:
+            if do_railway:
                 stg_verb_type = stg_io2.STGVerbType.object_railway_rough
             else:
                 stg_verb_type = stg_io2.STGVerbType.object_road_rough
