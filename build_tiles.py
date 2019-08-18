@@ -139,6 +139,7 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
         if exec_argument is Procedures.pylons or (exec_argument is Procedures.details and
                                                   parameters.C2P_PROCESS_STREETLAMPS is False):
             lit_areas = None
+            water_areas = None
             osm_buildings = None
         else:
             lit_areas, water_areas, osm_buildings = ol.process(the_coords_transform, my_airports)

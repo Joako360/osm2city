@@ -48,11 +48,20 @@ class Texture(object):
 
     """
     def __init__(self, filename: str,
-                 h_size_meters=None, h_cuts=list(), h_can_repeat=False,
-                 v_size_meters=None, v_cuts=list(), v_can_repeat=False,
+                 h_size_meters=None, h_cuts=None, h_can_repeat=False,
+                 v_size_meters=None, v_cuts=None, v_can_repeat=False,
                  height_min=0, height_max=9999,
-                 v_align_bottom: bool=False,
-                 provides=list(), requires=list(), levels=None) -> None:
+                 v_align_bottom: bool = False,
+                 provides=None, requires=None, levels=None) -> None:
+        # assert lists if None
+        if h_cuts is None:
+            h_cuts = list()
+        if v_cuts is None:
+            v_cuts = list()
+        if provides is None:
+            provides = list()
+        if requires is None:
+            requires = list()
         self.filename = os.path.join(Texture.tex_prefix, replace_with_os_separator(filename))
         self.x0 = self.x1 = self.y0 = self.y1 = 0
         self.sy = self.sx = 0

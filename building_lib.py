@@ -240,8 +240,14 @@ class Building(object):
 
     def __init__(self, osm_id: int, tags: Dict[str, str], outer_ring: shg.LinearRing, name: str,
                  anchor: Optional[Vec2d],
-                 stg_typ: STGVerbType = None, street_angle=0, inner_rings_list=list(),
-                 refs: List[int] = list(), is_owbb_model: bool = False) -> None:
+                 stg_typ: STGVerbType = None, street_angle=0, inner_rings_list=None,
+                 refs: List[int] = None, is_owbb_model: bool = False) -> None:
+        # assert empty lists if default None
+        if inner_rings_list is None:
+            inner_rings_list = list()
+        if refs is None:
+            refs = list()
+
         # set during init and methods called by init
         self.osm_id = osm_id
         self.tags = tags

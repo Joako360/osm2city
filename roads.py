@@ -1133,7 +1133,7 @@ class Roads(object):
                     self._join_ways(end_way, candidate_way, attached_ways_dict)
                     del start_dict[candidate_way]
                     number_merged_ways += 1
-                    logging.info('Merging at %i ways %i and %i', ref, end_way.osm_id, candidate_way.osm_id)
+                    logging.debug('Merging at %i ways %i and %i', ref, end_way.osm_id, candidate_way.osm_id)
 
         logging.info('Merged %i ways', number_merged_ways)
 
