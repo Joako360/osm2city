@@ -474,7 +474,7 @@ class Roads(object):
         # -- no change in topology beyond create_linear_objects() !
         logging.debug("before linear " + str(self))
         self._create_linear_objects()
-        self._propagate_h_add()
+        self._propagate_v_add()
         logging.debug("after linear " + str(self))
 
         if parameters.CREATE_BRIDGES_ONLY:
@@ -799,8 +799,8 @@ class Roads(object):
     def _probe_elev_at_nodes(self):
         """Add elevation info to all nodes.
 
-        MSL = meters above sea level (i.e. the elevation of the ground)
-        h_add = elevation after some adjustment has been added to take care of elevation probing bumpiness.
+        msl = meters above sea level (i.e. the elevation of the ground)
+        v_add = elevation after some adjustment has been added to take care of elevation probing bumpiness.
 
         At the end save the cache.
         """
@@ -808,25 +808,25 @@ class Roads(object):
             if math.isnan(the_node.lon) or math.isnan(the_node.lat):
                 logging.error("NaN encountered while probing elevation")
                 continue
-            the_node.MSL = self.fg_elev.probe_elev(Vec2d(the_node.lon, the_node.lat), is_global=True)
-            the_node.h_add = 0.
+            the_node.msl = self.fg_elev.probe_elev(Vec2d(the_node.lon, the_node.lat), is_global=True)
+            the_node.v_add = 0.
 
-    def _propagate_h_add_over_edge(self, ref0, ref1, args):
-        """propagate h_add over edges of graph"""
+    def _propagate_v_add_over_edge(self, ref0, ref1, args):
+        """propagate v_add over edges of graph"""
         obj = self.G[ref0][ref1]['obj']
         dh_dx = max_slope_for_road(obj)
         n0 = self.nodes_dict[ref0]
         n1 = self.nodes_dict[ref1]
-        if n1.h_add > 0:
+        if n1.v_add > 0:
             return False
             # FIXME: should we really just stop here? Probably yes.
-        n1.h_add = max(0, n0.MSL + n0.h_add - obj.center.length * dh_dx - n1.MSL)
-        if n1.h_add <= 0.:
+        n1.v_add = max(0, n0.msl + n0.v_add - obj.center.length * dh_dx - n1.msl)
+        if n1.v_add <= 0.:
             return False
         return True
     
-    def _propagate_h_add(self):
-        """start at bridges, propagate h_add through nodes"""
+    def _propagate_v_add(self):
+        """start at bridges, propagate v_add through nodes"""
         for the_bridge in self.bridges_list:
             # build tree starting at node0
             node0 = the_bridge.refs[0]
@@ -834,10 +834,10 @@ class Roads(object):
 
             node0s = {node1}
             visited = {node0, node1}
-            graph.for_edges_in_bfs_call(self._propagate_h_add_over_edge, None, self.G, node0s, visited)
+            graph.for_edges_in_bfs_call(self._propagate_v_add_over_edge, None, self.G, node0s, visited)
             node0s = {node0}
             visited = {node0, node1}
-            graph.for_edges_in_bfs_call(self._propagate_h_add_over_edge, None, self.G, node0s, visited)
+            graph.for_edges_in_bfs_call(self._propagate_v_add_over_edge, None, self.G, node0s, visited)
 
     def _line_string_from_way(self, way: op.Way) -> shg.LineString:
         osm_nodes = [self.nodes_dict[r] for r in way.refs]
@@ -911,8 +911,8 @@ class Roads(object):
     def _keep_only_bridges_and_embankments(self):
         """Remove everything that is not elevated - for debugging purposes"""
         for the_way in reversed(self.roads_list):
-            h_add = np.array([abs(self.nodes_dict[the_ref].h_add) for the_ref in the_way.refs])
-            if h_add.sum() == 0:
+            v_add = np.array([abs(self.nodes_dict[the_ref].v_add) for the_ref in the_way.refs])
+            if v_add.sum() == 0:
                 self.roads_list.remove(the_way)
                 logging.debug("kick %i", the_way.osm_id)
 

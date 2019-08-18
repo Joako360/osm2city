@@ -21,7 +21,6 @@ import shapely.geometry as shg
 
 import parameters
 from utils.coordinates import Transformation
-import utils.osmstrings as s
 
 
 PSEUDO_OSM_ID = -1  # For those nodes and ways, which get added as part of processing. Not written back to OSM.
@@ -86,15 +85,16 @@ def combine_tags(first_tags: Dict[str, str], second_tags: Dict[str, str]) -> Dic
 
 
 class Node(OSMElement):
-    __slots__ = ('lat', 'lon', 'MSL', 'h_add', 'layers')  # the last three are written from roads.py
+    __slots__ = ('lat', 'lon', 'msl', 'v_add', 'layers')  # the last three are written from roads.py
 
     def __init__(self, osm_id: int, lat: float, lon: float) -> None:
         OSMElement.__init__(self, osm_id)
         self.lat = lat  # float value
         self.lon = lon  # float value
-        self.MSL = None
-        self.h_add = None
-        self.layers = dict()  # key= osm_id of Way, value = layer: int (the higher the number, the more on top
+        # the following are mostly used in roads and linear objects/bridges
+        self.msl = None  # metres above sea level (from FGElev, but might get updated)
+        self.v_add = None  # vertical add, such that there is some smoothness of roads despite bumpiness of FG elevation
+        self.layers = dict()  # key= osm_id of Way, value = layer: int (the higher the number, the more on top)
 
 
 class Way(OSMElement):
