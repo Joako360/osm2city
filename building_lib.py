@@ -33,6 +33,7 @@ from typing import List, Dict, Optional, Set, Tuple, Union
 
 import myskeleton
 import numpy as np
+from shapely import affinity
 import shapely.geometry as shg
 from shapely.geos import TopologicalError
 
@@ -230,7 +231,7 @@ class Building(object):
         * Point (abbreviated to pt and pts): local coordinates for points on building (inner and outer)
     """
     __slots__ = ('osm_id', 'tags', 'is_owbb_model', 'name', 'stg_typ',
-                 'street_angle', 'anchor', 'zone',
+                 'street_angle', 'anchor', 'width', 'depth', 'zone',
                  'body_height', 'levels', 'min_height', 'roof_shape', 'roof_height', 'roof_neighbour_orientation',
                  'refs', 'refs_shared', 'inner_rings_list', 'outer_nodes_closest', 'polygon', 'geometry',
                  'parent', 'pts_all', 'roof_height_pts', 'edge_length_pts','facade_texture',
@@ -241,7 +242,7 @@ class Building(object):
     def __init__(self, osm_id: int, tags: Dict[str, str], outer_ring: shg.LinearRing, name: str,
                  anchor: Optional[Vec2d],
                  stg_typ: STGVerbType = None, street_angle=0, inner_rings_list=None,
-                 refs: List[int] = None, is_owbb_model: bool = False) -> None:
+                 refs: List[int] = None, is_owbb_model: bool = False, width: float = 0., depth: float = 0.) -> None:
         # assert empty lists if default None
         if inner_rings_list is None:
             inner_rings_list = list()
@@ -258,6 +259,8 @@ class Building(object):
         # For buildings drawn by shader in BUILDING_LIST
         self.street_angle = street_angle  # the angle from the front-door looking at the street
         self.anchor = anchor  # local Vec2d object
+        self.width = width
+        self.depth = depth
 
         # set during owbb land-use zone processing or owbb building generation
         self.zone = None  # either a owbb.model.(Generated)BuildingZone or owbb.model.CityBlock
@@ -303,11 +306,16 @@ class Building(object):
             if s.K_BUILDING not in self.tags:
                 self.tags[s.K_BUILDING] = part_value
 
-    def update_geometry(self, outer_ring: shg.LinearRing, inner_rings_list: List[shg.LinearRing] = list(),
-                        refs: List[int] = list()) -> None:
+    def update_geometry(self, outer_ring: shg.LinearRing, inner_rings_list: List[shg.LinearRing] = None,
+                        refs: List[int] = None) -> None:
         """Updates the geometry of the building. This can also happen after the building has been initialized.
         Makes also sure, that inner and outer rings have correct orientation.
         """
+        if inner_rings_list is None:
+            inner_rings_list = list()
+        if refs is None:
+            refs = list()
+
         # make sure that outer ring is ccw
         self.refs = refs
         if outer_ring.is_ccw is False:
@@ -335,7 +343,7 @@ class Building(object):
         The anchor point is used in 2 situations:
         * For buildings in meshes it just determines in which cluster a building is. Therefore it does basically not
           matter.
-        * For (random) buildings in lists, it matters a lot, because it determines the orientation. Here 0,0,0 is
+        * For shader buildings in lists, it matters a lot, because it determines the orientation. Here 0,0,0 is
           defined as the bottom center of the front face of the building. The "front face" is the facade of the
           building facing the street. "Bottom center" is on ground level vertically and centre means that it is
           horizontally between the left and right edge of the front face. Still: the rotation is relative to this
@@ -359,18 +367,45 @@ class Building(object):
             hull = self.polygon.convex_hull
             hull_points = list(hull.exterior.coords)
             shortest_distance = 99999.
-            for i in range(len(hull_points) - 1):
-                x, y = co.calc_point_on_line_local(hull_points[i][0], hull_points[i][1],
-                                                   hull_points[i+1][0], hull_points[i+1][1], 0.5)
+            shortest_node = 0
+            for j in range(len(hull_points) - 1):
+                x, y = co.calc_point_on_line_local(hull_points[j][0], hull_points[j][1],
+                                                   hull_points[j + 1][0], hull_points[j + 1][1], 0.5)
                 distance = shg.Point(x, y).distance(self.zone.geometry.exterior)
                 if distance < shortest_distance:
+                    shortest_node = j
                     shortest_distance = distance
-                    self.anchor = Vec2d(x, y)
-                    self.street_angle = 90 + co.calc_angle_of_line_local(hull_points[i][0], hull_points[i][1],
-                                                                         hull_points[i+1][0], hull_points[i+1][1])
+
+            i = shortest_node
+            x, y = co.calc_point_on_line_local(hull_points[i][0], hull_points[i][1],
+                                               hull_points[i + 1][0], hull_points[i + 1][1], 0.5)
+            self.anchor = Vec2d(x, y)
+            angle = co.calc_angle_of_line_local(hull_points[i][0], hull_points[i][1],
+                                                hull_points[i+1][0], hull_points[i+1][1])
+            self.street_angle = 90 + angle
+            self.width = co.calc_distance_local(hull_points[i][0], hull_points[i][1],
+                                                hull_points[i+1][0], hull_points[i+1][1])
+
+            # to get the depth we must rotate the hull and then calculate the distance of the most distant points.
+            rotated_hull = affinity.rotate(hull, angle, hull_points[i])
+            rotated_hull_points = list(rotated_hull.exterior.coords)
+            longest_1 = 0.
+            longest_2 = 0.
+            for k in range(len(rotated_hull_points) - 1):
+                distance = fabs(rotated_hull_points[i][0] - rotated_hull_points[k][0])
+                if distance > longest_1:
+                    longest_2 = longest_1
+                    longest_1 = distance
+                elif distance > longest_2:
+                    longest_2 = distance
+
+            if longest_1 * parameters.BUILDING_LIST_DEPTH_DEVIATION > longest_2:
+                self.depth = longest_1
+            else:
+                self.depth = (longest_1 + longest_2) / 2
         except AttributeError:
-            logging.warning('Problem to calc anchor for building osm_id=%i in zone of type=%s and settlement type=%s',
-                            self.osm_id, self.zone, self.zone.settlement_type)
+            logging.exception('Problem to calc anchor for building osm_id=%i in zone of type=%s and settlement type=%s',
+                              self.osm_id, self.zone, self.zone.settlement_type)
 
     def roll_inner_nodes(self) -> None:
         """Roll inner rings such that for each inner ring the node closest to an outer node goes first.
@@ -417,7 +452,9 @@ class Building(object):
             self.geometry = self.polygon
         return difference
 
-    def _set_polygon(self, outer: shg.LinearRing, inner: List[shg.LinearRing] = list()) -> None:
+    def _set_polygon(self, outer: shg.LinearRing, inner: List[shg.LinearRing] = None) -> None:
+        if inner is None:
+            inner = list()
         self.polygon = shg.Polygon(outer, inner)
         self.geometry = shg.Polygon(outer)
 
@@ -438,28 +475,22 @@ class Building(object):
     @property
     def building_list_type(self) -> BuildingListType:
         list_type = BuildingListType.small
-        if self.area > 150:
-            if self.levels > 1:
-                list_type = BuildingListType.medium
-            building_class = get_building_class(self.tags)
-            if self.levels > 3 or building_class not in [BuildingClass.residential, BuildingClass.residential_small,
+        building_class = get_building_class(self.tags)
+        if building_class in [BuildingClass.residential, BuildingClass.residential_small,
                                                          BuildingClass.terrace]:
+            if self.area > 800:
+                list_type = BuildingListType.medium
+            if self.levels > 7:
+                list_type = BuildingListType.large
+        else:
+            list_type = BuildingListType.medium
+            if self.area > 1000 or self.levels > 4:
                 list_type = BuildingListType.large
 
         return list_type
 
     def is_building_list_candidate(self) -> bool:
-        if self.has_neighbours or self.has_parent:
-            return False
         if s.K_AEROWAY in self.tags:
-            return False
-        if self.LOD is utils.stg_io2.LOD.rough:
-            return False
-        # let os assume that large buildings in general have an interesting geometry or are otherwise
-        # best represented in meshes
-        if self.area > 400:  # must correspond to definition of OSM_Building material large
-            return False
-        if self.pts_outer_count >= 8:
             return False
         if s.K_MIN_HEIGHT in self.tags:
             return False
@@ -467,7 +498,16 @@ class Building(object):
             return False
         if s.K_BUILDING in self.tags and self.tags[s.K_BUILDING] == s.V_WATER_TOWER:
             return False
-
+        if self.has_parent:  # mostly detailed buildings in OSM, which might be landmarks
+            return False
+        if self.has_neighbours and not parameters.BUILDING_LIST_ALLOW_NEIGHBOURS:
+            return False
+        if self.pts_outer_count == 3:
+            return False
+        if self.has_inner:
+            return False
+        if parameters.BUILDING_LIST_AREA_DEVIATION * self.width * self.depth > self.area:
+            return False
         return True
 
     @property
@@ -984,12 +1024,13 @@ class Building(object):
             if s.K_ROOF_SHAPE not in self.tags:
                 self.tags[s.K_ROOF_SHAPE] = 'gabled'
 
-    def _compute_roof_height(self) -> None:
+    def compute_roof_height(self, in_building_list: bool = False) -> None:
         """Compute roof_height for each node"""
+
         self.roof_height = 0.
         temp_roof_height = 0.  # temp variable before assigning to self
 
-        if self.roof_shape is roofs.RoofShape.skillion:
+        if self.roof_shape is roofs.RoofShape.skillion and (in_building_list is False):
             # get global roof_height and height for each vertex
             if s.K_ROOF_HEIGHT in self.tags:
                 # force clean of tag if the unit is given
@@ -1102,7 +1143,7 @@ class Building(object):
         # get local medium ground elevation for each building
         self.set_ground_elev_and_offset(cluster_elev, cluster_offset)
 
-        self._compute_roof_height()
+        self.compute_roof_height()
 
         index_first_node_in_ac_obj = ac_object.next_node_index()
 

@@ -76,9 +76,14 @@ TILE_SIZE = 2000            # -- tile size in meters for clustering of buildings
 WRITE_CLUSTER_STATS = False
 
 FLAG_COLOUR_TEX = False  # Feature flag for using colour codes in textures and OSM tags
-FLAG_STG_BUILDING_LIST = False  # use BUILDING_LIST in stg-files
+FLAG_STG_BUILDING_LIST = False  # use BUILDING_LIST in stg-files in 2019.2+ format
+FLAG_STG_BUILDING_LIST_2019_1 = False  # use BUILDING_LIST in stg-files in 2019.1 format
 FLAG_BUILDINGS_LIST_SKIP = False
 FLAG_BUILDINGS_MESH_SKIP = False
+
+BUILDING_LIST_ALLOW_NEIGHBOURS = True
+BUILDING_LIST_AREA_DEVIATION = 0.9
+BUILDING_LIST_DEPTH_DEVIATION = 0.8
 
 # Debugging by plotting with Matplotlib to pdfs. See description about its use in the appendix of the manual
 DEBUG_PLOT_RECTIFY = False

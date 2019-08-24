@@ -659,15 +659,23 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
     try:
         with open(os.path.join(path_to_stg, file_shader), 'w') as shader:
             for b in list_buildings:
-                if not b.is_owbb_model:
-                    b.update_anchor(True)
                 elev = b.ground_elev - list_elev - coordinates.calc_horizon_elev(b.anchor.x, b.anchor.y)
-                line = '{:.1f} {:.1f} {:.1f} {:.0f} {}\n'.format(-b.anchor.y, b.anchor.x, elev, b.street_angle,
-                                                                 b.building_list_type.value)
+                line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-b.anchor.y, b.anchor.x, elev, b.street_angle,
+                                                               b.building_list_type.value)
+                if not parameters.FLAG_STG_BUILDING_LIST_2019_1:
+                    b.compute_roof_height(True)
+                    tex_variability = 6
+                    if b.building_list_type is building_lib.BuildingListType.large:
+                        tex_variability = 4
+                    tex_idx = random.randint(1, tex_variability)  # FIXME: should calc on street level or owbb
+                    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {}'.format(b.width, b.depth, b.body_height,
+                                                                              b.roof_height, b.roof_shape, 0,
+                                                                              round(b.levels), tex_idx)
                 shader.write(line)
+                shader.write('\n')
     except IOError as e:
         logging.warning('Could not write buildings in list to file %s', e)
-    logging.debug("Total number of buildings written to a building_list: %d", len(list_buildings))
+    logging.info("Total number of shader buildings written to a building_list: %d", len(list_buildings))
     stats.random_buildings = len(list_buildings)
 
 
@@ -743,7 +751,7 @@ def write_buildings_in_meshes(coords_transform: coordinates.Transformation,
             total_buildings_written += len(cl.objects)
 
         handled_index += 1
-    logging.debug("Total number of buildings written to a cluster *.ac files: %d", total_buildings_written)
+    logging.info("Total number of buildings written to a cluster *.ac files: %d", total_buildings_written)
 
 
 def process_buildings(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
@@ -801,6 +809,8 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
     buildings_in_lists = list()
     if parameters.FLAG_STG_BUILDING_LIST:
         for building in the_buildings:
+            if not building.is_owbb_model:  # owbb models already have it set when init of Building object
+                building.update_anchor(True)  # prepare anchor, street_angle, width, depth
             if building.is_building_list_candidate():
                 buildings_in_lists.append(building)
             else:

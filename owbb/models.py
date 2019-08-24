@@ -1149,7 +1149,8 @@ class GenBuilding(object):
         moved = saf.translate(rotated, self.x, self.y)
         my_building = bl.Building(self.gen_id, self.shared_model.building_model.tags, moved.exterior, '',
                                   co.Vec2d(self.x, self.y),
-                                  street_angle=self.angle, is_owbb_model=True)
+                                  street_angle=self.angle, is_owbb_model=True,
+                                  width=self.shared_model.width, depth=self.shared_model.depth)
         my_building.zone = self.zone
         return my_building
 

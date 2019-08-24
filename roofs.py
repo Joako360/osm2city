@@ -35,15 +35,21 @@ class RoofShape(IntEnum):
     which actually is supported in osm2city.
 
     The enumeration should match what is provided in roofs.py and referenced in _write_roof_for_ac().
+
+    The values need to correspond to the S value in FG BUILDING_LIST
     """
     flat = 0
     skillion = 1
     gabled = 2
-    hipped = 3
-    pyramidal = 4
-    dome = 5
-    onion = 6
-    gambrel = 7
+    half_hipped = 3
+    hipped = 4
+    pyramidal = 5
+    gambrel = 6
+    mansard = 7
+    dome = 8
+    onion = 9
+    round = 10
+    saltbox = 11
     skeleton = 99  # does not exist in OSM
 
 
