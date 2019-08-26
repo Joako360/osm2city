@@ -1036,7 +1036,7 @@ class Building(object):
                 # force clean of tag if the unit is given
                 temp_roof_height = utils.osmparser.parse_length(self.tags[s.K_ROOF_HEIGHT])
             else:
-                if s.K_ROOF_ANGLE in self.tags:
+                if s.K_ROOF_ANGLE in self.tags and utils.osmparser.is_parsable_float(self.tags[s.K_ROOF_ANGLE]):
                     angle = float(self.tags[s.K_ROOF_ANGLE])
                     while angle > 0:
                         temp_roof_height = tan(np.deg2rad(angle)) * (self.edge_length_pts[1] / 2)
@@ -1124,7 +1124,7 @@ class Building(object):
                 if self.roof_shape is roofs.RoofShape.flat:
                     self.roof_height = 0.
                 else:
-                    if s.K_ROOF_ANGLE in self.tags:
+                    if s.K_ROOF_ANGLE in self.tags and utils.osmparser.is_parsable_float(self.tags[s.K_ROOF_ANGLE]):
                         angle = float(self.tags[s.K_ROOF_ANGLE])
                         while angle > 0:
                             temp_roof_height = tan(np.deg2rad(angle)) * (self.edge_length_pts[1] / 2)
