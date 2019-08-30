@@ -417,6 +417,20 @@ def cut_line_at_points(line: shg.LineString, points: List[shg.Point]) -> List[sh
     return lines
 
 
+class WaySegment:
+    """A segment of a way as a temporary storage to process nodes attributes for layers"""
+    __slots__ = ('way_osm_id', 'start_layer', 'end_layer', 'nodes')
+
+    def __init__(self, way_osm_id: int) -> None:
+        self.way_osm_id = way_osm_id
+        self.start_layer = -1
+        self.end_layer = -1
+        self.nodes = list()
+
+    def add_node(self, node: op.Node) -> None:
+        self.nodes.append(node)
+
+
 class Roads(object):
     def __init__(self, raw_osm_ways: List[op.Way], nodes_dict: Dict[int, op.Node],
                  coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev) -> None:
@@ -1448,4 +1462,4 @@ class TestUtilities(unittest.TestCase):
         intersection_points = [shg.Point(0, 500 + parameters.MIN_ROAD_SEGMENT_LENGTH * 0.1)]
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
         self.assertEqual(2, len(cut_ways_dict), 'number of ways: ' + msg)
-        self.assertEqual(3, len(way.refs), 'references of orig way: ' + msg)
+        self.assertEqual(4, len(way.refs), 'references of orig way: ' + msg)
