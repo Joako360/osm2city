@@ -30,7 +30,9 @@ def for_edges_in_bfs_call(func, args, graph, node0_set, visited_set):
 
 
 class Stub(object):
-    def __init__(self, attached_way, is_first, joint_nodes=list()):
+    def __init__(self, attached_way, is_first, joint_nodes=None):
+        if joint_nodes is None:
+            joint_nodes = list()
         self.attached_way = attached_way
         self.is_first = is_first
         self.joint_nodes = joint_nodes
@@ -51,9 +53,11 @@ class Junction(object):
                junction.attached_ways
     - 
     """
-    def __init__(self, way, is_first, joint_nodes=list()):
+    def __init__(self, way, is_first, joint_nodes=None):
         self._attached_ways = [way]
         self._is_first = [is_first]
+        if joint_nodes is None:
+            joint_nodes = list()
         self.joint_nodes = joint_nodes  # list of tuples -- unused?
         self._left_node = None
         self._right_node = None

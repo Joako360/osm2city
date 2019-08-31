@@ -17,11 +17,6 @@ import utils.osmparser as op
 import utils.osmstrings as s
 
 
-def probe_ground(fg_elev: FGElev, line_string):
-    """Probe ground elevation along given line string, return array"""
-    return np.array([fg_elev.probe_elev(the_node) for the_node in line_string.coords])
-
-
 class LinearObject(object):
     """
     generic linear feature, base class for road, railroad, bridge etc.
@@ -71,9 +66,8 @@ class LinearObject(object):
     """
 
     def __init__(self, transform, way: op.Way, nodes_dict:  Dict[int, op.Node],
-                 width: float, above_ground_level: float, tex_coords: Tuple[float, float] = textures.road.EMBANKMENT_1):
+                 width: float, tex_coords: Tuple[float, float] = textures.road.EMBANKMENT_1):
         self.width = width
-        self.AGL = above_ground_level  # drape distance above terrain
         self.way = way
         self.nodes_dict = nodes_dict
         self.written_to_ac = False
@@ -257,6 +251,17 @@ class LinearObject(object):
                     (right_nodes_list[i], xl, tex_y1)]
             obj.face(face[::-1], mat_idx=mat_idx)
 
+    def _probe_ground(self, fg_elev: FGElev, line_string) -> np.ndarray:
+        """Probe ground elevation along given line string, return array"""
+        z_array = np.array([fg_elev.probe_elev(the_node) for the_node in line_string.coords])
+        for i in range(0, len(self.way.refs)):
+            node = self.nodes_dict[self.way.refs[i]]
+            layer = node.layer_for_way(self.way)
+            if layer > 0:
+                z_array[i] += layer * parameters.DISTANCE_BETWEEN_LAYERS
+            z_array[i] += parameters.MIN_ABOVE_GROUND_LEVEL
+        return z_array
+
     def _get_v_add(self, fg_elev: FGElev):
         """
         """
@@ -267,7 +272,7 @@ class LinearObject(object):
         #    nodes. So far, v_add is for center line only.
         # FIXME: when do we need this? if left_z_given is None and right_z_given is None?
 
-        center_z = np.array([fg_elev.probe_elev(the_node) for the_node in self.center.coords]) + self.AGL
+        center_z = self._probe_ground(fg_elev, self.center)
 
         epsilon = 0.001
 
@@ -310,8 +315,8 @@ class LinearObject(object):
 
     def _level_out(self, fg_elev: FGElev, v_add):
         """given v_add, adjust left_z and right_z to stay below MAX_TRANSVERSE_GRADIENT"""
-        left_z = probe_ground(fg_elev, self.left) + self.AGL
-        right_z = probe_ground(fg_elev, self.right) + self.AGL
+        left_z = self._probe_ground(fg_elev, self.left)
+        right_z = self._probe_ground(fg_elev, self.right)
 
         diff_elev = left_z - right_z
         for i, the_diff in enumerate(diff_elev):
@@ -378,8 +383,8 @@ class LinearObject(object):
         if v_add is not None:
             # -- side walls of embankment
             if v_add.max() > 0.1:
-                left_ground_z = probe_ground(fg_elev, self.left)
-                right_ground_z = probe_ground(fg_elev, self.right)
+                left_ground_z = self._probe_ground(fg_elev, self.left)
+                right_ground_z = self._probe_ground(fg_elev, self.right)
 
                 left_ground_nodes = self._write_nodes(obj, self.left, left_ground_z, elev_offset, offset=offset)
                 right_ground_nodes = self._write_nodes(obj, self.right, right_ground_z, elev_offset, offset=offset)

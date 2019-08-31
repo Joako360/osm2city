@@ -585,9 +585,9 @@ Parameter                                       Type       Default   Description
 =============================================   ========   =======   ==============================================================================
 BRIDGE_MIN_LENGTH                               Decimal    20.       Discard short bridges and draw roads or railways instead.
 
-MIN_ABOVE_GROUND_LEVEL                          Decimal    0.03      How much a highway / railway is at least hovering above ground
+MIN_ABOVE_GROUND_LEVEL                          Decimal    0.1      How much a highway / railway is at least hovering above ground
 
-DISTANCE_BETWEEN_LAYERS                         Decimal    0.05      How much different layers of roads/railways at the same node are separated.
+DISTANCE_BETWEEN_LAYERS                         Decimal    0.2      How much different layers of roads/railways at the same node are separated.
 
 HIGHWAY_TYPE_MIN                                Integer    4         The lower the number, the smaller ways in the highway hierarchy are added.
                                                                      Currently the numbers are as follows (see roads.py -> HighwayType).

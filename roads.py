@@ -1071,29 +1071,21 @@ class Roads(object):
                 # in method Roads.store_way smaller highways already got removed
 
                 tex, width = get_highway_attributes(highway_type)
-                priority = highway_type.value
 
             elif is_railway(the_way):
                 railway_type = railway_type_from_osm_tags(the_way.tags)
                 tex, width = _get_railway_attributes(railway_type, the_way.tags)
-                priority = railway_type.value
             else:
                 continue
-
-            # The above the ground level determines how much the linear_obj will be hovering above the ground.
-            # The reason to include the type is that when (highways) are crossing, then the higher level linear_obj
-            # should have priority in visibility.
-            # In earlier code the following was added to give some variance: random.uniform(0.01, 0.1)
-            above_ground_level = parameters.MIN_ABOVE_GROUND_LEVEL + parameters.DISTANCE_BETWEEN_LAYERS * priority
 
             try:
                 if _is_bridge(the_way.tags):
                     obj = linear_bridge.LinearBridge(self.transform, self.fg_elev, the_way, self.nodes_dict,
-                                                     width, above_ground_level, tex_coords=tex)
+                                                     width, tex_coords=tex)
                     self.bridges_list.append(obj)
                 else:
                     obj = linear.LinearObject(self.transform, the_way, self.nodes_dict,
-                                              width, above_ground_level, tex_coords=tex)
+                                              width, tex_coords=tex)
                     if is_railway(the_way):
                         self.railway_list.append(obj)
                     else:

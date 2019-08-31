@@ -49,8 +49,8 @@ class DeckShapePoly(object):
 
 class LinearBridge(linear.LinearObject):
     def __init__(self, transform, fg_elev: FGElev, way: op.Way, nodes_dict: Dict[int, op.Node], width: float,
-                 above_ground_level: float, tex_coords: Tuple[float, float] = textures.road.EMBANKMENT_2):
-        super().__init__(transform, way, nodes_dict, width, above_ground_level, tex_coords)
+                 tex_coords: Tuple[float, float] = textures.road.EMBANKMENT_2):
+        super().__init__(transform, way, nodes_dict, width, tex_coords)
         # -- prepare elevation spline
         #    probe elev at n_probes locations
         n_probes = max(int(self.center.length / 5.), 3)
@@ -215,7 +215,12 @@ class LinearBridge(linear.LinearObject):
         z = np.zeros(n_nodes)
         length = 0.
         for i in range(n_nodes):
-            z[i] = self._deck_height(length, normalized=False) + self.AGL
+            z[i] = self._deck_height(length, normalized=False)
+            node = self.nodes_dict[self.way.refs[i]]
+            layer = node.layer_for_way(self.way)
+            if layer > 0:
+                z[i] += layer * parameters.DISTANCE_BETWEEN_LAYERS
+            z[i] += parameters.MIN_ABOVE_GROUND_LEVEL
             length += self.segment_len[i]
 
         left_top_nodes = self._write_nodes(obj, self.left, z, elev_offset,
