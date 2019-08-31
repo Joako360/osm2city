@@ -96,6 +96,13 @@ class Node(OSMElement):
         self.v_add = None  # vertical add, such that there is some smoothness of roads despite bumpiness of FG elevation
         self.layers = dict()  # key=way, value = int [the higher the number, the more on top])
 
+    def layer_for_way(self, way) -> int:
+        """Returns -1 if there is no entry in layers dict for the given way"""
+        if way in self.layers:
+            return self.layers[way]
+
+        return -1
+
 
 class Way(OSMElement):
     __slots__ = ('refs', 'pseudo_osm_id', 'was_split_at_end')

@@ -419,16 +419,62 @@ def cut_line_at_points(line: shg.LineString, points: List[shg.Point]) -> List[sh
 
 class WaySegment:
     """A segment of a way as a temporary storage to process nodes attributes for layers"""
-    __slots__ = ('way_osm_id', 'start_layer', 'end_layer', 'nodes')
+    __slots__ = ('way', 'start_layer', 'end_layer', 'nodes')
 
-    def __init__(self, way_osm_id: int) -> None:
-        self.way_osm_id = way_osm_id
-        self.start_layer = -1
-        self.end_layer = -1
+    def __init__(self, way: op.Way) -> None:
+        self.way = way
         self.nodes = list()
 
     def add_node(self, node: op.Node) -> None:
         self.nodes.append(node)
+
+    @property
+    def number_of_nodes(self) -> int:
+        return len(self.nodes)
+
+    @staticmethod
+    def split_way_into_way_segments(way: op.Way, nodes_dict: Dict[int, op.Node]) -> List['WaySegment']:
+        """Split is only done when a node has a layer for the specific way.
+
+        A segment can start and/or stop at a node, which does not have a layer attribute."""
+        segments = list()
+        the_segment = WaySegment(way)
+        the_segment.add_node(nodes_dict[way.refs[0]])
+        for i in range(1, len(way.refs)):
+            next_node = nodes_dict[way.refs[i]]
+            the_segment.add_node(next_node)
+            if the_segment.number_of_nodes == 2:
+                segments.append(the_segment)
+            if the_segment.number_of_nodes > 1 and next_node.layer_for_way(way) >= 0:
+                the_segment = WaySegment(way)
+                the_segment.add_node(next_node)
+        return segments
+
+    def calc_missing_layers_for_nodes(self) -> None:
+        """Make sure each node of the segment gets a layer for the way assigned.
+
+        Unless none of the nodes has a node with a layer at start or end (i.e. a Way in osm2city disconnected from
+        other ways.
+        If there is no end or start layer, then all nodes take over from the one node with a layer.
+        If there is both an end and a start layer, then it is distributed half/half.
+        We do NOT gradually go from e.g. layer 5 to e.g. 2, because if two ways follow each other in a shallow
+        angle (e.g. junction to motorway), we want to avoid z-fighting as much as possible."""
+        start_layer = self.nodes[0].layer_for_way(self.way)
+        end_layer = self.nodes[-1].layer_for_way(self.way)
+        if start_layer < 0 and end_layer < 0:
+            start_layer = 0
+            end_layer = 0
+        elif start_layer < 0:
+            start_layer = end_layer
+        elif end_layer < 0:
+            end_layer = start_layer
+
+        switch_point = int(len(self.nodes) / 2 + 0.5) - 1
+        layer = start_layer
+        for i in range(0, len(self.nodes)):
+            if i > switch_point:
+                layer = end_layer
+            self.nodes[i].layers[self.way] = layer
 
 
 class Roads(object):
@@ -489,6 +535,7 @@ class Roads(object):
         # -- no change in topology beyond create_linear_objects() !
         logging.debug("before linear " + str(self))
         self._calculate_way_layers_at_node()
+        self._calculate_way_layers_all_nodes()
         self._create_linear_objects()
         self._propagate_v_add()
         logging.debug("after linear " + str(self))
@@ -1002,6 +1049,13 @@ class Roads(object):
                 for i, my_tuple in enumerate(way_tuples):
                     node.layers[my_tuple[0]] = i
 
+    def _calculate_way_layers_all_nodes(self) -> None:
+        """Given the layers at intersecting nodes calculate the layers for the other nodes in all ways."""
+        for the_way in self.ways_list:
+            the_segments = WaySegment.split_way_into_way_segments(the_way, self.nodes_dict)
+            for segment in the_segments:
+                segment.calc_missing_layers_for_nodes()
+
     def _create_linear_objects(self) -> None:
         """Creates the linear objects, which will be created as scenery objects.
 
@@ -1463,3 +1517,101 @@ class TestUtilities(unittest.TestCase):
         cut_ways_dict = test_roads.cut_way_at_intersection_points(intersection_points, way, my_line)
         self.assertEqual(2, len(cut_ways_dict), 'number of ways: ' + msg)
         self.assertEqual(4, len(way.refs), 'references of orig way: ' + msg)
+
+    def test_assign_missing_node_layers(self) -> None:
+        nodes_dict = dict()
+        coords_transform = coordinates.Transformation(parameters.get_center_global())
+        way = op.Way(1)
+        way.tags["hello"] = "world"
+        lon, lat = coords_transform.to_global((0, 0))
+        node_1 = op.Node(1, lat, lon)
+        nodes_dict[1] = node_1
+        lon, lat = coords_transform.to_global((0, 300))
+        node_2 = op.Node(2, lat, lon)
+        nodes_dict[2] = node_2
+        lon, lat = coords_transform.to_global((0, 500))
+        node_3 = op.Node(3, lat, lon)
+        nodes_dict[3] = node_3
+        lon, lat = coords_transform.to_global((0, 600))
+        node_4 = op.Node(4, lat, lon)
+        nodes_dict[4] = node_4
+        node_4.layers[way] = 4  # just use the index as layer to make it easy
+        lon, lat = coords_transform.to_global((0, 900))
+        node_5 = op.Node(5, lat, lon)
+        nodes_dict[5] = node_5
+        node_5.layers[way] = 5
+        lon, lat = coords_transform.to_global((0, 1000))
+        node_6 = op.Node(6, lat, lon)
+        nodes_dict[6] = node_6
+        node_6.layers[way] = 6
+
+        # test the splitting into segments
+        way.refs = [4, 5]
+        segments = WaySegment.split_way_into_way_segments(way, nodes_dict)
+        self.assertEqual(1, len(segments), '2 nodes both having layers')
+
+        way.refs = [1, 2]
+        segments = WaySegment.split_way_into_way_segments(way, nodes_dict)
+        self.assertEqual(1, len(segments), '2 nodes none having layers')
+
+        way.refs = [1, 4, 5]
+        segments = WaySegment.split_way_into_way_segments(way, nodes_dict)
+        self.assertEqual(2, len(segments), '3 nodes last 2 having layers')
+
+        way.refs = [4, 5, 1]
+        segments = WaySegment.split_way_into_way_segments(way, nodes_dict)
+        self.assertEqual(2, len(segments), '3 nodes last having no layers')
+
+        way.refs = [4, 1, 5]
+        segments = WaySegment.split_way_into_way_segments(way, nodes_dict)
+        self.assertEqual(1, len(segments), '3 nodes middle having no layers')
+
+        # test layers
+        way.refs = [1, 2]
+        my_segment = WaySegment.split_way_into_way_segments(way, nodes_dict)[0]
+        my_segment.calc_missing_layers_for_nodes()
+        self.assertEqual(0, my_segment.nodes[0].layers[way], 'First node in 2 nodes none having layers')
+        self.assertEqual(0, my_segment.nodes[1].layers[way], 'Second node in 2 nodes none having layers')
+
+        way.refs = [4, 5]
+        my_segment = WaySegment.split_way_into_way_segments(way, nodes_dict)[0]
+        my_segment.calc_missing_layers_for_nodes()
+        self.assertEqual(4, my_segment.nodes[0].layers[way], 'First node in 2 nodes with having layers')
+        self.assertEqual(5, my_segment.nodes[1].layers[way], 'Second node in 2 nodes with having layers')
+
+        way.refs = [1, 2, 4]
+        del node_1.layers[way]
+        del node_2.layers[way]
+        my_segment = WaySegment.split_way_into_way_segments(way, nodes_dict)[0]
+        my_segment.calc_missing_layers_for_nodes()
+        self.assertEqual(4, my_segment.nodes[0].layers[way], 'First node in 3 nodes last having layers')
+        self.assertEqual(4, my_segment.nodes[1].layers[way], 'Second node in 3 nodes last having layers')
+        self.assertEqual(4, my_segment.nodes[2].layers[way], 'Third node in 3 nodes last having layers')
+
+        way.refs = [5, 1, 2]
+        del node_1.layers[way]
+        del node_2.layers[way]
+        my_segment = WaySegment.split_way_into_way_segments(way, nodes_dict)[0]
+        my_segment.calc_missing_layers_for_nodes()
+        self.assertEqual(5, my_segment.nodes[0].layers[way], 'First node in 3 nodes first having layers')
+        self.assertEqual(5, my_segment.nodes[1].layers[way], 'Second node in 3 nodes first having layers')
+        self.assertEqual(5, my_segment.nodes[2].layers[way], 'Third node in 3 nodes first having layers')
+
+        way.refs = [6, 1, 4]
+        del node_1.layers[way]
+        my_segment = WaySegment.split_way_into_way_segments(way, nodes_dict)[0]
+        my_segment.calc_missing_layers_for_nodes()
+        self.assertEqual(6, my_segment.nodes[0].layers[way], 'First node in 3 nodes middle having no layers')
+        self.assertEqual(6, my_segment.nodes[1].layers[way], 'Second node in 3 nodes middle having no layers')
+        self.assertEqual(4, my_segment.nodes[2].layers[way], 'Third node in 3 nodes middle having no layers')
+
+        way.refs = [6, 1, 2, 3, 4]
+        del node_1.layers[way]
+        del node_2.layers[way]
+        my_segment = WaySegment.split_way_into_way_segments(way, nodes_dict)[0]
+        my_segment.calc_missing_layers_for_nodes()
+        self.assertEqual(6, my_segment.nodes[0].layers[way], 'First node in 5 nodes middle having no layers')
+        self.assertEqual(6, my_segment.nodes[1].layers[way], 'Second node in 5 nodes middle having no layers')
+        self.assertEqual(6, my_segment.nodes[2].layers[way], 'Third node in 5 nodes middle having no layers')
+        self.assertEqual(4, my_segment.nodes[3].layers[way], 'Forth node in 5 nodes middle having no layers')
+        self.assertEqual(4, my_segment.nodes[4].layers[way], 'Fifth node in 5 nodes middle having no layers')
