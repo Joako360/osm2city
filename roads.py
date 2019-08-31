@@ -19,9 +19,9 @@ junctions:
 - currently, we get false positives: one road ends, another one begins.
 - loop junctions:
     for the_node in nodes:
-    if the_node is not endpoint: put way into splitting list
+    if the_node is not endpoint: put linear_obj into splitting list
     #if only 2 nodes, and both end nodes, and road types compatible:
-    #put way into joining list
+    #put linear_obj into joining list
 
 Data structures
 ---------------
@@ -36,7 +36,7 @@ Roads.G: graph
   edges represent roads between junctions, and have obj=op.Way
   self.G[ref_1][ref_2]['obj'] -> op.Way
 
-attached_ways_dict: for each (true) junction node, store a list of tuples (attached way, is_first)
+attached_ways_dict: for each (true) junction node, store a list of tuples (attached linear_obj, is_first)
   basically, this duplicates Roads.G!
   need self.G[ref]['stubs'][4]
   self.G[ref][] -> Junction.stubs_list[2]
@@ -53,18 +53,18 @@ Render junction:
         left_neighbor = compute from angles and width
         store end nodes coords separately
         add to object, get node index
-        - store end nodes index in way
-        - way does not write end node coords, central method does it
+        - store end nodes index in linear_obj
+        - linear_obj does not write end node coords, central method does it
       write junction face
 
 Splitting:
   find all junctions for the_way
-  normally a way would have exactly two junctions (at the ends)
-  sort junctions in way's node order:
+  normally a linear_obj would have exactly two junctions (at the ends)
+  sort junctions in linear_obj's node order:
     add junction node index to dict
     sort list
   split into njunctions-1 ways
-Now each way's end node is either junction or dead-end.
+Now each linear_obj's end node is either junction or dead-end.
 
 Joining:
 
@@ -105,11 +105,11 @@ def is_tunnel(tags: Dict[str, str]) -> bool:
     return s.K_TUNNEL in tags and tags[s.K_TUNNEL] not in [s.V_NO]
 
 
-REPLACED_BRIDGE_KEY = 'replaced_bridge'  # specifies a way that was originally a bridge, but due to length was changed
+REPLACED_BRIDGE_KEY = 'replaced_bridge'  # specifies a linear_obj that was originally a bridge, but due to length was changed
 
 
 def _is_bridge(tags: Dict[str, str]) -> bool:
-    """Returns true if the tags for this way contains the OSM key for bridge."""
+    """Returns true if the tags for this linear_obj contains the OSM key for bridge."""
     if s.K_MAN_MADE in tags and tags[s.K_MAN_MADE] == s.V_BRIDGE:
         return True
     if s.K_BRIDGE in tags and tags not in [s.V_NO]:
@@ -126,9 +126,9 @@ def _replace_bridge_tags(tags: Dict[str, str]) -> None:
 
 
 def _is_replaced_bridge(tags: Dict[str, str]) -> bool:
-    """Returns true is this way was originally a bridge, but was changed to a non-bridge due to length.
+    """Returns true is this linear_obj was originally a bridge, but was changed to a non-bridge due to length.
     See method Roads._replace_short_bridges_with_ways.
-    The reason to keep a replaced_tag is because else the way might be split if a node is in the water."""
+    The reason to keep a replaced_tag is because else the linear_obj might be split if a node is in the water."""
     return REPLACED_BRIDGE_KEY in tags
 
 
@@ -179,7 +179,7 @@ def _compatible_ways(way1: op.Way, way2: op.Way) -> bool:
 
 
 def _init_way_from_existing(way: op.Way, node_references: List[int]) -> op.Way:
-    """Return copy of way. The copy will have same osm_id and tags, but only given refs"""
+    """Return copy of linear_obj. The copy will have same osm_id and tags, but only given refs"""
     new_way = op.Way(op.get_next_pseudo_osm_id(op.OSMFeatureType.road))
     new_way.pseudo_osm_id = way.osm_id
     new_way.tags = way.tags.copy()
@@ -333,19 +333,19 @@ def highway_type_from_osm_tags(tags: Dict[str, str]) -> Optional[HighwayType]:
 
 
 def max_slope_for_road(obj):
-    if s.K_HIGHWAY in obj.tags:
-        if obj.tags[s.K_HIGHWAY] in [s.V_MOTORWAY]:
+    if s.K_HIGHWAY in obj.way.tags:
+        if obj.way.tags[s.K_HIGHWAY] in [s.V_MOTORWAY]:
             return parameters.MAX_SLOPE_MOTORWAY
         else:
             return parameters.MAX_SLOPE_ROAD
     # must be aligned with accepted railways in Roads._create_linear_objects
-    elif s.K_RAILWAY in obj.tags:
+    elif s.K_RAILWAY in obj.way.tags:
         return parameters.MAX_SLOPE_RAILWAY
 
 
 def _find_junctions(attached_ways_dict: Dict[int, List[Tuple[op.Way, bool]]],
                     ways_list: List[op.Way]) -> None:
-    """Finds nodes, which are shared by at least 2 ways at the start or end of the way.
+    """Finds nodes, which are shared by at least 2 ways at the start or end of the linear_obj.
 
     The node may only be referenced one, otherwise unclear how to join (e.g. circular)
     """
@@ -361,21 +361,21 @@ def _find_junctions(attached_ways_dict: Dict[int, List[Tuple[op.Way, bool]]],
 
 def _attached_ways_dict_remove(attached_ways_dict: Dict[int, List[Tuple[op.Way, bool]]], the_ref: int,
                                the_way: op.Way, is_start: bool) -> None:
-    """Remove given way from given node in attached_ways_dict"""
+    """Remove given linear_obj from given node in attached_ways_dict"""
     if the_ref not in attached_ways_dict:
-        logging.warning("not removing way %i from the ref %i because the ref is not in attached_ways_dict",
+        logging.warning("not removing linear_obj %i from the ref %i because the ref is not in attached_ways_dict",
                         the_way.osm_id, the_ref)
         return
     for way_pos_tuple in attached_ways_dict[the_ref]:
         if way_pos_tuple[0] == the_way and way_pos_tuple[1] is is_start:
-            logging.debug("removing way %s from node %i", the_way, the_ref)
+            logging.debug("removing linear_obj %s from node %i", the_way, the_ref)
             attached_ways_dict[the_ref].remove(way_pos_tuple)
             break
 
 
 def _attached_ways_dict_append(attached_ways_dict: Dict[int, List[Tuple[op.Way, bool]]], the_ref: int,
                                the_way: op.Way, is_start: bool) -> None:
-    """Append given way to attached_ways_dict."""
+    """Append given linear_obj to attached_ways_dict."""
     if the_ref not in attached_ways_dict:
         attached_ways_dict[the_ref] = list()
     attached_ways_dict[the_ref].append((the_way, is_start))
@@ -418,7 +418,7 @@ def cut_line_at_points(line: shg.LineString, points: List[shg.Point]) -> List[sh
 
 
 class WaySegment:
-    """A segment of a way as a temporary storage to process nodes attributes for layers"""
+    """A segment of a linear_obj as a temporary storage to process nodes attributes for layers"""
     __slots__ = ('way', 'start_layer', 'end_layer', 'nodes')
 
     def __init__(self, way: op.Way) -> None:
@@ -434,7 +434,7 @@ class WaySegment:
 
     @staticmethod
     def split_way_into_way_segments(way: op.Way, nodes_dict: Dict[int, op.Node]) -> List['WaySegment']:
-        """Split is only done when a node has a layer for the specific way.
+        """Split is only done when a node has a layer for the specific linear_obj.
 
         A segment can start and/or stop at a node, which does not have a layer attribute."""
         segments = list()
@@ -451,7 +451,7 @@ class WaySegment:
         return segments
 
     def calc_missing_layers_for_nodes(self) -> None:
-        """Make sure each node of the segment gets a layer for the way assigned.
+        """Make sure each node of the segment gets a layer for the linear_obj assigned.
 
         Unless none of the nodes has a node with a layer at start or end (i.e. a Way in osm2city disconnected from
         other ways.
@@ -502,7 +502,7 @@ class Roads(object):
         num_removed = 0
         for way in reversed(self.ways_list):
             if len(way.refs) < 2:
-                logging.warning('Removing way with osm_id=%i due to only %i nodes after "%s"',
+                logging.warning('Removing linear_obj with osm_id=%i due to only %i nodes after "%s"',
                                 way.osm_id, len(way.refs), prev_method_name)
                 self.ways_list.remove(way)
                 num_removed += 1
@@ -601,7 +601,7 @@ class Roads(object):
 
     def _check_lighting(self, lit_areas: List[shg.Polygon]) -> None:
         """Checks ways for lighting and maybe splits at borders for built-up areas."""
-        way_la_map = dict()  # key: way, value: list(lit_Area) from split -> prevent re-check of mini-residuals
+        way_la_map = dict()  # key: linear_obj, value: list(lit_Area) from split -> prevent re-check of mini-residuals
         new_ways_1 = self._check_lighting_inner(self.ways_list, lit_areas, way_la_map)
         self.ways_list.extend(new_ways_1)
         new_ways_2 = self._check_lighting_inner(new_ways_1, lit_areas, way_la_map)
@@ -629,7 +629,7 @@ class Roads(object):
                 continue
             if _is_lit(way.tags):
                 orig_lit += 1
-                continue  # nothing further to do with this way
+                continue  # nothing further to do with this linear_obj
 
             if way in way_la_map:
                 already_checked_luls = way_la_map[way]
@@ -682,7 +682,7 @@ class Roads(object):
                     cut_ways_dict = self.cut_way_at_intersection_points(intersection_points, way, my_line)
 
                     # now check whether it is lit or not. Due to rounding errors we do this conservatively
-                    is_new_way = False  # the first item in the dict is the original way by convention
+                    is_new_way = False  # the first item in the dict is the original linear_obj by convention
                     for cut_way, distance in cut_ways_dict.items():
                         my_point = my_line.interpolate(distance)
                         if my_point.within(lit_area):
@@ -722,16 +722,16 @@ class Roads(object):
 
     def cut_way_at_intersection_points(self, intersection_points: List[shg.Point], way: op.Way,
                                        my_line: shg.LineString) -> MutableMapping[op.Way, float]:
-        """Cuts an existing way into several parts based in intersection points given as a parameter.
-        Returns an OrderedDict of Ways, where the first element is always the (changed) original way, such
+        """Cuts an existing linear_obj into several parts based in intersection points given as a parameter.
+        Returns an OrderedDict of Ways, where the first element is always the (changed) original linear_obj, such
         that the distance from start to intersection is clear.
         Cutting also checks that the potential new cut ways have a minimum distance based on 
         parameters.BUILT_UP_AREA_LIT_BUFFER, such that the splitting is not too tiny. This can lead to that
-        an original way just keeps its original length despite one or several intersection points.
-        Distance in the returned dictionary refers to the last point's distance along the original way, which
-        is e.g. the length of the original way for the last cut way."""
+        an original linear_obj just keeps its original length despite one or several intersection points.
+        Distance in the returned dictionary refers to the last point's distance along the original linear_obj, which
+        is e.g. the length of the original linear_obj for the last cut linear_obj."""
         intersect_dict = dict()  # osm_id for node, distance from start
-        cut_ways_dict = OrderedDict()  # key: way, value: distance of end from start of original way
+        cut_ways_dict = OrderedDict()  # key: linear_obj, value: distance of end from start of original linear_obj
         # create new global nodes
         for point in intersection_points:
             distance = my_line.project(point)
@@ -777,7 +777,7 @@ class Roads(object):
             for key, distance in ordered_intersect_dict.items():
                 if prev_orig_point_dist < distance < next_orig_point_dist:
                     intersects_to_remove.append(key)
-                    # check minimal distance of way pieces
+                    # check minimal distance of linear_obj pieces
                     if (distance - prev_orig_point_dist) < parameters.OWBB_BUILT_UP_BUFFER:
                         continue
                     # make cut
@@ -806,9 +806,9 @@ class Roads(object):
         if is_first:  # maybe the intersection points were all below minimal distance -> nothing to do
             cut_ways_dict[way] = my_line.length / 2
         else:
-            # check minimal distance of way pieces
+            # check minimal distance of linear_obj pieces
             if (my_line.length - prev_orig_point_dist) < parameters.OWBB_BUILT_UP_BUFFER:
-                # instead of new cut way extend the last cut way, but do not change its middle_distance
+                # instead of new cut linear_obj extend the last cut linear_obj, but do not change its middle_distance
                 # last cut_way is still "new_way", because we are not is_first
                 new_way.refs.append(original_refs[-1])
             else:
@@ -819,21 +819,21 @@ class Roads(object):
                 new_way.refs.append(original_refs[-1])
                 cut_ways_dict[new_way] = my_line.length - (my_line.length - prev_orig_point_dist) / 2
 
-        logging.debug('{} new cut ways (not including orig way) from {} intersections'.format(len(cut_ways_dict) - 1,
+        logging.debug('{} new cut ways (not including orig linear_obj) from {} intersections'.format(len(cut_ways_dict) - 1,
                                                                                               len(intersection_points)))
         return cut_ways_dict
 
     def _change_way_for_object(self, my_line: shg.LineString, original_way: op.Way) -> None:
-        """Processes an original way and replaces its coordinates with the coordinates of a LineString."""
+        """Processes an original linear_obj and replaces its coordinates with the coordinates of a LineString."""
         prev_refs = original_way.refs[:]
         the_coordinates = list(my_line.coords)
         original_way.refs = utilities.match_local_coords_with_global_nodes(the_coordinates, prev_refs, self.nodes_dict,
                                                                            self.transform, original_way.osm_id, True)
 
     def _split_way_for_object(self, my_multiline: shg.MultiLineString, original_way: op.Way) -> List[op.Way]:
-        """Processes an original way split by an object (blocked area, stg_entry) and creates additional way.
+        """Processes an original linear_obj split by an object (blocked area, stg_entry) and creates additional linear_obj.
         If one of the linestrings is shorter than parameter, then it is discarded to reduce the number of residuals.
-        The list of returned ways can be empty, in which case the original way should be removed after the call."""
+        The list of returned ways can be empty, in which case the original linear_obj should be removed after the call."""
         is_first = True
         additional_ways = list()
         prev_refs = original_way.refs[:]
@@ -892,8 +892,8 @@ class Roads(object):
         """start at bridges, propagate v_add through nodes"""
         for the_bridge in self.bridges_list:
             # build tree starting at node0
-            node0 = the_bridge.refs[0]
-            node1 = the_bridge.refs[-1]
+            node0 = the_bridge.way.refs[0]
+            node1 = the_bridge.way.refs[-1]
 
             node0s = {node1}
             visited = {node0, node1}
@@ -932,14 +932,14 @@ class Roads(object):
             for ref in refs_to_remove:
                 if len(way.refs) == 2:
                     break
-                if ref in way.refs:  # This is a hack for something that actually happens (closed way?), but should not
+                if ref in way.refs:  # This is a hack for something that actually happens (closed linear_obj?), but should not
                     if way.refs.count(ref) > 1:
                         continue  # in seldom cases the same node might also be used several times (e.g. for an 8-form)
                     way.refs.remove(ref)
                     num_refs_removed += 1
-                    logging.debug('Removing ref %d from way %d due to too short segment', ref, way.osm_id)
+                    logging.debug('Removing ref %d from linear_obj %d due to too short segment', ref, way.osm_id)
                 else:
-                    logging.warning('Removing ref %d from way %d not possible because ref not there', ref, way.osm_id)
+                    logging.warning('Removing ref %d from linear_obj %d not possible because ref not there', ref, way.osm_id)
         logging.debug('Removed %i refs in %i ways due to too short segments', num_refs_removed, len(self.ways_list))
 
     def _cleanup_topology(self) -> None:
@@ -947,7 +947,7 @@ class Roads(object):
         logging.debug("Number of ways before cleaning topology: %i" % len(self.ways_list))
 
         # a dictionary with a Node id as key. Each node has one or several ways using it in a list.
-        # The entry per way is a tuple of the way object as well as whether the node is at the start
+        # The entry per linear_obj is a tuple of the linear_obj object as well as whether the node is at the start
         attached_ways_dict = dict()  # Dict[int, List[Tuple[op.Way, bool]]]
 
         # do it again, because the references and positions have changed
@@ -964,7 +964,7 @@ class Roads(object):
                 self.ways_list.remove(the_way)
 
     def _replace_short_bridges_with_ways(self):
-        """Remove bridge tag from short bridges, making them a simple way."""
+        """Remove bridge tag from short bridges, making them a simple linear_obj."""
         for the_way in self.ways_list:
             if _is_bridge(the_way.tags):
                 bridge = self._line_string_from_way(the_way)
@@ -1008,11 +1008,11 @@ class Roads(object):
             the_way.refs = my_new_refs
 
     def _calculate_way_layers_at_node(self) -> None:
-        """At each node shared between ways determine, which layer a way should belong to.
+        """At each node shared between ways determine, which layer a linear_obj should belong to.
 
         Otherwise the different textures at a given point might be fighting in the z-layer in rendering.
 
-        A way where the node is not at the start/end gets priority over a way, where it is at the start/end.
+        A linear_obj where the node is not at the start/end gets priority over a linear_obj, where it is at the start/end.
         Then a railway gets priority over a road
         Then within a railway or road the priority is based on the value of the type
         Last a higher osm_id wins anything else equal.
@@ -1021,7 +1021,7 @@ class Roads(object):
         for the_way in self.ways_list:
             for ref in the_way.refs:
                 node = self.nodes_dict[ref]
-                if the_way not in node.layers:  # the same node can be several times in a way
+                if the_way not in node.layers:  # the same node can be several times in a linear_obj
                     node.layers[the_way] = 0
 
         # now we need to do the sorting. If a node has none or 1 reference, then it is easy.
@@ -1080,22 +1080,20 @@ class Roads(object):
             else:
                 continue
 
-            # The above the ground level determines how much the way will be hovering above the ground.
-            # The reason to include the type is that when (highways) are crossing, then the higher level way
+            # The above the ground level determines how much the linear_obj will be hovering above the ground.
+            # The reason to include the type is that when (highways) are crossing, then the higher level linear_obj
             # should have priority in visibility.
             # In earlier code the following was added to give some variance: random.uniform(0.01, 0.1)
             above_ground_level = parameters.MIN_ABOVE_GROUND_LEVEL + parameters.DISTANCE_BETWEEN_LAYERS * priority
 
             try:
                 if _is_bridge(the_way.tags):
-                    obj = linear_bridge.LinearBridge(self.transform, self.fg_elev, the_way.osm_id,
-                                                     the_way.tags, the_way.refs, self.nodes_dict,
+                    obj = linear_bridge.LinearBridge(self.transform, self.fg_elev, the_way, self.nodes_dict,
                                                      width, above_ground_level, tex_coords=tex)
                     self.bridges_list.append(obj)
                 else:
-                    obj = linear.LinearObject(self.transform, the_way.osm_id,
-                                              the_way.tags, the_way.refs,
-                                              self.nodes_dict, width, above_ground_level, tex_coords=tex)
+                    obj = linear.LinearObject(self.transform, the_way, self.nodes_dict,
+                                              width, above_ground_level, tex_coords=tex)
                     if is_railway(the_way):
                         self.railway_list.append(obj)
                     else:
@@ -1177,7 +1175,7 @@ class Roads(object):
         """Join ways of compatible type, where way1's last node is way2's first node."""
         logging.debug("Joining %i and %i", way1.osm_id, way2.osm_id)
         if way1.osm_id == way2.osm_id:
-            logging.debug("WARNING: Not joining way %i with itself", way1.osm_id)
+            logging.debug("WARNING: Not joining linear_obj %i with itself", way1.osm_id)
             return
         _attached_ways_dict_remove(attached_ways_dict, way1.refs[-1], way1, False)
         _attached_ways_dict_remove(attached_ways_dict, way2.refs[0], way2, True)
@@ -1204,7 +1202,7 @@ class Roads(object):
             if len(way_pos_list) < 2:
                 continue
 
-            start_dict = dict()  # dict of ways where node is start point with key = way, value = degree from north
+            start_dict = dict()  # dict of ways where node is start point with key = linear_obj, value = degree from north
             end_dict = dict()  # ditto for node is end point
             for way, is_start in way_pos_list:
                 if is_start:
@@ -1222,7 +1220,7 @@ class Roads(object):
                                                                   self.transform)
                     end_dict[way] = angle
 
-            # for each in end_dict search in start_dict the one with the closest angle and which is a compatible way
+            # for each in end_dict search in start_dict the one with the closest angle and which is a compatible linear_obj
             for end_way, end_angle in end_dict.items():
                 if end_way.is_closed():
                     continue  # never combine ways which are closed (e.g. roundabouts)
@@ -1253,7 +1251,7 @@ class Roads(object):
         for the_way in self.ways_list:
             if the_way.osm_id == osm_id:
                 return the_way
-        raise ValueError("way %i not found" % osm_id)
+        raise ValueError("linear_obj %i not found" % osm_id)
 
     def _clusterize(self, stats: utilities.Stats):
         """Create cluster.
@@ -1265,12 +1263,12 @@ class Roads(object):
         self.railways_clusters = ClusterContainer(lmin, lmax)
 
         for the_object in self.bridges_list + self.roads_list + self.railway_list:
-            if is_railway(the_object):
+            if is_railway(the_object.way):
                 cluster_ref = self.railways_clusters.append(Vec2d(the_object.center.centroid.coords[0]),
                                                             the_object, stats)
             else:
-                if _is_highway(the_object):
-                    if highway_type_from_osm_tags(the_object.tags).value < parameters.HIGHWAY_TYPE_MIN_ROUGH_LOD:
+                if _is_highway(the_object.way):
+                    if highway_type_from_osm_tags(the_object.way.tags).value < parameters.HIGHWAY_TYPE_MIN_ROUGH_LOD:
                         cluster_ref = self.roads_clusters.append(Vec2d(the_object.center.centroid.coords[0]),
                                                                  the_object, stats)
                     else:

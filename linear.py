@@ -70,13 +70,11 @@ class LinearObject(object):
           - if yes, use stored node indices
     """
 
-    def __init__(self, transform, osm_id: int, tags: Dict[str, str], refs: List[int], nodes_dict:  Dict[int, op.Node],
+    def __init__(self, transform, way: op.Way, nodes_dict:  Dict[int, op.Node],
                  width: float, above_ground_level: float, tex_coords: Tuple[float, float] = textures.road.EMBANKMENT_1):
         self.width = width
         self.AGL = above_ground_level  # drape distance above terrain
-        self.osm_id = osm_id
-        self.refs = refs
-        self.tags = tags
+        self.way = way
         self.nodes_dict = nodes_dict
         self.written_to_ac = False
 
@@ -86,14 +84,14 @@ class LinearObject(object):
         self.segment_len = None  # numpy array defined in compute_angle_etc()
         self.dist = None  # numpy array defined in compute_angle_etc()
 
-        osm_nodes = [nodes_dict[r] for r in refs]
+        osm_nodes = [nodes_dict[r] for r in way.refs]
         nodes = np.array([transform.to_local((n.lon, n.lat)) for n in osm_nodes])
         self.center = shg.LineString(nodes)
         try:
             self._compute_angle_etc()
-            self.edge = self._compute_offset(self.width / 2.)
+            self.left, self.right = self._compute_sides(self.width / 2.)  # LineStrings
         except Warning as reason:
-            logging.warning("Warning in OSM_ID %i: %s", self.osm_id, reason)
+            logging.warning("Warning in OSM_ID %i: %s", self.way.osm_id, reason)
         self.tex = tex_coords  # determines which part of texture we use
 
         # set in roads.py
@@ -101,7 +99,8 @@ class LinearObject(object):
         self.junction0 = None  # utils.graph.Junction
         self.junction1 = None  # utils.graph.Junction
 
-    def _compute_offset(self, offset):
+    def _compute_sides(self, offset: float) -> Tuple[shg.LineString, shg.LineString]:
+        """Given an offset (ca. half of width) calculate left and right sides including taking care of angles."""
         offset += 1.
         n = len(self.center.coords)
         left = np.zeros((n, 2))
@@ -115,7 +114,7 @@ class LinearObject(object):
             mean_normal /= length
             angle = (np.pi + self.angle[i - 1] - self.angle[i]) / 2.
             if abs(angle) < 0.0175:  # 1 deg
-                raise ValueError('AGAIN angle > 179 in OSM_ID %i with refs %s' % (self.osm_id, str(self.refs)))
+                raise ValueError('AGAIN angle > 179 in OSM_ID %i with refs %s' % (self.way.osm_id, str(self.way.refs)))
             o = abs(offset / math.sin(angle))
             our_node = np.array(self.center.coords[i])
             left[i] = our_node + mean_normal * o
@@ -133,8 +132,8 @@ class LinearObject(object):
     def plot(self, center=True, left=False, right=False, angle=True, clf=True, show=True):
         """debug"""
         c = np.array(self.center.coords)
-        left_edge = np.array(self.edge[0].coords)
-        right_edge = np.array(self.edge[1].coords)
+        left_edge = np.array(self.left.coords)
+        right_edge = np.array(self.right.coords)
         if clf:
             plt.clf()
         if center:
@@ -160,7 +159,7 @@ class LinearObject(object):
                 plt.text(n[0] + 3, n[1], "%i" % i, color='r')
         if show:
             plt.show()
-            plt.savefig('roads_%i.eps' % self.osm_id)
+            plt.savefig('roads_%i.eps' % self.way.osm_id)
 
     def _compute_angle_etc(self):
         """Compute normals, angle, segment_length, accumulated distance start"""
@@ -179,11 +178,11 @@ class LinearObject(object):
             angle = np.pi - abs(self.angle[i - 1] - self.angle[i])
             if i > 0 and abs(angle) < 0.0175:  # 1 deg
                 raise ValueError('CONSTR angle > 179 in OSM_ID %i at (%i, %i) with refs %s'
-                                 % (self.osm_id, i, i - 1, str(self.refs)))
+                                 % (self.way.osm_id, i, i - 1, str(self.way.refs)))
 
             self.segment_len[i] = (dy * dy + dx * dx) ** 0.5
             if self.segment_len[i] == 0:
-                logging.error("osm id: %i contains a segment with zero len", self.osm_id)
+                logging.error("osm id: %i contains a segment with zero len", self.way.osm_id)
                 self.normals[i] = np.array((-dy, dx)) / 0.00000001
             else:
                 self.normals[i] = np.array((-dy, dx)) / self.segment_len[i]
@@ -261,8 +260,8 @@ class LinearObject(object):
     def _get_v_add(self, fg_elev: FGElev):
         """
         """
-        first_node = self.nodes_dict[self.refs[0]]
-        last_node = self.nodes_dict[self.refs[-1]]
+        first_node = self.nodes_dict[self.way.refs[0]]
+        last_node = self.nodes_dict[self.way.refs[-1]]
 
         # -- elevated road. Got v_add data for first and last node. Now lift intermediate
         #    nodes. So far, v_add is for center line only.
@@ -272,8 +271,8 @@ class LinearObject(object):
 
         epsilon = 0.001
 
-        assert (len(self.edge[0].coords) == len(self.edge[0].coords))
-        n_nodes = len(self.edge[0].coords)
+        assert (len(self.left.coords) == len(self.right.coords))
+        n_nodes = len(self.left.coords)
 
         v_add_0 = first_node.v_add
         v_add_1 = last_node.v_add
@@ -311,8 +310,8 @@ class LinearObject(object):
 
     def _level_out(self, fg_elev: FGElev, v_add):
         """given v_add, adjust left_z and right_z to stay below MAX_TRANSVERSE_GRADIENT"""
-        left_z = probe_ground(fg_elev, self.edge[0]) + self.AGL
-        right_z = probe_ground(fg_elev, self.edge[1]) + self.AGL
+        left_z = probe_ground(fg_elev, self.left) + self.AGL
+        right_z = probe_ground(fg_elev, self.right) + self.AGL
 
         diff_elev = left_z - right_z
         for i, the_diff in enumerate(diff_elev):
@@ -339,9 +338,9 @@ class LinearObject(object):
         return left_z, right_z, v_add
 
     def debug_print_node_info(self, the_node, v_add=None):
-        if the_node in self.refs:
-            i = self.refs.index(the_node)
-            logging.debug(">> OSMID %i %i v_add %5.2g", self.osm_id, i, self.nodes_dict[the_node].v_add)
+        if the_node in self.way.refs:
+            i = self.way.refs.index(the_node)
+            logging.debug(">> OSMID %i %i v_add %5.2g", self.way.osm_id, i, self.nodes_dict[the_node].v_add)
             if v_add is not None:
                 logging.debug(v_add)
             else:
@@ -352,7 +351,7 @@ class LinearObject(object):
     def debug_label_nodes(self, line_string, z, ac, elev_offset, offset, v_add):
         for i, anchor in enumerate(line_string.coords):
             e = z[i] - elev_offset
-            ac.add_label('<' + str(self.osm_id) + '> add %5.2f' % v_add[i], -(anchor[1] - offset.y),
+            ac.add_label('<' + str(self.way.osm_id) + '> add %5.2f' % v_add[i], -(anchor[1] - offset.y),
                          e + 0.5, -(anchor[0] - offset.x), scale=1)
 
     def write_to(self, obj: utils.ac3d.Object, fg_elev: FGElev, elev_offset, offset=None) -> bool:
@@ -366,24 +365,24 @@ class LinearObject(object):
         v_add, center_z = self._get_v_add(fg_elev)
         left_z, right_z, v_add = self._level_out(fg_elev, v_add)
 
-        left_nodes_list = self._write_nodes(obj, self.edge[0], left_z, elev_offset,
+        left_nodes_list = self._write_nodes(obj, self.left, left_z, elev_offset,
                                             offset, join=True, is_left=True)
-        right_nodes_list = self._write_nodes(obj, self.edge[1], right_z, elev_offset,
+        right_nodes_list = self._write_nodes(obj, self.right, right_z, elev_offset,
                                              offset, join=True, is_left=False)
 
         mat_idx = utils.ac3d.MAT_IDX_UNLIT
-        if s.K_LIT in self.tags and self.tags[s.K_LIT] == s.V_YES:
+        if s.K_LIT in self.way.tags and self.way.tags[s.K_LIT] == s.V_YES:
             mat_idx = utils.ac3d.MAT_IDX_LIT
 
         self._write_quads(obj, left_nodes_list, right_nodes_list, self.tex[0], self.tex[1], mat_idx)
         if v_add is not None:
             # -- side walls of embankment
             if v_add.max() > 0.1:
-                left_ground_z = probe_ground(fg_elev, self.edge[0])
-                right_ground_z = probe_ground(fg_elev, self.edge[1])
+                left_ground_z = probe_ground(fg_elev, self.left)
+                right_ground_z = probe_ground(fg_elev, self.right)
 
-                left_ground_nodes = self._write_nodes(obj, self.edge[0], left_ground_z, elev_offset, offset=offset)
-                right_ground_nodes = self._write_nodes(obj, self.edge[1], right_ground_z, elev_offset, offset=offset)
+                left_ground_nodes = self._write_nodes(obj, self.left, left_ground_z, elev_offset, offset=offset)
+                right_ground_nodes = self._write_nodes(obj, self.right, right_ground_z, elev_offset, offset=offset)
                 self._write_quads(obj, left_ground_nodes, left_nodes_list, parameters.EMBANKMENT_TEXTURE[0],
                                   parameters.EMBANKMENT_TEXTURE[1], utils.ac3d.MAT_IDX_UNLIT)
                 self._write_quads(obj, right_nodes_list, right_ground_nodes, parameters.EMBANKMENT_TEXTURE[0],

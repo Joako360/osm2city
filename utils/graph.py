@@ -43,7 +43,7 @@ class Junction(object):
           -> for the_ref, the_junction in attached_ways_dict.items()
           for ref in self.attached_ways_dict
           -> unchanged
-          for way, boolean in self.attached_ways_dict[the_ref]:
+          for linear_obj, boolean in self.attached_ways_dict[the_ref]:
           -> junction = self.attached_ways_dict[the_ref].attached_ways
           OR __items__()
           for ref, ways_tuple_list in self.attached_ways_dict.iteritems()
@@ -108,24 +108,24 @@ class Graph(nx.Graph):
         """return object attached to node"""
         return self.node[the_ref]['obj']
 
-    def add_linear_object_edge(self, way):
-        ref0 = way.refs[0]
-        ref1 = way.refs[-1]
+    def add_linear_object_edge(self, linear_obj):
+        ref0 = linear_obj.way.refs[0]
+        ref1 = linear_obj.way.refs[-1]
         try:
             junction0 = self.junction(ref0)
-            junction0.append_way(way, is_first=True)
+            junction0.append_way(linear_obj, is_first=True)
         except KeyError:
-            junction0 = Junction(way, is_first=True)  # IS_FIRST
+            junction0 = Junction(linear_obj, is_first=True)  # IS_FIRST
             super().add_node(ref0, obj=junction0)
 
         try:
             junction1 = self.junction(ref1)
-            junction1.append_way(way, is_first=False)
+            junction1.append_way(linear_obj, is_first=False)
         except KeyError:
-            junction1 = Junction(way, is_first=False)
+            junction1 = Junction(linear_obj, is_first=False)
             super().add_node(ref1, obj=junction1)
             
-        super().add_edge(ref0, ref1, obj=way)
+        super().add_edge(ref0, ref1, obj=linear_obj)
 
-        way.junction0 = junction0
-        way.junction1 = junction1
+        linear_obj.junction0 = junction0
+        linear_obj.junction1 = junction1
