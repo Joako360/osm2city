@@ -213,9 +213,3 @@ def get_apt_dat_blocked_areas_from_airports(coords_transform: coordinates.Transf
         if airport.within_boundary(min_lon, min_lat, max_lon, max_lat):
             blocked_areas.extend(airport.create_blocked_areas(coords_transform))
     return blocked_areas
-
-
-def get_apt_dat_blocked_areas(coords_transform: coordinates.Transformation,
-                              min_lon: float, min_lat: float, max_lon: float, max_lat: float) -> List[Polygon]:
-    airports = read_apt_dat_gz_file(min_lon, min_lat, max_lon, max_lat)
-    return get_apt_dat_blocked_areas_from_airports(coords_transform, min_lon, min_lat, max_lon, max_lat, airports)
