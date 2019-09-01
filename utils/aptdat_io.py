@@ -132,14 +132,16 @@ class Airport(object):
             return True
         return False
 
-    def create_blocked_areas(self, coords_transform: coordinates.Transformation) -> List[Polygon]:
+    def create_blocked_areas(self, coords_transform: coordinates.Transformation,
+                             include_pavement: bool) -> List[Polygon]:
         blocked_areas = list()
         for runway in self.runways:
             blocked_areas.append(runway.create_blocked_area(coords_transform))
-        for pavement in self.pavements:
-            pavement_buffers = pavement.create_polygon_buffer(coords_transform)
-            for pb in pavement_buffers:
-                blocked_areas.append(pb)
+        if include_pavement:
+            for pavement in self.pavements:
+                pavement_buffers = pavement.create_polygon_buffer(coords_transform)
+                for pb in pavement_buffers:
+                    blocked_areas.append(pb)
         return blocked_areas
 
     def create_boundary_polygons(self, coords_transform: coordinates.Transformation) -> Optional[List[Polygon]]:
@@ -204,12 +206,14 @@ def read_apt_dat_gz_file(min_lon: float, min_lat: float,
 
 def get_apt_dat_blocked_areas_from_airports(coords_transform: coordinates.Transformation,
                                             min_lon: float, min_lat: float, max_lon: float, max_lat: float,
-                                            airports: List[Airport]) -> List[Polygon]:
+                                            airports: List[Airport], include_pavement: bool) -> List[Polygon]:
     """Transforms runways in airports to polygons.
     Even though get_apt_dat_blocked_areas(...) already checks for boundary it is checked here again because if used
-    from batch, then first boundary of whole batch area is used - and first then reduced to tile boundary."""
+    from batch, then first boundary of whole batch area is used - and first then reduced to tile boundary.
+
+    If include_pavement is False, then only runways/helipads are considered"""
     blocked_areas = list()
     for airport in airports:
         if airport.within_boundary(min_lon, min_lat, max_lon, max_lat):
-            blocked_areas.extend(airport.create_blocked_areas(coords_transform))
+            blocked_areas.extend(airport.create_blocked_areas(coords_transform, include_pavement))
     return blocked_areas

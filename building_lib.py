@@ -1703,7 +1703,7 @@ def overlap_check_blocked_areas(orig_buildings: List[Building], blocked_areas: L
     for building in orig_buildings:
         is_intersected = False
         for blocked_area in blocked_areas:
-            if building.geometry.intersects(blocked_area):
+            if building.geometry.intersects(blocked_area) or building.geometry.within(blocked_area):
                 logging.debug("Building osm_id=%d intersects with blocked area.", building.osm_id)
                 is_intersected = True
                 break

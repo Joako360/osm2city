@@ -103,6 +103,8 @@ OVERLAP_CHECK_CH_BUFFER_SHARED = 0.0
 
 OVERLAP_CHECK_CONSIDER_SHARED = True
 
+OVERLAP_CHECK_PAVEMENT = False  # At airports do only use runways/heliports or also pavement
+
 # -- Skip buildings based on their OSM name tag or OSM ID, e.g. in case there's already
 #    a static model for these, and the overlap check fails.
 #    Use unicode strings as in the first example if there are non-ASCII characters.

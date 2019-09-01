@@ -125,16 +125,6 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
         my_fg_elev = FGElev(the_coords_transform, scenery_tile.tile_index)
         my_stg_entries = utils.stg_io2.read_stg_entries_in_boundary(True, the_coords_transform)
 
-        # cannot be read once for all outside of tiles in main function due to local coordinates
-        my_blocked_areas = None
-        if exec_argument in (Procedures.all, Procedures.buildings, Procedures.roads):
-            my_blocked_areas = aptdat_io.get_apt_dat_blocked_areas_from_airports(the_coords_transform,
-                                                                                 parameters.BOUNDARY_WEST,
-                                                                                 parameters.BOUNDARY_SOUTH,
-                                                                                 parameters.BOUNDARY_EAST,
-                                                                                 parameters.BOUNDARY_NORTH,
-                                                                                 my_airports)
-
         # run programs
         if exec_argument is Procedures.pylons or (exec_argument is Procedures.details and
                                                   parameters.C2P_PROCESS_STREETLAMPS is False):
@@ -147,10 +137,24 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
         if lit_areas is None and water_areas is None and osm_buildings is None:
             process_built_stuff = False
         if exec_argument in [Procedures.buildings, Procedures.main, Procedures.all] and process_built_stuff:
-            buildings.process_buildings(the_coords_transform, my_fg_elev, my_blocked_areas, my_stg_entries,
+            # cannot be read once for all outside of tiles in main function due to local coordinates
+            my_airport_areas = aptdat_io.get_apt_dat_blocked_areas_from_airports(the_coords_transform,
+                                                                                 parameters.BOUNDARY_WEST,
+                                                                                 parameters.BOUNDARY_SOUTH,
+                                                                                 parameters.BOUNDARY_EAST,
+                                                                                 parameters.BOUNDARY_NORTH,
+                                                                                 my_airports,
+                                                                                 parameters.OVERLAP_CHECK_PAVEMENT)
+            buildings.process_buildings(the_coords_transform, my_fg_elev, my_airport_areas, my_stg_entries,
                                         osm_buildings, file_lock)
         if exec_argument in [Procedures.roads, Procedures.main, Procedures.all] and process_built_stuff:
-            roads.process_roads(the_coords_transform, my_fg_elev, my_blocked_areas, lit_areas, water_areas,
+            my_airport_areas = aptdat_io.get_apt_dat_blocked_areas_from_airports(the_coords_transform,
+                                                                                 parameters.BOUNDARY_WEST,
+                                                                                 parameters.BOUNDARY_SOUTH,
+                                                                                 parameters.BOUNDARY_EAST,
+                                                                                 parameters.BOUNDARY_NORTH,
+                                                                                 my_airports, True)
+            roads.process_roads(the_coords_transform, my_fg_elev, my_airport_areas, lit_areas, water_areas,
                                 my_stg_entries, file_lock)
         if exec_argument in [Procedures.pylons, Procedures.main, Procedures.all]:
             pylons.process_pylons(the_coords_transform, my_fg_elev, my_stg_entries, file_lock)
