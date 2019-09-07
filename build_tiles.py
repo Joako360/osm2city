@@ -143,8 +143,7 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
                                                                                  parameters.BOUNDARY_SOUTH,
                                                                                  parameters.BOUNDARY_EAST,
                                                                                  parameters.BOUNDARY_NORTH,
-                                                                                 my_airports,
-                                                                                 parameters.OVERLAP_CHECK_PAVEMENT)
+                                                                                 my_airports, True)
             buildings.process_buildings(the_coords_transform, my_fg_elev, my_airport_areas, my_stg_entries,
                                         osm_buildings, file_lock)
         if exec_argument in [Procedures.roads, Procedures.main, Procedures.all] and process_built_stuff:
@@ -153,7 +152,7 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
                                                                                  parameters.BOUNDARY_SOUTH,
                                                                                  parameters.BOUNDARY_EAST,
                                                                                  parameters.BOUNDARY_NORTH,
-                                                                                 my_airports, True)
+                                                                                 my_airports, False)
             roads.process_roads(the_coords_transform, my_fg_elev, my_airport_areas, lit_areas, water_areas,
                                 my_stg_entries, file_lock)
         if exec_argument in [Procedures.pylons, Procedures.main, Procedures.all]:
