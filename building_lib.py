@@ -1936,7 +1936,7 @@ class WorshipBuilding(object):
             if model.type_ is requested_type:
                 circumference = 2 * (model.length + model.width)
                 if (model.length_largest and model.length <= max_length and model.width <= max_width) or (
-                    model.length_largest is False and model.width <= max_length and model.length <= max_width):
+                        model.length_largest is False and model.width <= max_length and model.length <= max_width):
                     if circumference > best_fit_circumference:
                         best_fit_building = model
                         best_fit_circumference = circumference
@@ -2071,7 +2071,7 @@ class NodeInRectifyBuilding(object):
                     return True
         return False
 
-    def update_angle(self) ->None:
+    def update_angle(self) -> None:
         self.angle = co.calc_angle_of_corner_local(self.prev_node.my_node.x, self.prev_node.my_node.y,
                                                    self.my_node.x, self.my_node.y,
                                                    self.next_node.my_node.x, self.next_node.my_node.y)

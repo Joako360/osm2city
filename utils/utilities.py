@@ -382,15 +382,15 @@ class FGElev(object):
         pickle.dump(self._cache, fpickle, -1)
         fpickle.close()
 
-    def probe_elev(self, position: ve.Vec2d, is_global: bool = False) -> float:
+    def probe_elev(self, position: Tuple[float, float], is_global: bool = False) -> float:
         elev_is_solid_tuple = self.probe(position, is_global)
         return elev_is_solid_tuple[0]
 
-    def probe_solid(self, position: ve.Vec2d, is_global: bool = False) -> bool:
+    def probe_solid(self, position: Tuple[float, float], is_global: bool = False) -> bool:
         elev_is_solid_tuple = self.probe(position, is_global)
         return elev_is_solid_tuple[1]
 
-    def probe(self, position: ve.Vec2d, is_global: bool = False) -> Tuple[float, bool]:
+    def probe(self, position: Tuple[float, float], is_global: bool = False) -> Tuple[float, bool]:
         """Return elevation and ground solidness at (x,y). We try our cache first. Failing that, call Fgelev.
         Elevation is in meters as float. Solid is True, in water is False
         """
@@ -466,7 +466,7 @@ class FGElev(object):
         min_ground_elev = 9999
         max_ground_elev = -999
         for point in points:
-            elev_is_solid_tuple = self.probe(ve.Vec2d(point))
+            elev_is_solid_tuple = self.probe(point)
             if elev_is_solid_tuple[0] == -9999:
                 logging.debug("-9999")
                 elev_water_ok = False

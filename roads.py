@@ -871,7 +871,7 @@ class Roads(object):
             if math.isnan(the_node.lon) or math.isnan(the_node.lat):
                 logging.error("NaN encountered while probing elevation")
                 continue
-            the_node.msl = self.fg_elev.probe_elev(Vec2d(the_node.lon, the_node.lat), is_global=True)
+            the_node.msl = self.fg_elev.probe_elev((the_node.lon, the_node.lat), is_global=True)
             the_node.v_add = 0.
 
     def _propagate_v_add_over_edge(self, ref0, ref1, args):
@@ -1316,7 +1316,7 @@ def _process_clusters(clusters, fg_elev: utilities.FGElev, stg_manager, stg_path
         file_name = parameters.PREFIX + file_start + "%02i%02i" % (cl.grid_index.ix, cl.grid_index.iy)
         center_global = Vec2d(coords_transform.to_global(cl.center))
         offset_local = cl.center
-        cluster_elev = fg_elev.probe_elev(center_global, True)
+        cluster_elev = fg_elev.probe_elev((center_global.lon, center_global.lat), True)
 
         # -- Now write cluster to disk.
         #    First create ac object. Write cluster's objects. Register stg object.

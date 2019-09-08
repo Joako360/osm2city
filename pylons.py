@@ -302,7 +302,7 @@ class SharedPylon(object):
 
     def calc_global_coordinates(self, fg_elev: utilities.FGElev, my_coord_transformator) -> None:
         self.lon, self.lat = my_coord_transformator.to_global((self.x, self.y))
-        self.elevation = fg_elev.probe_elev(vec2d.Vec2d(self.lon, self.lat), True)
+        self.elevation = fg_elev.probe_elev((self.lon, self.lat), True)
 
     def make_stg_entry(self, my_stg_mgr: stg_io2.STGManager) -> None:
         """Returns a stg entry for this pylon.
@@ -375,7 +375,7 @@ def _process_osm_chimneys_nodes(osm_nodes_dict: Dict[int, op.Node], coords_trans
     chimneys = list()
 
     for key, node in osm_nodes_dict.items():
-        probe_tuple = fg_elev.probe(vec2d.Vec2d(node.lon, node.lat), True)
+        probe_tuple = fg_elev.probe((node.lon, node.lat), True)
         chimney = Chimney(key, node.lon, node.lat, probe_tuple[0], node.tags)
         chimney.x, chimney.y = coords_transform.to_local((node.lon, node.lat))
         if chimney.height >= parameters.C2P_CHIMNEY_MIN_HEIGHT:
@@ -398,7 +398,7 @@ def _process_osm_chimneys_ways(nodes_dict, ways_dict, my_coord_transformator,
                 if my_polygon.is_valid and not my_polygon.is_empty:
                     my_centroid = my_polygon.centroid
                     lon, lat = my_coord_transformator.to_global((my_centroid.x, my_centroid.y))
-                    probe_tuple = fg_elev.probe(vec2d.Vec2d(lon, lat), True)
+                    probe_tuple = fg_elev.probe((lon, lat), True)
                     chimney = Chimney(key, lon, lat, probe_tuple[0], way.tags)
                     chimney.x = my_centroid.x
                     chimney.y = my_centroid.y
@@ -605,7 +605,7 @@ def _process_osm_wind_turbines(osm_nodes_dict: Dict[int, op.Node], coords_transf
                 generator_output = op.parse_generator_output(node.tags["generator:output:electricity"])
                 turbine = WindTurbine(key, node.lon, node.lat, generator_output, node.tags)
                 turbine.x, turbine.y = coords_transform.to_local((node.lon, node.lat))
-                probe_tuple = fg_elev.probe(vec2d.Vec2d(node.lon, node.lat), True)
+                probe_tuple = fg_elev.probe((node.lon, node.lat), True)
                 turbine.elevation = probe_tuple[0]
                 turbine.set_offshore_from_probe(probe_tuple[1])
                 my_wind_turbines.append(turbine)
@@ -1142,7 +1142,7 @@ def _process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev,
                     my_rail_node.lat = my_node.lat
                     my_rail_node.lon = my_node.lon
                     my_rail_node.x, my_rail_node.y = my_coord_transformator.to_local((my_node.lon, my_node.lat))
-                    my_rail_node.elevation = fg_elev.probe_elev(vec2d.Vec2d(my_rail_node.lon, my_rail_node.lat), True)
+                    my_rail_node.elevation = fg_elev.probe_elev((my_rail_node.lon, my_rail_node.lat), True)
                     for key in my_node.tags:
                         value = my_node.tags[key]
                         if s.K_RAILWAY == key and s.V_SWITCH == value:
@@ -1321,7 +1321,7 @@ def _process_osm_power_aerialway(nodes_dict, ways_dict, fg_elev: utilities.FGEle
                 my_pylon.lat = my_node.lat
                 my_pylon.lon = my_node.lon
                 my_pylon.x, my_pylon.y = my_coord_transformator.to_local((my_node.lon, my_node.lat))
-                my_pylon.elevation = fg_elev.probe_elev(vec2d.Vec2d(my_pylon.lon, my_pylon.lat), True)
+                my_pylon.elevation = fg_elev.probe_elev((my_pylon.lon, my_pylon.lat), True)
                 for key in my_node.tags:
                     value = my_node.tags[key]
                     if s.K_POWER == key:
@@ -1656,7 +1656,7 @@ def _process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator, fg
                                 radius = coordinates.calc_distance_global(lon, lat, my_node.lon, my_node.lat)
                                 if radius < 5:  # do not want very small objects
                                     continue
-                                elev = fg_elev.probe_elev(vec2d.Vec2d(lon, lat), True)
+                                elev = fg_elev.probe_elev((lon, lat), True)
                                 storage_tanks.append(StorageTank(way.osm_id, lon, lat, way.tags, radius, elev))
     logging.info("Found {} storage tanks".format(len(storage_tanks)))
     return my_buildings

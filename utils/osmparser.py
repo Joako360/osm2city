@@ -34,6 +34,8 @@ class OSMFeatureType(IntEnum):
     landuse = 5
     road = 6
     pylon_way = 7
+    generic_node = 8
+    generic_way = 9
 
 
 def get_next_pseudo_osm_id(osm_feature: OSMFeatureType) -> int:
@@ -42,7 +44,7 @@ def get_next_pseudo_osm_id(osm_feature: OSMFeatureType) -> int:
     Depending on which OSM feature is requesting, a different number range is returned.
     In order not to have conflicts between different processes in multiprocessing, the number range is adapted.
 
-    In Osmosis Ids have to be sorted  from low to high.
+    In Osmosis Ids have to be sorted from low to high.
     The highest ID value will be different for each type of object (nodes, ways and relations)
     The IDs are all 64 bit signed integers at the moment, so have a theoretical limit of 2^63-1
     or 9,223,372,036,854,775,807

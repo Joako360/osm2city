@@ -102,7 +102,7 @@ def _write_area(platform: Platform, fg_elev: utilities.FGElev, obj: ac3d.Object,
         logging.debug("Clockwise")
         platform.nodes = platform.nodes[::-1]
     for p in platform.nodes:
-        e = fg_elev.probe_elev(Vec2d(p[0], p[1])) + 1
+        e = fg_elev.probe_elev((p[0], p[1])) + 1
         obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
     top_nodes = np.arange(len(platform.nodes))
     platform.segment_len = np.array([0] + [Vec2d(coord).distance_to(Vec2d(platform.line_string.coords[i])) for i, coord in enumerate(platform.line_string.coords[1:])])
@@ -118,7 +118,7 @@ def _write_area(platform: Platform, fg_elev: utilities.FGElev, obj: ac3d.Object,
     obj.face(face)
     # Build bottom ring
     for p in platform.nodes:
-        e = fg_elev.probe_elev(Vec2d(p[0], p[1])) - 1
+        e = fg_elev.probe_elev((p[0], p[1])) - 1
         obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
     # Build Sides
     for i, n in enumerate(top_nodes[1:]):
@@ -140,11 +140,11 @@ def _write_line(platform, fg_elev: utilities.FGElev, obj, offset) -> None:
         return
     idx_left = obj.next_node_index()
     for p in left.coords:
-        e = fg_elev.probe_elev(Vec2d(p[0], p[1])) + 1
+        e = fg_elev.probe_elev((p[0], p[1])) + 1
         obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
     idx_right = obj.next_node_index()
     for p in right.coords:
-        e = fg_elev.probe_elev(Vec2d(p[0], p[1])) + 1
+        e = fg_elev.probe_elev((p[0], p[1])) + 1
         obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
     nodes_l = np.arange(len(left.coords))
     nodes_r = np.arange(len(right.coords))
@@ -165,12 +165,12 @@ def _write_line(platform, fg_elev: utilities.FGElev, obj, offset) -> None:
     # Build bottom left line
     idx_bottom_left = obj.next_node_index()
     for p in left.coords:
-        e = fg_elev.probe_elev(Vec2d(p[0], p[1])) + 1
+        e = fg_elev.probe_elev((p[0], p[1])) + 1
         obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
     # Build bottom right line
     idx_bottom_right = obj.next_node_index()
     for p in right.coords:
-        e = fg_elev.probe_elev(Vec2d(p[0], p[1])) + 1
+        e = fg_elev.probe_elev((p[0], p[1])) + 1
         obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
     idx_end = obj.next_node_index() - 1
     # Build Sides
@@ -205,7 +205,8 @@ def _write_line(platform, fg_elev: utilities.FGElev, obj, offset) -> None:
     obj.face(sideface)
 
 
-def process_details(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev, file_lock: mp.Lock=None) -> None:
+def process_details(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
+                    file_lock: mp.Lock = None) -> None:
     stats = utilities.Stats()
     # -- prepare transformation to local coordinates
     cmin, cmax = parameters.get_extent_global()
