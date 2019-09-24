@@ -327,10 +327,9 @@ class LinearObject(object):
                 right_z[i] += (v_add[i] + the_diff / 2.)
             else:
                 # v_add smaller than terrain gradient.
-                # In case terrain gradient is significant, create level
+                # In case terrain gradient is significant, create levelled
                 # road which is then higher than v_add anyway.
                 # Otherwise, create sloped road and ignore v_add.
-                # FIXME: is this a bug?
                 if the_diff / self.width > parameters.MAX_TRANSVERSE_GRADIENT:  # left > right
                     right_z[i] += the_diff  # dirty
                     v_add[i] += the_diff / 2.
@@ -382,7 +381,7 @@ class LinearObject(object):
         self._write_quads(obj, left_nodes_list, right_nodes_list, self.tex[0], self.tex[1], mat_idx)
         if v_add is not None:
             # -- side walls of embankment
-            if v_add.max() > 0.1:
+            if v_add.max() > parameters.MIN_EMBANKMENT_HEIGHT:
                 left_ground_z = self._probe_ground(fg_elev, self.left)
                 right_ground_z = self._probe_ground(fg_elev, self.right)
 

@@ -591,9 +591,18 @@ Parameter                                       Type       Default   Description
 =============================================   ========   =======   ==============================================================================
 BRIDGE_MIN_LENGTH                               Decimal    20.       Discard short bridges and draw roads or railways instead.
 
-MIN_ABOVE_GROUND_LEVEL                          Decimal    0.1      How much a highway / railway is at least hovering above ground
+MIN_ABOVE_GROUND_LEVEL                          Decimal    0.1       How much a highway / railway is at least hovering above ground
 
-DISTANCE_BETWEEN_LAYERS                         Decimal    0.2      How much different layers of roads/railways at the same node are separated.
+DISTANCE_BETWEEN_LAYERS                         Decimal    0.2       How much different layers of roads/railways at the same node are separated.
+
+MIN_EMBANKMENT_HEIGHT                           Decimal    0.4       How much extra elevation compared to ground (v_add) there is, before an
+                                                                     embankment is added at the side(s). This happens especially in bumpy areas and
+                                                                     for roads along a steep hill side.
+
+MAX_TRANSVERSE_GRADIENT                         Decimal    0.1       If the difference between the elevation at the right edge of a road and the
+                                                                     elevation at the left edge of the road divided by the width of the road is
+                                                                     larger than the gradient, then the road surface is levelled by adding v_add.
+                                                                     Otherwise it is accepted that the road is a bit sloped from left to right.
 
 HIGHWAY_TYPE_MIN                                Integer    4         The lower the number, the smaller ways in the highway hierarchy are added.
                                                                      Currently the numbers are as follows (see roads.py -> HighwayType).
@@ -620,7 +629,7 @@ POINTS_ON_LINE_DISTANCE_MAX                     Integer    1000      The maximum
 
 MAX_SLOPE_ROAD, MAX_SLOPE_*                     Decimal    0.08      The maximum allowed slope. It is used for ramps to bridges, but it is also
                                                                      used for other ramps. Especially in mountainous areas you might want to set
-                                                                     higher values (e.g. 0.15 for roads works fine in Switzeland). This leads to
+                                                                     higher values (e.g. 0.15 for roads works fine in Switzerland). This leads to
                                                                      steeper ramps to bridges, but give much fewer residuals with embankments.
 
 USE_TRAM_LINE                                   Boolean    False     Often tram lines are on top of existing roads or between. This can lead to
@@ -859,14 +868,6 @@ There might be situations, when you need to skip certain buildings or roads/rail
 In order to temporarily exclude certain buildings or roads/railways, you can use parameter ``SKIP_LIST``. For buildings you can either specify the OSM id or (if available) the value of the ``name`` tag. For roads/railways only the OSM id can be used.
 
 E.g. ``SKIP_LIST = ['St. Leodegar im Hof (Hofkirche)', 87220999]``
-
-
-.. FIXME missing explanations for MAX_TRANSVERSE_GRADIENT = 0.1   #
-   DEBUG_PLOT = 0
-   CREATE_BRIDGES_ONLY = 0         # create only bridges and embankments
-   BRIDGE_LAYER_HEIGHT = 4.         # bridge height per layer
-   BRIDGE_BODY_HEIGHT = 0.9         # height of bridge body
-   EMBANKMENT_TEXTURE = textures.road.EMBANKMENT_1  # Texture for the embankment
 
 On the other hand side there might be situations, where certain STG-entries should not be checked for overlap checking. For that situation parameter ``SKIP_LIST_OVERLAP`` can be used as a list of ``*.ac`` or ``*.xml`` file names which should not be used for overlap tests
 

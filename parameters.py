@@ -282,14 +282,15 @@ MAX_SLOPE_MOTORWAY = 0.03       # max slope for motorways
 MAX_SLOPE_ROAD = 0.08
 MAX_TRANSVERSE_GRADIENT = 0.1   #
 BRIDGE_MIN_LENGTH = 20.         # discard short bridges, draw road instead
-CREATE_BRIDGES_ONLY = 0         # create only bridges and embankments
+CREATE_BRIDGES_ONLY = False         # create only bridges and embankments
 BRIDGE_LAYER_HEIGHT = 4.         # bridge height per layer
 BRIDGE_BODY_HEIGHT = 0.9         # height of bridge body
 EMBANKMENT_TEXTURE = textures.road.EMBANKMENT_1  # Texture for the embankment
+MIN_EMBANKMENT_HEIGHT = 0.4     # the min height of an embankment before it actually is written
 MIN_ABOVE_GROUND_LEVEL = 0.1    # how much a highway / railway is at least hovering above ground
 DISTANCE_BETWEEN_LAYERS = 0.2  # how much different layers of roads/railways at the same node are separated
 HIGHWAY_TYPE_MIN = 4  # The lower the number, the more ways are added. See roads.HighwayType
-HIGHWAY_TYPE_MIN_ROUGH_LOD = 6  # the minimum type tobe added to the rough LOD clusters
+HIGHWAY_TYPE_MIN_ROUGH_LOD = 6  # the minimum type to be added to the rough LOD clusters
 POINTS_ON_LINE_DISTANCE_MAX = 1000  # the max dist between two points on a line. If longer, then new points are added
 MIN_ROAD_SEGMENT_LENGTH = 1.0         # if segment length is smaller than this, then remove point
 
