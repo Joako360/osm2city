@@ -667,10 +667,12 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
                     tex_variability = 6
                     if b.building_list_type is building_lib.BuildingListType.large:
                         tex_variability = 4
-                    tex_idx = random.randint(1, tex_variability)  # FIXME: should calc on street level or owbb
-                    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {}'.format(b.width, b.depth, b.body_height,
-                                                                              b.roof_height, b.roof_shape, 0,
-                                                                              round(b.levels), tex_idx)
+                    wall_tex_idx = random.randint(0, tex_variability - 1)  # FIXME: should calc on street level or owbb
+                    roof_tex_idx = random.randint(0, tex_variability - 1)  # FIXME: ditto plus "European cities"
+                    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(b.width, b.depth, b.body_height,
+                                                                                 b.roof_height, b.roof_shape, 0,
+                                                                                 round(b.levels),
+                                                                                 wall_tex_idx, roof_tex_idx)
                 shader.write(line)
                 shader.write('\n')
     except IOError as e:
