@@ -232,10 +232,13 @@ def _split_multipolygon_generated_building_zone(zone: m.GeneratedBuildingZone) -
             new_generated.append(my_split_generated)
         while len(zone.osm_buildings) > 0:
             my_building = zone.osm_buildings.pop()
+            my_building.zone = None
             for my_split_generated in new_generated:
                 if my_building.geometry.intersects(my_split_generated.geometry):
                     my_split_generated.relate_building(my_building)
-                    continue
+                    break
+            if my_building.zone is None:  # maybe no intersection -> fall back as each building needs a zone
+                new_generated[0].relate_building(my_building)
         for my_split_generated in new_generated:
             if my_split_generated.from_buildings and len(my_split_generated.osm_buildings) == 0:
                 continue
@@ -790,8 +793,11 @@ def _count_zones_related_buildings(buildings: List[bl.Building], text: str, chec
             if check_block and not isinstance(building.zone, m.CityBlock):
                 total_not_block += 1
                 logging.debug('type = %s, settlement type = %s', building.zone, building.zone.settlement_type)
+            if isinstance(building.zone.geometry, MultiPolygon):
+                raise SystemExit('Building with osm_id=%i has MultiPolygon of type = %s, zone osm_id = %i',
+                                 building.osm_id, building.zone, building.zone.osm_id)
         else:
-            raise SystemExit('Building with osm_id=%d has no associated zone - %s', building.osm_id, text)
+            raise SystemExit('Building with osm_id=%i has no associated zone - %s', building.osm_id, text)
 
     logging.info('%i out of %i buildings are related to zone %s - %i not in block', total_related, len(buildings),
                  text, total_not_block)
