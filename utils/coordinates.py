@@ -205,9 +205,7 @@ def calc_angle_of_line_local(x1: float, y1: float, x2: float, y2: float) -> floa
     """
     angle = atan2(x2 - x1, y2 - y1)
     degree = degrees(angle)
-    if degree < 0:
-        degree += 360
-    return degree
+    return normal_degrees(degree)
 
 
 def calc_point_angle_away(x: float, y: float, added_distance: float, angle: float) -> Tuple[float, float]:
@@ -287,6 +285,15 @@ def calc_horizon_elev(distance_1: float, distance_2) -> float:
     distance_square = distance_1**2 + distance_2**2
     hypotenuse = sqrt(distance_square + EQURAD**2)
     return hypotenuse - EQURAD
+
+
+def normal_degrees(degree: float) -> float:
+    """Makes sure that degrees are between 0 and 360."""
+    if degree < 0:
+        return degree + 360
+    elif degree >= 360:
+        return degree - 360
+    return degree
 
 
 # ================ UNITTESTS =======================

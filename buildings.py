@@ -669,7 +669,8 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
                         tex_variability = 4
                     wall_tex_idx = random.randint(0, tex_variability - 1)  # FIXME: should calc on street level or owbb
                     roof_tex_idx = random.randint(0, tex_variability - 1)  # FIXME: ditto plus "European cities"
-                    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(b.width, b.depth, b.body_height,
+                    # FIXME: currently the best results geometrically are if depth and width are switched
+                    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(b.depth, b.width, b.body_height,
                                                                                  b.roof_height, b.roof_shape, 0,
                                                                                  round(b.levels),
                                                                                  wall_tex_idx, roof_tex_idx)

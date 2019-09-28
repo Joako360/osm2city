@@ -359,9 +359,10 @@ class Building(object):
                 self.street_angle = 0
                 return
 
-        # Apparently we deal with a OSM building that is not to be drawn in a mesh. As anchor candidates we choose
-        # the middle points of the sides of the convex hull of the building. Then we search for the candidate which has
-        # the shortest distance to the zone/block border. The candidate with the shortest distance is chosen and the
+        # Apparently we deal with a OSM building that is not to be drawn in a mesh, but in building list.
+        # As anchor candidates we choose the middle points of the sides of the convex hull of the building.
+        # Then we search for the candidate which has the shortest distance to the zone/block border.
+        # The candidate with the shortest distance is chosen and the
         # street angle is based on the side of the convex hull, where the chosen candidate is situated.
         try:
             hull = self.polygon.convex_hull
@@ -379,12 +380,12 @@ class Building(object):
             i = shortest_node
             x, y = co.calc_point_on_line_local(hull_points[i][0], hull_points[i][1],
                                                hull_points[i + 1][0], hull_points[i + 1][1], 0.5)
-            self.anchor = Vec2d(x, y)
             angle = co.calc_angle_of_line_local(hull_points[i][0], hull_points[i][1],
-                                                hull_points[i+1][0], hull_points[i+1][1])
-            self.street_angle = 90 + angle
+                                                hull_points[i + 1][0], hull_points[i + 1][1])
+            self.anchor = Vec2d(x, y)
+            self.street_angle = co.normal_degrees(angle + 90)
             self.width = co.calc_distance_local(hull_points[i][0], hull_points[i][1],
-                                                hull_points[i+1][0], hull_points[i+1][1])
+                                                hull_points[i + 1][0], hull_points[i + 1][1])
 
             # to get the depth we must rotate the hull and then calculate the distance of the most distant points.
             rotated_hull = affinity.rotate(hull, angle, hull_points[i])
@@ -403,6 +404,7 @@ class Building(object):
                 self.depth = longest_1
             else:
                 self.depth = (longest_1 + longest_2) / 2
+
         except AttributeError:
             logging.exception('Problem to calc anchor for building osm_id=%i in zone of type=%s and settlement type=%s',
                               self.osm_id, self.zone, self.zone.settlement_type)
@@ -1795,8 +1797,7 @@ def _analyse_worship_building(building: Building, building_parent: BuildingParen
         if model:
             if not model.length_largest:
                 angle += 90
-            if angle >= 360:
-                angle -= 360
+            angle = co.normal_degrees(angle)
             x, y = utilities.fit_offsets_for_rectangle_with_hull(angle, hull, model.length, model.width,
                                                                  model.length_offset, model.width_offset,
                                                                  model.length_largest,
