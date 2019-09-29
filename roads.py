@@ -90,7 +90,6 @@ import shapely.geometry as shg
 
 from cluster import ClusterContainer
 import linear
-import linear_bridge
 import parameters
 import textures.road
 import utils.osmparser as op
@@ -1080,8 +1079,8 @@ class Roads(object):
 
             try:
                 if _is_bridge(the_way.tags):
-                    obj = linear_bridge.LinearBridge(self.transform, self.fg_elev, the_way, self.nodes_dict,
-                                                     width, tex_coords=tex)
+                    obj = linear.LinearBridge(self.transform, self.fg_elev, the_way, self.nodes_dict,
+                                              width, tex_coords=tex)
                     self.bridges_list.append(obj)
                 else:
                     obj = linear.LinearObject(self.transform, the_way, self.nodes_dict,
