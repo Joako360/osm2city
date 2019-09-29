@@ -386,19 +386,6 @@ class DeckShapeLinear(object):
             return self._compute(shape)
 
 
-class DeckShapePoly(object):
-    def __init__(self, h0, hm, h1):
-        self.h0 = h0
-        self.hm = hm
-        self.h1 = h1
-        self.a0 = h0
-        self.a2 = 2*(h1 - 2*hm + h0)
-        self.a1 = h1 - h0 - self.a2
-
-    def __call__(self, shape):
-        return self.a0 + self.a1*shape + self.a2*shape*shape
-
-
 class LinearBridge(LinearObject):
     def __init__(self, transform, fg_elev: FGElev, way: op.Way, nodes_dict: Dict[int, op.Node], width: float,
                  tex_coords: Tuple[float, float] = textures.road.EMBANKMENT_2):
@@ -500,11 +487,11 @@ class LinearBridge(LinearObject):
         node0.v_add = v_add[0]
         node1.v_add = v_add[-1]
 
-    def _deck_height(self, l: float, normalized: bool = True):
+    def _deck_height(self, linear_dist: float, normalized: bool = True):
         """given linear distance [m], interpolate and return deck height"""
         if not normalized and self.center.length != 0:
-            l /= self.center.length
-        return self.deck_shape_poly(l)
+            linear_dist /= self.center.length
+        return self.deck_shape_poly(linear_dist)
 
     def _pillar(self, obj: utils.ac3d.Object, x, y, h0, h1, angle):
         self.pillar_r0 = 1.
