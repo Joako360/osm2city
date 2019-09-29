@@ -160,7 +160,6 @@ class LinearObject(object):
             self.dist[i + 1] = cumulated_distance
             self.vectors[i] = vector
 
-            # assert abs(self.normals[i].magnitude() - 1.) < 0.00001
         self.normals[-1] = self.normals[-2]
         self.angle[-1] = self.angle[-2]
 
@@ -239,14 +238,11 @@ class LinearObject(object):
         return z_array
 
     def _get_v_add(self, fg_elev: FGElev):
-        """
+        """Got v_add data for first and last node. Now lift intermediate nodes.
+        So far, v_add is for center line only.
         """
         first_node = self.nodes_dict[self.way.refs[0]]
         last_node = self.nodes_dict[self.way.refs[-1]]
-
-        # -- elevated road. Got v_add data for first and last node. Now lift intermediate
-        #    nodes. So far, v_add is for center line only.
-        # FIXME: when do we need this? if left_z_given is None and right_z_given is None?
 
         center_z = self._probe_ground(fg_elev, self.center)
 
@@ -273,18 +269,14 @@ class LinearObject(object):
             v_add = np.zeros(n_nodes)
             for i in range(n_nodes):
                 v_add[i] = max(0, msl_0 - self.dist[i] * dh_dx - center_z[i])
-                if v_add[i] < epsilon:  # FIXME: different for other v_add?
+                if v_add[i] < epsilon:
                     break
 
-            #            for i in range(n_nodes):
-            #                v_add[i] = max(0, v_add_0 - self.dist[i] * dh_dx - (center_z[i] - center_z[0]))
-            #                if v_add[i] < 0.001:
-            #                    break
             for i in range(n_nodes)[::-1]:
                 other_v_add = v_add[i]
                 v_add[i] = max(0, msl_1 - (self.dist[-1] - self.dist[i]) * dh_dx - center_z[i])
                 if other_v_add > v_add[i]:
-                    v_add[i] = other_v_add  # FIXME: this is different than for first v_add?
+                    v_add[i] = other_v_add
                     break
 
         return v_add, center_z
@@ -441,7 +433,7 @@ class LinearBridge(LinearObject):
         node0 = nodes_dict[self.way.refs[0]]
         node1 = nodes_dict[self.way.refs[-1]]
 
-        msl_mid = self._elev([0.5])  # FIXME: use elev interpolator instead?
+        msl_mid = self._elev([0.5])
 
         msl = np.array([fg_elev.probe_elev(the_node) for the_node in self.center.coords])
 
@@ -488,7 +480,7 @@ class LinearBridge(LinearObject):
         node1.v_add = v_add[-1]
 
     def _deck_height(self, linear_dist: float, normalized: bool = True):
-        """given linear distance [m], interpolate and return deck height"""
+        """Given linear distance [m], interpolate and return deck height"""
         if not normalized and self.center.length != 0:
             linear_dist /= self.center.length
         return self.deck_shape_poly(linear_dist)
