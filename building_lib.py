@@ -479,11 +479,13 @@ class Building(object):
         list_type = BuildingListType.small
         building_class = get_building_class(self.tags)
         if building_class in [BuildingClass.residential, BuildingClass.residential_small,
-                                                         BuildingClass.terrace]:
+                              BuildingClass.terrace]:
             if self.area > 800:
                 list_type = BuildingListType.medium
             if self.levels > 7:
                 list_type = BuildingListType.large
+        elif building_class in [BuildingClass.apartments] and self.levels <= 3:
+            list_type = BuildingListType.small
         else:
             list_type = BuildingListType.medium
             if self.area > 1000 or self.levels > 4:
