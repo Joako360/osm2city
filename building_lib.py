@@ -121,6 +121,14 @@ class BuildingType(IntEnum):
     hangar = 100
 
 
+# Based on lines 476 ff in simgear/scene/tgdb/SGBuildingBin.cxx
+BUILDING_LIST_SMALL_MIN_SIDE = 6.
+BUILDING_LIST_MEDIUM_MIN_SIDE = 10.
+BUILDING_LIST_LARGE_MIN_SIDE = 20.
+BUILDING_LIST_SMALL_MAX_LEVELS = 3
+BUILDING_LIST_MEDIUM_MAX_LEVELS = 8
+BUILDING_LIST_LARGE_MAX_LEVELS = 22
+
 @unique
 class BuildingListType(IntEnum):
     """Available Random Building BUILDING_LIST types."""
@@ -474,45 +482,58 @@ class Building(object):
         self._set_pts_all(cluster_offset)
         self.ground_elev -= (cluster_elev + co.calc_horizon_elev(self.pts_all[0, 0], self.pts_all[0, 1]))
 
-    @property
-    def building_list_type(self) -> BuildingListType:
+    def calc_building_list_type(self) -> Optional[BuildingListType]:
+        """Determines the buildings list type. A return of None means it should be be handled in a mesh."""
+        # first make the obvious choices
+        if s.K_AEROWAY in self.tags:
+            return None
+        if s.K_MIN_HEIGHT in self.tags:
+            return None
+        if s.K_MAN_MADE in self.tags and self.tags[s.K_MAN_MADE] == s.V_TOWER:
+            return None
+        if s.K_BUILDING in self.tags and self.tags[s.K_BUILDING] == s.V_WATER_TOWER:
+            return None
+        if self.has_parent:  # mostly detailed buildings in OSM, which might be landmarks
+            return None
+        if self.has_neighbours and not parameters.BUILDING_LIST_ALLOW_NEIGHBOURS:
+            return None
+        if self.pts_outer_count == 3:
+            return None
+        if self.has_inner:
+            return None
+        if parameters.BUILDING_LIST_AREA_DEVIATION * self.width * self.depth > self.area:
+            return None
+
+        # now determine in details
+        min_side = min(self.width, self.depth)
+        if min_side < BUILDING_LIST_SMALL_MIN_SIDE:
+            return None
+        if self.levels > BUILDING_LIST_LARGE_MAX_LEVELS:
+            return None
         list_type = BuildingListType.small
         building_class = get_building_class(self.tags)
         if building_class in [BuildingClass.residential, BuildingClass.residential_small,
                               BuildingClass.terrace]:
             if self.area > 800:
                 list_type = BuildingListType.medium
-            if self.levels > 7:
+            if self.levels > BUILDING_LIST_SMALL_MAX_LEVELS:
+                list_type = BuildingListType.medium
+            if self.levels > BUILDING_LIST_MEDIUM_MAX_LEVELS:
                 list_type = BuildingListType.large
-        elif building_class in [BuildingClass.apartments] and self.levels <= 3:
+        elif building_class in [BuildingClass.apartments] and self.levels <= BUILDING_LIST_SMALL_MAX_LEVELS:
             list_type = BuildingListType.small
-        else:
-            list_type = BuildingListType.medium
-            if self.area > 1000 or self.levels > 4:
+
+        if list_type is BuildingListType.medium:
+            if min_side < BUILDING_LIST_MEDIUM_MIN_SIDE:
+                return None
+            if self.area > 1000 or self.levels > BUILDING_LIST_MEDIUM_MAX_LEVELS:
                 list_type = BuildingListType.large
+
+        if list_type is BuildingListType.large:
+            if min_side < BUILDING_LIST_LARGE_MIN_SIDE:
+                return None
 
         return list_type
-
-    def is_building_list_candidate(self) -> bool:
-        if s.K_AEROWAY in self.tags:
-            return False
-        if s.K_MIN_HEIGHT in self.tags:
-            return False
-        if s.K_MAN_MADE in self.tags and self.tags[s.K_MAN_MADE] == s.V_TOWER:
-            return False
-        if s.K_BUILDING in self.tags and self.tags[s.K_BUILDING] == s.V_WATER_TOWER:
-            return False
-        if self.has_parent:  # mostly detailed buildings in OSM, which might be landmarks
-            return False
-        if self.has_neighbours and not parameters.BUILDING_LIST_ALLOW_NEIGHBOURS:
-            return False
-        if self.pts_outer_count == 3:
-            return False
-        if self.has_inner:
-            return False
-        if parameters.BUILDING_LIST_AREA_DEVIATION * self.width * self.depth > self.area:
-            return False
-        return True
 
     @property
     def roof_complex(self) -> bool:

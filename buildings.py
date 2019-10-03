@@ -641,7 +641,7 @@ def construct_buildings_from_osm(coords_transform: coordinates.Transformation) -
 
 
 def write_buildings_in_lists(coords_transform: coordinates.Transformation,
-                             list_buildings: List[building_lib.Building],
+                             list_buildings: Dict[building_lib.Building, building_lib.BuildingListType],
                              stg_manager: stg_io2.STGManager,
                              stats: utilities.Stats) -> None:
     min_elevation = 9999
@@ -658,14 +658,14 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
 
     try:
         with open(os.path.join(path_to_stg, file_shader), 'w') as shader:
-            for b in list_buildings:
+            for b, list_type in list_buildings.items():
                 elev = b.ground_elev - list_elev - coordinates.calc_horizon_elev(b.anchor.x, b.anchor.y)
                 line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-b.anchor.y, b.anchor.x, elev, b.street_angle,
-                                                               b.building_list_type.value)
+                                                               list_type.value)
                 if not parameters.FLAG_STG_BUILDING_LIST_2019_1:
                     b.compute_roof_height(True)
                     tex_variability = 6
-                    if b.building_list_type is building_lib.BuildingListType.large:
+                    if list_type is building_lib.BuildingListType.large:
                         tex_variability = 4
                     wall_tex_idx = random.randint(0, tex_variability - 1)  # FIXME: should calc on street level or owbb
                     roof_tex_idx = random.randint(0, tex_variability - 1)  # FIXME: ditto plus "European cities"
@@ -808,13 +808,14 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
     # split between buildings in meshes and in buildings lists
     building_lib.decide_lod(the_buildings, stats)
     buildings_in_meshes = list()
-    buildings_in_lists = list()
+    buildings_in_lists = dict()  # key = building, value = building list type
     if parameters.FLAG_STG_BUILDING_LIST:
         for building in the_buildings:
             if not building.is_owbb_model:  # owbb models already have it set when init of Building object
                 building.update_anchor(True)  # prepare anchor, street_angle, width, depth
-            if building.is_building_list_candidate():
-                buildings_in_lists.append(building)
+            building_list_type = building.calc_building_list_type()
+            if building_list_type is not None:
+                buildings_in_lists[building] = building_list_type
             else:
                 buildings_in_meshes.append(building)
         if parameters.FLAG_BUILDINGS_LIST_SKIP is False:
