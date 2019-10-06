@@ -935,13 +935,13 @@ class WayLine(Line):  # The name "Line" is also used in e.g. SymPy
         else:
             self.type_ = WayLineType.power_line
             if average_height < 35.0 and max_length < 300.0:
-                pylon_model = "Models/Power/generic_pylon_25m.xml"
+                pylon_model = "Models/Power/generic_pylon_25m.ac"
             elif average_height < 75.0 and max_length < 500.0:
-                pylon_model = "Models/Power/generic_pylon_50m.xml"
+                pylon_model = "Models/Power/generic_pylon_50m.ac"
             elif parameters.C2P_POWER_LINE_ALLOW_100M:
-                pylon_model = "Models/Power/generic_pylon_100m.xml"
+                pylon_model = "Models/Power/generic_pylon_100m.ac"
             else:
-                pylon_model = "Models/Power/generic_pylon_50m.xml"
+                pylon_model = "Models/Power/generic_pylon_50m.ac"
 
         return pylon_model
 
