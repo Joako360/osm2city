@@ -971,7 +971,10 @@ class Building(object):
         If we have neighbours then it makes sense to try to orient the ridge such, that it is at right angles to
         the neighbour - at least most of the time. Some times (like along canals in Amsterdam) it might be that
         the gables actually look to the street instead to the neighbour - but then we must hope that the
-        key roof:orientation has been explicitly used."""
+        key roof:orientation has been explicitly used.
+        The information here is only used for buildings in meshes. for buildings in lists see corresponding
+        b.analyse_roof_list_orientation.
+        """
         self.roof_neighbour_orientation = -1.
         if self.roof_shape is roofs.RoofShape.flat or self.has_inner or (len(self.refs_shared) == 0):
             return
@@ -1011,6 +1014,32 @@ class Building(object):
             self.roof_neighbour_orientation += 90.
             if self.roof_neighbour_orientation >= 180.:
                 self.roof_neighbour_orientation -= 180.
+
+    def analyse_roof_list_orientation(self) -> int:
+        """Roof orientation for buildings in lists: 0 = parallel to front, 1 = orthogonal to front.
+
+        See README.scenery in FGDATA/docs.
+
+        For buildings in meshes the orientation was calculated in analyse_roof_neighbour_orientation.
+        """
+        front_is_longest = self.width >= self.depth
+        if s.K_ROOF_ORIENTATION in self.tags:  # if OSM data has hints, use them
+            osm_roof_orientation = str(self.tags[s.K_ROOF_ORIENTATION])
+            if osm_roof_orientation == s.V_ALONG:
+                if front_is_longest:
+                    return 0
+                else:
+                    return 1
+            elif osm_roof_orientation == s.V_ACROSS:
+                if front_is_longest:
+                    return 1
+                else:
+                    return 0
+            # else follow through next checks
+        if self.has_neighbours:  # assume like in European inner cities and most row houses
+            return 0
+        # just randomly distribute
+        return random.randint(0, 1)
 
     def analyse_large_enough(self) -> bool:
         """Checks whether a given building's area is too small for inclusion.

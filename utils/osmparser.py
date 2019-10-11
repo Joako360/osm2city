@@ -95,7 +95,7 @@ class Node(OSMElement):
         self.lon = lon  # float value
         # the following are mostly used in roads and linear objects/bridges
         self.msl = None  # metres above sea level (from FGElev, but might get updated)
-        self.v_add = None  # vertical add, such that there is some smoothness of roads despite bumpiness of FG elevation
+        self.v_add = 0.  # vertical add, such that there is some smoothness of roads despite bumpiness of FG elevation
         self.layers = dict()  # key=way, value = int [the higher the number, the more on top])
 
     def layer_for_way(self, way) -> int:

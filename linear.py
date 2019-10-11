@@ -364,18 +364,18 @@ class LinearObject(object):
 
 
 class DeckShapeLinear(object):
-    def __init__(self, h0, h1):
-        self.h0 = h0
-        self.h1 = h1
+    def __init__(self, h0: float, h1: float) -> None:
+        self.h0 = h0  # height of start node (msl)
+        self.h1 = h1  # height of end node (msl)
 
-    def _compute(self, x):
+    def _compute(self, x: float) -> float:
         return (1-x) * self.h0 + x * self.h1
 
-    def __call__(self, shape):
+    def __call__(self, ratio):
         try:
-            return [self._compute(x) for x in shape]
+            return [self._compute(x) for x in ratio]
         except TypeError:
-            return self._compute(shape)
+            return self._compute(ratio)
 
 
 class LinearBridge(LinearObject):
@@ -447,13 +447,13 @@ class LinearBridge(LinearObject):
         else:
             hi_end = 0
             lo_end = -1
-        self.deck_shape_poly = DeckShapeLinear(deck_msl[0], deck_msl[-1])
+        self.deck_shape_linear = DeckShapeLinear(deck_msl[0], deck_msl[-1])
         try:
             required_height = parameters.BRIDGE_LAYER_HEIGHT * int(self.way.tags[s.K_LAYER])
         except KeyError:
-            required_height = parameters.BRIDGE_LAYER_HEIGHT
+            required_height = parameters.BRIDGE_LAYER_HEIGHT  # e.g. if bridge over water
 
-        if (self.deck_shape_poly(0.5) - msl_mid) > required_height:
+        if (self.deck_shape_linear(0.5) - msl_mid) > required_height:
             return
 
         import roads  # late import due to circular dependency
@@ -474,7 +474,7 @@ class LinearBridge(LinearObject):
         left_z, right_z, v_add = self._level_out(fg_elev, v_add)
         deck_msl = msl + v_add
 
-        self.deck_shape_poly = DeckShapeLinear(deck_msl[0], deck_msl[-1])
+        self.deck_shape_linear = DeckShapeLinear(deck_msl[0], deck_msl[-1])
 
         node0.v_add = v_add[0]
         node1.v_add = v_add[-1]
@@ -483,7 +483,7 @@ class LinearBridge(LinearObject):
         """Given linear distance [m], interpolate and return deck height"""
         if not normalized and self.center.length != 0:
             linear_dist /= self.center.length
-        return self.deck_shape_poly(linear_dist)
+        return self.deck_shape_linear(linear_dist)
 
     def _pillar(self, obj: utils.ac3d.Object, x, y, h0, h1, angle):
         self.pillar_r0 = 1.
