@@ -876,7 +876,7 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
 
     if btg_reader is None:
         if len(osm_buildings) + len(highways_dict) + len(railways_dict) > 0:
-            raise ValueError('No BTG available in area, where there are OSM buildings or roads/rails')
+            logging.warning('No BTG available in area, where there are OSM buildings or roads/rails')
     else:
         if parameters.OWBB_USE_BTG_LANDUSE:
             btg_polygons = _process_polygons_from_btg_faces(btg_reader, btg.URBAN_MATERIALS, transformer)
