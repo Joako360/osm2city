@@ -169,7 +169,7 @@ BUILDING_NUMBER_LEVELS_OTHER = {1: 0.2, 2: 0.4, 3: 0.3, 4: 0.1}  # e.g. commerci
 
 BUILDING_LEVEL_HEIGHT_URBAN = 3.5  # this value should not be changed unless special textures are used
 BUILDING_LEVEL_HEIGHT_RURAL = 2.5  # ditto including periphery
-BUILDING_LEVEL_HEIGHT_INDUSTRIAL = 6.  # for industrial and warehouse
+BUILDING_LEVEL_HEIGHT_INDUSTRIAL = 4.  # for industrial and warehouse
 
 # make sure not visible buildings or building parts are excluded
 BUILDING_UNDERGROUND_LOCATION = True

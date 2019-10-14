@@ -640,6 +640,210 @@ def construct_buildings_from_osm(coords_transform: coordinates.Transformation) -
     return list(the_buildings.values())
 
 
+def _debug_building_list_lsme(coords_transform: coordinates.Transformation, file_writer, list_elev: float) -> None:
+    """Writes a set of list buildings for debugging purposes.
+
+    Should be called at beginning of method write_buildings_in_list.
+
+    The buildings are added from North along the Southern side of the runway at LSME ca. 30m from the runway.
+    """
+    anchor = coords_transform.to_local((8.3125, 47.0975))
+    elev = 427 - list_elev - coordinates.calc_horizon_elev(anchor[0], anchor[1])
+    street_angle = 120
+    list_type = building_lib.BuildingListType.small
+    line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
+    width = building_lib.BUILDING_LIST_SMALL_MIN_SIDE * 3
+    depth = building_lib.BUILDING_LIST_SMALL_MIN_SIDE
+    levels = 2
+    body_height = parameters.BUILDING_LEVEL_HEIGHT_RURAL * levels
+    roof_height = parameters.BUILDING_LEVEL_HEIGHT_RURAL
+    roof_shape = 1
+    wall_tex_idx = 0
+    roof_tex_idx = 0
+    roof_orientation = 1
+    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(width, depth, body_height,
+                                                                 roof_height, roof_shape,
+                                                                 roof_orientation, levels,
+                                                                 wall_tex_idx, roof_tex_idx)
+    file_writer.write(line)
+    file_writer.write('\n')
+
+    anchor = coords_transform.to_local((8.3121, 47.0972))
+    line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
+    roof_shape = 2
+    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(width, depth, body_height,
+                                                                 roof_height, roof_shape,
+                                                                 roof_orientation, levels,
+                                                                 wall_tex_idx, roof_tex_idx)
+    file_writer.write(line)
+    file_writer.write('\n')
+
+    anchor = coords_transform.to_local((8.3118, 47.0969))
+    line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
+    roof_shape = 3
+    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(width, depth, body_height,
+                                                                 roof_height, roof_shape,
+                                                                 roof_orientation, levels,
+                                                                 wall_tex_idx, roof_tex_idx)
+    file_writer.write(line)
+    file_writer.write('\n')
+
+    anchor = coords_transform.to_local((8.3114, 47.0966))
+    line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
+    roof_shape = 4
+    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(width, depth, body_height,
+                                                                 roof_height, roof_shape,
+                                                                 roof_orientation, levels,
+                                                                 wall_tex_idx, roof_tex_idx)
+    file_writer.write(line)
+    file_writer.write('\n')
+
+    anchor = coords_transform.to_local((8.3110, 47.0962))
+    line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
+    roof_shape = 5
+    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(width, depth, body_height,
+                                                                 roof_height, roof_shape,
+                                                                 roof_orientation, levels,
+                                                                 wall_tex_idx, roof_tex_idx)
+    file_writer.write(line)
+    file_writer.write('\n')
+
+    anchor = coords_transform.to_local((8.3104, 47.0957))
+    line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
+    roof_shape = 6
+    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(width, depth, body_height,
+                                                                 roof_height, roof_shape,
+                                                                 roof_orientation, levels,
+                                                                 wall_tex_idx, roof_tex_idx)
+    file_writer.write(line)
+    file_writer.write('\n')
+
+    anchor = coords_transform.to_local((8.3099, 47.0953))
+    line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
+    roof_shape = 7
+    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(width, depth, body_height,
+                                                                 roof_height, roof_shape,
+                                                                 roof_orientation, levels,
+                                                                 wall_tex_idx, roof_tex_idx)
+    file_writer.write(line)
+    file_writer.write('\n')
+
+    anchor = coords_transform.to_local((8.3094, 47.0947))
+    line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
+    roof_shape = 8
+    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(width, depth, body_height,
+                                                                 roof_height, roof_shape,
+                                                                 roof_orientation, levels,
+                                                                 wall_tex_idx, roof_tex_idx)
+    file_writer.write(line)
+    file_writer.write('\n')
+
+    anchor = coords_transform.to_local((8.3090, 47.0943))
+    line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
+    roof_shape = 9
+    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(width, depth, body_height,
+                                                                 roof_height, roof_shape,
+                                                                 roof_orientation, levels,
+                                                                 wall_tex_idx, roof_tex_idx)
+    file_writer.write(line)
+    file_writer.write('\n')
+
+    anchor = coords_transform.to_local((8.3087, 47.0940))
+    line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
+    roof_shape = 10
+    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(width, depth, body_height,
+                                                                 roof_height, roof_shape,
+                                                                 roof_orientation, levels,
+                                                                 wall_tex_idx, roof_tex_idx)
+    file_writer.write(line)
+    file_writer.write('\n')
+
+    anchor = coords_transform.to_local((8.3080, 47.0935))
+    line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
+    roof_shape = 11
+    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(width, depth, body_height,
+                                                                 roof_height, roof_shape,
+                                                                 roof_orientation, levels,
+                                                                 wall_tex_idx, roof_tex_idx)
+    file_writer.write(line)
+    file_writer.write('\n')
+
+    anchor = coords_transform.to_local((8.3073, 47.0928))
+    line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
+    roof_shape = 0
+    roof_height = 0
+    levels = building_lib.BUILDING_LIST_SMALL_MAX_LEVELS
+    body_height = parameters.BUILDING_LEVEL_HEIGHT_URBAN * levels
+    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(width, depth, body_height,
+                                                                 roof_height, roof_shape,
+                                                                 roof_orientation, levels,
+                                                                 wall_tex_idx, roof_tex_idx)
+    file_writer.write(line)
+    file_writer.write('\n')
+
+    anchor = coords_transform.to_local((8.3067, 47.0923))
+    list_type = building_lib.BuildingListType.medium
+    line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
+    width = building_lib.BUILDING_LIST_MEDIUM_MIN_SIDE + 1
+    depth = 3 * width
+    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(width, depth, body_height,
+                                                                 roof_height, roof_shape,
+                                                                 roof_orientation, levels,
+                                                                 wall_tex_idx, roof_tex_idx)
+    file_writer.write(line)
+    file_writer.write('\n')
+
+    anchor = coords_transform.to_local((8.3061, 47.0918))
+    list_type = building_lib.BuildingListType.medium
+    line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
+    roof_height = parameters.BUILDING_LEVEL_HEIGHT_URBAN
+    roof_shape = 2
+    roof_orientation = 0
+    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(width, depth, body_height,
+                                                                 roof_height, roof_shape,
+                                                                 roof_orientation, levels,
+                                                                 wall_tex_idx, roof_tex_idx)
+    file_writer.write(line)
+    file_writer.write('\n')
+
+    anchor = coords_transform.to_local((8.3051, 47.0909))
+    list_type = building_lib.BuildingListType.medium
+    width = depth
+    levels = building_lib.BUILDING_LIST_MEDIUM_MAX_LEVELS
+    body_height = levels * parameters.BUILDING_LEVEL_HEIGHT_URBAN
+    roof_height = 0
+    roof_shape = 0
+    line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
+    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(width, depth, body_height,
+                                                                 roof_height, roof_shape,
+                                                                 roof_orientation, levels,
+                                                                 wall_tex_idx, roof_tex_idx)
+    file_writer.write(line)
+    file_writer.write('\n')
+
+    anchor = coords_transform.to_local((8.3039, 47.0894))
+    list_type = building_lib.BuildingListType.large
+    width = building_lib.BUILDING_LIST_LARGE_MIN_SIDE
+    depth = 4 * width
+    levels = building_lib.BUILDING_LIST_LARGE_MAX_LEVELS
+    body_height = levels * parameters.BUILDING_LEVEL_HEIGHT_URBAN
+    line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
+    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(width, depth, body_height,
+                                                                 roof_height, roof_shape,
+                                                                 roof_orientation, levels,
+                                                                 wall_tex_idx, roof_tex_idx)
+    file_writer.write(line)
+    file_writer.write('\n')
+
+
+""" 
+  415.94 [ALRT]:nasal      lat:47.0881 lon:8.3029 alt:427m
+  418.59 [ALRT]:nasal      lat:47.0861 lon:8.3003 alt:429m
+  420.50 [ALRT]:nasal      lat:47.0848 lon:8.2987 alt:429m
+  422.25 [ALRT]:nasal      lat:47.0833 lon:8.2969 alt:429m
+  """
+
+
 def write_buildings_in_lists(coords_transform: coordinates.Transformation,
                              list_buildings: Dict[building_lib.Building, building_lib.BuildingListType],
                              stg_manager: stg_io2.STGManager,
@@ -668,7 +872,7 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
                     if list_type is building_lib.BuildingListType.large:
                         tex_variability = 4
                     wall_tex_idx = random.randint(0, tex_variability - 1)  # FIXME: should calc on street level or owbb
-                    roof_tex_idx = random.randint(0, tex_variability - 1)  # FIXME: ditto plus "European cities"
+                    roof_tex_idx = wall_tex_idx
                     roof_orientation = b.analyse_roof_list_orientation()
                     line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(b.width, b.depth, b.body_height,
                                                                                  b.roof_height, b.roof_shape.value,
@@ -676,6 +880,7 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
                                                                                  wall_tex_idx, roof_tex_idx)
                 shader.write(line)
                 shader.write('\n')
+            _debug_building_list_lsme(coords_transform, shader, list_elev)
     except IOError as e:
         logging.warning('Could not write buildings in list to file %s', e)
     logging.info("Total number of shader buildings written to a building_list: %d", len(list_buildings))

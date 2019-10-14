@@ -129,6 +129,7 @@ BUILDING_LIST_SMALL_MAX_LEVELS = 3
 BUILDING_LIST_MEDIUM_MAX_LEVELS = 8
 BUILDING_LIST_LARGE_MAX_LEVELS = 22
 
+
 @unique
 class BuildingListType(IntEnum):
     """Available Random Building BUILDING_LIST types."""
@@ -242,7 +243,7 @@ class Building(object):
                  'street_angle', 'anchor', 'width', 'depth', 'zone',
                  'body_height', 'levels', 'min_height', 'roof_shape', 'roof_height', 'roof_neighbour_orientation',
                  'refs', 'refs_shared', 'inner_rings_list', 'outer_nodes_closest', 'polygon', 'geometry',
-                 'parent', 'pts_all', 'roof_height_pts', 'edge_length_pts','facade_texture',
+                 'parent', 'pts_all', 'roof_height_pts', 'edge_length_pts', 'facade_texture',
                  'roof_texture', 'roof_requires', 'LOD',
                  'ground_elev', 'diff_elev'
                  )
@@ -1038,8 +1039,10 @@ class Building(object):
             # else follow through next checks
         if self.has_neighbours:  # assume like in European inner cities and most row houses
             return 0
-        # just randomly distribute
-        return random.randint(0, 1)
+        # just look at the width/depth
+        if front_is_longest:
+            return 0
+        return 1
 
     def analyse_large_enough(self) -> bool:
         """Checks whether a given building's area is too small for inclusion.
