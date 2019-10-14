@@ -643,7 +643,7 @@ def construct_buildings_from_osm(coords_transform: coordinates.Transformation) -
 def _debug_building_list_lsme(coords_transform: coordinates.Transformation, file_writer, list_elev: float) -> None:
     """Writes a set of list buildings for debugging purposes.
 
-    Should be called at beginning of method write_buildings_in_list.
+    Should be called at end of with file handler in  write_buildings_in_list.
 
     The buildings are added from North along the Southern side of the runway at LSME ca. 30m from the runway.
     """
@@ -836,14 +836,6 @@ def _debug_building_list_lsme(coords_transform: coordinates.Transformation, file
     file_writer.write('\n')
 
 
-""" 
-  415.94 [ALRT]:nasal      lat:47.0881 lon:8.3029 alt:427m
-  418.59 [ALRT]:nasal      lat:47.0861 lon:8.3003 alt:429m
-  420.50 [ALRT]:nasal      lat:47.0848 lon:8.2987 alt:429m
-  422.25 [ALRT]:nasal      lat:47.0833 lon:8.2969 alt:429m
-  """
-
-
 def write_buildings_in_lists(coords_transform: coordinates.Transformation,
                              list_buildings: Dict[building_lib.Building, building_lib.BuildingListType],
                              stg_manager: stg_io2.STGManager,
@@ -880,7 +872,7 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
                                                                                  wall_tex_idx, roof_tex_idx)
                 shader.write(line)
                 shader.write('\n')
-            _debug_building_list_lsme(coords_transform, shader, list_elev)
+            # _debug_building_list_lsme(coords_transform, shader, list_elev)
     except IOError as e:
         logging.warning('Could not write buildings in list to file %s', e)
     logging.info("Total number of shader buildings written to a building_list: %d", len(list_buildings))
