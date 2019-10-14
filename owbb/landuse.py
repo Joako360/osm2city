@@ -787,17 +787,19 @@ def _count_zones_related_buildings(buildings: List[bl.Building], text: str, chec
     total_related = 0
     total_not_block = 0
 
-    for building in buildings:
+    for building in reversed(buildings):
         if building.zone:
             total_related += 1
             if check_block and not isinstance(building.zone, m.CityBlock):
                 total_not_block += 1
                 logging.debug('type = %s, settlement type = %s', building.zone, building.zone.settlement_type)
             if isinstance(building.zone.geometry, MultiPolygon):
-                raise SystemExit('Building with osm_id=%i has MultiPolygon of type = %s, zone osm_id = %i',
-                                 building.osm_id, building.zone, building.zone.osm_id)
+                logging.warning('Building with osm_id=%i has MultiPolygon of type = %s, zone osm_id = %i - %s',
+                                building.osm_id, building.zone.type_.name, building.zone.osm_id, text)
+                building.zone.geometry = building.zone.geometry.geoms[0]  # just use the first polygon
         else:
-            raise SystemExit('Building with osm_id=%i has no associated zone - %s', building.osm_id, text)
+            logging.warning('Building with osm_id=%i has no associated zone - %s', building.osm_id, text)
+            buildings.remove(building)  # make sure we do not get conflicts
 
     logging.info('%i out of %i buildings are related to zone %s - %i not in block', total_related, len(buildings),
                  text, total_not_block)
