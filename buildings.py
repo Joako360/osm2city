@@ -866,6 +866,7 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
                     wall_tex_idx = random.randint(0, tex_variability - 1)  # FIXME: should calc on street level or owbb
                     roof_tex_idx = wall_tex_idx
                     roof_orientation = b.analyse_roof_list_orientation()
+                    roof_orientation = 1 if roof_orientation == 0 else 1  # Currently looks like simgear is wrong
                     line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(b.width, b.depth, b.body_height,
                                                                                  b.roof_height, b.roof_shape.value,
                                                                                  roof_orientation, round(b.levels),
