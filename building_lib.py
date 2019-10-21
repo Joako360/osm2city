@@ -800,7 +800,10 @@ class Building(object):
             # in analyse_roof_shape_check it is double checked whether e.g. building height or area exceed limits
             # and then it will be corrected back to flat roof.
             if parameters.BUILDING_COMPLEX_ROOFS:
-                self.roof_shape = _random_roof_shape()
+                if self.has_neighbours:
+                    self.roof_shape = roofs.RoofShape.gabled
+                else:
+                    self.roof_shape = _random_roof_shape()
             else:
                 self.roof_shape = roofs.RoofShape.flat
 
@@ -978,11 +981,11 @@ class Building(object):
         the neighbour - at least most of the time. Some times (like along canals in Amsterdam) it might be that
         the gables actually look to the street instead to the neighbour - but then we must hope that the
         key roof:orientation has been explicitly used.
-        The information here is only used for buildings in meshes. for buildings in lists see corresponding
+        The information here is only used for buildings in meshes. For buildings in lists see corresponding
         b.analyse_roof_list_orientation.
         """
         self.roof_neighbour_orientation = -1.
-        if self.roof_shape is roofs.RoofShape.flat or self.has_inner or (len(self.refs_shared) == 0):
+        if self.roof_shape is roofs.RoofShape.flat or self.has_inner or self.has_neighbours is False:
             return
 
         outer_points = self.pts_outer
@@ -1569,21 +1572,26 @@ def _relate_neighbours(buildings: List[Building]) -> None:
     """Relates neighbour buildings based on shared references."""
     neighbours = 0
     len_buildings = len(buildings)
-    for i in range(0, len_buildings):
+    for i, first_building in enumerate(buildings, 1):
         if i % 10000 == 0:
             logging.info('Checked building relations for %i out of %i buildings', i, len_buildings)
-        potential_attached = buildings[i].zone.osm_buildings
-        for j in range(0, len(potential_attached)):
-            if set(buildings[i].refs).isdisjoint(set(buildings[j].refs)) is False:
-                for pos_i in range(len(buildings[i].refs)):
-                    for pos_j in range(len(buildings[j].refs)):
-                        if buildings[i].refs[pos_i] == buildings[j].refs[pos_j]:
-                            buildings[i].refs_shared[pos_i] = True
-                            buildings[j].refs_shared[pos_j] = True
-                            neighbours += 1
+        potential_attached = first_building.zone.osm_buildings
+        ref_set_first = set(first_building.refs)
+        for second_building in potential_attached:
+            if first_building.osm_id == second_building.osm_id:  # do not compare with self
+                continue
+            ref_set_second = set(second_building.refs)
+            if ref_set_first.isdisjoint(ref_set_second) is False:
+                for pos_i in range(len(first_building.refs)):
+                    for pos_j in range(len(second_building.refs)):
+                        if first_building.refs[pos_i] == second_building.refs[pos_j]:
+                            first_building.refs_shared[pos_i] = True
+                            second_building.refs_shared[pos_j] = True
 
-    logging.info('%d neighbour relations for %d buildings created (some buildings have several neighbours).',
-                 neighbours // 2, len(buildings))
+    for b in buildings:
+        if b.has_neighbours:
+            neighbours += 1
+    logging.info('%i out of %i buildings have neighbour relations ', neighbours, len(buildings))
 
 
 def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: utils.stg_io2.STGManager,
