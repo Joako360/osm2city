@@ -122,7 +122,7 @@ class BuildingType(IntEnum):
 
 
 # Based on lines 476 ff in simgear/scene/tgdb/SGBuildingBin.cxx
-BUILDING_LIST_SMALL_MIN_SIDE = 6.
+BUILDING_LIST_SMALL_MIN_SIDE = 5.
 BUILDING_LIST_MEDIUM_MIN_SIDE = 10.
 BUILDING_LIST_LARGE_MIN_SIDE = 20.
 BUILDING_LIST_SMALL_MAX_LEVELS = 3
@@ -512,6 +512,11 @@ class Building(object):
         if self.levels > BUILDING_LIST_LARGE_MAX_LEVELS:
             return None
         list_type = BuildingListType.small
+        if min_side < BUILDING_LIST_MEDIUM_MIN_SIDE:
+            if self.levels > BUILDING_LIST_SMALL_MAX_LEVELS:
+                self.levels = BUILDING_LIST_SMALL_MAX_LEVELS
+                self.body_height = self.levels * self._calculate_level_height()
+            return list_type
         building_class = get_building_class(self.tags)
         if building_class in [BuildingClass.residential, BuildingClass.residential_small,
                               BuildingClass.terrace]:
