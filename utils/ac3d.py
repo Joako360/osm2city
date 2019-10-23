@@ -198,10 +198,12 @@ class File(object):
     a common source of bugs. Can also add 3d labels (useful for debugging, disabled
     by default)
     """
-    def __init__(self, file_name=None, stats=None, show_labels=False, materials_list: List[str]=list()) -> None:
+    def __init__(self, file_name=None, stats=None, show_labels=False, materials_list: List[str] = None) -> None:
         """If file_name not None, then read ac3d data from file_name if given. Otherwise create empty ac3d object."""
         self.objects = []
         self.materials_list = materials_list
+        if self.materials_list is None:
+            self.materials_list = list()
         self.show_labels = show_labels
         self.stats = stats
         self._current_object = None

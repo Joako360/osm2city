@@ -25,11 +25,15 @@ class Mesh:
         * save and load (with a internal format)
     """
 
-    def __init__(self, vertices=list(), faces=list()):
-        self.vertices   = vertices
-        self.faces      = faces
-        self.nv         = len(self.vertices)
-        self.nf         = len(self.faces)
+    def __init__(self, vertices=None, faces=None):
+        self.vertices = vertices
+        if self.vertices is None:
+            self.vertices = list()
+        self.faces = faces
+        if self.faces is None:
+            self.faces = list()
+        self.nv = len(self.vertices)
+        self.nf = len(self.faces)
 
     def add_vertex(self, p):
         """
