@@ -502,7 +502,7 @@ class Building(object):
             return None
         if self.has_inner:
             return None
-        if parameters.BUILDING_LIST_AREA_DEVIATION * self.width * self.depth > self.area:
+        if self.area < parameters.BUILDING_LIST_AREA_DEVIATION * self.width * self.depth:
             return None
 
         # now determine in details

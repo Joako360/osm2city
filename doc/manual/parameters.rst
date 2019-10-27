@@ -341,7 +341,7 @@ BUILDING_COMPLEX_ROOFS_MAX_AREA                 Integer    1600      Don't put c
 
 BUILDING_COMPLEX_ROOFS_MIN_RATIO_AREA           Integer    600       If a building is larger than this but smaller than ``..._MAX_AREA``, then
                                                                      it is compared whether the building tends to be small and long, because often
-                                                                     one more square buildings, which at the same time are large, the roof tends
+                                                                     on more square buildings, which at the same time are large, the roof tends
                                                                      to be flat.
 
 BUILDING_SKEL_MAX_NODES                         Integer    10        The maximum number of nodes for which a complex roof is generated. The higher
