@@ -393,14 +393,18 @@ class Building(object):
                                                 hull_points[i + 1][0], hull_points[i + 1][1])
             self.anchor = Vec2d(x, y)
             self.street_angle = co.normal_degrees(angle + 90)
-            self.width = co.calc_distance_local(hull_points[i][0], hull_points[i][1],
-                                                hull_points[i + 1][0], hull_points[i + 1][1])
 
-            # to get the depth we must rotate the hull and then calculate the distance of the most distant points.
+            # to get the width depth we must rotate the hull and then calculate the distance of the most distant points.
+            # we could calculate the width based on the following, but that is not accurate if e.g. the building in OSM
+            # is modelled with a small front door entrance just 1 meter wide (happens e.g. in the Netherlands)
+            # self.width = co.calc_distance_local(hull_points[i][0], hull_points[i][1],
+            #                                    hull_points[i + 1][0], hull_points[i + 1][1])
             rotated_hull = affinity.rotate(hull, angle, hull_points[i])
             rotated_hull_points = list(rotated_hull.exterior.coords)
             longest_1 = 0.
             longest_2 = 0.
+            widest_1 = 0.
+            widest_2 = 0.
             for k in range(len(rotated_hull_points) - 1):
                 distance = fabs(rotated_hull_points[i][0] - rotated_hull_points[k][0])
                 if distance > longest_1:
@@ -408,11 +412,21 @@ class Building(object):
                     longest_1 = distance
                 elif distance > longest_2:
                     longest_2 = distance
+                distance = fabs(rotated_hull_points[i][1] - rotated_hull_points[k][1])
+                if distance > widest_1:
+                    widest_2 = widest_1
+                    widest_1 = distance
+                elif distance > widest_2:
+                    widest_2 = distance
 
-            if longest_1 * parameters.BUILDING_LIST_DEPTH_DEVIATION > longest_2:
+            if longest_1 * parameters.BUILDING_LIST_DIST_DEVIATION > longest_2:
                 self.depth = longest_1
             else:
                 self.depth = (longest_1 + longest_2) / 2
+            if widest_1 * parameters.BUILDING_LIST_DIST_DEVIATION > widest_2:
+                self.width = widest_1
+            else:
+                self.width = (widest_1 + widest_2) / 2
 
         except AttributeError:
             logging.exception('Problem to calc anchor for building osm_id=%i in zone of type=%s and settlement type=%s',
@@ -498,11 +512,13 @@ class Building(object):
             return None
         if self.has_neighbours and not parameters.BUILDING_LIST_ALLOW_NEIGHBOURS:
             return None
-        if self.pts_outer_count == 3:
-            return None
         if self.has_inner:
             return None
-        if self.area < parameters.BUILDING_LIST_AREA_DEVIATION * self.width * self.depth:
+        if self.pts_outer_count == 3:  # triangles
+            return None
+        if self.pts_outer_count >= 7 and self.area > parameters.BUILDING_COMPLEX_ROOFS_MIN_RATIO_AREA:
+            return None  # keep larger buildings with many edges
+        if self.area < parameters.BUILDING_LIST_AREA_DEVIATION * self.width * self.depth:  # L-buildings or trapeze
             return None
 
         # now determine in details

@@ -83,7 +83,7 @@ FLAG_BUILDINGS_MESH_SKIP = False
 
 BUILDING_LIST_ALLOW_NEIGHBOURS = True
 BUILDING_LIST_AREA_DEVIATION = 0.9
-BUILDING_LIST_DEPTH_DEVIATION = 0.8
+BUILDING_LIST_DIST_DEVIATION = 0.8
 
 # Debugging by plotting with Matplotlib to pdfs. See description about its use in the appendix of the manual
 DEBUG_PLOT_RECTIFY = False
