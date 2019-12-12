@@ -188,7 +188,7 @@ def transform_hex_colour_int_rgb_values(hex_colour: str) -> List[int]:
 
 # amb has to be 1 1 1 no matter the colour when textures are involved
 MATERIAL_FORMAT = ('MATERIAL "{0}" rgb {1:05.3f} {2:05.3f} {3:05.3f} amb 1 1 1 '  # {1:05.3f} {2:05.3f} {3:05.3f} '
-                   'emis 0 0 0 spec 0.5 0.5 0.5 shi 64 trans 0')
+                   'emis 0 0 0 spec 0.0 0.0 0.0 shi 0 trans 0')
 
 
 def create_material(name: str, red: float, green: float, blue: float) -> str:
