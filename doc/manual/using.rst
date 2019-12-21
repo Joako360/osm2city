@@ -138,11 +138,13 @@ Depending on your region and your shader settings you might want to search for e
 
 .. _chapter-building_lists:
 
-===========================================================
-Change Materials to Use Buildings by Shaders (Experimental)
-===========================================================
+====================================================================================
+Change Materials to Not Crash FG for Sceneries with Shader Buildings (BUILDING_LIST)
+====================================================================================
 
-This is an experimental feature not available in FlightGear version 2018.3.x or earlier. Most people can just ignore this.
+If you are using a scenery, which uses BUILDING_LIST and your FlightGear version is older than 2019.2 (e.g. 2019.1.x, 2018.3.x or earlier), then FlightGear will crash. The easiest way to handle this is to not use such a scenery. Alternatively you can follow the instructions below - it might help.
+
+You can spot whether you are using such a scenery by finding files with names like ``*_buildings_shader.txt`` (e.g. ``TEST/Buildings/e000n40/e008n47/e000n40_e008n47_3088961_buildings_shader.txt``).
 
 Add the following after the last ``</material>`` tag and before the ``</PropertyList>`` tag at the end of ``$FG_ROOT/Materials/regions/global.xml``:
 

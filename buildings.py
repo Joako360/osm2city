@@ -858,18 +858,17 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
                 elev = b.ground_elev - list_elev - coordinates.calc_horizon_elev(b.anchor.x, b.anchor.y)
                 line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-b.anchor.y, b.anchor.x, elev, b.street_angle,
                                                                list_type.value)
-                if not parameters.FLAG_STG_BUILDING_LIST_2019_1:
-                    b.compute_roof_height(True)
-                    tex_variability = 6
-                    if list_type is building_lib.BuildingListType.large:
-                        tex_variability = 4
-                    wall_tex_idx = random.randint(0, tex_variability - 1)  # FIXME: should calc on street level or owbb
-                    roof_tex_idx = wall_tex_idx
-                    roof_orientation = b.analyse_roof_list_orientation()
-                    line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(b.width, b.depth, b.body_height,
-                                                                                 b.roof_height, b.roof_shape.value,
-                                                                                 roof_orientation, round(b.levels),
-                                                                                 wall_tex_idx, roof_tex_idx)
+                b.compute_roof_height(True)
+                tex_variability = 6
+                if list_type is building_lib.BuildingListType.large:
+                    tex_variability = 4
+                wall_tex_idx = random.randint(0, tex_variability - 1)  # FIXME: should calc on street level or owbb
+                roof_tex_idx = wall_tex_idx
+                roof_orientation = b.analyse_roof_list_orientation()
+                line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(b.width, b.depth, b.body_height,
+                                                                             b.roof_height, b.roof_shape.value,
+                                                                             roof_orientation, round(b.levels),
+                                                                             wall_tex_idx, roof_tex_idx)
                 shader.write(line)
                 shader.write('\n')
             # _debug_building_list_lsme(coords_transform, shader, list_elev)
