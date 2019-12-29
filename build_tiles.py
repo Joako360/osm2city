@@ -4,24 +4,19 @@ import logging
 import logging.config
 import multiprocessing as mp
 import os
-import parameters
 import sys
 import time
 import traceback
 from typing import List
 import unittest
 
-import buildings
-import owbb.landuse as ol
-import piers
-import platforms
-import pylons
-import roads
-import utils.aptdat_io as aptdat_io
-import utils.calc_tile as calc_tile
-import utils.coordinates as coordinates
-import utils.stg_io2
-from utils.utilities import BoundaryError, FGElev, date_time_now, check_boundary, parse_boundary, time_logging
+from osm2city import platforms, piers, pylons, roads, buildings, parameters
+from osm2city.owbb import landuse as ol
+from osm2city.utils import aptdat_io as aptdat_io
+from osm2city.utils import calc_tile
+from osm2city.utils import coordinates
+from osm2city.utils import stg_io2
+from osm2city.utils.utilities import BoundaryError, FGElev, date_time_now, check_boundary, parse_boundary, time_logging
 
 
 class SceneryTile(object):
@@ -123,7 +118,7 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
         the_coords_transform = coordinates.Transformation(parameters.get_center_global())
 
         my_fg_elev = FGElev(the_coords_transform, scenery_tile.tile_index)
-        my_stg_entries = utils.stg_io2.read_stg_entries_in_boundary(True, the_coords_transform)
+        my_stg_entries = stg_io2.read_stg_entries_in_boundary(True, the_coords_transform)
 
         # run programs
         if exec_argument is Procedures.pylons or (exec_argument is Procedures.details and
