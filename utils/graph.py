@@ -110,7 +110,7 @@ class Graph(nx.Graph):
     """Inherit from nx.Graph, make accessing graph node attribute (Junction) easier"""
     def junction(self, the_ref):
         """return object attached to node"""
-        return self.node[the_ref]['obj']
+        return self.nodes[the_ref]['obj']
 
     def add_linear_object_edge(self, linear_obj):
         ref0 = linear_obj.way.refs[0]
