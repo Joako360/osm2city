@@ -22,7 +22,7 @@ Python
 
 ``osm2city`` is written in Python and needs Python for execution. Python is available on all major desktop operating systems — including but not limited to Windows, Linux and Mac OS X. See http://www.python.org.
 
-Currently Python version 3.6 is used for development and is therefore the recommended version.
+Currently Python version 3.7 is used for development and is therefore the recommended version.
 
 
 -------------------------
@@ -35,7 +35,7 @@ osm2city uses the following Python extension packages, which must be installed o
 * matplotlib
 * networkx
 * numpy (on Windows you need Numpy+MKL)
-* pil (Pillow)
+* Pillow
 * pyproj
 * requests
 * scipy
