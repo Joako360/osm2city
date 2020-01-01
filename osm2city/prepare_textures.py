@@ -275,7 +275,7 @@ def init(stats: util.Stats, mode: InitMode=InitMode.read) -> None:
     my_tex_prefix_src = os.path.join(parameters.PATH_TO_OSM2CITY_DATA, 'tex.src')
     Texture.tex_prefix = my_tex_prefix_src  # need to set static variable so managers get full path
 
-    pkl_file_name = os.path.join(parameters.PATH_TO_OSM2CITY_DATA, "tex", "atlas_facades.pkl")
+    pkl_file_name = os.path.join(parameters.PATH_TO_OSM2CITY_DATA, "tex", "atlas_facades_new.pkl")
     
     if mode is InitMode.create:
         roofs = RoofManager('roof', stats)
