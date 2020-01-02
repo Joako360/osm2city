@@ -42,7 +42,7 @@ osm2city uses the following Python extension packages, which must be installed o
 * shapely
 * psycopg2-binary
 
-Please make sure to use Python 3.6+ compatible extensions. Often Python 3 compatible packages have a "3" in their name. Most Linux distributions come by default with the necessary packages — often they are prefixed with ``python-`` (e.g. ``python-numpy``). On Windows WinPython (https://winpython.github.io/) together with Christoph Gohlke's unofficial Windows binaries for Python extension packages (http://www.lfd.uci.edu/~gohlke/pythonlibs/) works well.
+Please make sure to use Python 3.7+ compatible extensions. Often Python 3 compatible packages have a "3" in their name. Most Linux distributions come by default with the necessary packages — often they are prefixed with ``python-`` (e.g. ``python-numpy``). On Windows WinPython (https://winpython.github.io/) together with Christoph Gohlke's unofficial Windows binaries for Python extension packages (http://www.lfd.uci.edu/~gohlke/pythonlibs/) works well.
 
 
 --------------------
@@ -91,10 +91,10 @@ Then:
 Installation of osm2city
 ========================
 
-There is no installer package - neither on Windows nor Linux. ``osm2city`` consists of a set of Python programs and the related data in "osm2city-data_". You need both.
+There is no installer package - neither on Windows nor Linux. "osm2city_" consists of a set of Python programs and the related data in "osm2city-data_". You need both.
 
-.. _osm2city: https://gitlab.com/fg-radi/osm2city
-.. _osm2city-data: https://gitlab.com/fg-radi/osm2city-data
+.. _osm2city: https://gitlab.com/osm2city/osm2city
+.. _osm2city-data: https://gitlab.com/osm2city/osm2city-data
 
 Do the following:
 
