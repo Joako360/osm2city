@@ -47,10 +47,10 @@ def query_population(entity_id: str) -> int:
         logging.warning('Response error in fetching data from WikiData: code = %i, reason = %s', status_code, reason)
         return error_value
     except requests.ReadTimeout:
-        logging.warning('Read timeout error occured in fetching data from WikiData')
+        logging.warning('Read timeout error occurred in fetching data from WikiData')
         return error_value
     except Exception:  # now we just give up, but want to continue - most probably just no connection
-        logging.warning('Some error occured in fetching data from WikData')
+        logging.warning('Some error occurred in fetching data from WikData')
         return error_value
     # We should be good to parse the content
     try:
@@ -62,7 +62,7 @@ def query_population(entity_id: str) -> int:
         else:
             return error_value
     except (ValueError, KeyError):
-        logging.warning('Error in interpreting data from WikiData with id=' + entity_id, exc_info=1)
+        logging.exception('Error in interpreting data from WikiData with id=%i', entity_id)
         return error_value
 
 
