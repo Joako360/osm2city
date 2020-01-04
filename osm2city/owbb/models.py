@@ -21,7 +21,7 @@ from osm2city import building_lib as bl
 from osm2city.utils import osmparser as op
 from osm2city.utils import osmstrings as s
 from osm2city.utils import coordinates as co
-from osm2city.utils import wikidata_io as wio
+from osm2city.utils import json_io as wio
 
 
 # type aliases
@@ -116,8 +116,8 @@ class Place(OSMFeature):
             self.population = op.parse_int(tags_dict[s.K_POPULATION], 0)
         elif s.K_WIKIDATA in tags_dict:
             my_id = tags_dict[s.K_WIKIDATA]
-            my_population = wio.query_population(my_id)
-            if my_population > 0:
+            my_population = wio.query_population_wikidata(my_id)
+            if my_population is not None:
                 self.population = my_population
 
         if s.K_NAME in tags_dict:
