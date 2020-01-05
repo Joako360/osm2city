@@ -25,13 +25,12 @@ import sys
 from typing import Dict, List, Tuple
 
 from osm2city import parameters
+import osm2city.utils.json_io as jio
 from osm2city.utils.utilities import FGElev, get_osm2city_directory
 from osm2city.utils.vec2d import Vec2d
 import osm2city.utils.stg_io2 as stg
 
 MODEL_LIBRARY = "library.txt"
-
-# input_file_name = "dsf_txt_collection2000/EDDF.txt"
 
 OUR_MAGIC = "dsf2stg"
 
@@ -232,78 +231,77 @@ def _jw_entry(o, f, jw_count):
     f.write('</jetway>\n')
 
 
-def main(input_file_name: str) -> None:
-    with open(input_file_name, 'r') as infile:
-        try:
-            n2 = os.path.basename(input_file_name)
-            icao, _ = os.path.splitext(n2)
-            logging.info("Starting airport: %s", icao)
+def main(icao: str) -> None:
+    scenery_id = jio.query_airport_xplane(icao)
+    if scenery_id is not None:
+        file_name = jio.query_scenery_xplane(scenery_id, icao)
+        with open(file_name, 'r') as infile:
+            try:
+                object_definition_paths = list()
+                object_definitions = dict()
 
-            object_definition_paths = list()
-            object_definitions = dict()
+                model_library = _read_model_library()
+                _read_obj_def(infile, object_definition_paths, object_definitions)
+                infile.seek(0)
+                objects = _read_obj(infile, model_library, object_definition_paths, object_definitions)
+                linecount = 0
+                jw_count = 0
+                jw_init_flag = False
 
-            model_library = _read_model_library()
-            _read_obj_def(infile, object_definition_paths, object_definitions)
-            infile.seek(0)
-            objects = _read_obj(infile, model_library, object_definition_paths, object_definitions)
-            linecount = 0
-            jw_count = 0
-            jw_init_flag = False
+                tile_index = 11111  # FIXME make it real
+                my_fg_elev = FGElev(None, tile_index)
+                stg_manager = stg.STGManager(parameters.PATH_TO_OUTPUT, stg.SceneryType.details, OUR_MAGIC)
+                for o in objects:
+                    if o.msl is None:
+                        o.msl = my_fg_elev.probe_elev((o.lon, o.lat), True) + o.zoff
+                        logging.debug("object %s: elev probed %s" % (o.fgpath, str(o.msl)))
+                    else:
+                        logging.debug("object %s: using provided MSL=%g" % (o.fgpath, o.msl))
 
-            tile_index = 11111  # FIXME make it real
-            my_fg_elev = FGElev(None, tile_index)
-            stg_manager = stg.STGManager(parameters.PATH_TO_OUTPUT, stg.SceneryType.details, OUR_MAGIC)
-            for o in objects:
-                if o.msl is None:
-                    o.msl = my_fg_elev.probe_elev((o.lon, o.lat), True) + o.zoff
-                    logging.debug("object %s: elev probed %s" % (o.fgpath, str(o.msl)))
-                else:
-                    logging.debug("object %s: using provided MSL=%g" % (o.fgpath, o.msl))
+                    if o.fgpath in ("Models/Airport/Jetway/jetway.xml", "Models/Airport/Jetway/jetway-movable.xml"):
+                        if not jw_init_flag:
+                            f = _jw_init(icao)
+                            jw_init_flag = True
+                        _jw_entry(o, f, jw_count)
+                        jw_count += 1
+                    elif o.fgpath == "CAR":
+                        numcars = len(CARPOOL)
+                        index = (randint(0, numcars-1))
+                        fgpath = ("Models/Transport/" + CARPOOL[index])
+                        stg_manager.add_object_shared(fgpath, o.pos, o.msl, o.hdg)
+                    elif o.fgpath == "CESSNA":
+                        numplanes = len(CESSNAS)
+                        index = (randint(0, numplanes-1))
+                        fgpath = ("Models/Aircraft/" + CESSNAS[index])
+                        stg_manager.add_object_shared(fgpath, o.pos, o.msl, o.hdg)
+                    else:
+                        stg_manager.add_object_shared(o.fgpath, o.pos, o.msl, o.hdg)
 
-                if o.fgpath in ("Models/Airport/Jetway/jetway.xml", "Models/Airport/Jetway/jetway-movable.xml"):
-                    if not jw_init_flag:
-                        f = _jw_init(icao)
-                        jw_init_flag = True
-                    _jw_entry(o, f, jw_count)
-                    jw_count += 1
-                elif o.fgpath == "CAR":
-                    numcars = len(CARPOOL)
-                    index = (randint(0, numcars-1))
-                    fgpath = ("Models/Transport/" + CARPOOL[index])
-                    stg_manager.add_object_shared(fgpath, o.pos, o.msl, o.hdg)
-                elif o.fgpath == "CESSNA":
-                    numplanes = len(CESSNAS)
-                    index = (randint(0, numplanes-1))
-                    fgpath = ("Models/Aircraft/" + CESSNAS[index])
-                    stg_manager.add_object_shared(fgpath, o.pos, o.msl, o.hdg)
-                else:
-                    stg_manager.add_object_shared(o.fgpath, o.pos, o.msl, o.hdg)
+                    linecount += 1
+                my_fg_elev.close()
 
-                linecount += 1
-            my_fg_elev.close()
+                stg_manager.write()
+                logging.info('Wrote %i stg lines for %s', linecount, icao)
 
-            stg_manager.write()
-            logging.info('Wrote %i stg lines for %s', linecount, icao)
-
-            if jw_init_flag:
-                f.write('</PropertyList>\n')
-                logging.info('Wrote %i jetway.xml entries for %s', jw_count, icao)
-                f.close()
-            logging.info("Done.")
-        except IOError:
-            logging.exception('Input file %s not found', input_file_name)
-            sys.exit()
+                if jw_init_flag:
+                    f.write('</PropertyList>\n')
+                    logging.info('Wrote %i jetway.xml entries for %s', jw_count, icao)
+                    f.close()
+                logging.info("Done.")
+            except IOError:
+                logging.exception('Input file %s not found', file_name)
+                sys.exit()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert X-plane gateway scenery package to FlightGear")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
-    parser.add_argument("-i", "--input", help="Path to x-plane scenery file", metavar="PATH", required=True)
+    parser.add_argument("-i", "--icao", help="ICAO of airport", required=True)
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG)
 
     parameters.read_from_file(args.filename)
 
-    main(args.input)
+    main(args.icao)

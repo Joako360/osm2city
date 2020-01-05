@@ -106,18 +106,20 @@ def query_airport_xplane(icao: str) -> Optional[int]:
         return None
 
 
-def query_scenery_xplane(scenery_id: int, icao: str) -> Optional[bool]:
-    """Queries the X-Plane Scenery Gateway for a specific scenery pack. Returns True if there is 3D information.
+def query_scenery_xplane(scenery_id: int, icao: str) -> Optional[str]:
+    """Queries the X-Plane Scenery Gateway for a specific scenery pack. Returns file name if there is 3D information.
 
     Returns None if error.
 
     We only need the .txt file included in the zip-file, not the .dat file.
     The .txt file gets written to the working directory and renamed to [icao]_[scenery_id].txt. If the file already
     exists, then True is returned and no new data is fetched.
+
+    https://gateway.x-plane.com/api#get-scenery
     """
     scenery_file = '{}_{}.txt'.format(icao, scenery_id)
     if path.exists(scenery_file):
-        return True
+        return scenery_file
     query = 'http://gateway.x-plane.com/apiv1/scenery/{}'.format(scenery_id)
     context = 'X-Plane Scenery Gateway specific scenery'
     response = _json_query_status(query, context)
@@ -140,10 +142,11 @@ def query_scenery_xplane(scenery_id: int, icao: str) -> Optional[bool]:
         try:
             _ = zip_fhandle.read(the_file)
         except IOError:
-            return False  # just testing whether it exists - sometimes there is only 2D information
+            logging.info('There is no 3D info for icao=%s', icao)
+            return None  # just testing whether it exists - sometimes there is only 2D information
         zip_fhandle.extract(the_file)
         os.rename(the_file, scenery_file)
-        return True
+        return scenery_file
     except (ValueError, KeyError, IOError):
         logging.exception('Error in interpreting data from %s for scenery ID=%i and ICAO=%s', context, scenery_id, icao)
         return None
