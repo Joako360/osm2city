@@ -133,9 +133,10 @@ BUILDING_COMPLEX_ROOFS_MIN_RATIO_AREA = 600  # if larger than this then ratio of
 BUILDING_SKEL_ROOFS_MIN_ANGLE = 10  # -- pySkeleton based complex roofs will
 BUILDING_SKEL_ROOFS_MAX_ANGLE = 50  #    have a random angle between MIN and MAX
 BUILDING_SKEL_MAX_NODES = 10        # -- max number of nodes for which we generate pySkeleton roofs
-BUILDING_SKILLION_ROOF_MAX_HEIGHT = 2.
 BUILDING_SKEL_ROOF_MAX_HEIGHT = 6.  # -- skip skeleton roofs (gabled, pyramidal, ..) if the roof height is larger than this
+BUILDING_SKEL_MAX_DIST_FROM_CENTROID = 400  # Hack to make sure skeleton residuals are not causing FG to crash in rendering
 BUILDING_ROOF_SIMPLIFY_TOLERANCE = .5
+BUILDING_SKILLION_ROOF_MAX_HEIGHT = 2.
 
 # If the roof_type is missing, what shall be the distribution of roof_types (must sum up to 1.0)
 # The keys are the shapes and must correspond to valid RoofShape values in roofs.py

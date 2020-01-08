@@ -6,6 +6,7 @@ Created on Fri Sep  6 19:37:03 2013
 """
 
 import logging
+from math import fabs
 import random
 import textwrap
 
@@ -42,8 +43,17 @@ def myskel(out, b, stats: utilities.Stats, offset_xy=Vec2d(0, 0), offset_z=0., h
             # We'll just flatten the roof then instead of loosing it
             angle -= 5
         if roof_height > max_height:
-            logging.debug("WARNING: roof too high %g > %g" % (roof_height, max_height))
+            logging.debug("Skeleton roof too high %g > %g - and therefore not accepted", roof_height, max_height)
             return False
+
+        # The following is a hack as in certain (not further investigated situation) the dimensions can get out
+        # of control generating e+07 numbers, which cannot be right.
+        # FG crashes if an ac-file has such values.
+        for p in roof_mesh.vertices:
+            if fabs(p[0] - b.polygon.centroid.x) > parameters.BUILDING_SKEL_MAX_DIST_FROM_CENTROID or (
+                    fabs(p[1] - b.polygon.centroid.y) > parameters.BUILDING_SKEL_MAX_DIST_FROM_CENTROID):
+                logging.debug("Skeleton roof might be broken - and therefore not accepted")
+                return False
 
         result = roof_mesh.to_out(out, b, offset_xy, offset_z, header)
     except Exception as reason:
