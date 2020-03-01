@@ -102,8 +102,8 @@ OVERLAP_CHECK_CH_BUFFER_SHARED = 0.0
 
 OVERLAP_CHECK_CONSIDER_SHARED = True
 
-OVERLAP_CHECK_PAVEMENT_BUILDINGS_INCLUDE = []  # At airports in list include overlap check with pavement for buildings
-OVERLAP_CHECK_PAVEMENT_ROADS_INCLUDE = []  # At airports in list include overlap check with pavement for roads
+OVERLAP_CHECK_PAVEMENT_BUILDINGS_INCLUDE = None  # At airports in list include overlap check with pavement for buildings
+OVERLAP_CHECK_PAVEMENT_ROADS_INCLUDE = None  # At airports in list include overlap check with pavement for roads
 
 # -- Skip buildings based on their OSM name tag or OSM ID, e.g. in case there's already
 #    a static model for these, and the overlap check fails.

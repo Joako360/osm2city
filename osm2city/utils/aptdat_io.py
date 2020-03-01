@@ -140,7 +140,11 @@ class Airport(object):
         pavement_include_list = parameters.OVERLAP_CHECK_PAVEMENT_ROADS_INCLUDE
         if for_buildings:
             pavement_include_list = parameters.OVERLAP_CHECK_PAVEMENT_BUILDINGS_INCLUDE
-        if self.code in pavement_include_list:
+
+        if pavement_include_list is None:
+            return blocked_areas
+
+        if len(pavement_include_list) == 0 or self.code in pavement_include_list:
             for pavement in self.pavements:
                 pavement_buffers = pavement.create_polygon_buffer(coords_transform)
                 for pb in pavement_buffers:

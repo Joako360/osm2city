@@ -404,11 +404,13 @@ OVERLAP_CHECK_CONSIDER_SHARED                   Bool       True      Whether onl
                                                                      models reused in different places like a church model).
                                                                      For this to work ``PATH_TO_SCENERY`` must point to the TerraSync directory.
 
-OVERLAP_CHECK_PAVEMENT_BUILDINGS_INCLUDE        List       []        At airports in list include overlap check with pavement for buildings.
-                                                                     Otherwise overlap check is done only against runways and helipads.
+OVERLAP_CHECK_PAVEMENT_BUILDINGS_INCLUDE        List       None      At airports in list include overlap check with pavement for buildings.
+                                                                     If the list is empty, then all airports are used.
+                                                                     If the value is ``None``, then overlap check is done only against runways
+                                                                     and helipads.
                                                                      Pavement includes e.g. APRONs.
 
-OVERLAP_CHECK_PAVEMENT_ROADS_INCLUDE            List       []        Ditto for roads and railways. E.g. ``['ENAT', 'LSZR']``
+OVERLAP_CHECK_PAVEMENT_ROADS_INCLUDE            List       None      Ditto for roads and railways. E.g. ``['ENAT', 'LSZR']``
 
 OVERLAP_CHECK_ROAD_MIN_REMAINING                Integer    10        When a static bridge model or other blocked area (e.g. airport object)
                                                                      intersect with a way, how much must at least be left so the way is kept after
