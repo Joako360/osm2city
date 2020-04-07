@@ -105,6 +105,9 @@ class Node(OSMElement):
 
         return -1
 
+    def __str__(self):
+        return 'Node with osm_id: {}'.format(self.osm_id)
+
 
 class Way(OSMElement):
     __slots__ = ('refs', 'pseudo_osm_id', 'was_split_at_end')
@@ -160,6 +163,9 @@ class Way(OSMElement):
             return True
         return False
 
+    def __str__(self):
+        return 'Way with osm_id: {}'.format(self.osm_id)
+
 
 class Member(object):
     __slots__ = ('ref', 'type_', 'role')
@@ -179,6 +185,9 @@ class Relation(OSMElement):
 
     def add_member(self, member: Member) -> None:
         self.members.append(member)
+
+    def __str__(self):
+        return 'Relation with osm_id: {}'.format(self.osm_id)
 
 
 def closed_ways_from_multiple_ways(way_parts: List[Way]) -> List[Way]:
