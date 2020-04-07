@@ -1537,7 +1537,7 @@ def _write_cable_clusters(cluster_container: cluster.ClusterContainer, coords_tr
         ac_file_lines = list()
         ac_file_lines.append("AC3Db")
         ac_file_lines.append(
-            'MATERIAL "cable" rgb 0.3 0.3 0.3 amb 0.3 0.3 0.3 emis 0.0 0.0 0.0 spec 0.3 0.3 0.3 shi 1 trans 0')
+            'MATERIAL "cable" rgb 0.3 0.3 0.3 amb 0.3 0.3 0.3 emis 0.0 0.0 0.0 spec 0.3 0.3 0.3 shi 100 trans 0')
         ac_file_lines.append("OBJECT world")
         ac_file_lines.append("kids " + str(len(cl.objects)))
         segment_index = 0
