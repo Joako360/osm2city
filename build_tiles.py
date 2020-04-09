@@ -12,7 +12,8 @@ import unittest
 
 from osm2city import platforms, piers, pylons, roads, buildings, parameters
 from osm2city.owbb import landuse as ol
-from osm2city.utils import aptdat_io as aptdat_io
+import osm2city.utils.aptdat_io as aio
+import osm2city.utils.btg_io as bio
 from osm2city.utils import calc_tile
 from osm2city.utils import coordinates
 from osm2city.utils import stg_io2
@@ -102,7 +103,7 @@ def pool_initializer(log_level: str, log_to_file: bool):
 
 
 def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
-                         exec_argument: Procedures, my_airports: List[aptdat_io.Airport],
+                         exec_argument: Procedures, my_airports: List[aio.Airport],
                          file_lock: mp.Lock, my_progress: str) -> None:
     my_fg_elev = None
     try:
@@ -133,22 +134,23 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
             process_built_stuff = False
         if exec_argument in [Procedures.buildings, Procedures.main, Procedures.all] and process_built_stuff:
             # cannot be read once for all outside of tiles in main function due to local coordinates
-            my_airport_areas = aptdat_io.get_apt_dat_blocked_areas_from_airports(the_coords_transform,
-                                                                                 parameters.BOUNDARY_WEST,
-                                                                                 parameters.BOUNDARY_SOUTH,
-                                                                                 parameters.BOUNDARY_EAST,
-                                                                                 parameters.BOUNDARY_NORTH,
-                                                                                 my_airports, True)
-            buildings.process_buildings(the_coords_transform, my_fg_elev, my_airport_areas, my_stg_entries,
+            blocked_apt_areas = aio.get_apt_dat_blocked_areas_from_airports(the_coords_transform,
+                                                                            parameters.BOUNDARY_WEST,
+                                                                            parameters.BOUNDARY_SOUTH,
+                                                                            parameters.BOUNDARY_EAST,
+                                                                            parameters.BOUNDARY_NORTH,
+                                                                            my_airports, True)
+            buildings.process_buildings(the_coords_transform, my_fg_elev, blocked_apt_areas, my_stg_entries,
                                         osm_buildings, file_lock)
         if exec_argument in [Procedures.roads, Procedures.main, Procedures.all] and process_built_stuff:
-            my_airport_areas = aptdat_io.get_apt_dat_blocked_areas_from_airports(the_coords_transform,
-                                                                                 parameters.BOUNDARY_WEST,
-                                                                                 parameters.BOUNDARY_SOUTH,
-                                                                                 parameters.BOUNDARY_EAST,
-                                                                                 parameters.BOUNDARY_NORTH,
-                                                                                 my_airports, False)
-            roads.process_roads(the_coords_transform, my_fg_elev, my_airport_areas, lit_areas, water_areas,
+            blocked_apt_areas = aio.get_apt_dat_blocked_areas_from_airports(the_coords_transform,
+                                                                            parameters.BOUNDARY_WEST,
+                                                                            parameters.BOUNDARY_SOUTH,
+                                                                            parameters.BOUNDARY_EAST,
+                                                                            parameters.BOUNDARY_NORTH,
+                                                                            my_airports, False)
+            blocked_apt_areas.extend(bio.get_blocked_areas_from_btg_airport_data(the_coords_transform, my_airports))
+            roads.process_roads(the_coords_transform, my_fg_elev, blocked_apt_areas, lit_areas, water_areas,
                                 my_stg_entries, file_lock)
         if exec_argument in [Procedures.pylons, Procedures.main, Procedures.all]:
             pylons.process_pylons(the_coords_transform, my_fg_elev, my_stg_entries, file_lock)
@@ -277,8 +279,8 @@ if __name__ == '__main__':
 
     # get airports from apt_dat. Transformation to blocked areas can only be done in sub-process due to local
     # coordinate system
-    airports = aptdat_io.read_apt_dat_gz_file(boundary_west, boundary_south,
-                                              boundary_east, boundary_north)
+    airports = aio.read_apt_dat_gz_file(boundary_west, boundary_south,
+                                        boundary_east, boundary_north)
 
     start_time = time.time()
     mp.set_start_method('spawn')  # use safe approach to make sure e.g. parameters module is initialized separately

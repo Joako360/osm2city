@@ -4,17 +4,14 @@
 
 import logging
 import math
-import os.path
 import pickle
 import time
 from typing import Dict, List, Optional, Tuple
 
-import pyproj
 from shapely.geometry import box, LineString, MultiPolygon, Polygon, CAP_STYLE, JOIN_STYLE
 from shapely.ops import unary_union
 from shapely.prepared import prep
 
-from osm2city.utils import calc_tile as ct
 from osm2city import building_lib as bl
 from osm2city import buildings as bu
 from osm2city.owbb import models as m
@@ -25,7 +22,6 @@ import osm2city.utils.aptdat_io as aptdat_io
 import osm2city.utils.btg_io as btg
 import osm2city.utils.osmparser as op
 from osm2city.utils.coordinates import disjoint_bounds, Transformation
-from osm2city.utils.stg_io2 import scenery_directory_name, SceneryType
 from osm2city.utils.utilities import time_logging, merge_buffers
 
 
@@ -248,127 +244,6 @@ def _split_multipolygon_generated_building_zone(zone: m.GeneratedBuildingZone) -
     else:
         split_zones.append(zone)
     return split_zones
-
-
-def _read_btg_file(transformer: Transformation) -> Optional[btg.BTGReader]:
-    """There is a need to do a local coordinate transformation, as BTG also has a local coordinate
-    transformation, but there the center will be in the middle of the tile, whereas here is can be
-     another place if the boundary is not a whole tile."""
-    lon_lat = parameters.get_center_global()
-    path_to_btg = ct.construct_path_to_files(parameters.PATH_TO_SCENERY, scenery_directory_name(SceneryType.terrain),
-                                             (lon_lat.lon, lon_lat.lat))
-    tile_index = parameters.get_tile_index()
-
-    # cartesian ellipsoid
-    in_proj = pyproj.Proj(proj='geocent', ellps='WGS84', datum='WGS84')
-    # geodetic flat
-    out_proj = pyproj.Proj('epsg:4326', ellps='WGS84', datum='WGS84')
-
-    btg_file_name = os.path.join(path_to_btg, ct.construct_btg_file_name_from_tile_index(tile_index))
-    if not os.path.isfile(btg_file_name):
-        logging.warning('File %s does not exist. Ocean or missing in Terrasync?', btg_file_name)
-        return None
-    logging.debug('Reading btg file: %s', btg_file_name)
-    btg_reader = btg.BTGReader(btg_file_name)
-
-    gbs_center = btg_reader.gbs_center
-
-    v_max_x = 0
-    v_max_y = 0
-    v_max_z = 0
-    v_min_x = 0
-    v_min_y = 0
-    v_min_z = 0
-    for vertex in btg_reader.vertices:
-        if vertex.x >= 0:
-            v_max_x = max(v_max_x, vertex.x)
-        else:
-            v_min_x = min(v_min_x, vertex.x)
-        if vertex.y >= 0:
-            v_max_y = max(v_max_y, vertex.y)
-        else:
-            v_min_y = min(v_min_y, vertex.y)
-        if vertex.z >= 0:
-            v_max_z = max(v_max_z, vertex.z)
-        else:
-            v_min_z = min(v_min_z, vertex.z)
-
-        # translate to lon_lat and then to local coordinates
-        lon, lat, _alt = pyproj.transform(in_proj, out_proj,
-                                          vertex.x + gbs_center.x,
-                                          vertex.y + gbs_center.y,
-                                          vertex.z + gbs_center.z,
-                                          radians=False)
-
-        vertex.x, vertex.y = transformer.to_local((lon, lat))
-        vertex.z = _alt
-
-    return btg_reader
-
-
-def _process_polygons_from_btg_faces(btg_reader: btg.BTGReader, materials: List[str],
-                                     transformer: Transformation, merge_polys: bool = True) -> Dict[str, List[Polygon]]:
-    """For a given set of BTG materials merge the faces read from BTG into as few polygons as possible"""
-    btg_lon, btg_lat = btg_reader.gbs_lon_lat
-    btg_x, btg_y = transformer.to_local((btg_lon, btg_lat))
-    logging.debug('Difference between BTG and transformer: x = %f, y = %f', btg_x, btg_y)
-
-    btg_polys = dict()
-    min_x, min_y = transformer.to_local((parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH))
-    max_x, max_y = transformer.to_local((parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH))
-    bounds = (min_x, min_y, max_x, max_y)
-
-    disjoint = 0
-    accepted = 0
-    counter = 0
-    merged_counter = 0
-
-    for key, faces_list in btg_reader.faces.items():
-        if key in materials:
-            temp_polys = list()
-            for face in faces_list:
-                counter += 1
-                v0 = btg_reader.vertices[face.vertices[0]]
-                v1 = btg_reader.vertices[face.vertices[1]]
-                v2 = btg_reader.vertices[face.vertices[2]]
-                # create the triangle polygon
-                my_geometry = Polygon([(v0.x - btg_x, v0.y - btg_y), (v1.x - btg_x, v1.y - btg_y),
-                                       (v2.x - btg_x, v2.y - btg_y), (v0.x - btg_x, v0.y - btg_y)])
-                if not my_geometry.is_valid:  # it might be self-touching or self-crossing polygons
-                    clean = my_geometry.buffer(0)  # cf. http://toblerity.org/shapely/manual.html#constructive-methods
-                    if clean.is_valid:
-                        my_geometry = clean  # it is now a Polygon or a MultiPolygon
-                    else:  # lets try with a different sequence of points
-                        my_geometry = Polygon([(v0.x - btg_x, v0.y - btg_y), (v2.x - btg_x, v2.y - btg_y),
-                                               (v1.x - btg_x, v1.y - btg_y), (v0.x - btg_x, v0.y - btg_y)])
-                        if not my_geometry.is_valid:
-                            clean = my_geometry.buffer(0)
-                            if clean.is_valid:
-                                my_geometry = clean
-                if isinstance(my_geometry, Polygon) and my_geometry.is_valid and not my_geometry.is_empty:
-                    if not disjoint_bounds(bounds, my_geometry.bounds):
-                        temp_polys.append(my_geometry)
-                        accepted += 1
-                    else:
-                        disjoint += 1
-                else:
-                    pass  # just discard the triangle
-
-            # merge polygons as much as possible in order to reduce processing and not having polygons
-            # smaller than parameters.OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA
-            if merge_polys:
-                merged_list = merge_buffers(temp_polys)
-                merged_counter += len(merged_list)
-                btg_polys[key] = merged_list
-            else:
-                btg_polys[key] = temp_polys
-
-    logging.debug('Out of %i faces %i were disjoint and %i were accepted with the bounds.',
-                  counter, disjoint, accepted)
-    logging.info('Number of polygons found: %i. Used materials: %s', counter, str(materials))
-    if merge_polys:
-        logging.info('These were reduced to %i polygons', merged_counter)
-    return btg_polys
 
 
 def _create_btg_buildings_zones(btg_polys: Dict[str, List[Polygon]]) -> List[m.BTGBuildingZone]:
@@ -872,7 +747,7 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     last_time = time_logging("Time used in seconds for processing aerodromes", last_time)
 
     # =========== READ LAND-USE DATA FROM FLIGHTGEAR BTG-FILES =============
-    btg_reader = _read_btg_file(transformer)
+    btg_reader = btg.read_btg_file(transformer, None)
     btg_building_zones = list()
     water_areas = list()
 
@@ -881,12 +756,13 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
             logging.warning('No BTG available in area, where there are OSM buildings or roads/rails')
     else:
         if parameters.OWBB_USE_BTG_LANDUSE:
-            btg_polygons = _process_polygons_from_btg_faces(btg_reader, btg.URBAN_MATERIALS, transformer)
+            btg_polygons = btg.process_polygons_from_btg_faces(btg_reader, btg.URBAN_MATERIALS, False, transformer)
             btg_building_zones = _create_btg_buildings_zones(btg_polygons)
             last_time = time_logging("Time used in seconds for processing BTG building zones", last_time)
 
-        btg_polygons = _process_polygons_from_btg_faces(btg_reader, btg.WATER_MATERIALS, transformer)
-        btg_transport = _process_polygons_from_btg_faces(btg_reader, btg.TRANSPORT_MATERIALS, transformer, False)
+        btg_polygons = btg.process_polygons_from_btg_faces(btg_reader, btg.WATER_MATERIALS, False, transformer)
+        btg_transport = btg.process_polygons_from_btg_faces(btg_reader, btg.TRANSPORT_MATERIALS, False, transformer,
+                                                            False)
         water_areas = _merge_btg_transport_in_water(btg_polygons, btg_transport)
         last_time = time_logging("Time used in seconds for processing BTG water polygons", last_time)
         logging.info('Final count of BTG water polygons is: %i', len(water_areas))

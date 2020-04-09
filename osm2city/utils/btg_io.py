@@ -29,12 +29,22 @@ save faces of a given fan or stripe in a separate structure instead of together 
 import gzip
 import logging
 import math
+import os.path
 import struct
-from typing import List, Tuple
+from typing import Dict, List, Optional, Tuple
 
-from osm2city.utils import calc_tile as ca
+import pyproj
+from shapely.geometry import Polygon
+
+from osm2city import parameters as parameters
+from osm2city.utils import calc_tile as ca, calc_tile as ct
+import osm2city.utils.aptdat_io as aio
 import osm2city.utils.coordinates as coord
+from osm2city.utils.coordinates import Transformation, disjoint_bounds
 from osm2city.utils.exceptions import MyException
+
+from osm2city.utils.stg_io2 import scenery_directory_name, SceneryType
+from osm2city.utils.utilities import merge_buffers
 
 # materials get set to lower in reading BTG files
 WATER_PROXY = 'water'
@@ -47,6 +57,8 @@ TRANSPORT_MATERIALS = ['freeway', 'road', 'railroad', 'transport', 'asphalt']
 
 WATER_MATERIALS = ['ocean', 'lake', 'pond', 'reservoir', 'stream', 'canal',
                    'lagoon', 'estuary', 'watercourse', 'saline']
+
+AIRPORT_EXCLUDE_MATERIALS = ['grass']
 
 OBJECT_TYPE_BOUNDING_SPHERE = 0
 OBJECT_TYPE_VERTEX_LIST = 1
@@ -92,7 +104,7 @@ class BTGReader(object):
     """Corresponds loosely to SGBinObject in simgear/io/sg_binobj.cxx"""
     __slots__ = ('bounding_sphere', 'faces', 'material_name', 'vertices', 'btg_version')
 
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: str, is_airport: bool = False) -> None:
         self.vertices = list()  # corresponds to wgs84_nodes in simgear/io/sg_binobj.hxx. List of Vec3d objects
         self.bounding_sphere = None
         self.faces = dict()  # material: str, list of faces
@@ -101,7 +113,7 @@ class BTGReader(object):
         self.btg_version = 0
 
         # run the loader
-        self._load(path)
+        self._load(path, is_airport)
         self._clean_data()
 
     @property
@@ -267,22 +279,27 @@ class BTGReader(object):
                 except IOError as e:
                     raise MyException('Error in file format (element data)') from e
 
-    def _load(self, path: str) -> None:
+    def _load(self, path: str, is_airport: bool) -> None:
         """Loads a btg-files and starts reading up to the point, where objects are read"""
         file_name = path.split('\\')[-1].split('/')[-1]
 
         # parse the file
         try:
             # Check if the file is gzipped, if so -> use built in gzip
+            tile_index = 0
             if file_name[-7:].lower() == ".btg.gz":
                 btg_file = gzip.open(path, "rb")
-                tile_index = int(file_name[:-7])
+                if not is_airport:
+                    tile_index = int(file_name[:-7])
             elif file_name[-4:].lower() == ".btg":
                 btg_file = open(path, "rb")
-                tile_index = int(file_name[:-4])
+                if not is_airport:
+                    tile_index = int(file_name[:-4])
             else:
                 raise MyException('Not a .btg or .btg.gz file: %s', file_name)
-            ca.log_tile_info(tile_index)
+
+            if not is_airport:
+                ca.log_tile_info(tile_index)
         except IOError as e:
             raise MyException('Cannot open file {}'.format(path)) from e
 
@@ -343,8 +360,160 @@ class BTGReader(object):
                 logging.debug('Removed %i faces for material %s', removed, material)
 
 
+def process_polygons_from_btg_faces(btg_reader: BTGReader, materials: List[str], exclusion_materials: bool,
+                                    transformer: Transformation, merge_polys: bool = True) -> Dict[str, List[Polygon]]:
+    """For a given set of BTG materials merge the faces read from BTG into as few polygons as possible.
+    Parameter exclusion_materials means whether the list of materials is for excluding or including in outcome."""
+    btg_lon, btg_lat = btg_reader.gbs_lon_lat
+    btg_x, btg_y = transformer.to_local((btg_lon, btg_lat))
+    logging.debug('Difference between BTG and transformer: x = %f, y = %f', btg_x, btg_y)
+    if exclusion_materials:  # airport has same origin as tile
+        btg_x = 0
+        btg_y = 0
+
+    btg_polys = dict()
+    min_x, min_y = transformer.to_local((parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH))
+    max_x, max_y = transformer.to_local((parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH))
+    bounds = (min_x, min_y, max_x, max_y)
+
+    disjoint = 0
+    accepted = 0
+    counter = 0
+    merged_counter = 0
+
+    for key, faces_list in btg_reader.faces.items():
+        if (exclusion_materials and key not in materials) or (exclusion_materials is False and key in materials):
+            temp_polys = list()
+            for face in faces_list:
+                counter += 1
+                v0 = btg_reader.vertices[face.vertices[0]]
+                v1 = btg_reader.vertices[face.vertices[1]]
+                v2 = btg_reader.vertices[face.vertices[2]]
+                # create the triangle polygon
+                my_geometry = Polygon([(v0.x - btg_x, v0.y - btg_y), (v1.x - btg_x, v1.y - btg_y),
+                                       (v2.x - btg_x, v2.y - btg_y), (v0.x - btg_x, v0.y - btg_y)])
+                if not my_geometry.is_valid:  # it might be self-touching or self-crossing polygons
+                    clean = my_geometry.buffer(0)  # cf. http://toblerity.org/shapely/manual.html#constructive-methods
+                    if clean.is_valid:
+                        my_geometry = clean  # it is now a Polygon or a MultiPolygon
+                    else:  # lets try with a different sequence of points
+                        my_geometry = Polygon([(v0.x - btg_x, v0.y - btg_y), (v2.x - btg_x, v2.y - btg_y),
+                                               (v1.x - btg_x, v1.y - btg_y), (v0.x - btg_x, v0.y - btg_y)])
+                        if not my_geometry.is_valid:
+                            clean = my_geometry.buffer(0)
+                            if clean.is_valid:
+                                my_geometry = clean
+                if isinstance(my_geometry, Polygon) and my_geometry.is_valid and not my_geometry.is_empty:
+                    if not disjoint_bounds(bounds, my_geometry.bounds):
+                        temp_polys.append(my_geometry)
+                        accepted += 1
+                    else:
+                        disjoint += 1
+                else:
+                    pass  # just discard the triangle
+
+            # merge polygons as much as possible in order to reduce processing and not having polygons
+            # smaller than parameters.OWBB_GENERATE_LANDUSE_LANDUSE_MIN_AREA
+            if merge_polys:
+                merged_list = merge_buffers(temp_polys)
+                merged_counter += len(merged_list)
+                btg_polys[key] = merged_list
+            else:
+                btg_polys[key] = temp_polys
+
+    logging.debug('Out of %i faces %i were disjoint and %i were accepted with the bounds.',
+                  counter, disjoint, accepted)
+    logging.info('Number of polygons found: %i. Used materials: %s (excluding: %s)', counter, str(materials),
+                 str(exclusion_materials))
+    if merge_polys:
+        logging.info('These were reduced to %i polygons', merged_counter)
+    return btg_polys
+
+
+def read_btg_file(transformer: Transformation, airport_code: Optional[str] = None) -> Optional[BTGReader]:
+    """There is a need to do a local coordinate transformation, as BTG also has a local coordinate
+    transformation, but there the center will be in the middle of the tile, whereas here it can be
+     another place if the boundary is not a whole tile."""
+    lon_lat = parameters.get_center_global()
+    path_to_btg = ct.construct_path_to_files(parameters.PATH_TO_SCENERY, scenery_directory_name(SceneryType.terrain),
+                                             (lon_lat.lon, lon_lat.lat))
+    tile_index = parameters.get_tile_index()
+
+    # cartesian ellipsoid
+    in_proj = pyproj.Proj(proj='geocent', ellps='WGS84', datum='WGS84')
+    # geodetic flat
+    out_proj = pyproj.Proj('epsg:4326', ellps='WGS84', datum='WGS84')
+
+    file_name = ct.construct_btg_file_name_from_tile_index(tile_index)
+    if airport_code:
+        file_name = ct.construct_btg_file_name_from_airport_code(airport_code)
+    btg_file_name = os.path.join(path_to_btg, file_name)
+    if not os.path.isfile(btg_file_name):
+        logging.warning('File %s does not exist. Ocean or missing in Terrasync?', btg_file_name)
+        return None
+    logging.debug('Reading btg file: %s', btg_file_name)
+    btg_reader = BTGReader(btg_file_name, True if airport_code is not None else False)
+
+    gbs_center = btg_reader.gbs_center
+
+    v_max_x = 0
+    v_max_y = 0
+    v_max_z = 0
+    v_min_x = 0
+    v_min_y = 0
+    v_min_z = 0
+    for vertex in btg_reader.vertices:
+        if vertex.x >= 0:
+            v_max_x = max(v_max_x, vertex.x)
+        else:
+            v_min_x = min(v_min_x, vertex.x)
+        if vertex.y >= 0:
+            v_max_y = max(v_max_y, vertex.y)
+        else:
+            v_min_y = min(v_min_y, vertex.y)
+        if vertex.z >= 0:
+            v_max_z = max(v_max_z, vertex.z)
+        else:
+            v_min_z = min(v_min_z, vertex.z)
+
+        # translate to lon_lat and then to local coordinates
+        lat, lon, _alt = pyproj.transform(in_proj, out_proj,
+                                          vertex.x + gbs_center.x,
+                                          vertex.y + gbs_center.y,
+                                          vertex.z + gbs_center.z,
+                                          radians=False)
+
+        vertex.x, vertex.y = transformer.to_local((lon, lat))
+        vertex.z = _alt
+
+    return btg_reader
+
+
+def get_blocked_areas_from_btg_airport_data(coords_transform: Transformation,
+                                            airports: List[aio.Airport]) -> List[Polygon]:
+    """Get blocked areas by looking at BTG data instead of apt.dat.
+    FIXME: does not work yet because the coordinate system of airport.btg seems to be off.
+    See https://forum.flightgear.org/viewtopic.php?f=5&t=37204#p365121.
+    """
+    blocked_areas = list()
+    if parameters.OVERLAP_CHECK_APT_USE_BTG_ROADS is None:
+        return blocked_areas
+    for airport in airports:
+        if len(parameters.OVERLAP_CHECK_APT_USE_BTG_ROADS) > 0 and airport.code \
+                not in parameters.OVERLAP_CHECK_APT_USE_BTG_ROADS:
+            continue
+        reader = read_btg_file(coords_transform, airport.code)
+        if reader:
+            polygons = process_polygons_from_btg_faces(reader, AIRPORT_EXCLUDE_MATERIALS, True, coords_transform, True)
+            for poly_lists in polygons.values():
+                blocked_areas.extend(poly_lists)
+    return merge_buffers(blocked_areas)
+
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
+    the_btg_reader = BTGReader('/home/vanosten/bin/TerraSync/Terrain/e000n40/e008n46/LSMM.btg.gz', True)
+    the_btg_reader2 = BTGReader('/home/vanosten/bin/TerraSync/Terrain/e000n40/e008n46/3088936.btg.gz')
     btg_reader_7 = BTGReader('/home/vanosten/bin/terrasync/Terrain/e000n40/e008n47/3088961.btg.gz')  # old version
     if not btg_reader_7.is_version_7:
         raise ValueError('BTG file used is not version 7')

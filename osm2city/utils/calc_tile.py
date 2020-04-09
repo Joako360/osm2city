@@ -119,11 +119,15 @@ def construct_stg_file_name(center_global: Tuple[float, float]) -> str:
 
 
 def construct_stg_file_name_from_tile_index(tile_idx: int) -> str:
-    return str(tile_idx) + ".stg"
+    return str(tile_idx) + '.stg'
 
 
 def construct_btg_file_name_from_tile_index(tile_idx: int) -> str:
-    return str(tile_idx) + ".btg.gz"
+    return str(tile_idx) + '.btg.gz'
+
+
+def construct_btg_file_name_from_airport_code(airport_code: str) -> str:
+    return airport_code + '.btg.gz'
 
 
 def get_north_lat(lat, y):

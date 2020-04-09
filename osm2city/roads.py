@@ -548,6 +548,17 @@ class Roads(object):
         Ways are clipped over into two ways if intersecting. If they are contained, then they are removed."""
         if not blocked_areas:
             return
+
+        # Need to be absolutely sure that overlapping blocked areas have been merged.
+        # Otherwise for some reason the algorithm re-creates ways when tested against overlapping areas.
+        merged_areas = utilities.merge_buffers(blocked_areas)
+        if parameters.DEBUG_PLOT_BLOCKED_AREAS_ROADS and is_water is False:
+            line_strings = list()
+            for way in self.ways_list:
+                if way.osm_id in parameters.DEBUG_PLOT_BLOCKED_AREAS_ROADS:
+                    line_strings.append(self._line_string_from_way(way))
+            utilities.plot_blocked_areas(merged_areas, line_strings)
+
         new_ways = list()
         for way in reversed(self.ways_list):
             if is_water and (_is_bridge(way.tags) or _is_replaced_bridge(way.tags)):
@@ -560,7 +571,7 @@ class Roads(object):
                 continue_intersect = True
                 for a_way in reversed(my_list):
                     my_line = self._line_string_from_way(a_way)
-                    for blocked_area in blocked_areas:
+                    for blocked_area in merged_areas:
                         if my_line.within(blocked_area):
                             my_list.remove(a_way)
                             logging.debug('removed %d because within', a_way.osm_id)
@@ -568,7 +579,7 @@ class Roads(object):
                             continue_loop = True
                             break
                     if continue_intersect:
-                        for blocked_area in blocked_areas:
+                        for blocked_area in merged_areas:
                             if my_line.intersects(blocked_area):
                                 my_line_difference = my_line.difference(blocked_area)
                                 length_diff = my_line.length - my_line_difference.length
@@ -585,9 +596,9 @@ class Roads(object):
                                 elif isinstance(my_line_difference, shg.MultiLineString):
                                     split_ways = self._split_way_for_object(my_line_difference, a_way)
                                     if len(split_ways) > 0:
-                                        for x in range(1, len(split_ways) - 1):
-                                            my_list.append(split_ways[x])
-                                            logging.debug('split %d into %d ways', a_way.osm_id, len(split_ways) + 1)
+                                        for split_way in split_ways:
+                                            my_list.append(split_way)
+                                        logging.debug('split %d into %d ways', a_way.osm_id, len(split_ways) + 1)
                                     else:
                                         my_list.remove(a_way)
                                         continue_loop = True
@@ -1010,7 +1021,7 @@ class Roads(object):
 
         Otherwise the different textures at a given point might be fighting in the z-layer in rendering.
 
-        A linear_obj where the node is not at the start/end gets priority over a linear_obj, where it is at the start/end.
+        A linear_obj where the node is not at the start/end gets priority over a linear_obj, where it is at start/end.
         Then a railway gets priority over a road
         Then within a railway or road the priority is based on the value of the type
         Last a higher osm_id wins anything else equal.
@@ -1192,7 +1203,7 @@ class Roads(object):
             if len(way_pos_list) < 2:
                 continue
 
-            start_dict = dict()  # dict of ways where node is start point with key = linear_obj, value = degree from north
+            start_dict = dict()  # dict of ways where node is start point with key=linear_obj, value=degree from north
             end_dict = dict()  # ditto for node is end point
             for way, is_start in way_pos_list:
                 if is_start:
@@ -1210,7 +1221,7 @@ class Roads(object):
                                                                   self.transform)
                     end_dict[way] = angle
 
-            # for each in end_dict search in start_dict the one with the closest angle and which is a compatible linear_obj
+            # for each in end_dict search in start_dict the one with the closest angle and is a compatible linear_obj
             for end_way, end_angle in end_dict.items():
                 if end_way.is_closed():
                     continue  # never combine ways which are closed (e.g. roundabouts)
@@ -1300,7 +1311,7 @@ def _process_osm_ways(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, op.Wa
 
 
 def _process_clusters(clusters, fg_elev: utilities.FGElev, stg_manager, stg_paths, do_railway,
-                      coords_transform: coordinates.Transformation, stats: utilities.Stats, is_rough_LOD: bool) -> None:
+                      coords_transform: coordinates.Transformation, stats: utilities.Stats, is_rough_lod: bool) -> None:
     for cl in clusters:
         if len(cl.objects) < parameters.CLUSTER_MIN_OBJECTS:
             continue  # skip almost empty clusters
@@ -1309,7 +1320,7 @@ def _process_clusters(clusters, fg_elev: utilities.FGElev, stg_manager, stg_path
             file_start = "railways"
         else:
             file_start = "roads"
-        if is_rough_LOD:
+        if is_rough_lod:
             file_start += "_rough"
         file_name = parameters.PREFIX + file_start + "%02i%02i" % (cl.grid_index.ix, cl.grid_index.iy)
         center_global = Vec2d(coords_transform.to_global(cl.center))
@@ -1329,7 +1340,7 @@ def _process_clusters(clusters, fg_elev: utilities.FGElev, stg_manager, stg_path
             stg_verb_type = stg_io2.STGVerbType.object_railway_detailed
         else:
             stg_verb_type = stg_io2.STGVerbType.object_road_detailed
-        if is_rough_LOD:
+        if is_rough_lod:
             if do_railway:
                 stg_verb_type = stg_io2.STGVerbType.object_railway_rough
             else:
@@ -1346,13 +1357,14 @@ def _process_clusters(clusters, fg_elev: utilities.FGElev, stg_manager, stg_path
 
 def _process_additional_blocked_areas(coords_transform: coordinates.Transformation, stg_entries: List[stg_io2.STGEntry],
                                       blocked_areas: List[shg.Polygon]) -> List[shg.Polygon]:
-    # APRONS
-    osm_result = op.fetch_osm_db_data_ways_key_values([op.create_key_value_pair(s.K_AEROWAY, s.V_APRON)])
     my_blocked_polys = list()
-    for way in list(osm_result.ways_dict.values()):
-        my_geometry = way.polygon_from_osm_way(osm_result.nodes_dict, coords_transform)
-        my_blocked_polys.append(my_geometry)
     my_blocked_polys.extend(blocked_areas)
+    # OSM APRONS
+    if parameters.OVERLAP_CHECK_APT_USE_OSM_APRON_ROADS:
+        osm_result = op.fetch_osm_db_data_ways_key_values([op.create_key_value_pair(s.K_AEROWAY, s.V_APRON)])
+        for way in list(osm_result.ways_dict.values()):
+            my_geometry = way.polygon_from_osm_way(osm_result.nodes_dict, coords_transform)
+            my_blocked_polys.append(my_geometry)
 
     # STG entries
     for stg_entry in stg_entries:
@@ -1371,7 +1383,7 @@ def process_roads(coords_transform: coordinates.Transformation, fg_elev: utiliti
     osm_way_result = op.fetch_osm_db_data_ways_keys([s.K_HIGHWAY, s.K_RAILWAY])
     osm_nodes_dict = osm_way_result.nodes_dict
     osm_ways_dict = osm_way_result.ways_dict
-    the_blocked_areas = _process_additional_blocked_areas(coords_transform, stg_entries, blocked_areas)
+    extended_blocked_areas = _process_additional_blocked_areas(coords_transform, stg_entries, blocked_areas)
 
     logging.info("Number of ways before basic processing: %i", len(osm_ways_dict))
     filtered_osm_ways_list = _process_osm_ways(osm_nodes_dict, osm_ways_dict)
@@ -1384,7 +1396,7 @@ def process_roads(coords_transform: coordinates.Transformation, fg_elev: utiliti
 
     path_to_output = parameters.get_output_path()
 
-    roads.process(the_blocked_areas, lit_areas, water_areas, stats)  # does the heavy lifting incl. clustering
+    roads.process(extended_blocked_areas, lit_areas, water_areas, stats)  # does the heavy lifting incl. clustering
 
     stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.roads, OUR_MAGIC, parameters.PREFIX)
 

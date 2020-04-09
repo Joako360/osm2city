@@ -21,8 +21,8 @@ import typing
 import unittest
 
 import osm2city.textures.road
-from osm2city.utils import calc_tile as ct
-from osm2city.utils import vec2d as v
+import osm2city.utils.calc_tile as ct
+import osm2city.utils.vec2d as vec2d
 import osm2city.utils.log_helper as ulog
 
 # default_args_start # DO NOT MODIFY THIS LINE
@@ -89,6 +89,7 @@ DEBUG_PLOT_RECTIFY = False
 DEBUG_PLOT_GENBUILDINGS = False
 DEBUG_PLOT_LANDUSE = False
 DEBUG_PLOT_ROADS = False
+DEBUG_PLOT_BLOCKED_AREAS_ROADS = []  # will only plot if at least one OSM id in list
 DEBUG_PLOT_OFFSETS = False
 
 # =============================================================================
@@ -102,8 +103,10 @@ OVERLAP_CHECK_CH_BUFFER_SHARED = 0.0
 
 OVERLAP_CHECK_CONSIDER_SHARED = True
 
-OVERLAP_CHECK_PAVEMENT_BUILDINGS_INCLUDE = None  # At airports in list include overlap check with pavement for buildings
-OVERLAP_CHECK_PAVEMENT_ROADS_INCLUDE = None  # At airports in list include overlap check with pavement for roads
+OVERLAP_CHECK_APT_PAVEMENT_BUILDINGS_INCLUDE = None  # At apts in list include overlap check with pavement for buildings
+OVERLAP_CHECK_APT_PAVEMENT_ROADS_INCLUDE = None  # At airports in list include overlap check with pavement for roads
+OVERLAP_CHECK_APT_USE_BTG_ROADS = []
+OVERLAP_CHECK_APT_USE_OSM_APRON_ROADS = False  # Add OSM APRON polygons for overlap checking with roads
 
 # -- Skip buildings based on their OSM name tag or OSM ID, e.g. in case there's already
 #    a static model for these, and the overlap check fails.
@@ -405,14 +408,14 @@ def get_output_path():
 
 
 def get_center_global():
-    cmin = v.Vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
-    cmax = v.Vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
+    cmin = vec2d.Vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
+    cmax = vec2d.Vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
     return (cmin + cmax) * 0.5
 
 
 def get_extent_global():
-    cmin = v.Vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
-    cmax = v.Vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
+    cmin = vec2d.Vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
+    cmax = vec2d.Vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
     return cmin, cmax
 
 
@@ -429,7 +432,7 @@ def get_clipping_border():
     return rect
 
 
-def _check_ratio_dict_parameter(ratio_dict: typing.Optional[typing.Dict], name: str, is_int: bool=True) -> None:
+def _check_ratio_dict_parameter(ratio_dict: typing.Optional[typing.Dict], name: str, is_int: bool = True) -> None:
     if ratio_dict is None:
         raise ValueError('Parameter {} must not be None'.format(name))
     if not isinstance(ratio_dict, dict):
@@ -580,7 +583,7 @@ def set_boundary(boundary_west: float, boundary_south: float,
 if __name__ == "__main__":
     # Handling arguments and parameters
     parser = argparse.ArgumentParser(
-        description="The parameters module provides parameters to osm2city - used as main it shows the parameters used.")
+        description="The parameters module provides parameters to osm2city - run as main it shows the parameters used.")
     parser.add_argument("-f", "--file", dest="filename",
                         help="read parameters from FILE (e.g. params.ini)", metavar="FILE")
     parser.add_argument("-d", "--show-default", action="store_true", help="show default parameters")

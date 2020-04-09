@@ -764,12 +764,12 @@ def merge_buffers(original_list: List[Polygon]) -> List[Polygon]:
     multi_polygon = original_list[0]
     try:
         multi_polygon = unary_union(original_list)
-    except ValueError as e:  # No Shapely geometry can be created from null value
+    except ValueError:  # No Shapely geometry can be created from null value
         for other_poly in original_list[1:]:  # lets do it slowly one at a time
             try:
                 new_multi_polygon = unary_union(other_poly)
                 multi_polygon = new_multi_polygon
-            except ValueError as e:
+            except ValueError:
                 pass  # just forget about this one polygon
     if isinstance(multi_polygon, Polygon):
         return [multi_polygon]
@@ -790,6 +790,8 @@ def merge_buffers(original_list: List[Polygon]) -> List[Polygon]:
 import osm2city.utils.plot_utilities as pu
 from descartes import PolygonPatch
 from matplotlib import patches as pat
+from matplotlib import pyplot as plt
+
 from time import sleep
 
 
@@ -823,6 +825,46 @@ def plot_fit_offsets(hull: shg.Polygon, box_minus: shg.Polygon, box_plus: shg.Po
     pdf_pages.close()
 
     sleep(2)  # to make sure we have not several files in same second
+
+
+def plot_blocked_areas(blocked_areas: List[shg.Polygon], ways: List[shg.LineString]) -> None:
+    pdf_pages = pu.create_pdf_pages("blocked areas")
+
+    # Generated buildings
+    my_figure = pu.create_a3_landscape_figure()
+    my_figure.suptitle("Blocked Areas")
+    ax = my_figure.add_subplot(111)
+
+    # bounding box
+    min_x = 999999
+    min_y = 999999
+    max_x = -999999
+    max_y = -999999
+
+    # first blocked areas
+    for poly in blocked_areas:
+        bounds_tuple = poly.bounds
+        min_x = min(min_x, bounds_tuple[0])
+        min_y = min(min_y, bounds_tuple[1])
+        max_x = max(max_x, bounds_tuple[2])
+        max_y = max(max_y, bounds_tuple[3])
+        patch = PolygonPatch(poly, facecolor="magenta", edgecolor="black")
+        ax.add_patch(patch)
+
+    # then the lines
+    for line in ways:
+        bounds_tuple = line.bounds
+        min_x = min(min_x, bounds_tuple[0])
+        min_y = min(min_y, bounds_tuple[1])
+        max_x = max(max_x, bounds_tuple[2])
+        max_y = max(max_y, bounds_tuple[3])
+        pu.plot_line(ax, line, 'green', 1)
+
+    pu.set_ax_limits(ax, min_x, min_y, max_x, max_y)
+    pdf_pages.savefig(my_figure)
+
+    pdf_pages.close()
+    plt.close("all")
 
 
 # ================ UNITTESTS =======================

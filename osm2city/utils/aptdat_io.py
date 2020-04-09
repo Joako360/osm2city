@@ -23,10 +23,12 @@ from osm2city.utils.vec2d import Vec2d
 
 
 class Boundary:
-    def __init__(self) -> None:
+    def __init__(self, name: str) -> None:
         self.nodes_lists = list()  # a list of list of Nodes, where a Node is a tuple (lon, lat)
+        self.name = name  # not used in osm2city, just for debugging
 
     def append_nodes_list(self, nodes_list) -> None:
+        """Append new nodes list. There can be situations, where several closed polygons make up an pavement etc."""
         self.nodes_lists.append(nodes_list)
 
     def within_boundary(self, min_lon, min_lat, max_lon, max_lat):
@@ -40,7 +42,7 @@ class Boundary:
                     return True
         return False
 
-    def create_polygon_buffer(self, transformer: coordinates.Transformation) -> Optional[List[Polygon]]:
+    def create_polygons(self, transformer: coordinates.Transformation) -> Optional[List[Polygon]]:
         if self.not_empty:
             boundaries = list()
             for my_list in self.nodes_lists:
@@ -49,7 +51,7 @@ class Boundary:
                 my_boundary = Polygon([transformer.to_local(n) for n in my_list])
                 if my_boundary.is_valid:
                     boundaries.append(my_boundary)
-            return utilities.merge_buffers(boundaries)
+            return boundaries
         return None
 
     @property
@@ -137,25 +139,25 @@ class Airport(object):
         blocked_areas = list()
         for runway in self.runways:
             blocked_areas.append(runway.create_blocked_area(coords_transform))
-        pavement_include_list = parameters.OVERLAP_CHECK_PAVEMENT_ROADS_INCLUDE
+        pavement_include_list = parameters.OVERLAP_CHECK_APT_PAVEMENT_ROADS_INCLUDE
         if for_buildings:
-            pavement_include_list = parameters.OVERLAP_CHECK_PAVEMENT_BUILDINGS_INCLUDE
+            pavement_include_list = parameters.OVERLAP_CHECK_APT_PAVEMENT_BUILDINGS_INCLUDE
 
         if pavement_include_list is None:
             return blocked_areas
 
         if len(pavement_include_list) == 0 or self.code in pavement_include_list:
             for pavement in self.pavements:
-                pavement_buffers = pavement.create_polygon_buffer(coords_transform)
-                for pb in pavement_buffers:
+                pavement_polygons = pavement.create_polygons(coords_transform)
+                for pb in pavement_polygons:
                     blocked_areas.append(pb)
-        return blocked_areas
+        return utilities.merge_buffers(blocked_areas)
 
     def create_boundary_polygons(self, coords_transform: coordinates.Transformation) -> Optional[List[Polygon]]:
         if self.airport_boundary is None:
             return None
         else:
-            return self.airport_boundary.create_polygon_buffer(coords_transform)
+            return self.airport_boundary.create_polygons(coords_transform)
 
 
 def read_apt_dat_gz_file(min_lon: float, min_lat: float,
@@ -198,11 +200,14 @@ def read_apt_dat_gz_file(min_lon: float, min_lat: float,
                                      float(parts[4]))
                 my_airport.append_runway(my_helipad)
             elif parts[0] == '110':  # Pavement
-                boundary = Boundary()
+                name = 'no name'
+                if len(parts) == 5:
+                    name = parts[4]
+                boundary = Boundary(name)
                 in_boundary = True
                 my_airport.append_pavement(boundary)
             elif parts[0] == '130':  # Airport boundary header
-                boundary = Boundary()
+                boundary = Boundary(parts[1])
                 in_boundary = True
                 my_airport.append_airport_boundary(boundary)
 
@@ -220,7 +225,18 @@ def get_apt_dat_blocked_areas_from_airports(coords_transform: coordinates.Transf
 
     If include_pavement is False, then only runways/helipads are considered"""
     blocked_areas = list()
+    if for_buildings:
+        for airport in airports:
+            if airport.within_boundary(min_lon, min_lat, max_lon, max_lat):
+                blocked_areas.extend(airport.create_blocked_areas(coords_transform, for_buildings))
+        return blocked_areas
+
+    # not for buildings (i.e. for roads is a bit more complicated parameter wise)
+    if parameters.OVERLAP_CHECK_APT_USE_BTG_ROADS is not None and len(parameters.OVERLAP_CHECK_APT_USE_BTG_ROADS) == 0:
+        return blocked_areas
     for airport in airports:
+        if parameters.OVERLAP_CHECK_APT_USE_BTG_ROADS and airport.code in parameters.OVERLAP_CHECK_APT_USE_BTG_ROADS:
+            continue
         if airport.within_boundary(min_lon, min_lat, max_lon, max_lat):
             blocked_areas.extend(airport.create_blocked_areas(coords_transform, for_buildings))
     return blocked_areas

@@ -404,13 +404,22 @@ OVERLAP_CHECK_CONSIDER_SHARED                   Bool       True      Whether onl
                                                                      models reused in different places like a church model).
                                                                      For this to work ``PATH_TO_SCENERY`` must point to the TerraSync directory.
 
-OVERLAP_CHECK_PAVEMENT_BUILDINGS_INCLUDE        List       None      At airports in list include overlap check with pavement for buildings.
-                                                                     If the list is empty, then all airports are used.
+OVERLAP_CHECK_APT_PAVEMENT_BUILDINGS_INCLUDE    List       None      At airports in list include overlap check with pavement for buildings.
+                                                                     Pavements are e.g. APRON and taxiways.
+                                                                     If the list is empty, then checks at all airports are done.
                                                                      If the value is ``None``, then overlap check is done only against runways
                                                                      and helipads.
-                                                                     Pavement includes e.g. APRONs.
 
-OVERLAP_CHECK_PAVEMENT_ROADS_INCLUDE            List       None      Ditto for roads and railways. E.g. ``['ENAT', 'LSZR']``
+OVERLAP_CHECK_APT_PAVEMENT_ROADS_INCLUDE        List       None      Ditto for roads and railways. E.g. ``['ENAT', 'LSZR']``
+
+OVERLAP_CHECK_APT_USE_BTG_ROADS                 List       []        Instead of data from apt.dat use FG scenery data in BTG files. This is a
+                                                                     bit slower, but might be more accurate than apt.dat data, especially if
+                                                                     airports in the scenery used use additional data not in apt.dat.
+                                                                     If this is ``None``, then .._APT_PAVEMENT_ROADS_INCLUDE is used. Otherwise
+                                                                     only BTG data is used if the list is empty ([] = default) or if the current
+                                                                     airport is in the list - e.g. ``['YSSY']``.
+
+OVERLAP_CHECK_APT_USE_OSM_APRON_ROADS           Bool       False     Add OSM data for APRONs to overlap check. Rarely necessary.
 
 OVERLAP_CHECK_ROAD_MIN_REMAINING                Integer    10        When a static bridge model or other blocked area (e.g. airport object)
                                                                      intersect with a way, how much must at least be left so the way is kept after

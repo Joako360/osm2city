@@ -1,40 +1,17 @@
 # -*- coding: utf-8 -*-
-import datetime
 import random
 from typing import List
 
 from descartes import PolygonPatch
 from matplotlib import axes as maxs
-from matplotlib import figure as mfig
 from matplotlib import patches as pat
 from matplotlib import pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
 from shapely.geometry import MultiPolygon, Polygon
 
 import osm2city.building_lib as bl
 import osm2city.owbb.models as m
-import osm2city.parameters
-
-
-def _create_a3_landscape_figure() -> mfig.Figure:
-    return plt.figure(figsize=(11.69, 16.53), dpi=600)
-
-
-def _create_a4_landscape_figure() -> mfig.Figure:
-    return plt.figure(figsize=(8.27, 11.69), dpi=600)
-
-
-def _create_pdf_pages(title_part: str) -> PdfPages:
-    today = datetime.datetime.now()
-    date_string = today.strftime("%Y-%m-%d_%H%M")
-    tile_index_str = str(parameters.get_tile_index())
-    return PdfPages("osm2city_debug_{0}_{1}_{2}.pdf".format(title_part, tile_index_str, date_string))
-
-
-def _plot_line(ax: maxs.Axes, ob, my_color, my_width) -> None:
-    x, y = ob.xy
-    ax.plot(x, y, color=my_color, alpha=0.7, linewidth=my_width, solid_capstyle='round', zorder=2)
+import osm2city.utils.plot_utilities as pu
 
 
 def _set_ax_limits_from_bounds(ax: maxs.Axes, bounds) -> None:
@@ -42,23 +19,15 @@ def _set_ax_limits_from_bounds(ax: maxs.Axes, bounds) -> None:
     y_min = bounds.min_point.y
     x_max = bounds.max_point.x
     y_max = bounds.max_point.y
-    _set_ax_limits(ax, x_min, x_max, y_min, y_max)
-
-
-def _set_ax_limits(ax: maxs.Axes, x_min: float, x_max:  float, y_min: float, y_max: float) -> None:
-    w = x_max - x_min
-    h = y_max - y_min
-    ax.set_xlim(x_min - 0.2*w, x_max + 0.2*w)
-    ax.set_ylim(y_min - 0.2*h, y_max + 0.2*h)
-    ax.set_aspect('equal')
+    pu.set_ax_limits(ax, x_min, y_min, x_max, y_max)
 
 
 def _draw_highways(highways_dict, ax: maxs.Axes) -> None:
     for my_highway in highways_dict.values():
         if my_highway.is_sideway():
-            _plot_line(ax, my_highway.geometry, "green", 1)
+            pu.plot_line(ax, my_highway.geometry, "green", 1)
         else:
-            _plot_line(ax, my_highway.geometry, "lime", 1)
+            pu.plot_line(ax, my_highway.geometry, "lime", 1)
 
 
 def _draw_buildings(buildings: List[bl.Building], ax: maxs.Axes) -> None:
@@ -266,10 +235,10 @@ def _draw_nodes_to_change(nodes_to_change: List[bl.NodeInRectifyBuilding], ax: m
 
 
 def draw_buildings(building_zones, bounds) -> None:
-    pdf_pages = _create_pdf_pages("would-be-buildings")
+    pdf_pages = pu.create_pdf_pages("would-be-buildings")
 
     # Generated buildings
-    my_figure = _create_a3_landscape_figure()
+    my_figure = pu.create_a3_landscape_figure()
     my_figure.suptitle("Generated buildings (yellow) and other blocked areas \n[yellow=generated building" +
                        ", blue=OSM building, dark green=open space, orange=other blocked area]")
     ax = my_figure.add_subplot(111)
@@ -287,10 +256,10 @@ def draw_buildings(building_zones, bounds) -> None:
 def draw_zones(buildings: List[bl.Building], building_zones: List[m.BuildingZone],
                btg_building_zones: List[m.BTGBuildingZone], btg_water_areas: List[Polygon],
                lit_areas: List[Polygon], bounds: m.Bounds) -> None:
-    pdf_pages = _create_pdf_pages("landuse")
+    pdf_pages = pu.create_pdf_pages("landuse")
 
     # OSM building zones original
-    my_figure = _create_a3_landscape_figure()
+    my_figure = pu.create_a3_landscape_figure()
     my_figure.suptitle("Original OpenStreetMap building zones \n[blue=commercial, green=industrial, dark orange=retail\
 , magenta=residential, brown=farmyard, purple=aerodrome, red=error]")
     ax = my_figure.add_subplot(111)
@@ -299,7 +268,7 @@ def draw_zones(buildings: List[bl.Building], building_zones: List[m.BuildingZone
     pdf_pages.savefig(my_figure)
 
     # Only water from BTG
-    my_figure = _create_a3_landscape_figure()
+    my_figure = pu.create_a3_landscape_figure()
     my_figure.suptitle("Water from FlightGear BTG files")
     ax = my_figure.add_subplot(111)
     _draw_btg_water_areas(btg_water_areas, ax)
@@ -308,7 +277,7 @@ def draw_zones(buildings: List[bl.Building], building_zones: List[m.BuildingZone
 
     # External land use from BTG
     if btg_building_zones:
-        my_figure = _create_a3_landscape_figure()
+        my_figure = pu.create_a3_landscape_figure()
         my_figure.suptitle("Land-use types from FlightGear BTG files \n[magenta=builtupcover and urban, \
 gold=town and suburban, yellow=construction and industrial and port, light blue=water]")
         ax = my_figure.add_subplot(111)
@@ -320,7 +289,7 @@ gold=town and suburban, yellow=construction and industrial and port, light blue=
         pdf_pages.savefig(my_figure)
 
     # All land-use
-    my_figure = _create_a3_landscape_figure()
+    my_figure = pu.create_a3_landscape_figure()
     my_figure.suptitle("Original OpenStreetMap and generated building zones \n[blue=commercial, green=industrial\
 , dark orange=retail, magenta=residential, brown=farmyard, purple=aerodrome, red=error;\n \
 lighter variants=generated from buildings;\
@@ -334,7 +303,7 @@ lighter variants=generated from buildings;\
     pdf_pages.savefig(my_figure)
 
     # Lit areas
-    my_figure = _create_a3_landscape_figure()
+    my_figure = pu.create_a3_landscape_figure()
     my_figure.suptitle("Lit areas from building zones")
     ax = my_figure.add_subplot(111)
     ax.grid(True, linewidth=1, linestyle="--", color="silver")
@@ -344,7 +313,7 @@ lighter variants=generated from buildings;\
     pdf_pages.savefig(my_figure)
 
     # Settlement type
-    my_figure = _create_a3_landscape_figure()
+    my_figure = pu.create_a3_landscape_figure()
     my_figure.suptitle("Built-up areas by settlement type \n[blue=centre (city), green=block, magenta=dense, \n \
     yellow=periphery, grey=rural, brown=farmyard]. If hatched, then type upgraded or downgraded for sanity.")
     ax = my_figure.add_subplot(111)
@@ -354,7 +323,7 @@ lighter variants=generated from buildings;\
     pdf_pages.savefig(my_figure)
 
     # Density of zones
-    my_figure = _create_a3_landscape_figure()
+    my_figure = pu.create_a3_landscape_figure()
     my_figure.suptitle("Density (ratio of building floor plan area to total area).\n \
     Light grey up to .05, Yellow up to .1, orange up to 0.15, red up to .2,\n \
     dark red up to .25, lime up to .3, green up to .4, dark green up to .45, black afterwards")
@@ -365,7 +334,7 @@ lighter variants=generated from buildings;\
     pdf_pages.savefig(my_figure)
 
     # City blocks
-    my_figure = _create_a3_landscape_figure()
+    my_figure = pu.create_a3_landscape_figure()
     my_figure.suptitle("City blocks random pattern")
     ax = my_figure.add_subplot(111)
     ax.grid(True, linewidth=1, linestyle="--", color="silver")
@@ -385,10 +354,10 @@ def draw_rectify(rectify_buildings: List[bl.RectifyBuilding], max_samples: int, 
         random.seed()
     samples_list = random.sample(rectify_buildings, number_of_samples)
 
-    pdf_pages = _create_pdf_pages("rectify_buildings")
+    pdf_pages = pu.create_pdf_pages("rectify_buildings")
 
     for sample in samples_list:
-        my_figure = _create_a4_landscape_figure()
+        my_figure = pu.create_a4_landscape_figure()
         my_figure.suptitle("Building with OSM id = %i. \nIf green then node to change;\nif blue then 90 degrees;\
 \n else red;\nif filled then corner of a bow; \nif light color then part of multiple buildings.\
 \nOriginal boundary is red, new boundary is green."
@@ -414,7 +383,7 @@ def draw_rectify(rectify_buildings: List[bl.RectifyBuilding], max_samples: int, 
                 blocked_nodes.append(node)
             elif node.within_rectify_deviation():
                 nodes_to_change.append(node)
-        _set_ax_limits(ax, min(original_x_array), max(original_x_array), min(original_y_array), max(original_y_array))
+        pu.set_ax_limits(ax, min(original_x_array), min(original_y_array), max(original_x_array), max(original_y_array))
         ax.plot(original_x_array, original_y_array, color='red', linewidth=1,
                 solid_capstyle='round', zorder=2)
         ax.plot(updated_x_array, updated_y_array, color='green', linewidth=1,
