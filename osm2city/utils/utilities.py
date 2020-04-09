@@ -758,14 +758,21 @@ def merge_buffers(original_list: List[Polygon]) -> List[Polygon]:
     The try/catch are needed due to maybe issues in Shapely with huge amounts of polys.
     See https://github.com/Toblerity/Shapely/issues/47. Seen problems with BTG-data, but then in the slow method
     actually no poly got discarded."""
-    if len(original_list) < 2:
-        return original_list
+    # first make sure that the polygons merged are actually good polygons
+    cleaned_list = list()
+    for poly in original_list:
+        if poly is None or poly.is_empty or poly.is_valid is False:
+            continue
+        cleaned_list.append(poly)
 
-    multi_polygon = original_list[0]
+    if len(cleaned_list) < 2:
+        return cleaned_list
+
+    multi_polygon = cleaned_list[0]
     try:
-        multi_polygon = unary_union(original_list)
+        multi_polygon = unary_union(cleaned_list)
     except ValueError:  # No Shapely geometry can be created from null value
-        for other_poly in original_list[1:]:  # lets do it slowly one at a time
+        for other_poly in cleaned_list[1:]:  # lets do it slowly one at a time
             try:
                 new_multi_polygon = unary_union(other_poly)
                 multi_polygon = new_multi_polygon
