@@ -1358,7 +1358,7 @@ def process_osm_place_refs(transformer: co.Transformation) -> Tuple[List[Place],
         outer_ways = op.closed_ways_from_multiple_ways(outer_ways)
         for way in outer_ways:
             polygon = way.polygon_from_osm_way(osm_nodes_dict, transformer)
-            if polygon.is_valid and not polygon.is_empty:
+            if polygon is not None and polygon.is_valid and not polygon.is_empty:
                 if largest_area is None:
                     largest_area = polygon
                 else:
