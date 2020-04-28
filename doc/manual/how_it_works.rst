@@ -136,6 +136,21 @@ Node numbering for ``gambrel`` roof type:
 Aerodromes
 ----------
 
-Data for runways and helipads are read from the ``apt.dat file`` in ``$FG_ROOT/Airports/apt.dat.gz``. This information is used to avoid having crossing OSM roads to be visible and potentially creating a considerable bump when a plane rolls over.
+Data for runways and helipads are depending on parameters read from the ``apt.dat file`` in ``$FG_ROOT/Airports/apt.dat.gz`` or directly from btg-files. This information is used to avoid having crossing OSM roads to be visible and potentially creating a considerable bump when a plane rolls over.
 
 Data for airport boundaries are also read from the ``apt.dat`` file (not all airports have information about boundaries). This data is then merged with OSM data for ``aeroway=aerodrome`` (again not all airports might be modelled with a zone). The resulting land-use is making sure that buildings within these zones will look more like airport buildings: using flat roofs (unless the roof type is explicitly modelled in OSM) and using a modern facade texture. Also: no buildings are generated inside zones for aerodromes.
+
+------------------------
+FGData Effects and Stuff
+------------------------
+
+``osm2city`` has dependencies in FGData for effects etc. to work. This means that changes in those parts might break osm2city — and osm2city might not work correctly if new features disregard those dependencies.
+
+* fgdata/Textures/osm2city/ contains the texture atlas for road and facades including the respective lightmaps.
+* fgdata/Textures/ has buildings-lightmap.png and the related lightmap, which are used for list based shader buildings.
+* fgdata/Shaders/road-ALS-ultra.frag: mapping with road texture, generates traffic and night lighting etc.
+* fgdata/Shaders/urban-ALS.frag and urban.frag
+* fgdata/Shaders/building-*.vert
+* fgdata/Effects/cityLM.eff: lightmap for facades texture atlas (so there is no need for xml-files wrapping the ac-file containing the meshes)
+* fgdata/Effects/road.eff: road and traffic effect incl. snow
+* fgdata/Effects/urban.eff: incl. snow for osm-buildings
