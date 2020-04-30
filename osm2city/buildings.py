@@ -35,7 +35,7 @@ OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
 
 # Cf. https://taginfo.openstreetmap.org/keys/building%3Apart#values and
 # https://wiki.openstreetmap.org/wiki/Key%3Abuilding%3Apart
-ALLOWED_BUILDING_PART_VALUES = [s.V_YES, 'residential', 'apartments', 'house', 'commercial', 'retail']
+ALLOWED_BUILDING_PART_VALUES = [s.V_YES, s.V_RESIDENTIAL, s.V_APARTMENTS, s.V_HOUSE, s.V_COMMERCIAL, s.V_RETAIL]
 
 
 def _in_skip_list(way: op.Way) -> bool:
