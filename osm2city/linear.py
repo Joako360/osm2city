@@ -13,7 +13,7 @@ from osm2city import roads, parameters
 from osm2city.textures import road
 from osm2city.utils import ac3d
 from osm2city.utils import osmparser as op
-from osm2city.utils import osmstrings as s
+from osm2city.types import osmstrings as s
 from osm2city.utils.utilities import FGElev
 from osm2city.utils.vec2d import Vec2d
 

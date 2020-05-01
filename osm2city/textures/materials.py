@@ -19,7 +19,7 @@ osm2city only supports the following two keys (cf. method screen_osm_keys_for_co
 
 Then again "gray" is used instead of "grey" due to W3C naming.
 
-From version 2018.2 of FlightGear roof and facade textures will be partly transparent and therefore the colour is
+From version FIXME of FlightGear roof and facade textures will be partly transparent and therefore the colour is
 taken more or less directly from the OSM tagging. I.e. the colour of a facade / roof is determined by the shader,
 which multiplies the surface colour value in AC3D (based on material) with the texture colour value.
 A colour value of white will result in no change to the texture's colour value.
@@ -30,6 +30,7 @@ from typing import Dict, List
 import unittest
 
 from osm2city import parameters
+from osm2city.types import osmstrings as s
 
 
 def screen_texture_tags_for_colour_spelling(original: str) -> str:
@@ -42,24 +43,24 @@ def screen_texture_tags_for_colour_spelling(original: str) -> str:
         return original
 
 
-OSM_MATERIAL_KEY_MAPPING = [('building:color', 'building:colour'),
-                            ('building:facade:color', 'building:colour'),
-                            ('building:facade:colour', 'building:colour'),
-                            ('wall:colour', 'building:colour'),
-                            ('wall:color', 'building:colour'),
-                            ('building:colour_1', 'building:colour'),
-                            ('roof:color', 'roof:colour'),
-                            ('building:roof:color', 'roof:colour'),
-                            ('building:roof:colour', 'roof:colour'),
-                            ('roof:colour_1', 'roof:colour'),
-                            ('building:facade:material', 'building:material'),
-                            ('building:roof:material', 'roof:material')
+OSM_MATERIAL_KEY_MAPPING = [('building:color', s.K_BUILDING_COLOUR),
+                            ('building:facade:color', s.K_BUILDING_COLOUR),
+                            ('building:facade:colour', s.K_BUILDING_COLOUR),
+                            ('wall:colour', s.K_BUILDING_COLOUR),
+                            ('wall:color', s.K_BUILDING_COLOUR),
+                            ('building:colour_1', s.K_BUILDING_COLOUR),
+                            ('roof:color', s.K_ROOF_COLOUR),
+                            ('building:roof:color', s.K_ROOF_COLOUR),
+                            ('building:roof:colour', s.K_ROOF_COLOUR),
+                            ('roof:colour_1', s.K_ROOF_COLOUR),
+                            ('building:facade:material', s.K_BUILDING_MATERIAL),
+                            ('building:roof:material', s.K_ROOF_MATERIAL)
                             ]
 
 
 def screen_osm_keys_for_colour_material_variants(tags: Dict[str, str]) -> None:
     """Makes sure colour and material is spelled correctly in key and reduces to known keys in osm2city.
-    And for the correct ones it makes sure that the values are recognizabl."""
+    And for the correct ones it makes sure that the values are recognizable."""
     for wrong, correct in OSM_MATERIAL_KEY_MAPPING:
         if wrong in tags:
             if correct not in tags:
@@ -68,10 +69,10 @@ def screen_osm_keys_for_colour_material_variants(tags: Dict[str, str]) -> None:
 
     # now make sure that the values are correct
     if parameters.FLAG_COLOUR_TEX:
-        if 'building:colour' in tags:
-            tags['building:colour'] = map_osm_colour_value_to_hex(tags['building:colour'], True)
-        if 'roof:colour' in tags:
-            tags['roof:colour'] = map_osm_colour_value_to_hex(tags['roof:colour'], True)
+        if s.K_BUILDING_COLOUR in tags:
+            tags[s.K_BUILDING_COLOUR] = map_osm_colour_value_to_hex(tags[s.K_BUILDING_COLOUR], True)
+        if s.K_ROOF_COLOUR in tags:
+            tags[s.K_ROOF_COLOUR] = map_osm_colour_value_to_hex(tags[s.K_ROOF_COLOUR], True)
 
 
 def map_hex_colour(value):
@@ -95,7 +96,7 @@ def map_hex_colour(value):
                   "#FF00FF": "fuchsia"
     }
     hash_pos = value.find("#")
-    if (value.startswith("roof:colour") or value.startswith("facade:building:colour")) and hash_pos > 0:
+    if (value.startswith(s.K_ROOF_COLOUR) or value.startswith("facade:building:colour")) and hash_pos > 0:
         try:
             tag_string = value[:hash_pos]
             colour_hex_string = value[hash_pos:].upper()
@@ -221,8 +222,8 @@ class TestOSMParser(unittest.TestCase):
         my_tags = {'foo': '1', 'building:color': 'red', 'building:colour': 'blue', 'building:roof:material': 'stone'}
         screen_osm_keys_for_colour_material_variants(my_tags)
         self.assertEqual(3, len(my_tags), '# of element reduced to 3')
-        self.assertEqual('blue', my_tags['building:colour'], 'original key/value preserved')
-        self.assertEqual('stone', my_tags['roof:material'], 'original key replaced and value preserved')
+        self.assertEqual('blue', my_tags[s.K_BUILDING_COLOUR], 'original key/value preserved')
+        self.assertEqual('stone', my_tags[s.K_ROOF_MATERIAL], 'original key replaced and value preserved')
 
     def test_map_osm_colour_value_to_hex(self):
         self.assertEqual(map_osm_colour_value_to_hex('lightgray', True), '#D3D3D3', 'Direct name mapping')

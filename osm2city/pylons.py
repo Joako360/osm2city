@@ -31,7 +31,7 @@ from osm2city import cluster, roads, parameters
 from osm2city.utils import vec2d
 from osm2city.utils import utilities, coordinates, stg_io2
 from osm2city.utils import osmparser as op
-from osm2city.utils import osmstrings as s
+from osm2city.types import osmstrings as s
 
 OUR_MAGIC = "pylons"  # Used in e.g. stg files to mark edits by osm2pylon
 OUT_MAGIC_DETAILS = "pylonsDetails"

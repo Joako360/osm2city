@@ -28,7 +28,7 @@ import osm2city.textures.materials
 import osm2city.utils.osmparser as op
 from osm2city.utils import utilities, coordinates, stg_io2
 from osm2city.owbb import plotting as p
-from osm2city.utils import osmstrings as s
+from osm2city.types import osmstrings as s
 from osm2city.utils import vec2d as v
 
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city

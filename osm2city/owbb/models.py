@@ -16,10 +16,11 @@ from shapely.geometry import box, Point, LineString, Polygon, MultiPolygon
 import shapely.affinity as saf
 from shapely.prepared import prep
 
+import osm2city.types.enumerations as enu
 from osm2city import parameters
 from osm2city import building_lib as bl
 from osm2city.utils import osmparser as op
-from osm2city.utils import osmstrings as s
+from osm2city.types import osmstrings as s
 from osm2city.utils import coordinates as co
 from osm2city.utils import json_io as wio
 
@@ -64,20 +65,6 @@ class OSMFeature(abc.ABC):
         """Parses the raw tags (key / values) from OSM to pick the relevant and cast them to internal fields."""
 
 
-@unique
-class PlaceType(IntEnum):
-    """See https://wiki.openstreetmap.org/wiki/Key:place - only used for city and town as well as farm.
-    Rest is ignored - including:
-    * isolated_dwelling and allotments -> too small
-    * borough: administrative and very few mappings
-    * quarter; not used much in OSM and might be better off just using neighbourhood in osm2city
-    * city_block and plot: too small
-    """
-    city = 10
-    town = 20
-    farm = 50  # only type allowed to remain as area as it is used to recognize land-use type
-
-
 class Place(OSMFeature):
     """ A 'Places' OSM Map Feature
     A Place can either be of element type Node -> Point geometry or Way -> Area -> LinearString
@@ -111,6 +98,14 @@ class Place(OSMFeature):
         obj.parse_tags_additional(node.tags)
         return obj
 
+    @staticmethod
+    def parse_tags(tags_dict: KeyValueDict) -> Union[None, enu.PlaceType]:
+        value = tags_dict[s.K_PLACE]
+        for member in enu.PlaceType:
+            if value == member.name:
+                return member
+        return None
+
     def parse_tags_additional(self, tags_dict: KeyValueDict) -> None:
         if s.K_POPULATION in tags_dict:
             self.population = op.parse_int(tags_dict[s.K_POPULATION], 0)
@@ -124,14 +119,6 @@ class Place(OSMFeature):
             self.name = tags_dict[s.K_NAME]
         elif s.K_PLACE_NAME in tags_dict:  # only use it if name was not included
             self.name = tags_dict[s.K_PLACE_NAME]
-
-    @staticmethod
-    def parse_tags(tags_dict: KeyValueDict) -> Union[None, PlaceType]:
-        value = tags_dict[s.K_PLACE]
-        for member in PlaceType:
-            if value == member.name:
-                return member
-        return None
 
     def is_valid(self) -> bool:
         if None is self.type_:
@@ -148,7 +135,7 @@ class Place(OSMFeature):
         """Transforms a Place defined as Way to a Point."""
         if self.is_point:
             return
-        if self.type_ is PlaceType.farm:
+        if self.type_ is enu.PlaceType.farm:
             logging.debug('Attempted to transform Place of type farm from area to point')
             return
         self.is_point = True
@@ -156,7 +143,7 @@ class Place(OSMFeature):
 
     def _calculate_circle_radius(self, population: int, power: float) -> float:
         radius = math.pow(population, power)
-        if self.type_ is PlaceType.city:
+        if self.type_ is enu.PlaceType.city:
             radius *= parameters.OWBB_PLACE_RADIUS_FACTOR_CITY
         else:
             radius *= parameters.OWBB_PLACE_RADIUS_FACTOR_TOWN
@@ -165,13 +152,13 @@ class Place(OSMFeature):
     def create_settlement_type_circles(self) -> Tuple[Polygon, Polygon, Polygon]:
         population = self.population
         if population == 0:
-            if self.type_ is PlaceType.city:
+            if self.type_ is enu.PlaceType.city:
                 population = parameters.OWBB_PLACE_POPULATION_DEFAULT_CITY
             else:
                 population = parameters.OWBB_PLACE_POPULATION_DEFAULT_TOWN
         centre_circle = Polygon()
         block_circle = Polygon()
-        if self.type_ is PlaceType.city:
+        if self.type_ is enu.PlaceType.city:
             radius = self._calculate_circle_radius(population, parameters.OWBB_PLACE_RADIUS_EXPONENT_CENTRE)
             centre_circle = self.geometry.buffer(radius)
             radius = self._calculate_circle_radius(population, parameters.OWBB_PLACE_RADIUS_EXPONENT_BLOCK)
@@ -256,7 +243,7 @@ class OpenSpace(OSMFeatureArea):
 
     @staticmethod
     def parse_tags(tags_dict: KeyValueDict) -> Union[OpenSpaceType, None]:
-        if bl.parse_building_tags_for_type(tags_dict) is not None:
+        if enu.parse_building_tags_for_type(tags_dict) is not None:
             return None
         elif s.K_PUBLIC_TRANSPORT in tags_dict:
             return OpenSpaceType.transport
@@ -285,41 +272,16 @@ class OpenSpace(OSMFeatureArea):
         return None
 
 
-@unique
-class BuildingZoneType(IntEnum):  # element names must match OSM values apart from non_osm
-    residential = 10
-    commercial = 20
-    industrial = 30
-    retail = 40
-    farmyard = 50  # for generated land-use zones this is not correctly applied, as several farmyards might be
-    # interpreted as one. See GeneratedBuildingZone.guess_building_zone_type
-    port = 60
-
-    aerodrome = 90  # key = aeroway, not landuse
-
-    non_osm = 100  # used for land-uses constructed with heuristics and not in original data from OSM
-
-    # FlightGear in BTG files
-    # must be in line with SUPPORTED_MATERIALS in btg_io.py (except from water)
-    btg_builtupcover = 201
-    btg_urban = 202
-    btg_town = 211
-    btg_suburban = 212
-    btg_construction = 221
-    btg_industrial = 222
-    btg_port = 223
-
-
 class CityBlock:
     """A special land-use derived from many kinds of land-use info and enclosed by streets (kind of)."""
-    def __init__(self, osm_id: int, geometry: Polygon, feature_type: Union[None, BuildingZoneType]) -> None:
+    def __init__(self, osm_id: int, geometry: Polygon, feature_type: Union[None, enu.BuildingZoneType]) -> None:
         self.osm_id = osm_id
         self.geometry = geometry
         self.prep_geom = None  # temp Shapely PreparedGeometry - only valid in a specific context, where it is set
         self.type_ = feature_type
         self.osm_buildings = list()  # List of already existing osm buildings
         self.__settlement_type = None
-        self.settlement_type = bl.SettlementType.periphery
+        self.settlement_type = enu.SettlementType.periphery
         self.settlement_type_changed = False
         self.__building_levels = 0
 
@@ -333,13 +295,13 @@ class CityBlock:
         return self.__building_levels
 
     @property
-    def settlement_type(self) -> bl.SettlementType:
+    def settlement_type(self) -> enu.SettlementType:
         return self.__settlement_type
 
     @settlement_type.setter
     def settlement_type(self, value):
         self.__settlement_type = value
-        self.__building_levels = bl.calc_levels_for_settlement_type(value, bl.BuildingClass.residential)
+        self.__building_levels = bl.calc_levels_for_settlement_type(value, enu.BuildingClass.residential)
 
 
 class BuildingZone(OSMFeatureArea):
@@ -354,7 +316,7 @@ class BuildingZone(OSMFeatureArea):
     __slots__ = ('linked_blocked_areas', 'osm_buildings', 'generated_buildings', 'linked_genways',
                  'linked_city_blocks', 'settlement_type')
 
-    def __init__(self, osm_id: int, geometry: MPoly, feature_type: Union[None, BuildingZoneType]) -> None:
+    def __init__(self, osm_id: int, geometry: MPoly, feature_type: Union[None, enu.BuildingZoneType]) -> None:
         super().__init__(osm_id, geometry, feature_type)
 
         # the following fields are only used for generating would be buildings
@@ -364,7 +326,7 @@ class BuildingZone(OSMFeatureArea):
         self.generated_buildings = list()  # List of GenBuilding objects for generated non-osm buildings
         self.linked_genways = list()  # List of Highways that are available for generating buildings
         self.linked_city_blocks = list()
-        self.settlement_type = bl.SettlementType.rural
+        self.settlement_type = enu.SettlementType.rural
 
     @property
     def density(self) -> float:
@@ -388,18 +350,18 @@ class BuildingZone(OSMFeatureArea):
         return obj
 
     @staticmethod
-    def parse_tags(tags_dict: KeyValueDict) -> Union[None, BuildingZoneType]:
+    def parse_tags(tags_dict: KeyValueDict) -> Union[None, enu.BuildingZoneType]:
         if s.K_AEROWAY in tags_dict and tags_dict[s.K_AEROWAY] == s.V_AERODROME:
-            return BuildingZoneType.aerodrome
+            return enu.BuildingZoneType.aerodrome
         value = tags_dict[s.K_LANDUSE]
-        for member in BuildingZoneType:
+        for member in enu.BuildingZoneType:
             if value == member.name:
                 return member
         return None
 
     @staticmethod
     def is_building_zone_value(value: str) -> bool:
-        for member in BuildingZoneType:
+        for member in enu.BuildingZoneType:
             if value == member.name:
                 return True
         return False
@@ -485,7 +447,7 @@ class BuildingZone(OSMFeatureArea):
     def process_buildings_as_blocked_areas(self):
         for building in self.osm_buildings:
             blocked = BlockedArea(BlockedAreaType.osm_building, building.geometry,
-                                  bl.parse_building_tags_for_type(building.tags))
+                                  enu.parse_building_tags_for_type(building.tags))
             self.linked_blocked_areas.append(blocked)
 
     def process_open_spaces_as_blocked_areas(self, open_spaces_dict: Dict[int, OpenSpace]) -> None:
@@ -508,7 +470,7 @@ class BuildingZone(OSMFeatureArea):
 
     @property
     def is_aerodrome(self) -> bool:
-        return self.type_ is BuildingZoneType.aerodrome
+        return self.type_ is enu.BuildingZoneType.aerodrome
 
 
 class BTGBuildingZone(object):
@@ -523,23 +485,23 @@ class GeneratedBuildingZone(BuildingZone):
     """A fake OSM Land-use for buildings based on heuristics"""
     def __init__(self, generated_id, geometry, building_zone_type) -> None:
         super().__init__(generated_id, geometry, building_zone_type)
-        self.from_buildings = self.type_ is BuildingZoneType.non_osm
+        self.from_buildings = self.type_ is enu.BuildingZoneType.non_osm
 
     def guess_building_zone_type(self, farm_places: List[Place]):
         """Based on some heuristics of linked buildings guess the building zone type"""
         # first we try to map directly BTG zones to OSM zones
-        if self.type_ in [BuildingZoneType.btg_suburban, BuildingZoneType.btg_town, BuildingZoneType.btg_urban,
-                          BuildingZoneType.btg_builtupcover]:
-            self.type_ = BuildingZoneType.residential
+        if self.type_ in [enu.BuildingZoneType.btg_suburban, enu.BuildingZoneType.btg_town,
+                          enu.BuildingZoneType.btg_urban, enu.BuildingZoneType.btg_builtupcover]:
+            self.type_ = enu.BuildingZoneType.residential
             return
 
-        if self.type_ in [BuildingZoneType.btg_port, BuildingZoneType.btg_industrial,
-                          BuildingZoneType.btg_construction]:
-            self.type_ = BuildingZoneType.industrial
+        if self.type_ in [enu.BuildingZoneType.btg_port, enu.BuildingZoneType.btg_industrial,
+                          enu.BuildingZoneType.btg_construction]:
+            self.type_ = enu.BuildingZoneType.industrial
             return
 
         # now we should only have non_osm based on lonely buildings
-        if self.type_ is not BuildingZoneType.non_osm:
+        if self.type_ is not enu.BuildingZoneType.non_osm:
             logging.error('Should be of type "non_osm", but actually is: %s. Programming logic error!',
                           self.type_.name)
             exit(1)
@@ -549,20 +511,20 @@ class GeneratedBuildingZone(BuildingZone):
         retail_buildings = 0
         farm_buildings = 0
         for building in self.osm_buildings:
-            building_class = bl.get_building_class(building.tags)
-            if building_class in [bl.BuildingClass.residential_small, bl.BuildingClass.residential,
-                                  bl.BuildingClass.terrace, bl.BuildingClass.public]:
+            building_class = enu.get_building_class(building.tags)
+            if building_class in [enu.BuildingClass.residential_small, enu.BuildingClass.residential,
+                                  enu.BuildingClass.terrace, enu.BuildingClass.public]:
                 residential_buildings += 1
-            elif building_class is bl.BuildingClass.commercial:
+            elif building_class is enu.BuildingClass.commercial:
                 commercial_buildings += 1
-            elif building_class in [bl.BuildingClass.industrial, bl.BuildingClass.warehouse]:
+            elif building_class in [enu.BuildingClass.industrial, enu.BuildingClass.warehouse]:
                 industrial_buildings += 1
-            elif building_class in [bl.BuildingClass.retail, bl.BuildingClass.parking_house]:
+            elif building_class in [enu.BuildingClass.retail, enu.BuildingClass.parking_house]:
                 retail_buildings += 1
-            elif building_class is bl.BuildingClass.farm:
+            elif building_class is enu.BuildingClass.farm:
                 farm_buildings += 1
 
-        guessed_type = BuildingZoneType.residential  # default
+        guessed_type = enu.BuildingZoneType.residential  # default
         max_value = max([residential_buildings, commercial_buildings, industrial_buildings, retail_buildings,
                          farm_buildings])
         if 0 < max_value:
@@ -571,27 +533,27 @@ class GeneratedBuildingZone(BuildingZone):
                 for my_place in farm_places:
                     if my_place.is_point:
                         if my_place.geometry.within(self.geometry):
-                            self.type_ = BuildingZoneType.farmyard
+                            self.type_ = enu.BuildingZoneType.farmyard
                             farm_places.remove(my_place)
                             logging.debug("Found one based on node place")
                             return
                     else:
                         if my_place.geometry.intersects(self.geometry):
-                            self.type_ = BuildingZoneType.farmyard
+                            self.type_ = enu.BuildingZoneType.farmyard
                             farm_places.remove(my_place)
                             logging.debug("Found one based on area place")
                             return
             if farm_buildings == max_value:  # in small villages farm houses might be tagged, but rest just ="yes"
                 if (len(self.osm_buildings) >= 10) and (farm_buildings < int(0.5*len(self.osm_buildings))):
-                    guessed_type = BuildingZoneType.residential
+                    guessed_type = enu.BuildingZoneType.residential
                 else:
-                    guessed_type = BuildingZoneType.farmyard
+                    guessed_type = enu.BuildingZoneType.farmyard
             elif commercial_buildings == max_value:
-                guessed_type = BuildingZoneType.commercial
+                guessed_type = enu.BuildingZoneType.commercial
             elif industrial_buildings == max_value:
-                guessed_type = BuildingZoneType.industrial
+                guessed_type = enu.BuildingZoneType.industrial
             elif retail_buildings == max_value:
-                guessed_type = BuildingZoneType.retail
+                guessed_type = enu.BuildingZoneType.retail
 
         self.type_ = guessed_type
 
@@ -706,28 +668,28 @@ class RailwayLine(OSMFeatureLinearWithTunnel):
 
     @staticmethod
     def _parse_tags_service_spur(tags_dict: KeyValueDict) -> bool:
-        if s.K_SERVICE in tags_dict and tags_dict[s.K_SERVICE] == "spur":
+        if s.K_SERVICE in tags_dict and tags_dict[s.K_SERVICE] == s.V_SPUR:
             return True
         return False
 
     @staticmethod
     def parse_tags(tags_dict: KeyValueDict) -> Union[RailwayLineType, None]:
         value = tags_dict[s.K_RAILWAY]
-        if value == "rail":
+        if value == s.V_RAIL:
             return RailwayLineType.rail
-        elif value == "subway":
+        elif value == s.V_SUBWAY:
             return RailwayLineType.subway
-        elif value == "monorail":
+        elif value == s.V_MONORAIL:
             return RailwayLineType.monorail
-        elif value == "light_rail":
+        elif value == s.V_LIGHT_RAIL:
             return RailwayLineType.light_rail
-        elif value == "funicular":
+        elif value == s.V_FUNICULAR:
             return RailwayLineType.funicular
-        elif value == "narrow_gauge":
+        elif value == s.V_NARROW_GAUGE:
             return RailwayLineType.narrow_gauge
-        elif value == "tram":
+        elif value == s.V_TRAM:
             return RailwayLineType.tram
-        elif value in ["abandoned", "construction", "disused", "preserved"]:
+        elif value in [s.V_ABANDONED, s.V_CONSTRUCTION, s.V_DISUSED, s.V_PRESERVED]:
             return RailwayLineType.other
         return None
 
@@ -826,11 +788,11 @@ class Highway(OSMFeatureLinearWithTunnel):
 
     def _parse_tags_oneway(self, tags_dict: KeyValueDict) -> bool:
         if self.type_ == HighwayType.motorway:
-            if (s.K_ONEWAY in tags_dict) and (tags_dict[s.K_ONEWAY] == "no"):
+            if (s.K_ONEWAY in tags_dict) and (tags_dict[s.K_ONEWAY] == s.V_NO):
                 return False
             else:
                 return True  # in motorways oneway is implied
-        elif (s.K_ONEWAY in tags_dict) and (tags_dict[s.K_ONEWAY] == "yes"):
+        elif (s.K_ONEWAY in tags_dict) and (tags_dict[s.K_ONEWAY] == s.V_YES):
             return True
         return False
 
@@ -893,7 +855,7 @@ class BuildingModel(object):
 
     Tags contains e.g. roof type, number of levels etc. according to OSM tagging."""
 
-    def __init__(self, width: float, depth: float, model_type: bl.BuildingType, regions: List[str],
+    def __init__(self, width: float, depth: float, model_type: enu.BuildingType, regions: List[str],
                  model: Optional[str], facade_id: int, roof_id: int, tags: KeyValueDict) -> None:
         self.width = width  # if you look at the building from its front, then you see the width between the sides
         self.depth = depth  # from the front to the back
@@ -930,44 +892,44 @@ class SharedModel(object):
         self._back_buffer = 0
         self._side_buffer = 0
 
-    def calc_buffers(self, settlement_type: bl.SettlementType) -> None:
+    def calc_buffers(self, settlement_type: enu.SettlementType) -> None:
         # industrial
-        if self.building_model.model_type is bl.BuildingType.industrial:
+        if self.building_model.model_type is enu.BuildingType.industrial:
             my_rand = random.random()
             self._side_buffer = parameters.OWBB_INDUSTRIAL_BUILDING_SIDE_MIN + my_rand * (
                     parameters.OWBB_INDUSTRIAL_BUILDING_SIDE_MAX - parameters.OWBB_INDUSTRIAL_BUILDING_SIDE_MIN
             )
             self._back_buffer = self._side_buffer
             self._front_buffer = self._side_buffer
-            if settlement_type in [bl.SettlementType.dense, bl.SettlementType.block, bl.SettlementType.centre]:
+            if settlement_type in [enu.SettlementType.dense, enu.SettlementType.block, enu.SettlementType.centre]:
                 self._front_buffer = parameters.OWBB_FRONT_DENSE
         else:
             self._side_buffer = math.sqrt(self.width) * parameters.OWBB_RESIDENTIAL_SIDE_FACTOR_PERIPHERY
             self._back_buffer = math.sqrt(self.depth) * parameters.OWBB_RESIDENTIAL_BACK_FACTOR_PERIPHERY
             self._front_buffer = math.sqrt(self.width) * parameters.OWBB_RESIDENTIAL_FRONT_FACTOR_PERIPHERY
             # terraces
-            if self.building_model.model_type is bl.BuildingType.terrace:
+            if self.building_model.model_type is enu.BuildingType.terrace:
                 self._side_buffer = 0.0
                 # however we want to have some breaks in the continuous line of houses
                 if random.random() < (1 / parameters.OWBB_RESIDENTIAL_TERRACE_TYPICAL_NUMBER):
                     self._side_buffer = math.sqrt(self.width) * parameters.OWBB_RESIDENTIAL_SIDE_FACTOR_PERIPHERY
             # dense areas
-            if settlement_type in [bl.SettlementType.dense, bl.SettlementType.block, bl.SettlementType.centre]:
+            if settlement_type in [enu.SettlementType.dense, enu.SettlementType.block, enu.SettlementType.centre]:
                 self._front_buffer = parameters.OWBB_FRONT_DENSE
                 self._side_buffer = 0.0
                 self._back_buffer = parameters.OWBB_FRONT_DENSE  # yes, it is small
-                if settlement_type is bl.SettlementType.dense:
-                    if self.building_model.model_type is bl.BuildingType.terrace:
+                if settlement_type is enu.SettlementType.dense:
+                    if self.building_model.model_type is enu.BuildingType.terrace:
                         # however we want to have some breaks in the continuous line of houses
                         if random.random() < (1 / parameters.OWBB_RESIDENTIAL_TERRACE_TYPICAL_NUMBER):
                             self._side_buffer = math.sqrt(
                                 self.width) * parameters.OWBB_RESIDENTIAL_SIDE_FACTOR_DENSE
-                    elif self.building_model.model_type in [bl.BuildingType.apartments, bl.BuildingType.detached]:
+                    elif self.building_model.model_type in [enu.BuildingType.apartments, enu.BuildingType.detached]:
                         self._side_buffer = math.sqrt(self.width) * parameters.OWBB_RESIDENTIAL_SIDE_FACTOR_DENSE
                         self._front_buffer = self._side_buffer
 
     @property
-    def type_(self) -> bl.BuildingType:
+    def type_(self) -> enu.BuildingType:
         return self.building_model.model_type
 
     @property
@@ -1039,19 +1001,19 @@ class SharedModelsLibrary(object):
 
     def _populate_models_library(self, building_models: List[BuildingModel]) -> None:
         for building_model in building_models:
-            if building_model.model_type is bl.BuildingType.apartments:
+            if building_model.model_type is enu.BuildingType.apartments:
                 a_model = SharedModel(building_model)
                 self._residential_apartments.append(a_model)
-            elif building_model.model_type is bl.BuildingType.attached:
+            elif building_model.model_type is enu.BuildingType.attached:
                 a_model = SharedModel(building_model)
                 self._residential_attached.append(a_model)
-            elif building_model.model_type is bl.BuildingType.detached:
+            elif building_model.model_type is enu.BuildingType.detached:
                 a_model = SharedModel(building_model)
                 self._residential_detached.append(a_model)
-            elif building_model.model_type is bl.BuildingType.terrace:
+            elif building_model.model_type is enu.BuildingType.terrace:
                 a_model = SharedModel(building_model)
                 self._residential_terraces.append(a_model)
-            elif building_model.model_type is bl.BuildingType.industrial:
+            elif building_model.model_type is enu.BuildingType.industrial:
                 a_model = SharedModel(building_model)
                 if building_model.area > parameters.OWBB_INDUSTRIAL_LARGE_MIN_AREA:
                     self._industrial_buildings_large.append(a_model)
@@ -1083,7 +1045,7 @@ class SharedModelsLibrary(object):
 class GenBuilding(object):
     """An object representing a generated non-OSM building"""
     def __init__(self, gen_id: int, shared_model: SharedModel, highway_width: float,
-                 settlement_type: bl.SettlementType) -> None:
+                 settlement_type: enu.SettlementType) -> None:
         self.gen_id = gen_id
         self.shared_model = shared_model
         self.shared_model.calc_buffers(settlement_type)
@@ -1096,8 +1058,9 @@ class GenBuilding(object):
         # x/y; see building_lib.calculate_anchor -> mid-point of the front facade seen from street in local coords
         self.x = 0
         self.y = 0
-        self.angle = 0  # the angle in degrees from North (y-axis) in the local coordinate system for the building's
-                        # static object local x-axis
+        # the angle in degrees from North (y-axis) in the local coordinate system for the building's
+        # static object local x-axis
+        self.angle = 0
         self.zone = None  # either a BuildingZone or a CityBlock
 
     def _create_my_polygons(self, highway_width: float) -> None:
@@ -1161,7 +1124,8 @@ class TempGenBuildings(object):
         self.bounding_box = bounding_box
         self.generated_blocked_areas = list()  # List of BlockedArea objects from temp generated buildings
         self.generated_buildings = list()  # List of GenBuildings
-        self.blocked_areas_along_objects = dict()  # key=BlockedArea value=None found during generation along specific highway
+        # found at generation along specific highway
+        self.blocked_areas_along_objects = dict()  # key=BlockedArea value=None
         self.blocked_areas_along_sequence = list()  # BlockedArea objects
 
     def add_generated(self, building, blocked_area):
@@ -1308,7 +1272,7 @@ def process_osm_place_refs(transformer: co.Transformation) -> Tuple[List[Place],
     farm_places = list()
 
     key_value_pairs = list()
-    for member in PlaceType:
+    for member in enu.PlaceType:
         key_value_pairs.append('place=>{}'.format(member.name))
 
     # temporarily change the tile border to get more places
@@ -1324,7 +1288,7 @@ def process_osm_place_refs(transformer: co.Transformation) -> Tuple[List[Place],
     for key, node in osm_nodes_dict.items():
         place = Place.create_from_node(node, transformer)
         if place.is_valid():
-            if place.type_ is PlaceType.farm:
+            if place.type_ is enu.PlaceType.farm:
                 farm_places.append(place)
             else:
                 urban_places.append(place)
@@ -1335,7 +1299,7 @@ def process_osm_place_refs(transformer: co.Transformation) -> Tuple[List[Place],
     for key, way in osm_ways_dict.items():
         place = Place.create_from_way(way, osm_nodes_dict, transformer)
         if place.is_valid():
-            if place.type_ is PlaceType.farm:
+            if place.type_ is enu.PlaceType.farm:
                 farm_places.append(place)
             else:
                 place.transform_to_point()
@@ -1351,7 +1315,7 @@ def process_osm_place_refs(transformer: co.Transformation) -> Tuple[List[Place],
         largest_area = None  # in case there are several polygons in the relation, we just keep the largest
         outer_ways = list()
         for member in relation.members:
-            if member.type_ == 'way' and member.role == 'outer' and member.ref in osm_rel_ways_dict:
+            if member.type_ == s.V_WAY and member.role == s.V_OUTER and member.ref in osm_rel_ways_dict:
                 way = osm_rel_ways_dict[member.ref]
                 outer_ways.append(way)
 
@@ -1367,7 +1331,7 @@ def process_osm_place_refs(transformer: co.Transformation) -> Tuple[List[Place],
 
         if largest_area is not None:
             my_place = Place(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse), largest_area.centroid,
-                             PlaceType.city, True)
+                             enu.PlaceType.city, True)
             my_place.parse_tags(relation.tags)
             my_place.parse_tags_additional(relation.tags)
             if my_place.is_valid():

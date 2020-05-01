@@ -12,6 +12,7 @@ from shapely.geometry import box, LineString, MultiPolygon, Polygon, CAP_STYLE, 
 from shapely.ops import unary_union
 from shapely.prepared import prep
 
+import osm2city.types.enumerations as enu
 from osm2city import building_lib as bl
 from osm2city import buildings as bu
 from osm2city.owbb import models as m
@@ -51,7 +52,7 @@ def _process_aerodromes(building_zones: List[m.BuildingZone], aerodrome_zones: L
     # for the remaining polygons create new aerodrome_zones
     for poly in apt_dat_polygons:
         new_aerodrome_zone = m.BuildingZone(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse),
-                                            poly, m.BuildingZoneType.aerodrome)
+                                            poly, enu.BuildingZoneType.aerodrome)
         aerodrome_zones.append(new_aerodrome_zone)
 
     # make sure that if a building zone is overlapping with a aerodrome that it is clipped
@@ -158,7 +159,7 @@ def _generate_building_zones_from_buildings(building_zones: List[m.BuildingZone]
                 break
         if not within_existing_building_zone:
             my_candidate = m.GeneratedBuildingZone(op.get_next_pseudo_osm_id(op.OSMFeatureType.landuse),
-                                                   buffer_polygon, m.BuildingZoneType.non_osm)
+                                                   buffer_polygon, enu.BuildingZoneType.non_osm)
             my_candidate.relate_building(my_building)
             zones_candidates[my_candidate.osm_id] = my_candidate
     logging.debug("Candidate land-uses found: %s", len(zones_candidates))
@@ -252,7 +253,7 @@ def _create_btg_buildings_zones(btg_polys: Dict[str, List[Polygon]]) -> List[m.B
     for key, polys in btg_polys.items():
         # find the corresponding BuildingZoneType
         type_ = None
-        for member in m.BuildingZoneType:
+        for member in enu.BuildingZoneType:
             btg_key = 'btg_' + key
             if btg_key == member.name:
                 type_ = member
@@ -534,7 +535,7 @@ def _create_settlement_clusters(lit_areas: List[Polygon], osm_water_areas: List[
             centre_circle, block_circle, dense_circle = place.create_settlement_type_circles()
             if not dense_circle.disjoint(polygon):
                 candidate_places.append(place)
-                if place.type_ is m.PlaceType.city:
+                if place.type_ is enu.PlaceType.city:
                     cities += 1
                 else:
                     towns += 1
@@ -570,7 +571,7 @@ def _link_building_zones_with_settlements(settlement_clusters: List[m.Settlement
         z = 0
         z_number = len(building_zones)
         for zone in building_zones:
-            if zone.type_ is m.BuildingZoneType.aerodrome:
+            if zone.type_ is enu.BuildingZoneType.aerodrome:
                 continue
             z += 1
             if z % 20 == 0:
@@ -580,7 +581,7 @@ def _link_building_zones_with_settlements(settlement_clusters: List[m.Settlement
                 # and therefore a zone can always only be within one lit-area/settlement and not another
                 if zone.geometry.within(settlement.geometry):
                     zones_processed_in_settlement.append(zone)
-                    zone.settlement_type = bl.SettlementType.periphery
+                    zone.settlement_type = enu.SettlementType.periphery
                     # create city blocks
                     _assign_city_blocks(zone, highways_dict)
                     # Test for being within a settlement type circle beginning with the highest ranking circles.
@@ -588,28 +589,28 @@ def _link_building_zones_with_settlements(settlement_clusters: List[m.Settlement
                     # If yes, then assign settlement type to city block
                     for city_block in zone.linked_city_blocks:
                         prep_geom = prep(city_block.geometry)
-                        if city_block.settlement_type.value < bl.SettlementType.centre.value:
+                        if city_block.settlement_type.value < enu.SettlementType.centre.value:
                             for circle in centre_circles:
                                 if prep_geom.intersects(circle):
-                                    city_block.settlement_type = bl.SettlementType.centre
-                                    zone.settlement_type = bl.SettlementType.centre
+                                    city_block.settlement_type = enu.SettlementType.centre
+                                    zone.settlement_type = enu.SettlementType.centre
                                     break
-                        if city_block.settlement_type.value < bl.SettlementType.block.value:
+                        if city_block.settlement_type.value < enu.SettlementType.block.value:
                             for circle in block_circles:
                                 if prep_geom.intersects(circle):
-                                    city_block.settlement_type = bl.SettlementType.block
-                                    zone.settlement_type = bl.SettlementType.block
+                                    city_block.settlement_type = enu.SettlementType.block
+                                    zone.settlement_type = enu.SettlementType.block
                                     break
-                        if city_block.settlement_type.value < bl.SettlementType.dense.value:
+                        if city_block.settlement_type.value < enu.SettlementType.dense.value:
                             for circle in dense_circles:
                                 if prep_geom.intersects(circle):
-                                    city_block.settlement_type = bl.SettlementType.dense
-                                    zone.settlement_type = bl.SettlementType.dense
+                                    city_block.settlement_type = enu.SettlementType.dense
+                                    zone.settlement_type = enu.SettlementType.dense
                                     break
 
     # now make sure that also zones outside of settlements get city blocks
     for zone in building_zones:
-        if zone not in zones_processed_in_settlement and zone.type_ is not m.BuildingZoneType.aerodrome:
+        if zone not in zones_processed_in_settlement and zone.type_ is not enu.BuildingZoneType.aerodrome:
             _assign_city_blocks(zone, highways_dict)
 
 
@@ -617,24 +618,24 @@ def _sanity_check_settlement_types(building_zones: List[m.BuildingZone], highway
     upgraded = 0
     downgraded = 0
     for zone in building_zones:
-        if zone.type_ is m.BuildingZoneType.aerodrome:
+        if zone.type_ is enu.BuildingZoneType.aerodrome:
             continue
         my_density = zone.density
         if my_density < parameters.OWBB_PLACE_SANITY_DENSITY:
-            if zone.settlement_type in [bl.SettlementType.dense, bl.SettlementType.block]:
-                zone.settlement_type = bl.SettlementType.periphery
+            if zone.settlement_type in [enu.SettlementType.dense, enu.SettlementType.block]:
+                zone.settlement_type = enu.SettlementType.periphery
                 downgraded += 1
                 for city_block in zone.linked_city_blocks:
-                    city_block.settlement_type = bl.SettlementType.periphery
+                    city_block.settlement_type = enu.SettlementType.periphery
                     city_block.settlement_type_changed = True
         else:
-            if zone.settlement_type in [bl.SettlementType.rural, bl.SettlementType.periphery]:
-                zone.settlement_type = bl.SettlementType.dense
+            if zone.settlement_type in [enu.SettlementType.rural, enu.SettlementType.periphery]:
+                zone.settlement_type = enu.SettlementType.dense
                 upgraded += 1
                 # now also make sure we actually have city blocks
                 _assign_city_blocks(zone, highways_dict)
                 for city_block in zone.linked_city_blocks:
-                    city_block.settlement_type = bl.SettlementType.dense
+                    city_block.settlement_type = enu.SettlementType.dense
                     city_block.settlement_type_changed = True
     logging.debug('Upgraded %i and downgraded %i settlement types for %i total building zones', upgraded, downgraded,
                   len(building_zones))

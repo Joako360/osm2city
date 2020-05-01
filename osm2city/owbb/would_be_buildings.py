@@ -11,13 +11,14 @@ import sys
 from shapely.geometry import box
 from shapely.geometry import LineString, MultiLineString, Polygon
 
+import osm2city.types.enumerations as enu
 from osm2city import parameters
 from osm2city.owbb import plotting
 import osm2city.building_lib as bl
 import osm2city.owbb.models as m
 import osm2city.utils.coordinates as co
 import osm2city.utils.osmparser as op
-import osm2city.utils.osmstrings as s
+import osm2city.types.osmstrings as s
 from osm2city.utils.utilities import time_logging, random_value_from_ratio_dict_parameter
 
 
@@ -119,7 +120,7 @@ def _generate_extra_buildings(building_zone: m.BuildingZone, shared_models_libra
     for highway in building_zone.linked_genways:
         if highway.type_ in HIGHWAYS_FOR_ZONE_SPLIT:
             continue
-        if building_zone.type_ is m.BuildingZoneType.residential:
+        if building_zone.type_ is enu.BuildingZoneType.residential:
             # apartment_houses_list = shared_models_library.residential_apartments
             detached_houses_list = shared_models_library.residential_detached
 
@@ -129,13 +130,13 @@ def _generate_extra_buildings(building_zone: m.BuildingZone, shared_models_libra
             terrace_share = parameters.OWBB_RESIDENTIAL_RURAL_TERRACE_SHARE
             apartment_share = parameters.OWBB_RESIDENTIAL_RURAL_APARTMENT_SHARE
             try:
-                if highway.along_city_block.settlement_type is bl.SettlementType.periphery:
+                if highway.along_city_block.settlement_type is enu.SettlementType.periphery:
                     terrace_share = parameters.OWBB_RESIDENTIAL_PERIPHERY_TERRACE_SHARE
                     apartment_share = parameters.OWBB_RESIDENTIAL_PERIPHERY_APARTMENT_SHARE
             except AttributeError:
                 caught_errors += 1
                 try:
-                    if highway.reversed_city_block.settlement_type is not bl.SettlementType.periphery:
+                    if highway.reversed_city_block.settlement_type is not enu.SettlementType.periphery:
                         terrace_share = parameters.OWBB_RESIDENTIAL_PERIPHERY_TERRACE_SHARE
                         apartment_share = parameters.OWBB_RESIDENTIAL_PERIPHERY_APARTMENT_SHARE
                 except AttributeError:
@@ -158,15 +159,15 @@ def _generate_extra_buildings(building_zone: m.BuildingZone, shared_models_libra
                 # prepare for not rural / periphery, so we can have the same along and reverse
                 primary_houses = shared_models_library.residential_attached
                 try:
-                    if highway.along_city_block.settlement_type is bl.SettlementType.dense:
+                    if highway.along_city_block.settlement_type is enu.SettlementType.dense:
                         building_type = random_value_from_ratio_dict_parameter(
                             parameters.OWBB_RESIDENTIAL_DENSE_TYPE_SHARE)
-                        if building_type == 'detached':
+                        if building_type == s.V_DETACHED:
                             primary_houses = shared_models_library.residential_detached
-                        elif building_type == 'terrace':
+                        elif building_type == s.V_TERRACE:
                             index = random.randint(0, len(shared_models_library.residential_terraces) - 1)
                             primary_houses = shared_models_library.residential_terraces[index:index + 1]
-                        elif building_type == 'apartments':
+                        elif building_type == s.V_APARTMENTS:
                             index = random.randint(0, len(shared_models_library.residential_apartments) - 1)
                             primary_houses = shared_models_library.residential_apartments[index:index + 1]
                 except AttributeError:
@@ -174,25 +175,25 @@ def _generate_extra_buildings(building_zone: m.BuildingZone, shared_models_libra
 
                 # along
                 try:
-                    if highway.along_city_block.settlement_type in [bl.SettlementType.rural,
-                                                                    bl.SettlementType.periphery]:
+                    if highway.along_city_block.settlement_type in [enu.SettlementType.rural,
+                                                                    enu.SettlementType.periphery]:
                         _generate_extra_buildings_residential(building_zone, highway, detached_houses_list,
                                                               alternatives_list, False, bounding_box)
                     else:
                         _generate_extra_buildings_residential(building_zone, highway, primary_houses, None,
                                                               False, bounding_box)
-                except AttributeError as e:
+                except AttributeError:
                     pass
                 # reverse
                 try:
-                    if highway.reversed_city_block.settlement_type in [bl.SettlementType.rural,
-                                                                      bl.SettlementType.periphery]:
+                    if highway.reversed_city_block.settlement_type in [enu.SettlementType.rural,
+                                                                       enu.SettlementType.periphery]:
                         _generate_extra_buildings_residential(building_zone, highway, detached_houses_list,
                                                               alternatives_list, True, bounding_box)
                     else:
                         _generate_extra_buildings_residential(building_zone, highway, primary_houses, None,
                                                               True, bounding_box)
-                except AttributeError as e:
+                except AttributeError:
                     pass
 
         else:  # elif landuse.type_ is Landuse.TYPE_INDUSTRIAL:
@@ -239,7 +240,7 @@ def _generate_extra_buildings_industrial(building_zone: m.BuildingZone, highway:
     building_zone.commit_temp_gen_buildings(temp_buildings, highway, is_reverse)
 
 
-def _generate_buildings_along_highway(building_zone: m.BuildingZone, settlement_type: bl.SettlementType,
+def _generate_buildings_along_highway(building_zone: m.BuildingZone, settlement_type: enu.SettlementType,
                                       highway: m.Highway,
                                       shared_models_list: List[m.SharedModel], is_reverse: bool,
                                       temp_buildings: m.TempGenBuildings):
@@ -297,109 +298,109 @@ def _read_building_models_library() -> List[m.BuildingModel]:
     models = list()
 
     # residential detached
-    detached_1_tags = {s.K_BUILDING: 'detached',
-                       'building:colour': 'white', 'building:levels': '2',
-                       'roof:colour': 'red', 'roof:shape': 'hipped', 'roof:height': '2',
-                       s.K_OWBB_GENERATED: 'yes'}
-    detached_1 = m.BuildingModel(15., 8., bl.BuildingType.detached, list(), None, 0, 0, detached_1_tags)
+    detached_1_tags = {s.K_BUILDING: s.V_DETACHED,
+                       s.K_BUILDING_COLOUR: 'white', s.K_BUILDING_LEVELS: '2',
+                       s.K_ROOF_COLOUR: 'red', s.K_ROOF_SHAPE: s.V_HIPPED, s.K_ROOF_HEIGHT: '2',
+                       s.K_OWBB_GENERATED: s.V_YES}
+    detached_1 = m.BuildingModel(15., 8., enu.BuildingType.detached, list(), None, 0, 0, detached_1_tags)
     models.append(detached_1)
-    detached_2_tags = {s.K_BUILDING: 'detached',
-                       'building:colour': 'tan', 'building:levels': '1',
-                       'roof:colour': 'firebrick', 'roof:shape': 'gabled', 'roof:height': '2',
-                       s.K_OWBB_GENERATED: 'yes'}
-    detached_2 = m.BuildingModel(10., 10., bl.BuildingType.detached, list(), None, 0, 0, detached_2_tags)
+    detached_2_tags = {s.K_BUILDING: s.V_DETACHED,
+                       s.K_BUILDING_COLOUR: 'tan', s.K_BUILDING_LEVELS: '1',
+                       s.K_ROOF_COLOUR: 'firebrick', s.K_ROOF_SHAPE: s.V_GABLED, s.K_ROOF_HEIGHT: '2',
+                       s.K_OWBB_GENERATED: s.V_YES}
+    detached_2 = m.BuildingModel(10., 10., enu.BuildingType.detached, list(), None, 0, 0, detached_2_tags)
     models.append(detached_2)
-    detached_3_tags = {s.K_BUILDING: 'detached',
-                       'building:colour': 'pink', 'building:levels': '2',
-                       'roof:colour': 'firebrick', 'roof:shape': 'gabled', 'roof:height': '2',
-                       s.K_OWBB_GENERATED: 'yes'}
-    detached_3 = m.BuildingModel(16., 12., bl.BuildingType.detached, list(), None, 0, 0, detached_3_tags)
+    detached_3_tags = {s.K_BUILDING: s.V_DETACHED,
+                       s.K_BUILDING_COLOUR: 'pink', s.K_BUILDING_LEVELS: '2',
+                       s.K_ROOF_COLOUR: 'firebrick', s.K_ROOF_SHAPE: s.V_GABLED, s.K_ROOF_HEIGHT: '2',
+                       s.K_OWBB_GENERATED: s.V_YES}
+    detached_3 = m.BuildingModel(16., 12., enu.BuildingType.detached, list(), None, 0, 0, detached_3_tags)
     models.append(detached_3)
-    detached_4_tags = {s.K_BUILDING: 'detached',
-                       'building:colour': 'beige', 'building:levels': '2',
-                       'roof:colour': 'black', 'roof:shape': 'gambrel', 'roof:height': '2',
-                       s.K_OWBB_GENERATED: 'yes'}
-    detached_4 = m.BuildingModel(12., 9., bl.BuildingType.detached, list(), None, 0, 0, detached_4_tags)
+    detached_4_tags = {s.K_BUILDING: s.V_DETACHED,
+                       s.K_BUILDING_COLOUR: 'beige', s.K_BUILDING_LEVELS: '2',
+                       s.K_ROOF_COLOUR: 'black', s.K_ROOF_SHAPE: s.V_GAMBREL, s.K_ROOF_HEIGHT: '2',
+                       s.K_OWBB_GENERATED: s.V_YES}
+    detached_4 = m.BuildingModel(12., 9., enu.BuildingType.detached, list(), None, 0, 0, detached_4_tags)
     models.append(detached_4)
 
     # residential apartments (for rural, periphery and dense)
-    apartment_1_tags = {s.K_BUILDING: 'apartments',
-                        'building:colour': 'white', 'building:levels': '3',
-                        'roof:colour': 'firebrick', 'roof:shape': 'gabled', 'roof:height': '2',
-                        s.K_OWBB_GENERATED: 'yes'}
-    apartment_1 = m.BuildingModel(30., 20, bl.BuildingType.apartments, list(), None, 0, 0, apartment_1_tags)
+    apartment_1_tags = {s.K_BUILDING: s.V_APARTMENTS,
+                        s.K_BUILDING_COLOUR: 'white', s.K_BUILDING_LEVELS: '3',
+                        s.K_ROOF_COLOUR: 'firebrick', s.K_ROOF_SHAPE: s.V_GABLED, s.K_ROOF_HEIGHT: '2',
+                        s.K_OWBB_GENERATED: s.V_YES}
+    apartment_1 = m.BuildingModel(30., 20, enu.BuildingType.apartments, list(), None, 0, 0, apartment_1_tags)
     models.append(apartment_1)
-    apartment_2_tags = {s.K_BUILDING: 'apartments',
-                        'building:colour': 'beige', 'building:levels': '3',
-                        'roof:colour': 'red', 'roof:shape': 'gabled', 'roof:height': '2',
-                        s.K_OWBB_GENERATED: 'yes'}
-    apartment_2 = m.BuildingModel(35., 14, bl.BuildingType.apartments, list(), None, 0, 0, apartment_2_tags)
+    apartment_2_tags = {s.K_BUILDING: s.V_APARTMENTS,
+                        s.K_BUILDING_COLOUR: 'beige', s.K_BUILDING_LEVELS: '3',
+                        s.K_ROOF_COLOUR: 'red', s.K_ROOF_SHAPE: s.V_GABLED, s.K_ROOF_HEIGHT: '2',
+                        s.K_OWBB_GENERATED: s.V_YES}
+    apartment_2 = m.BuildingModel(35., 14, enu.BuildingType.apartments, list(), None, 0, 0, apartment_2_tags)
     models.append(apartment_2)
-    apartment_3_tags = {s.K_BUILDING: 'apartments',
-                        'building:colour': 'tan', 'building:levels': '4',
-                        'roof:colour': 'red', 'roof:shape': 'gabled', 'roof:height': '2',
-                        s.K_OWBB_GENERATED: 'yes'}
-    apartment_3 = m.BuildingModel(26., 22, bl.BuildingType.apartments, list(), None, 0, 0, apartment_3_tags)
+    apartment_3_tags = {s.K_BUILDING: s.V_APARTMENTS,
+                        s.K_BUILDING_COLOUR: 'tan', s.K_BUILDING_LEVELS: '4',
+                        s.K_ROOF_COLOUR: 'red', s.K_ROOF_SHAPE: s.V_GABLED, s.K_ROOF_HEIGHT: '2',
+                        s.K_OWBB_GENERATED: s.V_YES}
+    apartment_3 = m.BuildingModel(26., 22, enu.BuildingType.apartments, list(), None, 0, 0, apartment_3_tags)
     models.append(apartment_3)
 
     # residential attached (for dense, block and centre)
     # Will get roof type, number of levels etc. assigned automatically based on SettlementType and
     # other parameters
-    attached_1_tags = {s.K_BUILDING: 'attached', 'building:colour': 'white', s.K_OWBB_GENERATED: 'yes'}
-    attached_1 = m.BuildingModel(30., 15, bl.BuildingType.attached, list(), None, 0, 0, attached_1_tags)
+    attached_1_tags = {s.K_BUILDING: s.V_ATTACHED, s.K_BUILDING_COLOUR: 'white', s.K_OWBB_GENERATED: s.V_YES}
+    attached_1 = m.BuildingModel(30., 15, enu.BuildingType.attached, list(), None, 0, 0, attached_1_tags)
     models.append(attached_1)
-    attached_2_tags = {s.K_BUILDING: 'attached', 'building:colour': 'tan', s.K_OWBB_GENERATED: 'yes'}
-    attached_2 = m.BuildingModel(35., 14, bl.BuildingType.attached, list(), None, 0, 0, attached_2_tags)
+    attached_2_tags = {s.K_BUILDING: s.V_ATTACHED, s.K_BUILDING_COLOUR: 'tan', s.K_OWBB_GENERATED: s.V_YES}
+    attached_2 = m.BuildingModel(35., 14, enu.BuildingType.attached, list(), None, 0, 0, attached_2_tags)
     models.append(attached_2)
-    attached_3_tags = {s.K_BUILDING: 'attached', 'building:colour': 'snow', s.K_OWBB_GENERATED: 'yes'}
-    attached_3 = m.BuildingModel(26., 14, bl.BuildingType.attached, list(), None, 0, 0, attached_3_tags)
+    attached_3_tags = {s.K_BUILDING: s.V_ATTACHED, s.K_BUILDING_COLOUR: 'snow', s.K_OWBB_GENERATED: s.V_YES}
+    attached_3 = m.BuildingModel(26., 14, enu.BuildingType.attached, list(), None, 0, 0, attached_3_tags)
     models.append(attached_3)
 
     # terrace
-    terrace_1_tags = {s.K_BUILDING: 'terrace',
-                      'building:colour': 'beige', 'building:levels': '2',
-                      'roof:colour': 'darksalmon', 'roof:shape': 'skillion', 'roof:height': '1.5',
-                      s.K_OWBB_GENERATED: 'yes'}
-    terrace_1 = m.BuildingModel(8., 8., bl.BuildingType.terrace, list(), None, 0, 0, terrace_1_tags)
+    terrace_1_tags = {s.K_BUILDING: s.V_TERRACE,
+                      s.K_BUILDING_COLOUR: 'beige', s.K_BUILDING_LEVELS: '2',
+                      s.K_ROOF_COLOUR: 'darksalmon', s.K_ROOF_SHAPE: s.V_SKILLION, s.K_ROOF_HEIGHT: '1.5',
+                      s.K_OWBB_GENERATED: s.V_YES}
+    terrace_1 = m.BuildingModel(8., 8., enu.BuildingType.terrace, list(), None, 0, 0, terrace_1_tags)
     models.append(terrace_1)
-    terrace_2_tags = {s.K_BUILDING: 'terrace',
-                      'building:colour': 'snow', 'building:levels': '2',
-                      'roof:colour': 'firebrick', 'roof:shape': 'gabled', 'roof:height': '1.5',
-                      s.K_OWBB_GENERATED: 'yes'}
-    terrace_2 = m.BuildingModel(10., 8., bl.BuildingType.terrace, list(), None, 0, 0, terrace_2_tags)
+    terrace_2_tags = {s.K_BUILDING: s.V_TERRACE,
+                      s.K_BUILDING_COLOUR: 'snow', s.K_BUILDING_LEVELS: '2',
+                      s.K_ROOF_COLOUR: 'firebrick', s.K_ROOF_SHAPE: s.V_GABLED, s.K_ROOF_HEIGHT: '1.5',
+                      s.K_OWBB_GENERATED: s.V_YES}
+    terrace_2 = m.BuildingModel(10., 8., enu.BuildingType.terrace, list(), None, 0, 0, terrace_2_tags)
     models.append(terrace_2)
 
     # industrial large
-    industry_1_tags = {s.K_BUILDING: 'industrial',
-                       'building:colour': 'silver',  'building:levels': '4',
-                       'roof:colour': 'darkgray', 'roof:shape': 'flat', 'roof:height': '0',
-                       s.K_OWBB_GENERATED: 'yes'}
-    industry_1 = m.BuildingModel(20., 30., bl.BuildingType.industrial, list(), None, 0, 0, industry_1_tags)
+    industry_1_tags = {s.K_BUILDING: s.V_INDUSTRIAL,
+                       s.K_BUILDING_COLOUR: 'silver',  s.K_BUILDING_LEVELS: '4',
+                       s.K_ROOF_COLOUR: 'darkgray', s.K_ROOF_SHAPE: s.V_FLAT, s.K_ROOF_HEIGHT: '0',
+                       s.K_OWBB_GENERATED: s.V_YES}
+    industry_1 = m.BuildingModel(20., 30., enu.BuildingType.industrial, list(), None, 0, 0, industry_1_tags)
     models.append(industry_1)
-    industry_2_tags = {s.K_BUILDING: 'industrial',
-                       'building:colour': 'silver',  'building:levels': '3',
-                       'roof:colour': 'gray', 'roof:shape': 'flat', 'roof:height': '0',
-                       s.K_OWBB_GENERATED: 'yes'}
-    industry_2 = m.BuildingModel(40., 20., bl.BuildingType.industrial, list(), None, 0, 0, industry_2_tags)
+    industry_2_tags = {s.K_BUILDING: s.V_INDUSTRIAL,
+                       s.K_BUILDING_COLOUR: 'silver',  s.K_BUILDING_LEVELS: '3',
+                       s.K_ROOF_COLOUR: 'gray', s.K_ROOF_SHAPE: s.V_FLAT, s.K_ROOF_HEIGHT: '0',
+                       s.K_OWBB_GENERATED: s.V_YES}
+    industry_2 = m.BuildingModel(40., 20., enu.BuildingType.industrial, list(), None, 0, 0, industry_2_tags)
     models.append(industry_2)
-    industry_3_tags = {s.K_BUILDING: 'industrial',
-                       'building:colour': 'lightyellow',  'building:levels': '2',
-                       'roof:colour': 'darkgray', 'roof:gabled': 'flat', 'roof:height': '0',
-                       s.K_OWBB_GENERATED: 'yes'}
-    industry_3 = m.BuildingModel(26., 20., bl.BuildingType.industrial, list(), None, 0, 0, industry_3_tags)
+    industry_3_tags = {s.K_BUILDING: s.V_INDUSTRIAL,
+                       s.K_BUILDING_COLOUR: 'lightyellow',  s.K_BUILDING_LEVELS: '2',
+                       s.K_ROOF_COLOUR: 'darkgray', s.K_ROOF_SHAPE: s.V_FLAT, s.K_ROOF_HEIGHT: '0',
+                       s.K_OWBB_GENERATED: s.V_YES}
+    industry_3 = m.BuildingModel(26., 20., enu.BuildingType.industrial, list(), None, 0, 0, industry_3_tags)
     models.append(industry_3)
     # industrial small
-    industry_4_tags = {s.K_BUILDING: 'industrial',
-                       'building:colour': 'lightgreen', 'building:levels': '3',
-                       'roof:colour': 'red', 'roof:shape': 'gabled', 'roof:height': '2',
-                       s.K_OWBB_GENERATED: 'yes'}
-    industry_4 = m.BuildingModel(20., 15., bl.BuildingType.industrial, list(), None, 0, 0, industry_4_tags)
+    industry_4_tags = {s.K_BUILDING: s.V_INDUSTRIAL,
+                       s.K_BUILDING_COLOUR: 'lightgreen', s.K_BUILDING_LEVELS: '3',
+                       s.K_ROOF_COLOUR: 'red', s.K_ROOF_SHAPE: s.V_GABLED, s.K_ROOF_HEIGHT: '2',
+                       s.K_OWBB_GENERATED: s.V_YES}
+    industry_4 = m.BuildingModel(20., 15., enu.BuildingType.industrial, list(), None, 0, 0, industry_4_tags)
     models.append(industry_4)
-    industry_5_tags = {s.K_BUILDING: 'industrial',
-                       'building:colour': 'white', 'building:levels': '2',
-                       'roof:colour': 'black', 'roof:shape': 'flat', 'roof:height': '0',
-                       s.K_OWBB_GENERATED: 'yes'}
-    industry_5 = m.BuildingModel(25., 10., bl.BuildingType.industrial, list(), None, 0, 0, industry_5_tags)
+    industry_5_tags = {s.K_BUILDING: s.V_INDUSTRIAL,
+                       s.K_BUILDING_COLOUR: 'white', s.K_BUILDING_LEVELS: '2',
+                       s.K_ROOF_COLOUR: 'black', s.K_ROOF_SHAPE: s.V_FLAT, s.K_ROOF_HEIGHT: '0',
+                       s.K_OWBB_GENERATED: s.V_YES}
+    industry_5 = m.BuildingModel(25., 10., enu.BuildingType.industrial, list(), None, 0, 0, industry_5_tags)
     models.append(industry_5)
 
     return models
@@ -454,7 +455,7 @@ def process(transformer: co.Transformation, building_zones: List[m.BuildingZone]
                 use_me = parameters.OWBB_USE_GENERATED_LANDUSE_FOR_BUILDING_GENERATION
             else:
                 use_me = parameters.OWBB_USE_EXTERNAL_LANDUSE_FOR_BUILDING_GENERATION
-        elif b_zone.type_ is m.BuildingZoneType.aerodrome:
+        elif b_zone.type_ is enu.BuildingZoneType.aerodrome:
             use_me = False
 
         # check whether density is already all right if we still thing we are going to use the zone

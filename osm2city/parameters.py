@@ -24,6 +24,7 @@ import osm2city.textures.road
 import osm2city.utils.calc_tile as ct
 import osm2city.utils.vec2d as vec2d
 import osm2city.utils.log_helper as ulog
+import osm2city.types.osmstrings as s
 
 # default_args_start # DO NOT MODIFY THIS LINE
 # -*- coding: utf-8 -*-
@@ -143,7 +144,7 @@ BUILDING_SKILLION_ROOF_MAX_HEIGHT = 2.
 
 # If the roof_type is missing, what shall be the distribution of roof_types (must sum up to 1.0)
 # The keys are the shapes and must correspond to valid RoofShape values in roofs.py
-BUILDING_ROOF_SHAPE_RATIO = {'flat': 0.1, 'gabled': 0.8, 'hipped': 0.1}
+BUILDING_ROOF_SHAPE_RATIO = {s.V_FLAT: 0.1, s.V_GABLED: 0.8, s.V_HIPPED: 0.1}
 
 # ==================== RECTIFY BUILDINGS ============
 RECTIFY_ENABLED = True
@@ -377,7 +378,7 @@ OWBB_RESIDENTIAL_RURAL_TERRACE_SHARE = 0.1
 OWBB_RESIDENTIAL_PERIPHERY_TERRACE_SHARE = 0.25
 OWBB_RESIDENTIAL_RURAL_APARTMENT_SHARE = 0.1
 OWBB_RESIDENTIAL_PERIPHERY_APARTMENT_SHARE = 0.3
-OWBB_RESIDENTIAL_DENSE_TYPE_SHARE = {'detached': 0.1, 'terraces': 0.1, 'apartments': 0.3, 'attached': 0.5}
+OWBB_RESIDENTIAL_DENSE_TYPE_SHARE = {s.V_DETACHED: 0.1, s.V_TERRACE: 0.1, s.V_APARTMENTS: 0.3, s.V_ATTACHED: 0.5}
 
 OWBB_RESIDENTIAL_TERRACE_MIN_NUMBER = 4
 OWBB_RESIDENTIAL_TERRACE_TYPICAL_NUMBER = 5

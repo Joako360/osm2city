@@ -29,7 +29,7 @@ from enum import IntEnum, unique
 import logging
 import random
 from math import fabs, sin, cos, tan, sqrt, pi, radians
-from typing import List, Dict, Optional, Set, Tuple, Union
+from typing import List, Dict, Optional, Set, Tuple
 
 import numpy as np
 from shapely import affinity
@@ -38,82 +38,17 @@ from shapely.geos import TopologicalError
 
 from osm2city import myskeleton, parameters, roofs
 from osm2city.textures import materials as mat, texture as tex
+import osm2city.types.enumerations as enu
 from osm2city.utils import coordinates as co
 from osm2city.utils import utilities, ac3d, osmparser
-from osm2city.utils import osmstrings as s
+from osm2city.types import osmstrings as s
 from osm2city.utils import stg_io2
 from osm2city.utils.vec2d import Vec2d
 
 
-KeyValueDict = Dict[str, str]
-
-
-def _random_roof_shape() -> roofs.RoofShape:
+def _random_roof_shape() -> enu.RoofShape:
     random_shape = utilities.random_value_from_ratio_dict_parameter(parameters.BUILDING_ROOF_SHAPE_RATIO)
-    return roofs.map_osm_roof_shape(random_shape)
-
-
-@unique
-class BuildingClass(IntEnum):
-    """Used to classify buildings for processing on zone level and defining height per level in some cases"""
-    residential = 100
-    residential_small = 110
-    terrace = 120
-    apartments = 130
-    commercial = 200
-    industrial = 300
-    warehouse = 301
-    retail = 400
-    parking_house = 1000
-    religion = 2000
-    public = 3000
-    farm = 4000
-    airport = 5000
-    undefined = 9999  # mostly because BuildingType can only be approximated to "yes"
-
-
-@unique
-class BuildingType(IntEnum):
-    """Mostly match value of a tag with k=building"""
-    yes = 1  # default
-    parking = 10  # k="parking" v="multi-storey"
-    apartments = 21
-    attached = 210  # an apartment in a city block without space between buildings. Does not exist in OSM
-    house = 22
-    detached = 23
-    residential = 24
-    dormitory = 25
-    terrace = 26
-    bungalow = 31
-    static_caravan = 32
-    cabin = 33
-    hut = 34
-    commercial = 41
-    office = 42
-    retail = 51
-    industrial = 61
-    warehouse = 62
-    cathedral = 71
-    chapel = 72
-    church = 73
-    mosque = 74
-    temple = 75
-    synagogue = 76
-    public = 81
-    civic = 82
-    school = 83
-    hospital = 84
-    hotel = 85
-    kiosk = 86
-    farm = 91
-    barn = 92
-    cowshed = 93
-    farm_auxiliary = 94
-    greenhouse = 95
-    stable = 96
-    sty = 97
-    riding_hall = 98
-    hangar = 100
+    return enu.map_osm_roof_shape(random_shape)
 
 
 # Based on lines 476 ff in simgear/scene/tgdb/SGBuildingBin.cxx
@@ -133,93 +68,31 @@ class BuildingListType(IntEnum):
     large = 2  # larger apartment or industrial/commercial/retail ...
 
 
-def parse_building_tags_for_type(tags_dict: KeyValueDict) -> Union[None, BuildingType]:
-    if (s.K_PARKING in tags_dict) and (tags_dict[s.K_PARKING] == s.V_MULTISTOREY):
-        return BuildingType.parking
-    else:
-        value = None
-        if s.K_BUILDING in tags_dict:
-            value = tags_dict[s.K_BUILDING]
-        elif s.K_BUILDING_PART in tags_dict:
-            value = tags_dict[s.K_BUILDING_PART]
-        if value is not None:
-            for member in BuildingType:
-                if value == member.name:
-                    return member
-            return BuildingType.yes
-    return None
-
-
-def get_building_class(tags: KeyValueDict) -> BuildingClass:
-    type_ = parse_building_tags_for_type(tags)
-    if type_ is None:
-        return BuildingClass.undefined
-    if type_ in [BuildingType.house, BuildingType.detached, BuildingType.residential]:
-        return BuildingClass.residential
-    elif type_ in [BuildingType.bungalow, BuildingType.static_caravan, BuildingType.cabin, BuildingType.hut,
-                   BuildingType.kiosk]:
-        return BuildingClass.residential_small
-    elif type_ in [BuildingType.apartments, BuildingType.dormitory, BuildingType.hotel]:
-        return BuildingClass.apartments
-    elif type_ in [BuildingType.terrace]:
-        return BuildingClass.terrace
-    elif type_ in [BuildingType.commercial, BuildingType.office]:
-        return BuildingClass.commercial
-    elif type_ in [BuildingType.retail]:
-        return BuildingClass.retail
-    elif type_ in [BuildingType.industrial]:
-        return BuildingClass.industrial
-    elif type_ in [BuildingType.warehouse]:
-        return BuildingClass.warehouse
-    elif type_ in [BuildingType.parking]:
-        return BuildingClass.parking_house
-    elif type_ in [BuildingType.cathedral, BuildingType.chapel, BuildingType.church,
-                   BuildingType.mosque, BuildingType.temple, BuildingType.synagogue]:
-        return BuildingClass.religion
-    elif type_ in [BuildingType.public, BuildingType.civic, BuildingType.school, BuildingType.hospital]:
-        return BuildingClass.public
-    elif type_ in [BuildingType.farm, BuildingType.barn, BuildingType.cowshed, BuildingType.farm_auxiliary,
-                   BuildingType.greenhouse, BuildingType.stable, BuildingType.sty, BuildingType.riding_hall]:
-        return BuildingClass.farm
-    elif type_ in [BuildingType.hangar]:
-        return BuildingClass.airport
-    return BuildingClass.undefined  # the default / fallback, e.g. for "yes"
-
-
-@unique
-class SettlementType(IntEnum):
-    centre = 9  # elsewhere in the code the value is used for comparison, so centre should be highest
-    block = 8
-    dense = 7
-    periphery = 6  # default within lit area
-    rural = 5  # only implicitly used for building zones without city blocks.
-
-
-def calc_levels_for_settlement_type(settlement_type: SettlementType, building_class: BuildingClass) -> int:
-    if settlement_type is SettlementType.centre:
+def calc_levels_for_settlement_type(settlement_type: enu.SettlementType, building_class: enu.BuildingClass) -> int:
+    if settlement_type is enu.SettlementType.centre:
         ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_CENTRE
-    elif settlement_type is SettlementType.block:
+    elif settlement_type is enu.SettlementType.block:
         ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_BLOCK
     else:
         # now check residential vs. others
         if building_class in [building_class.residential, building_class.residential_small]:
-            if settlement_type is SettlementType.dense:
+            if settlement_type is enu.SettlementType.dense:
                 ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_DENSE
-            elif settlement_type is SettlementType.periphery:
+            elif settlement_type is enu.SettlementType.periphery:
                 ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_PERIPHERY
             else:
                 ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_RURAL
-        elif building_class is BuildingClass.apartments:
+        elif building_class is enu.BuildingClass.apartments:
             ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_APARTMENTS
-        elif building_class in [BuildingClass.industrial, BuildingClass.warehouse]:
+        elif building_class in [enu.BuildingClass.industrial, enu.BuildingClass.warehouse]:
             ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_INDUSTRIAL
         else:
             ratio_parameter = parameters.BUILDING_NUMBER_LEVELS_OTHER
     return utilities.random_value_from_ratio_dict_parameter(ratio_parameter)
 
 
-def calc_level_height_for_settlement_type(settlement_type: SettlementType) -> float:
-    if settlement_type in [SettlementType.periphery, SettlementType.rural]:
+def calc_level_height_for_settlement_type(settlement_type: enu.SettlementType) -> float:
+    if settlement_type in [enu.SettlementType.periphery, enu.SettlementType.rural]:
         return parameters.BUILDING_LEVEL_HEIGHT_RURAL
     return parameters.BUILDING_LEVEL_HEIGHT_URBAN
 
@@ -273,7 +146,7 @@ class Building(object):
         self.body_height = 0.0
         self.levels = 0
         self.min_height = 0.0  # the height over ground relative to ground_elev of the facade. See min_height in OSM
-        self.roof_shape = roofs.RoofShape.flat
+        self.roof_shape = enu.RoofShape.flat
         self.roof_height = 0.0  # the height of the roof (0 if flat), not the elevation over ground of the roof
         self.roof_neighbour_orientation = -1.  # only valid if >= 0 and then finally used in roofs.py
 
@@ -528,16 +401,16 @@ class Building(object):
                 self.levels = BUILDING_LIST_SMALL_MAX_LEVELS
                 self.body_height = self.levels * self._calculate_level_height()
             return list_type
-        building_class = get_building_class(self.tags)
-        if building_class in [BuildingClass.residential, BuildingClass.residential_small,
-                              BuildingClass.terrace]:
+        building_class = enu.get_building_class(self.tags)
+        if building_class in [enu.BuildingClass.residential, enu.BuildingClass.residential_small,
+                              enu.BuildingClass.terrace]:
             if self.area > 800:
                 list_type = BuildingListType.medium
             if self.levels > BUILDING_LIST_SMALL_MAX_LEVELS:
                 list_type = BuildingListType.medium
             if self.levels > BUILDING_LIST_MEDIUM_MAX_LEVELS:
                 list_type = BuildingListType.large
-        elif building_class in [BuildingClass.apartments] and self.levels <= BUILDING_LIST_SMALL_MAX_LEVELS:
+        elif building_class in [enu.BuildingClass.apartments] and self.levels <= BUILDING_LIST_SMALL_MAX_LEVELS:
             list_type = BuildingListType.small
 
         if list_type is BuildingListType.medium:
@@ -556,7 +429,7 @@ class Building(object):
     def roof_complex(self) -> bool:
         """Proxy to see whether the roof is flat or not.
         Skillion is also kind of flat, but is not horizontal and therefore would also return false."""
-        if self.roof_shape is roofs.RoofShape.flat:
+        if self.roof_shape is enu.RoofShape.flat:
             return False
         return True
 
@@ -805,32 +678,32 @@ class Building(object):
 
     def analyse_roof_shape(self) -> None:
         if s.K_ROOF_SHAPE in self.tags:
-            self.roof_shape = roofs.map_osm_roof_shape(self.tags[s.K_ROOF_SHAPE])
+            self.roof_shape = enu.map_osm_roof_shape(self.tags[s.K_ROOF_SHAPE])
         else:
             # use some parameters and randomize to assign optimistically a roof shape
             # in analyse_roof_shape_check it is double checked whether e.g. building height or area exceed limits
             # and then it will be corrected back to flat roof.
             if parameters.BUILDING_COMPLEX_ROOFS:
                 if self.has_neighbours:
-                    self.roof_shape = roofs.RoofShape.gabled
+                    self.roof_shape = enu.RoofShape.gabled
                 else:
                     self.roof_shape = _random_roof_shape()
             else:
-                self.roof_shape = roofs.RoofShape.flat
+                self.roof_shape = enu.RoofShape.flat
 
     def analyse_building_type(self) -> None:
-        building_class = get_building_class(self.tags)
+        building_class = enu.get_building_class(self.tags)
         if building_class.undefined:
             # FIXME do stuff with amenities and land-use
 
             # if still residential, then check floor area if in peripheral or rural area - > apartments
             # what about terraces -> should we check how long vs. width?
             if self.area > 250:
-                building_class = BuildingClass.apartments
+                building_class = enu.BuildingClass.apartments
                 if s.K_BUILDING in self.tags:
-                    self.tags[s.K_BUILDING] = 'apartments'
+                    self.tags[s.K_BUILDING] = s.V_APARTMENTS
                 else:
-                    self.tags[s.K_BUILDING_PART] = 'apartments'
+                    self.tags[s.K_BUILDING_PART] = s.V_APARTMENTS
 
     def analyse_height_and_levels(self, building_parent: Optional['BuildingParent']) -> None:
         """Determines total height (and number of levels) of a building based on OSM values and other logic.
@@ -921,13 +794,14 @@ class Building(object):
         if isinstance(self.zone, m.CityBlock) and self.zone.building_levels > 0:
             return self.zone.building_levels
         elif isinstance(self.zone, m.BuildingZone) \
-                and self.zone.type_ is m.BuildingZoneType.aerodrome:
+                and self.zone.type_ is enu.BuildingZoneType.aerodrome:
             return parameters.BUILDING_NUMBER_LEVELS_AEROWAY
         else:
-            building_class = get_building_class(self.tags)
+            building_class = enu.get_building_class(self.tags)
             my_levels = calc_levels_for_settlement_type(self.zone.settlement_type, building_class)
             # make corrections for steep slopes
-            if building_class in [BuildingClass.residential, BuildingClass.residential_small, BuildingClass.apartments]:
+            if building_class in [enu.BuildingClass.residential, enu.BuildingClass.residential_small,
+                                  enu.BuildingClass.apartments]:
                 if self.diff_elev >= 0.5 and my_levels == 1:
                     my_levels += 1
                 elif self.diff_elev >= 1.0 and my_levels > 1:
@@ -937,14 +811,14 @@ class Building(object):
     def _calculate_level_height(self) -> float:
         from osm2city.owbb import models as m
         if isinstance(self.zone, m.BuildingZone) \
-                and self.zone.type_ is m.BuildingZoneType.aerodrome:
+                and self.zone.type_ is enu.BuildingZoneType.aerodrome:
             return parameters.BUILDING_LEVEL_HEIGHT_AEROWAY
 
-        building_class = get_building_class(self.tags)
-        if building_class in [BuildingClass.industrial, BuildingClass.warehouse]:
+        building_class = enu.get_building_class(self.tags)
+        if building_class in [enu.BuildingClass.industrial, enu.BuildingClass.warehouse]:
             return parameters.BUILDING_LEVEL_HEIGHT_INDUSTRIAL
-        elif building_class in [BuildingClass.commercial, BuildingClass.retail, BuildingClass.public,
-                                BuildingClass.parking_house]:
+        elif building_class in [enu.BuildingClass.commercial, enu.BuildingClass.retail, enu.BuildingClass.public,
+                                enu.BuildingClass.parking_house]:
             return parameters.BUILDING_LEVEL_HEIGHT_URBAN
         return calc_level_height_for_settlement_type(self.zone.settlement_type)
 
@@ -958,7 +832,7 @@ class Building(object):
                 # no complex roof on buildings with inner rings
                 if self.polygon.interiors:
                     if len(self.polygon.interiors) == 1:
-                        self.roof_shape = roofs.RoofShape.skeleton
+                        self.roof_shape = enu.RoofShape.skeleton
                     else:
                         allow_complex_roofs = False
                 # no complex roof on large buildings
@@ -977,14 +851,14 @@ class Building(object):
                 # no complex roof on tiny buildings.
                 elif self.levels < parameters.BUILDING_COMPLEX_ROOFS_MIN_LEVELS and s.K_ROOF_SHAPE not in self.tags:
                     allow_complex_roofs = False
-                elif self.roof_shape not in [roofs.RoofShape.pyramidal, roofs.RoofShape.dome, roofs.RoofShape.onion,
-                                             roofs.RoofShape.skillion] \
+                elif self.roof_shape not in [enu.RoofShape.pyramidal, enu.RoofShape.dome, enu.RoofShape.onion,
+                                             enu.RoofShape.skillion] \
                         and self.pts_all_count > parameters.BUILDING_SKEL_MAX_NODES:
                     allow_complex_roofs = False
 
             # make sure roof shape is flat if we are not allowed to use it
             if allow_complex_roofs is False:
-                self.roof_shape = roofs.RoofShape.flat
+                self.roof_shape = enu.RoofShape.flat
 
     def analyse_roof_neighbour_orientation(self) -> None:
         """Analyses the roof orientation for non-flat roofs and only if no inner rings and with neighbours.
@@ -996,7 +870,7 @@ class Building(object):
         b.analyse_roof_list_orientation.
         """
         self.roof_neighbour_orientation = -1.
-        if self.roof_shape is roofs.RoofShape.flat or self.has_inner or self.has_neighbours is False:
+        if self.roof_shape is enu.RoofShape.flat or self.has_inner or self.has_neighbours is False:
             return
 
         outer_points = self.pts_outer
@@ -1106,7 +980,7 @@ class Building(object):
         self.roof_height = 0.
         temp_roof_height = 0.  # temp variable before assigning to self
 
-        if self.roof_shape is roofs.RoofShape.skillion and (in_building_list is False):
+        if self.roof_shape is enu.RoofShape.skillion and (in_building_list is False):
             # get global roof_height and height for each vertex
             if s.K_ROOF_HEIGHT in self.tags:
                 # force clean of tag if the unit is given
@@ -1197,7 +1071,7 @@ class Building(object):
                 self.roof_height = osmparser.parse_length(self.tags[s.K_ROOF_HEIGHT])
 
             else:  # roof:height based on heuristics
-                if self.roof_shape is roofs.RoofShape.flat:
+                if self.roof_shape is enu.RoofShape.flat:
                     self.roof_height = 0.
                 else:
                     if s.K_ROOF_ANGLE in self.tags and osmparser.is_parsable_float(self.tags[s.K_ROOF_ANGLE]):
@@ -1246,7 +1120,7 @@ class Building(object):
         for pt in self.pts_all:
             ac_object.node(-pt[1], z, -pt[0])
         # under the roof nodes
-        if self.roof_shape is roofs.RoofShape.skillion:
+        if self.roof_shape is enu.RoofShape.skillion:
             # skillion
             #           __ -+
             #     __-+--    |
@@ -1296,7 +1170,7 @@ class Building(object):
                 if not (tex_coord_right <= 1.):
                     logging.debug('FIXME: v_can_repeat: need to check in analyse')
 
-            if self.roof_shape is roofs.RoofShape.skillion and tex_coord_top_input != 0:
+            if self.roof_shape is enu.RoofShape.skillion and tex_coord_top_input != 0:
                 tex_y12 = self.facade_texture.y((self.body_height + self.roof_height_pts[i]) /
                                                 self.body_height * tex_coord_top_input)
                 tex_y11 = self.facade_texture.y((self.body_height + self.roof_height_pts[ipp]) /
@@ -1319,7 +1193,7 @@ class Building(object):
                            roof_mat_idx: int, facade_mat_idx: int,
                            cluster_offset: Vec2d, stats: utilities.Stats) -> None:
         """Writes the roof vertices and faces to an ac3d object."""
-        if self.roof_shape is roofs.RoofShape.flat:
+        if self.roof_shape is enu.RoofShape.flat:
             roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, roof_mat_idx, stats)
         else:
             my_cluster_offset = cluster_offset
@@ -1327,7 +1201,7 @@ class Building(object):
             # gabled and gambrel get changed to skeleton.
             # skillion may not be changed due to numbers from _compute_roof_height
             if (self.pts_all_count > 4) and (self.has_inner is False) and \
-                    (self.roof_shape is not roofs.RoofShape.skillion):
+                    (self.roof_shape is not enu.RoofShape.skillion):
                 roof_polygon = shg.Polygon(self.pts_all)  # because the current polygon is not current anymore
                 my_number = len(roof_polygon.exterior.coords) - 1
                 roof_polygon_new = roof_polygon.simplify(parameters.BUILDING_ROOF_SIMPLIFY_TOLERANCE, True)
@@ -1349,13 +1223,13 @@ class Building(object):
                     my_cluster_offset = Vec2d(0, 0)
             # -- pitched roof for > 4 ground nodes
             if self.pts_all_count > 4:
-                if self.roof_shape is roofs.RoofShape.skillion:
+                if self.roof_shape is enu.RoofShape.skillion:
                     roofs.separate_skillion(ac_object, self, roof_mat_idx)
-                elif self.roof_shape is roofs.RoofShape.pyramidal:
+                elif self.roof_shape is enu.RoofShape.pyramidal:
                     roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
-                elif self.roof_shape is roofs.RoofShape.dome:
+                elif self.roof_shape is enu.RoofShape.dome:
                     roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
-                elif self.roof_shape is roofs.RoofShape.onion:
+                elif self.roof_shape is enu.RoofShape.onion:
                     roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
                 else:
                     skeleton_possible = myskeleton.myskel(ac_object, self, stats, offset_xy=my_cluster_offset,
@@ -1365,27 +1239,27 @@ class Building(object):
                         stats.have_complex_roof += 1
 
                     else:  # something went wrong - fall back to flat roof
-                        self.roof_shape = roofs.RoofShape.flat
+                        self.roof_shape = enu.RoofShape.flat
                         roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, roof_mat_idx, stats)
             # -- pitched roof for exactly 4 ground nodes
             elif self.pts_all_count == 4:
-                if self.roof_shape in [roofs.RoofShape.gabled, roofs.RoofShape.gambrel]:
+                if self.roof_shape in [enu.RoofShape.gabled, enu.RoofShape.gambrel]:
                     roofs.separate_gable(ac_object, self, roof_mat_idx, facade_mat_idx)
-                elif self.roof_shape is roofs.RoofShape.hipped:
+                elif self.roof_shape is enu.RoofShape.hipped:
                     roofs.separate_hipped(ac_object, self, roof_mat_idx)
-                elif self.roof_shape is roofs.RoofShape.pyramidal:
+                elif self.roof_shape is enu.RoofShape.pyramidal:
                     roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
-                elif self.roof_shape is roofs.RoofShape.dome:
+                elif self.roof_shape is enu.RoofShape.dome:
                     roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
-                elif self.roof_shape is roofs.RoofShape.onion:
+                elif self.roof_shape is enu.RoofShape.onion:
                     roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
-                elif self.roof_shape is roofs.RoofShape.skillion:
+                elif self.roof_shape is enu.RoofShape.skillion:
                     roofs.separate_skillion(ac_object, self, roof_mat_idx)
                 else:
                     logging.warning("Roof type %s seems to be unsupported, but is mapped ", self.roof_shape.name)
                     roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, roof_mat_idx, stats)
             else:  # fall back to pyramidal
-                self.roof_shape = roofs.RoofShape.pyramidal
+                self.roof_shape = enu.RoofShape.pyramidal
                 roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
 
     def __str__(self):
@@ -1828,7 +1702,7 @@ def update_building_tags_in_aerodromes(my_buildings: List[Building]) -> None:
     my_parents = set()
     for building in my_buildings:
         if building.parent is not None and isinstance(building.zone, m.BuildingZone) \
-                and building.zone.type_ is m.BuildingZoneType.aerodrome:
+                and building.zone.type_ is enu.BuildingZoneType.aerodrome:
             my_parents.add(building.parent)
 
     for building_parent in my_parents:
@@ -1847,7 +1721,7 @@ def update_building_tags_in_aerodromes(my_buildings: List[Building]) -> None:
     # now do all buildings including roof to make stuff easy in processing
     for building in my_buildings:
         if isinstance(building.zone, m.BuildingZone) \
-                and building.zone.type_ is m.BuildingZoneType.aerodrome:
+                and building.zone.type_ is enu.BuildingZoneType.aerodrome:
             if s.K_ROOF_SHAPE not in building.tags:
                 building.tags[s.K_ROOF_SHAPE] = s.V_FLAT
             if s.K_AEROWAY not in building.tags:
@@ -1900,31 +1774,6 @@ def _analyse_worship_building(building: Building, building_parent: BuildingParen
         return False
 
 
-@unique
-class ArchitectureStyle(IntEnum):
-    """http://wiki.openstreetmap.org/wiki/Key:building:architecture"""
-    romanesque = 1
-    gothic = 2
-    unknown = 99
-
-
-@unique
-class WorshipBuildingType(IntEnum):
-    """See http://wiki.openstreetmap.org/wiki/Key:building or
-    http://wiki.openstreetmap.org/wiki/Tag:building%3Dchurch
-
-    cathedral is not supported, because too close to church in shared models etc. Size of building should be enough.
-    """
-    church = 10
-    # not supportedOSM value = cathedral
-    chapel = 12
-    church_orthodox = 20  # not official tag - just to make it easier to distinguish from catholoic / protestant
-    mosque = 40
-    synagogue = 50
-    temple = 60
-    shrine = 70
-
-
 class WorshipBuilding(object):
     """Buildings for worshipping.
     The building=* should be applied in tagging according to the architectural style, often such religious buildings
@@ -1935,7 +1784,7 @@ class WorshipBuilding(object):
     For example, a catholic church can be tagged on the building outline with amenity=place_of_worship +
     religion=christian + denomination=catholic + building=church.
     """
-    def __init__(self, file_name: str, has_texture: bool, type_: WorshipBuildingType, style: ArchitectureStyle,
+    def __init__(self, file_name: str, has_texture: bool, type_: enu.WorshipBuildingType, style: enu.ArchitectureStyle,
                  number_towers: int, length: float, width: float, height: float,
                  length_offset: float = 0., width_offset: float = 0., height_offset: float = 0.) -> None:
         self.file_name = file_name  # without path - see property shared_model
@@ -1974,27 +1823,11 @@ class WorshipBuilding(object):
         return False
 
     @staticmethod
-    def deduct_worship_building_type(tags: Dict[str, str]) -> Optional['WorshipBuildingType']:
-        """Return a type if the building is a worship building, Otherwise return None."""
-        worship_building_type = None
-        if tags[s.K_BUILDING] == 'cathedral':
-            tags[s.K_BUILDING] = 'church'
-        try:
-            worship_building_type = WorshipBuildingType.__members__[tags[s.K_BUILDING]]
-        except KeyError:  # e.g. building=yes
-            if s.K_AMENITY in tags and tags[s.K_AMENITY] == 'place_of_worship':
-                if s.K_RELIGION in tags and tags[s.K_RELIGION] == 'christian':
-                    worship_building_type = WorshipBuildingType.church
-                    if s.K_DENOMINATION in tags and tags[s.K_DENOMINATION].find('orthodox') > 0:
-                        worship_building_type = WorshipBuildingType.church_orthodox
-        return worship_building_type
-
-    @staticmethod
-    def screen_worship_building_type(tags: Dict[str, str]) -> Optional['WorshipBuildingType']:
+    def screen_worship_building_type(tags: Dict[str, str]) -> Optional[enu.WorshipBuildingType]:
         """Returns a type if the building is a worship building, for which there might be a shared model.
 
         This method needs to be in sync with list available_worship_buildings"""
-        worship_building_type = WorshipBuilding.deduct_worship_building_type(tags)
+        worship_building_type = enu.deduct_worship_building_type(tags)
         if worship_building_type is not None:
             # now make sure that we actually have a mapped building
             for building in _available_worship_buildings:
@@ -2003,7 +1836,7 @@ class WorshipBuilding(object):
         return None
 
     @staticmethod
-    def find_matching_worship_building(requested_type: WorshipBuildingType, max_length: float, max_width: float) \
+    def find_matching_worship_building(requested_type: enu.WorshipBuildingType, max_length: float, max_width: float) \
             -> Optional['WorshipBuilding']:
         """Finds a worship building of a given type which satisfies the length/widt constraints.
 
@@ -2033,39 +1866,39 @@ class WorshipBuilding(object):
                                      self.elevation, self.angle - angle_correction)
 
 
-_available_worship_buildings = [WorshipBuilding('big-church.ac', True, WorshipBuildingType.church,
-                                                ArchitectureStyle.romanesque, 1, 30., 26., 40., width_offset=5.5),
-                                WorshipBuilding('breton-church.ac', False, WorshipBuildingType.church,
-                                                ArchitectureStyle.unknown, 1, 50., 28., 43., length_offset=25.),
+_available_worship_buildings = [WorshipBuilding('big-church.ac', True, enu.WorshipBuildingType.church,
+                                                enu.ArchitectureStyle.romanesque, 1, 30., 26., 40., width_offset=5.5),
+                                WorshipBuilding('breton-church.ac', False, enu.WorshipBuildingType.church,
+                                                enu.ArchitectureStyle.unknown, 1, 50., 28., 43., length_offset=25.),
                                 WorshipBuilding('Church_generic_twintower_oniondome.ac', False,
-                                                WorshipBuildingType.church,
-                                                ArchitectureStyle.unknown, 2, 22., 37., 34., width_offset=12.5),
-                                WorshipBuilding('church36m_blue.ac', False, WorshipBuildingType.church,
-                                                ArchitectureStyle.unknown, 1, 10., 36.2, 34.5, width_offset=0.9),
-                                WorshipBuilding('church36m_blue2.ac', False, WorshipBuildingType.church,
-                                                ArchitectureStyle.unknown, 1, 10., 36.2, 34.5, width_offset=0.9),
-                                WorshipBuilding('church36m_green.ac', False, WorshipBuildingType.church,
-                                                ArchitectureStyle.unknown, 1, 10., 36.2, 34.5, width_offset=0.9),
-                                WorshipBuilding('church36m_red.ac', False, WorshipBuildingType.church,
-                                                ArchitectureStyle.unknown, 1, 10., 36.2, 34.5, width_offset=0.9),
-                                WorshipBuilding('GenChurch_rd.ac', False, WorshipBuildingType.church,
-                                                ArchitectureStyle.unknown, 1, 46., 110., 120.),
-                                WorshipBuilding('generic_cathedral.xml', True, WorshipBuildingType.church,
-                                                ArchitectureStyle.romanesque, 2, 67., 37., 51.),
-                                WorshipBuilding('generic_church_01.ac', True, WorshipBuildingType.church,
-                                                ArchitectureStyle.gothic, 1, 68., 124.4, 100., width_offset=11.2),
-                                WorshipBuilding('generic_church_02.ac', False, WorshipBuildingType.church,
-                                                ArchitectureStyle.unknown, 1, 32.4, 71.8, 63.5, width_offset=-1.5),
-                                WorshipBuilding('generic_church_03.ac', False, WorshipBuildingType.church,
-                                                ArchitectureStyle.unknown, 1, 38., 89.8, 95.),
-                                WorshipBuilding('gothical_church.xml', True, WorshipBuildingType.church,
-                                                ArchitectureStyle.gothic, 1, 44., 24.8, 46., length_offset=22.),
-                                WorshipBuilding('NDBoulogne.ac', True, WorshipBuildingType.church,
-                                                ArchitectureStyle.romanesque, 3, 42., 82., 81.5),
-                                WorshipBuilding('roman_church.xml', True, WorshipBuildingType.church,
-                                                ArchitectureStyle.romanesque, 1, 44., 24.8, 25., length_offset=22.),
-                                WorshipBuilding('StVaast.ac', True, WorshipBuildingType.church,
-                                                ArchitectureStyle.romanesque, 0, 58., 98., 36.)
+                                                enu.WorshipBuildingType.church,
+                                                enu.ArchitectureStyle.unknown, 2, 22., 37., 34., width_offset=12.5),
+                                WorshipBuilding('church36m_blue.ac', False, enu.WorshipBuildingType.church,
+                                                enu.ArchitectureStyle.unknown, 1, 10., 36.2, 34.5, width_offset=0.9),
+                                WorshipBuilding('church36m_blue2.ac', False, enu.WorshipBuildingType.church,
+                                                enu.ArchitectureStyle.unknown, 1, 10., 36.2, 34.5, width_offset=0.9),
+                                WorshipBuilding('church36m_green.ac', False, enu.WorshipBuildingType.church,
+                                                enu.ArchitectureStyle.unknown, 1, 10., 36.2, 34.5, width_offset=0.9),
+                                WorshipBuilding('church36m_red.ac', False, enu.WorshipBuildingType.church,
+                                                enu.ArchitectureStyle.unknown, 1, 10., 36.2, 34.5, width_offset=0.9),
+                                WorshipBuilding('GenChurch_rd.ac', False, enu.WorshipBuildingType.church,
+                                                enu.ArchitectureStyle.unknown, 1, 46., 110., 120.),
+                                WorshipBuilding('generic_cathedral.xml', True, enu.WorshipBuildingType.church,
+                                                enu.ArchitectureStyle.romanesque, 2, 67., 37., 51.),
+                                WorshipBuilding('generic_church_01.ac', True, enu.WorshipBuildingType.church,
+                                                enu.ArchitectureStyle.gothic, 1, 68., 124.4, 100., width_offset=11.2),
+                                WorshipBuilding('generic_church_02.ac', False, enu.WorshipBuildingType.church,
+                                                enu.ArchitectureStyle.unknown, 1, 32.4, 71.8, 63.5, width_offset=-1.5),
+                                WorshipBuilding('generic_church_03.ac', False, enu.WorshipBuildingType.church,
+                                                enu.ArchitectureStyle.unknown, 1, 38., 89.8, 95.),
+                                WorshipBuilding('gothical_church.xml', True, enu.WorshipBuildingType.church,
+                                                enu.ArchitectureStyle.gothic, 1, 44., 24.8, 46., length_offset=22.),
+                                WorshipBuilding('NDBoulogne.ac', True, enu.WorshipBuildingType.church,
+                                                enu.ArchitectureStyle.romanesque, 3, 42., 82., 81.5),
+                                WorshipBuilding('roman_church.xml', True, enu.WorshipBuildingType.church,
+                                                enu.ArchitectureStyle.romanesque, 1, 44., 24.8, 25., length_offset=22.),
+                                WorshipBuilding('StVaast.ac', True, enu.WorshipBuildingType.church,
+                                                enu.ArchitectureStyle.romanesque, 0, 58., 98., 36.)
                                 ]
 
 # WorshipBuilding(eglise.xml, True, church, gothic)  # not aligned to x-axis

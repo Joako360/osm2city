@@ -11,6 +11,7 @@ from shapely.geometry import MultiPolygon, Polygon
 
 import osm2city.building_lib as bl
 import osm2city.owbb.models as m
+import osm2city.types.enumerations as enu
 import osm2city.utils.plot_utilities as pu
 
 
@@ -51,17 +52,17 @@ def _add_patch_for_building_zone(building_zone: m.BuildingZone, face_color: str,
 def _draw_settlement_zones(building_zones: List[m.BuildingZone], ax: maxs.Axes) -> None:
     for building_zone in building_zones:
         colour = 'grey'
-        if building_zone.type_ is m.BuildingZoneType.farmyard:
+        if building_zone.type_ is enu.BuildingZoneType.farmyard:
             colour = 'brown'
         _add_patch_for_building_zone(building_zone, colour, colour, ax)
         for block in building_zone.linked_city_blocks:
-            if block.settlement_type is bl.SettlementType.centre:
+            if block.settlement_type is enu.SettlementType.centre:
                 colour = 'blue'
-            elif block.settlement_type is bl.SettlementType.block:
+            elif block.settlement_type is enu.SettlementType.block:
                 colour = 'green'
-            elif block.settlement_type is bl.SettlementType.dense:
+            elif block.settlement_type is enu.SettlementType.dense:
                 colour = 'magenta'
-            elif block.settlement_type is bl.SettlementType.periphery:
+            elif block.settlement_type is enu.SettlementType.periphery:
                 colour = 'yellow'
             patch = PolygonPatch(block.geometry, facecolor=colour, edgecolor=colour)
             if block.settlement_type_changed:
@@ -98,17 +99,17 @@ def _draw_osm_zones(building_zones: List[m.BuildingZone], ax: maxs.Axes) -> None
     for building_zone in building_zones:
         if not isinstance(building_zone, m.GeneratedBuildingZone):
             face_color = "red"
-            if m.BuildingZoneType.commercial is building_zone.type_:
+            if enu.BuildingZoneType.commercial is building_zone.type_:
                 face_color = "blue"
-            elif m.BuildingZoneType.industrial is building_zone.type_:
+            elif enu.BuildingZoneType.industrial is building_zone.type_:
                 face_color = "green"
-            elif m.BuildingZoneType.retail is building_zone.type_:
+            elif enu.BuildingZoneType.retail is building_zone.type_:
                 face_color = "darkorange"
-            elif m.BuildingZoneType.residential is building_zone.type_:
+            elif enu.BuildingZoneType.residential is building_zone.type_:
                 face_color = "magenta"
-            elif m.BuildingZoneType.farmyard is building_zone.type_:
+            elif enu.BuildingZoneType.farmyard is building_zone.type_:
                 face_color = "chocolate"
-            elif m.BuildingZoneType.aerodrome is building_zone.type_:
+            elif enu.BuildingZoneType.aerodrome is building_zone.type_:
                 face_color = 'purple'
             _add_patch_for_building_zone(building_zone, face_color, face_color, ax)
 
@@ -117,22 +118,22 @@ def _draw_generated_zones(building_zones, ax: maxs.Axes) -> None:
     for building_zone in building_zones:
         if isinstance(building_zone, m.GeneratedBuildingZone):
             face_color = "red"
-            if m.BuildingZoneType.commercial is building_zone.type_:
+            if enu.BuildingZoneType.commercial is building_zone.type_:
                 face_color = "lightblue"
-            elif m.BuildingZoneType.industrial is building_zone.type_:
+            elif enu.BuildingZoneType.industrial is building_zone.type_:
                 face_color = "lightgreen"
-            elif m.BuildingZoneType.retail is building_zone.type_:
+            elif enu.BuildingZoneType.retail is building_zone.type_:
                 face_color = "orange"
-            elif m.BuildingZoneType.residential is building_zone.type_:
+            elif enu.BuildingZoneType.residential is building_zone.type_:
                 face_color = "pink"
-            elif m.BuildingZoneType.farmyard is building_zone.type_:
+            elif enu.BuildingZoneType.farmyard is building_zone.type_:
                 face_color = "sandybrown"
-            elif building_zone.type_ in [m.BuildingZoneType.btg_construction, m.BuildingZoneType.btg_industrial,
-                                         m.BuildingZoneType.btg_port]:
+            elif building_zone.type_ in [enu.BuildingZoneType.btg_construction, enu.BuildingZoneType.btg_industrial,
+                                         enu.BuildingZoneType.btg_port]:
                 face_color = "cyan"
-            elif building_zone.type_ in [m.BuildingZoneType.btg_urban, m.BuildingZoneType.btg_town]:
+            elif building_zone.type_ in [enu.BuildingZoneType.btg_urban, enu.BuildingZoneType.btg_town]:
                 face_color = "gold"
-            elif building_zone.type_ in [m.BuildingZoneType.btg_builtupcover, m.BuildingZoneType.btg_suburban]:
+            elif building_zone.type_ in [enu.BuildingZoneType.btg_builtupcover, enu.BuildingZoneType.btg_suburban]:
                 face_color = "yellow"
             edge_color = face_color
             _add_patch_for_building_zone(building_zone, face_color, edge_color, ax)
@@ -140,9 +141,9 @@ def _draw_generated_zones(building_zones, ax: maxs.Axes) -> None:
 
 def _draw_btg_building_zones(btg_building_zones, ax: maxs.Axes) -> None:
     for item in btg_building_zones:
-        if item.type_ in [m.BuildingZoneType.btg_builtupcover, m.BuildingZoneType.btg_urban]:
+        if item.type_ in [enu.BuildingZoneType.btg_builtupcover, enu.BuildingZoneType.btg_urban]:
             my_color = "magenta"
-        elif item.type_ in [m.BuildingZoneType.btg_town, m.BuildingZoneType.btg_suburban]:
+        elif item.type_ in [enu.BuildingZoneType.btg_town, enu.BuildingZoneType.btg_suburban]:
             my_color = "gold"
         else:
             my_color = "yellow"

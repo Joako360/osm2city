@@ -15,7 +15,7 @@ import numpy as np
 from osm2city import parameters
 from osm2city.pySkeleton import polygon
 import osm2city.utils.log_helper as ulog
-from osm2city.utils import osmstrings as s
+from osm2city.types import osmstrings as s
 from osm2city.utils import utilities
 from osm2city.utils.vec2d import Vec2d
 

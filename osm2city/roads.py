@@ -93,7 +93,7 @@ from osm2city.cluster import ClusterContainer
 import osm2city.textures.road
 import osm2city.utils.osmparser as op
 from osm2city.utils import utilities, ac3d, graph, coordinates, stg_io2
-from osm2city.utils import osmstrings as s
+from osm2city.types import osmstrings as s
 from osm2city.utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits

@@ -22,7 +22,7 @@ from shapely.geometry.linestring import LineString
 from osm2city import parameters
 from osm2city.cluster import ClusterContainer
 from osm2city.utils import utilities, ac3d, coordinates, osmparser, stg_io2
-from osm2city.utils import osmstrings as s
+from osm2city.types import osmstrings as s
 from osm2city.utils.vec2d import Vec2d
 
 OUR_MAGIC = "piers"  # Used in e.g. stg files to mark edits by osm2Piers

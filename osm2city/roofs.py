@@ -1,5 +1,4 @@
 import copy
-from enum import IntEnum, unique
 import logging
 from math import sin, cos, atan2, radians, tan, sqrt, fabs
 from typing import List
@@ -9,7 +8,8 @@ import numpy as np
 
 import osm2city.utils.ac3d as ac
 import osm2city.utils.coordinates as coord
-from osm2city.utils import osmstrings as s
+from osm2city.types import enumerations as enu
+from osm2city.types import osmstrings as s
 from osm2city.utils.utilities import Stats
 from osm2city.textures.texture import Texture, RoofManager
 
@@ -25,63 +25,6 @@ def roof_looks_square(circumference: float, area: float) -> bool:
     if circumference < 3 * sqrt(2 * area):
         return True
     return False
-
-
-@unique
-class RoofShape(IntEnum):
-    """Matches the roof:shape in OSM, see http://wiki.openstreetmap.org/wiki/Simple_3D_buildings.
-
-    Some of the OSM types might not be directly supported and are mapped to a different type,
-    which actually is supported in osm2city.
-
-    The enumeration should match what is provided in roofs.py and referenced in _write_roof_for_ac().
-
-    The values need to correspond to the S value in FG BUILDING_LIST
-    """
-    flat = 0
-    skillion = 1
-    gabled = 2
-    half_hipped = 3
-    hipped = 4
-    pyramidal = 5
-    gambrel = 6
-    mansard = 7
-    dome = 8
-    onion = 9
-    round = 10
-    saltbox = 11
-    skeleton = 99  # does not exist in OSM
-
-
-def map_osm_roof_shape(osm_roof_shape: str) -> RoofShape:
-    """Maps OSM roof:shape tag to supported types in osm2city.
-
-    See http://wiki.openstreetmap.org/wiki/Simple_3D_buildings#Roof_shape"""
-    _shape = osm_roof_shape.strip()
-    if len(_shape) == 0:
-        return RoofShape.flat
-    if _shape == s.V_FLAT:
-        return RoofShape.flat
-    if _shape in ['skillion', 'lean_to', 'pitched', 'shed']:
-        return RoofShape.skillion
-    if _shape in ['gabled', 'half-hipped', 'saltbox']:
-        return RoofShape.gabled
-    if _shape in ['gambrel', 'round']:
-        return RoofShape.gambrel
-    if _shape in ['hipped', 'mansard']:
-        return RoofShape.hipped
-    if _shape == 'pyramidal':
-        return RoofShape.pyramidal
-    if _shape == 'dome':
-        return RoofShape.dome
-    if _shape == 'onion':
-        return RoofShape.onion
-
-    # fall back for all not directly handled OSM types. The rational for using "hipped" as default is that most
-    # probably if someone actually has tried to specify a shape, then 'flat' is unliekly to be misspelled and
-    # most probably a form with a ridge was meant.
-    logging.debug('Not handled roof shape found: %s. Therefore transformed to "hipped".', _shape)
-    return RoofShape.skeleton
 
 
 def flat(ac_object: ac.Object, index_first_node_in_ac_obj: int, b, roof_mgr: RoofManager, roof_mat_idx: int,
@@ -190,7 +133,7 @@ def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_
         along_angle = coord.calc_angle_of_line_local(b.pts_all[i_long % 4][0],
                                                      b.pts_all[i_long % 4][1],
                                                      b.pts_all[(i_long + 1) % 4][0],
-                                                     b.pts_all[(i_long + 1)% 4][1])
+                                                     b.pts_all[(i_long + 1) % 4][1])
         if along_angle >= 180.:
             along_angle -= 180.
         difference = fabs(b.roof_neighbour_orientation - along_angle)
@@ -209,7 +152,7 @@ def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_
     # We don't want the hipped part to be larger than the height, which is 45 deg
     inward_meters = min(roof_height, inward_meters)
 
-    if inward_meters > 0. and b.roof_shape is RoofShape.hipped:
+    if inward_meters > 0. and b.roof_shape is enu.RoofShape.hipped:
         # -- tangential vector of long edge (always [0, 0] if not hipped (because inward meters = 0)
         tang = (b.pts_all[seq_n[1]]-b.pts_all[seq_n[0]])/b.edge_length_pts[seq_n[1]] * inward_meters
     else:
@@ -237,7 +180,7 @@ def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_
     repeat_x_front = ((len_roof_bottom_front + len_roof_ridge) / 2) / roof_texture_size_x
     repeat_x_back = ((len_roof_bottom_back + len_roof_ridge) / 2) / roof_texture_size_x
 
-    if b.roof_shape in [RoofShape.gabled, RoofShape.hipped]:
+    if b.roof_shape in [enu.RoofShape.gabled, enu.RoofShape.hipped]:
         # roofs
         len_roof_hypo = ((0.5*b.edge_length_pts[seq_n[1]])**2 + roof_height**2)**0.5
         repeat_y = len_roof_hypo / roof_texture_size_y
@@ -385,24 +328,22 @@ def separate_pyramidal(ac_object: ac.Object, b, roof_mat_idx: int) -> None:
     ring = b.pts_all
     top = bottom + roof_height
 
-    if shape in [RoofShape.dome, RoofShape.onion]:
+    if shape in [enu.RoofShape.dome, enu.RoofShape.onion]:
         # For dome and onion we need to add new rings and faces before the top
         height_share = list()  # the share of the roof height by each ring
         radius_share = list()  # the share of the radius by each ring
-        if shape is RoofShape.dome:  # we use five additional rings
+        if shape is enu.RoofShape.dome:  # we use five additional rings
             height_share = [sin(radians(90 / 6)),
                             sin(radians(90 * 2 / 6)),
                             sin(radians(90 * 3 / 6)),
                             sin(radians(90 * 4 / 6)),
-                            sin(radians(90 * 5 / 6))
-            ]
+                            sin(radians(90 * 5 / 6))]
 
             radius_share = [cos(radians(90 / 6)),
                             cos(radians(90 * 2 / 6)),
                             cos(radians(90 * 3 / 6)),
                             cos(radians(90 * 4 / 6)),
-                            cos(radians(90 * 5 / 6))
-            ]
+                            cos(radians(90 * 5 / 6))]
         else:  # we use five additional rings based on guessed values - onion diameter gets broader than drum
             height_share = [.1, .2, .3, .4, .5, .7]
 
