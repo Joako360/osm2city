@@ -295,8 +295,6 @@ Given the available textures in ``osm2city-data`` and the in general limited tag
 
 The following parameters try to "fix" this by adding OSM-tags ``roof:colour=red`` and ``roof:shape=gabled`` to all those buildings, which do not have parents or pseudo-parents (i.e. nor relationships or parts in OSM), but which share node references with other buildings. So typically what is happening in blocks in inner cities in Europe.
 
-Excluded from this are buildings tagged as ``building=house`` or ``building=terrace`` or ``building=detached``.
-
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================

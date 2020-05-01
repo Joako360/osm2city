@@ -110,6 +110,8 @@ class BuildingType(IntEnum):
     sty = 97
     riding_hall = 98
     hangar = 100
+    stadium = 110
+    sports_hall = 111
 
 
 def parse_building_tags_for_type(tags_dict: KeyValueDict) -> Union[None, BuildingType]:

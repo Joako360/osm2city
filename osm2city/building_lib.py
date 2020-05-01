@@ -676,18 +676,29 @@ class Building(object):
                 self.street_angle = co.calc_angle_of_line_local(pts_outer[i, 0], pts_outer[i, 1],
                                                                 pts_outer[i + 1, 0], pts_outer[i + 1, 1])
 
-    def analyse_roof_shape(self) -> None:
+    def analyse_roof_shape(self, building_parent: Optional['BuildingParent']) -> None:
+        """See also description in manual for European Style parameters.
+
+        Be aware that these tags could be overwritten later in the processing again. It just increases probability.
+        """
         if s.K_ROOF_SHAPE in self.tags:
             self.roof_shape = enu.map_osm_roof_shape(self.tags[s.K_ROOF_SHAPE])
         else:
             # use some parameters and randomize to assign optimistically a roof shape
             # in analyse_roof_shape_check it is double checked whether e.g. building height or area exceed limits
             # and then it will be corrected back to flat roof.
-            if parameters.BUILDING_COMPLEX_ROOFS:
-                if self.has_neighbours:
+            if parameters.BUILDING_COMPLEX_ROOFS and building_parent is None:
+                if self.has_neighbours and parameters.BUILDING_FORCE_EUROPEAN_INNER_CITY_STYLE:
                     self.roof_shape = enu.RoofShape.gabled
                 else:
                     self.roof_shape = _random_roof_shape()
+                if parameters.BUILDING_FORCE_EUROPEAN_INNER_CITY_STYLE:
+                    # now apply some tags to increase European style
+                    if s.K_ROOF_COLOUR not in self.tags:
+                        if parameters.FLAG_COLOUR_TEX:
+                            self.tags[s.K_ROOF_COLOUR] = '#FF0000'
+                        else:
+                            self.tags[s.K_ROOF_COLOUR] = 'red'
             else:
                 self.roof_shape = enu.RoofShape.flat
 
@@ -827,14 +838,14 @@ class Building(object):
         # roof_shape from OSM is already set in analyse_height_and_levels(...)
         if self.roof_complex:
             allow_complex_roofs = False
-            if parameters.BUILDING_COMPLEX_ROOFS:
+            if parameters.BUILDING_COMPLEX_ROOFS:  # Attention: due to elif's the sequence is important!
                 allow_complex_roofs = True
-                # no complex roof on buildings with inner rings
-                if self.polygon.interiors:
-                    if len(self.polygon.interiors) == 1:
-                        self.roof_shape = enu.RoofShape.skeleton
-                    else:
-                        allow_complex_roofs = False
+                # no complex roof on tall buildings
+                if self.levels > parameters.BUILDING_COMPLEX_ROOFS_MAX_LEVELS and s.K_ROOF_SHAPE not in self.tags:
+                    allow_complex_roofs = False
+                # no complex roof on tiny buildings.
+                elif self.levels < parameters.BUILDING_COMPLEX_ROOFS_MIN_LEVELS and s.K_ROOF_SHAPE not in self.tags:
+                    allow_complex_roofs = False
                 # no complex roof on large buildings
                 elif self.area > parameters.BUILDING_COMPLEX_ROOFS_MAX_AREA:
                     allow_complex_roofs = False
@@ -845,12 +856,12 @@ class Building(object):
                         parameters.BUILDING_COMPLEX_ROOFS_MAX_AREA:
                     if roofs.roof_looks_square(self.circumference, self.area):
                         allow_complex_roofs = False
-                # no complex roof on tall buildings
-                elif self.levels > parameters.BUILDING_COMPLEX_ROOFS_MAX_LEVELS and s.K_ROOF_SHAPE not in self.tags:
-                    allow_complex_roofs = False
-                # no complex roof on tiny buildings.
-                elif self.levels < parameters.BUILDING_COMPLEX_ROOFS_MIN_LEVELS and s.K_ROOF_SHAPE not in self.tags:
-                    allow_complex_roofs = False
+                # no complex roof on buildings with inner rings
+                elif self.polygon.interiors:
+                    if len(self.polygon.interiors) == 1:
+                        self.roof_shape = enu.RoofShape.skeleton
+                    else:
+                        allow_complex_roofs = False
                 elif self.roof_shape not in [enu.RoofShape.pyramidal, enu.RoofShape.dome, enu.RoofShape.onion,
                                              enu.RoofShape.skillion] \
                         and self.pts_all_count > parameters.BUILDING_SKEL_MAX_NODES:
@@ -951,28 +962,6 @@ class Building(object):
         if self.area < parameters.BUILDING_REDUCE_THRESHOLD and random.uniform(0, 1) < parameters.BUILDING_REDUCE_RATE:
             return False
         return True
-
-    def enforce_european_style(self, building_parent: Optional['BuildingParent']) -> None:
-        """See description in manual for European Style parameters.
-
-        Be aware that these tags could be overwritten later in the processing again. It just increases probability.
-        """
-        if self.has_neighbours:
-            # exclude those with (pseudo)parents
-            if building_parent is not None:
-                return
-            # exclude houses and terraces
-            if s.K_BUILDING in self.tags and self.tags[s.K_BUILDING] in ['house', 'detached', 'terrace']:
-                return
-
-            # now apply some tags to increase European style
-            if s.K_ROOF_COLOUR not in self.tags:
-                if parameters.FLAG_COLOUR_TEX:
-                    self.tags[s.K_ROOF_COLOUR] = '#FF0000'
-                else:
-                    self.tags[s.K_ROOF_COLOUR] = 'red'
-            if s.K_ROOF_SHAPE not in self.tags:
-                self.tags[s.K_ROOF_SHAPE] = 'gabled'
 
     def compute_roof_height(self, in_building_list: bool = False) -> None:
         """Compute roof_height for each node"""
@@ -1517,9 +1506,6 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: s
                 if _analyse_worship_building(b, building_parent, stg_manager, fg_elev, coords_transform):
                     continue
 
-        if parameters.BUILDING_FORCE_EUROPEAN_INNER_CITY_STYLE:
-            b.enforce_european_style(building_parent)
-
         if building_parent is None:  # do not simplify if in parent/child relationship
             stats.nodes_simplified += b.simplify()
         try:
@@ -1537,7 +1523,7 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: s
 
         b.analyse_street_angle()
 
-        b.analyse_roof_shape()
+        b.analyse_roof_shape(building_parent)
 
         b.analyse_building_type()
 
