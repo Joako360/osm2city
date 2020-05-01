@@ -311,6 +311,7 @@ class RoofManager(object):
             # Break down requirements to find something that matches
             for simple_req in requires:
                 candidates = self.find_candidates([simple_req], list())
+                self._screen_grass_and_glass(candidates, requires)
                 if candidates:
                     break
                 if not candidates:
@@ -347,6 +348,17 @@ class RoofManager(object):
                     the_texture = fallback_candidates[random.randint(0, len(fallback_candidates) - 1)]
         stats.count_texture(the_texture)
         return the_texture
+
+    @staticmethod
+    def _screen_grass_and_glass(candidates: List[Texture], requires: List[str]) -> None:
+        """Special case handling of grass and glass so they get excluded unless really requested.
+
+        This does only work with the Spring 2020 atlas having specific roof textures that match this pattern!"""
+        for candidate in reversed(candidates):
+            if 'roof:roof:material:grass' in candidate.provides and 'roof:material:grass' not in requires:
+                candidates.remove(candidate)
+            elif 'roof:roof:material:glass' in candidate.provides and 'roof:material:glass' not in requires:
+                candidates.remove(candidate)
 
     def find_candidates(self, requires: List[str], excludes: List[str]):
         candidates = []
