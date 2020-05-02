@@ -152,7 +152,7 @@ class Building(object):
 
         # set during method called by init(...) through self.update_geometry and related sub-calls
         self.refs = None  # contains only the refs of the outer_ring
-        self.refs_shared = dict()  # refs shared with other buildings (dict of index position, value False or True)
+        self.refs_shared = dict()  # refs shared with other buildings (dict of index position, value list of osm_id's)
         self.inner_rings_list = None
         self.outer_nodes_closest = None
         self.polygon = None  # can have inner and outer rings, i.e. the real polygon
@@ -439,8 +439,8 @@ class Building(object):
 
     @property
     def has_neighbours(self) -> bool:
-        """To know whether this building shares references (nodes) with other buildings"""
-        return len(self.refs_shared) > 0
+        """To know whether this building shares at least 2 references (nodes) with other buildings"""
+        return len(self.refs_shared) > 1
 
     @property
     def has_parent(self) -> bool:
@@ -1274,6 +1274,9 @@ class BuildingParent(object):
         self.children.append(child)
         child.parent = self
 
+    def contains_child(self, child: Building) -> bool:
+        return child in self.children
+
     def add_tags(self, tags: Dict[str, str]) -> None:
         """The added tags are either from the outline if simple3d or otherwise from the original building
         used as a parent for building_parts, if not relation was given."""
@@ -1335,6 +1338,13 @@ class BuildingParent(object):
             if building.parent:
                 building_parents.add(building.parent)
         return building_parents
+
+    def transfer_children(self, other_parent: 'BuildingParent') -> None:
+        """Transfer all children from this parent to another.
+        Once all children have a new parent then there will be no pointers to this one -> no del of children necessary.
+        """
+        for child in self.children:
+            other_parent.add_child(child)
 
     @staticmethod
     def clean_building_parents_dangling_children(my_buildings: List[Building]) -> None:
@@ -1459,8 +1469,12 @@ def _relate_neighbours(buildings: List[Building]) -> None:
                 for pos_i in range(len(first_building.refs)):
                     for pos_j in range(len(second_building.refs)):
                         if first_building.refs[pos_i] == second_building.refs[pos_j]:
-                            first_building.refs_shared[pos_i] = True
-                            second_building.refs_shared[pos_j] = True
+                            if pos_i not in first_building.refs_shared:
+                                first_building.refs_shared[pos_i] = list()
+                            first_building.refs_shared[pos_i].append(second_building.osm_id)
+                            if pos_j not in second_building.refs_shared:
+                                second_building.refs_shared[pos_j] = list()
+                            second_building.refs_shared[pos_j].append(first_building.osm_id)
 
     for b in buildings:
         if b.has_neighbours:

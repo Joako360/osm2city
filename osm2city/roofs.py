@@ -85,7 +85,7 @@ def separate_hipped(ac_object: ac.Object, b, roof_mat_idx: int) -> None:
 
 
 def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_meters=0.) -> None:
-    """Gabled roof (or hipped if inward_meters > 0) with 4 nodes."""
+    """Gabled or gambrel roof (or hipped if inward_meters > 0) with 4 nodes."""
     t = b.roof_texture
     
     if b.roof_height:

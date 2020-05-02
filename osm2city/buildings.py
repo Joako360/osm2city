@@ -16,7 +16,7 @@ import os
 import random
 import textwrap
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import shapely.geometry as shg
 import shapely.ops as sho
@@ -492,6 +492,68 @@ def _process_building_parts(nodes_dict: Dict[int, op.Node],
                  len(building_parents), stats_original_removed)
 
 
+def process_building_loose_parts(nodes_dict: Dict[int, op.Node], my_buildings: List[building_lib.Building]) -> None:
+    """Checks whether some buildings actually should have the same parent based on shared references.
+
+    This is due to the fact that relations in OSM are not always done clearly - and building:parts are often
+    only related by geometry and not distinct modelling in OSM.
+
+    Therefore the following assumption is made:
+    * If a building shares 4 or more nodes with another building, then it is related and they get the same parent
+    * If a buildings shares 3 consecutive nodes and for each segment the length is more than 2 metres, then
+      they are related and get the same parent. In order not to depend on correct sequence etc. it is just assumed
+      that the distance between each of the 3 points must be more than 2 metres. It is very improbable that that
+      would not be the case for the distance between the 2 pints not directly connected. We take the risk.
+    """
+    new_relations = 0
+    for first_building in my_buildings:
+        potential_attached = first_building.zone.osm_buildings
+        ref_set_first = set(first_building.refs)
+        for second_building in potential_attached:
+            if first_building.osm_id == second_building.osm_id:  # do not compare with self
+                continue
+            if first_building.parent is not None and first_building.parent.contains_child(second_building):
+                continue  # existing relationship, nothing to add
+            ref_set_second = set(second_building.refs)
+            if ref_set_first.isdisjoint(ref_set_second):
+                continue  # not related (actually could be related if within, but then _process_building_parts())
+            common_refs = list()
+            for pos_i in range(len(first_building.refs)):
+                for pos_j in range(len(second_building.refs)):
+                    if first_building.refs[pos_i] == second_building.refs[pos_j]:
+                        common_refs.append(first_building.refs[pos_i])
+            # now check our requirements
+            if len(common_refs) < 3:
+                continue
+            new_relationship = False
+            if len(common_refs) > 3:
+                new_relationship = True
+            else:
+                node_0 = nodes_dict[common_refs[0]]
+                node_1 = nodes_dict[common_refs[1]]
+                node_2 = nodes_dict[common_refs[2]]
+                len_side_1 = coordinates.calc_distance_global(node_0.lon, node_0.lat, node_1.lon, node_1.lat)
+                len_side_2 = coordinates.calc_distance_global(node_1.lon, node_1.lat, node_2.lon, node_2.lat)
+                len_side_3 = coordinates.calc_distance_global(node_2.lon, node_2.lat, node_0.lon, node_0.lat)
+                if len_side_1 > 2 and len_side_2 > 2 and len_side_3 > 2:
+                    new_relationship = True
+            if new_relationship:
+                new_relations += 1
+                if first_building.parent and second_building.parent:
+                    # need to decide on one parent (we pick first) and transfer all children from other parent
+                    second_building.parent.transfer_children(first_building.parent)
+                elif first_building.parent:
+                    first_building.parent.add_child(second_building)
+                elif second_building.parent:
+                    second_building.parent.add_child(first_building)
+                else:
+                    my_parent = building_lib.BuildingParent(op.get_next_pseudo_osm_id(
+                                op.OSMFeatureType.building_relation), False)
+                    my_parent.add_child(first_building)
+                    my_parent.add_child(second_building)
+    logging.info('Created %i new building relations based on shared references', new_relations)
+
+
 def _process_osm_building(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, op.Way],
                           coords_transform: coordinates.Transformation) -> Dict[int, building_lib.Building]:
     my_buildings = dict()
@@ -612,7 +674,8 @@ def _write_obstruction_lights(path: str, file_name: str,
         return False
 
 
-def construct_buildings_from_osm(coords_transform: coordinates.Transformation) -> List[building_lib.Building]:
+def construct_buildings_from_osm(coords_transform: coordinates.Transformation) -> Tuple[List[building_lib.Building],
+                                                                                        Dict[int, op.Node]]:
     osm_read_results = op.fetch_osm_db_data_ways_keys([s.K_BUILDING, s.K_BUILDING_PART])
     osm_read_results = op.fetch_osm_db_data_relations_buildings(osm_read_results)
     osm_nodes_dict = osm_read_results.nodes_dict
@@ -634,7 +697,7 @@ def construct_buildings_from_osm(coords_transform: coordinates.Transformation) -
     _ = utilities.time_logging('Time used in seconds for processing building parts', last_time)
 
     # for convenience change to list from dict
-    return list(the_buildings.values())
+    return list(the_buildings.values()), osm_nodes_dict
 
 
 def _debug_building_list_lsme(coords_transform: coordinates.Transformation, file_writer, list_elev: float) -> None:

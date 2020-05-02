@@ -736,7 +736,7 @@ def simplify_balconies(original: shg.Polygon, distance_tolerance_line: float,
                     to_remove_points.add(_safe_index(counter + i, num_coords))
                 for i in range(counter + 5, num_coords):
                     if i in refs_shared:
-                        refs_shared[i - 4] = True
+                        refs_shared[i - 4] = refs_shared[i]
                         del refs_shared[i]
                 counter += 4
 

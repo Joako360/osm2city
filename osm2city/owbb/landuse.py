@@ -735,7 +735,7 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     aerodrome_zones = m.process_aerodrome_refs(transformer)
     building_zones = m.process_osm_building_zone_refs(transformer)
     urban_places, farm_places = m.process_osm_place_refs(transformer)
-    osm_buildings = bu.construct_buildings_from_osm(transformer)
+    osm_buildings, building_nodes_dict = bu.construct_buildings_from_osm(transformer)
     highways_dict = m.process_osm_highway_refs(transformer)
     railways_dict = m.process_osm_railway_refs(transformer)
     waterways_dict = m.process_osm_waterway_refs(transformer)
@@ -854,6 +854,11 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
         if isinstance(my_zone, m.GeneratedBuildingZone):
             my_zone.guess_building_zone_type(farm_places)
     last_time = time_logging("Time used in seconds for guessing zone types", last_time)
+
+    # =========== See whether we can do more building relations ============================
+    # this is done as late as possible to reduce exec time by only looking in the building's same zone
+    bu.process_building_loose_parts(building_nodes_dict, osm_buildings)
+    last_time = time_logging('Time used in seconds for processing building loose parts', last_time)
 
     # =========== FINALIZE Land-use PROCESSING =============================================
     if parameters.DEBUG_PLOT_LANDUSE:
