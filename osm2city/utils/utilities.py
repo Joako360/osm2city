@@ -15,7 +15,7 @@ import subprocess
 import sys
 import textwrap
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 import unittest
 
 import numpy as np
@@ -695,7 +695,7 @@ def _safe_index(index: int, number_of_elements: int) -> int:
 
 
 def simplify_balconies(original: shg.Polygon, distance_tolerance_line: float,
-                       distance_tolerance_away: float, refs_shared: Dict[int, bool]) -> shg.Polygon:
+                       distance_tolerance_away: float, refs_shared: Dict[int, Set[int]]) -> Optional[shg.Polygon]:
     """Removes edges from polygons, which look like balconies on a building.
     Removes always 4 points at a time.
 
@@ -707,7 +707,9 @@ def simplify_balconies(original: shg.Polygon, distance_tolerance_line: float,
     away from the new front.
 
     The refs_shared dictionary makes sure that no shared references (with other buildings) are simplified away.
-    The dictionary might get updated if points are taken away
+    The dictionary might get updated if points are taken away.
+
+    Does one simplification at a time and should therefore be called until None is returned.
     """
     to_remove_points = set()  # index positions
     counter = 0
@@ -718,8 +720,14 @@ def simplify_balconies(original: shg.Polygon, distance_tolerance_line: float,
         # check that there would be at least 3 nodes left
         if num_coords - len(to_remove_points) < 7:
             break
-        if not (counter + 1 in refs_shared or counter + 2 in refs_shared or counter + 3 in refs_shared
-                or counter + 4 in refs_shared):
+        all_positions = list()
+        for pos_lists in refs_shared.values():
+            all_positions.extend(pos_lists)
+        set_positions = set(all_positions)
+        if not (_safe_index(counter + 1, num_coords) in set_positions
+                or _safe_index(counter + 2, num_coords) in set_positions
+                or _safe_index(counter + 3, num_coords) in set_positions
+                or _safe_index(counter + 4, num_coords) in set_positions):
             valid_removal = False
             base_line = shg.LineString([my_coords[counter], my_coords[_safe_index(counter + 5, num_coords)]])
             my_point = shg.Point(my_coords[_safe_index(counter + 1, num_coords)])
@@ -734,16 +742,21 @@ def simplify_balconies(original: shg.Polygon, distance_tolerance_line: float,
             if valid_removal:
                 for i in range(1, 5):
                     to_remove_points.add(_safe_index(counter + i, num_coords))
-                for i in range(counter + 5, num_coords):
-                    if i in refs_shared:
-                        refs_shared[i - 4] = refs_shared[i]
-                        del refs_shared[i]
-                counter += 4
 
+                for key, pos_list in refs_shared.items():
+                    new_pos_set = set()
+                    for pos in pos_list:
+                        to_remove_smaller_than_pos = 0
+                        for i in range(1, 5):
+                            if _safe_index(counter + i, num_coords) < pos:
+                                to_remove_smaller_than_pos += 1
+                        new_pos_set.add(pos - to_remove_smaller_than_pos)
+                    refs_shared[key] = new_pos_set
+                break  # do not continue the while loop once we have found one balcony to remove
         counter += 1
 
     if len(to_remove_points) == 0:
-        return original
+        return None
     else:
         ny_coords = list()
         for i in range(len(my_coords)):
@@ -916,29 +929,34 @@ class TestUtilities(unittest.TestCase):
         refs_shared = dict()
         six_node_polygon = shg.Polygon([(0, 0), (10, 0), (10, 5), (9, 5), (9, 6), (0, 6)])
         simplified_poly = simplify_balconies(six_node_polygon, 0.5, 2., refs_shared)
-        self.assertEqual(6 + 1, len(simplified_poly.exterior.coords))
+        self.assertIsNone(simplified_poly)
         # balcony to remove
         eight_node_polygon = shg.Polygon([(0, 0), (10, 0), (10, 5), (9, 5), (9, 6), (4, 6), (4, 5), (0, 5)])
         simplified_poly = simplify_balconies(eight_node_polygon, 0.5, 2., refs_shared)
+        self.assertIsNotNone(simplified_poly)
         self.assertEqual(4 + 1, len(simplified_poly.exterior.coords))
         # balcony too far away (also checking inward)
         eight_node_polygon = shg.Polygon([(0, 0), (1, 0), (1, 3), (3, 3), (3, 0), (10, 0), (10, 5), (0, 5)])
         simplified_poly = simplify_balconies(eight_node_polygon, 0.5, 2., refs_shared)
-        self.assertEqual(8 + 1, len(simplified_poly.exterior.coords))
+        self.assertIsNone(simplified_poly)
         # balcony base not close to line (and testing index=0 in the balcony)
         eight_node_polygon = shg.Polygon([(4, 6), (0, 5), (0, 0), (10, 0), (10, 5), (9, 6), (9, 7), (4, 7)])
         simplified_poly = simplify_balconies(eight_node_polygon, 0.5, 2., refs_shared)
-        self.assertEqual(8 + 1, len(simplified_poly.exterior.coords))
+        self.assertIsNone(simplified_poly)
         # two balconies to remove
         twelve_node_polygon = shg.Polygon([(0, 0), (1, 0), (1, 1), (3, 1), (3, 0), (10, 0), (10, 5), (9, 5), (9, 6),
                                            (4, 6), (4, 5), (0, 5)])
         simplified_poly = simplify_balconies(twelve_node_polygon, 0.5, 2., refs_shared)
+        self.assertIsNotNone(simplified_poly)
+        self.assertEqual(8 + 1, len(simplified_poly.exterior.coords))
+        simplified_poly = simplify_balconies(simplified_poly, 0.5, 2., refs_shared)
+        self.assertIsNotNone(simplified_poly)
         self.assertEqual(4 + 1, len(simplified_poly.exterior.coords))
 
         # balcony to remove not locked by refs_shared
-        refs_shared = {0: True, 7: True}
+        refs_shared = {11111: {0, 7}}
         eight_node_polygon = shg.Polygon([(0, 0), (10, 0), (10, 5), (9, 5), (9, 6), (4, 6), (4, 5), (0, 5)])
         simplified_poly = simplify_balconies(eight_node_polygon, 0.5, 2., refs_shared)
         self.assertEqual(4 + 1, len(simplified_poly.exterior.coords))
-        self.assertEqual(2, len(refs_shared))
-        self.assertTrue(3 in refs_shared)
+        self.assertEqual(2, len(refs_shared[11111]))
+        self.assertTrue(3 in refs_shared[11111])

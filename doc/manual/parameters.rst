@@ -240,7 +240,7 @@ BUILDING_LEVEL_HEIGHT_URBAN                     Number     3.5       The height 
                                                                      ``parking_house``, then this height is always used.
 BUILDING_LEVEL_HEIGHT_RURAL                     Number     2.5       Ditto for settlement types ``periphery`` and ``rural``.
 
-BUILDING_LEVEL_HEIGHT_INDUSTRIAL                Number     6.0       Ditto for buildings of class ``industrial`` or ``warehouse``.
+BUILDING_LEVEL_HEIGHT_INDUSTRIAL                Number     4.0       Ditto for buildings of class ``industrial`` or ``warehouse``.
 
 =============================================   ========   =======   ==============================================================================
 

@@ -106,9 +106,12 @@ V_DOME = 'dome'
 V_DYKE = 'dyke'
 V_FLAT = 'flat'
 V_FERRY = 'ferry'
+V_FUEL_STORAGE_TANK = 'fuel_storage_tank'  # deprecated tag in OSM
 V_FUNICULAR = 'funicular'
 V_GABLED = 'gabled'
 V_GAMBREL = 'gambrel'
+V_GLASSHOUSE = 'glasshouse'
+V_GREENHOUSE = 'greenhouse'
 V_HALF_HIPPED = 'half-hipped'
 V_HAMLET = 'hamlet'
 V_HANGAR = 'hangar'
@@ -134,6 +137,7 @@ V_NARROW_GAUGE = 'narrow_gauge'
 V_NAVAL_BASE = 'naval_base'
 V_NO = 'no'
 V_OFFSHORE_PLATFORM = 'offshore_platform'
+V_OIL_TANK = 'oil_tank'  # deprecated tag in OSM
 V_ONION = 'onion'
 V_ORTHODOX = 'orthodox'
 V_OUTER = 'outer'
@@ -168,7 +172,7 @@ V_STREAM = 'stream'
 V_SUBURB = 'suburb'
 V_SUBWAY = 'subway'
 V_SWITCH = 'switch'
-V_TANK = 'tank'
+V_TANK = 'tank'  # deprecated tag in OSM
 V_TERMINAL = 'terminal'
 V_TERRACE = 'terrace'
 V_TERTIARY = 'tertiary'
@@ -185,6 +189,10 @@ V_WATER_TOWER = 'water_tower'
 V_WAY = 'way'
 V_YES = 'yes'
 V_ZOO = 'zoo'
+
+
+# ======================= LISTS ===================================
+L_STORAGE_TANK = [V_STORAGE_TANK, V_TANK, V_OIL_TANK, V_FUEL_STORAGE_TANK]
 
 # ======================= KEY-VALUE PAIRS ==================================
 KV_MAN_MADE_CHIMNEY = 'man_made=>chimney'

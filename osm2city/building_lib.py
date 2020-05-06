@@ -152,7 +152,7 @@ class Building(object):
 
         # set during method called by init(...) through self.update_geometry and related sub-calls
         self.refs = None  # contains only the refs of the outer_ring
-        self.refs_shared = dict()  # refs shared with other buildings (dict of index position, value list of osm_id's)
+        self.refs_shared = dict()  # refs shared with other buildings (key: neighbour osm_id, value: set of positions)
         self.inner_rings_list = None
         self.outer_nodes_closest = None
         self.polygon = None  # can have inner and outer rings, i.e. the real polygon
@@ -337,12 +337,17 @@ class Building(object):
         if self.has_inner:
             return 0
         original_number = len(self.polygon.exterior.coords)
-        self.polygon = utilities.simplify_balconies(self.polygon, parameters.BUILDING_SIMPLIFY_TOLERANCE_LINE,
-                                                    parameters.BUILDING_SIMPLIFY_TOLERANCE_AWAY, self.refs_shared)
+        while True:
+            simplified = utilities.simplify_balconies(self.polygon, parameters.BUILDING_SIMPLIFY_TOLERANCE_LINE,
+                                                      parameters.BUILDING_SIMPLIFY_TOLERANCE_AWAY, self.refs_shared)
+            if simplified is None:
+                break
+            else:
+                self.polygon = simplified
         simplified_number = len(self.polygon.exterior.coords)
         difference = original_number - simplified_number
         if difference > 0:
-            self.geometry = self.polygon
+            self.geometry = self.polygon  # can do this because self.has_inner is False
         return difference
 
     def _set_polygon(self, outer: shg.LinearRing, inner: List[shg.LinearRing] = None) -> None:
@@ -439,8 +444,12 @@ class Building(object):
 
     @property
     def has_neighbours(self) -> bool:
-        """To know whether this building shares at least 2 references (nodes) with other buildings"""
-        return len(self.refs_shared) > 1
+        """To know whether this building shares at least 2 references (nodes) with another building."""
+        if self.refs_shared:
+            for pos_list in self.refs_shared.values():
+                if len(pos_list) > 1:
+                    return True
+        return False
 
     @property
     def has_parent(self) -> bool:
@@ -871,54 +880,43 @@ class Building(object):
             if allow_complex_roofs is False:
                 self.roof_shape = enu.RoofShape.flat
 
-    def analyse_roof_neighbour_orientation(self) -> None:
-        """Analyses the roof orientation for non-flat roofs and only if no inner rings and with neighbours.
-        If we have neighbours then it makes sense to try to orient the ridge such, that it is at right angles to
-        the neighbour - at least most of the time. Some times (like along canals in Amsterdam) it might be that
-        the gables actually look to the street instead to the neighbour - but then we must hope that the
-        key roof:orientation has been explicitly used.
-        The information here is only used for buildings in meshes. For buildings in lists see corresponding
-        b.analyse_roof_list_orientation.
+    def analyse_roof_mesh_orientation(self) -> None:
+        """Analyses the roof orientation for non-flat roofs with neighbours.
+
+        There is a possibility that the there is more than one neighbour or that the same neighbour
+        has more than 2 edges shared. Therefore we assume that the longest shared edge is representative
+        for the side of the roof, which is 90 degrees to the ridge respectively is a gable end.
         """
         self.roof_neighbour_orientation = -1.
         if self.roof_shape is enu.RoofShape.flat or self.has_inner or self.has_neighbours is False:
             return
 
         outer_points = self.pts_outer
-        lop = len(outer_points)
-        prev_was_neighbour_line = False
-        orientations = []
-
-        for index in range(lop):
-            if prev_was_neighbour_line:  # we do not want to have lines reusing a node
-                prev_was_neighbour_line = False
+        longest_distance = 0
+        for node_positions in self.refs_shared.values():
+            if len(node_positions) < 2:  # not interested in neighbours with only one common node
                 continue
-
-            if index in self.refs_shared:
-                orientation = -1.
-                if index == 0 and lop - 1 in self.refs_shared:
-                    prev_was_neighbour_line = True
-                    orientation = co.calc_angle_of_line_local(outer_points[index][0], outer_points[index][1],
-                                                              outer_points[lop - 1][0], outer_points[lop - 1][1])
-                elif index > 0 and index - 1 in self.refs_shared:
-                    prev_was_neighbour_line = True
-                    orientation = co.calc_angle_of_line_local(outer_points[index - 1][0], outer_points[index - 1][1],
-                                                              outer_points[index][0], outer_points[index][1])
-                if prev_was_neighbour_line:
-                    if orientation >= 180.:
-                        orientation -= 180.
-                    orientations.append(orientation)
-
-        if orientations:
-            # take the average orientation (often they will be parallel if there even is more than one)
-            final_orientation = 0.
-            for my_orient in orientations:
-                final_orientation += my_orient
-            self.roof_neighbour_orientation = final_orientation / len(orientations)
-            # now add 90 degrees to make the orientation at right angle
-            self.roof_neighbour_orientation += 90.
-            if self.roof_neighbour_orientation >= 180.:
-                self.roof_neighbour_orientation -= 180.
+            for i in node_positions:
+                first_pos = -1
+                second_pos = -1
+                # if we have the last node, then try to connect it with the first
+                if i == (len(outer_points) - 1) and 0 in node_positions:
+                    first_pos = i
+                    second_pos = 0
+                elif (i + 1) in node_positions:
+                    first_pos = i
+                    second_pos = i + 1
+                if first_pos > -1:
+                    orientation = co.calc_angle_of_line_local(outer_points[first_pos][0], outer_points[first_pos][1],
+                                                              outer_points[second_pos][0], outer_points[second_pos][1])
+                    distance = co.calc_distance_local(outer_points[first_pos][0], outer_points[first_pos][1],
+                                                      outer_points[second_pos][0], outer_points[second_pos][1])
+                    if distance > longest_distance:
+                        longest_distance = distance
+                        self.roof_neighbour_orientation = orientation + 90  # add 90 to the gable end orientat. -> ridge
+                        if self.roof_neighbour_orientation > 180:
+                            self.roof_neighbour_orientation -= 180
+        return
 
     def analyse_roof_list_orientation(self) -> int:
         """Roof orientation for buildings in lists: 0 = parallel to front, 1 = orthogonal to front.
@@ -1469,12 +1467,12 @@ def _relate_neighbours(buildings: List[Building]) -> None:
                 for pos_i in range(len(first_building.refs)):
                     for pos_j in range(len(second_building.refs)):
                         if first_building.refs[pos_i] == second_building.refs[pos_j]:
-                            if pos_i not in first_building.refs_shared:
-                                first_building.refs_shared[pos_i] = list()
-                            first_building.refs_shared[pos_i].append(second_building.osm_id)
-                            if pos_j not in second_building.refs_shared:
-                                second_building.refs_shared[pos_j] = list()
-                            second_building.refs_shared[pos_j].append(first_building.osm_id)
+                            if second_building.osm_id not in first_building.refs_shared:
+                                first_building.refs_shared[second_building.osm_id] = set()
+                            first_building.refs_shared[second_building.osm_id].add(pos_i)
+                            if first_building.osm_id not in second_building.refs_shared:
+                                second_building.refs_shared[first_building.osm_id] = set()
+                            second_building.refs_shared[first_building.osm_id].add(pos_j)
 
     for b in buildings:
         if b.has_neighbours:
@@ -1502,13 +1500,13 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: s
         # exclude what is processed elsewhere
         if s.K_BUILDING in b.tags:  # not if 'building:part'
             # temporarily exclude greenhouses / glasshouses
-            if b.tags[s.K_BUILDING] in ['glasshouse', 'greenhouse'] or (
-                            s.K_AMENITY in b.tags and b.tags[s.K_AMENITY] in ['glasshouse', 'greenhouse']):
+            if b.tags[s.K_BUILDING] in [s.V_GLASSHOUSE, s.V_GREENHOUSE] or (
+                            s.K_AMENITY in b.tags and b.tags[s.K_AMENITY] in [s.V_GLASSHOUSE, s.V_GREENHOUSE]):
                 logging.debug("Excluded greenhouse with osm_id={}".format(b.osm_id))
                 continue
             # exclude storage tanks -> pylons.py
-            if b.tags[s.K_BUILDING] in ['storage_tank', 'tank'] or (
-                    s.K_MAN_MADE in b.tags and b.tags[s.K_MAN_MADE] in ['storage_tank', 'tank']):
+            if b.tags[s.K_BUILDING] in s.L_STORAGE_TANK or (
+                    s.K_MAN_MADE in b.tags and b.tags[s.K_MAN_MADE] in s.L_STORAGE_TANK):
                 logging.debug("Excluded storage tank with osm_id={}".format(b.osm_id))
                 continue
             # exclude chimneys -> pylons.py
@@ -1555,7 +1553,7 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: s
                 continue
         b.analyse_roof_shape_check()
 
-        b.analyse_roof_neighbour_orientation()
+        b.analyse_roof_mesh_orientation()
 
         if not b.analyse_textures(facade_mgr, roof_mgr, stats):
             continue
@@ -1870,9 +1868,9 @@ _available_worship_buildings = [WorshipBuilding('big-church.ac', True, enu.Worsh
                                                 enu.ArchitectureStyle.romanesque, 1, 30., 26., 40., width_offset=5.5),
                                 WorshipBuilding('breton-church.ac', False, enu.WorshipBuildingType.church,
                                                 enu.ArchitectureStyle.unknown, 1, 50., 28., 43., length_offset=25.),
-                                WorshipBuilding('Church_generic_twintower_oniondome.ac', False,
-                                                enu.WorshipBuildingType.church,
-                                                enu.ArchitectureStyle.unknown, 2, 22., 37., 34., width_offset=12.5),
+                                #WorshipBuilding('Church_generic_twintower_oniondome.ac', False,
+                                #                enu.WorshipBuildingType.church,
+                                #                enu.ArchitectureStyle.unknown, 2, 22., 37., 34., width_offset=12.5),
                                 WorshipBuilding('church36m_blue.ac', False, enu.WorshipBuildingType.church,
                                                 enu.ArchitectureStyle.unknown, 1, 10., 36.2, 34.5, width_offset=0.9),
                                 WorshipBuilding('church36m_blue2.ac', False, enu.WorshipBuildingType.church,
