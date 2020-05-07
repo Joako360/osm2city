@@ -128,7 +128,7 @@ def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_
     if osm_roof_orientation_exists:
         if osm_roof_orientation == s.V_ACROSS:
             i_side = i_small
-    elif b.roof_neighbour_orientation >= 0.:  # only override if we have neighbours
+    elif b.roof_ridge_orientation >= 0.:  # only override if we have neighbours
         # calculate the angle of the "along"
         along_angle = coord.calc_angle_of_line_local(b.pts_all[i_long % 4][0],
                                                      b.pts_all[i_long % 4][1],
@@ -136,7 +136,7 @@ def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_
                                                      b.pts_all[(i_long + 1) % 4][1])
         if along_angle >= 180.:
             along_angle -= 180.
-        difference = fabs(b.roof_neighbour_orientation - along_angle)
+        difference = fabs(b.roof_ridge_orientation - along_angle)
         # if the difference is closer to 90 than parallel, then change the orientation
         if 45 < difference < 135:
             i_side = i_small

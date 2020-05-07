@@ -702,6 +702,36 @@ def _sanitize_building_zones(building_zones: List[m.BuildingZone], text: str) ->
     logging.info('Sanitize %s has deleted %i building zones', text, number_deleted)
 
 
+def _relate_neighbours(buildings: List[bl.Building]) -> None:
+    """Relates neighbour buildings based on shared references."""
+    neighbours = 0
+    len_buildings = len(buildings)
+    for i, first_building in enumerate(buildings, 1):
+        if i % 10000 == 0:
+            logging.info('Checked building relations for %i out of %i buildings', i, len_buildings)
+        potential_attached = first_building.zone.osm_buildings
+        ref_set_first = set(first_building.refs)
+        for second_building in potential_attached:
+            if first_building.osm_id == second_building.osm_id:  # do not compare with self
+                continue
+            ref_set_second = set(second_building.refs)
+            if ref_set_first.isdisjoint(ref_set_second) is False:
+                for pos_i in range(len(first_building.refs)):
+                    for pos_j in range(len(second_building.refs)):
+                        if first_building.refs[pos_i] == second_building.refs[pos_j]:
+                            if second_building.osm_id not in first_building.refs_shared:
+                                first_building.refs_shared[second_building.osm_id] = set()
+                            first_building.refs_shared[second_building.osm_id].add(pos_i)
+                            if first_building.osm_id not in second_building.refs_shared:
+                                second_building.refs_shared[first_building.osm_id] = set()
+                            second_building.refs_shared[first_building.osm_id].add(pos_j)
+
+    for b in buildings:
+        if b.has_neighbours:
+            neighbours += 1
+    logging.info('%i out of %i buildings have neighbour relations ', neighbours, len(buildings))
+
+
 def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> Tuple[Optional[List[Polygon]],
                                                                                      Optional[List[Polygon]],
                                                                                      Optional[List[bl.Building]]]:
@@ -855,10 +885,24 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
             my_zone.guess_building_zone_type(farm_places)
     last_time = time_logging("Time used in seconds for guessing zone types", last_time)
 
-    # =========== See whether we can do more building relations ============================
-    # this is done as late as possible to reduce exec time by only looking in the building's same zone
+    # =========== Now let us do final calculations and relations as long as we have the nodes dict =================
+    # See whether we can do more building relations
+    # This is done as late as possible to reduce exec time by only looking in the building's same zone
     bu.process_building_loose_parts(building_nodes_dict, osm_buildings)
     last_time = time_logging('Time used in seconds for processing building loose parts', last_time)
+
+    # run a neighbour analysis -> building.refs_shared
+    _relate_neighbours(osm_buildings)
+    last_time = time_logging('Time used in seconds for relating neighbours', last_time)
+    # now we can calculate the roof ridge orientation
+    for building in osm_buildings:
+        building.calc_roof_mesh_orientation(building_nodes_dict, transformer)
+    last_time = time_logging('Time used in seconds for calculating the roof ridge orientation', last_time)
+    # FIXME: simplify stuff
+    # update the geometry a final time based on node references before we loose it
+    for building in osm_buildings:
+        building.update_geometry_from_refs(building_nodes_dict, transformer)
+    last_time = time_logging('Time used in seconds for calculating the roof ridge orientation', last_time)
 
     # =========== FINALIZE Land-use PROCESSING =============================================
     if parameters.DEBUG_PLOT_LANDUSE:

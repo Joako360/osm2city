@@ -40,7 +40,8 @@ from osm2city import myskeleton, parameters, roofs
 from osm2city.textures import materials as mat, texture as tex
 import osm2city.types.enumerations as enu
 from osm2city.utils import coordinates as co
-from osm2city.utils import utilities, ac3d, osmparser
+from osm2city.utils import osmparser as op
+from osm2city.utils import utilities, ac3d
 from osm2city.types import osmstrings as s
 from osm2city.utils import stg_io2
 from osm2city.utils.vec2d import Vec2d
@@ -107,19 +108,20 @@ class Building(object):
         * Vertex: in ac-file
         * Point (abbreviated to pt and pts): local coordinates for points on building (inner and outer)
     """
-    __slots__ = ('osm_id', 'tags', 'is_owbb_model', 'name', 'stg_typ',
+    __slots__ = ('osm_id', 'tags', 'is_owbb_model', 'stg_typ',
                  'street_angle', 'anchor', 'width', 'depth', 'zone',
-                 'body_height', 'levels', 'min_height', 'roof_shape', 'roof_height', 'roof_neighbour_orientation',
-                 'refs', 'refs_shared', 'inner_rings_list', 'outer_nodes_closest', 'polygon', 'geometry',
+                 'body_height', 'levels', 'min_height', 'roof_shape', 'roof_height', 'roof_ridge_orientation',
+                 'refs', 'refs_inner', 'refs_shared', 'inner_rings_list', 'outer_nodes_closest', 'polygon', 'geometry',
                  'parent', 'pts_all', 'roof_height_pts', 'edge_length_pts', 'facade_texture',
                  'roof_texture', 'roof_requires', 'LOD',
                  'ground_elev', 'diff_elev'
                  )
 
-    def __init__(self, osm_id: int, tags: Dict[str, str], outer_ring: shg.LinearRing, name: str,
+    def __init__(self, osm_id: int, tags: Dict[str, str], outer_ring: shg.LinearRing,
                  anchor: Optional[Vec2d],
                  stg_typ: stg_io2.STGVerbType = None, street_angle=0, inner_rings_list=None,
-                 refs: List[int] = None, is_owbb_model: bool = False, width: float = 0., depth: float = 0.) -> None:
+                 refs: List[int] = None, refs_inner: List[List[int]] = None,
+                 is_owbb_model: bool = False, width: float = 0., depth: float = 0.) -> None:
         # assert empty lists if default None
         if inner_rings_list is None:
             inner_rings_list = list()
@@ -130,7 +132,6 @@ class Building(object):
         self.osm_id = osm_id
         self.tags = tags
         self.is_owbb_model = is_owbb_model
-        self.name = name
         self.stg_typ = stg_typ  # STGVerbType
 
         # For buildings drawn by shader in BUILDING_LIST
@@ -148,16 +149,17 @@ class Building(object):
         self.min_height = 0.0  # the height over ground relative to ground_elev of the facade. See min_height in OSM
         self.roof_shape = enu.RoofShape.flat
         self.roof_height = 0.0  # the height of the roof (0 if flat), not the elevation over ground of the roof
-        self.roof_neighbour_orientation = -1.  # only valid if >= 0 and then finally used in roofs.py
+        self.roof_ridge_orientation = -1.  # only valid if >= 0 and then finally used in roofs.py
 
         # set during method called by init(...) through self.update_geometry and related sub-calls
         self.refs = None  # contains only the refs of the outer_ring
+        self.refs_inner = None
         self.refs_shared = dict()  # refs shared with other buildings (key: neighbour osm_id, value: set of positions)
         self.inner_rings_list = None
         self.outer_nodes_closest = None
         self.polygon = None  # can have inner and outer rings, i.e. the real polygon
         self.geometry = None  # only the outer ring - for convenience and faster processing in some analysis
-        self.update_geometry(outer_ring, inner_rings_list, refs)
+        self.update_geometry(outer_ring, inner_rings_list, refs, refs_inner)
 
         # set in buildings.py for building relations prior to building_lib.analyse(...)
         # - from building._process_building_parts(...)
@@ -184,7 +186,7 @@ class Building(object):
                 self.tags[s.K_BUILDING] = part_value
 
     def update_geometry(self, outer_ring: shg.LinearRing, inner_rings_list: List[shg.LinearRing] = None,
-                        refs: List[int] = None) -> None:
+                        refs: List[int] = None, refs_inner: List[List[int]] = None) -> None:
         """Updates the geometry of the building. This can also happen after the building has been initialized.
         Makes also sure, that inner and outer rings have correct orientation.
         """
@@ -203,9 +205,12 @@ class Building(object):
         self.inner_rings_list = inner_rings_list
         if self.inner_rings_list:
             # make sure that inner rings are not ccw
+            index_pos = 0
             for inner_ring in self.inner_rings_list:
                 if inner_ring.is_ccw:
                     inner_ring.coords = list(inner_ring.coords)[::-1]
+                    refs_inner[index_pos] = refs_inner[index_pos][::-1]
+                index_pos += 1
         self.outer_nodes_closest = []
         if len(outer_ring.coords) > 2:
             self._set_polygon(outer_ring, self.inner_rings_list)
@@ -214,6 +219,18 @@ class Building(object):
         if self.inner_rings_list:
             self.roll_inner_nodes()
         self.update_anchor(False)
+
+    def update_geometry_from_refs(self, nodes_dict: Dict[int, op.Node],
+                                  coords_transform: co.Transformation) -> None:
+        """Make it possible to update geometry based on refs already stored in the building.
+
+        E.g. to make sure that after different geometry operations sequence of nodes vs. refs is still consistent."""
+        outer_ring = op.refs_to_ring(coords_transform, self.refs, nodes_dict)
+        inner_rings_list = list()
+        if self.refs_inner:
+            for inner_ring_refs in self.refs_inner:
+                inner_rings_list.append(op.refs_to_ring(coords_transform, inner_ring_refs.refs, nodes_dict))
+        self.update_geometry(outer_ring, inner_rings_list, self.refs, self.refs_inner)
 
     def update_anchor(self, recalculate: bool) -> None:
         """Determines the anchor point of a building.
@@ -754,12 +771,12 @@ class Building(object):
         proxy_roof_height = 0.
 
         if s.K_HEIGHT in self.tags:
-            proxy_total_height = osmparser.parse_length(self.tags[s.K_HEIGHT])
+            proxy_total_height = op.parse_length(self.tags[s.K_HEIGHT])
         if s.K_BUILDING_HEIGHT in self.tags:
-            proxy_body_height = osmparser.parse_length(self.tags[s.K_BUILDING_HEIGHT])
+            proxy_body_height = op.parse_length(self.tags[s.K_BUILDING_HEIGHT])
         if s.K_ROOF_HEIGHT in self.tags:
             try:
-                proxy_roof_height = osmparser.parse_length(self.tags[s.K_ROOF_HEIGHT])
+                proxy_roof_height = op.parse_length(self.tags[s.K_ROOF_HEIGHT])
             except:
                 proxy_roof_height = 0.
 
@@ -767,7 +784,7 @@ class Building(object):
             self.tags[s.K_MIN_HEIGHT] = self.tags[s.K_MIN_HEIGHT_COLON]
             del self.tags[s.K_MIN_HEIGHT_COLON]
         if s.K_MIN_HEIGHT in self.tags:
-            self.min_height = osmparser.parse_length(self.tags[s.K_MIN_HEIGHT])
+            self.min_height = op.parse_length(self.tags[s.K_MIN_HEIGHT])
 
         # a bit of sanity
         if proxy_roof_height == 0. and self.roof_complex:
@@ -880,18 +897,19 @@ class Building(object):
             if allow_complex_roofs is False:
                 self.roof_shape = enu.RoofShape.flat
 
-    def analyse_roof_mesh_orientation(self) -> None:
-        """Analyses the roof orientation for non-flat roofs with neighbours.
+    def calc_roof_mesh_orientation(self, nodes_dict: Dict[int, op.Node], transformation: co.Transformation) -> None:
+        """Calculates the roof orientation for roofs with neighbours for OSM buildings.
+
+        (Only used for buildings in meshes. Generated buildings do not have neighbours, but have a street angle.)
 
         There is a possibility that the there is more than one neighbour or that the same neighbour
         has more than 2 edges shared. Therefore we assume that the longest shared edge is representative
         for the side of the roof, which is 90 degrees to the ridge respectively is a gable end.
         """
-        self.roof_neighbour_orientation = -1.
-        if self.roof_shape is enu.RoofShape.flat or self.has_inner or self.has_neighbours is False:
+        self.roof_ridge_orientation = -1.
+        if self.has_inner or self.has_neighbours is False:
             return
 
-        outer_points = self.pts_outer
         longest_distance = 0
         for node_positions in self.refs_shared.values():
             if len(node_positions) < 2:  # not interested in neighbours with only one common node
@@ -900,25 +918,27 @@ class Building(object):
                 first_pos = -1
                 second_pos = -1
                 # if we have the last node, then try to connect it with the first
-                if i == (len(outer_points) - 1) and 0 in node_positions:
+                if i == (len(self.refs) - 1) and 0 in node_positions:
                     first_pos = i
                     second_pos = 0
                 elif (i + 1) in node_positions:
                     first_pos = i
                     second_pos = i + 1
                 if first_pos > -1:
-                    orientation = co.calc_angle_of_line_local(outer_points[first_pos][0], outer_points[first_pos][1],
-                                                              outer_points[second_pos][0], outer_points[second_pos][1])
-                    distance = co.calc_distance_local(outer_points[first_pos][0], outer_points[first_pos][1],
-                                                      outer_points[second_pos][0], outer_points[second_pos][1])
+                    first_node = nodes_dict[self.refs[first_pos]]
+                    second_node = nodes_dict[self.refs[second_pos]]
+                    orientation = co.calc_angle_of_line_global(first_node.lon, first_node.lat,
+                                                               second_node.lon, second_node.lat, transformation)
+                    distance = co.calc_distance_global(first_node.lon, first_node.lat,
+                                                       second_node.lon, second_node.lat)
                     if distance > longest_distance:
                         longest_distance = distance
-                        self.roof_neighbour_orientation = orientation + 90  # add 90 to the gable end orientat. -> ridge
-                        if self.roof_neighbour_orientation > 180:
-                            self.roof_neighbour_orientation -= 180
+                        self.roof_ridge_orientation = orientation + 90  # add 90 to the gable end orientat. -> ridge
+                        if self.roof_ridge_orientation > 180:
+                            self.roof_ridge_orientation -= 180
         return
 
-    def analyse_roof_list_orientation(self) -> int:
+    def calc_roof_list_orientation(self) -> int:
         """Roof orientation for buildings in lists: 0 = parallel to front, 1 = orthogonal to front.
 
         See README.scenery in FGDATA/docs.
@@ -971,9 +991,9 @@ class Building(object):
             # get global roof_height and height for each vertex
             if s.K_ROOF_HEIGHT in self.tags:
                 # force clean of tag if the unit is given
-                temp_roof_height = osmparser.parse_length(self.tags[s.K_ROOF_HEIGHT])
+                temp_roof_height = op.parse_length(self.tags[s.K_ROOF_HEIGHT])
             else:
-                if s.K_ROOF_ANGLE in self.tags and osmparser.is_parsable_float(self.tags[s.K_ROOF_ANGLE]):
+                if s.K_ROOF_ANGLE in self.tags and op.is_parsable_float(self.tags[s.K_ROOF_ANGLE]):
                     angle = float(self.tags[s.K_ROOF_ANGLE])
                     while angle > 0:
                         temp_roof_height = tan(np.deg2rad(angle)) * (self.edge_length_pts[1] / 2)
@@ -994,7 +1014,7 @@ class Building(object):
                 # angle 360 north
                 #
                 # here we works with trigo angles
-                angle00 = pi / 2. - (((osmparser.parse_direction(self.tags[s.K_ROOF_SLOPE_DIRECTION])) % 360.)
+                angle00 = pi / 2. - (((op.parse_direction(self.tags[s.K_ROOF_SLOPE_DIRECTION])) % 360.)
                                      * pi / 180.)
             else:
                 angle00 = 0
@@ -1055,13 +1075,13 @@ class Building(object):
         else:  # roof types other than skillion
             if s.K_ROOF_HEIGHT in self.tags:
                 # get roof:height given by osm
-                self.roof_height = osmparser.parse_length(self.tags[s.K_ROOF_HEIGHT])
+                self.roof_height = op.parse_length(self.tags[s.K_ROOF_HEIGHT])
 
             else:  # roof:height based on heuristics
                 if self.roof_shape is enu.RoofShape.flat:
                     self.roof_height = 0.
                 else:
-                    if s.K_ROOF_ANGLE in self.tags and osmparser.is_parsable_float(self.tags[s.K_ROOF_ANGLE]):
+                    if s.K_ROOF_ANGLE in self.tags and op.is_parsable_float(self.tags[s.K_ROOF_ANGLE]):
                         angle = float(self.tags[s.K_ROOF_ANGLE])
                         while angle > 0:
                             temp_roof_height = tan(np.deg2rad(angle)) * (self.edge_length_pts[1] / 2)
@@ -1374,13 +1394,13 @@ def _parse_building_levels(tags: Dict[str, str]) -> float:
     proxy_levels = 0.
     if s.K_BUILDING_LEVELS in tags:
         if ';' in tags[s.K_BUILDING_LEVELS]:
-            proxy_levels = float(osmparser.parse_multi_int_values(tags[s.K_BUILDING_LEVELS]))
-        elif osmparser.is_parsable_float(tags[s.K_BUILDING_LEVELS]):
+            proxy_levels = float(op.parse_multi_int_values(tags[s.K_BUILDING_LEVELS]))
+        elif op.is_parsable_float(tags[s.K_BUILDING_LEVELS]):
             proxy_levels = float(tags[s.K_BUILDING_LEVELS])
     if s.K_LEVELS in tags:
         if ';' in tags[s.K_LEVELS]:
-            proxy_levels = float(osmparser.parse_multi_int_values(tags[s.K_LEVELS]))
-        elif osmparser.is_parsable_float(tags[s.K_LEVELS]):
+            proxy_levels = float(op.parse_multi_int_values(tags[s.K_LEVELS]))
+        elif op.is_parsable_float(tags[s.K_LEVELS]):
             proxy_levels = float(tags[s.K_LEVELS])
     return proxy_levels
 
@@ -1450,36 +1470,6 @@ def decide_lod(buildings: List[Building], stats: utilities.Stats) -> None:
         stats.count_LOD(lod)
 
 
-def _relate_neighbours(buildings: List[Building]) -> None:
-    """Relates neighbour buildings based on shared references."""
-    neighbours = 0
-    len_buildings = len(buildings)
-    for i, first_building in enumerate(buildings, 1):
-        if i % 10000 == 0:
-            logging.info('Checked building relations for %i out of %i buildings', i, len_buildings)
-        potential_attached = first_building.zone.osm_buildings
-        ref_set_first = set(first_building.refs)
-        for second_building in potential_attached:
-            if first_building.osm_id == second_building.osm_id:  # do not compare with self
-                continue
-            ref_set_second = set(second_building.refs)
-            if ref_set_first.isdisjoint(ref_set_second) is False:
-                for pos_i in range(len(first_building.refs)):
-                    for pos_j in range(len(second_building.refs)):
-                        if first_building.refs[pos_i] == second_building.refs[pos_j]:
-                            if second_building.osm_id not in first_building.refs_shared:
-                                first_building.refs_shared[second_building.osm_id] = set()
-                            first_building.refs_shared[second_building.osm_id].add(pos_i)
-                            if first_building.osm_id not in second_building.refs_shared:
-                                second_building.refs_shared[first_building.osm_id] = set()
-                            second_building.refs_shared[first_building.osm_id].add(pos_j)
-
-    for b in buildings:
-        if b.has_neighbours:
-            neighbours += 1
-    logging.info('%i out of %i buildings have neighbour relations ', neighbours, len(buildings))
-
-
 def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: stg_io2.STGManager,
             coords_transform: co.Transformation,
             facade_mgr: tex.FacadeManager, roof_mgr: tex.RoofManager, stats: utilities.Stats) -> List[Building]:
@@ -1488,10 +1478,6 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: s
     get transformed to dynamically created AC3D files containing a cluster of buildings.
     Some OSM buildings are excluded from analysis, as they get processed in pylons.py.
     """
-    # run a neighbour analysis
-    _relate_neighbours(buildings)
-
-    # do the analysis
     new_buildings = []
     for b in buildings:
         building_parent = b.parent
@@ -1552,8 +1538,6 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: s
                 stats.skipped_small += 1
                 continue
         b.analyse_roof_shape_check()
-
-        b.analyse_roof_mesh_orientation()
 
         if not b.analyse_textures(facade_mgr, roof_mgr, stats):
             continue
@@ -1676,12 +1660,8 @@ def overlap_check_convex_hull(orig_buildings: List[Building], stg_entries: List[
             try:
                 if entry.convex_hull is not None and entry.convex_hull.intersects(building.geometry):
                     is_intersecting = True
-                    if building.name is None or len(building.name) == 0:
-                        logging.debug("Convex hull of object '%s' is intersecting. Skipping building with osm_id %d",
-                                      entry.obj_filename, building.osm_id)
-                    else:
-                        logging.debug("Convex hull of object '%s' is intersecting. Skipping building '%s' (osm_id %d)",
-                                      entry.obj_filename, building.name, building.osm_id)
+                    logging.debug("Convex hull of object '%s' is intersecting. Skipping building with osm_id %d",
+                                  entry.obj_filename, building.osm_id)
                     break
             except TopologicalError:
                 logging.exception('Convex hull could not be checked due to topology problem - building osm_id: %d',

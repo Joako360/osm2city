@@ -585,20 +585,20 @@ def _process_osm_building(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, o
 
 def _make_building_from_way(nodes_dict: Dict[int, op.Node], all_tags: Dict[str, str], way: op.Way,
                             coords_transform: coordinates.Transformation,
-                            inner_ways=None) -> Optional[building_lib.Building]:
+                            inner_ways: List[op.Way] = None) -> Optional[building_lib.Building]:
     if way.refs[0] == way.refs[-1]:
         way.refs = way.refs[0:-1]  # -- kick last ref if it coincides with first
 
-    name = ""
-
-    # -- funny things might happen while parsing OSM
     try:
-        # -- make outer and inner rings from refs
-        outer_ring = _refs_to_ring(coords_transform, way.refs, nodes_dict)
+        outer_ring = op.refs_to_ring(coords_transform, way.refs, nodes_dict)
         inner_rings_list = list()
+        inner_refs_list = list()
         if inner_ways:
             for _way in inner_ways:
-                inner_rings_list.append(_refs_to_ring(coords_transform, _way.refs, nodes_dict))
+                if _way.refs[0] == _way.refs[-1]:
+                    _way.refs = _way.refs[0:-1]  # -- kick last ref if it coincides with first
+                inner_rings_list.append(op.refs_to_ring(coords_transform, _way.refs, nodes_dict))
+                inner_refs_list.append(_way.refs)
     except KeyError as reason:
         logging.debug("ERROR: Failed to parse building referenced node missing clipped?(%s) WayID %d %s Refs %s" % (
             reason, way.osm_id, all_tags, way.refs))
@@ -608,20 +608,8 @@ def _make_building_from_way(nodes_dict: Dict[int, op.Node], all_tags: Dict[str, 
                                                                                      way.refs))
         return None
 
-    return building_lib.Building(way.osm_id, all_tags, outer_ring, name, None, inner_rings_list=inner_rings_list,
-                                 refs=way.refs)
-
-
-def _refs_to_ring(coords_transform: coordinates.Transformation, refs,
-                  nodes_dict: Dict[int, op.Node]) -> shg.LinearRing:
-    """Accept a list of OSM refs, return a linear ring."""
-    coords = []
-    for ref in refs:
-        c = nodes_dict[ref]
-        coords.append(coords_transform.to_local((c.lon, c.lat)))
-
-    ring = shg.polygon.LinearRing(coords)
-    return ring
+    return building_lib.Building(way.osm_id, all_tags, outer_ring, None, inner_rings_list=inner_rings_list,
+                                 refs=way.refs, refs_inner=inner_refs_list)
 
 
 def _clean_building_zones_dangling_children(my_buildings: List[building_lib.Building]) -> None:
@@ -924,7 +912,7 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
                     tex_variability = 4
                 wall_tex_idx = random.randint(0, tex_variability - 1)  # FIXME: should calc on street level or owbb
                 roof_tex_idx = wall_tex_idx
-                roof_orientation = b.analyse_roof_list_orientation()
+                roof_orientation = b.calc_roof_list_orientation()
                 line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(b.width, b.depth, b.body_height,
                                                                              b.roof_height, b.roof_shape.value,
                                                                              roof_orientation, round(b.levels),

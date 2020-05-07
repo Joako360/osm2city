@@ -190,6 +190,18 @@ class Relation(OSMElement):
         return 'Relation with osm_id: {}'.format(self.osm_id)
 
 
+def refs_to_ring(coords_transform: Transformation, refs: List[int],
+                 nodes_dict: Dict[int, Node]) -> shg.LinearRing:
+    """Accept a list of OSM refs, return a linear ring."""
+    coords = []
+    for ref in refs:
+        c = nodes_dict[ref]
+        coords.append(coords_transform.to_local((c.lon, c.lat)))
+
+    ring = shg.polygon.LinearRing(coords)
+    return ring
+
+
 def closed_ways_from_multiple_ways(way_parts: List[Way]) -> List[Way]:
     """Create closed ways from multiple not closed ways where possible.
     See http://wiki.openstreetmap.org/wiki/Relation:multipolygon.
