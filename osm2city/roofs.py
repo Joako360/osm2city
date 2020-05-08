@@ -17,6 +17,22 @@ GAMBREL_ANGLE_LOWER_PART = 70
 GAMBREL_HEIGHT_RATIO_LOWER_PART = 0.75
 
 
+class RoofHint:
+    """As set of hints for placing or constructing the roof.
+    Not all buildings have a RoofHint - and most often only one of the fields will be available.
+    Fields:
+    * ridge_orientation: the orientation in degrees of the ridge - for gabled roofs with 4 edges. Only set
+                         if there are neighbours and therefore the ridge should be aligned.
+    * inner_node:        in an L-shaped building or a 4 edge building with two neighbours around the corner:
+                         the node which is at the inner side in teh ca. 90 deg corner
+    """
+    __slots__ = ('ridge_orientation', 'inner_node')
+
+    def __init__(self) -> None:
+        self.ridge_orientation = -1.  # float >= 0. Only valid hint if >= 0 and then finally used in roofs.py
+        self.inner_node = None  # local lon/lat Tuple[float, float]
+
+
 def roof_looks_square(circumference: float, area: float) -> bool:
     """Determines if a roof's floor plan looks square.
     The formula basically states that if it was a rectangle, then the ratio between the long side length
@@ -128,7 +144,7 @@ def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_
     if osm_roof_orientation_exists:
         if osm_roof_orientation == s.V_ACROSS:
             i_side = i_small
-    elif b.roof_ridge_orientation >= 0.:  # only override if we have neighbours
+    elif b.roof_hint is not None and b.roof_hint.ridge_orientation >= 0.:  # only override if we have neighbours
         # calculate the angle of the "along"
         along_angle = coord.calc_angle_of_line_local(b.pts_all[i_long % 4][0],
                                                      b.pts_all[i_long % 4][1],
@@ -136,7 +152,7 @@ def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_
                                                      b.pts_all[(i_long + 1) % 4][1])
         if along_angle >= 180.:
             along_angle -= 180.
-        difference = fabs(b.roof_ridge_orientation - along_angle)
+        difference = fabs(b.roof_hint.ridge_orientation - along_angle)
         # if the difference is closer to 90 than parallel, then change the orientation
         if 45 < difference < 135:
             i_side = i_small

@@ -896,8 +896,8 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     last_time = time_logging('Time used in seconds for relating neighbours', last_time)
     # now we can calculate the roof ridge orientation
     for building in osm_buildings:
-        building.calc_roof_mesh_orientation(building_nodes_dict, transformer)
-    last_time = time_logging('Time used in seconds for calculating the roof ridge orientation', last_time)
+        building.calc_roof_hints(building_nodes_dict, transformer)
+    last_time = time_logging('Time used in seconds for calculating roof hints', last_time)
     # FIXME: simplify stuff
     # update the geometry a final time based on node references before we loose it
     for building in osm_buildings:

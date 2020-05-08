@@ -110,7 +110,7 @@ class Building(object):
     """
     __slots__ = ('osm_id', 'tags', 'is_owbb_model', 'stg_typ',
                  'street_angle', 'anchor', 'width', 'depth', 'zone',
-                 'body_height', 'levels', 'min_height', 'roof_shape', 'roof_height', 'roof_ridge_orientation',
+                 'body_height', 'levels', 'min_height', 'roof_shape', 'roof_height', 'roof_hint',
                  'refs', 'refs_inner', 'refs_shared', 'inner_rings_list', 'outer_nodes_closest', 'polygon', 'geometry',
                  'parent', 'pts_all', 'roof_height_pts', 'edge_length_pts', 'facade_texture',
                  'roof_texture', 'roof_requires', 'LOD',
@@ -149,7 +149,7 @@ class Building(object):
         self.min_height = 0.0  # the height over ground relative to ground_elev of the facade. See min_height in OSM
         self.roof_shape = enu.RoofShape.flat
         self.roof_height = 0.0  # the height of the roof (0 if flat), not the elevation over ground of the roof
-        self.roof_ridge_orientation = -1.  # only valid if >= 0 and then finally used in roofs.py
+        self.roof_hint = None  # roofs.RoofHint object
 
         # set during method called by init(...) through self.update_geometry and related sub-calls
         self.refs = None  # contains only the refs of the outer_ring
@@ -897,7 +897,7 @@ class Building(object):
             if allow_complex_roofs is False:
                 self.roof_shape = enu.RoofShape.flat
 
-    def calc_roof_mesh_orientation(self, nodes_dict: Dict[int, op.Node], transformation: co.Transformation) -> None:
+    def _calc_ridge_orientation(self, nodes_dict: Dict[int, op.Node], transformation: co.Transformation) -> None:
         """Calculates the roof orientation for roofs with neighbours for OSM buildings.
 
         (Only used for buildings in meshes. Generated buildings do not have neighbours, but have a street angle.)
@@ -906,10 +906,6 @@ class Building(object):
         has more than 2 edges shared. Therefore we assume that the longest shared edge is representative
         for the side of the roof, which is 90 degrees to the ridge respectively is a gable end.
         """
-        self.roof_ridge_orientation = -1.
-        if self.has_inner or self.has_neighbours is False:
-            return
-
         longest_distance = 0
         for node_positions in self.refs_shared.values():
             if len(node_positions) < 2:  # not interested in neighbours with only one common node
@@ -933,10 +929,71 @@ class Building(object):
                                                        second_node.lon, second_node.lat)
                     if distance > longest_distance:
                         longest_distance = distance
-                        self.roof_ridge_orientation = orientation + 90  # add 90 to the gable end orientat. -> ridge
-                        if self.roof_ridge_orientation > 180:
-                            self.roof_ridge_orientation -= 180
-        return
+                        if self.roof_hint is None:
+                            self.roof_hint = roofs.RoofHint()
+                        self.roof_hint.ridge_orientation = orientation + 90  # add 90 to the gable end orient. -> ridge
+                        if self.roof_hint.ridge_orientation > 180:
+                            self.roof_hint.ridge_orientation -= 180
+
+    def _calc_inner_node(self, nodes_dict: Dict[int, op.Node], transformation: co.Transformation) -> None:
+        """For L-shaped buildings with at least one neighbour or a 4-edge building with 2 neighbours around a corner."""
+        # test whether there is a common reference position if there are two neighbours
+        common_set = set()
+        if len(self.refs_shared) == 2:
+            first_set = None
+            second_set = None
+            for ref_list in self.refs_shared.values():
+                if first_set is None:
+                    first_set = set(ref_list)
+                    if len(first_set) != 2:  # only interested if neighbour shares 2 points
+                        first_set = set()
+                else:
+                    second_set = set(ref_list)
+                    if len(second_set) != 2:
+                        second_set = set()
+            common_set = first_set.intersection(second_set)
+
+        if len(self.refs) == 4 and len(self.refs_shared) == 2:  # theoretically there could 3 or 4 neighbours
+            # Just need to find the node, which is shared with two buildings - if any
+            if len(common_set) == 1:
+                if self.roof_hint is None:
+                    self.roof_hint = roofs.RoofHint()
+                node = nodes_dict[self.refs[common_set.pop()]]
+                self.roof_hint.inner_node = transformation.to_local((node.lon, node.lat))
+
+        elif len(self.refs) == 6 and 1 <= len(self.refs_shared) <= 2:
+            # if there are 2 neighbours, then we need to make sure that they are not sharing an edge
+            if len(common_set) > 0:
+                return
+            # now find the node in references, which is the closest to one of the points in one of the
+            # neighbours
+            shortest_distance = 99999999
+            closest_node = None
+            for ref_list in self.refs_shared.values():
+                if len(ref_list) != 2:
+                    continue
+                for ref in self.refs:
+                    for pos in ref_list:
+                        if ref == self.refs[pos]:
+                            continue
+                        first_node = nodes_dict[ref]
+                        second_node = nodes_dict[self.refs[pos]]
+                        distance = co.calc_distance_global(first_node.lon, first_node.lat,
+                                                           second_node.lon, second_node.lat)
+                        if distance < shortest_distance:
+                            shortest_distance = distance
+                            closest_node = first_node
+                break  # one neighbour is enough
+            if closest_node:
+                if self.roof_hint is None:
+                    self.roof_hint = roofs.RoofHint()
+                self.roof_hint.inner_node = transformation.to_local((closest_node.lon, closest_node.lat))
+
+    def calc_roof_hints(self, nodes_dict: Dict[int, op.Node], transformation: co.Transformation) -> None:
+        if self.has_inner or self.has_neighbours is False:
+            return
+        self._calc_ridge_orientation(nodes_dict, transformation)
+        self._calc_inner_node(nodes_dict, transformation)
 
     def calc_roof_list_orientation(self) -> int:
         """Roof orientation for buildings in lists: 0 = parallel to front, 1 = orthogonal to front.
