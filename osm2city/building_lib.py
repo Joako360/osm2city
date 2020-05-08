@@ -349,23 +349,25 @@ class Building(object):
         self.outer_nodes_closest = [y for (y, x) in yx]
         self._set_polygon(self.polygon.exterior, self.inner_rings_list)
 
-    def simplify(self) -> int:
+    def simplify(self, nodes_dict: Dict[int, op.Node], coords_transform: co.Transformation) -> int:
         """Simplifies the geometry, but only if no inners."""
         if self.has_inner:
             return 0
-        original_number = len(self.polygon.exterior.coords)
+        count_simplified = 0
         while True:
-            simplified = utilities.simplify_balconies(self.polygon, parameters.BUILDING_SIMPLIFY_TOLERANCE_LINE,
-                                                      parameters.BUILDING_SIMPLIFY_TOLERANCE_AWAY, self.refs_shared)
-            if simplified is None:
+            to_remove = utilities.simplify_balconies(self.polygon, parameters.BUILDING_SIMPLIFY_TOLERANCE_LINE,
+                                                     parameters.BUILDING_SIMPLIFY_TOLERANCE_AWAY, self.refs_shared)
+            if len(to_remove) == 0:
                 break
             else:
-                self.polygon = simplified
-        simplified_number = len(self.polygon.exterior.coords)
-        difference = original_number - simplified_number
-        if difference > 0:
-            self.geometry = self.polygon  # can do this because self.has_inner is False
-        return difference
+                count_simplified += 1
+                new_refs = list()
+                for i in range(0, len(self.refs)):
+                    if i not in to_remove:
+                        new_refs.append(self.refs[i])
+                self.refs = new_refs
+                self.update_geometry_from_refs(nodes_dict, coords_transform)
+        return count_simplified
 
     def _set_polygon(self, outer: shg.LinearRing, inner: List[shg.LinearRing] = None) -> None:
         if inner is None:
@@ -1561,8 +1563,6 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: s
                 if _analyse_worship_building(b, building_parent, stg_manager, fg_elev, coords_transform):
                     continue
 
-        if building_parent is None:  # do not simplify if in parent/child relationship
-            stats.nodes_simplified += b.simplify()
         try:
             b.roll_inner_nodes()
         except Exception as reason:

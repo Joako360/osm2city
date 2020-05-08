@@ -894,10 +894,17 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     # run a neighbour analysis -> building.refs_shared
     _relate_neighbours(osm_buildings)
     last_time = time_logging('Time used in seconds for relating neighbours', last_time)
+    # simplify the geometry
+    count_simplified = 0
+    for building in osm_buildings:
+        if not building.has_parent:  # do not simplify if in parent/child relationship
+            count_simplified += building.simplify(building_nodes_dict, transformer)
+    logging.info('Made %i simplifications in total (there can be more than 1 simplification in a building',
+                 count_simplified)
     # now we can calculate the roof ridge orientation
     for building in osm_buildings:
         building.calc_roof_hints(building_nodes_dict, transformer)
-    last_time = time_logging('Time used in seconds for calculating roof hints', last_time)
+    last_time = time_logging('Time used in seconds for simplifying and calculating roof hints', last_time)
     # FIXME: simplify stuff
     # update the geometry a final time based on node references before we loose it
     for building in osm_buildings:

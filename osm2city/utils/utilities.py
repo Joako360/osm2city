@@ -695,7 +695,7 @@ def _safe_index(index: int, number_of_elements: int) -> int:
 
 
 def simplify_balconies(original: shg.Polygon, distance_tolerance_line: float,
-                       distance_tolerance_away: float, refs_shared: Dict[int, Set[int]]) -> Optional[shg.Polygon]:
+                       distance_tolerance_away: float, refs_shared: Dict[int, Set[int]]) -> Set[int]:
     """Removes edges from polygons, which look like balconies on a building.
     Removes always 4 points at a time.
 
@@ -754,16 +754,7 @@ def simplify_balconies(original: shg.Polygon, distance_tolerance_line: float,
                     refs_shared[key] = new_pos_set
                 break  # do not continue the while loop once we have found one balcony to remove
         counter += 1
-
-    if len(to_remove_points) == 0:
-        return None
-    else:
-        ny_coords = list()
-        for i in range(len(my_coords)):
-            if i not in to_remove_points:
-                ny_coords.append(my_coords[i])
-        reduced_poly = shg.Polygon(shg.LinearRing(ny_coords))
-        return reduced_poly
+    return to_remove_points
 
 
 def merge_buffers(original_list: List[Polygon]) -> List[Polygon]:
