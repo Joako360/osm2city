@@ -20,11 +20,19 @@ GAMBREL_HEIGHT_RATIO_LOWER_PART = 0.75
 class RoofHint:
     """As set of hints for placing or constructing the roof.
     Not all buildings have a RoofHint - and most often only one of the fields will be available.
+
+    See description in the 'how it works' section of the manual.
+
+    If a building has an inner node, then no more simplifications should be done.
+
     Fields:
     * ridge_orientation: the orientation in degrees of the ridge - for gabled roofs with 4 edges. Only set
                          if there are neighbours and therefore the ridge should be aligned.
-    * inner_node:        in an L-shaped building or a 4 edge building with two neighbours around the corner:
-                         the node which is at the inner side in teh ca. 90 deg corner
+    * inner_node:        for L-shaped roofs due to neighbours or L-shaped building:
+                         the node which is at the inner side in the ca. 90 deg corner as follows:
+                         Tuple of tuple(lon, lat) in local coordinates.
+                         The lon/lat instead of a node position is kept because due to geometry changes
+                         the sequence of the outer ring could change. This way we can test.
     """
     __slots__ = ('ridge_orientation', 'inner_node')
 
@@ -96,6 +104,30 @@ def flat(ac_object: ac.Object, index_first_node_in_ac_obj: int, b, roof_mgr: Roo
     ac_object.face(nodes_uv_list, mat_idx=roof_mat_idx)
 
 
+def sanity_roof_height_complex(b, roof_type: str) -> float:
+    if b.roof_height:
+        return b.roof_height
+    else:
+        logging.warning("no roof_height in %s for building %i", roof_type, b.osm_id)
+        return enu.BUILDING_LEVEL_HEIGHT_RURAL
+
+
+def separate_gable_with_corner(ac_object, b, roof_mat_idx: int, facade_mat_idx: int) -> None:
+    """By convention counting of nodes starts at the inner node."""
+    t = b.roof_texture
+    roof_height = sanity_roof_height_complex(b, 'gable_with_corner')
+
+    # find the point closest to the RoofHint.inner_node
+    shortest_dist = 9999999
+    shortest_index = 0
+    num_nodes = len(b.pts_all)  # pts_all works because there are no inner points in a complex roof
+    for index, pt in b.pts_all.enumerate():
+        dist = coord.calc_distance_local(pt.x, pt.y, b.roof_hint.inner_node.x, b.roof_hint.inner_node.x)
+        if dist < shortest_dist:
+            shortest_dist = dist
+            shortest_index = index
+
+
 def separate_hipped(ac_object: ac.Object, b, roof_mat_idx: int) -> None:
     return separate_gable(ac_object, b, roof_mat_idx, roof_mat_idx, inward_meters=2.)
 
@@ -103,16 +135,12 @@ def separate_hipped(ac_object: ac.Object, b, roof_mat_idx: int) -> None:
 def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_meters=0.) -> None:
     """Gabled or gambrel roof (or hipped if inward_meters > 0) with 4 nodes."""
     t = b.roof_texture
-    
-    if b.roof_height:
-        roof_height = b.roof_height
-    else:
-        my_type = 'separate_gable'
-        if inward_meters > 0:
-            my_type = 'separate_hipped'
-        logging.warning("no roof_height in %s for building %i", my_type, b.osm_id)
-        roof_height = 2.0
-    
+
+    my_type = 'separate_gable'
+    if inward_meters > 0:
+        my_type = 'separate_hipped'
+    roof_height = sanity_roof_height_complex(b, my_type)
+
     # get orientation if exits:
     osm_roof_orientation_exists = False
     if s.K_ROOF_ORIENTATION in b.tags:
@@ -322,11 +350,7 @@ def separate_pyramidal(ac_object: ac.Object, b, roof_mat_idx: int) -> None:
     shape = b.roof_shape
     roof_texture = b.roof_texture
         
-    # -- get roof height 
-    if b.roof_height:
-        roof_height = b.roof_height 
-    else:
-        return
+    roof_height = sanity_roof_height_complex(b, 'pyramidal')
 
     bottom = b.beginning_of_roof_above_sea_level
             

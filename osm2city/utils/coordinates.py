@@ -228,12 +228,31 @@ def calc_point_on_line_local(x1: float, y1: float, x2: float, y2: float, factor:
 def calc_angle_of_corner_local(prev_point_x: float, prev_point_y: float,
                                corner_point_x: float, corner_point_y,
                                next_point_x: float, next_point_y) -> float:
+    """The angle seen from the corner looking at the prev_point and then the next point."""
     first_angle = calc_angle_of_line_local(corner_point_x, corner_point_y, prev_point_x, prev_point_y)
     second_angle = calc_angle_of_line_local(corner_point_x, corner_point_y, next_point_x, next_point_y)
     final_angle = fabs(first_angle - second_angle)
     if final_angle > 180:
         final_angle = 360 - final_angle
     return final_angle
+
+
+def calc_delta_bearing(bearing1: float, bearing2: float) -> float:
+    """Calculates the difference between two bearings. If positive with clock, if negative against the clock sense.
+
+    I.e. from bearing1 to bearing2 you need to turn delta with or against the clock."""
+    if bearing1 == 360.:
+        bearing1 = 0.
+    if bearing2 == 360.:
+        bearing2 = 0.
+    delta = bearing2 - bearing1
+
+    if delta > 180:
+        delta = delta - 360
+    elif delta < -180:
+        delta = 360 + delta
+
+    return delta
 
 
 def calc_distance_local(x1, y1, x2, y2):
@@ -360,6 +379,39 @@ class TestCoordinates(unittest.TestCase):
 
         self.assertAlmostEqual(45, calc_angle_of_corner_local(-1, 1, 0, 0, 0, 1), 2)
         self.assertAlmostEqual(45, calc_angle_of_corner_local(-1, 1, 0, 0, -1, 0), 2)
+
+    def test_calc_delta_bearing(self):
+        bearing1 = 0.
+        bearing2 = 0.
+        self.assertEqual(0., calc_delta_bearing(bearing1, bearing2), 'No difference 0')
+
+        bearing1 = 0.
+        bearing2 = 360.
+        self.assertEqual(0., calc_delta_bearing(bearing1, bearing2), 'No difference 0/360')
+
+        bearing1 = 360.
+        bearing2 = 0.
+        self.assertEqual(0., calc_delta_bearing(bearing1, bearing2), 'No difference 360/0')
+
+        bearing1 = 20
+        bearing2 = 200
+        self.assertEqual(180., fabs(calc_delta_bearing(bearing1, bearing2)), '180 degrees')
+
+        bearing1 = 10
+        bearing2 = 20
+        self.assertEqual(10., calc_delta_bearing(bearing1, bearing2), '10 with clock')
+
+        bearing1 = 20
+        bearing2 = 10
+        self.assertEqual(-10., calc_delta_bearing(bearing1, bearing2), '10 against clock')
+
+        bearing1 = 350
+        bearing2 = 10
+        self.assertEqual(20., calc_delta_bearing(bearing1, bearing2), 'Through 0: 20 with clock')
+
+        bearing1 = 10
+        bearing2 = 350
+        self.assertEqual(-20., calc_delta_bearing(bearing1, bearing2), 'Through 0: 20 against clock')
 
     def test_calc_point_on_line_local(self):
         # straight up

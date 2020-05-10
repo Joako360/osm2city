@@ -105,6 +105,10 @@ class Node(OSMElement):
 
         return -1
 
+    @property
+    def lon_lat_tuple(self) -> Tuple[float, float]:
+        return self.lon, self.lat
+
     def __str__(self):
         return 'Node with osm_id: {}'.format(self.osm_id)
 

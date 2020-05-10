@@ -270,3 +270,15 @@ class BuildingZoneType(IntEnum):  # element names must match OSM values apart fr
     btg_construction = 221
     btg_industrial = 222
     btg_port = 223
+
+
+# ================================ CONSTANTS =========================================
+# Should not be changed unless all dependencies have been thoroughly checked.
+
+# The height per level. This value should not be changed unless special textures are used.
+# For settlement types ``centre``, ``block`` and ``dense``.
+# If a building is of class ``commercial``, ``retail``, ``public`` or
+# ``parking_house``, then this height is always used.
+BUILDING_LEVEL_HEIGHT_URBAN = 3.5
+BUILDING_LEVEL_HEIGHT_RURAL = 2.5  # ditto including periphery and rural
+BUILDING_LEVEL_HEIGHT_INDUSTRIAL = 4.  # for industrial and warehouse

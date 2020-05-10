@@ -905,7 +905,6 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     for building in osm_buildings:
         building.calc_roof_hints(building_nodes_dict, transformer)
     last_time = time_logging('Time used in seconds for simplifying and calculating roof hints', last_time)
-    # FIXME: simplify stuff
     # update the geometry a final time based on node references before we loose it
     for building in osm_buildings:
         building.update_geometry_from_refs(building_nodes_dict, transformer)

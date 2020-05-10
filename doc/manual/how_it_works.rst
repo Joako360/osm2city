@@ -130,6 +130,15 @@ Node numbering for ``gambrel`` roof type:
 .. _Key Place: https://wiki.openstreetmap.org/wiki/Key:place
 
 
+There are three situations, where a gabled roof is done. See also class RoofHints in roofs.py:
+
+* A 4-sided building with 4 nodes and 2 adjacent buildings share 1 common node with the building (if there is only one neighbour building or if the 2 neighbours are on each side, then a gabled roof is done).  If more than 2 neighbours we would not know what to do.
+* A somewhat square-shaped building with 5 nodes and 5 sides, where the inner node is shared with a neighbour building. It is a requirement that the inner node is making an angle between 170 and 190 degrees with the previous/next node. Otherwise the roof just gets a skeleton roof.
+* A L-shaped building with 6 nodes and 6 sides where the inner node is not shared with a neighbour building. If is a requirement that the inner node is making an angle between 80 and 100 degrees with the previous/next node. Otherwise the roof just gets a skeleton roof.
+
+.. image:: roof_inner.jpg
+
+
 .. _chapter-aerodromes:
 
 ----------

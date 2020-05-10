@@ -234,14 +234,6 @@ BUILDING_NUMBER_LEVELS_*                        Dict       .         A dictionar
                                                                      settlement type is not ``centre`` or ``block``, then specific parameters
                                                                      are used for apartments, industrial/warehouse and others.
 
-BUILDING_LEVEL_HEIGHT_URBAN                     Number     3.5       The height per level. This value should not be changed unless special textures
-                                                                     are used. For settlement types ``centre``, ``block`` and ``dense``.
-                                                                     If a building is of class ``commercial``, ``retail``, ``public`` or
-                                                                     ``parking_house``, then this height is always used.
-BUILDING_LEVEL_HEIGHT_RURAL                     Number     2.5       Ditto for settlement types ``periphery`` and ``rural``.
-
-BUILDING_LEVEL_HEIGHT_INDUSTRIAL                Number     4.0       Ditto for buildings of class ``industrial`` or ``warehouse``.
-
 =============================================   ========   =======   ==============================================================================
 
 

@@ -94,8 +94,8 @@ def calc_levels_for_settlement_type(settlement_type: enu.SettlementType, buildin
 
 def calc_level_height_for_settlement_type(settlement_type: enu.SettlementType) -> float:
     if settlement_type in [enu.SettlementType.periphery, enu.SettlementType.rural]:
-        return parameters.BUILDING_LEVEL_HEIGHT_RURAL
-    return parameters.BUILDING_LEVEL_HEIGHT_URBAN
+        return enu.BUILDING_LEVEL_HEIGHT_RURAL
+    return enu.BUILDING_LEVEL_HEIGHT_URBAN
 
 
 class Building(object):
@@ -777,10 +777,7 @@ class Building(object):
         if s.K_BUILDING_HEIGHT in self.tags:
             proxy_body_height = op.parse_length(self.tags[s.K_BUILDING_HEIGHT])
         if s.K_ROOF_HEIGHT in self.tags:
-            try:
-                proxy_roof_height = op.parse_length(self.tags[s.K_ROOF_HEIGHT])
-            except:
-                proxy_roof_height = 0.
+            proxy_roof_height = op.parse_length(self.tags[s.K_ROOF_HEIGHT])
 
         if s.K_MIN_HEIGHT_COLON in self.tags and (s.K_MIN_HEIGHT not in self.tags):  # very few values, wrong tagging
             self.tags[s.K_MIN_HEIGHT] = self.tags[s.K_MIN_HEIGHT_COLON]
@@ -855,10 +852,10 @@ class Building(object):
 
         building_class = enu.get_building_class(self.tags)
         if building_class in [enu.BuildingClass.industrial, enu.BuildingClass.warehouse]:
-            return parameters.BUILDING_LEVEL_HEIGHT_INDUSTRIAL
+            return enu.BUILDING_LEVEL_HEIGHT_INDUSTRIAL
         elif building_class in [enu.BuildingClass.commercial, enu.BuildingClass.retail, enu.BuildingClass.public,
                                 enu.BuildingClass.parking_house]:
-            return parameters.BUILDING_LEVEL_HEIGHT_URBAN
+            return enu.BUILDING_LEVEL_HEIGHT_URBAN
         return calc_level_height_for_settlement_type(self.zone.settlement_type)
 
     def analyse_roof_shape_check(self) -> None:
@@ -938,8 +935,11 @@ class Building(object):
                             self.roof_hint.ridge_orientation -= 180
 
     def _calc_inner_node(self, nodes_dict: Dict[int, op.Node], transformation: co.Transformation) -> None:
-        """For L-shaped buildings with at least one neighbour or a 4-edge building with 2 neighbours around a corner."""
+        """For L-shaped roofs with at least one neighbour or a 4-edge building with 2 neighbours around a corner.
+        See description in roofs.RoofHint.
+        """
         # test whether there is a common reference position if there are two neighbours
+        # the outcome is used differently for 4, 5 or nodes
         common_set = set()
         if len(self.refs_shared) == 2:
             first_set = None
@@ -947,7 +947,7 @@ class Building(object):
             for ref_list in self.refs_shared.values():
                 if first_set is None:
                     first_set = set(ref_list)
-                    if len(first_set) != 2:  # only interested if neighbour shares 2 points
+                    if len(first_set) != 2:  # only interested if a neighbour shares 2 points
                         first_set = set()
                 else:
                     second_set = set(ref_list)
@@ -955,7 +955,7 @@ class Building(object):
                         second_set = set()
             common_set = first_set.intersection(second_set)
 
-        if len(self.refs) == 4 and len(self.refs_shared) == 2:  # theoretically there could 3 or 4 neighbours
+        if len(self.refs) == 4 and len(self.refs_shared) == 2:  # theoretically there could be 3 or 4 neighbours
             # Just need to find the node, which is shared with two buildings - if any
             if len(common_set) == 1:
                 if self.roof_hint is None:
@@ -963,33 +963,45 @@ class Building(object):
                 node = nodes_dict[self.refs[common_set.pop()]]
                 self.roof_hint.inner_node = transformation.to_local((node.lon, node.lat))
 
-        elif len(self.refs) == 6 and 1 <= len(self.refs_shared) <= 2:
-            # if there are 2 neighbours, then we need to make sure that they are not sharing an edge
-            if len(common_set) > 0:
-                return
-            # now find the node in references, which is the closest to one of the points in one of the
-            # neighbours
-            shortest_distance = 99999999
-            closest_node = None
-            for ref_list in self.refs_shared.values():
-                if len(ref_list) != 2:
-                    continue
-                for ref in self.refs:
-                    for pos in ref_list:
-                        if ref == self.refs[pos]:
-                            continue
-                        first_node = nodes_dict[ref]
-                        second_node = nodes_dict[self.refs[pos]]
-                        distance = co.calc_distance_global(first_node.lon, first_node.lat,
-                                                           second_node.lon, second_node.lat)
-                        if distance < shortest_distance:
-                            shortest_distance = distance
-                            closest_node = first_node
-                break  # one neighbour is enough
-            if closest_node:
-                if self.roof_hint is None:
-                    self.roof_hint = roofs.RoofHint()
-                self.roof_hint.inner_node = transformation.to_local((closest_node.lon, closest_node.lat))
+        elif (len(self.refs) == 5 or len(self.refs) == 6) and 1 <= len(self.refs_shared) <= 2 and len(common_set) == 0:
+            # find the inner node - if +/- 10 deg limits of straight line
+            for index in range(0, len(self.refs)):
+                if index == 0:
+                    prev_node = nodes_dict[self.refs[-1]]
+                else:
+                    prev_node = nodes_dict[self.refs[index - 1]]
+                corner_node = nodes_dict[self.refs[index]]
+                if index == len(self.refs) - 1:
+                    next_node = nodes_dict[self.refs[0]]
+                else:
+                    next_node = nodes_dict[self.refs[index + 1]]
+                prev_local = transformation.to_local(prev_node.lon_lat_tuple)
+                corner_local = transformation.to_local(corner_node.lon_lat_tuple)
+                next_local = transformation.to_local(next_node.lon_lat_tuple)
+                angle_1 = co.calc_angle_of_line_local(prev_local[0], prev_local[1], corner_local[0], corner_local[1])
+                angle_2 = co.calc_angle_of_line_local(corner_local[0], corner_local[1], next_local[0], next_local[1])
+                delta = co.calc_delta_bearing(angle_1, angle_2)
+                if len(self.refs) == 5 and fabs(delta) < 10:
+                    # test that it actually is shared with a neighbour
+                    for ref_list in self.refs_shared.values():
+                        if index in ref_list:
+                            if self.roof_hint is None:
+                                self.roof_hint = roofs.RoofHint()
+                            self.roof_hint.inner_node = corner_local
+                            break
+                    break  # there can only be one if the shape is kind of rectangular
+                elif len(self.refs) == 6 and delta > 0 and fabs(delta - 90) < 10:  # with clock
+                    # test that it is not shared with a neighbour
+                    found = False
+                    for ref_list in self.refs_shared.values():
+                        if index in ref_list:
+                            found = True
+                            break
+                    if not found:
+                        if self.roof_hint is None:
+                            self.roof_hint = roofs.RoofHint()
+                        self.roof_hint.inner_node = corner_local
+                    break  # there can only be one if the shape is kind of L-shaped
 
     def calc_roof_hints(self, nodes_dict: Dict[int, op.Node], transformation: co.Transformation) -> None:
         if self.has_inner or self.has_neighbours is False:
@@ -1287,8 +1299,28 @@ class Building(object):
                     self.polygon = roof_polygon_new  # needed to get correct .pts_all_count
                     # reset cluster offset as we are using translated clusters
                     my_cluster_offset = Vec2d(0, 0)
+            # -- pitched roof for exactly 4 ground nodes
+            # if self.pts_all_count == 4 or self.pts_all_count == 6 and self.roof_shape is not enu.RoofShape.flat and (
+            #             self.roof_hint is not None and self.roof_hint.inner_node is not None):
+            #   roofs.separate_gable_with_corner(ac_object, self, roof_mat_idx, facade_mat_idx)
+            if self.pts_all_count == 4:
+                if self.roof_shape in [enu.RoofShape.gabled, enu.RoofShape.gambrel]:
+                    roofs.separate_gable(ac_object, self, roof_mat_idx, facade_mat_idx)
+                elif self.roof_shape is enu.RoofShape.hipped:
+                    roofs.separate_hipped(ac_object, self, roof_mat_idx)
+                elif self.roof_shape is enu.RoofShape.pyramidal:
+                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
+                elif self.roof_shape is enu.RoofShape.dome:
+                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
+                elif self.roof_shape is enu.RoofShape.onion:
+                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
+                elif self.roof_shape is enu.RoofShape.skillion:
+                    roofs.separate_skillion(ac_object, self, roof_mat_idx)
+                else:
+                    logging.warning("Roof type %s seems to be unsupported, but is mapped ", self.roof_shape.name)
+                    roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, roof_mat_idx, stats)
             # -- pitched roof for > 4 ground nodes
-            if self.pts_all_count > 4:
+            elif self.pts_all_count > 4:
                 if self.roof_shape is enu.RoofShape.skillion:
                     roofs.separate_skillion(ac_object, self, roof_mat_idx)
                 elif self.roof_shape is enu.RoofShape.pyramidal:
@@ -1307,23 +1339,6 @@ class Building(object):
                     else:  # something went wrong - fall back to flat roof
                         self.roof_shape = enu.RoofShape.flat
                         roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, roof_mat_idx, stats)
-            # -- pitched roof for exactly 4 ground nodes
-            elif self.pts_all_count == 4:
-                if self.roof_shape in [enu.RoofShape.gabled, enu.RoofShape.gambrel]:
-                    roofs.separate_gable(ac_object, self, roof_mat_idx, facade_mat_idx)
-                elif self.roof_shape is enu.RoofShape.hipped:
-                    roofs.separate_hipped(ac_object, self, roof_mat_idx)
-                elif self.roof_shape is enu.RoofShape.pyramidal:
-                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
-                elif self.roof_shape is enu.RoofShape.dome:
-                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
-                elif self.roof_shape is enu.RoofShape.onion:
-                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
-                elif self.roof_shape is enu.RoofShape.skillion:
-                    roofs.separate_skillion(ac_object, self, roof_mat_idx)
-                else:
-                    logging.warning("Roof type %s seems to be unsupported, but is mapped ", self.roof_shape.name)
-                    roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, roof_mat_idx, stats)
             else:  # fall back to pyramidal
                 self.roof_shape = enu.RoofShape.pyramidal
                 roofs.separate_pyramidal(ac_object, self, roof_mat_idx)

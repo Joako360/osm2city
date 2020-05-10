@@ -29,6 +29,7 @@ import osm2city.utils.osmparser as op
 from osm2city.utils import utilities, coordinates, stg_io2
 from osm2city.owbb import plotting as p
 from osm2city.types import osmstrings as s
+from osm2city.types import enumerations as enu
 from osm2city.utils import vec2d as v
 
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
@@ -703,8 +704,8 @@ def _debug_building_list_lsme(coords_transform: coordinates.Transformation, file
     width = building_lib.BUILDING_LIST_SMALL_MIN_SIDE * 3
     depth = building_lib.BUILDING_LIST_SMALL_MIN_SIDE
     levels = 2
-    body_height = parameters.BUILDING_LEVEL_HEIGHT_RURAL * levels
-    roof_height = parameters.BUILDING_LEVEL_HEIGHT_RURAL
+    body_height = enu.BUILDING_LEVEL_HEIGHT_RURAL * levels
+    roof_height = enu.BUILDING_LEVEL_HEIGHT_RURAL
     roof_shape = 1
     wall_tex_idx = 0
     roof_tex_idx = 0
@@ -821,7 +822,7 @@ def _debug_building_list_lsme(coords_transform: coordinates.Transformation, file
     roof_shape = 0
     roof_height = 0
     levels = building_lib.BUILDING_LIST_SMALL_MAX_LEVELS
-    body_height = parameters.BUILDING_LEVEL_HEIGHT_URBAN * levels
+    body_height = enu.BUILDING_LEVEL_HEIGHT_URBAN * levels
     line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(width, depth, body_height,
                                                                  roof_height, roof_shape,
                                                                  roof_orientation, levels,
@@ -844,7 +845,7 @@ def _debug_building_list_lsme(coords_transform: coordinates.Transformation, file
     anchor = coords_transform.to_local((8.3061, 47.0918))
     list_type = building_lib.BuildingListType.medium
     line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
-    roof_height = parameters.BUILDING_LEVEL_HEIGHT_URBAN
+    roof_height = enu.BUILDING_LEVEL_HEIGHT_URBAN
     roof_shape = 2
     roof_orientation = 0
     line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(width, depth, body_height,
@@ -858,7 +859,7 @@ def _debug_building_list_lsme(coords_transform: coordinates.Transformation, file
     list_type = building_lib.BuildingListType.medium
     width = depth
     levels = building_lib.BUILDING_LIST_MEDIUM_MAX_LEVELS
-    body_height = levels * parameters.BUILDING_LEVEL_HEIGHT_URBAN
+    body_height = levels * enu.BUILDING_LEVEL_HEIGHT_URBAN
     roof_height = 0
     roof_shape = 0
     line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
@@ -874,7 +875,7 @@ def _debug_building_list_lsme(coords_transform: coordinates.Transformation, file
     width = building_lib.BUILDING_LIST_LARGE_MIN_SIDE
     depth = 4 * width
     levels = building_lib.BUILDING_LIST_LARGE_MAX_LEVELS
-    body_height = levels * parameters.BUILDING_LEVEL_HEIGHT_URBAN
+    body_height = levels * enu.BUILDING_LEVEL_HEIGHT_URBAN
     line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
     line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(width, depth, body_height,
                                                                  roof_height, roof_shape,
