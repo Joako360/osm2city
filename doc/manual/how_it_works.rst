@@ -163,3 +163,20 @@ FGData Effects and Stuff
 * fgdata/Effects/cityLM.eff: lightmap for facades texture atlas (so there is no need for xml-files wrapping the ac-file containing the meshes)
 * fgdata/Effects/road.eff: road and traffic effect incl. snow
 * fgdata/Effects/urban.eff: incl. snow for osm-buildings
+
+--------
+Textures
+--------
+
+On 12 May 2020 Stuart Buchanan wrote:
+
+Just to document what we discussed:
+
+#. Creating a new texture atlas is fine. Keeping it to 4K x 4K would be better than 8K x 8K as some older graphics cards may not support it.
+#. Creating and referencing a new file is fine - we can put the new BUILDING_LIST buildings and the new texture atlas in a new scenery directory to avoid compatibility issues.
+#. Using a transparent texture and underlying model colours is very bad for performance, unless you use a shader, which you want to avoid.
+#. If you use a separate texture for the walls compared with the roof you should try to create a series of big objects containing all the walls or roofs for multiple buildings, as the .ac format only supports a single texture per object. Bigger objects are better for graphics cards.
+
+On 16 May 2020 Rick wrote:
+
+Wouldn't it be better, if the files would reside in TerraSync/Models instead? Then the newest would always be available even for older FG versions -> the atlas could evolve as intended with no version compatibility issues of scenery generated. The only guarantee would have to be that the pods in the atlas always would have to be reserved for the same thing (geometry, properties, etc).
