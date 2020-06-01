@@ -10,7 +10,7 @@ Please consider the following:
 * These parameters determine how scenery objects are generated offline as described in chapter :ref:`Scenery Generation <chapter-generation-label>`.
 * All decimals need to be with "." — i.e. local specific decimal separators like "," are not accepted.
 * Unless specified otherwise then all length is in metres and areas are in square metres.
-* You do not have to specify all parameters in your ``params.ini`` file. Actually it is better only to specify those parameters, which you want to actively control — the rest just gets the defaults.
+* You do not have to specify all parameters in your ``params.py`` file. Actually it is better only to specify those parameters, which you want to actively control — the rest just gets the defaults.
 
 
 =========================
@@ -25,11 +25,11 @@ It might be easiest to read ``parameters.py`` directly. Python code is easy to r
 
     /usr/bin/python3 /home/vanosten/develop_vcs/osm2city/parameters.py -d
 
-If you want to see a listing of the actual parameters used during scenery generation (i.e. a combination of the defaults with the overridden values in your ``params.ini`` file, then you can run the following command:
+If you want to see a listing of the actual parameters used during scenery generation (i.e. a combination of the defaults with the overridden values in your ``params.py`` file, then you can run the following command:
 
 ::
 
-    /usr/bin/python3 --file /home/pingu/development/osm2city/parameters.py -f LSZS/params.ini
+    /usr/bin/python3 --file /home/pingu/development/osm2city/parameters.py -f LSZS/params.py
 
 
 ====================

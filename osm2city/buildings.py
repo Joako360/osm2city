@@ -275,6 +275,10 @@ def _process_multipolygon_buildings(nodes_dict: Dict[int, op.Node], rel_ways_dic
 
     # create the actual buildings
     added_buildings = 0
+    building_parent = None
+    if len(outer_ways) > 1:
+        building_parent = building_lib.BuildingParent(op.get_next_pseudo_osm_id(op.OSMFeatureType.building_relation),
+                                                      True)
     for outer_way in outer_ways:
         # use the tags from the relation and the member
         all_tags = dict(list(outer_way.tags.items()) + list(relation.tags.items()))
@@ -285,6 +289,8 @@ def _process_multipolygon_buildings(nodes_dict: Dict[int, op.Node], rel_ways_dic
                 inner_rings.append(inner_way)
         a_building = _make_building_from_way(nodes_dict, all_tags, outer_way, coords_transform, inner_rings)
         my_buildings[a_building.osm_id] = a_building
+        if building_parent:
+            building_parent.add_child(a_building)
         added_buildings += 1
     return added_buildings
 
@@ -298,7 +304,7 @@ def _process_simple_3d_building(relation: op.Relation, my_buildings: Dict[int, b
         if member.type_ == s.V_WAY:
             if member.ref in my_buildings:
                 related_building = my_buildings[member.ref]
-                if s.K_BUILDING in related_building.tags:
+                if s.K_BUILDING in related_building.tags or s.K_BUILDING_PART in related_building.tags:
                     if member.role == s.V_OUTLINE:
                         building_outlines_found.append(related_building.osm_id)
                     else:
@@ -493,6 +499,52 @@ def _process_building_parts(nodes_dict: Dict[int, op.Node],
                  len(building_parents), stats_original_removed)
 
 
+def _remove_pseudo_outlines(my_buildings: Dict[int, building_lib.Building]) -> None:
+    """Removes buildings with overlap to Simple3D buildings due to special modelling in OSM -> reduce flickering.
+
+    E.g. https://www.openstreetmap.org/query?lat=21.31293&lon=-157.85991 -> Honolulu Park Place:
+    https://www.openstreetmap.org/way/500644307 building overlaps with https://www.openstreetmap.org/relation/7301766
+    relation, which has 3 ways. The relation with 3 ways models the building better than the building (outline).
+    Same for https://www.openstreetmap.org/query?lat=21.31202&lon=-157.85955 -> Kukui Plaza
+    https://www.openstreetmap.org/way/293593313 building overlaps with https://www.openstreetmap.org/relation/4064546
+    relation.
+    Also https://www.openstreetmap.org/query?lat=21.30903&lon=-157.86345 -> Harbour Court
+    https://www.openstreetmap.org/way/500162714 building and https://www.openstreetmap.org/relation/7302050 relation.
+
+
+    https://www.openstreetmap.org/relation/7331962 relation (Hawaii Pacific University)
+
+    Note that sometimes the combination of the floor plan of all relations could be larger than the building.
+    """
+    building_parents = set()
+    for building in my_buildings.values():
+        if building.parent:
+            building_parents.add(building.parent)
+
+    building_keys_to_remove = set()  # save them to remove for later -> no problem in looping
+
+    for parent in building_parents:
+        my_polies = list()
+        for child in parent.children:
+            my_polies.append(child.geometry)
+        my_outline = utilities.merge_buffers(my_polies)[0]  # In most situations there will only be one.
+
+        for key, building in my_buildings.items():
+            if building.parent is not None:
+                continue  # this is not the case we are looking for
+            if building.geometry.disjoint(my_outline):
+                continue
+            # we have a candidate. Now make sure that there is a high probability by requesting at least 70% overlap
+            difference = my_outline.difference(building.geometry)
+            if difference.area < 0.3 * my_outline.area:
+                building_keys_to_remove.add(key)
+                break  # there should not be any other with the same overlap
+
+    for key in building_keys_to_remove:
+        del my_buildings[key]
+    logging.info('Removed %i pseudo outlines', len(building_keys_to_remove))
+
+
 def process_building_loose_parts(nodes_dict: Dict[int, op.Node], my_buildings: List[building_lib.Building]) -> None:
     """Checks whether some buildings actually should have the same parent based on shared references.
 
@@ -555,8 +607,8 @@ def process_building_loose_parts(nodes_dict: Dict[int, op.Node], my_buildings: L
     logging.info('Created %i new building relations based on shared references', new_relations)
 
 
-def _process_osm_building(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, op.Way],
-                          coords_transform: coordinates.Transformation) -> Dict[int, building_lib.Building]:
+def _process_osm_buildings(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, op.Way],
+                           coords_transform: coordinates.Transformation) -> Dict[int, building_lib.Building]:
     my_buildings = dict()
     clipping_border = shg.Polygon(parameters.get_clipping_border())
 
@@ -678,12 +730,14 @@ def construct_buildings_from_osm(coords_transform: coordinates.Transformation) -
 
     # then create the actual building objects
     last_time = time.time()
-    the_buildings = _process_osm_building(osm_nodes_dict, osm_ways_dict, coords_transform)
+    the_buildings = _process_osm_buildings(osm_nodes_dict, osm_ways_dict, coords_transform)
     last_time = utilities.time_logging('Time used in seconds for processing OSM buildings', last_time)
     _process_osm_relations(osm_nodes_dict, osm_rel_ways_dict, osm_relations_dict, the_buildings, coords_transform)
     last_time = utilities.time_logging('Time used in seconds for processing OSM relations', last_time)
     _process_building_parts(osm_nodes_dict, the_buildings, coords_transform)
-    _ = utilities.time_logging('Time used in seconds for processing building parts', last_time)
+    last_time = utilities.time_logging('Time used in seconds for processing building parts', last_time)
+    _remove_pseudo_outlines(the_buildings)
+    _ = utilities.time_logging('Time used in seconds for removing pseudo outlines', last_time)
 
     # for convenience change to list from dict
     return list(the_buildings.values()), osm_nodes_dict

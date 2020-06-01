@@ -54,7 +54,7 @@ The following shows a directory structure, which one of the developers is using 
             projects/
                 KBOS/
                     kbos_narrow.osm          (not needed it database is used)
-                    params.ini
+                    params.py
                 LSME/
                     ...
 
@@ -100,7 +100,7 @@ Setting a Minimal Set of Parameters
 
 ``osm2city`` has a large amount of parameters, by which the generation of scenery objects based on OSM data can be influenced. Chapter :ref:`Parameters <chapter-parameters-label>` has detailed information about the most important of these parameters[#]_. However to get started only a few parameters must be specified — actually it is generally recommended only to specify those parameters, which need to get a different value from the default values, so as to have a better understanding for which parameters you have taken an active decision.
 
-Create a ``params.ini`` file with your favorite text editor. In our example it would get stored in ``fg_customscenery/projects/LSZS`` and the minimal content could be as follows:
+Create a ``params.py`` file with your favorite text editor. In our example it would get stored in ``fg_customscenery/projects/LSZS`` and the minimal content could be as follows:
 
 ::
 

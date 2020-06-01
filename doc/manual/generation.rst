@@ -36,7 +36,7 @@ In most situations it is enough to call the following command once and then only
 
 ::
 
-  /usr/bin/python3 /home/pingu/develop_vcs/osm2city/prepare_textures.py -f LSZS/params.ini
+  /usr/bin/python3 /home/pingu/develop_vcs/osm2city/prepare_textures.py -f LSZS/params.py
 
 
 Chapter :ref:`Textures <chapter-parameters-textures>` has an overview of how roof and facade textures can be filtered to suit a given scenery's needs by means of parameters.
@@ -63,12 +63,12 @@ Calling the batch process is then pretty easy in just one step:
 
 ::
 
-    $ /usr/bin/python3 /home/pingu/develop_vcs/osm2city/batch_processing/build_tiles_db.py -f TEST/params.ini -b 8.25_47_8.5_47.2 -p 3
+    $ /usr/bin/python3 /home/pingu/develop_vcs/osm2city/batch_processing/build_tiles_db.py -f TEST/params.py -b 8.25_47_8.5_47.2 -p 3
 
 Mandatory command line arguments:
 
 * ``-b BOUNDARY``: the boundary as an underscore delimited string WEST_SOUTH_EAST_NORTH like 9.1_47.0_11_48.8 (use '.' as decimal separator). If the Western longitude is negative (e.g. in Americas), then use an asterisk character (``*``) in front (e.g. ``-b *-71.25_42.25_-70.75_42.5`` for the Boston Logan airport KBOS).
-* ``-f FILE_PATH``: the relative path to the main params.ini file. Remember that the paths are relative to the ``WORKING_DIRECTORY``.
+* ``-f FILE_PATH``: the relative path to the main params.py file. Remember that the paths are relative to the ``WORKING_DIRECTORY``.
 * ``-p NUMBER``: number of parallel processes (should not be more than the number of cores/CPUs) and might be constrained by memory
 
 Optional arguments:

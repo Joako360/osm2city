@@ -90,7 +90,7 @@ DEBUG_PLOT_RECTIFY = False
 DEBUG_PLOT_GENBUILDINGS = False
 DEBUG_PLOT_LANDUSE = False
 DEBUG_PLOT_ROADS = False
-DEBUG_PLOT_BLOCKED_AREAS_ROADS = []  # will only plot if at least one OSM id in list
+DEBUG_PLOT_BLOCKED_AREAS_ROADS = []  # will only plot if at least one OSM id of a road in the list
 DEBUG_PLOT_OFFSETS = False
 
 # =============================================================================
