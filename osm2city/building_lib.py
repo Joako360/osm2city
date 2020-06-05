@@ -34,7 +34,6 @@ from typing import List, Dict, Optional, Set, Tuple
 import numpy as np
 from shapely import affinity
 import shapely.geometry as shg
-from shapely.geos import TopologicalError
 
 from osm2city import myskeleton, parameters, roofs
 from osm2city.textures import materials as mat, texture as tex
@@ -1680,8 +1679,8 @@ def write(ac_file_name: str, buildings: List[Building], cluster_elev: float, clu
     ac.write(ac_file_name)
 
 
-def buildings_after_remove_with_parent_children(orig_buildings: List[Building],
-                                                buildings_to_remove: List[Building]) -> List[Building]:
+def _buildings_after_remove_with_parent_children(orig_buildings: List[Building],
+                                                 buildings_to_remove: List[Building]) -> List[Building]:
     """Returns a list of buildings, which are in the original list, but which are neither in the list
     to remove or those buildings' parents' related children.
 
@@ -1718,30 +1717,7 @@ def overlap_check_blocked_areas(orig_buildings: List[Building], blocked_areas: L
                 break
         if is_intersected:
             buildings_to_remove.append(building)
-    return buildings_after_remove_with_parent_children(orig_buildings, buildings_to_remove)
-
-
-def overlap_check_convex_hull(orig_buildings: List[Building], stg_entries: List[stg_io2.STGEntry])\
-        -> List[Building]:
-    """Checks for all buildings whether their polygon intersects with a static or shared object's convex hull."""
-    buildings_to_remove = list()
-
-    for building in orig_buildings:
-        is_intersecting = False
-        for entry in stg_entries:
-            try:
-                if entry.convex_hull is not None and entry.convex_hull.intersects(building.geometry):
-                    is_intersecting = True
-                    logging.debug("Convex hull of object '%s' is intersecting. Skipping building with osm_id %d",
-                                  entry.obj_filename, building.osm_id)
-                    break
-            except TopologicalError:
-                logging.exception('Convex hull could not be checked due to topology problem - building osm_id: %d',
-                                  building.osm_id)
-
-        if is_intersecting:
-            buildings_to_remove.append(building)
-    return buildings_after_remove_with_parent_children(orig_buildings, buildings_to_remove)
+    return _buildings_after_remove_with_parent_children(orig_buildings, buildings_to_remove)
 
 
 def update_building_tags_in_aerodromes(my_buildings: List[Building]) -> None:

@@ -17,7 +17,7 @@ import osm2city.utils.btg_io as bio
 from osm2city.utils import calc_tile
 from osm2city.utils import coordinates
 from osm2city.utils import stg_io2
-from osm2city.utils.utilities import BoundaryError, FGElev, date_time_now, check_boundary, parse_boundary, time_logging
+from osm2city.utils import utilities as u
 
 
 class SceneryTile(object):
@@ -87,9 +87,9 @@ def configure_logging(log_level: str, log_to_file: bool) -> None:
         file_handle_dict = {'level': log_level, 'formatter': 'f', 'class': 'logging.FileHandler'}
         process_name = mp.current_process().name
         if process_name == 'MainProcess':
-            file_handle_dict['filename'] = 'osm2city_main_{}.log'.format(date_time_now())
+            file_handle_dict['filename'] = 'osm2city_main_{}.log'.format(u.date_time_now())
         else:
-            file_handle_dict['filename'] = 'osm2city_process_{}_{}.log'.format(process_name, date_time_now())
+            file_handle_dict['filename'] = 'osm2city_process_{}_{}.log'.format(process_name, u.date_time_now())
         handlers_dict['file'] = file_handle_dict
         handlers_array.append('file')
 
@@ -118,8 +118,8 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
 
         the_coords_transform = coordinates.Transformation(parameters.get_center_global())
 
-        my_fg_elev = FGElev(the_coords_transform, scenery_tile.tile_index)
-        my_stg_entries = stg_io2.read_stg_entries_in_boundary(True, the_coords_transform)
+        my_fg_elev = u.FGElev(the_coords_transform, scenery_tile.tile_index)
+        my_stg_entries = stg_io2.read_stg_entries_in_boundary(the_coords_transform)
 
         # run programs
         if exec_argument is Procedures.pylons or (exec_argument is Procedures.details and
@@ -168,7 +168,7 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
 
         with open("osm2city-exceptions.log", "a") as f:
             # print info
-            f.write(msg + ' at ' + date_time_now() + ' -  ' + os.linesep)
+            f.write(msg + ' at ' + u.date_time_now() + ' -  ' + os.linesep)
             # print exception
             exc_type, exc_value, exc_traceback = sys.exc_info()
             f.write(''.join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
@@ -225,8 +225,8 @@ if __name__ == '__main__':
             sys.exit(1)
 
     try:
-        boundary_floats = parse_boundary(args.boundary)
-    except BoundaryError as be:
+        boundary_floats = u.parse_boundary(args.boundary)
+    except u.BoundaryError as be:
         logging.error(be.message)
         sys.exit(1)
 
@@ -235,7 +235,7 @@ if __name__ == '__main__':
     boundary_east = boundary_floats[2]
     boundary_north = boundary_floats[3]
     logging.info("Overall boundary {}, {}, {}, {}".format(boundary_west, boundary_south, boundary_east, boundary_north))
-    check_boundary(boundary_west, boundary_south, boundary_east, boundary_north)
+    u.check_boundary(boundary_west, boundary_south, boundary_east, boundary_north)
 
     # list of sceneries tiles (might have smaller boundaries). Each entry has a list with the 4 boundary points
     scenery_tiles_list = list()
@@ -301,7 +301,7 @@ if __name__ == '__main__':
     pool.close()
     pool.join()
 
-    time_logging("Total time used", start_time)
+    u.time_logging("Total time used", start_time)
 
 
 # ================ UNITTESTS =======================

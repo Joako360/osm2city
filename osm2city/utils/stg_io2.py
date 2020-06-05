@@ -266,7 +266,7 @@ class STGEntry(object):
             return os.path.join(self.stg_path, self.obj_filename)
 
 
-def read_stg_entries(stg_path_and_name: str, consider_shared: bool = True, our_magic: str = "",
+def read_stg_entries(stg_path_and_name: str, our_magic: str = "",
                      ignore_bad_lines: bool = False) -> List[STGEntry]:
     """Reads an stg-file and extracts STGEntry objects outside of marked areas for our_magic.
     TODO: In the future, take care of multiple scenery paths here.
@@ -294,7 +294,7 @@ def read_stg_entries(stg_path_and_name: str, consider_shared: bool = True, our_m
                     continue
                 if line.startswith('OBJECT_SIGN'):
                     continue
-                if consider_shared is False and line.startswith("OBJECT_SHARED"):
+                if parameters.OVERLAP_CHECK_CONSIDER_SHARED is False and line.startswith("OBJECT_SHARED"):
                     continue
                 try:
                     splitted = line.split()
@@ -326,8 +326,7 @@ def read_stg_entries(stg_path_and_name: str, consider_shared: bool = True, our_m
     return entries
 
 
-def read_stg_entries_in_boundary(consider_shared: bool = True,
-                                 my_coord_transform: Transformation = None) -> List[STGEntry]:
+def read_stg_entries_in_boundary(my_coord_transform: Transformation) -> List[STGEntry]:
     """Returns a list of all STGEntries within the boundary according to parameters.
     Adds all tiles bordering the chosen tile in order to make sure that objects crossing tile borders but
     maybe located outside also are taken into account.
@@ -353,7 +352,7 @@ def read_stg_entries_in_boundary(consider_shared: bool = True,
             stg_files.extend(stg_files_opt)
 
     for filename in stg_files:
-        stg_entries.extend(read_stg_entries(filename, consider_shared))
+        stg_entries.extend(read_stg_entries(filename))
 
     # exclude entries in skip list
     for entry in reversed(stg_entries):
@@ -364,8 +363,9 @@ def read_stg_entries_in_boundary(consider_shared: bool = True,
     south_west = my_coord_transform.to_local((parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH))
     north_east = my_coord_transform.to_local((parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH))
     tile_box = shg.box(south_west[0], south_west[1], north_east[0], north_east[1])
-    if my_coord_transform is not None:
-        _parse_stg_entries_for_convex_hull(stg_entries, my_coord_transform, tile_box)
+
+    _parse_stg_entries_for_convex_hull(stg_entries, my_coord_transform, tile_box)
+
     return stg_entries
 
 
@@ -399,13 +399,18 @@ def _parse_stg_entries_for_convex_hull(stg_entries: List[STGEntry], my_coord_tra
                 else:
                     entry.convex_hull = translated_polygon
             except IOError as reason:
-                logging.warning("Ignoring unreadable stg_entry %s", reason)
+                logging.warning("Ignoring unreadable stg_entry of type %s and file name %s: %s", entry.verb_type,
+                                entry.obj_filename, reason)
             except ValueError:
                 # Happens e.g. for waterfalls, where the xml-file only references a <particlesystem>
                 logging.debug("AC-filename could be wrong in xml-file %s - or just no ac-file referenced", ac_filename)
-            if entry.convex_hull is None:
+
+            # Now check, whether we are interested
+            if entry.convex_hull is None or entry.convex_hull.is_valid is False or entry.convex_hull.is_empty:
+                logging.warning("Ignoring stg_entry of type %s and file name %s: convex hull invalid", entry.verb_type,
+                                entry.obj_filename)
                 stg_entries.remove(entry)
-            elif entry.convex_hull.disjoint(tile_box):  # only keep entries which are somehow intersecting the tile
+            elif entry.convex_hull.within(tile_box) is False and entry.convex_hull.disjoint(tile_box):
                 stg_entries.remove(entry)
 
 
@@ -456,6 +461,27 @@ def _extract_ac_from_xml(xml_filename: str, alternative_xml_filename: str = None
         xml_data = f.read()
         ac_filename = _parse_ac_file_name(xml_data)
         return ac_filename
+
+
+def merge_stg_entries_with_blocked_areas(stg_entries: List[STGEntry],
+                                         blocked_areas: List[shg.Polygon]) -> List[shg.Polygon]:
+    """Merge the convex hull of objects in stg-files into the blocked areas list of polygons."""
+    my_blocked_polys = list()
+    my_blocked_polys.extend(blocked_areas)
+
+    my_blocked_polys.extend(convex_hulls_from_stg_entries(stg_entries,
+                                                          [STGVerbType.object_static, STGVerbType.object_shared]))
+    return my_blocked_polys
+
+
+def convex_hulls_from_stg_entries(stg_entries: List[STGEntry], verb_types: List[STGVerbType]) -> List[shg.Polygon]:
+    """Merge the convex hull of objects in stg-files into the blocked areas list of polygons."""
+    my_polys = list()
+
+    for stg_entry in stg_entries:
+        if stg_entry.verb_type in verb_types:
+            my_polys.append(stg_entry.convex_hull)
+    return my_polys
 
 
 def _make_delimiter_string(our_magic: Optional[str], prefix: Optional[str], is_start: bool) -> str:

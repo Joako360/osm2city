@@ -380,7 +380,7 @@ If parameter ``PATH_TO_SCENERY_OPT`` is not None, then also object from that pat
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
-OVERLAP_CHECK_CONVEX_HULL                       Bool       True      Reads all points from static (not shared) objects and creates a convex hull
+OVERLAP_CHECK_CONVEX_HULL                       Bool       True      Reads all points from static (or shared) objects and creates a convex hull
                                                                      around all points. This is a brute force algorithm only taking into account
                                                                      the firsts object's vertices.
 

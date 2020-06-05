@@ -90,6 +90,7 @@ DEBUG_PLOT_RECTIFY = False
 DEBUG_PLOT_GENBUILDINGS = False
 DEBUG_PLOT_LANDUSE = False
 DEBUG_PLOT_ROADS = False
+DEBUG_PLOT_BLOCKED_AREAS_DIFFERENTIATED = False  # plots airport blocked areas, static and shared stg-entries
 DEBUG_PLOT_BLOCKED_AREAS_ROADS = []  # will only plot if at least one OSM id of a road in the list
 DEBUG_PLOT_OFFSETS = False
 
@@ -97,7 +98,7 @@ DEBUG_PLOT_OFFSETS = False
 # PARAMETERS RELATED TO BUILDINGS IN osm2city
 # =============================================================================
 
-# -- Check for static objects in the PATH_TO_SCENERY folder based on convex hull around all points
+# -- Check for objects in the PATH_TO_SCENERY folder based on convex hull around all points
 OVERLAP_CHECK_CONVEX_HULL = True
 OVERLAP_CHECK_CH_BUFFER_STATIC = 0.0
 OVERLAP_CHECK_CH_BUFFER_SHARED = 0.0

@@ -838,40 +838,66 @@ def plot_fit_offsets(hull: shg.Polygon, box_minus: shg.Polygon, box_plus: shg.Po
     sleep(2)  # to make sure we have not several files in same second
 
 
-def plot_blocked_areas(blocked_areas: List[shg.Polygon], ways: List[shg.LineString]) -> None:
-    pdf_pages = pu.create_pdf_pages("blocked areas")
+def plot_blocked_areas_roads(blocked_areas: List[shg.Polygon], ways: List[shg.LineString],
+                             transform: co.Transformation) -> None:
+    pdf_pages = pu.create_pdf_pages('blocked_areas_roads')
 
     # Generated buildings
     my_figure = pu.create_a3_landscape_figure()
     my_figure.suptitle("Blocked Areas")
     ax = my_figure.add_subplot(111)
 
-    # bounding box
-    min_x = 999999
-    min_y = 999999
-    max_x = -999999
-    max_y = -999999
-
     # first blocked areas
-    for poly in blocked_areas:
-        bounds_tuple = poly.bounds
-        min_x = min(min_x, bounds_tuple[0])
-        min_y = min(min_y, bounds_tuple[1])
-        max_x = max(max_x, bounds_tuple[2])
-        max_y = max(max_y, bounds_tuple[3])
-        patch = PolygonPatch(poly, facecolor="magenta", edgecolor="black")
-        ax.add_patch(patch)
+    pu.add_list_of_polygons(ax, blocked_areas, 'magenta', 'black')
 
     # then the lines
     for line in ways:
-        bounds_tuple = line.bounds
-        min_x = min(min_x, bounds_tuple[0])
-        min_y = min(min_y, bounds_tuple[1])
-        max_x = max(max_x, bounds_tuple[2])
-        max_y = max(max_y, bounds_tuple[3])
         pu.plot_line(ax, line, 'green', 1)
 
-    pu.set_ax_limits(ax, min_x, min_y, max_x, max_y)
+    pu.set_ax_limits_from_tile(ax, transform)
+    pdf_pages.savefig(my_figure)
+
+    pdf_pages.close()
+    plt.close("all")
+
+
+def plot_blocked_areas_and_stg_entries(blocked_areas: List[shg.Polygon], static_objects: List[shg.Polygon],
+                                       shared_objects: List[shg.Polygon], before: List[shg.Polygon],
+                                       after: List[shg.Polygon], transform: co.Transformation) -> None:
+    pdf_pages = pu.create_pdf_pages('blocked_apt_areas_incl_stg_objects')
+
+    # Blocked areas
+    my_figure = pu.create_large_figure()
+    my_figure.suptitle('Blocked Areas for airports (magenta) as well as static (green) and shared (cyan) stg entries\
+and buildings (yellow)')
+    ax = my_figure.add_subplot(111)
+
+    # first blocked areas
+    pu.add_list_of_polygons(ax, blocked_areas, 'magenta', 'magenta')
+    # then the static stg entries
+    pu.add_list_of_polygons(ax, static_objects, 'green', 'green')
+    # then the shared stg entries
+    pu.add_list_of_polygons(ax, shared_objects, 'cyan', 'cyan')
+    # and finally the shared stg entries
+    pu.add_list_of_polygons(ax, before, 'yellow', 'yellow')
+    pu.set_ax_limits_from_tile(ax, transform)
+    pdf_pages.savefig(my_figure)
+
+    my_figure = pu.create_large_figure()
+    my_figure.suptitle('Before buildings (red) and after buildings (yellow)')
+    ax = my_figure.add_subplot(111)
+    pu.add_list_of_polygons(ax, before, 'red', 'red')
+    pu.add_list_of_polygons(ax, after, 'yellow', 'yellow')
+    pu.set_ax_limits_from_tile(ax, transform)
+    pdf_pages.savefig(my_figure)
+
+    my_figure = pu.create_large_figure()
+    my_figure.suptitle('Only blocked areas')
+    ax = my_figure.add_subplot(111)
+    pu.add_list_of_polygons(ax, blocked_areas, 'magenta', 'magenta')
+    pu.add_list_of_polygons(ax, static_objects, 'green', 'green')
+    pu.add_list_of_polygons(ax, shared_objects, 'cyan', 'cyan')
+    pu.set_ax_limits_from_tile(ax, transform)
     pdf_pages.savefig(my_figure)
 
     pdf_pages.close()

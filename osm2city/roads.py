@@ -509,15 +509,16 @@ class Roads(object):
         else:
             logging.info('No ways with only one node after "%s"', prev_method_name)
 
-    def process(self, blocked_areas: List[shg.Polygon], lit_areas: List[shg.Polygon], water_areas: List[shg.Polygon],
+    def process(self, transform: coordinates.Transformation, blocked_areas: List[shg.Polygon],
+                lit_areas: List[shg.Polygon], water_areas: List[shg.Polygon],
                 stats: utilities.Stats) -> None:
         """Processes the OSM data until data can be clusterised.
         """
         self._remove_tunnels()
         self._replace_short_bridges_with_ways()
-        self._check_against_blocked_areas(water_areas, True)
+        self._check_against_blocked_areas(transform, water_areas, True)
         self._check_ways_sanity('_check_against_blocked_areas_water')
-        self._check_against_blocked_areas(blocked_areas)
+        self._check_against_blocked_areas(transform, blocked_areas)
         self._check_ways_sanity('_check_against_blocked_areas')
         self._check_lighting(lit_areas)
         self._check_ways_sanity('_check_lighting')
@@ -543,7 +544,8 @@ class Roads(object):
 
         self._clusterize(stats)
 
-    def _check_against_blocked_areas(self, blocked_areas: List[shg.Polygon], is_water: bool = False) -> None:
+    def _check_against_blocked_areas(self, transform: coordinates.Transformation,  blocked_areas: List[shg.Polygon],
+                                     is_water: bool = False) -> None:
         """Makes sure that there are no ways, which go across a blocked area (e.g. airport runway).
         Ways are clipped over into two ways if intersecting. If they are contained, then they are removed."""
         if not blocked_areas:
@@ -557,7 +559,7 @@ class Roads(object):
             for way in self.ways_list:
                 if way.osm_id in parameters.DEBUG_PLOT_BLOCKED_AREAS_ROADS:
                     line_strings.append(self._line_string_from_way(way))
-            utilities.plot_blocked_areas(merged_areas, line_strings)
+            utilities.plot_blocked_areas_roads(merged_areas, line_strings, transform)
 
         new_ways = list()
         for way in reversed(self.ways_list):
@@ -1355,27 +1357,8 @@ def _process_clusters(clusters, fg_elev: utilities.FGElev, stg_manager, stg_path
             the_way.junction1.reset()
 
 
-def _process_additional_blocked_areas(coords_transform: coordinates.Transformation, stg_entries: List[stg_io2.STGEntry],
-                                      blocked_areas: List[shg.Polygon]) -> List[shg.Polygon]:
-    my_blocked_polys = list()
-    my_blocked_polys.extend(blocked_areas)
-    # OSM APRONS
-    if parameters.OVERLAP_CHECK_APT_USE_OSM_APRON_ROADS:
-        osm_result = op.fetch_osm_db_data_ways_key_values([op.create_key_value_pair(s.K_AEROWAY, s.V_APRON)])
-        for way in list(osm_result.ways_dict.values()):
-            my_geometry = way.polygon_from_osm_way(osm_result.nodes_dict, coords_transform)
-            my_blocked_polys.append(my_geometry)
-
-    # STG entries
-    for stg_entry in stg_entries:
-        if stg_entry.verb_type is stg_io2.STGVerbType.object_static:
-            my_blocked_polys.append(stg_entry.convex_hull)
-
-    return utilities.merge_buffers(my_blocked_polys)
-
-
-def process_roads(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
-                  blocked_areas: List[shg.Polygon], lit_areas: List[shg.Polygon], water_areas: List[shg.Polygon],
+def process_roads(transform: coordinates.Transformation, fg_elev: utilities.FGElev,
+                  blocked_apt_areas: List[shg.Polygon], lit_areas: List[shg.Polygon], water_areas: List[shg.Polygon],
                   stg_entries: List[stg_io2.STGEntry], file_lock: mp.Lock = None) -> None:
     random.seed(42)
     stats = utilities.Stats()
@@ -1383,7 +1366,16 @@ def process_roads(coords_transform: coordinates.Transformation, fg_elev: utiliti
     osm_way_result = op.fetch_osm_db_data_ways_keys([s.K_HIGHWAY, s.K_RAILWAY])
     osm_nodes_dict = osm_way_result.nodes_dict
     osm_ways_dict = osm_way_result.ways_dict
-    extended_blocked_areas = _process_additional_blocked_areas(coords_transform, stg_entries, blocked_areas)
+
+    # OSM APRONS
+    if parameters.OVERLAP_CHECK_APT_USE_OSM_APRON_ROADS:
+        osm_result = op.fetch_osm_db_data_ways_key_values([op.create_key_value_pair(s.K_AEROWAY, s.V_APRON)])
+        for way in list(osm_result.ways_dict.values()):
+            my_geometry = way.polygon_from_osm_way(osm_result.nodes_dict, transform)
+            blocked_apt_areas.append(my_geometry)
+
+    # add STGEntries to the blocked area mix
+    extended_blocked_areas = stg_io2.merge_stg_entries_with_blocked_areas(stg_entries, blocked_apt_areas)
 
     logging.info("Number of ways before basic processing: %i", len(osm_ways_dict))
     filtered_osm_ways_list = _process_osm_ways(osm_nodes_dict, osm_ways_dict)
@@ -1392,11 +1384,11 @@ def process_roads(coords_transform: coordinates.Transformation, fg_elev: utiliti
         logging.info("No roads and railways found -> aborting")
         return
 
-    roads = Roads(filtered_osm_ways_list, osm_nodes_dict, coords_transform, fg_elev)
+    roads = Roads(filtered_osm_ways_list, osm_nodes_dict, transform, fg_elev)
 
     path_to_output = parameters.get_output_path()
 
-    roads.process(extended_blocked_areas, lit_areas, water_areas, stats)  # does the heavy lifting incl. clustering
+    roads.process(transform, extended_blocked_areas, lit_areas, water_areas, stats)  # does the heavy lifting incl. clustering
 
     stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.roads, OUR_MAGIC, parameters.PREFIX)
 
@@ -1404,11 +1396,11 @@ def process_roads(coords_transform: coordinates.Transformation, fg_elev: utiliti
     stg_paths = set()
 
     _process_clusters(roads.railways_clusters, fg_elev, stg_manager, stg_paths, True,
-                      coords_transform, stats, True)
+                      transform, stats, True)
     _process_clusters(roads.roads_clusters, fg_elev, stg_manager, stg_paths, False,
-                      coords_transform, stats, False)
+                      transform, stats, False)
     _process_clusters(roads.roads_rough_clusters, fg_elev, stg_manager, stg_paths, False,
-                      coords_transform, stats, True)
+                      transform, stats, True)
 
     if parameters.DEBUG_PLOT_ROADS:
         roads.debug_plot(show=True, clusters=roads.roads_clusters)

@@ -1057,7 +1057,7 @@ def write_buildings_in_meshes(coords_transform: coordinates.Transformation,
 
 
 def process_buildings(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
-                      blocked_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
+                      blocked_apt_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
                       the_buildings: List[building_lib.Building],
                       file_lock: mp.Lock = None) -> None:
     last_time = time.time()
@@ -1074,11 +1074,24 @@ def process_buildings(coords_transform: coordinates.Transformation, fg_elev: uti
         osm2city.textures.materials.screen_osm_keys_for_colour_material_variants(b.tags)
 
     # check for buildings on airport runways etc.
-    if blocked_areas:
-        the_buildings = building_lib.overlap_check_blocked_areas(the_buildings, blocked_areas)
+    before = list()
+    if parameters.DEBUG_PLOT_BLOCKED_AREAS_DIFFERENTIATED:
+        for b in the_buildings:
+            before.append(b.geometry)
 
-    if parameters.OVERLAP_CHECK_CONVEX_HULL:  # needs to be before building_lib.analyse to catch more at first hit
-        the_buildings = building_lib.overlap_check_convex_hull(the_buildings, stg_entries)
+    if parameters.OVERLAP_CHECK_CONVEX_HULL:
+        blocked_apt_areas = stg_io2.merge_stg_entries_with_blocked_areas(stg_entries, blocked_apt_areas)
+    if blocked_apt_areas:
+        the_buildings = building_lib.overlap_check_blocked_areas(the_buildings, blocked_apt_areas)
+
+    if parameters.DEBUG_PLOT_BLOCKED_AREAS_DIFFERENTIATED:
+        static_objects = stg_io2.convex_hulls_from_stg_entries(stg_entries, [stg_io2.STGVerbType.object_static])
+        shared_objects = stg_io2.convex_hulls_from_stg_entries(stg_entries, [stg_io2.STGVerbType.object_shared])
+        after = list()
+        for b in the_buildings:
+            after.append(b.geometry)
+        utilities.plot_blocked_areas_and_stg_entries(blocked_apt_areas, static_objects, shared_objects, before, after,
+                                                     coords_transform)
 
     # final check on building parent hierarchy and zones linked to buildings > remove dangling stuff
     building_lib.BuildingParent.clean_building_parents_dangling_children(the_buildings)
