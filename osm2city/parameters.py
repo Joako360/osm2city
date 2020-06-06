@@ -44,6 +44,8 @@ BOUNDARY_SOUTH = 47.48
 BOUNDARY_EAST = 9.58
 BOUNDARY_NORTH = 47.50
 
+AREA = ''  # Not used in the code - use it in your parameters.py for conditional parameters
+
 # -- Full path to the scenery folder without trailing slash. This is where we
 #    will probe elevation and check for overlap with static objects. Most
 #    likely you'll want to use your TerraSync path here.

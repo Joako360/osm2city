@@ -139,6 +139,34 @@ DB_*
     Connection settings for PostGIS: see :ref:`database parameters <chapter-parameters-database>`.
 
 
+-------------------------
+Advance Parameter Setting
+-------------------------
+The parameter files are just regular Python files, the content of which is merged with the default parameters. This actually allows for some scripting, if you know very basic Python programming.
+
+The parameter ``AREA`` has been added with the sole purpose of helping you reuse some parameters, while having some saved for special areas. This saves the trouble of having different parameter files for different areas.
+
+The following is an example of how that can be used, where the only change between two generations is that I have to update ``AREA`` to be either "HAWAII" or "SCOTLAND". NB: "..." in the example below is just to tell that there would be other parameters - you must not have it in your file.
+
+::
+
+    AREA = 'HAWAII'
+    ...
+    OWBB_USE_EXTERNAL_LANDUSE_FOR_BUILDING_GENERATION = True
+    OWBB_LANDUSE_CACHE = True
+    ...
+
+    if AREA == 'HAWAII':
+        OWBB_GENERATE_BUILDINGS = True
+        OWBB_USE_BTG_LANDUSE = True
+        ...
+
+    elif AREA == 'SCOTLAND':
+        OWBB_USE_EXTERNAL_LANDUSE_FOR_BUILDING_GENERATION = False
+        ...
+
+The drawback of this advanced parameter setting is, that you might get difficult to interpret error messages, if you do something wrong. Python knowledge helps in that case.
+
 .. _chapter-generating-elevation-data-label:
 
 =========================
