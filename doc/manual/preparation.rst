@@ -139,9 +139,9 @@ DB_*
     Connection settings for PostGIS: see :ref:`database parameters <chapter-parameters-database>`.
 
 
--------------------------
-Advance Parameter Setting
--------------------------
+--------------------------
+Advanced Parameter Setting
+--------------------------
 The parameter files are just regular Python files, the content of which is merged with the default parameters. This actually allows for some scripting, if you know very basic Python programming.
 
 The parameter ``AREA`` has been added with the sole purpose of helping you reuse some parameters, while having some saved for special areas. This saves the trouble of having different parameter files for different areas.
@@ -166,6 +166,8 @@ The following is an example of how that can be used, where the only change betwe
         ...
 
 The drawback of this advanced parameter setting is, that you might get difficult to interpret error messages, if you do something wrong. Python knowledge helps in that case.
+
+If you want to use your own variables, then make sure you prefix them with "_" (underscore) - otherwise the process will abort immediately because an unknown parameter was found.
 
 .. _chapter-generating-elevation-data-label:
 

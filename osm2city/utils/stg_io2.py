@@ -16,7 +16,7 @@ import logging
 import multiprocessing as mp
 import os
 import time
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from shapely import affinity
 import shapely.geometry as shg
@@ -326,7 +326,7 @@ def read_stg_entries(stg_path_and_name: str, our_magic: str = "",
     return entries
 
 
-def read_stg_entries_in_boundary(my_coord_transform: Transformation) -> List[STGEntry]:
+def read_stg_entries_in_boundary(transform: Transformation, for_roads: bool) -> List[STGEntry]:
     """Returns a list of all STGEntries within the boundary according to parameters.
     Adds all tiles bordering the chosen tile in order to make sure that objects crossing tile borders but
     maybe located outside also are taken into account.
@@ -360,13 +360,62 @@ def read_stg_entries_in_boundary(my_coord_transform: Transformation) -> List[STG
             stg_entries.remove(entry)
 
     # the border of the original tile in local coordinates
-    south_west = my_coord_transform.to_local((parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH))
-    north_east = my_coord_transform.to_local((parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH))
+    south_west = transform.to_local((parameters.BOUNDARY_WEST, parameters.BOUNDARY_SOUTH))
+    north_east = transform.to_local((parameters.BOUNDARY_EAST, parameters.BOUNDARY_NORTH))
     tile_box = shg.box(south_west[0], south_west[1], north_east[0], north_east[1])
 
-    _parse_stg_entries_for_convex_hull(stg_entries, my_coord_transform, tile_box)
+    _parse_stg_entries_for_convex_hull(stg_entries, transform, tile_box)
 
+    # after having all original stg-entries, lets check for exclude areas
+    if for_roads:
+        areas = parameters.OVERLAP_CHECK_EXCLUDE_AREAS_ROADS
+    else:
+        areas = parameters.OVERLAP_CHECK_EXCLUDE_AREAS_BUILDINGS
+    exclude_area_entries = _create_pseudo_stg_entries_for_exclude_areas(areas, transform)
+    # remove all static entries within the exclude areas - as they might have problems in their geometry
+    count_removed = 0
+    for entry in reversed(stg_entries):
+        if entry.verb_type is not STGVerbType.object_static:
+            continue
+        x, y = transform.to_local((entry.lon, entry.lat))
+        for fake_entry in exclude_area_entries:
+            if fake_entry.convex_hull.contains(shg.Point(x, y)):
+                stg_entries.remove(entry)
+                count_removed += 1
+                break
+    # finally add the fake exclude areas to the list of entries
+    logging.info('Removed %i static object entries due to OVERLAP_CHECK_EXCLUDE_AREAS', count_removed)
+    stg_entries.extend(exclude_area_entries)
     return stg_entries
+
+
+def _create_pseudo_stg_entries_for_exclude_areas(areas: Optional[List[List[Tuple[float, float]]]],
+                                                 transform: Transformation) -> List[STGEntry]:
+    """Create a list of faked STGEntries for exclude areas.
+
+    We cannot control the data quality of the user provided input, so no recovery on error -> fail fast.
+    """
+    if areas is None or len(areas) == 0:
+        return list()
+    faked_entries = list()
+    for i, list_of_tuples in enumerate(areas):
+        my_coordinates = list()
+        for lon_lat in list_of_tuples:
+            x, y = transform.to_local((lon_lat[0], lon_lat[1]))
+            my_coordinates.append((x, y))
+        if len(my_coordinates) >= 3:
+            my_polygon = shg.Polygon(my_coordinates)
+            if my_polygon.is_valid and not my_polygon.is_empty:
+                lon, lat = transform.to_global((my_polygon.centroid.x, my_polygon.centroid.y))
+                my_entry = STGEntry(STGVerbType.object_static.name, 'exclude area', 'fake', lon, lat, 0, 0)
+                my_entry.convex_hull = my_polygon
+                faked_entries.append(my_entry)
+            else:
+                raise ValueError('Resulting exclude area polygon is not valid or empty: Entry: %i', i + 1)
+        else:
+            raise ValueError('There must be at least 3 coordinate tuples per exclude area polygon. Entry: %i', i + 1)
+    logging.info('Added %i fake static STGEntries for OVERLAP_CHECK_EXCLUDE_AREAS', len(faked_entries))
+    return faked_entries
 
 
 def _parse_stg_entries_for_convex_hull(stg_entries: List[STGEntry], my_coord_transformation: Transformation,

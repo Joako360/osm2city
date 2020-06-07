@@ -119,7 +119,7 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
         the_coords_transform = coordinates.Transformation(parameters.get_center_global())
 
         my_fg_elev = u.FGElev(the_coords_transform, scenery_tile.tile_index)
-        my_stg_entries = stg_io2.read_stg_entries_in_boundary(the_coords_transform)
+        my_stg_entries = stg_io2.read_stg_entries_in_boundary(the_coords_transform, False)
 
         # run programs
         if exec_argument is Procedures.pylons or (exec_argument is Procedures.details and
@@ -150,8 +150,9 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
                                                                             parameters.BOUNDARY_NORTH,
                                                                             my_airports, False)
             blocked_apt_areas.extend(bio.get_blocked_areas_from_btg_airport_data(the_coords_transform, my_airports))
+            the_stg_entries = stg_io2.read_stg_entries_in_boundary(the_coords_transform, True)
             roads.process_roads(the_coords_transform, my_fg_elev, blocked_apt_areas, lit_areas, water_areas,
-                                my_stg_entries, file_lock)
+                                the_stg_entries, file_lock)
         if exec_argument in [Procedures.pylons, Procedures.main, Procedures.all]:
             pylons.process_pylons(the_coords_transform, my_fg_elev, my_stg_entries, file_lock)
         if exec_argument in [Procedures.details, Procedures.all]:

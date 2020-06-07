@@ -369,9 +369,9 @@ BUILDING_SKEL_ROOF_MAX_HEIGHT                   Decimal    6.        Skip skelet
 
 .. _chapter-parameters-overlap-label:
 
----------------------------
-Overlap Check for Buildings
----------------------------
+-------------------------------------
+Overlap Check for Buildings and Roads
+-------------------------------------
 
 Overlap checks try to omit overlap of buildings generated based on OSM data with static object as well as shared objects (depending on parameter ``OVERLAP_CHECK_CONSIDER_SHARED``) in the default scenery (defined by ``PATH_TO_SCENERY``).
 
@@ -414,6 +414,17 @@ OVERLAP_CHECK_APT_USE_OSM_APRON_ROADS           Bool       False     Add OSM dat
 OVERLAP_CHECK_ROAD_MIN_REMAINING                Integer    10        When a static bridge model or other blocked area (e.g. airport object)
                                                                      intersect with a way, how much must at least be left so the way is kept after
                                                                      intersection.
+
+OVERLAP_CHECK_EXCLUDE_AREAS_BUILDINGS           List       None      Areas blocked for placing buildings. It is a list of polygons defining the
+                                                                     areas to exclude. Each polygon is a list of lon/lat coordinates, where the
+                                                                     last element automatically connects to the first element to close the polygon.
+                                                                     The coordinate points must be defined counter-clock wise.
+                                                                     This is a last resort to handle situations, where the built in mechanism
+                                                                     cannot handle especially static elements, because their geometry is not
+                                                                     clearly handled when interpreting the corresponding ac-file.
+                                                                     See example below the table for PHNL.
+
+OVERLAP_CHECK_EXCLUDE_AREAS_ROADS               List       None      Ditto for roads. Often they will be the same - but not always.
 =============================================   ========   =======   ==============================================================================
 
 Examples of overlap objects based on static objects at LSZS (light grey structures at bottom of buildings):
@@ -422,6 +433,28 @@ Examples of overlap objects based on static objects at LSZS (light grey structur
 
 
 .. image:: lszs_hull_back.png
+
+
+An example of difficult to handle situations is PHNL (Hawaii), where several objects inside the ac-file have rotations. The picture below shows the blocked areas (green) automatically detected. E.g. the large green area top left is a static object for the Admiral Bernard Chick Clarey Bridge. At the PHNL airport the green stripes parallel to the runway should actually be rather large areas covering most of the hangar areas of the airport.
+
+.. image:: blocked_areas_phnl.png
+
+
+The next image shows the blocked areas by parameter as well as the code to define these areas. There are at least two problems with this: (a) such issues cannot be detected automatically and (b) it is tedious and error prone to define these polygons. This is more a proof of concept and a "hack" for PHNL than anything else.
+
+.. image:: blocked_areas_with_excludes_phnl.png
+
+Remark in the parameters below that for roads only the bridge has been excluded - that is because it has been tested visually (again: tedious and slow).
+
+::
+
+    _admiral_clarey_bridge = [(-157.953, 21.3693), (-157.953, 21.3671), (-157.9356, 21.3690), (-157.9346, 21.3711)]
+    _phnl_airport = [(-157.9015, 21.3354), (-157.9264, 21.3393), (-157.9272, 21.3347), (-157.9459, 21.3393),
+                    (-157.9516, 21.3331), (-157.9558, 21.3371), (-157.9589, 21.3373), (-157.9694, 21.3287),
+                    (-157.9503, 21.3038), (-157.9048, 21.3040)]
+    OVERLAP_CHECK_EXCLUDE_AREAS_ROADS = [_admiral_clarey_bridge]
+    OVERLAP_CHECK_EXCLUDE_AREAS_BUILDINGS = [_admiral_clarey_bridge, _phnl_airport]
+
 
 
 -----------------

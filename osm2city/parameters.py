@@ -112,6 +112,9 @@ OVERLAP_CHECK_APT_PAVEMENT_ROADS_INCLUDE = None  # At airports in list include o
 OVERLAP_CHECK_APT_USE_BTG_ROADS = []
 OVERLAP_CHECK_APT_USE_OSM_APRON_ROADS = False  # Add OSM APRON polygons for overlap checking with roads
 
+OVERLAP_CHECK_EXCLUDE_AREAS_BUILDINGS = None  # Exclude placing buildings in this area: list of list of lon/lat tuples
+OVERLAP_CHECK_EXCLUDE_AREAS_ROADS = None  # ditto
+
 # -- Skip buildings based on their OSM name tag or OSM ID, e.g. in case there's already
 #    a static model for these, and the overlap check fails.
 #    Use unicode strings as in the first example if there are non-ASCII characters.
