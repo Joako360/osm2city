@@ -217,6 +217,7 @@ def _process_multipolygon_buildings(nodes_dict: Dict[int, op.Node], rel_ways_dic
                                     coords_transform: coordinates.Transformation) -> int:
     """Processes the members in a multipolygon relationship. Returns the number of buildings actually created.
     If there are several members of type 'outer', then multiple buildings are created.
+    Also, tif there are several 'outer', then these buildings are combined in a parent.
     """
     outer_ways = []
     outer_ways_multiple = []  # outer ways, where multiple ways form one or more closed ring
@@ -296,10 +297,14 @@ def _process_multipolygon_buildings(nodes_dict: Dict[int, op.Node], rel_ways_dic
 
 
 def _process_simple_3d_building(relation: op.Relation, my_buildings: Dict[int, building_lib.Building]):
-    """Processes the members in a Simple3D relationship in order to make sure that a building outline exists."""
-    buildings_found = list()  # osm_id
+    """Processes the members in a Simple3D relationship in order to make sure that a building outline exists.
+
+    According to https://wiki.openstreetmap.org/wiki/Simple_3D_buildings#Building_outlines the outline is not
+    used for rendering and therefore it is omitted from the parent/child relationship and removed.
+    """
     building_outlines_found = list()  # osm_id
     # make relations - we are only interested
+    parent = building_lib.BuildingParent(op.get_next_pseudo_osm_id(op.OSMFeatureType.building_relation), False)
     for member in relation.members:
         if member.type_ == s.V_WAY:
             if member.ref in my_buildings:
@@ -308,42 +313,13 @@ def _process_simple_3d_building(relation: op.Relation, my_buildings: Dict[int, b
                     if member.role == s.V_OUTLINE:
                         building_outlines_found.append(related_building.osm_id)
                     else:
-                        buildings_found.append(related_building.osm_id)
+                        if s.K_BUILDING_PART in related_building.tags and \
+                                related_building.tags[s.K_BUILDING_PART] in ALLOWED_BUILDING_PART_VALUES:
+                            parent.add_child(related_building)
 
-    if len(building_outlines_found) == 1:
-        # nothing to be done - everything as it should and _process_building_parts() takes care of relating etc.
-        parent = building_lib.BuildingParent(building_outlines_found[0], True)
-        outline_part = my_buildings[building_outlines_found[0]]
-        parent.add_child(outline_part)
-        for member in buildings_found:
-            b_part = my_buildings[member]
-            parent.add_child(b_part)
-    elif len(building_outlines_found) > 1:
-        # meaning the tagging in OSM is wrong - there should only be one outline
-        # _process_building_parts() takes care of relating etc. and will probably find different parents.
-        logging.warning('OSM data error: there is more than one "outline" member in relation %i',
-                        relation.osm_id)
-    else:
-        # meaning that the tagging in OSM is wrong - there should be one outline
-        if buildings_found:
-            # Most probably the role was tagged wrongly.
-            # nothing to be done - at least one building it will be found as parent in _process_building_parts()
-            logging.warning('OSM data error: there is no "outline" member, but at least one "building" in relation %i',
-                            relation.osm_id)
-        else:
-            # now we do not have a building to find as parent in _process_building_parts(). In order to have
-            # the building_parts relate nevertheless, we create a virtual parent and relate all parts to
-            # this after checking that the building_parts are relevant.
-            # There will be no additional checking in _process_building_parts() because now there is a parent already
-            logging.warning('OSM data error: there is no "outline" member in relation %i', relation.osm_id)
-            parent = building_lib.BuildingParent(op.get_next_pseudo_osm_id(op.OSMFeatureType.building_relation), False)
-            # no tags are available to be added on parent level
-            for member in relation.members:
-                if member.ref in my_buildings:
-                    building_part = my_buildings[member.ref]
-                    if s.K_BUILDING_PART in building_part.tags and \
-                            building_part.tags[s.K_BUILDING_PART] not in ALLOWED_BUILDING_PART_VALUES:
-                        parent.add_child(building_part)
+    for osm_id in building_outlines_found:
+        if osm_id in my_buildings:
+            del my_buildings[osm_id]
 
 
 def _process_building_parts(nodes_dict: Dict[int, op.Node],

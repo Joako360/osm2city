@@ -585,11 +585,14 @@ class Building(object):
         return facade_requires
 
     def analyse_textures(self, facade_mgr: tex.FacadeManager, roof_mgr: tex.RoofManager,
-                         stats: utilities.Stats) -> bool:
-        """Determine the facade and roof textures. Return False if anomaly is found."""
+                         stats: utilities.Stats, body_height: float) -> bool:
+        """Determine the facade and roof textures. Return False if anomaly is found.
+
+        Body height is a parameter such that it can be set from outside instead of from building object directly.
+        """
         facade_requires = self._analyse_facade_roof_requirements()
         longest_edge_length = self.longest_edge_length  # keep for performance
-        self.facade_texture = facade_mgr.find_matching_facade(facade_requires, self.tags, self.body_height,
+        self.facade_texture = facade_mgr.find_matching_facade(facade_requires, self.tags, body_height,
                                                               longest_edge_length, stats)
         if self.facade_texture:
             logging.debug('Facade texture for osm_id {}: {} - {}'.format(self.osm_id, str(self.facade_texture),
@@ -1373,52 +1376,58 @@ class BuildingParent(object):
         used as a parent for building_parts, if not relation was given."""
         self.tags = tags
 
-    def align_textures_children(self) -> None:
+    def align_textures_children(self, facade_mgr: tex.FacadeManager, roof_mgr: tex.RoofManager,
+                                stats: utilities.Stats) -> None:
         """Aligns the facade and roof textures for all the children belonging to this parent.
-        Unless there are deviations in the use of tags, then the textures of the child with
-        the largest longest_edge_len is chosen.
-        It might be best if the one part with the most clear tags would win, but [A] it is highly probable
-        that all children have similar tags (but maybe different values), and [B] it is safest to choose
-        a texture matching the longest edge.
-        If there is at least one deviation, then all parts keep their textures.
+        Per default the building colour and building material of the child with the largest longest_edge_len is chosen.
+        Then the rest of the children are searched for colour/material and the first one wins.
+        Finally the default is used to analyse for textures again with whatever colour/material was there, and this
+        time the height of the highest child is used.
         """
         if len(self.children) == 0:  # might be sanitize_children() has removed them all
             return
 
+        # first find the child with the longest edge
         default_child = None
-        difference_found = False
-        building_colour = None
-        building_material = None
         for child in self.children:
             if default_child is None:
                 default_child = child
-                if s.K_BUILDING_COLOUR in child.tags:
-                    building_colour = child.tags[s.K_BUILDING_COLOUR]
-                if s.K_BUILDING_MATERIAL in child.tags:
-                    building_material = child.tags[s.K_BUILDING_MATERIAL]
-            else:
-                if child.longest_edge_length > default_child.longest_edge_length:
-                    default_child = child
-                if s.K_BUILDING_COLOUR in child.tags:
-                    if building_colour is None:
-                        difference_found = True
-                        break
-                    elif building_colour != child.tags[s.K_BUILDING_COLOUR]:
-                        difference_found = True
-                        break
-                if s.K_BUILDING_MATERIAL in child.tags:
-                    if building_material is None:
-                        difference_found = True
-                        break
-                    elif building_material != child.tags[s.K_BUILDING_MATERIAL]:
-                        difference_found = True
-                        break
+            elif child.longest_edge_length > default_child.longest_edge_length:
+                default_child = child
 
-        if difference_found:  # nothing to do - keep as is
-            return
+        # find out if we can find hints for real material
+        largest_body_height = default_child.body_height
+        building_colour = None
+        building_material = None
+        if s.K_BUILDING_COLOUR in default_child.tags:
+            building_colour = default_child.tags[s.K_BUILDING_COLOUR]
+        if s.K_BUILDING_MATERIAL in default_child.tags:
+            building_material = default_child.tags[s.K_BUILDING_MATERIAL]
+
+        for child in self.children:
+            if child is default_child:
+                continue
+            if building_colour is None and s.K_BUILDING_COLOUR in child.tags:
+                building_colour = child.tags[s.K_BUILDING_COLOUR]
+            if building_material is None and s.K_BUILDING_MATERIAL in child.tags:
+                building_material = child.tags[s.K_BUILDING_MATERIAL]
+            largest_body_height = max(largest_body_height, child.body_height)
+
+        if s.K_BUILDING_COLOUR not in default_child.tags and building_colour:
+            default_child.tags[s.K_BUILDING_COLOUR] = building_colour
+        if s.K_BUILDING_MATERIAL not in default_child.tags and building_material:
+            default_child.tags[s.K_BUILDING_MATERIAL] = building_material
+
+        # now that everything is in place, analyse for texture again
+        try:
+            default_child.analyse_textures(facade_mgr, roof_mgr, stats, largest_body_height)
+        except Exception as e:
+            foo = 0
 
         # apply same textures to all children
         for child in self.children:
+            if child is default_child:
+                continue
             child.facade_texture = default_child.facade_texture
             child.roof_texture = default_child.roof_texture
 
@@ -1610,7 +1619,7 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: s
                 continue
         b.analyse_roof_shape_check()
 
-        if not b.analyse_textures(facade_mgr, roof_mgr, stats):
+        if not b.analyse_textures(facade_mgr, roof_mgr, stats, b.body_height):
             continue
 
         # -- finally: append building to new list
@@ -1623,7 +1632,7 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: s
 
     building_parents = BuildingParent.get_building_parents(new_buildings)
     for parent in building_parents:
-        parent.align_textures_children()
+        parent.align_textures_children(facade_mgr, roof_mgr, stats)
 
     # make sure that min_height is only used if there is a real parent (not pseudo_parents)
     # i.e. for all others we just set it to 0.0
