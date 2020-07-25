@@ -501,10 +501,8 @@ class GeneratedBuildingZone(BuildingZone):
             return
 
         # now we should only have non_osm based on lonely buildings
-        if self.type_ is not enu.BuildingZoneType.non_osm:
-            logging.error('Should be of type "non_osm", but actually is: %s. Programming logic error!',
-                          self.type_.name)
-            exit(1)
+        assert self.type_ is enu.BuildingZoneType.non_osm, 'Needs type "non_osm", but actually is "{}"'.format(
+            self.type_.name)
         residential_buildings = 0
         commercial_buildings = 0
         industrial_buildings = 0

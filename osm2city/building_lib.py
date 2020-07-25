@@ -1115,20 +1115,24 @@ class Building(object):
             return 0
         return 1
 
-    def analyse_large_enough(self) -> bool:
+    def is_too_small_building(self) -> bool:
         """Checks whether a given building's area is too small for inclusion.
         Never drop tall buildings.
         Returns true if the building should be included (i.e. area is big enough etc.)
         """
-        if self.levels >= parameters.BUILDING_NEVER_SKIP_LEVELS:
-            return True
         if self.inner_rings_list:  # never skip a building with inner rings
-            return True
-        if self.area < parameters.BUILDING_MIN_AREA and self.has_parent is False:
             return False
-        if self.area < parameters.BUILDING_REDUCE_THRESHOLD and random.uniform(0, 1) < parameters.BUILDING_REDUCE_RATE:
-            return False
-        return True
+        if self.has_parent:
+            if self.area < parameters.BUILDING_MIN_AREA:
+                return True
+            if self.area < parameters.BUILDING_REDUCE_THRESHOLD and (
+                    random.uniform(0, 1) < parameters.BUILDING_REDUCE_RATE):
+                proxy_levels = _parse_building_levels(self.tags)
+                if proxy_levels > 0:
+                    if proxy_levels >= parameters.BUILDING_NEVER_REDUCE_LEVELS:
+                        return False
+                return True
+        return False
 
     def compute_roof_height(self, in_building_list: bool = False) -> None:
         """Compute roof_height for each node"""
@@ -1457,6 +1461,9 @@ class BuildingParent(object):
         self.children.append(child)
         child.parent = self
 
+    def remove_child(self, child: Building) -> None:
+        self.children.remove(child)
+
     def contains_child(self, child: Building) -> bool:
         return child in self.children
 
@@ -1546,7 +1553,7 @@ class BuildingParent(object):
             for child in reversed(parent.children):
                 if child not in my_buildings:
                     child.parent = None
-                    parent.children.remove(child)
+                    parent.remove_child(child)
 
             parent.make_sure_lone_building_in_parent_stands_alone()
 
@@ -1654,26 +1661,10 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: s
         building_parent = b.parent
         b.parent = None  # will be reset again if actually all is ok at end
 
-        # exclude what is processed elsewhere
-        if s.K_BUILDING in b.tags:  # not if 'building:part'
-            # temporarily exclude greenhouses / glasshouses
-            if b.tags[s.K_BUILDING] in [s.V_GLASSHOUSE, s.V_GREENHOUSE] or (
-                            s.K_AMENITY in b.tags and b.tags[s.K_AMENITY] in [s.V_GLASSHOUSE, s.V_GREENHOUSE]):
-                logging.debug("Excluded greenhouse with osm_id={}".format(b.osm_id))
+        # handle places of worship
+        if s.K_BUILDING in b.tags and parameters.BUILDING_USE_SHARED_WORSHIP:
+            if _analyse_worship_building(b, building_parent, stg_manager, fg_elev, coords_transform):
                 continue
-            # exclude storage tanks -> pylons.py
-            if b.tags[s.K_BUILDING] in s.L_STORAGE_TANK or (
-                    s.K_MAN_MADE in b.tags and b.tags[s.K_MAN_MADE] in s.L_STORAGE_TANK):
-                logging.debug("Excluded storage tank with osm_id={}".format(b.osm_id))
-                continue
-            # exclude chimneys -> pylons.py
-            if s.K_MAN_MADE in b.tags and b.tags[s.K_MAN_MADE] in ['chimney']:
-                logging.debug("Excluded chimney or with osm_id={}".format(b.osm_id))
-                continue
-            # handle places of worship
-            if parameters.BUILDING_USE_SHARED_WORSHIP:
-                if _analyse_worship_building(b, building_parent, stg_manager, fg_elev, coords_transform):
-                    continue
 
         try:
             b.roll_inner_nodes()
@@ -1701,11 +1692,6 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: s
             stats.skipped_small += 1
             continue
 
-        # -- check area, but if has parent then always keep
-        if not building_parent:
-            if not b.analyse_large_enough():
-                stats.skipped_small += 1
-                continue
         b.analyse_roof_shape_check()
 
         if not b.analyse_textures(facade_mgr, roof_mgr, stats, b.body_height):

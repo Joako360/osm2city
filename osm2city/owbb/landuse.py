@@ -19,9 +19,11 @@ from osm2city.owbb import models as m
 import osm2city.owbb.plotting as plotting
 import osm2city.owbb.would_be_buildings as wbb
 import osm2city.parameters as parameters
+import osm2city.types.osmstrings as s
 import osm2city.utils.aptdat_io as aptdat_io
 import osm2city.utils.btg_io as btg
 import osm2city.utils.osmparser as op
+
 from osm2city.utils.coordinates import disjoint_bounds, Transformation
 from osm2city.utils.utilities import time_logging, merge_buffers
 
@@ -885,7 +887,20 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
             my_zone.guess_building_zone_type(farm_places)
     last_time = time_logging("Time used in seconds for guessing zone types", last_time)
 
-    # =========== Now let us do final calculations and relations as long as we have the nodes dict =================
+    # ============ Exclude buildings not processed in buildings now that we have the zones and guessed their type ===
+    remove_unused = set()
+    for building in reversed(osm_buildings):
+        if s.is_small_building_land_use(building.tags, True) or s.is_small_building_land_use(building.tags, False):
+            remove_unused.add(building)
+        elif building.is_too_small_building():
+            remove_unused.add(building)
+    for building in remove_unused:
+        if building.has_parent:
+            building.parent.remove_child(building)
+        osm_buildings.remove(building)
+    logging.info('Removed %i small buildings used in land-use', len(remove_unused))
+
+    # ============ Now let us do final calculations and relations as long as we have the nodes dict =================
     # See whether we can do more building relations
     # This is done as late as possible to reduce exec time by only looking in the building's same zone
     bu.process_building_loose_parts(building_nodes_dict, osm_buildings)

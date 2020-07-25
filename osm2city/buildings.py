@@ -701,7 +701,20 @@ def construct_buildings_from_osm(coords_transform: coordinates.Transformation) -
     osm_nodes_dict.update(osm_read_results.rel_nodes_dict)  # just add all relevant nodes to have one dict of nodes
     osm_rel_ways_dict = osm_read_results.rel_ways_dict
 
-    # first make sure that buildings are as rectified as possible -> temporary buildings
+    # remove those buildings, which will not be rendered and not used in land-use processing
+    remove_unused = set()
+    for key, way in osm_ways_dict.items():
+        if s.is_small_building_detail(way.tags, True) or s.is_small_building_detail(way.tags, False):
+            remove_unused.add(key)
+        elif s.is_storage_tank(way.tags, True) or s.is_storage_tank(way.tags, False):
+            remove_unused.add(key)
+        elif s.is_chimney(way.tags):
+            remove_unused.add(key)
+    for key in remove_unused:
+        del osm_ways_dict[key]
+    logging.info('Removed %i small buildings not used in land-use', len(remove_unused))
+
+    # make sure that buildings are as rectified as possible -> temporary buildings
     _process_rectify_buildings(osm_nodes_dict, osm_read_results.rel_nodes_dict, osm_ways_dict, coords_transform)
 
     # then create the actual building objects

@@ -70,7 +70,8 @@ class BuildingClass(IntEnum):
 
 @unique
 class BuildingType(IntEnum):
-    """Mostly match value of a tag with k=building"""
+    """Mostly match value of a tag with k=building.
+    If changed, then also check use in get_building_class() as well as is_...() methods in osmstrings.py."""
     yes = 1  # default
     parking = 10  # k="parking" v="multi-storey"
     apartments = 21
@@ -100,18 +101,19 @@ class BuildingType(IntEnum):
     school = 83
     hospital = 84
     hotel = 85
-    kiosk = 86
-    farm = 91
-    barn = 92
-    cowshed = 93
-    farm_auxiliary = 94
-    greenhouse = 95
-    stable = 96
-    sty = 97
-    riding_hall = 98
-    hangar = 100
-    stadium = 110
-    sports_hall = 111
+    farm = 101
+    barn = 102
+    cowshed = 103
+    farm_auxiliary = 104
+    greenhouse = 105
+    glasshouse = 106
+    stable = 107
+    sty = 108
+    riding_hall = 109
+    slurry_tank = 110
+    hangar = 201
+    stadium = 301
+    sports_hall = 302
 
 
 def parse_building_tags_for_type(tags_dict: KeyValueDict) -> Union[None, BuildingType]:
@@ -137,8 +139,7 @@ def get_building_class(tags: KeyValueDict) -> BuildingClass:
         return BuildingClass.undefined
     if type_ in [BuildingType.house, BuildingType.detached, BuildingType.residential]:
         return BuildingClass.residential
-    elif type_ in [BuildingType.bungalow, BuildingType.static_caravan, BuildingType.cabin, BuildingType.hut,
-                   BuildingType.kiosk]:
+    elif type_ in [BuildingType.bungalow, BuildingType.static_caravan, BuildingType.cabin, BuildingType.hut]:
         return BuildingClass.residential_small
     elif type_ in [BuildingType.apartments, BuildingType.dormitory, BuildingType.hotel]:
         return BuildingClass.apartments
@@ -160,7 +161,8 @@ def get_building_class(tags: KeyValueDict) -> BuildingClass:
     elif type_ in [BuildingType.public, BuildingType.civic, BuildingType.school, BuildingType.hospital]:
         return BuildingClass.public
     elif type_ in [BuildingType.farm, BuildingType.barn, BuildingType.cowshed, BuildingType.farm_auxiliary,
-                   BuildingType.greenhouse, BuildingType.stable, BuildingType.sty, BuildingType.riding_hall]:
+                   BuildingType.greenhouse, BuildingType.stable, BuildingType.sty, BuildingType.riding_hall,
+                   BuildingType.slurry_tank]:
         return BuildingClass.farm
     elif type_ in [BuildingType.hangar]:
         return BuildingClass.airport

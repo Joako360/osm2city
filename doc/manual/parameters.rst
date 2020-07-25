@@ -147,7 +147,7 @@ BUILDING_REDUCE_RATE                            Number     0.5       Rate (betwe
                                                                      randomly in output.
 BUILDING_REDUCE_CHECK_TOUCH                     Boolean    False     Before removing a building due to area, check whether it is touching another
                                                                      building and therefore should be kept.
-BUILDING_NEVER_SKIP_LEVELS                      Integer    6         Buildings that tall will never be skipped.
+BUILDING_NEVER_REDUCE_LEVELS                    Integer    6         Buildings that tall will never be removed in removing.
 
 =============================================   ========   =======   ==============================================================================
 

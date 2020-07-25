@@ -130,7 +130,7 @@ BUILDING_MIN_AREA = 50.0            # -- minimum area for a building to be inclu
 BUILDING_PART_MIN_AREA = 10.0  # minimum area for building:parts
 BUILDING_REDUCE_THRESHOLD = 200.0   # -- threshold area of a building below which a rate of buildings gets reduced from output
 BUILDING_REDUCE_RATE = 0.5          # -- rate (between 0 and 1) of buildings below a threshold which get reduced randomly in output
-BUILDING_NEVER_SKIP_LEVELS = 6      # -- buildings that tall will never be skipped
+BUILDING_NEVER_REDUCE_LEVELS = 6      # -- buildings that tall will never be skipped
 BUILDING_SIMPLIFY_TOLERANCE_LINE = 1.0
 BUILDING_SIMPLIFY_TOLERANCE_AWAY = 2.5
 

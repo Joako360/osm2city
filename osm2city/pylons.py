@@ -1646,8 +1646,7 @@ def _process_osm_building_refs(nodes_dict, ways_dict, my_coord_transformator, fg
                         my_buildings.append(my_polygon.convex_hull)
                         # process storage tanks
                         if parameters.C2P_PROCESS_STORAGE_TANKS:
-                            if way.tags[s.K_BUILDING] in s.L_STORAGE_TANK or (
-                                        s.K_MAN_MADE in way.tags and way.tags[s.K_MAN_MADE] in s.L_STORAGE_TANK):
+                            if s.is_storage_tank(way.tags, True) or s.is_storage_tank(way.tags, False):
                                 my_centroid = my_polygon.centroid
                                 lon, lat = my_coord_transformator.to_global((my_centroid.x, my_centroid.y))
                                 if not clipping_border.contains(shg.Point(lon, lat)):

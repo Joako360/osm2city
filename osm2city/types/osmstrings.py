@@ -1,6 +1,13 @@
 """Holds string constants for OSM keys and values."""
 
-# ======================= KEYS ====================================
+from typing import Dict
+
+# ========================= NON OSM KEYS AND VALUES ==============================================================
+K_OWBB_GENERATED = 'owbb_generated'
+
+V_GEN = 'gen'
+
+# ======================= KEYS ===================================================================================
 K_AERIALWAY = 'aerialway'
 K_AEROWAY = 'aeroway'
 K_AMENITY = 'amenity'
@@ -72,7 +79,7 @@ K_WATERWAY = 'waterway'
 K_WIKIDATA = 'wikidata'
 K_WIRES = 'wires'
 
-# ======================= VALUES ==================================
+# ======================= VALUES =================================================================================
 V_ABANDONED = 'abandoned'
 V_ACROSS = 'across'
 V_AERODROME = 'aerodrome'
@@ -91,6 +98,7 @@ V_CATHEDRAL = 'cathedral'
 V_CIRCULAR = 'circular'
 V_CITY = 'city'
 V_CHECKPOINT = 'checkpoint'
+V_CHIMNEY = 'chimney'
 V_CHRISTIAN = 'christian'
 V_CHURCH = 'church'
 V_COASTLINE = 'coastline'
@@ -101,6 +109,7 @@ V_CONTACT_LINE = 'contact_line'
 V_DAM = 'dam'
 V_DANGER_AREA = 'danger_area'
 V_DETACHED = 'detached'
+V_DIGESTER = 'digester'
 V_DISUSED = 'disused'
 V_DOME = 'dome'
 V_DYKE = 'dyke'
@@ -164,11 +173,14 @@ V_SALTBOX = 'saltbox'
 V_SECONDARY = 'secondary'
 V_SHED = 'shed'
 V_SKILLION = 'skillion'
+V_SLURRY_TANK = 'slurry_tank'
 V_SPUR = 'spur'
 V_STADIUM = 'stadium'
+V_STATIC_CARAVAN = 'static_caravan'
 V_STATION = 'station'
 V_STORAGE_TANK = 'storage_tank'
 V_STREAM = 'stream'
+V_STY = 'sty'
 V_SUBURB = 'suburb'
 V_SUBWAY = 'subway'
 V_SWITCH = 'switch'
@@ -191,15 +203,51 @@ V_YES = 'yes'
 V_ZOO = 'zoo'
 
 
-# ======================= LISTS ===================================
-L_STORAGE_TANK = [V_STORAGE_TANK, V_TANK, V_OIL_TANK, V_FUEL_STORAGE_TANK]
+# ======================= LISTS ==================================================================================
+L_GLASS_H = [V_GLASSHOUSE, V_GREENHOUSE]
+L_STORAGE_TANK = [V_STORAGE_TANK, V_TANK, V_OIL_TANK, V_FUEL_STORAGE_TANK, V_DIGESTER]
 
-# ======================= KEY-VALUE PAIRS ==================================
+
+# ======================= KEY-VALUE PAIRS ========================================================================
 KV_MAN_MADE_CHIMNEY = 'man_made=>chimney'
 KV_ROUTE_FERRY = 'route=>ferry'
 
 
-# ========================= NON OSM KEYS AND VALUES ===============
-K_OWBB_GENERATED = 'owbb_generated'
+# ========================= CHECKS TO DIFFERENTIATE STUFF, e.g. processing in buildings vs. pylons ===============
+def _is_glasshouse(tags: Dict[str, str], is_building_part: bool) -> bool:
+    """Whether this is a glasshouse or a greenhouse.
+    Is not yet processed cf. https://gitlab.com/osm2city/osm2city/-/issues/37."""
+    building_key = K_BUILDING_PART if is_building_part else K_BUILDING
+    return (building_key in tags and tags[building_key] in L_GLASS_H) or (
+            K_AMENITY in tags and tags[K_AMENITY] in L_GLASS_H)
 
-V_GEN = 'gen'
+
+def is_storage_tank(tags: Dict[str, str], is_building_part: bool) -> bool:
+    """Whether this is a storage tank (or similar) and processed in pylons.py."""
+    building_key = K_BUILDING_PART if is_building_part else K_BUILDING
+    return (building_key in tags and tags[building_key] in L_STORAGE_TANK) or (
+            K_MAN_MADE in tags and tags[K_MAN_MADE] in L_STORAGE_TANK)
+
+
+def is_chimney(tags: Dict[str, str]) -> bool:
+    """Whether this is a chimney and processed in pylons.py."""
+    return K_MAN_MADE in tags and tags[K_MAN_MADE] in [V_CHIMNEY]
+
+
+def is_small_building_land_use(tags: Dict[str, str], is_building_part: bool) -> bool:
+    """Whether this is a building used for determining land-use, but not used in rendering.
+
+    See also enumerations.py -> BuildingType and get_building_class()."""
+    building_key = K_BUILDING_PART if is_building_part else K_BUILDING
+    return building_key in tags and tags[building_key] in [V_STY, V_SLURRY_TANK, V_STATIC_CARAVAN] or (
+        _is_glasshouse(tags, is_building_part))
+
+
+def is_small_building_detail(tags: Dict[str, str], is_building_part: bool) -> bool:
+    """Small buildings, which are not rendered as buildings (but might get rendered as 'Details' some day).
+    As they are not used for land-use either, they can be excluded immediately."""
+    building_key = K_BUILDING_PART if is_building_part else K_BUILDING
+    return building_key in tags and tags[building_key] in ['garage', 'garages', 'carport', 'car_port',
+                                                           'kiosk', 'toilets', 'service',
+                                                           'shed', 'tree_house',
+                                                           'roof']
