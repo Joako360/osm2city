@@ -695,7 +695,7 @@ def _safe_index(index: int, number_of_elements: int) -> int:
 
 
 def simplify_balconies(original: shg.Polygon, distance_tolerance_line: float,
-                       distance_tolerance_away: float, refs_shared: Dict[int, Set[int]]) -> Set[int]:
+                       distance_tolerance_away: float, refs_shared: Dict[Any, Set[int]]) -> Set[int]:
     """Removes edges from polygons, which look like balconies on a building.
     Removes always 4 points at a time.
 

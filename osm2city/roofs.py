@@ -33,12 +33,15 @@ class RoofHint:
                          Tuple of tuple(lon, lat) in local coordinates.
                          The lon/lat instead of a node position is kept because due to geometry changes
                          the sequence of the outer ring could change. This way we can test.
+    * node_before_inner_is_shared: only used for roof with 5 nodes to signal whether the node before inner is
+                         a shared node with neighbour or after. Otherwise there is not enough info to find the L.
     """
-    __slots__ = ('ridge_orientation', 'inner_node')
+    __slots__ = ('ridge_orientation', 'inner_node', 'node_before_inner_is_shared')
 
     def __init__(self) -> None:
         self.ridge_orientation = -1.  # float >= 0. Only valid hint if >= 0 and then finally used in roofs.py
         self.inner_node = None  # local lon/lat Tuple[float, float]
+        self.node_before_inner_is_shared = False
 
 
 def roof_looks_square(circumference: float, area: float) -> bool:
@@ -113,7 +116,15 @@ def sanity_roof_height_complex(b, roof_type: str) -> float:
 
 
 def separate_gable_with_corner(ac_object, b, roof_mat_idx: int, facade_mat_idx: int) -> None:
-    """By convention counting of nodes starts at the inner node."""
+    """Create a gabled roof around a corner - there can be 4, 5, or 6 nodes.
+    By convention counting of nodes starts at the inner node (0) and is counter clockwise.
+    The nodes on the top are numbered as follows:
+    * First gable counter clockwise: node_10
+    * Second gable counter clockwise: node_11
+    * Centre node on top where ridges meet: node_12
+
+    See e.g. https://en.wikipedia.org/wiki/Roof#/media/File:Roof_diagram.jpg for the meaning of ridge, hip and eaves.
+    """
     t = b.roof_texture
     roof_height = sanity_roof_height_complex(b, 'gable_with_corner')
 
@@ -121,11 +132,339 @@ def separate_gable_with_corner(ac_object, b, roof_mat_idx: int, facade_mat_idx: 
     shortest_dist = 9999999
     shortest_index = 0
     num_nodes = len(b.pts_all)  # pts_all works because there are no inner points in a complex roof
-    for index, pt in b.pts_all.enumerate():
-        dist = coord.calc_distance_local(pt.x, pt.y, b.roof_hint.inner_node.x, b.roof_hint.inner_node.x)
+    index = -1  # enumerate over b.pts_all does not seem to work due to ndarray
+    for pt in b.pts_all:
+        index += 1
+        dist = coord.calc_distance_local(pt[0], pt[1], b.roof_hint.inner_node[0], b.roof_hint.inner_node[1])
         if dist < shortest_dist:
             shortest_dist = dist
             shortest_index = index
+
+    node_0 = b.pts_all[shortest_index]
+    node_1 = b.pts_all[(shortest_index + 1) % num_nodes]
+    node_2 = b.pts_all[(shortest_index + 2) % num_nodes]
+    node_3 = b.pts_all[(shortest_index + 3) % num_nodes]
+    node_4 = None
+    node_5 = None
+    if num_nodes > 4:
+        node_4 = b.pts_all[(shortest_index + 4) % num_nodes]
+    if num_nodes == 6:
+        node_5 = b.pts_all[(shortest_index + 5) % num_nodes]
+
+    idx_offset_top = 10 - num_nodes  # used to correct between node number and real index
+
+    # point_10: the first gable
+    first_node = node_0
+    second_node = node_1
+    if num_nodes == 5:
+        if b.roof_hint.node_before_inner_is_shared:
+            first_node = node_1
+            second_node = node_2
+        # else same as for 4 nodes
+    elif num_nodes == 6:
+        first_node = node_1
+        second_node = node_2
+    node_10 = coord.calc_point_on_line_local(first_node[0], first_node[1],
+                                             second_node[0], second_node[1],
+                                             0.5)
+    # point_11: the second gable
+    first_node = node_3
+    second_node = node_0
+    if num_nodes == 5:
+        if b.roof_hint.node_before_inner_is_shared:
+            first_node = node_4
+            second_node = node_0
+        else:
+            first_node = node_3
+            second_node = node_4
+    elif num_nodes == 6:
+        first_node = node_4
+        second_node = node_5
+    node_11 = coord.calc_point_on_line_local(first_node[0], first_node[1],
+                                             second_node[0], second_node[1],
+                                             0.5)
+    # point_12: the centre point
+    first_node = node_0
+    second_node = node_2
+    if num_nodes == 5:
+        if b.roof_hint.node_before_inner_is_shared:
+            second_node = node_3
+        # else same as for 4 nodes
+    elif num_nodes == 6:
+        second_node = node_3
+    node_12 = coord.calc_point_on_line_local(first_node[0], first_node[1],
+                                             second_node[0], second_node[1],
+                                             0.5)
+
+    # add nodes to ac-object
+    object_node_index = ac_object.next_node_index()  # must be before nodes are added!
+    ac_object.node(-node_0[1], b.beginning_of_roof_above_sea_level, -node_0[0])
+    ac_object.node(-node_1[1], b.beginning_of_roof_above_sea_level, -node_1[0])
+    ac_object.node(-node_2[1], b.beginning_of_roof_above_sea_level, -node_2[0])
+    ac_object.node(-node_3[1], b.beginning_of_roof_above_sea_level, -node_3[0])
+    if num_nodes > 4:
+        ac_object.node(-node_4[1], b.beginning_of_roof_above_sea_level, -node_4[0])
+    if num_nodes == 6:
+        ac_object.node(-node_5[1], b.beginning_of_roof_above_sea_level, -node_5[0])
+    ac_object.node(-node_10[1], b.beginning_of_roof_above_sea_level + roof_height, -node_10[0])
+    ac_object.node(-node_11[1], b.beginning_of_roof_above_sea_level + roof_height, -node_11[0])
+    ac_object.node(-node_12[1], b.beginning_of_roof_above_sea_level + roof_height, -node_12[0])
+
+    # now the faces
+    roof_texture_size_x = t.h_size_meters  # size of roof texture in meters
+    roof_texture_size_y = t.v_size_meters
+    if num_nodes == 4:
+        # first inside roof side
+        ridge_len = coord.calc_distance_local(node_12[0], node_12[1], node_10[0], node_10[1])
+        ridge_x = ridge_len / roof_texture_size_x
+        hip_len = (coord.calc_distance_local(node_0[0], node_0[1], node_10[0], node_10[1]) ** 2
+                   + roof_height ** 2) ** 0.5
+        repeat_y = hip_len / roof_texture_size_y
+        ac_object.face([(object_node_index + 0, t.x(ridge_x), t.y(0)),  # node_0
+                        (object_node_index + 10 - idx_offset_top, t.x(ridge_x), t.y(repeat_y)),  # node_10
+                        (object_node_index + 12 - idx_offset_top, t.x(0), t.y(repeat_y))],  # node_12
+                       mat_idx=roof_mat_idx)
+        # first outside/back roof side
+        eaves_len = coord.calc_distance_local(node_1[0], node_1[1], node_2[0], node_2[1])
+        eaves_x = eaves_len / roof_texture_size_x
+        ridge_len = coord.calc_distance_local(node_10[0], node_10[1], node_12[0], node_12[1])
+        ridge_x = ridge_len / roof_texture_size_x
+        hip_len = (coord.calc_distance_local(node_1[0], node_1[1], node_10[0], node_10[1]) ** 2
+                   + roof_height ** 2) ** 0.5
+        repeat_y = hip_len / roof_texture_size_y
+        ac_object.face([(object_node_index + 1, t.x(0), t.y(0)),  # node_1
+                        (object_node_index + 2, t.x(eaves_x), t.y(0)),  # node_2
+                        (object_node_index + 12 - idx_offset_top, t.x(ridge_x), t.y(repeat_y)),  # node_12
+                        (object_node_index + 10 - idx_offset_top, t.x(0), t.y(repeat_y))],  # node_10
+                       mat_idx=roof_mat_idx)
+        # second outside/back roof side
+        eaves_len = coord.calc_distance_local(node_2[0], node_2[1], node_3[0], node_3[1])
+        eaves_x = eaves_len / roof_texture_size_x
+        ridge_len = coord.calc_distance_local(node_11[0], node_11[1], node_12[0], node_12[1])
+        ridge_x = ridge_len / roof_texture_size_x
+        hip_len = (coord.calc_distance_local(node_3[0], node_3[1], node_11[0], node_11[1]) ** 2
+                   + roof_height ** 2) ** 0.5
+        repeat_y = hip_len / roof_texture_size_y
+        ac_object.face([(object_node_index + 2, t.x(0), t.y(0)),  # node_2
+                        (object_node_index + 3, t.x(eaves_x), t.y(0)),  # node_3
+                        (object_node_index + 11 - idx_offset_top, t.x(eaves_x), t.y(repeat_y)),  # node_11
+                        (object_node_index + 12 - idx_offset_top, t.x(eaves_x - ridge_x), t.y(repeat_y))],  # node_12
+                       mat_idx=roof_mat_idx)
+        # second inside roof side
+        ridge_len = coord.calc_distance_local(node_11[0], node_11[1], node_12[0], node_12[1])
+        ridge_x = ridge_len / roof_texture_size_x
+        hip_len = (coord.calc_distance_local(node_0[0], node_0[1], node_11[0], node_11[1]) ** 2
+                   + roof_height ** 2) ** 0.5
+        repeat_y = hip_len / roof_texture_size_y
+        ac_object.face([(object_node_index + 0, t.x(0), t.y(0)),  # node_0
+                        (object_node_index + 12 - idx_offset_top, t.x(ridge_x), t.y(repeat_y)),  # node_12
+                        (object_node_index + 11 - idx_offset_top, t.x(0), t.y(repeat_y))],  # node_11
+                       mat_idx=roof_mat_idx)
+        # the sides where it is gabled and facade texture
+        _add_sides_gabled_facade_tex(ac_object, t, object_node_index, idx_offset_top, facade_mat_idx,
+                                     roof_height, roof_texture_size_x, roof_texture_size_y,
+                                     node_0, 0,
+                                     node_1, 1,
+                                     node_3, 3,
+                                     node_0, 0)
+    elif num_nodes == 5:
+        if b.roof_hint.node_before_inner_is_shared:
+            # first inside roof side
+            eaves_len = coord.calc_distance_local(node_0[0], node_0[1], node_1[0], node_1[1])
+            eaves_x = eaves_len / roof_texture_size_x
+            ridge_len = coord.calc_distance_local(node_10[0], node_10[1], node_12[0], node_12[1])
+            ridge_x = ridge_len / roof_texture_size_x
+            hip_len = (coord.calc_distance_local(node_1[0], node_1[1], node_10[0], node_10[1]) ** 2
+                       + roof_height ** 2) ** 0.5
+            repeat_y = hip_len / roof_texture_size_y
+            ac_object.face([(object_node_index + 0, t.x(ridge_x - eaves_x), t.y(0)),  # node_0
+                            (object_node_index + 1, t.x(ridge_x), t.y(0)),  # node_1
+                            (object_node_index + 10 - idx_offset_top, t.x(ridge_x), t.y(repeat_y)),  # node_10
+                            (object_node_index + 12 - idx_offset_top, t.x(0), t.y(repeat_y))],  # node_12
+                           mat_idx=roof_mat_idx)
+            # first outside/back roof side
+            eaves_len = coord.calc_distance_local(node_2[0], node_2[1], node_3[0], node_3[1])
+            eaves_x = eaves_len / roof_texture_size_x
+            ridge_len = coord.calc_distance_local(node_12[0], node_12[1], node_10[0], node_10[1])
+            ridge_x = ridge_len / roof_texture_size_x
+            hip_len = (coord.calc_distance_local(node_2[0], node_2[1], node_10[0], node_10[1]) ** 2
+                       + roof_height ** 2) ** 0.5
+            repeat_y = hip_len / roof_texture_size_y
+            ac_object.face([(object_node_index + 2, t.x(0), t.y(0)),  # node_2
+                            (object_node_index + 3, t.x(eaves_x), t.y(0)),  # node_3
+                            (object_node_index + 12 - idx_offset_top, t.x(ridge_x), t.y(repeat_y)),  # node_12
+                            (object_node_index + 10 - idx_offset_top, t.x(0), t.y(repeat_y))],  # node_10
+                           mat_idx=roof_mat_idx)
+            # second outside/back roof side
+            eaves_len = coord.calc_distance_local(node_3[0], node_3[1], node_4[0], node_4[1])
+            eaves_x = eaves_len / roof_texture_size_x
+            ridge_len = coord.calc_distance_local(node_11[0], node_11[1], node_12[0], node_12[1])
+            ridge_x = ridge_len / roof_texture_size_x
+            hip_len = (coord.calc_distance_local(node_4[0], node_4[1], node_11[0], node_11[1]) ** 2
+                       + roof_height ** 2) ** 0.5
+            repeat_y = hip_len / roof_texture_size_y
+            ac_object.face([(object_node_index + 3, t.x(0), t.y(0)),  # node_3
+                            (object_node_index + 4, t.x(eaves_x), t.y(0)),  # node_4
+                            (object_node_index + 11 - idx_offset_top, t.x(eaves_x), t.y(repeat_y)),  # node_11
+                            (object_node_index + 12 - idx_offset_top, t.x(eaves_x - ridge_x), t.y(repeat_y))],
+                           mat_idx=roof_mat_idx)
+            # second inside roof side
+            ridge_len = coord.calc_distance_local(node_12[0], node_12[1], node_11[0], node_11[1])
+            ridge_x = ridge_len / roof_texture_size_x
+            hip_len = (coord.calc_distance_local(node_0[0], node_0[1], node_11[0], node_11[1]) ** 2
+                       + roof_height ** 2) ** 0.5
+            repeat_y = hip_len / roof_texture_size_y
+            ac_object.face([(object_node_index + 0, t.x(ridge_x), t.y(0)),  # node_0
+                            (object_node_index + 12 - idx_offset_top, t.x(ridge_x), t.y(repeat_y)),  # node_12
+                            (object_node_index + 11 - idx_offset_top, t.x(0), t.y(repeat_y))],  # node_11
+                           mat_idx=roof_mat_idx)
+            # the sides where it is gabled and facade texture
+            _add_sides_gabled_facade_tex(ac_object, t, object_node_index, idx_offset_top, facade_mat_idx,
+                                         roof_height, roof_texture_size_x, roof_texture_size_y,
+                                         node_1, 1,
+                                         node_2, 2,
+                                         node_4, 4,
+                                         node_0, 0)
+        else:
+            # first inside roof side
+            ridge_len = coord.calc_distance_local(node_12[0], node_12[1], node_10[0], node_10[1])
+            ridge_x = ridge_len / roof_texture_size_x
+            hip_len = (coord.calc_distance_local(node_0[0], node_0[1], node_10[0], node_10[1]) ** 2
+                       + roof_height ** 2) ** 0.5
+            repeat_y = hip_len / roof_texture_size_y
+            ac_object.face([(object_node_index + 0, t.x(ridge_x), t.y(0)),  # node_0
+                            (object_node_index + 10 - idx_offset_top, t.x(ridge_x), t.y(repeat_y)),  # node_10
+                            (object_node_index + 12 - idx_offset_top, t.x(0), t.y(repeat_y))],  # node_12
+                           mat_idx=roof_mat_idx)
+            # first outside/back roof side
+            eaves_len = coord.calc_distance_local(node_1[0], node_1[1], node_2[0], node_2[1])
+            eaves_x = eaves_len / roof_texture_size_x
+            ridge_len = coord.calc_distance_local(node_10[0], node_10[1], node_12[0], node_12[1])
+            ridge_x = ridge_len / roof_texture_size_x
+            hip_len = (coord.calc_distance_local(node_1[0], node_1[1], node_10[0], node_10[1]) ** 2
+                       + roof_height ** 2) ** 0.5
+            repeat_y = hip_len / roof_texture_size_y
+            ac_object.face([(object_node_index + 1, t.x(0), t.y(0)),  # node_1
+                            (object_node_index + 2, t.x(eaves_x), t.y(0)),  # node_2
+                            (object_node_index + 12 - idx_offset_top, t.x(ridge_x), t.y(repeat_y)),  # node_12
+                            (object_node_index + 10 - idx_offset_top, t.x(0), t.y(repeat_y))],  # node_10
+                           mat_idx=roof_mat_idx)
+            # second outside/back roof side
+            eaves_len = coord.calc_distance_local(node_2[0], node_2[1], node_3[0], node_3[1])
+            eaves_x = eaves_len / roof_texture_size_x
+            ridge_len = coord.calc_distance_local(node_11[0], node_11[1], node_12[0], node_12[1])
+            ridge_x = ridge_len / roof_texture_size_x
+            hip_len = (coord.calc_distance_local(node_3[0], node_3[1], node_11[0], node_11[1]) ** 2
+                       + roof_height ** 2) ** 0.5
+            repeat_y = hip_len / roof_texture_size_y
+            ac_object.face([(object_node_index + 2, t.x(0), t.y(0)),  # node_2
+                            (object_node_index + 3, t.x(eaves_x), t.y(0)),  # node_3
+                            (object_node_index + 11 - idx_offset_top, t.x(eaves_x), t.y(repeat_y)),  # node_11
+                            (object_node_index + 12 - idx_offset_top, t.x(eaves_x - ridge_x), t.y(repeat_y))],
+                           mat_idx=roof_mat_idx)
+            # second inside roof side
+            eaves_len = coord.calc_distance_local(node_4[0], node_4[1], node_0[0], node_0[1])
+            eaves_x = eaves_len / roof_texture_size_x
+            ridge_len = coord.calc_distance_local(node_11[0], node_11[1], node_12[0], node_12[1])
+            ridge_x = ridge_len / roof_texture_size_x
+            hip_len = (coord.calc_distance_local(node_4[0], node_4[1], node_11[0], node_11[1]) ** 2
+                       + roof_height ** 2) ** 0.5
+            repeat_y = hip_len / roof_texture_size_y
+            ac_object.face([(object_node_index + 4, t.x(0), t.y(0)),  # node_4
+                            (object_node_index + 0, t.x(eaves_x), t.y(0)),  # node_0
+                            (object_node_index + 12 - idx_offset_top, t.x(ridge_x), t.y(repeat_y)),  # node_12
+                            (object_node_index + 11 - idx_offset_top, t.x(0), t.y(repeat_y))],
+                           mat_idx=roof_mat_idx)
+            # the sides where it is gabled and facade texture
+            _add_sides_gabled_facade_tex(ac_object, t, object_node_index, idx_offset_top, facade_mat_idx,
+                                         roof_height, roof_texture_size_x, roof_texture_size_y,
+                                         node_0, 0,
+                                         node_1, 1,
+                                         node_3, 3,
+                                         node_4, 4)
+    elif num_nodes == 6:
+        # first inside roof side
+        eaves_len = coord.calc_distance_local(node_0[0], node_0[1], node_1[0], node_1[1])
+        eaves_x = eaves_len / roof_texture_size_x
+        ridge_len = coord.calc_distance_local(node_10[0], node_10[1], node_12[0], node_12[1])
+        ridge_x = ridge_len / roof_texture_size_x
+        hip_len = (coord.calc_distance_local(node_1[0], node_1[1], node_10[0], node_10[1]) ** 2
+                   + roof_height ** 2) ** 0.5
+        repeat_y = hip_len / roof_texture_size_y
+        ac_object.face([(object_node_index + 0, t.x(ridge_x - eaves_x), t.y(0)),  # node_0
+                        (object_node_index + 1, t.x(ridge_x), t.y(0)),  # node_1
+                        (object_node_index + 10 - idx_offset_top, t.x(ridge_x), t.y(repeat_y)),  # node_10
+                        (object_node_index + 12 - idx_offset_top, t.x(0), t.y(repeat_y))],  # node_12
+                       mat_idx=roof_mat_idx)
+        # first outside/back roof side
+        eaves_len = coord.calc_distance_local(node_2[0], node_2[1], node_3[0], node_3[1])
+        eaves_x = eaves_len / roof_texture_size_x
+        ridge_len = coord.calc_distance_local(node_12[0], node_12[1], node_10[0], node_10[1])
+        ridge_x = ridge_len / roof_texture_size_x
+        hip_len = (coord.calc_distance_local(node_2[0], node_2[1], node_10[0], node_10[1]) ** 2
+                   + roof_height ** 2) ** 0.5
+        repeat_y = hip_len / roof_texture_size_y
+        ac_object.face([(object_node_index + 2, t.x(0), t.y(0)),  # node_2
+                        (object_node_index + 3, t.x(eaves_x), t.y(0)),  # node_3
+                        (object_node_index + 12 - idx_offset_top, t.x(ridge_x), t.y(repeat_y)),  # node_12
+                        (object_node_index + 10 - idx_offset_top, t.x(0), t.y(repeat_y))],  # node_10
+                       mat_idx=roof_mat_idx)
+        # second outside/back roof side
+        eaves_len = coord.calc_distance_local(node_3[0], node_3[1], node_4[0], node_4[1])
+        eaves_x = eaves_len / roof_texture_size_x
+        ridge_len = coord.calc_distance_local(node_11[0], node_11[1], node_12[0], node_12[1])
+        ridge_x = ridge_len / roof_texture_size_x
+        hip_len = (coord.calc_distance_local(node_4[0], node_4[1], node_11[0], node_11[1]) ** 2
+                   + roof_height ** 2) ** 0.5
+        repeat_y = hip_len / roof_texture_size_y
+        ac_object.face([(object_node_index + 3, t.x(0), t.y(0)),  # node_3
+                        (object_node_index + 4, t.x(eaves_x), t.y(0)),  # node_4
+                        (object_node_index + 11 - idx_offset_top, t.x(eaves_x), t.y(repeat_y)),  # node_11
+                        (object_node_index + 12 - idx_offset_top, t.x(eaves_x - ridge_x), t.y(repeat_y))],  # node_12
+                       mat_idx=roof_mat_idx)
+        # second inside roof side
+        eaves_len = coord.calc_distance_local(node_5[0], node_5[1], node_0[0], node_0[1])
+        eaves_x = eaves_len / roof_texture_size_x
+        ridge_len = coord.calc_distance_local(node_11[0], node_11[1], node_12[0], node_12[1])
+        ridge_x = ridge_len / roof_texture_size_x
+        hip_len = (coord.calc_distance_local(node_5[0], node_5[1], node_11[0], node_11[1]) ** 2
+                   + roof_height ** 2) ** 0.5
+        repeat_y = hip_len / roof_texture_size_y
+        ac_object.face([(object_node_index + 5, t.x(0), t.y(0)),  # node_5
+                        (object_node_index + 0, t.x(eaves_x), t.y(0)),  # node_0
+                        (object_node_index + 12 - idx_offset_top, t.x(ridge_x), t.y(repeat_y)),  # node_12
+                        (object_node_index + 11 - idx_offset_top, t.x(0), t.y(repeat_y))],  # node_11
+                       mat_idx=roof_mat_idx)
+        # the sides where it is gabled and facade texture
+        _add_sides_gabled_facade_tex(ac_object, t, object_node_index, idx_offset_top, facade_mat_idx,
+                                     roof_height, roof_texture_size_x, roof_texture_size_y,
+                                     node_1, 1,
+                                     node_2, 2,
+                                     node_4, 4,
+                                     node_5, 5)
+
+
+def _add_sides_gabled_facade_tex(ac_object, t, object_node_index: int, idx_offset_top: int, facade_mat_idx: int,
+                                 roof_height: float, roof_texture_size_x: float, roof_texture_size_y: float,
+                                 first_node, first_node_idx: int,
+                                 second_node, second_node_idx: int,
+                                 third_node, third_node_idx: int,
+                                 fourth_node, fourth_node_idx: int) -> None:
+    """Add the sides to roof through ac_object where it is gabled and facade texture."""
+    eaves_len = coord.calc_distance_local(first_node[0], first_node[1], second_node[0], second_node[1])
+    eaves_x = eaves_len / roof_texture_size_x
+    repeat_y = roof_height / roof_texture_size_y
+    ac_object.face([(object_node_index + first_node_idx, t.x(0), t.y(0)),
+                    (object_node_index + second_node_idx, t.x(eaves_x), t.y(0)),
+                    (object_node_index + 10 - idx_offset_top, t.x(0.5 * eaves_x), t.y(repeat_y))],  # node_10
+                   mat_idx=facade_mat_idx)
+    eaves_len = coord.calc_distance_local(third_node[0], third_node[1], fourth_node[0], fourth_node[1])
+    eaves_x = eaves_len / roof_texture_size_x
+    repeat_y = roof_height / roof_texture_size_y
+    ac_object.face([(object_node_index + third_node_idx, t.x(0), t.y(0)),
+                    (object_node_index + fourth_node_idx, t.x(eaves_x), t.y(0)),  # node_0
+                    (object_node_index + 11 - idx_offset_top, t.x(0.5 * eaves_x), t.y(repeat_y))],  # node_11
+                   mat_idx=facade_mat_idx)
 
 
 def separate_hipped(ac_object: ac.Object, b, roof_mat_idx: int) -> None:

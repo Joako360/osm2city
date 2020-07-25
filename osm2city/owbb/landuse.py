@@ -719,12 +719,12 @@ def _relate_neighbours(buildings: List[bl.Building]) -> None:
                 for pos_i in range(len(first_building.refs)):
                     for pos_j in range(len(second_building.refs)):
                         if first_building.refs[pos_i] == second_building.refs[pos_j]:
-                            if second_building.osm_id not in first_building.refs_shared:
-                                first_building.refs_shared[second_building.osm_id] = set()
-                            first_building.refs_shared[second_building.osm_id].add(pos_i)
-                            if first_building.osm_id not in second_building.refs_shared:
-                                second_building.refs_shared[first_building.osm_id] = set()
-                            second_building.refs_shared[first_building.osm_id].add(pos_j)
+                            if second_building not in first_building.refs_shared:
+                                first_building.refs_shared[second_building] = set()
+                            first_building.refs_shared[second_building].add(pos_i)
+                            if first_building not in second_building.refs_shared:
+                                second_building.refs_shared[first_building] = set()
+                            second_building.refs_shared[first_building].add(pos_j)
 
     for b in buildings:
         if b.has_neighbours:
@@ -895,16 +895,20 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     _relate_neighbours(osm_buildings)
     last_time = time_logging('Time used in seconds for relating neighbours', last_time)
     # simplify the geometry
-    count_simplified = 0
+    count = 0
     for building in osm_buildings:
         if not building.has_parent:  # do not simplify if in parent/child relationship
-            count_simplified += building.simplify(building_nodes_dict, transformer)
+            count += building.simplify(building_nodes_dict, transformer)
     logging.info('Made %i simplifications in total (there can be more than 1 simplification in a building',
-                 count_simplified)
-    # now we can calculate the roof ridge orientation
+                 count)
+    # now we can calculate the roof ridge orientation and L-shaped roofs
+    count = 0
     for building in osm_buildings:
         building.calc_roof_hints(building_nodes_dict, transformer)
+        if building.roof_hint and building.roof_hint.inner_node:
+            count += 1
     last_time = time_logging('Time used in seconds for simplifying and calculating roof hints', last_time)
+    logging.info('%i L-shaped roofs with inner-nodes.', count)
     # update the geometry a final time based on node references before we loose it
     for building in osm_buildings:
         building.update_geometry_from_refs(building_nodes_dict, transformer)

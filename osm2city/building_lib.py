@@ -153,7 +153,7 @@ class Building(object):
         # set during method called by init(...) through self.update_geometry and related sub-calls
         self.refs = None  # contains only the refs of the outer_ring
         self.refs_inner = None
-        self.refs_shared = dict()  # refs shared with other buildings (key: neighbour osm_id, value: set of positions)
+        self.refs_shared = dict()  # refs shared with other buildings (key: neighbour building, value: set of positions)
         self.inner_rings_list = None
         self.outer_nodes_closest = None
         self.polygon = None  # can have inner and outer rings, i.e. the real polygon
@@ -380,6 +380,10 @@ class Building(object):
         for i in range(self.pts_all_count):
             self.pts_all[i, 0] -= cluster_offset.x
             self.pts_all[i, 1] -= cluster_offset.y
+        # adapt the coordinates of roof hints if any
+        if self.roof_hint is not None and self.roof_hint.inner_node is not None:
+            self.roof_hint.inner_node = (self.roof_hint.inner_node[0] - cluster_offset.x,
+                                         self.roof_hint.inner_node[1] - cluster_offset.y)
 
     def set_ground_elev_and_offset(self, cluster_elev: float, cluster_offset: Vec2d) -> None:
         """Sets the ground elevations as difference between real elevation and cluster elevation.
@@ -939,10 +943,53 @@ class Building(object):
     def _calc_inner_node(self, nodes_dict: Dict[int, op.Node], transformation: co.Transformation) -> None:
         """For L-shaped roofs with at least one neighbour or a 4-edge building with 2 neighbours around a corner.
         See description in roofs.RoofHint.
+        There are lots of situations, when it does not get an L-shaped roof, e.g. depending on where the neighbours
+        are.
         """
+        diff_degs = 20  # maximum allowed difference in degrees
+        # exclude all irrelevant
+        if len(self.refs) < 4 or len(self.refs) > 6:
+            return
+        if len(self.refs_shared) == 0 or len(self.refs_shared) > 2:
+            return
+
+        # make sure that the shared sides of other buildings are a side and not just part of a side of another building
+        for neighbour_building in self.refs_shared.keys():
+            if self in neighbour_building.refs_shared:
+                refs_shared = list(neighbour_building.refs_shared[self])
+                if len(refs_shared) != 2:
+                    continue
+                # check whether the node before the first shared is at least diff_degs away
+                prev_index = refs_shared[0] - 1
+                if prev_index < 0:
+                    prev_index = len(neighbour_building.refs) - 1
+                next_index = refs_shared[0] + 1
+                if next_index == len(neighbour_building.refs):
+                    next_index = 0
+                delta = calc_angle_of_nodes(neighbour_building.refs[prev_index],
+                                            neighbour_building.refs[refs_shared[0]],
+                                            neighbour_building.refs[next_index],
+                                            nodes_dict, transformation)
+                if fabs(delta) < diff_degs:
+                    return
+                # check whether the node after the second shared is at least diff_degs away
+                prev_index = refs_shared[1] - 1
+                if prev_index < 0:
+                    prev_index = len(neighbour_building.refs) - 1
+                next_index = refs_shared[1] + 1
+                if next_index == len(neighbour_building.refs):
+                    next_index = 0
+                delta = calc_angle_of_nodes(neighbour_building.refs[prev_index],
+                                            neighbour_building.refs[refs_shared[1]],
+                                            neighbour_building.refs[next_index],
+                                            nodes_dict, transformation)
+                if fabs(delta) < diff_degs:
+                    return
+
         # test whether there is a common reference position if there are two neighbours
         # the outcome is used differently for 4, 5 or nodes
         common_set = set()
+        neighbours_common_set = set()
         if len(self.refs_shared) == 2:
             first_set = None
             second_set = None
@@ -957,9 +1004,18 @@ class Building(object):
                         second_set = set()
             common_set = first_set.intersection(second_set)
 
+            first_set = None
+            second_set = None
+            for key in self.refs_shared.keys():
+                if first_set is None:
+                    first_set = set(key.refs)
+                else:
+                    second_set = set(key.refs)
+            neighbours_common_set = first_set.intersection(second_set)
+
         if len(self.refs) == 4 and len(self.refs_shared) == 2:  # theoretically there could be 3 or 4 neighbours
             # Just need to find the node, which is shared with two buildings - if any
-            if len(common_set) == 1:
+            if len(common_set) == 1 and len(neighbours_common_set) == 1:
                 if self.roof_hint is None:
                     self.roof_hint = roofs.RoofHint()
                 node = nodes_dict[self.refs[common_set.pop()]]
@@ -968,42 +1024,62 @@ class Building(object):
         elif (len(self.refs) == 5 or len(self.refs) == 6) and 1 <= len(self.refs_shared) <= 2 and len(common_set) == 0:
             # find the inner node - if +/- 10 deg limits of straight line
             for index in range(0, len(self.refs)):
+                pref_index = len(self.refs) - 1 if index == 0 else index - 1
                 if index == 0:
-                    prev_node = nodes_dict[self.refs[-1]]
+                    prev_ref = self.refs[-1]
                 else:
-                    prev_node = nodes_dict[self.refs[index - 1]]
-                corner_node = nodes_dict[self.refs[index]]
+                    prev_ref = self.refs[index - 1]
+                next_index = 0 if index == len(self.refs) - 1 else index + 1
                 if index == len(self.refs) - 1:
-                    next_node = nodes_dict[self.refs[0]]
+                    next_ref= self.refs[0]
                 else:
-                    next_node = nodes_dict[self.refs[index + 1]]
-                prev_local = transformation.to_local(prev_node.lon_lat_tuple)
+                    next_ref = self.refs[index + 1]
+                corner_ref = self.refs[index]
+                corner_node = nodes_dict[corner_ref]
                 corner_local = transformation.to_local(corner_node.lon_lat_tuple)
-                next_local = transformation.to_local(next_node.lon_lat_tuple)
-                angle_1 = co.calc_angle_of_line_local(prev_local[0], prev_local[1], corner_local[0], corner_local[1])
-                angle_2 = co.calc_angle_of_line_local(corner_local[0], corner_local[1], next_local[0], next_local[1])
-                delta = co.calc_delta_bearing(angle_1, angle_2)
-                if len(self.refs) == 5 and fabs(delta) < 10:
+                delta = calc_angle_of_nodes(prev_ref, corner_ref, next_ref, nodes_dict, transformation)
+                if len(self.refs) == 5 and fabs(delta) < diff_degs:
                     # test that it actually is shared with a neighbour
+                    all_good = 0
+                    before_inner_is_shared = False
+                    index_in_ref_list = True
                     for ref_list in self.refs_shared.values():
+                        if pref_index in ref_list or next_index in ref_list:
+                            if len(self.refs_shared) == 1:
+                                all_good = 2
+                            else:
+                                all_good += 1
                         if index in ref_list:
-                            if self.roof_hint is None:
-                                self.roof_hint = roofs.RoofHint()
-                            self.roof_hint.inner_node = corner_local
-                            break
-                    break  # there can only be one if the shape is kind of rectangular
-                elif len(self.refs) == 6 and delta > 0 and fabs(delta - 90) < 10:  # with clock
+                            index_in_ref_list = True
+                            if pref_index in ref_list:
+                                before_inner_is_shared = True
+                    if all_good == 2 and index_in_ref_list:
+                        if self.roof_hint is None:
+                            self.roof_hint = roofs.RoofHint()
+                        self.roof_hint.inner_node = corner_local
+                        self.roof_hint.node_before_inner_is_shared = before_inner_is_shared
+                    break  # there can only be one such situation if the shape is kind of rectangular
+                elif len(self.refs) == 6 and delta > 0 and fabs(delta - 90) < diff_degs:  # with clock
                     # test that it is not shared with a neighbour
                     found = False
                     for ref_list in self.refs_shared.values():
                         if index in ref_list:
                             found = True
-                            break
+                            break  # it is shared and therefor if cannot be a valid L-shape roof
                     if not found:
-                        if self.roof_hint is None:
-                            self.roof_hint = roofs.RoofHint()
-                        self.roof_hint.inner_node = corner_local
-                    break  # there can only be one if the shape is kind of L-shaped
+                        # test that neighbours just before and just after inner node
+                        all_good = 0
+                        for ref_list in self.refs_shared.values():
+                            if pref_index in ref_list or next_index in ref_list:
+                                if len(self.refs_shared) == 1:
+                                    all_good = 2
+                                else:
+                                    all_good += 1
+                        if all_good == 2:
+                            if self.roof_hint is None:
+                                self.roof_hint = roofs.RoofHint()
+                            self.roof_hint.inner_node = corner_local
+                    break  # there can only be one such situation if the shape is kind of L-shaped
 
     def calc_roof_hints(self, nodes_dict: Dict[int, op.Node], transformation: co.Transformation) -> None:
         if self.has_inner or self.has_neighbours is False:
@@ -1302,9 +1378,9 @@ class Building(object):
                     # reset cluster offset as we are using translated clusters
                     my_cluster_offset = Vec2d(0, 0)
             # -- pitched roof for exactly 4 ground nodes
-            # if self.pts_all_count == 4 or self.pts_all_count == 6 and self.roof_shape is not enu.RoofShape.flat and (
-            #             self.roof_hint is not None and self.roof_hint.inner_node is not None):
-            #   roofs.separate_gable_with_corner(ac_object, self, roof_mat_idx, facade_mat_idx)
+            if 4 <= self.pts_all_count <= 6 and self.roof_shape is not enu.RoofShape.flat and (
+                        self.roof_hint is not None and self.roof_hint.inner_node is not None):
+                roofs.separate_gable_with_corner(ac_object, self, roof_mat_idx, facade_mat_idx)
             if self.pts_all_count == 4:
                 if self.roof_shape in [enu.RoofShape.gabled, enu.RoofShape.gambrel]:
                     roofs.separate_gable(ac_object, self, roof_mat_idx, facade_mat_idx)
@@ -1347,6 +1423,19 @@ class Building(object):
 
     def __str__(self):
         return "<OSM_ID %d at %s>" % (self.osm_id, hex(id(self)))
+
+
+def calc_angle_of_nodes(pref_ref: int, corner_ref: int, next_ref: int,
+                        nodes_dict: Dict[int, op.Node], transformation: co.Transformation) -> float:
+    prev_node = nodes_dict[pref_ref]
+    corner_node = nodes_dict[corner_ref]
+    next_node = nodes_dict[next_ref]
+    prev_local = transformation.to_local(prev_node.lon_lat_tuple)
+    corner_local = transformation.to_local(corner_node.lon_lat_tuple)
+    next_local = transformation.to_local(next_node.lon_lat_tuple)
+    angle_1 = co.calc_angle_of_line_local(prev_local[0], prev_local[1], corner_local[0], corner_local[1])
+    angle_2 = co.calc_angle_of_line_local(corner_local[0], corner_local[1], next_local[0], next_local[1])
+    return co.calc_delta_bearing(angle_1, angle_2)
 
 
 class BuildingParent(object):
