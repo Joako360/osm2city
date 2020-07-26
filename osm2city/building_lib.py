@@ -953,7 +953,9 @@ class Building(object):
         if len(self.refs_shared) == 0 or len(self.refs_shared) > 2:
             return
 
-        # make sure that the shared sides of other buildings are a side and not just part of a side of another building
+        # make sure that the shared sides of other buildings are a whole side and not just part of a side of another
+        # building and that max 2 points are shared.
+        refs_shared_ok = dict()
         for neighbour_building in self.refs_shared.keys():
             if self in neighbour_building.refs_shared:
                 refs_shared = list(neighbour_building.refs_shared[self])
@@ -971,7 +973,7 @@ class Building(object):
                                             neighbour_building.refs[next_index],
                                             nodes_dict, transformation)
                 if fabs(delta) < diff_degs:
-                    return
+                    continue
                 # check whether the node after the second shared is at least diff_degs away
                 prev_index = refs_shared[1] - 1
                 if prev_index < 0:
@@ -984,16 +986,18 @@ class Building(object):
                                             neighbour_building.refs[next_index],
                                             nodes_dict, transformation)
                 if fabs(delta) < diff_degs:
-                    return
+                    continue
+                # shared refs op neighbour fulfills all criteria -> copy
+                refs_shared_ok[neighbour_building] = self.refs_shared[neighbour_building]
 
         # test whether there is a common reference position if there are two neighbours
         # the outcome is used differently for 4, 5 or nodes
         common_set = set()
         neighbours_common_set = set()
-        if len(self.refs_shared) == 2:
+        if len(refs_shared_ok) == 2:
             first_set = None
             second_set = None
-            for ref_list in self.refs_shared.values():
+            for ref_list in refs_shared_ok.values():
                 if first_set is None:
                     first_set = set(ref_list)
                     if len(first_set) != 2:  # only interested if a neighbour shares 2 points
@@ -1006,14 +1010,14 @@ class Building(object):
 
             first_set = None
             second_set = None
-            for key in self.refs_shared.keys():
+            for key in refs_shared_ok.keys():
                 if first_set is None:
                     first_set = set(key.refs)
                 else:
                     second_set = set(key.refs)
             neighbours_common_set = first_set.intersection(second_set)
 
-        if len(self.refs) == 4 and len(self.refs_shared) == 2:  # theoretically there could be 3 or 4 neighbours
+        if len(self.refs) == 4 and len(refs_shared_ok) == 2:  # theoretically there could be 3 or 4 neighbours
             # Just need to find the node, which is shared with two buildings - if any
             if len(common_set) == 1 and len(neighbours_common_set) == 1:
                 if self.roof_hint is None:
@@ -1021,7 +1025,7 @@ class Building(object):
                 node = nodes_dict[self.refs[common_set.pop()]]
                 self.roof_hint.inner_node = transformation.to_local((node.lon, node.lat))
 
-        elif (len(self.refs) == 5 or len(self.refs) == 6) and 1 <= len(self.refs_shared) <= 2 and len(common_set) == 0:
+        elif (len(self.refs) == 5 or len(self.refs) == 6) and 1 <= len(refs_shared_ok) <= 2 and len(common_set) == 0:
             # find the inner node - if +/- 10 deg limits of straight line
             for index in range(0, len(self.refs)):
                 pref_index = len(self.refs) - 1 if index == 0 else index - 1
@@ -1043,9 +1047,9 @@ class Building(object):
                     all_good = 0
                     before_inner_is_shared = False
                     index_in_ref_list = True
-                    for ref_list in self.refs_shared.values():
+                    for ref_list in refs_shared_ok.values():
                         if pref_index in ref_list or next_index in ref_list:
-                            if len(self.refs_shared) == 1:
+                            if len(refs_shared_ok) == 1:
                                 all_good = 2
                             else:
                                 all_good += 1
@@ -1062,16 +1066,16 @@ class Building(object):
                 elif len(self.refs) == 6 and delta > 0 and fabs(delta - 90) < diff_degs:  # with clock
                     # test that it is not shared with a neighbour
                     found = False
-                    for ref_list in self.refs_shared.values():
+                    for ref_list in refs_shared_ok.values():
                         if index in ref_list:
                             found = True
                             break  # it is shared and therefor if cannot be a valid L-shape roof
                     if not found:
                         # test that neighbours just before and just after inner node
                         all_good = 0
-                        for ref_list in self.refs_shared.values():
+                        for ref_list in refs_shared_ok.values():
                             if pref_index in ref_list or next_index in ref_list:
-                                if len(self.refs_shared) == 1:
+                                if len(refs_shared_ok) == 1:
                                     all_good = 2
                                 else:
                                     all_good += 1
