@@ -1359,6 +1359,9 @@ class Building(object):
         """Writes the roof vertices and faces to an ac3d object."""
         if self.roof_shape is enu.RoofShape.flat:
             roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, roof_mat_idx, stats)
+        elif 4 <= self.pts_all_count <= 6 and (
+                    self.roof_hint is not None and self.roof_hint.inner_node is not None):
+            roofs.separate_gable_with_corner(ac_object, self, roof_mat_idx, facade_mat_idx)
         else:
             my_cluster_offset = cluster_offset
             # try to see whether we can reduce the number of nodes - and maybe get the count down - such that fewer
@@ -1386,9 +1389,6 @@ class Building(object):
                     # reset cluster offset as we are using translated clusters
                     my_cluster_offset = Vec2d(0, 0)
             # -- pitched roof for exactly 4 ground nodes
-            if 4 <= self.pts_all_count <= 6 and self.roof_shape is not enu.RoofShape.flat and (
-                        self.roof_hint is not None and self.roof_hint.inner_node is not None):
-                roofs.separate_gable_with_corner(ac_object, self, roof_mat_idx, facade_mat_idx)
             if self.pts_all_count == 4:
                 if self.roof_shape in [enu.RoofShape.gabled, enu.RoofShape.gambrel]:
                     roofs.separate_gable(ac_object, self, roof_mat_idx, facade_mat_idx)
