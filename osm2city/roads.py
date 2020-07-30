@@ -415,6 +415,36 @@ def cut_line_at_points(line: shg.LineString, points: List[shg.Point]) -> List[sh
     return lines
 
 
+def check_points_on_line_distance(max_point_dist: int, ways_list: List[op.Way], nodes_dict: Dict[int, op.Node],
+                                  transform: coordinates.Transformation) -> None:
+    """Based on parameter makes sure that points on a line are not too long apart for elevation probing reasons.
+
+    If distance is longer than the related parameter, then new points are added along the line.
+    """
+    for the_way in ways_list:
+        my_new_refs = [the_way.refs[0]]
+        for index in range(1, len(the_way.refs)):
+            node0 = nodes_dict[the_way.refs[index - 1]]
+            node1 = nodes_dict[the_way.refs[index]]
+            my_line = shg.LineString([transform.to_local((node0.lon, node0.lat)),
+                                      transform.to_local((node1.lon, node1.lat))])
+            if my_line.length <= max_point_dist:
+                my_new_refs.append(the_way.refs[index])
+                continue
+            else:
+                additional_needed_nodes = int(my_line.length / max_point_dist)
+                for x in range(additional_needed_nodes):
+                    new_point = my_line.interpolate((x + 1) * max_point_dist)
+                    osm_id = op.get_next_pseudo_osm_id(op.OSMFeatureType.road)
+                    lon_lat = transform.to_global((new_point.x, new_point.y))
+                    new_node = op.Node(osm_id, lon_lat[1], lon_lat[0])
+                    nodes_dict[osm_id] = new_node
+                    my_new_refs.append(osm_id)
+                my_new_refs.append(the_way.refs[index])
+
+        the_way.refs = my_new_refs
+
+
 class WaySegment:
     """A segment of a linear_obj as a temporary storage to process nodes attributes for layers"""
     __slots__ = ('way', 'start_layer', 'end_layer', 'nodes')
@@ -509,16 +539,15 @@ class Roads(object):
         else:
             logging.info('No ways with only one node after "%s"', prev_method_name)
 
-    def process(self, transform: coordinates.Transformation, blocked_areas: List[shg.Polygon],
+    def process(self, blocked_areas: List[shg.Polygon],
                 lit_areas: List[shg.Polygon], water_areas: List[shg.Polygon],
                 stats: utilities.Stats) -> None:
-        """Processes the OSM data until data can be clusterised.
-        """
+        """Processes the OSM data until data can be clusterised."""
         self._remove_tunnels()
         self._replace_short_bridges_with_ways()
-        self._check_against_blocked_areas(transform, water_areas, True)
+        self._check_against_blocked_areas(water_areas, True)
         self._check_ways_sanity('_check_against_blocked_areas_water')
-        self._check_against_blocked_areas(transform, blocked_areas)
+        self._check_against_blocked_areas(blocked_areas)
         self._check_ways_sanity('_check_against_blocked_areas')
         self._check_lighting(lit_areas)
         self._check_ways_sanity('_check_lighting')
@@ -526,7 +555,8 @@ class Roads(object):
         self._remove_short_way_segments()
         self._check_ways_sanity('_remove_short_way_segments')
         self._cleanup_topology()
-        self._check_points_on_line_distance()
+        check_points_on_line_distance(parameters.POINTS_ON_LINE_DISTANCE_MAX, self.ways_list, self.nodes_dict,
+                                      self.transform)
 
         self._remove_unused_nodes()
         self._probe_elev_at_nodes()
@@ -544,8 +574,7 @@ class Roads(object):
 
         self._clusterize(stats)
 
-    def _check_against_blocked_areas(self, transform: coordinates.Transformation,  blocked_areas: List[shg.Polygon],
-                                     is_water: bool = False) -> None:
+    def _check_against_blocked_areas(self, blocked_areas: List[shg.Polygon], is_water: bool = False) -> None:
         """Makes sure that there are no ways, which go across a blocked area (e.g. airport runway).
         Ways are clipped over into two ways if intersecting. If they are contained, then they are removed."""
         if not blocked_areas:
@@ -559,7 +588,7 @@ class Roads(object):
             for way in self.ways_list:
                 if way.osm_id in parameters.DEBUG_PLOT_BLOCKED_AREAS_ROADS:
                     line_strings.append(self._line_string_from_way(way))
-            utilities.plot_blocked_areas_roads(merged_areas, line_strings, transform)
+            utilities.plot_blocked_areas_roads(merged_areas, line_strings, self.transform)
 
         new_ways = list()
         for way in reversed(self.ways_list):
@@ -990,34 +1019,6 @@ class Roads(object):
                 self.roads_list.remove(the_way)
                 logging.debug("kick %i", the_way.osm_id)
 
-    def _check_points_on_line_distance(self):
-        """Based on parameter makes sure that points on a line are not too long apart for elevation probing reasons.
-
-        If distance is longer than the related parameter, then new points are added along the line.
-        """
-        for the_way in self.ways_list:
-            my_new_refs = [the_way.refs[0]]
-            for index in range(1, len(the_way.refs)):
-                node0 = self.nodes_dict[the_way.refs[index - 1]]
-                node1 = self.nodes_dict[the_way.refs[index]]
-                my_line = shg.LineString([self.transform.to_local((node0.lon, node0.lat)),
-                                          self.transform.to_local((node1.lon, node1.lat))])
-                if my_line.length <= parameters.POINTS_ON_LINE_DISTANCE_MAX:
-                    my_new_refs.append(the_way.refs[index])
-                    continue
-                else:
-                    additional_needed_nodes = int(my_line.length / parameters.POINTS_ON_LINE_DISTANCE_MAX)
-                    for x in range(additional_needed_nodes):
-                        new_point = my_line.interpolate((x + 1) * parameters.POINTS_ON_LINE_DISTANCE_MAX)
-                        osm_id = op.get_next_pseudo_osm_id(op.OSMFeatureType.road)
-                        lon_lat = self.transform.to_global((new_point.x, new_point.y))
-                        new_node = op.Node(osm_id, lon_lat[1], lon_lat[0])
-                        self.nodes_dict[osm_id] = new_node
-                        my_new_refs.append(osm_id)
-                    my_new_refs.append(the_way.refs[index])
-
-            the_way.refs = my_new_refs
-
     def _calculate_way_layers_at_node(self) -> None:
         """At each node shared between ways determine, which layer a linear_obj should belong to.
 
@@ -1388,7 +1389,7 @@ def process_roads(transform: coordinates.Transformation, fg_elev: utilities.FGEl
 
     path_to_output = parameters.get_output_path()
 
-    roads.process(transform, extended_blocked_areas, lit_areas, water_areas, stats)  # does the heavy lifting incl. clustering
+    roads.process(extended_blocked_areas, lit_areas, water_areas, stats)  # does the heavy lifting incl. clustering
 
     stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.roads, OUR_MAGIC, parameters.PREFIX)
 
