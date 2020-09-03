@@ -1545,6 +1545,7 @@ class BuildingParent(object):
         """
         for child in self.children:
             other_parent.add_child(child)
+            self.remove_child(child)
 
     @staticmethod
     def clean_building_parents_dangling_children(my_buildings: List[Building]) -> None:
