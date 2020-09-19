@@ -941,6 +941,10 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
 
     material_name_shader = 'OSMBuildings'
     file_shader = stg_manager.prefix + "_buildings_shader.txt"
+    wall_tex_idx = 0
+    roof_tex_idx = 0
+    loc_x = 0
+    loc_y = 0
 
     path_to_stg = stg_manager.add_building_list(file_shader, material_name_shader, coords_transform.anchor, list_elev)
 
@@ -951,11 +955,32 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
                 line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-b.anchor.y, b.anchor.x, elev, b.street_angle,
                                                                list_type.value)
                 b.compute_roof_height(True)
-                tex_variability = 6
-                if list_type is building_lib.BuildingListType.large:
-                    tex_variability = 4
-                wall_tex_idx = random.randint(0, tex_variability - 1)  # FIXME: should calc on street level or owbb
-                roof_tex_idx = wall_tex_idx
+                if parameters.BUILDING_TEXTURE_GROUP_RADIUS_M > 0:
+                    # Use same texture indexes for small buildings close together.  We take advantage of the building
+                    # list being approximately sorted spatially.  This provides some variability.
+                    delta_x = b.anchor.x - loc_x
+                    delta_y = b.anchor.y - loc_y
+                    dist2 = delta_x * delta_x + delta_y * delta_y
+
+                    if list_type.value == building_lib.BuildingListType.small:
+                        if dist2 > (parameters.BUILDING_TEXTURE_GROUP_RADIUS_M *
+                                    parameters.BUILDING_TEXTURE_GROUP_RADIUS_M):
+                            # Generate new texture index if a sufficient distance the center of the last location.
+                            wall_tex_idx = int(abs(b.anchor.x / 7.0))
+                            roof_tex_idx = int(abs(b.anchor.y / 5.0))
+                            loc_x = b.anchor.x
+                            loc_y = b.anchor.y
+                    else:
+                        # Medium and large buildings have semi-random texture
+                        wall_tex_idx = int(abs(b.anchor.x / 7.0))
+                        roof_tex_idx = int(abs(b.anchor.y / 5.0))
+                else:
+                    tex_variability = 6
+                    if list_type is building_lib.BuildingListType.large:
+                        tex_variability = 4
+                    wall_tex_idx = random.randint(0, tex_variability - 1)  # FIXME: should calc on street level or owbb
+                    roof_tex_idx = wall_tex_idx
+
                 roof_orientation = b.calc_roof_list_orientation()
                 line += ' {:.1f} {:.1f} {:.1f} {:.1f} {} {} {} {} {}'.format(b.width, b.depth, b.body_height,
                                                                              b.roof_height, b.roof_shape.value,

@@ -413,7 +413,8 @@ class FGElev(object):
                 while line == "" and empty_lines < 20:
                     empty_lines += 1
                     line = self.fgelev_pipe.stdout.readline().strip()
-                    if line.startswith('Now checking'):  # New in FG Git version end of Dec 2018
+                    if line.startswith('Now checking') or line.startswith('osg::Registry::addImageProcessor') or \
+                            line.startswith('Loaded plug-in'):  # New in FG Git version end of Dec 20188
                         line = ""
                 parts = line.split()
                 elev = float(parts[1]) + self.h_offset

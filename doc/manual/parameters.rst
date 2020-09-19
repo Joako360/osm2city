@@ -100,8 +100,9 @@ Parameter                                       Type       Default   Description
 FLAG_COLOUR_TEX                                 Boolean    False     Experimental code. If True then the texture and OSM tags can use
                                                                      colouring. For later versions of FlightGear (2019.x?).
 
-FLAG_STG_BUILDING_LIST                          Boolean    False     Experimental code. If True then some buildings use the Random Building
-                                                                     code in FlightGear instead of a building mesh.
+FLAG_STG_BUILDING_LIST                          Boolean    False     If True then some buildings use the Random Building code in FlightGear instead
+                                                                     of a building mesh, which reduces scenery size and can help with rendering
+                                                                     performance.
 
 BUILDING_USE_SHARED_WORSHIP                     Boolean    False     Use a shared model for worship buildings instead of OSM floor plan and
                                                                      heuristics. The shared models will try to respect the type of building (e.g.
@@ -148,6 +149,10 @@ BUILDING_REDUCE_RATE                            Number     0.5       Rate (betwe
 BUILDING_REDUCE_CHECK_TOUCH                     Boolean    False     Before removing a building due to area, check whether it is touching another
                                                                      building and therefore should be kept.
 BUILDING_NEVER_REDUCE_LEVELS                    Integer    6         Buildings that tall will never be removed in removing.
+
+BUILDING_TEXTURE_GROUP_RADIUS_M                 Integer    0         For BUILDING_LIST buildings, distance within which buildings will tend to
+                                                                     have the same texture (e.g. in the UK, Netherlands).
+                                                                     Heuristics are only used if value > 0. A typical value would be around 2000.
 
 =============================================   ========   =======   ==============================================================================
 

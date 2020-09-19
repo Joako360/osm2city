@@ -147,6 +147,8 @@ BUILDING_SKEL_MAX_DIST_FROM_CENTROID = 400  # Hack to make sure skeleton residua
 BUILDING_ROOF_SIMPLIFY_TOLERANCE = .5
 BUILDING_SKILLION_ROOF_MAX_HEIGHT = 2.
 
+BUILDING_TEXTURE_GROUP_RADIUS_M = 0  # For BUILDING_LIST buildings, distance within which buildings will tend to have the same texture
+
 # If the roof_type is missing, what shall be the distribution of roof_types (must sum up to 1.0)
 # The keys are the shapes and must correspond to valid RoofShape values in roofs.py
 BUILDING_ROOF_SHAPE_RATIO = {s.V_FLAT: 0.1, s.V_GABLED: 0.8, s.V_HIPPED: 0.1}
