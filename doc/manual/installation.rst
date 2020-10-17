@@ -22,7 +22,7 @@ Python
 
 ``osm2city`` is written in Python and needs Python for execution. Python is available on all major desktop operating systems — including but not limited to Windows, Linux and Mac OS X. See http://www.python.org.
 
-Currently Python version 3.7 is used for development and is therefore the recommended version.
+Currently Python version 3.8 is used for development and is therefore the recommended version.
 
 
 -------------------------
@@ -42,7 +42,7 @@ osm2city uses the following Python extension packages, which must be installed o
 * shapely
 * psycopg2-binary
 
-Please make sure to use Python 3.7+ compatible extensions. Often Python 3 compatible packages have a "3" in their name. Most Linux distributions come by default with the necessary packages — often they are prefixed with ``python-`` (e.g. ``python-numpy``). On Windows WinPython (https://winpython.github.io/) together with Christoph Gohlke's unofficial Windows binaries for Python extension packages (http://www.lfd.uci.edu/~gohlke/pythonlibs/) works well.
+Please make sure to use Python 3.8+ compatible extensions. Often Python 3 compatible packages have a "3" in their name. Most Linux distributions come by default with the necessary packages — often they are prefixed with ``python-`` (e.g. ``python-numpy``). On Windows WinPython (https://winpython.github.io/) together with Christoph Gohlke's unofficial Windows binaries for Python extension packages (http://www.lfd.uci.edu/~gohlke/pythonlibs/) works well.
 
 
 --------------------
@@ -56,31 +56,10 @@ Then:
 
 ::
 
-    user$ python3 -m venv /home/vanosten/bin/virtualenvs/o2c36
-    user$ source /home/vanosten/bin/virtualenvs/o2c36/bin/activate
-    (o2c36) user$ pip install matplotlib
-    (o2c36) user$ pip install networkx
-    ...
-    (o2c36) user$ pip freeze
-    cffi==1.11.5
-    cycler==0.10.0
-    decorator==4.3.0
-    descartes==1.1.0
-    kiwisolver==1.0.1
-    matplotlib==2.2.2
-    networkx==2.1
-    numpy==1.14.3
-    Pillow==5.1.0
-    pkg-resources==0.0.0
-    psycopg2-binary==2.7.4
-    pycparser==2.18
-    pyparsing==2.2.0
-    python-dateutil==2.7.3
-    pytz==2018.4
-    scipy==1.1.0
-    Shapely==1.6.4.post1
-    six==1.11.0
-
+    user$ python3 -m venv /home/pingu/bin/virtualenvs/o2c38
+    user$ source /home/pingu/bin/virtualenvs/o2c38/bin/activate
+    (o2c38) user$ cd /home/pingu/osm2city
+    (o2c36) user$ pip install -r requirements.txt
 
 .. _Virtualenv: https://virtualenv.pypa.io/en/stable/
 
@@ -145,14 +124,14 @@ Setting up PostGIS
 Installed Packages on Linux
 ---------------------------
 
-On Ubuntu 17.10 the following packages have amongst others been installed (not exhaustive list):
+On Ubuntu 20.04 the following packages have amongst others been installed (not exhaustive list):
 
-* postgresql-9.6
-* postgresql-9.6-postgis-2.3
-* postgresql-client-9.6
-* postgresql-contrib-9.6
-* pgadmin3
+* postgresql-12
 * postgis
+* postgresql-12-postgis-3
+* postgresql-client-12
+* postgresql-common
+* pgadmin3
 * python3-psycopg2
 
 ---------------------
@@ -166,6 +145,15 @@ For windows, the best way to get PostgreSQL and PostGI is to use this download p
 Creating a database and loading data
 ------------------------------------
 
+Create a database user:
+
+::
+
+    $ sudo -u postgres psql
+    postgres=# CREATE USER gisuser WITH PASSWORD 'myPassword';
+    postgres=# \q
+
+
 * The following examples of usage will assume that the database name is ``kbos`` and the user is ``gisuser``. Of course your installation can differ and you can set different parameters foŕ :ref:`Database <chapter-parameters-database>`.
 * See :ref:`Getting OpenStreetMap Data <chapter-getting-data-label>`. To get data for the whole planet go to Planet OSM (http://planet.osm.org/).
 * Setting up a PostGIS database as described in `PostGIS setup`_ (replace ``pgsnapshot`` with whatever you named the database, e.g. ``osmogis``). For now schema support for linestrings does not have to be set up. However you need to run at least ``pgsnapshot_schema_0.6.sql`` and ``pgsimple_schema_0.6_bbox.sql``.
@@ -177,13 +165,16 @@ Preparing the database might look as follows:
 
 ::
 
-    $ sudo -u postgres createdb --encoding=UTF8 --owner=gisuser kbos
+    sudo -u postgres createdb --encoding=UTF8 --owner=gisuser kbos
+    sudo -u postgres psql
+    postgres=# \connect kbos
+    kbos=# CREATE EXTENSION postgis;
+    kbos=# CREATE EXTENSION hstore;
+    kbos=# GRANT ALL PRIVILEGES ON DATABASE kbos to gisuser;
+    kbos=# \q
 
-    $ psql --username=postgres --dbname=kbos -c "CREATE EXTENSION postgis;"
-    $ psql --username=postgres --dbname=kbos -c "CREATE EXTENSION hstore;"'
-
-    $ psql --username=postgres -d kbos -f /home/vanosten/bin/osmosis-latest/script/pgsnapshot_schema_0.6.sql
-    $ psql --username=postgres -d kbos -f /home/vanosten/bin/osmosis-latest/script/pgsnapshot_schema_0.6_bbox.sql
+    psql --username=gisuser -d kbos -f /home/pingu/bin/osmosis-latest/script/pgsnapshot_schema_0.6.sql
+    psql --username=gisuser -d kbos -f /home/pingu/bin/osmosis-latest/script/pgsnapshot_schema_0.6_bbox.sql
 
 The you might first cut down the downloaded OSM pbf-file to the needed area and finally import it to the database:
 
@@ -193,7 +184,7 @@ The you might first cut down the downloaded OSM pbf-file to the needed area and 
 
     $ /home/vanosten/bin/osmosis-latest/bin/osmosis --read-pbf file="/media/sf_fg_customscenery/projects/TEST/kbos.pbf" --log-progress --write-pgsql database=kbos host=localhost:5433 user=gisuser password=!Password1
 
-And finally you might want to index the tags in hstore to get some more query speed after loading the data (on a medium powered machine for the relatively small KBOS area this takes ca. 30 minutes):
+And finally you might want to index the tags in hstore to get some more query speed after loading the data. However, this can take a long time and actually not even be worth it, even though you might use the database many times:
 
 ::
 

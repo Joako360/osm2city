@@ -439,10 +439,8 @@ def read_btg_file(transformer: Transformation, airport_code: Optional[str] = Non
                                              (lon_lat.lon, lon_lat.lat))
     tile_index = parameters.get_tile_index()
 
-    # cartesian ellipsoid
-    in_proj = pyproj.Proj(proj='geocent', ellps='WGS84', datum='WGS84')
-    # geodetic flat
-    out_proj = pyproj.Proj('epsg:4326', ellps='WGS84', datum='WGS84')
+    # from cartesian ellipsoid to geodetic flat
+    trans_proj = pyproj.Transformer.from_crs({"proj": 'geocent', "ellps": 'WGS84', "datum": 'WGS84'},"EPSG:4326")
 
     file_name = ct.construct_btg_file_name_from_tile_index(tile_index)
     if airport_code:
@@ -477,11 +475,10 @@ def read_btg_file(transformer: Transformation, airport_code: Optional[str] = Non
             v_min_z = min(v_min_z, vertex.z)
 
         # translate to lon_lat and then to local coordinates
-        lat, lon, _alt = pyproj.transform(in_proj, out_proj,
-                                          vertex.x + gbs_center.x,
-                                          vertex.y + gbs_center.y,
-                                          vertex.z + gbs_center.z,
-                                          radians=False)
+        lat, lon, _alt = trans_proj.transform(vertex.x + gbs_center.x,
+                                              vertex.y + gbs_center.y,
+                                              vertex.z + gbs_center.z,
+                                              radians=False)
 
         vertex.x, vertex.y = transformer.to_local((lon, lat))
         vertex.z = _alt
