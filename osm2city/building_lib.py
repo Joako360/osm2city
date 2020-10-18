@@ -1467,6 +1467,7 @@ class BuildingParent(object):
 
     def remove_child(self, child: Building) -> None:
         self.children.remove(child)
+        child.parent = None
 
     def contains_child(self, child: Building) -> bool:
         return child in self.children
@@ -1477,15 +1478,17 @@ class BuildingParent(object):
         self.tags = tags
 
     def align_textures_children(self, facade_mgr: tex.FacadeManager, roof_mgr: tex.RoofManager,
-                                stats: utilities.Stats) -> None:
+                                stats: utilities.Stats) -> bool:
         """Aligns the facade and roof textures for all the children belonging to this parent.
         Per default the building colour and building material of the child with the largest longest_edge_len is chosen.
         Then the rest of the children are searched for colour/material and the first one wins.
         Finally the default is used to analyse for textures again with whatever colour/material was there, and this
         time the height of the highest child is used.
+        If the analysis does return a result, then the texture is used for all children. Otherwise False is
+        returned and the whole BuildingParent with all its buildings is removed.
         """
         if len(self.children) == 0:  # might be sanitize_children() has removed them all
-            return
+            return True
 
         # first find the child with the longest edge
         default_child = None
@@ -1521,6 +1524,8 @@ class BuildingParent(object):
         # now that everything is in place, analyse for texture again
         try:
             default_child.analyse_textures(facade_mgr, roof_mgr, stats, largest_body_height)
+            if default_child.facade_texture is None:
+                return False
         except Exception as e:
             foo = 0
 
@@ -1530,6 +1535,7 @@ class BuildingParent(object):
                 continue
             child.facade_texture = default_child.facade_texture
             child.roof_texture = default_child.roof_texture
+        return True
 
     @staticmethod
     def get_building_parents(my_buildings: List[Building]) -> Set['BuildingParent']:
@@ -1557,7 +1563,6 @@ class BuildingParent(object):
             # remove no longer valid children
             for child in reversed(parent.children):
                 if child not in my_buildings:
-                    child.parent = None
                     parent.remove_child(child)
 
             parent.make_sure_lone_building_in_parent_stands_alone()
@@ -1663,8 +1668,11 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: s
     """
     new_buildings = []
     for b in buildings:
-        building_parent = b.parent
-        b.parent = None  # will be reset again if actually all is ok at end
+        if b.parent is None:
+            building_parent = None
+        else:
+            building_parent = b.parent
+            building_parent.remove_child(b)
 
         # handle places of worship
         if s.K_BUILDING in b.tags and parameters.BUILDING_USE_SHARED_WORSHIP:
@@ -1705,14 +1713,19 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: s
         # -- finally: append building to new list
         new_buildings.append(b)
         if building_parent is not None:
-            b.parent = building_parent
+            building_parent.add_child(b)
 
     # work with parents to align textures and stuff
     BuildingParent.clean_building_parents_dangling_children(new_buildings)
 
     building_parents = BuildingParent.get_building_parents(new_buildings)
     for parent in building_parents:
-        parent.align_textures_children(facade_mgr, roof_mgr, stats)
+        found = parent.align_textures_children(facade_mgr, roof_mgr, stats)
+        if not found:
+            for building in parent.children:
+                building.parent = None
+                new_buildings.remove(building)
+                logging.warning('Removing building osm_id=%i due to no matching texture in parent', building.osm_id)
 
     # make sure that min_height is only used if there is a real parent (not pseudo_parents)
     # i.e. for all others we just set it to 0.0

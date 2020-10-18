@@ -473,8 +473,6 @@ class FacadeManager(RoofManager):
                 return None
         ranked_list = _rank_candidates(candidates, tags)
         the_texture = ranked_list[random.randint(0, len(ranked_list) - 1)]
-        if not hasattr(the_texture, 'v_can_repeat'):
-            the_texture.v_can_repeat = False
         if stats is not None:
             stats.count_texture(the_texture)
         return the_texture
