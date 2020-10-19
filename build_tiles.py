@@ -1,5 +1,6 @@
 import argparse
 from enum import IntEnum, unique
+import datetime
 import logging
 import logging.config
 import multiprocessing as mp
@@ -58,48 +59,47 @@ def _parse_exec_for_procedure(exec_argument: str) -> Procedures:
     return Procedures.__members__[exec_argument.lower()]
 
 
-def configure_logging(log_level: str, log_to_file: bool) -> None:
+class RuntimeFormatter(logging.Formatter):
+    """A logging formatter which includes the delta time since start.
+
+    Cf. https://stackoverflow.com/questions/25194864/python-logging-time-since-start-of-program
+    """
+    def __init__(self, *the_args, **kwargs) -> None:
+        super().__init__(*the_args, **kwargs)
+        self.start_time = time.time()
+
+    def formatTime(self, record, datefmt=None):
+        duration = datetime.datetime.utcfromtimestamp(record.created - self.start_time)
+        elapsed = duration.strftime('%H:%M:%S')
+        return "{}".format(elapsed)
+
+
+def configure_time_logging(log_level: str, log_to_file: bool) -> None:
     """Set the logging level and maybe write to file.
 
     See also accepted answer to https://stackoverflow.com/questions/29015958/how-can-i-prevent-the-inheritance-
     of-python-loggers-and-handlers-during-multipro?noredirect=1&lq=1.
     And: https://docs.python.org/3.5/howto/logging-cookbook.html#logging-to-a-single-file-from-multiple-processes
     """
-    logging_config = {
-        'formatters': {
-            'f': {
-                'format': '%(processName)-10s %(name)s'
-                          ' %(levelname)-8s %(message)s',
-            },
-        },
-        'version': 1,
-    }
-    handlers_dict = {
-        'console': {
-            'level': log_level,
-            'formatter': 'f',
-            'class': 'logging.StreamHandler',
-        }
-    }
-    logging_config['handlers'] = handlers_dict
-    handlers_array = ['console']
+    log_format = '%(processName)-10s %(name)s -- %(asctime)s - %(levelname)-9s: %(message)s'
+    console_handler = logging.StreamHandler()
+    fmt = RuntimeFormatter(log_format)
+    console_handler.setFormatter(fmt)
+    logging.getLogger().addHandler(console_handler)
+    logging.getLogger().setLevel(log_level)
     if log_to_file:
-        file_handle_dict = {'level': log_level, 'formatter': 'f', 'class': 'logging.FileHandler'}
         process_name = mp.current_process().name
         if process_name == 'MainProcess':
-            file_handle_dict['filename'] = 'osm2city_main_{}.log'.format(u.date_time_now())
+            file_name = 'osm2city_main_{}.log'.format(u.date_time_now())
         else:
-            file_handle_dict['filename'] = 'osm2city_process_{}_{}.log'.format(process_name, u.date_time_now())
-        handlers_dict['file'] = file_handle_dict
-        handlers_array.append('file')
-
-    logging_config['loggers'] = {'': {'handlers': handlers_array, 'level': log_level, 'propagate': True}}
-
-    logging.config.dictConfig(logging_config)
+            file_name = 'osm2city_process_{}_{}.log'.format(process_name, u.date_time_now())
+        file_handler = logging.FileHandler(filename=file_name)
+        file_handler.setFormatter(fmt)
+        logging.getLogger().addHandler(file_handler)
 
 
 def pool_initializer(log_level: str, log_to_file: bool):
-    configure_logging(log_level, log_to_file)
+    configure_time_logging(log_level, log_to_file)
 
 
 def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
@@ -219,7 +219,7 @@ if __name__ == '__main__':
     my_log_level = 'INFO'
     if args.logging_level:
         my_log_level = args.logging_level.upper()
-    configure_logging(my_log_level, args.log_to_file)
+    configure_time_logging(my_log_level, args.log_to_file)
 
     parameters.read_from_file(args.filename)
     if parameters.FLAG_COLOUR_TEX:
