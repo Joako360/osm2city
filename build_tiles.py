@@ -182,6 +182,14 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
     logging.info("******* Finished tile {} - {} *******".format(scenery_tile.tile_index, my_progress))
 
 
+counter = 0
+
+
+def counter_callback() -> None:
+    global counter
+    counter += 1
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="build-tiles generates a whole scenery of osm2city objects \
     based on a lon/lat defined area")
@@ -291,18 +299,21 @@ if __name__ == '__main__':
         max_tasks_per_child = args.max_tasks
     pool = mp.Pool(processes=args.processes, maxtasksperchild=max_tasks_per_child,
                    initializer=pool_initializer, initargs=(my_log_level, args.log_to_file))
-    the_file_lock = mp.Manager().Lock()
-    total = len(scenery_tiles_list)
-    progress = 1
-    for my_scenery_tile in scenery_tiles_list:
-        progress_str = '{}/{}'.format(progress, total)
-        pool.apply_async(process_scenery_tile, (my_scenery_tile, args.filename,
-                                                exec_procedure, airports, the_file_lock, progress_str))
-        progress += 1
-    pool.close()
-    pool.join()
+    with pool:
+        the_file_lock = mp.Manager().Lock()
+        total = len(scenery_tiles_list)
+        progress = 1
+        for my_scenery_tile in scenery_tiles_list:
+            progress_str = '{}/{}'.format(progress, total)
+            pool.apply_async(process_scenery_tile, (my_scenery_tile, args.filename,
+                                                    exec_procedure, airports, the_file_lock, progress_str),
+                             callback=counter_callback())
+            progress += 1
+        pool.close()
+        pool.join()
 
     u.time_logging("Total time used", start_time)
+    logging.info('Processed %i tiles', counter)
 
 
 # ================ UNITTESTS =======================
