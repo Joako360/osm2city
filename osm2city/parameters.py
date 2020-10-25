@@ -285,8 +285,10 @@ C2P_CHIMNEY_DEFAULT_HEIGHT_VARIATION = 20  # a random variation on top of the de
 # =============================================================================
 
 MAX_SLOPE_RAILWAY = 0.04
-MAX_SLOPE_MOTORWAY = 0.03       # max slope for motorways
-MAX_SLOPE_ROAD = 0.08
+MAX_SLOPE_TRAM = 0.14
+MAX_SLOPE_RACK = 0.49
+MAX_SLOPE_MOTORWAY = 0.07       # max slope for motorways
+MAX_SLOPE_ROAD = 0.15
 MAX_TRANSVERSE_GRADIENT = 0.1   #
 BRIDGE_MIN_LENGTH = 20.         # discard short bridges, draw road instead
 CREATE_BRIDGES_ONLY = False         # create only bridges and embankments

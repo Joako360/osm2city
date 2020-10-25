@@ -112,12 +112,6 @@ def _is_replaced_bridge(tags: Dict[str, str]) -> bool:
     return REPLACED_BRIDGE_KEY in tags
 
 
-def _is_lit(tags: Dict[str, str]) -> bool:
-    if s.K_LIT in tags and tags[s.K_LIT] == s.V_YES:
-        return True
-    return False
-
-
 def _is_highway(way: op.Way) -> bool:
     return s.K_HIGHWAY in way.tags
 
@@ -144,7 +138,7 @@ def _compatible_ways(way1: op.Way, way2: op.Way) -> bool:
             logging.debug("Nope, both must be of same highway type")
             return False
         # check lit
-        if _is_lit(way1.tags) != _is_lit(way2.tags):
+        if s.is_lit(way1.tags) != s.is_lit(way2.tags):
             logging.debug("Nope, both must be lit or not")
             return False
     elif is_railway(way1) and is_railway(way2):
@@ -152,8 +146,12 @@ def _compatible_ways(way1: op.Way, way2: op.Way) -> bool:
             logging.debug("Nope, both must be of same railway type")
             return False
         # check electrified
-        if is_electrified_railway(way1.tags) != is_electrified_railway(way2.tags):
+        if s.is_electrified_railway(way1.tags) != s.is_electrified_railway(way2.tags):
             logging.debug("Nope, both must be electrified or not")
+            return False
+        # check electrified
+        if s.is_rack_railway(way1.tags) != s.is_rack_railway(way2.tags):
+            logging.debug("Nope, both must have a rack or not")
             return False
     return True
 
@@ -184,12 +182,6 @@ def _calc_railway_gauge(tags: Dict[str, str]) -> float:
     return width / 1000 * 126 / 57  # in the texture roads.png the track uses 57 out of 126 pixels
 
 
-def is_electrified_railway(tags: Dict[str, str]) -> bool:
-    if s.K_ELECTRIFIED in tags and tags[s.K_ELECTRIFIED] in [s.V_CONTACT_LINE, s.V_YES]:
-        return True
-    return False
-
-
 @enum.unique
 class RailwayType(enum.IntEnum):
     normal = 5
@@ -209,7 +201,16 @@ def _get_railway_attributes(railway_type: RailwayType, tags: Dict[str, str]) -> 
 
 def railway_type_from_osm_tags(tags: Dict[str, str]) -> Optional[RailwayType]:
     """Based on OSM tags deducts the RailwayType.
-    Returns None if not a highway are unknown value.
+    Returns None if not a railway or not used or an unknown value.
+
+    See also RailwayLineType in models.py (not used here)
+
+    Not taken into account:
+    * abandoned
+    * construction
+    * funicular
+    * miniature
+    * monorail
     """
     if s.K_RAILWAY in tags:
         value = tags[s.K_RAILWAY]
@@ -320,6 +321,10 @@ def max_slope_for_road(obj):
             return parameters.MAX_SLOPE_ROAD
     # must be aligned with accepted railways in Roads._create_linear_objects
     elif s.K_RAILWAY in obj.way.tags:
+        if s.is_rack_railway(obj.way.tags):
+            return parameters.MAX_SLOPE_RACK
+        if obj.way.tags[s.K_RAILWAY] == s.V_TRAM:
+            return parameters.MAX_SLOPE_TRAM
         return parameters.MAX_SLOPE_RAILWAY
 
 

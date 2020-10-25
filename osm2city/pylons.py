@@ -1124,7 +1124,7 @@ def _process_osm_rail_overhead(nodes_dict, ways_dict, fg_elev: utilities.FGElev,
 
     for way in railway_candidates:
         my_line = RailLine(way.osm_id)
-        is_electrified = roads.is_electrified_railway(way.tags)
+        is_electrified = s.is_electrified_railway(way.tags)
         is_challenged = False
         for key in way.tags:
             if s.K_RAILWAY == key:

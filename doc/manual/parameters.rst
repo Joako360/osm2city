@@ -666,15 +666,28 @@ POINTS_ON_LINE_DISTANCE_MAX                     Integer    1000      The maximum
                                                                      value should be chosen. The drawback of small values are that the number
                                                                      of faces gets bigger affecting frame rates.
 
-MAX_SLOPE_ROAD, MAX_SLOPE_*                     Decimal    0.08      The maximum allowed slope. It is used for ramps to bridges, but it is also
+MAX_SLOPE_ROAD                                  Decimal    0.15      The maximum allowed slope. It is used for ramps to bridges, but it is also
                                                                      used for other ramps. Especially in mountainous areas you might want to set
-                                                                     higher values (e.g. 0.15 for roads works fine in Switzerland). This leads to
-                                                                     steeper ramps to bridges, but give much fewer residuals with embankments.
+                                                                     higher values. This leads to steeper ramps to bridges, but give much fewer
+                                                                     residuals with embankments.
+MAX_SLOPE_MOTORWAY                              Decimal    0.07      (ditto) for motorways. It is seldom that motorways have lopes more than 0.04,
+                                                                     but e.g. in Switzerland there are places with over 6% - e.g. `A12`_.
+MAX_SLOPE_RAILWAY                               Decimal    0.08      (ditto) for railways. With `adhesion`_ only railways are along motorways in
+                                                                     terms of max slopes.
+MAX_SLOPE_TRAM                                  Decimal    0.14      (ditto) for trams, which also use `adhesion`_, but can be steeper.
+MAX_SLOPE_RACK                                  Decimal    0.49      For railways with racks the steepest is Pilatus Railway with 48% incline.
 
 USE_TRAM_LINE                                   Boolean    False     Often tram lines are on top of existing roads or between. This can lead to
                                                                      roads being (partially) hidden etc.
 
 =============================================   ========   =======   ==============================================================================
+
+
+
+.. _`A12`: https://en.wikipedia.org/wiki/A12_motorway_(Switzerland)
+
+.. _`adhesion`: https://en.wikipedia.org/wiki/List_of_steepest_gradients_on_adhesion_railways
+
 
 With residuals:
 

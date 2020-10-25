@@ -75,7 +75,7 @@ class LinearObject(object):
 
     def _prepare_lighting(self, nodes, lit_areas: List[shg.Polygon]) -> None:
         """Checks each node of the way whether it is in a lit area and creates a bool in a list"""
-        if s.K_LIT in self.way.tags and self.way.tags[s.K_LIT] == s.V_YES:
+        if s.is_lit(self.way.tags):
             for _ in nodes:
                 self.lighting.append(True)
         for node in nodes:

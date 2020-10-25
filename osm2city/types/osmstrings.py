@@ -52,6 +52,7 @@ K_PLACE_NAME = 'place_name'
 K_POPULATION = 'population'
 K_POWER = 'power'
 K_PUBLIC_TRANSPORT = 'public_transport'
+K_RACK = 'rack'
 K_RAILWAY = 'railway'
 K_RELIGION = 'religion'
 K_ROOF_ANGLE = 'roof:angle'
@@ -249,3 +250,30 @@ def is_small_building_detail(tags: Dict[str, str], is_building_part: bool) -> bo
                                                            'kiosk', 'toilets', 'service',
                                                            'shed', 'tree_house',
                                                            'roof']
+
+
+def is_lit(tags: Dict[str, str]) -> bool:
+    if K_LIT in tags and tags[K_LIT] == V_YES:
+        return True
+    return False
+
+
+def is_rack_railway(tags: Dict[str, str]) -> bool:
+    """Rack can have different values, so just excluding no.
+
+    cf. https://wiki.openstreetmap.org/wiki/Key:rack?uselang=en
+    """
+    if K_RACK in tags and tags[K_RACK] != V_NO:
+        return True
+    return False
+
+
+def is_electrified_railway(tags: Dict[str, str]) -> bool:
+    """Whether this is an electrified railway with overhead contact line.
+
+    Cf. https://wiki.openstreetmap.org/wiki/Key:electrified?uselang=en
+    'yes' is taken into account in case not more info is available.
+    """
+    if K_ELECTRIFIED in tags and tags[K_ELECTRIFIED] in [V_CONTACT_LINE, V_YES]:
+        return True
+    return False
