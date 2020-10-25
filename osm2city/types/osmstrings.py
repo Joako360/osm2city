@@ -5,8 +5,6 @@ from typing import Dict
 # ========================= NON OSM KEYS AND VALUES ==============================================================
 K_OWBB_GENERATED = 'owbb_generated'
 
-V_GEN = 'gen'
-
 # ======================= KEYS ===================================================================================
 K_AERIALWAY = 'aerialway'
 K_AEROWAY = 'aeroway'

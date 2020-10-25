@@ -12,6 +12,7 @@ import shapely.geometry as shg
 from osm2city import roads, parameters
 from osm2city.textures import road
 from osm2city.utils import ac3d
+from osm2city.utils import coordinates as co
 from osm2city.utils import osmparser as op
 from osm2city.types import osmstrings as s
 from osm2city.utils.utilities import FGElev
@@ -41,7 +42,8 @@ class LinearObject(object):
 
     """
 
-    def __init__(self, transform, way: op.Way, nodes_dict:  Dict[int, op.Node],
+    def __init__(self, transform: co.Transformation, way: op.Way, nodes_dict:  Dict[int, op.Node],
+                 lit_areas: List[shg.Polygon],
                  width: float, tex_coords: Tuple[float, float] = road.EMBANKMENT_1):
         self.width = width
         self.way = way
@@ -57,6 +59,8 @@ class LinearObject(object):
         osm_nodes = [nodes_dict[r] for r in way.refs]
         nodes = np.array([transform.to_local((n.lon, n.lat)) for n in osm_nodes])
         self.center = shg.LineString(nodes)
+        self.lighting = list()  # same number of elements as self.center
+        self._prepare_lighting(nodes, lit_areas)
         try:
             self._compute_angle_etc()
             self.left, self.right = self._compute_sides(self.width / 2.)  # LineStrings
@@ -68,6 +72,20 @@ class LinearObject(object):
         self.cluster_ref = None  # Cluster
         self.junction0 = None  # utils.graph.Junction
         self.junction1 = None  # utils.graph.Junction
+
+    def _prepare_lighting(self, nodes, lit_areas: List[shg.Polygon]) -> None:
+        """Checks each node of the way whether it is in a lit area and creates a bool in a list"""
+        if s.K_LIT in self.way.tags and self.way.tags[s.K_LIT] == s.V_YES:
+            for _ in nodes:
+                self.lighting.append(True)
+        for node in nodes:
+            point = shg.Point(node)
+            is_lit = False
+            for area in lit_areas:
+                if area.contains(point):
+                    is_lit = True
+                    break
+            self.lighting.append(is_lit)
 
     def _compute_sides(self, offset: float) -> Tuple[shg.LineString, shg.LineString]:
         """Given an offset (ca. half of width) calculate left and right sides including taking care of angles."""
@@ -210,7 +228,7 @@ class LinearObject(object):
         return nodes_list
 
     def _write_quads(self, obj: ac3d.Object, left_nodes_list, right_nodes_list, tex_y0, tex_y1,
-                     mat_idx: int) -> None:
+                     check_lit: bool = False) -> None:
         """Write a series of quads bound by left and right.
         Left/right are lists of node indices which will be used to form a series of quads.
         Material index tells whether it is lit or not.
@@ -218,6 +236,10 @@ class LinearObject(object):
         n_nodes = len(left_nodes_list)
         assert (len(left_nodes_list) == len(right_nodes_list))
         for i in range(n_nodes - 1):
+            mat_idx = ac3d.MAT_IDX_UNLIT
+            if check_lit:
+                if self.lighting[i] or self.lighting[i + 1]:
+                    mat_idx = ac3d.MAT_IDX_LIT
             xl = self.dist[i] / road.LENGTH
             xr = self.dist[i + 1] / road.LENGTH
             face = [(left_nodes_list[i], xl, tex_y0),
@@ -341,11 +363,7 @@ class LinearObject(object):
         right_nodes_list = self._write_nodes(obj, self.right, right_z, elev_offset,
                                              offset, join=True, is_left=False)
 
-        mat_idx = ac3d.MAT_IDX_UNLIT
-        if s.K_LIT in self.way.tags and self.way.tags[s.K_LIT] == s.V_YES:
-            mat_idx = ac3d.MAT_IDX_LIT
-
-        self._write_quads(obj, left_nodes_list, right_nodes_list, self.tex[0], self.tex[1], mat_idx)
+        self._write_quads(obj, left_nodes_list, right_nodes_list, self.tex[0], self.tex[1], True)
         if v_add is not None:
             # -- side walls of embankment
             if v_add.max() > parameters.MIN_EMBANKMENT_HEIGHT:
@@ -355,9 +373,9 @@ class LinearObject(object):
                 left_ground_nodes = self._write_nodes(obj, self.left, left_ground_z, elev_offset, offset=offset)
                 right_ground_nodes = self._write_nodes(obj, self.right, right_ground_z, elev_offset, offset=offset)
                 self._write_quads(obj, left_ground_nodes, left_nodes_list, parameters.EMBANKMENT_TEXTURE[0],
-                                  parameters.EMBANKMENT_TEXTURE[1], ac3d.MAT_IDX_UNLIT)
+                                  parameters.EMBANKMENT_TEXTURE[1])
                 self._write_quads(obj, right_nodes_list, right_ground_nodes, parameters.EMBANKMENT_TEXTURE[0],
-                                  parameters.EMBANKMENT_TEXTURE[1], ac3d.MAT_IDX_UNLIT)
+                                  parameters.EMBANKMENT_TEXTURE[1])
 
         return True
 
@@ -378,9 +396,10 @@ class DeckShapeLinear(object):
 
 
 class LinearBridge(LinearObject):
-    def __init__(self, transform, fg_elev: FGElev, way: op.Way, nodes_dict: Dict[int, op.Node], width: float,
-                 tex_coords: Tuple[float, float] = road.EMBANKMENT_2):
-        super().__init__(transform, way, nodes_dict, width, tex_coords)
+    def __init__(self, transform: co.Transformation, fg_elev: FGElev, way: op.Way, nodes_dict: Dict[int, op.Node],
+                 lit_areas: List[shg.Polygon],
+                 width: float, tex_coords: Tuple[float, float] = road.EMBANKMENT_2):
+        super().__init__(transform, way, nodes_dict, lit_areas, width, tex_coords)
         # -- prepare elevation spline
         #    probe elev at n_probes locations
         n_probes = max(int(self.center.length / 5.), 3)
@@ -562,22 +581,17 @@ class LinearBridge(LinearObject):
         right_bottom_nodes = self._write_nodes(obj, right_bottom_edge, z - parameters.BRIDGE_BODY_HEIGHT,
                                                elev_offset, offset)
         # -- top
-        mat_idx = ac3d.MAT_IDX_UNLIT
-        if s.K_LIT in self.way.tags and self.way.tags[s.K_LIT] == s.V_YES:
-            mat_idx = ac3d.MAT_IDX_LIT
-        self._write_quads(obj, left_top_nodes, right_top_nodes, self.tex[0], self.tex[1], mat_idx)
+        self._write_quads(obj, left_top_nodes, right_top_nodes, self.tex[0], self.tex[1], True)
 
         # -- right
         self._write_quads(obj, right_top_nodes, right_bottom_nodes, road.BRIDGE_1[1],
-                          road.BRIDGE_1[0], ac3d.MAT_IDX_UNLIT)
+                          road.BRIDGE_1[0])
 
         # -- left
-        self._write_quads(obj, left_bottom_nodes, left_top_nodes, road.BRIDGE_1[0], road.BRIDGE_1[1],
-                          ac3d.MAT_IDX_UNLIT)
+        self._write_quads(obj, left_bottom_nodes, left_top_nodes, road.BRIDGE_1[0], road.BRIDGE_1[1])
 
         # -- bottom
-        self._write_quads(obj, right_bottom_nodes, left_bottom_nodes, road.BOTTOM[0], road.BOTTOM[1],
-                          ac3d.MAT_IDX_UNLIT)
+        self._write_quads(obj, right_bottom_nodes, left_bottom_nodes, road.BOTTOM[0], road.BOTTOM[1])
 
         # -- end wall 1
         the_node = self.left.coords[0]

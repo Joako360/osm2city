@@ -3,25 +3,6 @@
 Created on Sun Sep 29 10:42:12 2013
 
 @author: tom
-TODO:
-x clusterize (however, you don't see residential roads in cities from low alt anyway. LOD?)
-  - a road meandering along a cluster boarder should not be clipped all the time.
-  - only clip if on next-to-next tile?
-  - clip at next tile center?
-- LOD
-  - major roads - LOD rough
-  - minor roads - LOD detail
-  - roads LOD? road_rough, road_detail?
-- handle junctions
-- handle layers/bridges
-
-junctions:
-- currently, we get false positives: one road ends, another one begins.
-- loop junctions:
-    for the_node in nodes:
-    if the_node is not endpoint: put linear_obj into splitting list
-    #if only 2 nodes, and both end nodes, and road types compatible:
-    #put linear_obj into joining list
 
 Data structures
 ---------------
@@ -103,7 +84,8 @@ def is_tunnel(tags: Dict[str, str]) -> bool:
     return s.K_TUNNEL in tags and tags[s.K_TUNNEL] not in [s.V_NO]
 
 
-REPLACED_BRIDGE_KEY = 'replaced_bridge'  # specifies a linear_obj that was originally a bridge, but due to length was changed
+# specifies a linear_obj that was originally a bridge, but due to length was changed
+REPLACED_BRIDGE_KEY = 'replaced_bridge'
 
 
 def _is_bridge(tags: Dict[str, str]) -> bool:
@@ -549,8 +531,6 @@ class Roads(object):
         self._check_ways_sanity('_check_against_blocked_areas_water')
         self._check_against_blocked_areas(blocked_areas)
         self._check_ways_sanity('_check_against_blocked_areas')
-        self._check_lighting(lit_areas)
-        self._check_ways_sanity('_check_lighting')
 
         self._remove_short_way_segments()
         self._check_ways_sanity('_remove_short_way_segments')
@@ -565,7 +545,7 @@ class Roads(object):
         logging.debug("before linear " + str(self))
         self._calculate_way_layers_at_node()
         self._calculate_way_layers_all_nodes()
-        self._create_linear_objects()
+        self._create_linear_objects(lit_areas)
         self._propagate_v_add()
         logging.debug("after linear " + str(self))
 
@@ -638,127 +618,6 @@ class Roads(object):
                 new_ways.extend(my_list)
 
         self.ways_list = new_ways
-
-    def _check_lighting(self, lit_areas: List[shg.Polygon]) -> None:
-        """Checks ways for lighting and maybe splits at borders for built-up areas."""
-        way_la_map = dict()  # key: linear_obj, value: list(lit_Area) from split -> prevent re-check of mini-residuals
-        new_ways_1 = self._check_lighting_inner(self.ways_list, lit_areas, way_la_map)
-        self.ways_list.extend(new_ways_1)
-        new_ways_2 = self._check_lighting_inner(new_ways_1, lit_areas, way_la_map)
-        self.ways_list.extend(new_ways_2)
-        # Looping again might get even better splits, but is quite costly for the gained extra effect.
-        # now replace 'gen' with 'yes'
-        for way in self.ways_list:
-            if s.K_LIT in way.tags and way.tags[s.K_LIT] == s.V_GEN:
-                way.tags[s.K_LIT] = s.V_YES
-
-    def _check_lighting_inner(self, ways_list: List[op.Way], lit_areas: List[shg.Polygon],
-                              way_la_map: Dict[op.Way, shg.Polygon]) -> List[op.Way]:
-        """Inner method for _check_lighting doing the actual checking. New split ways are the outcome of the method.
-        However all ways by reference get updated tags. This method exists such that new ways can be checked again
-        against other built-up areas.
-        Using 'gen' instead of 'yes' for lit, because else it would be excluded from further processing by first
-        check in loop."""
-        new_ways = list()
-        non_highway = 0
-        orig_lit = 0  # where the tag was set in OSM
-        has_intersection = 0
-        for i, way in enumerate(ways_list):
-            if not _is_highway(way):
-                non_highway += 1
-                continue
-            if _is_lit(way.tags):
-                orig_lit += 1
-                continue  # nothing further to do with this linear_obj
-
-            if way in way_la_map:
-                already_checked_luls = way_la_map[way]
-            else:
-                already_checked_luls = list()
-                way_la_map[way] = already_checked_luls
-
-            way_changed = True
-            my_line = None
-            my_line_bounds = None
-            for lit_area in lit_areas:
-                if way_changed:
-                    my_line = self._line_string_from_way(way)  # needs to be re-calculated because could change below
-                    my_line_bounds = my_line.bounds
-                    way_changed = False
-                if lit_area in already_checked_luls:
-                    continue
-                # do a fast cheap check on intersection working with static .bounds (ca. 200 times faster than calling
-                # every time)
-                if coordinates.disjoint_bounds(my_line_bounds, lit_area.bounds):
-                    continue
-
-                # do more narrow intersection checks
-                if my_line.within(lit_area):
-                    way.tags[s.K_LIT] = s.V_GEN
-                    break  # it cannot be in more than one built_up area at a time
-
-                intersection_points = list()
-                some_geometry = my_line.intersection(lit_area.exterior)
-                if isinstance(some_geometry, shg.LineString):
-                    continue  # it only touches
-                elif isinstance(some_geometry, shg.Point):
-                    intersection_points.append(some_geometry)
-                elif isinstance(some_geometry, shg.MultiPoint):
-                    for a_point in some_geometry:
-                        intersection_points.append(a_point)
-                elif isinstance(some_geometry, shg.GeometryCollection):
-                    if some_geometry.is_empty:
-                        continue  # disjoint
-                    for a_geom in some_geometry:
-                        if isinstance(a_geom, shg.Point):
-                            intersection_points.append(a_geom)
-                        elif isinstance(a_geom, shg.MultiPoint):
-                            for a_point in a_geom:
-                                intersection_points.append(a_point)
-                        # else nothing to do (we are not interested in a touching LineString
-                if intersection_points:
-                    way_changed = True
-                    has_intersection += 1
-                    cut_ways_dict = self.cut_way_at_intersection_points(intersection_points, way, my_line)
-
-                    # now check whether it is lit or not. Due to rounding errors we do this conservatively
-                    is_new_way = False  # the first item in the dict is the original linear_obj by convention
-                    for cut_way, distance in cut_ways_dict.items():
-                        my_point = my_line.interpolate(distance)
-                        if my_point.within(lit_area):
-                            cut_way.tags[s.K_LIT] = s.V_GEN
-                        else:
-                            cut_way.tags[s.K_LIT] = s.V_NO
-                        already_checked_luls.append(lit_area)
-                        if is_new_way:
-                            new_ways.append(cut_way)
-                        else:
-                            is_new_way = True  # set at end of (first) loop
-
-            if s.K_LIT not in way.tags:
-                way.tags[s.K_LIT] = s.V_NO
-
-        number_lit = 0
-        number_unlit = 0
-        for way in ways_list:
-            if not _is_highway(way):
-                continue
-            if way.tags[s.K_LIT] in [s.V_YES, s.V_GEN]:
-                number_lit += 1
-            elif way.tags[s.K_LIT] == s.V_NO:
-                number_unlit += 1
-        for way in new_ways:
-            if way.tags[s.K_LIT] in [s.V_YES, s.V_GEN]:
-                number_lit += 1
-            elif way.tags[s.K_LIT] == s.V_NO:
-                number_unlit += 1
-
-        logging.info('Originally lit {} - generated lit {} - no lit {}'.format(orig_lit, number_lit - orig_lit,
-                                                                               number_unlit))
-        logging.info('Added {} new streets to existing {} highways'.format(len(new_ways), len(ways_list) - non_highway))
-        logging.info('There were {} existing highways with at least 1 intersection'.format(has_intersection))
-
-        return new_ways
 
     def cut_way_at_intersection_points(self, intersection_points: List[shg.Point], way: op.Way,
                                        my_line: shg.LineString) -> MutableMapping[op.Way, float]:
@@ -859,8 +718,8 @@ class Roads(object):
                 new_way.refs.append(original_refs[-1])
                 cut_ways_dict[new_way] = my_line.length - (my_line.length - prev_orig_point_dist) / 2
 
-        logging.debug('{} new cut ways (not including orig linear_obj) from {} intersections'.format(len(cut_ways_dict) - 1,
-                                                                                              len(intersection_points)))
+        logging.debug('{} new cut ways (not including orig linear_obj) from {} intersections'.format(
+            len(cut_ways_dict) - 1, len(intersection_points)))
         return cut_ways_dict
 
     def _change_way_for_object(self, my_line: shg.LineString, original_way: op.Way) -> None:
@@ -871,9 +730,11 @@ class Roads(object):
                                                                            self.transform, original_way.osm_id, True)
 
     def _split_way_for_object(self, my_multiline: shg.MultiLineString, original_way: op.Way) -> List[op.Way]:
-        """Processes an original linear_obj split by an object (blocked area, stg_entry) and creates additional linear_obj.
-        If one of the linestrings is shorter than parameter, then it is discarded to reduce the number of residuals.
-        The list of returned ways can be empty, in which case the original linear_obj should be removed after the call."""
+        """Processes an original linear_obj split by an object (blocked area, stg_entry) and creates additional
+        linear_obj.
+        If one of the line strings is shorter than parameter, then it is discarded to reduce the number of residuals.
+        The list of returned ways can be empty, in which case the original linear_obj should be removed after the call.
+        """
         is_first = True
         additional_ways = list()
         prev_refs = original_way.refs[:]
@@ -972,14 +833,15 @@ class Roads(object):
             for ref in refs_to_remove:
                 if len(way.refs) == 2:
                     break
-                if ref in way.refs:  # This is a hack for something that actually happens (closed linear_obj?), but should not
+                if ref in way.refs:  # A hack for something that actually happens (closed linear_obj?), but should not
                     if way.refs.count(ref) > 1:
                         continue  # in seldom cases the same node might also be used several times (e.g. for an 8-form)
                     way.refs.remove(ref)
                     num_refs_removed += 1
                     logging.debug('Removing ref %d from linear_obj %d due to too short segment', ref, way.osm_id)
                 else:
-                    logging.warning('Removing ref %d from linear_obj %d not possible because ref not there', ref, way.osm_id)
+                    logging.warning('Removing ref %d from linear_obj %d not possible because ref not there',
+                                    ref, way.osm_id)
         logging.debug('Removed %i refs in %i ways due to too short segments', num_refs_removed, len(self.ways_list))
 
     def _cleanup_topology(self) -> None:
@@ -1068,7 +930,7 @@ class Roads(object):
             for segment in the_segments:
                 segment.calc_missing_layers_for_nodes()
 
-    def _create_linear_objects(self) -> None:
+    def _create_linear_objects(self, lit_areas: List[shg.Polygon]) -> None:
         """Creates the linear objects, which will be created as scenery objects.
 
         Not processing parking for now (the_way.tags['amenity'] in ['parking'])
@@ -1092,11 +954,11 @@ class Roads(object):
 
             try:
                 if _is_bridge(the_way.tags):
-                    obj = linear.LinearBridge(self.transform, self.fg_elev, the_way, self.nodes_dict,
+                    obj = linear.LinearBridge(self.transform, self.fg_elev, the_way, self.nodes_dict, lit_areas,
                                               width, tex_coords=tex)
                     self.bridges_list.append(obj)
                 else:
-                    obj = linear.LinearObject(self.transform, the_way, self.nodes_dict,
+                    obj = linear.LinearObject(self.transform, the_way, self.nodes_dict, lit_areas,
                                               width, tex_coords=tex)
                     if is_railway(the_way):
                         self.railway_list.append(obj)
@@ -1313,7 +1175,8 @@ def _process_osm_ways(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, op.Wa
     return my_ways
 
 
-def _process_clusters(clusters, fg_elev: utilities.FGElev, stg_manager, stg_paths, do_railway,
+def _process_clusters(clusters, fg_elev: utilities.FGElev,
+                      stg_manager, stg_paths, do_railway,
                       coords_transform: coordinates.Transformation, stats: utilities.Stats, is_rough_lod: bool) -> None:
     for cl in clusters:
         if len(cl.objects) < parameters.CLUSTER_MIN_OBJECTS:
