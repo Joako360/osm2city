@@ -582,7 +582,9 @@ class Roads(object):
                 continue
             my_list = [way]
             continue_loop = True
-            while continue_loop and my_list:
+            loop_counter = 0  # a bit of a hack because the road could almost endlessly be split up
+            while continue_loop and my_list and loop_counter < 10:
+                loop_counter += 1
                 continue_loop = False  # only set to true if something changed
                 continue_intersect = True
                 for a_way in reversed(my_list):
