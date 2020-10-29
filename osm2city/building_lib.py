@@ -1724,7 +1724,10 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: s
         if not found:
             for building in parent.children:
                 building.parent = None
-                new_buildings.remove(building)
+                try:
+                    new_buildings.remove(building)
+                except ValueError:
+                    pass  # building might not have been added to new_buildings, but have been referenced to parent
                 logging.warning('Removing building osm_id=%i due to no matching texture in parent', building.osm_id)
 
     # make sure that min_height is only used if there is a real parent (not pseudo_parents)
