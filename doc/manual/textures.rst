@@ -54,22 +54,46 @@ FGData Effects and Stuff
 Proposal Renewed Implementation
 ===============================
 
------------------
-Texture Size Etc.
------------------
+-----------------------
+Needed Texture Atlasses
+-----------------------
 
-On 12 May 2020 Stuart Buchanan wrote:
+......................................
+Ideas, Constraints and Random Thoughts
+......................................
 
-Just to document what we discussed:
+* Older graphic cards might have difficulties with textures larger than 4k x 4k. On the other hand side the current texture atlas is 16k x 256 without people complaining. By the time new osm2city atlasses get mainstream (i.e. next LTS after 2020.3) another year or so will have passed and "older" graphics cards still can manage 8k x 8k. Whoever runs osm2city might not have an old PC anyway. => Going with 8k per dimension max.
+* Using a transparent texture and underlying model colours is very bad for performance, unless a shader is used. I.e. using a few textures and then doing the variety by using colours in the ac-file is not a viable way.
+* Bigger objects/meshes are better for graphics cards. Level of details settings in FG rendering preferences can play a bit against it. So there is a sweet spot between mesh dimensions (as large as possible) and LOD settings.
+* FG seems to support only one texture per ac-file - even though the ``AC3D file format <https://www.inivis.com/ac3d/man/ac3dfileformat.html>``_ does support several textures (one texture per object, but there can be many objects).
+* In cities and centres of towns the ground floor has often shops/bars - even though the next floors might be inhabited. And therefore facade has more glas, more "signs" / "colours", and more diverse lighting during night -> should be possible to texture map explicitely based on distance from centre etc.
+* There are two options for compatibility between FG versions (as the texture atlasses reside within FG and not within scenery folders a new scenery generated with the latest atlas might not work on an FG version referencing an older texture, which will lead to funny rendering):
+    * Put new BUILDING_LIST buildings and new texture atlasses in a new scenery directories to avoid compatibility issues. Each FG version then knows which directory to reference.
+    * Put the files into Terrasync/Models instead and make sure that as the atlas evolves only new stuff is added and each sub-texture has a "known FG minimal version" number.
 
-#. Creating a new texture atlas is fine. Keeping it to 4K x 4K would be better than 8K x 8K as some older graphics cards may not support it.
-#. Creating and referencing a new file is fine - we can put the new BUILDING_LIST buildings and the new texture atlas in a new scenery directory to avoid compatibility issues.
-#. Using a transparent texture and underlying model colours is very bad for performance, unless you use a shader, which you want to avoid.
-#. If you use a separate texture for the walls compared with the roof you should try to create a series of big objects containing all the walls or roofs for multiple buildings, as the .ac format only supports a single texture per object. Bigger objects are better for graphics cards.
 
-On 16 May 2020 Rick wrote:
+.....................................
+High Office Buildings and Skyscrapers
+.....................................
 
-Wouldn't it be better, if the files would reside in TerraSync/Models instead? Then the newest would always be available even for older FG versions -> the atlas could evolve as intended with no version compatibility issues of scenery generated. The only guarantee would have to be that the pods in the atlas always would have to be reserved for the same thing (geometry, properties, etc).
+For all but very high buildings we can manage vertical scale within texture. Therefore it makes sense to have the texture for high and very high buildings separate. That texture can also in general be used for office buildings. Horisontal scale is not know - and therefore these skyscraper textures should be x-repeatable. Skyscrapers should have possibility for special bottom (often ca. 2 times floor height) and special handling of top (often also 2-3 times floor height).
 
-This should be done for both facades/roofs and roads as well as other textures.
+Proposal:
 
+* 1 special atlas file
+* 20 cm per pixel
+* Normal floors: 4 metres / floor height => 20 pixels
+* Ground floor: 6 metres height => 30 pixels
+* Top floor: x metres => 26 pixels, which can be stretched (allowing some variations between buildings). Often no top floor for buildings with relatively few floors
+* Use 10 floors per texture, which should fit most commercial buildings / industry offices etc.
+* Resulting in 10*20 pixels plus 30 pixels plus 26 pixels = 256 pixels per texture => 32 different textures in 8k
+* Use a width of 256 pixels, i.e. ca. 50 metres should allow to repeat in x-direction without looking wrong
+
+
+----------------
+Todo's and PoC's
+----------------
+
+* Inclusion of ac-objects into mesh: read electrical pylons and combine them into mesh of cables. Significantly reduces number of nodes in scenery and proofs possibility. As a side effect if at some point the object would be removed from terrasync (or renamed), then the program would at least abort.
+* Split roofs into own texture atlas: structure program such that it "remembers" facades vs. roofs
+* Split buildings using skyscraper texture atlas into own mesh - but then generate tile-size meshes (one for facades and one for roofs): horisontal repeat, vertical extra nodes if very high building 
