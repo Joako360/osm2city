@@ -11,7 +11,7 @@ import traceback
 from typing import List
 import unittest
 
-from osm2city import platforms, piers, pylons, roads, buildings, parameters
+from osm2city import details, pylons, roads, buildings, parameters
 from osm2city.owbb import landuse as ol
 import osm2city.utils.aptdat_io as aio
 import osm2city.utils.btg_io as bio
@@ -156,9 +156,7 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
         if exec_argument in [Procedures.pylons, Procedures.main, Procedures.all]:
             pylons.process_pylons(the_coords_transform, my_fg_elev, my_stg_entries, file_lock)
         if exec_argument in [Procedures.details, Procedures.all]:
-            pylons.process_details(the_coords_transform, lit_areas, my_fg_elev, file_lock)
-            platforms.process_details(the_coords_transform, my_fg_elev, file_lock)
-            piers.process_details(the_coords_transform, my_fg_elev, file_lock)
+            details.process_details(the_coords_transform, lit_areas, my_fg_elev, file_lock)
 
     except:
         logging.exception('Exception occurred while processing tile {}.'.format(scenery_tile.tile_index))

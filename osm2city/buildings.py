@@ -1048,8 +1048,8 @@ def write_buildings_in_meshes(coords_transform: coordinates.Transformation,
             center_global = v.Vec2d(coords_transform.to_global((cluster_offset.x, cluster_offset.y)))
             logging.debug("Cluster center -> elevation: %d, position: %s", cluster_elev, cluster_offset)
 
-            file_name = stg_manager.prefix + "city" + str(handled_index) + "%02i%02i" % (cl.grid_index.ix,
-                                                                                         cl.grid_index.iy)
+            file_name = stg_manager.prefix + "b" + str(handled_index) + "%i%i" % (cl.grid_index.ix,
+                                                                                  cl.grid_index.iy)
             logging.info("writing cluster %s with %d buildings" % (file_name, len(cl.objects)))
 
             path_to_stg = stg_manager.add_object_static(file_name + '.ac', center_global, cluster_elev, 0,
@@ -1059,7 +1059,7 @@ def write_buildings_in_meshes(coords_transform: coordinates.Transformation,
             building_lib.write(os.path.join(path_to_stg, file_name + ".ac"), cl.objects,
                                cluster_elev, cluster_offset, prepare_textures.roofs, stats)
             if parameters.OBSTRUCTION_LIGHT_MIN_LEVELS > 0:
-                obstr_file_name = file_name + '_obstrlights.xml'
+                obstr_file_name = file_name + '_o.xml'
                 has_models = _write_obstruction_lights(path_to_stg, obstr_file_name, cl.objects, cluster_offset)
                 if has_models:
                     stg_manager.add_object_static(obstr_file_name, center_global, cluster_elev, 0,

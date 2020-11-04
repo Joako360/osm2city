@@ -74,7 +74,7 @@ FG_ELEV = '"D:/Program Files/FlightGear/bin/Win64/fgelev.exe"'
 FG_ELEV_CACHE = True  # saves the elevation probing results to a file, so next rerun is faster (but uses disk space!)
 PROBE_FOR_WATER = True  # only possible with FGElev version after 9th of November 2016 / FG 2016.4.1
 
-TILE_SIZE = 2000            # -- tile size in meters for clustering of buildings, roads, ...
+TILE_SIZE = 4000  # tile size in meters for clustering of meshes; has to be at least 3000. 4000 leads to max 5x5 meshes
 
 WRITE_CLUSTER_STATS = False
 
@@ -546,6 +546,12 @@ def read_from_file(filename):
     _check_ratio_dict_parameter(BUILDING_NUMBER_LEVELS_OTHER, 'BUILDING_NUMBER_LEVELS_OTHER')
     _check_ratio_dict_parameter(BUILDING_ROOF_SHAPE_RATIO, 'BUILDING_ROOF_SHAPE_RATIO', False)
     _check_ratio_dict_parameter(OWBB_RESIDENTIAL_DENSE_TYPE_SHARE, 'OWBB_RESIDENTIAL_DENSE_TYPE_SHARE', False)
+
+    # check minimal tile size - otherwise there might be problems with naming of files within same tile
+    # in clustering. Each tiles has max ca. 20 km length/width. There may only be one digit for x/y naming
+    global TILE_SIZE
+    if TILE_SIZE is None or TILE_SIZE < 3000:
+        raise ValueError('Parameter TILE_SIZE needs to be at least 3000')
 
 
 def show_default():

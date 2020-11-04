@@ -48,7 +48,7 @@ class Cluster(object):
 class ClusterContainer(object):
     """A container for clusters. Initially each cluster is part of a grid of size parameters.TILE_SIZE"""
     def __init__(self, min_point: Vec2d, max_point: Vec2d,
-                 stg_verb_type: STGVerbType=STGVerbType.object_static) -> None:
+                 stg_verb_type: STGVerbType = STGVerbType.object_static) -> None:
         self.max = max_point
         self.min = min_point
         delta = max_point - min_point  # Vec2d
@@ -102,7 +102,7 @@ class ClusterContainer(object):
             for item in each_list:
                 yield item
 
-    def append(self, anchor: Vec2d, obj, stats: osm2city.utils.utilities.Stats=None) -> Cluster:
+    def append(self, anchor: Vec2d, obj, stats: osm2city.utils.utilities.Stats = None) -> Cluster:
         """Finds the cluster within the cluster grid where a given object's anchor point is situated and then
         adds the object to that cluster."""
         the_cluster = self(anchor)

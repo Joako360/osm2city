@@ -49,7 +49,18 @@ Created on Sat Jun  7 22:38:59 2014
 # These approximations fail in the vicinity of either pole and at large 
 # distances. The fractional errors are of order (distance/R)^2.
 
-See also http://wiki.flightgear.org/Geographic_Coordinate_Systems
+See also:
+    http://wiki.flightgear.org/Geographic_Coordinate_Systems
+
+    https://projectionwizard.org/ proposes for 1x1 degree large scale maps:
+    +proj=tmerc +x_0=500000 +lon_0=-146.5 +k_0=0.9999 +datum=WGS84 +units=m +no_defs
+    where -146.5 in this case is the midpoint of -147E/-146E (somewhere in Alaska)
+
+    https://epsg.org
+    https://en.wikipedia.org/wiki/Transverse_Mercator_projection
+    UTM: https://en.wikipedia.org/wiki/Universal_Transverse_Mercator_coordinate_system
+    https://en.wikipedia.org/wiki/Map_projection
+    EPSG:4326: https://en.wikipedia.org/wiki/World_Geodetic_System
 """
 
 from math import asin, atan2, sin, cos, sqrt, radians, degrees, pi, fabs

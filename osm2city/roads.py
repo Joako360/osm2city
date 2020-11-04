@@ -505,7 +505,7 @@ class Roads(object):
         self.G = None  # network graph of ways
         self.roads_clusters = None
         self.roads_rough_clusters = None
-        self.railways_clusters = None
+        self.railways_clusters = None  # always rough currently
 
     def __str__(self):
         return "%i ways, %i roads, %i railways, %i bridges" % (len(self.ways_list), len(self.roads_list),
@@ -1190,12 +1190,12 @@ def _process_clusters(clusters, fg_elev: utilities.FGElev,
             continue  # skip almost empty clusters
 
         if do_railway:
-            file_start = "railways"
+            file_start = "w"
         else:
-            file_start = "roads"
+            file_start = "r"
         if is_rough_lod:
-            file_start += "_rough"
-        file_name = parameters.PREFIX + file_start + "%02i%02i" % (cl.grid_index.ix, cl.grid_index.iy)
+            file_start += "r"
+        file_name = parameters.PREFIX + file_start + "%i%i" % (cl.grid_index.ix, cl.grid_index.iy)
         center_global = Vec2d(coords_transform.to_global(cl.center))
         offset_local = cl.center
         cluster_elev = fg_elev.probe_elev((center_global.lon, center_global.lat), True)

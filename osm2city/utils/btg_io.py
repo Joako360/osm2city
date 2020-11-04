@@ -440,7 +440,7 @@ def read_btg_file(transformer: Transformation, airport_code: Optional[str] = Non
     tile_index = parameters.get_tile_index()
 
     # from cartesian ellipsoid to geodetic flat
-    trans_proj = pyproj.Transformer.from_crs({"proj": 'geocent', "ellps": 'WGS84', "datum": 'WGS84'},"EPSG:4326")
+    trans_proj = pyproj.Transformer.from_crs({"proj": 'geocent', "ellps": 'WGS84', "datum": 'WGS84'}, "EPSG:4326")
 
     file_name = ct.construct_btg_file_name_from_tile_index(tile_index)
     if airport_code:
