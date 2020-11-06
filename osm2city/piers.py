@@ -18,9 +18,9 @@ from shapely.geometry.base import CAP_STYLE, JOIN_STYLE
 from shapely.geometry.linestring import LineString
 
 from osm2city import parameters
-from osm2city.utils import utilities, ac3d, coordinates, osmparser, stg_io2
+from osm2city.utils import coordinates as co
+from osm2city.utils import utilities, ac3d, osmparser, stg_io2
 from osm2city.types import osmstrings as s
-from osm2city.utils.vec2d import Vec2d
 
 
 class Pier(object):
@@ -37,7 +37,7 @@ class Pier(object):
             if r in nodes_dict:
                 self.osm_nodes.append(nodes_dict[r])
         self.nodes = np.array([transform.to_local((n.lon, n.lat)) for n in self.osm_nodes])
-        self.anchor = Vec2d(self.nodes[0])
+        self.anchor = co.Vec2d(self.nodes[0])
 
     def calc_elevation(self, fg_elev: utilities.FGElev) -> None:
         """Calculates the elevation (level above sea) as a minimum of all nodes.
@@ -83,7 +83,8 @@ class Pier(object):
         for p in self.nodes:
             obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
         top_nodes = np.arange(len(self.nodes))
-        self.segment_len = np.array([0] + [Vec2d(coord).distance_to(Vec2d(linear_ring.coords[i])) for i, coord in enumerate(linear_ring.coords[1:])])
+        self.segment_len = np.array([0] + [co.Vec2d(coord).distance_to(co.Vec2d(linear_ring.coords[i]))
+                                           for i, coord in enumerate(linear_ring.coords[1:])])
         rd_len = len(linear_ring.coords)
         self.dist = np.zeros((rd_len))
         for i in range(1, rd_len):
@@ -127,7 +128,8 @@ class Pier(object):
             obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
         nodes_l = np.arange(len(left.coords))
         nodes_r = np.arange(len(right.coords))
-        self.segment_len = np.array([0] + [Vec2d(coord).distance_to(Vec2d(line_string.coords[i])) for i, coord in enumerate(line_string.coords[1:])])
+        self.segment_len = np.array([0] + [co.Vec2d(coord).distance_to(co.Vec2d(line_string.coords[i]))
+                                           for i, coord in enumerate(line_string.coords[1:])])
         rd_len = len(line_string.coords)
         self.dist = np.zeros((rd_len))
         for i in range(1, rd_len):
@@ -184,7 +186,7 @@ class Pier(object):
         obj.face(sideface)
 
 
-def process_osm_piers(my_coord_transformator: coordinates.Transformation) -> List[Pier]:
+def process_osm_piers(my_coord_transformator: co.Transformation) -> List[Pier]:
     osm_way_result = osmparser.fetch_osm_db_data_ways_key_values(["man_made=>pier"])
     osm_nodes_dict = osm_way_result.nodes_dict
     osm_ways_dict = osm_way_result.ways_dict
@@ -205,7 +207,7 @@ def process_osm_piers(my_coord_transformator: coordinates.Transformation) -> Lis
     return my_piers
 
 
-def write_boats(stg_manager, piers: List[Pier], coords_transform: coordinates.Transformation):
+def write_boats(stg_manager, piers: List[Pier], coords_transform: co.Transformation):
     for pier in piers:
         if pier.handle_as_area:
             _write_boat_area(pier, stg_manager, coords_transform)
@@ -213,7 +215,7 @@ def write_boats(stg_manager, piers: List[Pier], coords_transform: coordinates.Tr
             _write_boat_line(pier, stg_manager, coords_transform)
 
 
-def _write_boat_area(pier, stg_manager, coords_transform: coordinates.Transformation):
+def _write_boat_area(pier, stg_manager, coords_transform: co.Transformation):
     if len(pier.nodes) < 3:
         return
     # Guess a possible position for realistic boat placement
@@ -239,7 +241,7 @@ def _write_boat_area(pier, stg_manager, coords_transform: coordinates.Transforma
                     logging.error(reason)
 
 
-def _write_boat_line(pier, stg_manager, coords_transform: coordinates.Transformation):
+def _write_boat_line(pier, stg_manager, coords_transform: co.Transformation):
     line_string = LineString(pier.nodes)
     right_line = line_string.parallel_offset(4, 'left', resolution=8, join_style=1, mitre_limit=10.0)
     if isinstance(right_line, LineString):  # FIXME: what to do else?
@@ -292,4 +294,4 @@ def _write_model(length, stg_manager: stg_io2.STGManager, pos_global, direction,
                   ('Models/Maritime/Civilian/FerryBoat1.ac', 70)]
         choice = randint(0, len(models) - 1)
         model = models[choice]
-    stg_manager.add_object_shared(model[0], Vec2d(pos_global), my_elev, direction + model[1])
+    stg_manager.add_object_shared(model[0], co.Vec2d(pos_global), my_elev, direction + model[1])

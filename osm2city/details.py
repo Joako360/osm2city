@@ -8,22 +8,22 @@ import shapely.geometry as shg
 from osm2city import parameters, piers, platforms, pylons
 from osm2city.cluster import ClusterContainer
 from osm2city.types import osmstrings as s
-from osm2city.utils import ac3d, utilities, coordinates, stg_io2
-from osm2city.utils.vec2d import Vec2d
+from osm2city.utils import coordinates as co
+from osm2city.utils import ac3d, utilities, stg_io2
 
 
 OUR_MAGIC = "details"
 
 
-def process_details(coords_transform: coordinates.Transformation, lit_areas: Optional[List[shg.Polygon]],
+def process_details(coords_transform: co.Transformation, lit_areas: Optional[List[shg.Polygon]],
                     fg_elev: utilities.FGElev, file_lock: mp.Lock = None) -> None:
     stats = utilities.Stats()
     # -- prepare transformation to local coordinates
     cmin, cmax = parameters.get_extent_global()
 
     # -- create (empty) clusters
-    lmin = Vec2d(coords_transform.to_local(cmin))
-    lmax = Vec2d(coords_transform.to_local(cmax))
+    lmin = co.Vec2d(coords_transform.to_local(cmin))
+    lmax = co.Vec2d(coords_transform.to_local(cmax))
     clusters = ClusterContainer(lmin, lmax)
 
     # piers
@@ -46,7 +46,7 @@ def process_details(coords_transform: coordinates.Transformation, lit_areas: Opt
 
     for cl in clusters:
         if cl.objects:
-            center_tile = Vec2d(coords_transform.to_global(cl.center))
+            center_tile = co.Vec2d(coords_transform.to_global(cl.center))
             ac_file_name = "%sd%i%i.ac" % (parameters.PREFIX, cl.grid_index.ix, cl.grid_index.iy)
             ac = ac3d.File(stats=stats)
             obj = ac.new_object('details', 'Textures/Terrain/asphalt.png', default_mat_idx=ac3d.MAT_IDX_UNLIT)
@@ -70,8 +70,8 @@ def process_details(coords_transform: coordinates.Transformation, lit_areas: Opt
     _process_pylon_details(coords_transform, lit_areas, fg_elev, stg_manager, lmin, lmax, file_lock)
 
 
-def _process_pylon_details(coords_transform: coordinates.Transformation, lit_areas: Optional[List[shg.Polygon]],
-                           fg_elev: utilities.FGElev, stg_manager: stg_io2.STGManager, lmin: Vec2d, lmax: Vec2d,
+def _process_pylon_details(coords_transform: co.Transformation, lit_areas: Optional[List[shg.Polygon]],
+                           fg_elev: utilities.FGElev, stg_manager: stg_io2.STGManager, lmin: co.Vec2d, lmax: co.Vec2d,
                            file_lock: mp.Lock = None) -> None:
     """Pylon details (mostly cables) go also into details, but cannot be processed together with piers and pylons."""
     # Transform to real objects

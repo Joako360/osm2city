@@ -16,7 +16,6 @@ from osm2city.utils import coordinates as co
 from osm2city.utils import osmparser as op
 from osm2city.types import osmstrings as s
 from osm2city.utils.utilities import FGElev
-from osm2city.utils.vec2d import Vec2d
 
 
 class LinearObject(object):
@@ -182,7 +181,7 @@ class LinearObject(object):
         self.angle[-1] = self.angle[-2]
 
     def _write_nodes(self, obj: ac3d.Object, line_string: shg.LineString, z, cluster_elev: float,
-                     offset: Optional[Vec2d] = None, join: bool = False, is_left: bool = False) -> List[int]:
+                     offset: Optional[co.Vec2d] = None, join: bool = False, is_left: bool = False) -> List[int]:
         """given a LineString and z, write nodes to .ac.
            Return nodes_list
         """

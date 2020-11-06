@@ -28,8 +28,8 @@ import unittest
 import shapely.geometry as shg
 
 from osm2city import cluster, roads, parameters
-from osm2city.utils import vec2d
-from osm2city.utils import utilities, coordinates, stg_io2
+from osm2city.utils import coordinates as co
+from osm2city.utils import utilities, stg_io2
 from osm2city.utils import osmparser as op
 from osm2city.types import osmstrings as s
 
@@ -74,8 +74,8 @@ class Cable(object):
         self.end_cable_vertex = end_cable_vertex
         self.vertices = [self.start_cable_vertex, self.end_cable_vertex]
         self.radius = radius
-        self.heading = coordinates.calc_angle_of_line_local(start_cable_vertex.x, start_cable_vertex.y,
-                                                            end_cable_vertex.x, end_cable_vertex.y)
+        self.heading = co.calc_angle_of_line_local(start_cable_vertex.x, start_cable_vertex.y,
+                                                   end_cable_vertex.x, end_cable_vertex.y)
 
         if (number_extra_vertices > 0) and (catenary_a > 0) and (distance >= parameters.C2P_CATENARY_MIN_DISTANCE):
             self._make_catenary_cable(number_extra_vertices, catenary_a)
@@ -87,8 +87,8 @@ class Cable(object):
         be taken into account https://en.wikipedia.org/wiki/File:Catenary-tension.png.
         However the elevation correction actually already helps quite a bit, because the x/y are kept constant.
         """
-        cable_distance = coordinates.calc_distance_local(self.start_cable_vertex.x, self.start_cable_vertex.y,
-                                                         self.end_cable_vertex.x, self.end_cable_vertex.y)
+        cable_distance = co.calc_distance_local(self.start_cable_vertex.x, self.start_cable_vertex.y,
+                                                self.end_cable_vertex.x, self.end_cable_vertex.y)
         part_distance = cable_distance / (1 + number_extra_vertices)
         pylon_y = catenary_a * math.cosh((cable_distance / 2) / catenary_a)
         part_elevation = ((self.start_cable_vertex.elevation - self.end_cable_vertex.elevation) /
@@ -320,7 +320,7 @@ class SharedPylon(object):
             direction_correction = 180
 
         # 90 less because arms are in x-direction in ac-file
-        my_stg_mgr.add_object_shared(self.pylon_model, vec2d.Vec2d(self.lon, self.lat),
+        my_stg_mgr.add_object_shared(self.pylon_model, co.Vec2d(self.lon, self.lat),
                                      self.elevation,
                                      _stg_angle(self.heading - 90 + direction_correction))
 
@@ -370,7 +370,7 @@ class Chimney(SharedPylon):
         self.pylon_model = 'Models/Industrial/' + self.pylon_model
 
 
-def _process_osm_chimneys_nodes(osm_nodes_dict: Dict[int, op.Node], coords_transform: coordinates.Transformation,
+def _process_osm_chimneys_nodes(osm_nodes_dict: Dict[int, op.Node], coords_transform: co.Transformation,
                                 fg_elev: utilities.FGElev) -> List[Chimney]:
     chimneys = list()
 
@@ -457,7 +457,7 @@ class StorageTank(SharedPylon):
         self.pylon_model = 'Models/Industrial/' + self.pylon_model
 
     def make_stg_entry(self, my_stg_mgr: stg_io2.STGManager) -> None:
-        my_stg_mgr.add_object_shared(self.pylon_model, vec2d.Vec2d(self.lon, self.lat), self.elevation, 0)
+        my_stg_mgr.add_object_shared(self.pylon_model, co.Vec2d(self.lon, self.lat), self.elevation, 0)
 
 
 class WindTurbine(SharedPylon):
@@ -544,10 +544,10 @@ class WindTurbine(SharedPylon):
     def make_stg_entry(self, my_stg_mgr: stg_io2.STGManager) -> None:
         # special for Vestas_Off_Shore140M.xml
         if self.pylon_model.endswith("140M.xml"):
-            my_stg_mgr.add_object_shared("Models/Power/Vestas_Base.ac", vec2d.Vec2d(self.lon, self.lat),
+            my_stg_mgr.add_object_shared("Models/Power/Vestas_Base.ac", co.Vec2d(self.lon, self.lat),
                                          self.elevation, 0)
             # no need to add 12m to elevation for Vestas_Off_Shore140M.xml - ac-model already takes care
-        my_stg_mgr.add_object_shared(self.pylon_model, vec2d.Vec2d(self.lon, self.lat), self.elevation, 0)
+        my_stg_mgr.add_object_shared(self.pylon_model, co.Vec2d(self.lon, self.lat), self.elevation, 0)
 
 
 class WindFarm(object):
@@ -582,7 +582,7 @@ class WindFarm(object):
             turbine.pylon_model = shared_model
 
 
-def _process_osm_wind_turbines(osm_nodes_dict: Dict[int, op.Node], coords_transform: coordinates.Transformation,
+def _process_osm_wind_turbines(osm_nodes_dict: Dict[int, op.Node], coords_transform: co.Transformation,
                                fg_elev: utilities.FGElev, stg_entries: List[stg_io2.STGEntry]) -> List[WindTurbine]:
     my_wind_turbines = list()
     wind_farms = list()
@@ -596,7 +596,7 @@ def _process_osm_wind_turbines(osm_nodes_dict: Dict[int, op.Node], coords_transf
                 shared_within_distance = False
                 for entry in stg_entries:
                     if entry.verb_type is stg_io2.STGVerbType.object_shared:
-                        if coordinates.calc_distance_global(entry.lon, entry.lat, node.lon, node.lat) < parameters.C2P_WIND_TURBINE_MIN_DISTANCE_SHARED_OBJECT:
+                        if co.calc_distance_global(entry.lon, entry.lat, node.lon, node.lat) < parameters.C2P_WIND_TURBINE_MIN_DISTANCE_SHARED_OBJECT:
                             logging.debug("Excluding turbine osm_id = {} due to overlap shared object.".format(node.osm_id))
                             shared_within_distance = True
                             break
@@ -618,8 +618,8 @@ def _process_osm_wind_turbines(osm_nodes_dict: Dict[int, op.Node], coords_transf
     # Therefore brute force based on distance
     for i in range(1, len(my_wind_turbines)):
         for j in range(i + 1, len(my_wind_turbines)):
-            if coordinates.calc_distance_local(my_wind_turbines[i].x, my_wind_turbines[i].y,
-                                               my_wind_turbines[j].x, my_wind_turbines[j].y) \
+            if co.calc_distance_local(my_wind_turbines[i].x, my_wind_turbines[i].y,
+                                      my_wind_turbines[j].x, my_wind_turbines[j].y) \
                     <= parameters.C2P_WIND_TURBINE_MAX_DISTANCE_WITHIN_WIND_FARM:
                 my_wind_farm = my_wind_turbines[i].wind_farm
                 if my_wind_farm is None:
@@ -760,9 +760,8 @@ class WaySegment(object):
         self.start_pylon = start_pylon
         self.end_pylon = end_pylon
         self.cables = []
-        self.length = coordinates.calc_distance_local(start_pylon.x, start_pylon.y, end_pylon.x, end_pylon.y)
-        self.heading = coordinates.calc_angle_of_line_local(start_pylon.x, start_pylon.y,
-                                                            end_pylon.x, end_pylon.y)
+        self.length = co.calc_distance_local(start_pylon.x, start_pylon.y, end_pylon.x, end_pylon.y)
+        self.heading = co.calc_angle_of_line_local(start_pylon.x, start_pylon.y, end_pylon.x, end_pylon.y)
 
 
 class Line(LineWithoutCables):
@@ -1031,7 +1030,7 @@ class RailLine(Line):
                 direction_type = PylonDirectionType.normal
                 mast_point = my_left_parallel.interpolate(current_distance * (my_left_parallel_length / my_length))
             self.shared_pylons.append(RailMast(PylonType.railway_single, point_on_line, mast_point, direction_type))
-            prev_angle = coordinates.calc_angle_of_line_local(prev_point.x, prev_point.y, point_on_line.x, point_on_line.y)
+            prev_angle = co.calc_angle_of_line_local(prev_point.x, prev_point.y, point_on_line.x, point_on_line.y)
             prev_point = point_on_line
             # find new masts along the line with a simple approximation for less distance between masts
             # if the radius gets tighter
@@ -1044,8 +1043,8 @@ class RailLine(Line):
                 else:
                     test_distance = current_distance + RailLine.DEFAULT_MAST_DISTANCE
                     point_on_line = self.linear.interpolate(test_distance)
-                    new_angle = coordinates.calc_angle_of_line_local(prev_point.x, prev_point.y,
-                                                                     point_on_line.x, point_on_line.y)
+                    new_angle = co.calc_angle_of_line_local(prev_point.x, prev_point.y,
+                                                            point_on_line.x, point_on_line.y)
                     difference = abs(new_angle - prev_angle)
                     if difference >= 25:
                         current_distance += 10
@@ -1068,8 +1067,8 @@ class RailLine(Line):
                     direction_type = PylonDirectionType.normal
                     mast_point = my_left_parallel.interpolate(current_distance * (my_left_parallel_length / my_length))
                 self.shared_pylons.append(RailMast(PylonType.railway_single, point_on_line, mast_point, direction_type))
-                prev_angle = coordinates.calc_angle_of_line_local(prev_point.x, prev_point.y,
-                                                                  point_on_line.x, point_on_line.y)
+                prev_angle = co.calc_angle_of_line_local(prev_point.x, prev_point.y,
+                                                         point_on_line.x, point_on_line.y)
                 prev_point = point_on_line
 
         # virtual end point
@@ -1353,11 +1352,11 @@ def _find_connecting_line(key, lines, max_allowed_angle=360):
     # Get the angle of each line
     for line in lines:
         if line.nodes[0].osm_id == key:
-            angle = coordinates.calc_angle_of_line_local(line.nodes[0].x, line.nodes[0].y,
-                                                         line.nodes[1].x, line.nodes[1].y)
+            angle = co.calc_angle_of_line_local(line.nodes[0].x, line.nodes[0].y,
+                                                line.nodes[1].x, line.nodes[1].y)
         elif line.nodes[-1].osm_id == key:
-            angle = coordinates.calc_angle_of_line_local(line.nodes[-1].x, line.nodes[-1].y,
-                                                         line.nodes[-2].x, line.nodes[-2].y)
+            angle = co.calc_angle_of_line_local(line.nodes[-1].x, line.nodes[-1].y,
+                                                line.nodes[-2].x, line.nodes[-2].y)
         else:
             raise Exception("The referenced node is not at the beginning or end of line0")
         angles.append(angle)
@@ -1444,11 +1443,11 @@ def _merge_lines(osm_id, line0, line1, shared_nodes):
 def distribute_way_segments_to_clusters(lines: List[Line], cluster_container: cluster.ClusterContainer) -> None:
     for line in lines:
         for way_segment in line.way_segments:
-            anchor = vec2d.Vec2d(way_segment.start_pylon.x, way_segment.start_pylon.y)
+            anchor = co.Vec2d(way_segment.start_pylon.x, way_segment.start_pylon.y)
             cluster_container.append(anchor, way_segment)
 
 
-def write_cable_clusters(cluster_container: cluster.ClusterContainer, coords_transform: coordinates.Transformation,
+def write_cable_clusters(cluster_container: cluster.ClusterContainer, coords_transform: co.Transformation,
                          my_stg_mgr: stg_io2.STGManager, details: bool = False) -> None:
     cluster_index = 0
     for ic, cl in enumerate(cluster_container):
@@ -1484,8 +1483,8 @@ def write_cable_clusters(cluster_container: cluster.ClusterContainer, coords_tra
         if details:
             cluster_filename += 'd'
         cluster_filename += 'c%02i' % cluster_index
-        path_to_stg = my_stg_mgr.add_object_static(cluster_filename + '.ac', vec2d.Vec2d(center_global[0],
-                                                                                         center_global[1]),
+        path_to_stg = my_stg_mgr.add_object_static(cluster_filename + '.ac',
+                                                   co.Vec2d(center_global[0], center_global[1]),
                                                    cluster_elevation, 90, cluster_container.stg_verb_type)
 
         ac_file_lines = list()
@@ -1519,14 +1518,13 @@ def _calc_heading_nodes(nodes_array: List[SharedPylon]) -> None:
     """Calculates the headings of nodes in a line based on medium angle. nodes must have a heading, x and y attribute"""
     current_pylon = nodes_array[0]
     next_pylon = nodes_array[1]
-    current_angle = coordinates.calc_angle_of_line_local(current_pylon.x, current_pylon.y, next_pylon.x, next_pylon.y)
+    current_angle = co.calc_angle_of_line_local(current_pylon.x, current_pylon.y, next_pylon.x, next_pylon.y)
     current_pylon.heading = current_angle
     for x in range(1, len(nodes_array) - 1):
         prev_angle = current_angle
         current_pylon = nodes_array[x]
         next_pylon = nodes_array[x + 1]
-        current_angle = coordinates.calc_angle_of_line_local(current_pylon.x, current_pylon.y,
-                                                             next_pylon.x, next_pylon.y)
+        current_angle = co.calc_angle_of_line_local(current_pylon.x, current_pylon.y, next_pylon.x, next_pylon.y)
         current_pylon.heading = _calc_middle_angle(prev_angle, current_angle)
     nodes_array[-1].heading = current_angle
 
@@ -1609,7 +1607,7 @@ def process_osm_building_refs(my_coord_transformator, fg_elev: utilities.FGElev,
                                 lon, lat = my_coord_transformator.to_global((my_centroid.x, my_centroid.y))
                                 if not clipping_border.contains(shg.Point(lon, lat)):
                                     continue
-                                radius = coordinates.calc_distance_global(lon, lat, my_node.lon, my_node.lat)
+                                radius = co.calc_distance_global(lon, lat, my_node.lon, my_node.lat)
                                 if radius < 5:  # do not want very small objects
                                     continue
                                 elev = fg_elev.probe_elev((lon, lat), True)
@@ -1763,7 +1761,7 @@ def process_highways_for_streetlamps(my_highways: Dict[int, Highway], lit_areas:
     return list(my_streetlamps.values())
 
 
-def process_pylons(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
+def process_pylons(coords_transform: co.Transformation, fg_elev: utilities.FGElev,
                    stg_entries: List[stg_io2.STGEntry], file_lock: mp.Lock = None) -> None:
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
@@ -1817,8 +1815,8 @@ def process_pylons(coords_transform: coordinates.Transformation, fg_elev: utilit
     # Write to FlightGear
     cmin, cmax = parameters.get_extent_global()
     logging.info("min/max " + str(cmin) + " " + str(cmax))
-    lmin = vec2d.Vec2d(coords_transform.to_local(cmin))
-    lmax = vec2d.Vec2d(coords_transform.to_local(cmax))
+    lmin = co.Vec2d(coords_transform.to_local(cmin))
+    lmax = co.Vec2d(coords_transform.to_local(cmax))
     cluster_container = cluster.ClusterContainer(lmin, lmax, stg_io2.STGVerbType.object_building_mesh_detailed)
 
     if parameters.C2P_PROCESS_POWERLINES:

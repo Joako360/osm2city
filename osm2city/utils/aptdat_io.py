@@ -1,7 +1,7 @@
 """Handles reading from apt.dat airport files and read/write to pickle file for minimized representation.
 See http://developer.x-plane.com/?article=airport-data-apt-dat-file-format-specification for the specification.
 
-Flightgear 2016.4 can read multiple apt.data files - see e.g. http://wiki.flightgear.org/FFGo
+FlightGear 2016.4 can read multiple apt.data files - see e.g. http://wiki.flightgear.org/FFGo
 and https://sourceforge.net/p/flightgear/flightgear/ci/516a5cf016a7d504b09aaac2e0e66c7e9efd42b2/.
 However this module does only support reading from the apt.dat.gz in $FG_ROOT/Airports/apt.dat.gz).
 
@@ -18,8 +18,8 @@ from typing import List, Optional
 from shapely.affinity import rotate
 from shapely.geometry import box, CAP_STYLE, LineString, Point, Polygon
 
-from osm2city.utils import utilities, coordinates
-from osm2city.utils.vec2d import Vec2d
+from osm2city.utils import utilities
+import osm2city.utils.coordinates as co
 
 
 class Boundary:
@@ -42,7 +42,7 @@ class Boundary:
                     return True
         return False
 
-    def create_polygons(self, transformer: coordinates.Transformation) -> Optional[List[Polygon]]:
+    def create_polygons(self, transformer: co.Transformation) -> Optional[List[Polygon]]:
         if self.not_empty:
             boundaries = list()
             for my_list in self.nodes_lists:
@@ -67,12 +67,12 @@ class Runway(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def create_blocked_area(self, coords_transform: coordinates.Transformation) -> Polygon:
+    def create_blocked_area(self, coords_transform: co.Transformation) -> Polygon:
         pass
 
 
 class LandRunway(Runway):
-    def __init__(self, width: float, start: Vec2d, end: Vec2d) -> None:
+    def __init__(self, width: float, start: co.Vec2d, end: co.Vec2d) -> None:
         self.width = width
         self.start = start  # global coordinates
         self.end = end  # global coordinates
@@ -91,7 +91,7 @@ class LandRunway(Runway):
 
 
 class Helipad(Runway):
-    def __init__(self, length: float, width: float, center: Vec2d, orientation: float) -> None:
+    def __init__(self, length: float, width: float, center: co.Vec2d, orientation: float) -> None:
         self.length = length
         self.width = width
         self.center = center  # global coordinates
@@ -134,7 +134,7 @@ class Airport(object):
             return True
         return False
 
-    def create_blocked_areas(self, coords_transform: coordinates.Transformation,
+    def create_blocked_areas(self, coords_transform: co.Transformation,
                              for_buildings: bool) -> List[Polygon]:
         blocked_areas = list()
         for runway in self.runways:
@@ -153,7 +153,7 @@ class Airport(object):
                     blocked_areas.append(pb)
         return utilities.merge_buffers(blocked_areas)
 
-    def create_boundary_polygons(self, coords_transform: coordinates.Transformation) -> Optional[List[Polygon]]:
+    def create_boundary_polygons(self, coords_transform: co.Transformation) -> Optional[List[Polygon]]:
         if self.airport_boundary is None:
             return None
         else:
@@ -192,11 +192,11 @@ def read_apt_dat_gz_file(min_lon: float, min_lat: float,
                     my_airport = Airport(parts[4])
                     total_airports += 1
             elif parts[0] == '100':
-                my_runway = LandRunway(float(parts[1]), Vec2d(float(parts[10]), float(parts[9])),
-                                       Vec2d(float(parts[19]), float(parts[18])))
+                my_runway = LandRunway(float(parts[1]), co.Vec2d(float(parts[10]), float(parts[9])),
+                                       co.Vec2d(float(parts[19]), float(parts[18])))
                 my_airport.append_runway(my_runway)
             elif parts[0] == '102':
-                my_helipad = Helipad(float(parts[5]), float(parts[6]), Vec2d(float(parts[3]), float(parts[2])),
+                my_helipad = Helipad(float(parts[5]), float(parts[6]), co.Vec2d(float(parts[3]), float(parts[2])),
                                      float(parts[4]))
                 my_airport.append_runway(my_helipad)
             elif parts[0] == '110':  # Pavement
@@ -216,7 +216,7 @@ def read_apt_dat_gz_file(min_lon: float, min_lat: float,
     return airports
 
 
-def get_apt_dat_blocked_areas_from_airports(coords_transform: coordinates.Transformation,
+def get_apt_dat_blocked_areas_from_airports(coords_transform: co.Transformation,
                                             min_lon: float, min_lat: float, max_lon: float, max_lat: float,
                                             airports: List[Airport], for_buildings: bool) -> List[Polygon]:
     """Transforms runways in airports to polygons.

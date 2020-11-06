@@ -22,7 +22,7 @@ import unittest
 
 import osm2city.textures.road
 import osm2city.utils.calc_tile as ct
-import osm2city.utils.vec2d as vec2d
+import osm2city.utils.coordinates as co
 import osm2city.utils.log_helper as ulog
 import osm2city.types.osmstrings as s
 
@@ -414,14 +414,14 @@ def get_output_path():
 
 
 def get_center_global():
-    cmin = vec2d.Vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
-    cmax = vec2d.Vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
+    cmin = co.Vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
+    cmax = co.Vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
     return (cmin + cmax) * 0.5
 
 
 def get_extent_global():
-    cmin = vec2d.Vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
-    cmax = vec2d.Vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
+    cmin = co.Vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
+    cmax = co.Vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
     return cmin, cmax
 
 

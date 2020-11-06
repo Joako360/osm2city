@@ -23,8 +23,7 @@ import shapely.geometry as shg
 
 from osm2city import parameters
 from osm2city.utils import calc_tile
-from osm2city.utils.coordinates import Transformation
-from osm2city.utils.vec2d import Vec2d
+from osm2city.utils.coordinates import Transformation, Vec2d
 
 
 @enum.unique

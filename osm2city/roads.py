@@ -73,9 +73,9 @@ from osm2city import linear, parameters
 from osm2city.cluster import ClusterContainer
 import osm2city.textures.road
 import osm2city.utils.osmparser as op
-from osm2city.utils import utilities, ac3d, graph, coordinates, stg_io2
+from osm2city.utils import utilities, ac3d, graph, stg_io2
+import osm2city.utils.coordinates as co
 from osm2city.types import osmstrings as s
-from osm2city.utils.vec2d import Vec2d
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 
@@ -403,7 +403,7 @@ def cut_line_at_points(line: shg.LineString, points: List[shg.Point]) -> List[sh
 
 
 def check_points_on_line_distance(max_point_dist: int, ways_list: List[op.Way], nodes_dict: Dict[int, op.Node],
-                                  transform: coordinates.Transformation) -> None:
+                                  transform: co.Transformation) -> None:
     """Based on parameter makes sure that points on a line are not too long apart for elevation probing reasons.
 
     If distance is longer than the related parameter, then new points are added along the line.
@@ -494,7 +494,7 @@ class WaySegment:
 
 class Roads(object):
     def __init__(self, raw_osm_ways: List[op.Way], nodes_dict: Dict[int, op.Node],
-                 coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev) -> None:
+                 coords_transform: co.Transformation, fg_elev: utilities.FGElev) -> None:
         self.transform = coords_transform
         self.fg_elev = fg_elev
         self.ways_list = raw_osm_ways  # raw ways from OSM
@@ -648,7 +648,7 @@ class Roads(object):
             refs_to_remove = set()
             for ref in way.refs:
                 ref_node = self.nodes_dict[ref]
-                segment_length = coordinates.calc_distance_global(lon, lat, ref_node.lon, ref_node.lat)
+                segment_length = co.calc_distance_global(lon, lat, ref_node.lon, ref_node.lat)
                 if segment_length < parameters.MIN_ROAD_SEGMENT_LENGTH:
                     if ref == way.refs[0] or ref == way.refs[-1]:  # ignore because it is almost at either start or end
                         add_intersection = False
@@ -829,8 +829,8 @@ class Roads(object):
             for i in range(1, ref_len):
                 first_node = self.nodes_dict[way.refs[i - 1]]
                 second_node = self.nodes_dict[way.refs[i]]
-                distance = coordinates.calc_distance_global(first_node.lon, first_node.lat,
-                                                            second_node.lon, second_node.lat)
+                distance = co.calc_distance_global(first_node.lon, first_node.lat,
+                                                   second_node.lon, second_node.lat)
                 if distance < parameters.MIN_ROAD_SEGMENT_LENGTH:
                     if i == ref_len - 1:
                         refs_to_remove.append(way.refs[i - 1])  # shall not remove the last node
@@ -1081,16 +1081,16 @@ class Roads(object):
                 if is_start:
                     first_node = self.nodes_dict[way.refs[0]]
                     second_node = self.nodes_dict[way.refs[1]]
-                    angle = coordinates.calc_angle_of_line_global(first_node.lon, first_node.lat,
-                                                                  second_node.lon, second_node.lat,
-                                                                  self.transform)
+                    angle = co.calc_angle_of_line_global(first_node.lon, first_node.lat,
+                                                         second_node.lon, second_node.lat,
+                                                         self.transform)
                     start_dict[way] = angle
                 else:
                     first_node = self.nodes_dict[way.refs[-2]]
                     second_node = self.nodes_dict[way.refs[-1]]
-                    angle = coordinates.calc_angle_of_line_global(first_node.lon, first_node.lat,
-                                                                  second_node.lon, second_node.lat,
-                                                                  self.transform)
+                    angle = co.calc_angle_of_line_global(first_node.lon, first_node.lat,
+                                                         second_node.lon, second_node.lat,
+                                                         self.transform)
                     end_dict[way] = angle
 
             # for each in end_dict search in start_dict the one with the closest angle and is a compatible linear_obj
@@ -1130,25 +1130,25 @@ class Roads(object):
         """Create cluster.
            Put objects in clusters based on their centroid.
         """
-        lmin, lmax = [Vec2d(self.transform.to_local(c)) for c in parameters.get_extent_global()]
+        lmin, lmax = [co.Vec2d(self.transform.to_local(c)) for c in parameters.get_extent_global()]
         self.roads_clusters = ClusterContainer(lmin, lmax)
         self.roads_rough_clusters = ClusterContainer(lmin, lmax)
         self.railways_clusters = ClusterContainer(lmin, lmax)
 
         for the_object in self.bridges_list + self.roads_list + self.railway_list:
             if is_railway(the_object.way):
-                cluster_ref = self.railways_clusters.append(Vec2d(the_object.center.centroid.coords[0]),
+                cluster_ref = self.railways_clusters.append(co.Vec2d(the_object.center.centroid.coords[0]),
                                                             the_object, stats)
             else:
                 if _is_highway(the_object.way):
                     if highway_type_from_osm_tags(the_object.way.tags).value < parameters.HIGHWAY_TYPE_MIN_ROUGH_LOD:
-                        cluster_ref = self.roads_clusters.append(Vec2d(the_object.center.centroid.coords[0]),
+                        cluster_ref = self.roads_clusters.append(co.Vec2d(the_object.center.centroid.coords[0]),
                                                                  the_object, stats)
                     else:
-                        cluster_ref = self.roads_rough_clusters.append(Vec2d(the_object.center.centroid.coords[0]),
+                        cluster_ref = self.roads_rough_clusters.append(co.Vec2d(the_object.center.centroid.coords[0]),
                                                                        the_object, stats)
                 else:
-                    cluster_ref = self.roads_clusters.append(Vec2d(the_object.center.centroid.coords[0]), the_object,
+                    cluster_ref = self.roads_clusters.append(co.Vec2d(the_object.center.centroid.coords[0]), the_object,
                                                              stats)
             the_object.cluster_ref = cluster_ref
 
@@ -1184,7 +1184,7 @@ def _process_osm_ways(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, op.Wa
 
 def _process_clusters(clusters, fg_elev: utilities.FGElev,
                       stg_manager, stg_paths, do_railway,
-                      coords_transform: coordinates.Transformation, stats: utilities.Stats, is_rough_lod: bool) -> None:
+                      coords_transform: co.Transformation, stats: utilities.Stats, is_rough_lod: bool) -> None:
     for cl in clusters:
         if len(cl.objects) < parameters.CLUSTER_MIN_OBJECTS:
             continue  # skip almost empty clusters
@@ -1196,7 +1196,7 @@ def _process_clusters(clusters, fg_elev: utilities.FGElev,
         if is_rough_lod:
             file_start += "r"
         file_name = parameters.PREFIX + file_start + "%i%i" % (cl.grid_index.ix, cl.grid_index.iy)
-        center_global = Vec2d(coords_transform.to_global(cl.center))
+        center_global = co.Vec2d(coords_transform.to_global(cl.center))
         offset_local = cl.center
         cluster_elev = fg_elev.probe_elev((center_global.lon, center_global.lat), True)
 
@@ -1228,7 +1228,7 @@ def _process_clusters(clusters, fg_elev: utilities.FGElev,
             the_way.junction1.reset()
 
 
-def process_roads(transform: coordinates.Transformation, fg_elev: utilities.FGElev,
+def process_roads(transform: co.Transformation, fg_elev: utilities.FGElev,
                   blocked_apt_areas: List[shg.Polygon], lit_areas: List[shg.Polygon], water_areas: List[shg.Polygon],
                   stg_entries: List[stg_io2.STGEntry], file_lock: mp.Lock = None) -> None:
     random.seed(42)
@@ -1287,7 +1287,7 @@ class TestUtilities(unittest.TestCase):
     def test_cut_way_at_intersection_points(self):
         raw_osm_ways = list()
         nodes_dict = dict()
-        coords_transform = coordinates.Transformation(parameters.get_center_global())
+        coords_transform = co.Transformation(parameters.get_center_global())
         the_fg_elev = utilities.FGElev(coords_transform, 111111)
         way = op.Way(1)
         way.tags["hello"] = "world"
@@ -1383,7 +1383,7 @@ class TestUtilities(unittest.TestCase):
 
     def test_assign_missing_node_layers(self) -> None:
         nodes_dict = dict()
-        coords_transform = coordinates.Transformation(parameters.get_center_global())
+        coords_transform = co.Transformation(parameters.get_center_global())
         way = op.Way(1)
         way.tags["hello"] = "world"
         lon, lat = coords_transform.to_global((0, 0))

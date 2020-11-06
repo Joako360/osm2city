@@ -43,7 +43,6 @@ from osm2city.utils import osmparser as op
 from osm2city.utils import utilities, ac3d
 from osm2city.types import osmstrings as s
 from osm2city.utils import stg_io2
-from osm2city.utils.vec2d import Vec2d
 
 
 def _random_roof_shape() -> enu.RoofShape:
@@ -117,7 +116,7 @@ class Building(object):
                  )
 
     def __init__(self, osm_id: int, tags: Dict[str, str], outer_ring: shg.LinearRing,
-                 anchor: Optional[Vec2d],
+                 anchor: Optional[co.Vec2d],
                  stg_typ: stg_io2.STGVerbType = None, street_angle=0, inner_rings_list=None,
                  refs: List[int] = None, refs_inner: List[List[int]] = None,
                  is_owbb_model: bool = False, width: float = 0., depth: float = 0.) -> None:
@@ -248,7 +247,7 @@ class Building(object):
 
             if self.zone is None:  # zone is first set after building has been created
                 # just use the first point of the outside of the building
-                self.anchor = Vec2d(self.pts_outer[0])
+                self.anchor = co.Vec2d(self.pts_outer[0])
                 self.street_angle = 0
                 return
 
@@ -275,7 +274,7 @@ class Building(object):
                                                hull_points[i + 1][0], hull_points[i + 1][1], 0.5)
             angle = co.calc_angle_of_line_local(hull_points[i][0], hull_points[i][1],
                                                 hull_points[i + 1][0], hull_points[i + 1][1])
-            self.anchor = Vec2d(x, y)
+            self.anchor = co.Vec2d(x, y)
             self.street_angle = co.normal_degrees(angle + 90)
 
             # to get the width depth we must rotate the hull and then calculate the distance of the most distant points.
@@ -329,9 +328,9 @@ class Building(object):
             min_i = 0  # index position of the inner node
             min_o = 0  # index position of the outer node
             for i, node_i in enumerate(list(inner.coords)[:-1]):
-                node_i = Vec2d(node_i)
+                node_i = co.Vec2d(node_i)
                 for o in outer_nodes_avail:
-                    r = node_i.distance_to(Vec2d(self.pts_outer[o]))
+                    r = node_i.distance_to(co.Vec2d(self.pts_outer[o]))
                     if r <= min_r:
                         min_r = r
                         min_i = i
@@ -374,7 +373,7 @@ class Building(object):
         self.polygon = shg.Polygon(outer, inner)
         self.geometry = shg.Polygon(outer)
 
-    def _set_pts_all(self, cluster_offset: Vec2d) -> None:
+    def _set_pts_all(self, cluster_offset: co.Vec2d) -> None:
         """Given an cluster middle point changes all coordinates in x/y space."""
         self.pts_all = np.array(self.pts_outer + self.pts_inner)
         for i in range(self.pts_all_count):
@@ -385,7 +384,7 @@ class Building(object):
             self.roof_hint.inner_node = (self.roof_hint.inner_node[0] - cluster_offset.x,
                                          self.roof_hint.inner_node[1] - cluster_offset.y)
 
-    def set_ground_elev_and_offset(self, cluster_elev: float, cluster_offset: Vec2d) -> None:
+    def set_ground_elev_and_offset(self, cluster_elev: float, cluster_offset: co.Vec2d) -> None:
         """Sets the ground elevations as difference between real elevation and cluster elevation.
         Additionally it takes into consideration that the world is round.
         Also translates x/y coordinates"""
@@ -1035,7 +1034,7 @@ class Building(object):
                     prev_ref = self.refs[index - 1]
                 next_index = 0 if index == len(self.refs) - 1 else index + 1
                 if index == len(self.refs) - 1:
-                    next_ref= self.refs[0]
+                    next_ref = self.refs[0]
                 else:
                     next_ref = self.refs[index + 1]
                 corner_ref = self.refs[index]
@@ -1199,7 +1198,7 @@ class Building(object):
 
             p0 = (self.pts_all[0][0], self.pts_all[0][1])
             for i in range(0, len(self.pts_all)):
-                # compute coord in new referentiel
+                # compute coord in new referential
                 vecA = (self.pts_all[i][0] - p0[0], self.pts_all[i][1] - p0[1])
                 X2.append(vecA)
                 #
@@ -1251,7 +1250,7 @@ class Building(object):
                         temp_roof_height = calc_level_height_for_settlement_type(self.zone.settlement_type)
                     self.roof_height = temp_roof_height
 
-    def write_to_ac(self, ac_object: ac3d.Object, cluster_elev: float, cluster_offset: Vec2d,
+    def write_to_ac(self, ac_object: ac3d.Object, cluster_elev: float, cluster_offset: co.Vec2d,
                     roof_mgr: tex.RoofManager, face_mat_idx: int, roof_mat_idx: int,
                     stats: utilities.Stats) -> None:
         # get local medium ground elevation for each building
@@ -1355,7 +1354,7 @@ class Building(object):
 
     def _write_roof_for_ac(self, ac_object: ac3d.Object, index_first_node_in_ac_obj: int, roof_mgr: tex.RoofManager,
                            roof_mat_idx: int, facade_mat_idx: int,
-                           cluster_offset: Vec2d, stats: utilities.Stats) -> None:
+                           cluster_offset: co.Vec2d, stats: utilities.Stats) -> None:
         """Writes the roof vertices and faces to an ac3d object."""
         if self.roof_shape is enu.RoofShape.flat:
             roofs.flat(ac_object, index_first_node_in_ac_obj, self, roof_mgr, roof_mat_idx, stats)
@@ -1387,7 +1386,7 @@ class Building(object):
                     self.pts_all = np.array(roof_polygon_new.exterior.coords)[:-1]
                     self.polygon = roof_polygon_new  # needed to get correct .pts_all_count
                     # reset cluster offset as we are using translated clusters
-                    my_cluster_offset = Vec2d(0, 0)
+                    my_cluster_offset = co.Vec2d(0, 0)
             # -- pitched roof for exactly 4 ground nodes
             if self.pts_all_count == 4:
                 if self.roof_shape in [enu.RoofShape.gabled, enu.RoofShape.gambrel]:
@@ -1739,7 +1738,7 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: s
     return new_buildings
 
 
-def write(ac_file_name: str, buildings: List[Building], cluster_elev: float, cluster_offset: Vec2d,
+def write(ac_file_name: str, buildings: List[Building], cluster_elev: float, cluster_offset: co.Vec2d,
           roof_mgr: tex.RoofManager, stats: utilities.Stats) -> None:
     """Write buildings across LOD for given tile.
        While writing, accumulate some statistics (totals stored in global stats object, individually also in building).
@@ -1993,7 +1992,7 @@ class WorshipBuilding(object):
         angle_correction = 0
         if self.length_largest:
             angle_correction = 90
-        my_stg_mgr.add_object_shared(self.shared_model, Vec2d(self.lon, self.lat),
+        my_stg_mgr.add_object_shared(self.shared_model, co.Vec2d(self.lon, self.lat),
                                      self.elevation, self.angle - angle_correction)
 
 
@@ -2001,7 +2000,7 @@ _available_worship_buildings = [WorshipBuilding('big-church.ac', True, enu.Worsh
                                                 enu.ArchitectureStyle.romanesque, 1, 30., 26., 40., width_offset=5.5),
                                 WorshipBuilding('breton-church.ac', False, enu.WorshipBuildingType.church,
                                                 enu.ArchitectureStyle.unknown, 1, 50., 28., 43., length_offset=25.),
-                                #WorshipBuilding('Church_generic_twintower_oniondome.ac', False,
+                                # WorshipBuilding('Church_generic_twintower_oniondome.ac', False,
                                 #                enu.WorshipBuildingType.church,
                                 #                enu.ArchitectureStyle.unknown, 2, 22., 37., 34., width_offset=12.5),
                                 WorshipBuilding('church36m_blue.ac', False, enu.WorshipBuildingType.church,

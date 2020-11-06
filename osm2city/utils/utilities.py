@@ -27,7 +27,6 @@ from shapely.ops import unary_union
 import osm2city.utils.coordinates as co
 import osm2city.utils.log_helper as ulog
 import osm2city.utils.osmparser as op
-from osm2city.utils import vec2d as ve
 from osm2city import parameters
 
 
@@ -395,7 +394,7 @@ class FGElev(object):
         """Return elevation and ground solidness at (x,y). We try our cache first. Failing that, call Fgelev.
         Elevation is in meters as float. Solid is True, in water is False
         """
-        def really_probe(a_position: ve.Vec2d) -> Tuple[float, bool]:
+        def really_probe(a_position: co.Vec2d) -> Tuple[float, bool]:
             if not self.fgelev_pipe:
                 self._open_fgelev()
             if math.isnan(a_position.lon) or math.isnan(a_position.lat):
@@ -439,9 +438,9 @@ class FGElev(object):
             return 0, True
 
         if not is_global:
-            position = ve.Vec2d(self.coords_transform.to_global(position))
+            position = co.Vec2d(self.coords_transform.to_global(position))
         else:
-            position = ve.Vec2d(position[0], position[1])
+            position = co.Vec2d(position[0], position[1])
 
         self.record += 1
         if self._cache is None:

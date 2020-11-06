@@ -17,7 +17,7 @@ from osm2city.pySkeleton import polygon
 import osm2city.utils.log_helper as ulog
 from osm2city.types import osmstrings as s
 from osm2city.utils import utilities
-from osm2city.utils.vec2d import Vec2d
+from osm2city.utils.coordinates import Vec2d
 
 
 def myskel(out, b, stats: utilities.Stats, offset_xy=Vec2d(0, 0), offset_z=0., header=False, max_height=1e99) -> bool:

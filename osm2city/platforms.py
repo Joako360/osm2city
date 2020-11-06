@@ -13,9 +13,9 @@ from typing import List
 import shapely.geometry as shg
 
 from osm2city import parameters
-from osm2city.utils import utilities, ac3d, coordinates, osmparser
+from osm2city.utils import coordinates as co
+from osm2city.utils import utilities, ac3d, osmparser
 from osm2city.types import osmstrings as s
-from osm2city.utils.vec2d import Vec2d
 
 
 class Platform(object):
@@ -35,7 +35,7 @@ class Platform(object):
         if s.K_AREA in tags and tags[s.K_AREA] == s.V_YES and len(self.nodes) > 2:
             self.is_area = True
         self.line_string = shg.LineString(self.nodes)
-        self.anchor = Vec2d(self.nodes[0])
+        self.anchor = co.Vec2d(self.nodes[0])
 
     def write(self, fg_elev: utilities.FGElev, obj: ac3d.Object, offset) -> None:
         if self.is_area:
@@ -60,7 +60,8 @@ class Platform(object):
             e = fg_elev.probe_elev((p[0], p[1])) + 1
             obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
         top_nodes = np.arange(len(self.nodes))
-        self.segment_len = np.array([0] + [Vec2d(coord).distance_to(Vec2d(self.line_string.coords[i])) for i, coord in enumerate(self.line_string.coords[1:])])
+        self.segment_len = np.array([0] + [co.Vec2d(coord).distance_to(co.Vec2d(self.line_string.coords[i]))
+                                           for i, coord in enumerate(self.line_string.coords[1:])])
         rd_len = len(self.line_string.coords)
         self.dist = np.zeros((rd_len))
         for i in range(1, rd_len):
@@ -102,7 +103,8 @@ class Platform(object):
             obj.node(-p[1] + offset.y, e, -p[0] + offset.x)
         nodes_l = np.arange(len(left.coords))
         nodes_r = np.arange(len(right.coords))
-        self.segment_len = np.array([0] + [Vec2d(coord).distance_to(Vec2d(self.line_string.coords[i])) for i, coord in enumerate(self.line_string.coords[1:])])
+        self.segment_len = np.array([0] + [co.Vec2d(coord).distance_to(co.Vec2d(self.line_string.coords[i]))
+                                           for i, coord in enumerate(self.line_string.coords[1:])])
         rd_len = len(self.line_string.coords)
         self.dist = np.zeros((rd_len))
         for i in range(1, rd_len):
@@ -159,7 +161,7 @@ class Platform(object):
         obj.face(sideface)
 
 
-def process_osm_platform(my_coord_transformator: coordinates.Transformation) -> List[Platform]:
+def process_osm_platform(my_coord_transformator: co.Transformation) -> List[Platform]:
     osm_way_result = osmparser.fetch_osm_db_data_ways_key_values(["railway=>platform"])
     osm_nodes_dict = osm_way_result.nodes_dict
     osm_ways_dict = osm_way_result.ways_dict

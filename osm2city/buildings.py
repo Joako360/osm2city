@@ -25,12 +25,12 @@ from shapely.prepared import prep
 import numpy as np
 from osm2city import building_lib, prepare_textures, cluster, parameters
 import osm2city.textures.materials
+import osm2city.utils.coordinates as co
 import osm2city.utils.osmparser as op
-from osm2city.utils import utilities, coordinates, stg_io2
+from osm2city.utils import utilities, stg_io2
 from osm2city.owbb import plotting as p
 from osm2city.types import osmstrings as s
 from osm2city.types import enumerations as enu
-from osm2city.utils import vec2d as v
 
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
 
@@ -76,7 +76,7 @@ def _is_underground(tags: Dict[str, str]) -> bool:
 
 
 def _process_rectify_buildings(nodes_dict: Dict[int, op.Node], rel_nodes_dict: Dict[int, op.Node],
-                               ways_dict: Dict[int, op.Way], coords_transform: coordinates.Transformation) -> None:
+                               ways_dict: Dict[int, op.Way], coords_transform: co.Transformation) -> None:
     if not parameters.RECTIFY_ENABLED:
         return
 
@@ -150,7 +150,7 @@ def _process_rectify_buildings(nodes_dict: Dict[int, op.Node], rel_nodes_dict: D
 def _process_osm_relations(nodes_dict: Dict[int, op.Node], rel_ways_dict: Dict[int, op.Way],
                            relations_dict: Dict[int, op.Relation],
                            my_buildings: Dict[int, building_lib.Building],
-                           coords_transform: coordinates.Transformation) -> None:
+                           coords_transform: co.Transformation) -> None:
     """Adds buildings based on relation tags. There are two scenarios: multipolygon buildings and Simple3D tagging.
     Only multipolygon and simple 3D buildings are implemented currently. 
     The added buildings go into parameter my_buildings.
@@ -214,7 +214,7 @@ def _process_osm_relations(nodes_dict: Dict[int, op.Node], rel_ways_dict: Dict[i
 
 def _process_multipolygon_buildings(nodes_dict: Dict[int, op.Node], rel_ways_dict: Dict[int, op.Way],
                                     relation: op.Relation, my_buildings: Dict[int, building_lib.Building],
-                                    coords_transform: coordinates.Transformation) -> int:
+                                    coords_transform: co.Transformation) -> int:
     """Processes the members in a multipolygon relationship. Returns the number of buildings actually created.
     If there are several members of type 'outer', then multiple buildings are created.
     Also, tif there are several 'outer', then these buildings are combined in a parent.
@@ -324,7 +324,7 @@ def _process_simple_3d_building(relation: op.Relation, my_buildings: Dict[int, b
 
 def _process_building_parts(nodes_dict: Dict[int, op.Node],
                             my_buildings: Dict[int, building_lib.Building],
-                            coords_transform: coordinates.Transformation) -> None:
+                            coords_transform: co.Transformation) -> None:
     """Process building parts, for which there is no relationship tagging and therefore there might be overlaps.
     I.e. methods related to _process_osm_relation do not help. Therefore some brute force searching is needed.
     """
@@ -561,9 +561,9 @@ def process_building_loose_parts(nodes_dict: Dict[int, op.Node], my_buildings: L
                 node_0 = nodes_dict[common_refs[0]]
                 node_1 = nodes_dict[common_refs[1]]
                 node_2 = nodes_dict[common_refs[2]]
-                len_side_1 = coordinates.calc_distance_global(node_0.lon, node_0.lat, node_1.lon, node_1.lat)
-                len_side_2 = coordinates.calc_distance_global(node_1.lon, node_1.lat, node_2.lon, node_2.lat)
-                len_side_3 = coordinates.calc_distance_global(node_2.lon, node_2.lat, node_0.lon, node_0.lat)
+                len_side_1 = co.calc_distance_global(node_0.lon, node_0.lat, node_1.lon, node_1.lat)
+                len_side_2 = co.calc_distance_global(node_1.lon, node_1.lat, node_2.lon, node_2.lat)
+                len_side_3 = co.calc_distance_global(node_2.lon, node_2.lat, node_0.lon, node_0.lat)
                 if len_side_1 > 2 and len_side_2 > 2 and len_side_3 > 2:
                     new_relationship = True
             if new_relationship:
@@ -584,7 +584,7 @@ def process_building_loose_parts(nodes_dict: Dict[int, op.Node], my_buildings: L
 
 
 def _process_osm_buildings(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, op.Way],
-                           coords_transform: coordinates.Transformation) -> Dict[int, building_lib.Building]:
+                           coords_transform: co.Transformation) -> Dict[int, building_lib.Building]:
     my_buildings = dict()
     clipping_border = shg.Polygon(parameters.get_clipping_border())
 
@@ -613,7 +613,7 @@ def _process_osm_buildings(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, 
 
 
 def _make_building_from_way(nodes_dict: Dict[int, op.Node], all_tags: Dict[str, str], way: op.Way,
-                            coords_transform: coordinates.Transformation,
+                            coords_transform: co.Transformation,
                             inner_ways: List[op.Way] = None) -> Optional[building_lib.Building]:
     if way.refs[0] == way.refs[-1]:
         way.refs = way.refs[0:-1]  # -- kick last ref if it coincides with first
@@ -656,7 +656,7 @@ def _clean_building_zones_dangling_children(my_buildings: List[building_lib.Buil
 
 
 def _write_obstruction_lights(path: str, file_name: str,
-                              the_buildings: List[building_lib.Building], cluster_offset: v.Vec2d) -> bool:
+                              the_buildings: List[building_lib.Building], cluster_offset: co.Vec2d) -> bool:
     """Add obstruction lights on top of high buildings. Return true if at least one obstruction light is added."""
     models_list = list()  # list of strings
     for b in the_buildings:
@@ -691,8 +691,8 @@ def _write_obstruction_lights(path: str, file_name: str,
         return False
 
 
-def construct_buildings_from_osm(coords_transform: coordinates.Transformation) -> Tuple[List[building_lib.Building],
-                                                                                        Dict[int, op.Node]]:
+def construct_buildings_from_osm(coords_transform: co.Transformation) -> Tuple[List[building_lib.Building],
+                                                                               Dict[int, op.Node]]:
     osm_read_results = op.fetch_osm_db_data_ways_keys([s.K_BUILDING, s.K_BUILDING_PART])
     osm_read_results = op.fetch_osm_db_data_relations_buildings(osm_read_results)
     osm_nodes_dict = osm_read_results.nodes_dict
@@ -732,7 +732,7 @@ def construct_buildings_from_osm(coords_transform: coordinates.Transformation) -
     return list(the_buildings.values()), osm_nodes_dict
 
 
-def _debug_building_list_lsme(coords_transform: coordinates.Transformation, file_writer, list_elev: float) -> None:
+def _debug_building_list_lsme(coords_transform: co.Transformation, file_writer, list_elev: float) -> None:
     """Writes a set of list buildings for debugging purposes.
 
     Should be called at end of with file handler in  write_buildings_in_list.
@@ -740,7 +740,7 @@ def _debug_building_list_lsme(coords_transform: coordinates.Transformation, file
     The buildings are added from North along the Southern side of the runway at LSME ca. 30m from the runway.
     """
     anchor = coords_transform.to_local((8.3125, 47.0975))
-    elev = 427 - list_elev - coordinates.calc_horizon_elev(anchor[0], anchor[1])
+    elev = 427 - list_elev - co.calc_horizon_elev(anchor[0], anchor[1])
     street_angle = 120
     list_type = building_lib.BuildingListType.small
     line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-anchor[1], anchor[0], elev, street_angle, list_type.value)
@@ -928,7 +928,7 @@ def _debug_building_list_lsme(coords_transform: coordinates.Transformation, file
     file_writer.write('\n')
 
 
-def write_buildings_in_lists(coords_transform: coordinates.Transformation,
+def write_buildings_in_lists(coords_transform: co.Transformation,
                              list_buildings: Dict[building_lib.Building, building_lib.BuildingListType],
                              stg_manager: stg_io2.STGManager,
                              stats: utilities.Stats) -> None:
@@ -951,7 +951,7 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
     try:
         with open(os.path.join(path_to_stg, file_shader), 'w') as shader:
             for b, list_type in list_buildings.items():
-                elev = b.ground_elev - list_elev - coordinates.calc_horizon_elev(b.anchor.x, b.anchor.y)
+                elev = b.ground_elev - list_elev - co.calc_horizon_elev(b.anchor.x, b.anchor.y)
                 line = '{:.1f} {:.1f} {:.1f} {:.0f} {}'.format(-b.anchor.y, b.anchor.x, elev, b.street_angle,
                                                                list_type.value)
                 b.compute_roof_height(True)
@@ -995,15 +995,15 @@ def write_buildings_in_lists(coords_transform: coordinates.Transformation,
     stats.random_buildings = len(list_buildings)
 
 
-def write_buildings_in_meshes(coords_transform: coordinates.Transformation,
+def write_buildings_in_meshes(coords_transform: co.Transformation,
                               mesh_buildings: List[building_lib.Building],
                               stg_manager: stg_io2.STGManager,
                               stats: utilities.Stats) -> None:
     # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
     cmin, cmax = parameters.get_extent_global()
     logging.info("min/max " + str(cmin) + " " + str(cmax))
-    lmin = v.Vec2d(coords_transform.to_local(cmin))
-    lmax = v.Vec2d(coords_transform.to_local(cmax))
+    lmin = co.Vec2d(coords_transform.to_local(cmin))
+    lmax = co.Vec2d(coords_transform.to_local(cmax))
 
     handled_clusters = list()  # cluster.ClusterContainer objects
     clusters_building_mesh_detailed = cluster.ClusterContainer(lmin, lmax,
@@ -1044,8 +1044,8 @@ def write_buildings_in_meshes(coords_transform: coordinates.Transformation,
                 max_x = max(max_x, b.anchor.x)
                 max_y = max(max_y, b.anchor.y)
             cluster_elev = (max_elevation - min_elevation) / 2 + min_elevation
-            cluster_offset = v.Vec2d((max_x - min_x) / 2 + min_x, (max_y - min_y) / 2 + min_y)
-            center_global = v.Vec2d(coords_transform.to_global((cluster_offset.x, cluster_offset.y)))
+            cluster_offset = co.Vec2d((max_x - min_x) / 2 + min_x, (max_y - min_y) / 2 + min_y)
+            center_global = co.Vec2d(coords_transform.to_global((cluster_offset.x, cluster_offset.y)))
             logging.debug("Cluster center -> elevation: %d, position: %s", cluster_elev, cluster_offset)
 
             file_name = stg_manager.prefix + "b" + str(handled_index) + "%i%i" % (cl.grid_index.ix,
@@ -1070,7 +1070,7 @@ def write_buildings_in_meshes(coords_transform: coordinates.Transformation,
     logging.info("Total number of buildings written to a cluster *.ac files: %d", total_buildings_written)
 
 
-def process_buildings(coords_transform: coordinates.Transformation, fg_elev: utilities.FGElev,
+def process_buildings(coords_transform: co.Transformation, fg_elev: utilities.FGElev,
                       blocked_apt_areas: List[shg.Polygon], stg_entries: List[stg_io2.STGEntry],
                       the_buildings: List[building_lib.Building],
                       file_lock: mp.Lock = None) -> None:

@@ -27,7 +27,7 @@ from typing import Dict, List, Tuple
 from osm2city import parameters
 import osm2city.utils.json_io as jio
 from osm2city.utils.utilities import FGElev, get_osm2city_directory
-from osm2city.utils.vec2d import Vec2d
+from osm2city.utils.coordinates import Vec2d
 import osm2city.utils.stg_io2 as stg
 
 MODEL_LIBRARY = "library.txt"

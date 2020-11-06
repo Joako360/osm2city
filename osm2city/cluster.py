@@ -17,7 +17,7 @@ import os
 from osm2city import parameters
 import osm2city.utils.log_helper as ulog
 import osm2city.utils.utilities
-from osm2city.utils.vec2d import Vec2d
+from osm2city.utils.coordinates import Vec2d
 from osm2city.utils.stg_io2 import STGVerbType
 
 
