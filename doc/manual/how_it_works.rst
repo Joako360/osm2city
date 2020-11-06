@@ -155,35 +155,3 @@ Aerodromes
 Data for runways and helipads are depending on parameters read from the ``apt.dat file`` in ``$FG_ROOT/Airports/apt.dat.gz`` or directly from btg-files. This information is used to avoid having crossing OSM roads to be visible and potentially creating a considerable bump when a plane rolls over.
 
 Data for airport boundaries are also read from the ``apt.dat`` file (not all airports have information about boundaries). This data is then merged with OSM data for ``aeroway=aerodrome`` (again not all airports might be modelled with a zone). The resulting land-use is making sure that buildings within these zones will look more like airport buildings: using flat roofs (unless the roof type is explicitly modelled in OSM) and using a modern facade texture. Also: no buildings are generated inside zones for aerodromes.
-
-------------------------
-FGData Effects and Stuff
-------------------------
-
-``osm2city`` has dependencies in FGData for effects etc. to work. This means that changes in those parts might break osm2city — and osm2city might not work correctly if new features disregard those dependencies.
-
-* fgdata/Textures/osm2city/ contains the texture atlas for road and facades including the respective lightmaps.
-* fgdata/Textures/ has buildings-lightmap.png and the related lightmap, which are used for list based shader buildings.
-* fgdata/Shaders/road-ALS-ultra.frag: mapping with road texture, generates traffic and night lighting etc.
-* fgdata/Shaders/urban-ALS.frag and urban.frag
-* fgdata/Shaders/building-*.vert
-* fgdata/Effects/cityLM.eff: lightmap for facades texture atlas (so there is no need for xml-files wrapping the ac-file containing the meshes)
-* fgdata/Effects/road.eff: road and traffic effect incl. snow
-* fgdata/Effects/urban.eff: incl. snow for osm-buildings
-
---------
-Textures
---------
-
-On 12 May 2020 Stuart Buchanan wrote:
-
-Just to document what we discussed:
-
-#. Creating a new texture atlas is fine. Keeping it to 4K x 4K would be better than 8K x 8K as some older graphics cards may not support it.
-#. Creating and referencing a new file is fine - we can put the new BUILDING_LIST buildings and the new texture atlas in a new scenery directory to avoid compatibility issues.
-#. Using a transparent texture and underlying model colours is very bad for performance, unless you use a shader, which you want to avoid.
-#. If you use a separate texture for the walls compared with the roof you should try to create a series of big objects containing all the walls or roofs for multiple buildings, as the .ac format only supports a single texture per object. Bigger objects are better for graphics cards.
-
-On 16 May 2020 Rick wrote:
-
-Wouldn't it be better, if the files would reside in TerraSync/Models instead? Then the newest would always be available even for older FG versions -> the atlas could evolve as intended with no version compatibility issues of scenery generated. The only guarantee would have to be that the pods in the atlas always would have to be reserved for the same thing (geometry, properties, etc).
