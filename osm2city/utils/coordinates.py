@@ -4,15 +4,6 @@ Transform global (aka geodetic) coordinates to a local cartesian, in meters.
 A flat earth approximation (http://williams.best.vwh.net/avform.htm) seems good
 enough if distances are up to a few km.
 
-Alternatively, use UTM, but that fails if the origin is near an UTM zone boundary.
-Also, this requires the utm python package (pip install utm).
-
-The correct approach, though, is probably to do exactly what FG does, which I think is
-- transform geodetic to geocentric coordinates (find a python lib for that)
-- from there, compute the (geocentric) Cartesian coordinates as described here:
-    http://www.flightgear.org/Docs/Scenery/CoordinateSystem/CoordinateSystem.html
-- project them onto local Cartesian (including correct up vector etc)
-
 Created on Sat Jun  7 22:38:59 2014
 @author: albrecht
 
@@ -49,26 +40,16 @@ Created on Sat Jun  7 22:38:59 2014
 # These approximations fail in the vicinity of either pole and at large 
 # distances. The fractional errors are of order (distance/R)^2.
 
-See also:
-    http://wiki.flightgear.org/Geographic_Coordinate_Systems
-
-    https://projectionwizard.org/ proposes for 1x1 degree large scale maps:
-    +proj=tmerc +x_0=500000 +lon_0=-146.5 +k_0=0.9999 +datum=WGS84 +units=m +no_defs
-    where -146.5 in this case is the midpoint of -147E/-146E (somewhere in Alaska)
-
-    https://epsg.org
-    https://en.wikipedia.org/wiki/Transverse_Mercator_projection
-    UTM: https://en.wikipedia.org/wiki/Universal_Transverse_Mercator_coordinate_system
-    https://en.wikipedia.org/wiki/Map_projection
-    EPSG:4326: https://en.wikipedia.org/wiki/World_Geodetic_System
 """
 
-from math import asin, atan2, sin, cos, sqrt, radians, degrees, pi, fabs
+from math import asin, atan2, sin, cos, sqrt, radians, degrees, pi, fabs, floor
 import logging
 from typing import Tuple
 import unittest
 
 import numpy as np
+import pyproj
+from pyproj.enums import TransformDirection
 
 
 class Vec2d(object):
@@ -175,6 +156,21 @@ class Vec2d(object):
         return atan2(self.y, self.x)
 
 
+def _convert_wgs_to_utm(lon, lat):
+    """Get the EPSG code for a UTM projection based on lon/lat.
+
+    From: https://gis.stackexchange.com/questions/269518/auto-select-suitable-utm-zone-based-on-grid-intersection
+    """
+    utm_band = str((floor((lon + 180) / 6) % 60) + 1)
+    if len(utm_band) == 1:
+        utm_band = '0'+utm_band
+    if lat >= 0:
+        epsg_code = '326' + utm_band
+    else:
+        epsg_code = '327' + utm_band
+    return epsg_code
+
+
 NAUTICAL_MILES_METERS = 1852
 
 # from WGS84. See simgear/math/SGGeodesy.cxx
@@ -188,17 +184,52 @@ E4 = E2 * E2
 
 
 class Transformation(object):
-    """global <-> local coordinate system transformation, using flat earth approximation
-       http://williams.best.vwh.net/avform.htm#flat
+    """Global <-> local coordinate system transformation, using flat earth approximation
+
+    See explanation in module header. The non-approximations using projections instead of the approximation
+    result actually in worse placing of e.g. cables and roads relative to the BTG-stuff and the pylons
+    if run near LSME and following e.g. a railroad towards north/tilde edge.
+
+
+    UTM fails typically if the origin is near an UTM zone boundary.
+
+    The correct approach, though, is probably to do exactly what FG does, and is used in btg_io.py.
+    However that projection would then have to be reprojected to cartesian flat somehow.
+
+    See also:
+    http://wiki.flightgear.org/Geographic_Coordinate_Systems
+
+    https://projectionwizard.org/ proposes for 1x1 degree large scale maps:
+    +proj=tmerc +x_0=500000 +lon_0=-146.5 +k_0=0.9999 +datum=WGS84 +units=m +no_defs
+    where -146.5 in this case is the midpoint of -147E/-146E (somewhere in Alaska)
+
+    https://epsg.org
+    https://en.wikipedia.org/wiki/Transverse_Mercator_projection
+    UTM: https://en.wikipedia.org/wiki/Universal_Transverse_Mercator_coordinate_system
+    https://en.wikipedia.org/wiki/Map_projection
+    EPSG:4326: https://en.wikipedia.org/wiki/World_Geodetic_System
+
     """
-    def __init__(self, lon_lat=(0, 0), hdg=0):
+    def __init__(self, lon_lat=(0, 0), use_approximation: bool = True):
         (lon, lat) = lon_lat
-        if hdg != 0.:
-            logging.error("heading != 0 not yet implemented.")
-            raise NotImplemented
         self._lon = lon
         self._lat = lat
-        self._update()
+        self.trans_proj = None
+        self.approximation = use_approximation
+        if self.approximation:
+            self._update()
+        else:
+            out_projection = 'tcea'  # equi-area; tmerc: conformal
+            self.trans_proj = pyproj.Transformer.from_crs('EPSG:4326',
+                                                          {'proj': out_projection,
+                                                           'x_0': '500000.0',
+                                                           'lon_0': str(self._lon),
+                                                           'lat_0': str(self._lat),
+                                                           'k_0': '0.9999',
+                                                           'datum': 'WGS84'},
+                                                          always_xy=True)
+            # utm_code = _convert_wgs_to_utm(self._lon, self._lat)
+            # _ = pyproj.Transformer.from_crs('EPSG:4326', 'EPSG:{0}'.format(utm_code), always_xy=True)
 
     @property
     def anchor(self) -> Vec2d:
@@ -221,15 +252,21 @@ class Transformation(object):
     def to_local(self, coord_tuple: Tuple[float, float]) -> Tuple[float, float]:
         """transform global -> local coordinates"""
         (lon, lat) = coord_tuple
-        y = self._R1 * radians(lat - self._lat)
-        x = self._R2 * radians(lon - self._lon) * self._coslat
+        if self.approximation:
+            y = self._R1 * radians(lat - self._lat)
+            x = self._R2 * radians(lon - self._lon) * self._coslat
+        else:
+            x, y = self.trans_proj.transform(lon, lat, radians=False)
         return x, y
 
     def to_global(self, coord_tuple: Tuple[float, float]) -> Tuple[float, float]:
         """transform local -> global coordinates"""
         (x, y) = coord_tuple
-        lat = degrees(y / self._R1) + self._lat
-        lon = degrees(x / (self._R2 * self._coslat)) + self._lon
+        if self.approximation:
+            lat = degrees(y / self._R1) + self._lat
+            lon = degrees(x / (self._R2 * self._coslat)) + self._lon
+        else:
+            lon, lat = self.trans_proj.transform(x, y, radians=False, direction=TransformDirection.INVERSE)
         return lon, lat
 
     def __str__(self):
@@ -561,3 +598,27 @@ class TestCoordinates(unittest.TestCase):
         elev_1 = calc_horizon_elev(2000, 2000)
         elev_2 = calc_horizon_elev(2000, 0)
         self.assertGreater(elev_1, elev_2)
+
+
+if __name__ == '__main__':
+    my_lon = 24
+    my_lat = 70
+    centre = (my_lon + 0.125, my_lat + 0.125)
+    approx_trans = Transformation(centre, True)
+    real_trans = Transformation(centre, False)
+    for trans in [approx_trans, real_trans]:
+        lon_lat_1 = (my_lon, my_lat)
+        x_y_1 = trans.to_local(lon_lat_1)
+        print('1', x_y_1)
+        lon_lat_2 = (my_lon, my_lat + 0.25)
+        x_y_2 = trans.to_local(lon_lat_2)
+        print('2', x_y_2)
+        dist = calc_distance_local(x_y_1[0], x_y_1[1], x_y_2[0], x_y_2[1])
+        print('Dist 1->2:', dist)
+        lon_lat_3 = (my_lon + 0.25, my_lat)
+        x_y_3 = trans.to_local(lon_lat_3)
+        print('3', x_y_3)
+        dist = calc_distance_local(x_y_1[0], x_y_1[1], x_y_3[0], x_y_3[1])
+        print('Dist 1->3:', dist)
+        lon_lat_back = trans.to_global(x_y_3)
+        print('3 back', lon_lat_back)

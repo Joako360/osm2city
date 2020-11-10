@@ -46,13 +46,13 @@ class Cluster(object):
 
 
 class ClusterContainer(object):
-    """A container for clusters. Initially each cluster is part of a grid of size parameters.TILE_SIZE"""
+    """A container for clusters. Initially each cluster is part of a grid of size parameters.CLUSTER_DIMENSION"""
     def __init__(self, min_point: Vec2d, max_point: Vec2d,
                  stg_verb_type: STGVerbType = STGVerbType.object_static) -> None:
         self.max = max_point
         self.min = min_point
         delta = max_point - min_point  # Vec2d
-        self.size = parameters.TILE_SIZE
+        self.size = parameters.CLUSTER_DIMENSION
         max_grid_x = int(delta.x // self.size + 1)
         max_grid_y = int(delta.y // self.size + 1)
         self.max_grid = GridIndex(max_grid_x, max_grid_y)

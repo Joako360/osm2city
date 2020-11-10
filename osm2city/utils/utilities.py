@@ -537,6 +537,11 @@ def check_boundary(boundary_west: float, boundary_south: float,
     if boundary_south >= boundary_north:
         raise BoundaryError("Boundary South {} must be smaller than North {} -> aborting!".format(boundary_south,
                                                                                                   boundary_north))
+    # make sure that we are within safe latitude for calculations
+    # in FG when tile span more than 1 deg it can get tricky -> http://wiki.flightgear.org/Tile_Index_Scheme
+    # For most map projection the farther to the north the more tricky.
+    if boundary_north > 83 or math.fabs(boundary_south) > 83:
+        raise BoundaryError('Latitudes must be less than 83 N / 83 S')
 
 
 def bounds_from_list(bounds_list: List[Tuple[float, float, float, float]]) -> Tuple[float, float, float, float]:
