@@ -37,13 +37,13 @@ class Platform(object):
         self.line_string = shg.LineString(self.nodes)
         self.anchor = co.Vec2d(self.nodes[0])
 
-    def write(self, fg_elev: utilities.FGElev, obj: ac3d.Object, offset) -> None:
+    def write(self, fg_elev: utilities.FGElev, obj: ac3d.Object, offset: co.Vec2d) -> None:
         if self.is_area:
             self._write_area(fg_elev, obj, offset)
         else:
             self._write_line(fg_elev, obj, offset)
 
-    def _write_area(self, fg_elev: utilities.FGElev, obj: ac3d.Object, offset) -> None:
+    def _write_area(self, fg_elev: utilities.FGElev, obj: ac3d.Object, offset: co.Vec2d) -> None:
         """Writes a platform mapped as an area"""
         if len(self.nodes) < 3:
             logging.debug('ERROR: platform with osm_id=%d cannot created due to less then 3 nodes', self.osm_id)
@@ -85,7 +85,7 @@ class Platform(object):
             sideface.append((n + o - 1, x, 0.5))
             obj.face(sideface)
 
-    def _write_line(self, fg_elev: utilities.FGElev, obj, offset) -> None:
+    def _write_line(self, fg_elev: utilities.FGElev, obj, offset: co.Vec2d) -> None:
         """Writes a platform as a area which only is mapped as a line"""
         o = obj.next_node_index()
         left = self.line_string.parallel_offset(2, 'left', resolution=8, join_style=1, mitre_limit=10.0)

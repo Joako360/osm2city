@@ -58,13 +58,13 @@ class Pier(object):
             and self.nodes[0][0] == self.nodes[(length - 1)][0] \
             and self.nodes[0][1] == self.nodes[(length - 1)][1]
 
-    def write(self, obj: ac3d.Object, offset):
+    def write(self, obj: ac3d.Object, offset: co.Vec2d):
         if self.handle_as_area:
             self._write_pier_area(obj, offset)
         else:
             self._write_pier_line(obj, offset)
 
-    def _write_pier_area(self, obj: ac3d.Object, offset) -> None:
+    def _write_pier_area(self, obj: ac3d.Object, offset: co.Vec2d) -> None:
         """Writes a Pier mapped as an area"""
         if len(self.nodes) < 3:
             logging.debug('ERROR: platform with osm_id=%d cannot created due to less then 3 nodes', self.osm_id)
@@ -109,7 +109,7 @@ class Pier(object):
             sideface.append((n + o - 1, x, 0.5))
             obj.face(sideface)
 
-    def _write_pier_line(self, obj, offset):
+    def _write_pier_line(self, obj, offset: co.Vec2d):
         """Writes a Pier as a area which only is mapped as a line."""
         line_string = shg.LineString(self.nodes)
         o = obj.next_node_index()

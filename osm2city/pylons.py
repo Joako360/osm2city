@@ -1449,62 +1449,38 @@ def distribute_way_segments_to_clusters(lines: List[Line], cluster_container: cl
 
 def write_cable_clusters(cluster_container: cluster.ClusterContainer, coords_transform: co.Transformation,
                          my_stg_mgr: stg_io2.STGManager, details: bool = False) -> None:
-    cluster_index = 0
-    for ic, cl in enumerate(cluster_container):
-        cluster_index += 1
-        if not cl.objects:
-            continue
+    for cl in cluster_container:
+        if cl.objects:
+            center_tile = co.Vec2d(coords_transform.to_global(cl.center))
+            cluster_filename = parameters.PREFIX
+            # it is important to have the ac-file names for cables different in "Pylons" and "Details/Objects",
+            # because otherwise FG does not know which information to take from which stg-files, which results
+            # in that e.g. the ac-file is taken from the Pylons stg - but the lat/lon/angle from the
+            # "Details/Objects" stg-file.
+            if details:
+                cluster_filename += 'd'
+            cluster_filename += "c%i%i.ac" % (cl.grid_index.ix, cl.grid_index.iy)
+            path_to_stg = my_stg_mgr.add_object_static(cluster_filename + '.ac', center_tile, 0, 90,
+                                                       cluster_container.stg_verb_type)
 
-        # first do some min/max calculation to be able to center the mesh
-        elevation_min = 10000
-        elevation_max = -10000
-        x_min = 1000000000
-        x_max = -1000000000
-        y_min = 1000000000
-        y_max = -1000000000
-        for way_segment in cl.objects:
-            elevation_min = min(elevation_min, way_segment.start_pylon.elevation, way_segment.end_pylon.elevation)
-            elevation_max = max(elevation_max, way_segment.start_pylon.elevation, way_segment.end_pylon.elevation)
-            x_min = min(x_min, way_segment.start_pylon.x, way_segment.end_pylon.x)
-            x_max = max(x_max, way_segment.start_pylon.x, way_segment.end_pylon.x)
-            y_min = min(y_min, way_segment.start_pylon.y, way_segment.end_pylon.y)
-            y_max = max(y_max, way_segment.start_pylon.y, way_segment.end_pylon.y)
+            ac_file_lines = list()
+            ac_file_lines.append("AC3Db")
+            ac_file_lines.append(
+                'MATERIAL "cable" rgb 0.3 0.3 0.3 amb 0.3 0.3 0.3 emis 0.0 0.0 0.0 spec 0.3 0.3 0.3 shi 100 trans 0')
+            ac_file_lines.append("OBJECT world")
+            ac_file_lines.append("kids " + str(len(cl.objects)))
+            segment_index = 0
+            for way_segment in cl.objects:
+                segment_index += 1
+                ac_file_lines.append("OBJECT group")
+                ac_file_lines.append('name "segment%05d"' % segment_index)
+                ac_file_lines.append("kids " + str(len(way_segment.cables)))
+                for cable in way_segment.cables:
+                    cable.translate_vertices_relative(cl.center.x, cl.center.y, 0)
+                    ac_file_lines.append(cable.make_ac_entry(0))  # material is 0-indexed
 
-        # now write the mesh into files
-        cluster_x = x_max - (x_max - x_min)/2.0
-        cluster_y = y_max - (y_max - y_min)/2.0
-        cluster_elevation = elevation_max - (elevation_max - elevation_min)/2.0
-        center_global = coords_transform.to_global((cluster_x, cluster_y))
-        cluster_filename = parameters.PREFIX
-        # it is important to have the ac-file names for cables different in "Pylons" and "Details/Objects",
-        # because otherwise FG does not know which information to take from which stg-files, which results
-        # in that e.g. the ac-file is taken from the Pylons stg - but the lat/lon/angle from the
-        # "Details/Objects" stg-file.
-        if details:
-            cluster_filename += 'd'
-        cluster_filename += 'c%02i' % cluster_index
-        path_to_stg = my_stg_mgr.add_object_static(cluster_filename + '.ac',
-                                                   co.Vec2d(center_global[0], center_global[1]),
-                                                   cluster_elevation, 90, cluster_container.stg_verb_type)
-
-        ac_file_lines = list()
-        ac_file_lines.append("AC3Db")
-        ac_file_lines.append(
-            'MATERIAL "cable" rgb 0.3 0.3 0.3 amb 0.3 0.3 0.3 emis 0.0 0.0 0.0 spec 0.3 0.3 0.3 shi 100 trans 0')
-        ac_file_lines.append("OBJECT world")
-        ac_file_lines.append("kids " + str(len(cl.objects)))
-        segment_index = 0
-        for way_segment in cl.objects:
-            segment_index += 1
-            ac_file_lines.append("OBJECT group")
-            ac_file_lines.append('name "segment%05d"' % segment_index)
-            ac_file_lines.append("kids " + str(len(way_segment.cables)))
-            for cable in way_segment.cables:
-                cable.translate_vertices_relative(cluster_x, cluster_y, cluster_elevation)
-                ac_file_lines.append(cable.make_ac_entry(0))  # material is 0-indexed
-
-                with open(os.path.join(path_to_stg, cluster_filename + ".ac"), 'w') as f:
-                    f.write("\n".join(ac_file_lines))
+            with open(os.path.join(path_to_stg, cluster_filename + ".ac"), 'w') as f:
+                f.write("\n".join(ac_file_lines))
 
 
 def write_stg_entries_pylons_for_line(my_stg_mgr, lines_list: List[Line]) -> None:
