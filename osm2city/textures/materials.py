@@ -19,12 +19,8 @@ osm2city only supports the following two keys (cf. method screen_osm_keys_for_co
 
 Then again "gray" is used instead of "grey" due to W3C naming.
 
-From version FIXME of FlightGear roof and facade textures will be partly transparent and therefore the colour is
-taken more or less directly from the OSM tagging. I.e. the colour of a facade / roof is determined by the shader,
-which multiplies the surface colour value in AC3D (based on material) with the texture colour value.
-A colour value of white will result in no change to the texture's colour value.
-
 """
+from enum import IntEnum
 import logging
 from typing import Dict, List
 import unittest
@@ -43,40 +39,32 @@ def screen_texture_tags_for_colour_spelling(original: str) -> str:
         return original
 
 
-OSM_MATERIAL_KEY_MAPPING = [('building:color', s.K_BUILDING_COLOUR),
-                            ('building:facade:color', s.K_BUILDING_COLOUR),
-                            ('building:facade:colour', s.K_BUILDING_COLOUR),
-                            ('wall:colour', s.K_BUILDING_COLOUR),
-                            ('wall:color', s.K_BUILDING_COLOUR),
-                            ('building:colour_1', s.K_BUILDING_COLOUR),
-                            ('roof:color', s.K_ROOF_COLOUR),
-                            ('building:roof:color', s.K_ROOF_COLOUR),
-                            ('building:roof:colour', s.K_ROOF_COLOUR),
-                            ('roof:colour_1', s.K_ROOF_COLOUR),
-                            ('building:facade:material', s.K_BUILDING_MATERIAL),
-                            ('building:roof:material', s.K_ROOF_MATERIAL)
-                            ]
+_OSM_MATERIAL_KEY_MAPPING = [('building:color', s.K_BUILDING_COLOUR),
+                             ('building:facade:color', s.K_BUILDING_COLOUR),
+                             ('building:facade:colour', s.K_BUILDING_COLOUR),
+                             ('wall:colour', s.K_BUILDING_COLOUR),
+                             ('wall:color', s.K_BUILDING_COLOUR),
+                             ('building:colour_1', s.K_BUILDING_COLOUR),
+                             ('roof:color', s.K_ROOF_COLOUR),
+                             ('building:roof:color', s.K_ROOF_COLOUR),
+                             ('building:roof:colour', s.K_ROOF_COLOUR),
+                             ('roof:colour_1', s.K_ROOF_COLOUR),
+                             ('building:facade:material', s.K_BUILDING_MATERIAL),
+                             ('building:roof:material', s.K_ROOF_MATERIAL)
+                             ]
 
 
 def screen_osm_keys_for_colour_material_variants(tags: Dict[str, str]) -> None:
     """Makes sure colour and material is spelled correctly in key and reduces to known keys in osm2city.
     And for the correct ones it makes sure that the values are recognizable."""
-    for wrong, correct in OSM_MATERIAL_KEY_MAPPING:
+    for wrong, correct in _OSM_MATERIAL_KEY_MAPPING:
         if wrong in tags:
             if correct not in tags:
                 tags[correct] = tags[wrong]
             del (tags[wrong])
 
-    # now make sure that the values are correct
-    if parameters.FLAG_COLOUR_TEX:
-        if s.K_BUILDING_COLOUR in tags:
-            tags[s.K_BUILDING_COLOUR] = map_osm_colour_value_to_hex(tags[s.K_BUILDING_COLOUR], True)
-        if s.K_ROOF_COLOUR in tags:
-            tags[s.K_ROOF_COLOUR] = map_osm_colour_value_to_hex(tags[s.K_ROOF_COLOUR], True)
-
 
 def map_hex_colour(value):
-    # FIXME can be removed once textures are transparent without colour
     colour_map = {
                   "#000000": "black",
                   "#FFFFFF": "white",
@@ -107,7 +95,7 @@ def map_hex_colour(value):
     return value
 
 
-COLOUR_NAME_TO_HEX_MAP = {
+_COLOUR_NAME_TO_HEX_MAP = {
     # See https://www.w3.org/TR/css-color-3/#html4 16 basic colours.
     'black': '#000000',
     'silver': '#C0C0C0',
@@ -154,7 +142,7 @@ COLOUR_NAME_TO_HEX_MAP = {
 }
 
 
-def map_osm_colour_value_to_hex(colour_value: str, facade_colour: bool) -> str:
+def _map_osm_colour_value_to_hex(colour_value: str, facade_colour: bool) -> str:
     """Maps a colour value from OSM to a hex colour value.
 
     If the value cannot be interpreted, then a default colour based on parameters is used.
@@ -162,8 +150,8 @@ def map_osm_colour_value_to_hex(colour_value: str, facade_colour: bool) -> str:
     # make light_gray -> lightgray and remove #
     my_value = colour_value.replace('_', '').replace('#', '')
     # now let us see whether it can be interpreted as a known colour name
-    if my_value in COLOUR_NAME_TO_HEX_MAP:
-        return COLOUR_NAME_TO_HEX_MAP[my_value].upper()
+    if my_value in _COLOUR_NAME_TO_HEX_MAP:
+        return _COLOUR_NAME_TO_HEX_MAP[my_value].upper()
     # now try to interpret it as a hex value
     if len(my_value) == 3:  # transform abbreviated, three (hexadecimal)-digit
         my_value = my_value[0] + my_value[0] + my_value[1] + my_value[1] + my_value[2] + my_value[2]
@@ -182,35 +170,45 @@ def map_osm_colour_value_to_hex(colour_value: str, facade_colour: bool) -> str:
         return parameters.BUILDING_ROOF_DEFAULT_COLOUR
 
 
-def transform_hex_colour_int_rgb_values(hex_colour: str) -> List[int]:
+def _transform_hex_colour_int_rgb_values(hex_colour: str) -> List[int]:
     value = hex_colour.lstrip('#')
     return [int(value[i:i + 2], 16) for i in range(0, 6, 2)]
 
 
 # amb has to be 1 1 1 no matter the colour when textures are involved
-MATERIAL_FORMAT = ('MATERIAL "{0}" rgb {1:05.3f} {2:05.3f} {3:05.3f} amb 1 1 1 '  # {1:05.3f} {2:05.3f} {3:05.3f} '
-                   'emis 0 0 0 spec 0.0 0.0 0.0 shi 0 trans 0')
+_MATERIAL_FORMAT = ('MATERIAL "{0}" rgb {1:05.3f} {2:05.3f} {3:05.3f} amb {4:05.3f} {5:05.3f} {6:05.3f} '
+                    'emis 0 0 0 spec 0.0 0.0 0.0 shi {7} trans 0')
 
 
-def create_material(name: str, red: float, green: float, blue: float) -> str:
+def _create_material(name: str, red: float, green: float, blue: float, shi: int,
+                     ambient_as_colour: bool) -> str:
     """Creates a material line in AC3D format.
-    See also http://wiki.flightgear.org/AC_files:_Basic_changes_to_textures_and_colors#Textures"""
-    return MATERIAL_FORMAT.format(name, red, green, blue)
+    See also http://wiki.flightgear.org/AC_files:_Basic_changes_to_textures_and_colors#Textures.
+
+    A fabric like cloth might have a shi like 32, whereas polished steel might have > 100.
+    If something does not get a texture, then ambient should be like the colour.
+    """
+    if ambient_as_colour:
+        return _MATERIAL_FORMAT.format(name, red, green, blue, red, green, blue, shi)
+    return _MATERIAL_FORMAT.format(name, red, green, blue, 1., 1., 1., shi)
 
 
-def create_materials_list_from_hex_colours(hex_colours: Dict[str, int]) -> List[str]:
-    # FIXME: make sure that the sequence is absolutely correct as input
+class Material(IntEnum):
+    """Defines all available materials with the value being the index in a list.
+
+    The list is defined in method create_materials_list below and needs to be in sync.
+    """
+    default = 0
+    unlit = 0
+    lit = 1
+    cable = 2
+
+
+def create_materials_list() -> List[str]:
     materials_list = list()
-    for key, value in hex_colours.items():
-        rgb_int = transform_hex_colour_int_rgb_values(key)
-        materials_list.append(create_material(key, rgb_int[0] / 255, rgb_int[1] / 255, rgb_int[2] / 255))
-    return materials_list
-
-
-def create_materials_list_roads() -> List[str]:
-    materials_list = list()
-    materials_list.append(create_material('unlit', 0.0, 0.0, 0.0))
-    materials_list.append(create_material('lit', 1.0, 1.0, 1.0))
+    materials_list.append(_create_material(Material.unlit.name, 0., 0., 0., 0, False))
+    materials_list.append(_create_material(Material.lit.name, 1., 1., 1., 0, False))
+    materials_list.append(_create_material(Material.cable.name, .3, .3, .3, 100, True))
     return materials_list
 
 
@@ -226,18 +224,14 @@ class TestOSMParser(unittest.TestCase):
         self.assertEqual('stone', my_tags[s.K_ROOF_MATERIAL], 'original key replaced and value preserved')
 
     def test_map_osm_colour_value_to_hex(self):
-        self.assertEqual(map_osm_colour_value_to_hex('lightgray', True), '#D3D3D3', 'Direct name mapping')
-        self.assertEqual(map_osm_colour_value_to_hex('light_gray', True), '#D3D3D3', 'Name mapping with underscore')
-        self.assertEqual(map_osm_colour_value_to_hex('D3D3D3', True), '#D3D3D3', 'Valid hex without #')
-        self.assertEqual(map_osm_colour_value_to_hex('#D3D3D3', True), '#D3D3D3', 'Valid hex with #')
-        self.assertEqual(map_osm_colour_value_to_hex('#ABC', True), '#AABBCC', 'Valid 3-digit hex with #')
-        self.assertEqual(map_osm_colour_value_to_hex('', True), parameters.BUILDING_FACADE_DEFAULT_COLOUR, 'Empty')
-        self.assertEqual(map_osm_colour_value_to_hex('x', False), parameters.BUILDING_ROOF_DEFAULT_COLOUR, 'Not valid')
-
-    def test_create_material_(self):
-        black = 'MATERIAL "black" rgb 0.000 0.000 0.000 amb 0.000 0.000 0.000 spec 0.5 0.5 0.5 shi 64 trans 0'
-        self.assertEqual(black, create_material('black', 0.0, 0.0, 0.0))
+        self.assertEqual(_map_osm_colour_value_to_hex('lightgray', True), '#D3D3D3', 'Direct name mapping')
+        self.assertEqual(_map_osm_colour_value_to_hex('light_gray', True), '#D3D3D3', 'Name mapping with underscore')
+        self.assertEqual(_map_osm_colour_value_to_hex('D3D3D3', True), '#D3D3D3', 'Valid hex without #')
+        self.assertEqual(_map_osm_colour_value_to_hex('#D3D3D3', True), '#D3D3D3', 'Valid hex with #')
+        self.assertEqual(_map_osm_colour_value_to_hex('#ABC', True), '#AABBCC', 'Valid 3-digit hex with #')
+        self.assertEqual(_map_osm_colour_value_to_hex('', True), parameters.BUILDING_FACADE_DEFAULT_COLOUR, 'Empty')
+        self.assertEqual(_map_osm_colour_value_to_hex('x', False), parameters.BUILDING_ROOF_DEFAULT_COLOUR, 'Not valid')
 
     def test_transform_hex_colour_int_rgb_values(self):
-        self.assertEqual(0, transform_hex_colour_int_rgb_values('#000000')[0], 'black')
-        self.assertEqual(255, transform_hex_colour_int_rgb_values('ffffff')[0], 'white without #')
+        self.assertEqual(0, _transform_hex_colour_int_rgb_values('#000000')[0], 'black')
+        self.assertEqual(255, _transform_hex_colour_int_rgb_values('ffffff')[0], 'white without #')

@@ -7,6 +7,7 @@ import shapely.geometry as shg
 
 from osm2city import parameters, piers, platforms, pylons
 from osm2city.cluster import ClusterContainer
+from osm2city.textures import materials as mat
 from osm2city.types import osmstrings as s
 from osm2city.utils import coordinates as co
 from osm2city.utils import ac3d, utilities, stg_io2
@@ -49,7 +50,7 @@ def process_details(coords_transform: co.Transformation, lit_areas: Optional[Lis
             center_tile = co.Vec2d(coords_transform.to_global(cl.center))
             ac_file_name = "%sd%i%i.ac" % (parameters.PREFIX, cl.grid_index.ix, cl.grid_index.iy)
             ac = ac3d.File(stats=stats)
-            obj = ac.new_object('details', 'Textures/Terrain/asphalt.png', default_mat_idx=ac3d.MAT_IDX_UNLIT)
+            obj = ac.new_object('details', 'Textures/Terrain/asphalt.png', default_mat_idx=mat.Material.unlit.value)
             for detail in cl.objects[:]:
                 if isinstance(detail, piers.Pier):
                     detail.write(obj, cl.center)

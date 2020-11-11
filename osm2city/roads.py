@@ -72,10 +72,11 @@ import shapely.geometry as shg
 from osm2city import linear, parameters
 from osm2city.cluster import ClusterContainer
 import osm2city.textures.road
+from osm2city.textures import materials as mat
+from osm2city.types import osmstrings as s
 import osm2city.utils.osmparser as op
 from osm2city.utils import utilities, ac3d, graph, stg_io2
 import osm2city.utils.coordinates as co
-from osm2city.types import osmstrings as s
 
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 
@@ -1205,7 +1206,7 @@ def _process_clusters(clusters, fg_elev: utilities.FGElev,
         #    Write ac to file.
         ac = ac3d.File(stats=stats, show_labels=True)
         ac3d_obj = ac.new_object(file_name, 'Textures/osm2city/roads.png',
-                                 default_swap_uv=True, default_mat_idx=ac3d.MAT_IDX_UNLIT)
+                                 default_swap_uv=True, default_mat_idx=mat.Material.unlit.value)
         for rd in cl.objects:
             rd.write_to(ac3d_obj, fg_elev, cluster_elev, offset=offset_local)
 

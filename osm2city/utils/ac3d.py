@@ -6,15 +6,10 @@ import numpy as np
 from pyparsing import Literal, Word, alphas, Optional, OneOrMore, \
     Group, nums, Regex, alphanums, LineEnd, Each, ZeroOrMore
 
-import osm2city.textures.materials
+import osm2city.textures.materials as mat
 
 fmt_node = '%g'
 fmt_surf = '%1.4g'
-
-# The index position of material with regards to lighting etc. Needs to be in sync with File.__str__
-MAT_IDX_DEFAULT = 0
-MAT_IDX_UNLIT = 0
-MAT_IDX_LIT = 1
 
 
 class Node(object):
@@ -56,7 +51,8 @@ class Object(object):
     The default_mat 0 is for unlit objects and 1 is for lit objects -> cf. File.__str__
     """
     def __init__(self, name=None, stats=None, texture=None, texrep=None, texoff=None, rot=None, loc=None, crease=None,
-                 url=None, default_type=0x00, default_mat_idx: int=MAT_IDX_DEFAULT, default_swap_uv=False, kids=0):
+                 url=None, default_type=0x00, default_mat_idx: int = mat.Material.default.value,
+                 default_swap_uv: bool = False, kids: int = 0) -> None:
         self._nodes = []
         self._faces = []
         self.name = name
@@ -278,7 +274,7 @@ class File(object):
     def __str__(self) -> str:
         s = 'AC3Db\n'
         if not self.materials_list:
-            self.materials_list = osm2city.textures.materials.create_materials_list_roads()
+            self.materials_list = mat.create_materials_list()
         s += "".join(['%s\n' % the_mat for the_mat in self.materials_list])
         non_empty = [o for o in self.objects if not o.is_empty()]
         # FIXME: this doesn't handle nested kids properly

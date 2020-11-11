@@ -644,13 +644,6 @@ class Building(object):
             return False
 
         logging.debug("__done" + str(self.roof_texture) + str(self.roof_texture.provides))
-
-        if parameters.FLAG_COLOUR_TEX:
-            if s.K_BUILDING_COLOUR not in self.tags:
-                self.tags[s.K_BUILDING_COLOUR] = parameters.BUILDING_FACADE_DEFAULT_COLOUR
-            if s.K_ROOF_COLOUR not in self.tags:
-                self.tags[s.K_ROOF_COLOUR] = parameters.BUILDING_ROOF_DEFAULT_COLOUR
-
         return True
 
     def analyse_elev_and_water(self, fg_elev: utilities.FGElev) -> bool:
@@ -728,10 +721,7 @@ class Building(object):
                 if parameters.BUILDING_FORCE_EUROPEAN_INNER_CITY_STYLE:
                     # now apply some tags to increase European style
                     if s.K_ROOF_COLOUR not in self.tags:
-                        if parameters.FLAG_COLOUR_TEX:
-                            self.tags[s.K_ROOF_COLOUR] = '#FF0000'
-                        else:
-                            self.tags[s.K_ROOF_COLOUR] = 'red'
+                        self.tags[s.K_ROOF_COLOUR] = 'red'
             else:
                 self.roof_shape = enu.RoofShape.flat
 
@@ -1759,25 +1749,17 @@ def write(ac_file_name: str, buildings: List[Building], cluster_elev: float, clu
                 colours[building.tags[s.K_ROOF_COLOUR]] = colours_index
                 colours_index += 1
 
-    materials_list = list()
-    if parameters.FLAG_COLOUR_TEX:
-        texture_name = 'FIXME'  # FIXME: this is only temporary until we have new textures
-        materials_list = mat.create_materials_list_from_hex_colours(colours)
-
-    ac = ac3d.File(stats=stats, materials_list=materials_list)
+    ac = ac3d.File(stats=stats)
 
     # create the main objects in AC3D
     lod_objects = list()  # a list of meshes, where each LOD has one mesh
-    lod_objects.append(ac.new_object('LOD_rough', texture_name, default_mat_idx=ac3d.MAT_IDX_LIT))
-    lod_objects.append(ac.new_object('LOD_detail', texture_name, default_mat_idx=ac3d.MAT_IDX_LIT))
+    lod_objects.append(ac.new_object('LOD_rough', texture_name, default_mat_idx=mat.Material.lit.value))
+    lod_objects.append(ac.new_object('LOD_detail', texture_name, default_mat_idx=mat.Material.lit.value))
 
     for ib, b in enumerate(buildings):
         ac_object = lod_objects[b.LOD]
         face_mat_idx = 1  # needs to correspond with with a material that has r, g, b = 1.0
         roof_mat_idx = 1  # ditto
-        if parameters.FLAG_COLOUR_TEX:
-            face_mat_idx = colours[b.tags[s.K_BUILDING_COLOUR]]
-            roof_mat_idx = colours[b.tags[s.K_ROOF_COLOUR]]
         b.write_to_ac(ac_object, cluster_elev, cluster_offset, roof_mgr, face_mat_idx, roof_mat_idx, stats)
 
     ac.write(ac_file_name)

@@ -28,6 +28,7 @@ import unittest
 import shapely.geometry as shg
 
 from osm2city import cluster, roads, parameters
+from osm2city.textures import  materials as mat
 from osm2city.utils import coordinates as co
 from osm2city.utils import utilities, stg_io2
 from osm2city.utils import osmparser as op
@@ -130,7 +131,7 @@ class Cable(object):
         numvert_lines += " " + str(-1*cable_vertex.y)
         return numvert_lines
 
-    def make_ac_entry(self, material: int) -> str:
+    def make_ac_entry(self, mat_idx: int) -> str:
         """
         Returns an ac entry for this cable.
         """
@@ -144,21 +145,21 @@ class Cable(object):
             lines.append(self._create_numvert_lines(self.vertices[i + 1]))
             lines.append("numsurf 3")
             lines.append("SURF 0x40")
-            lines.append("mat " + str(material))
+            lines.append("mat " + str(mat_idx))
             lines.append("refs 4")
             lines.append("0 0 0")
             lines.append("3 0 0")
             lines.append("5 0 0")
             lines.append("2 0 0")
             lines.append("SURF 0x40")
-            lines.append("mat " + str(material))
+            lines.append("mat " + str(mat_idx))
             lines.append("refs 4")
             lines.append("0 0 0")
             lines.append("1 0 0")
             lines.append("4 0 0")
             lines.append("3 0 0")
             lines.append("SURF 0x40")
-            lines.append("mat " + str(material))
+            lines.append("mat " + str(mat_idx))
             lines.append("refs 4")
             lines.append("4 0 0")
             lines.append("1 0 0")
@@ -1465,8 +1466,7 @@ def write_cable_clusters(cluster_container: cluster.ClusterContainer, coords_tra
 
             ac_file_lines = list()
             ac_file_lines.append("AC3Db")
-            ac_file_lines.append(
-                'MATERIAL "cable" rgb 0.3 0.3 0.3 amb 0.3 0.3 0.3 emis 0.0 0.0 0.0 spec 0.3 0.3 0.3 shi 100 trans 0')
+            ac_file_lines.extend(mat.create_materials_list())
             ac_file_lines.append("OBJECT world")
             ac_file_lines.append("kids " + str(len(cl.objects)))
             segment_index = 0
@@ -1477,7 +1477,7 @@ def write_cable_clusters(cluster_container: cluster.ClusterContainer, coords_tra
                 ac_file_lines.append("kids " + str(len(way_segment.cables)))
                 for cable in way_segment.cables:
                     cable.translate_vertices_relative(cl.center.x, cl.center.y, 0)
-                    ac_file_lines.append(cable.make_ac_entry(0))  # material is 0-indexed
+                    ac_file_lines.append(cable.make_ac_entry(mat.Material.cable.value))
 
             with open(os.path.join(path_to_stg, cluster_filename + ".ac"), 'w') as f:
                 f.write("\n".join(ac_file_lines))

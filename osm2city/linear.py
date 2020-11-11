@@ -10,6 +10,7 @@ import scipy.interpolate
 import shapely.geometry as shg
 
 from osm2city import roads, parameters
+from osm2city.textures import materials as mat
 from osm2city.textures import road
 from osm2city.utils import ac3d
 from osm2city.utils import coordinates as co
@@ -235,17 +236,17 @@ class LinearObject(object):
         n_nodes = len(left_nodes_list)
         assert (len(left_nodes_list) == len(right_nodes_list))
         for i in range(n_nodes - 1):
-            mat_idx = ac3d.MAT_IDX_UNLIT
+            mat_idx = mat.Material.unlit
             if check_lit:
                 if self.lighting[i] or self.lighting[i + 1]:
-                    mat_idx = ac3d.MAT_IDX_LIT
+                    mat_idx = mat.Material.lit
             xl = self.dist[i] / road.LENGTH
             xr = self.dist[i + 1] / road.LENGTH
             face = [(left_nodes_list[i], xl, tex_y0),
                     (left_nodes_list[i + 1], xr, tex_y0),
                     (right_nodes_list[i + 1], xr, tex_y1),
                     (right_nodes_list[i], xl, tex_y1)]
-            obj.face(face[::-1], mat_idx=mat_idx)
+            obj.face(face[::-1], mat_idx=mat_idx.value)
 
     def _probe_ground(self, fg_elev: FGElev, line_string) -> np.ndarray:
         """Probe ground elevation along given line string, return array"""
