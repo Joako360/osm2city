@@ -674,8 +674,8 @@ def _write_obstruction_lights(path: str, file_name: str,
                     <x-m>%g</x-m>
                     <y-m>%g</y-m>
                     <z-m>%g</z-m>
-                    <pitch-deg> 0.00</pitch-deg>
-                    <heading-deg>0.0 </heading-deg>
+                    <pitch-deg>0.00</pitch-deg>
+                    <heading-deg>0.0</heading-deg>
                   </offsets>
                 </model>""") % (-yo, xo, zo))
     if len(models_list) > 0:
