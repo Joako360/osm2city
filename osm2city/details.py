@@ -47,7 +47,7 @@ def process_details(coords_transform: co.Transformation, lit_areas: Optional[Lis
 
     for cl in clusters:
         if cl.objects:
-            center_tile = co.Vec2d(coords_transform.to_global(cl.center))
+            cluster_center_global = co.Vec2d(coords_transform.to_global(cl.center))
             ac_file_name = "%sd%i%i.ac" % (parameters.PREFIX, cl.grid_index.ix, cl.grid_index.iy)
             ac = ac3d.File(stats=stats)
             obj = ac.new_object('details', 'Textures/Terrain/asphalt.png', default_mat_idx=mat.Material.unlit.value)
@@ -56,7 +56,7 @@ def process_details(coords_transform: co.Transformation, lit_areas: Optional[Lis
                     detail.write(obj, cl.center)
                 else:
                     detail.write(fg_elev, obj, cl.center)
-            path = stg_manager.add_object_static(ac_file_name, center_tile, 0, 0)
+            path = stg_manager.add_object_static(ac_file_name, cluster_center_global, 0, 0)
             file_name = os.path.join(path, ac_file_name)
             f = open(file_name, 'w')
             f.write(str(ac))

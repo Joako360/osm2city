@@ -83,6 +83,7 @@ High Office Buildings and Skyscrapers
 .....................................
 
 For all but very high buildings we can manage vertical scale within texture. Therefore it makes sense to have the texture for high and very high buildings separate. That texture can in general also be used for office buildings. Horizontal scale is not known - and therefore these skyscraper textures should be x-repeatable. Skyscrapers should have the possibility for special bottom (often ca. 2 times floor height) handling and special handling of top (often also 2-3 times floor height).
+NB: this is not for apartment buildings, as they typically have lower floor height and have a facade with clear entries/staircase dividing the building.
 
 Proposal:
 
@@ -109,7 +110,7 @@ Textures for buildings, which are large especially in the horizontal dimension. 
 
 Proposal:
 
-* 1 special atlas file (512 x 8 k pixels)
+* 2 special atlas files (512 x 8 k pixels): one for "modern" and one for "old/brick and mortar"
 * 20 cm per pixel (typically, can be overridden e.g. in vertical direction for modern warehouses)
 * Normal floors: determined by texture, often 4 metres / floor => 20 pixels
 * Ground floors: determined by texture
@@ -131,7 +132,7 @@ Proposal:
 
 * 1 special atlas file (? x ? pixels)
 * 20 cm per pixel (but can be made stretchable as an attribute of th individual textures)
-* repeatable in x-direction
+* Repeatable in x-direction
 
 Additionally, in the future it might be possible to handle these roofs with shaders to:
 
@@ -156,16 +157,18 @@ Proposal:
 * Most often 10 cm per pixel, but can be defined individually
 * On per texture level it can be specified, whether it is x-repeatable and where horizontal cuts can be done.
 * On per texture level it can be specified, which levels can be cut (vertical cuts)
-* The atlas is split into "areas" with distinct size and with specific content (e.g. city buildings)
-* Each area is split into "pods" with distinct size
-* Each pod contains a set of textures. All these textures have the same geometry, type etc., but can be different in colour etc.
-* The areas and pods have fixed positions and IDs in the atlas
+* The atlas is split into "sectors" with distinct size and with specific building types (e.g. city buildings)
+* Each "sector" is split into "pods" with distinct size
+* Each pod contains a one or a set of textures. All these textures have the same geometry, type etc., but can be different in the looks (colour etc.).
+* The sectors and pods have fixed positions and IDs in the atlas
 * A pod corresponds to a file in the filesystem with a distinct name corresponding to the ID scheme. osm2city combines the single files into an atlas making sure that the atlas is always fixed in terms of where a given pod lives.
 * In the beginning some pods might be empty - but they will already be allocated in the atlas scheme. That way over time more and more textures can be added to the atlas and osm2city will check which textures are available already. This necessitates like today that the atlases (also for skyscrapers / large buildings) are written as serialized Python objects by osm2city (texture) maintainers in a osm2city place for those who generate sceneries - and that the osm2city (texture maintainers) push the corresponding atlas images to TerraySync.
 
 Special handling in osm2city:
 
 * n/a
+
+NB: details has its own texture atlas for stuff like cars, pylons and cabins for aerialways, platform roofs etc.
 
 -----------------------------------
 Resulting Number of Meshes per Tile

@@ -1452,7 +1452,7 @@ def write_cable_clusters(cluster_container: cluster.ClusterContainer, coords_tra
                          my_stg_mgr: stg_io2.STGManager, details: bool = False) -> None:
     for cl in cluster_container:
         if cl.objects:
-            center_tile = co.Vec2d(coords_transform.to_global(cl.center))
+            cluster_center_global = co.Vec2d(coords_transform.to_global(cl.center))
             cluster_filename = parameters.PREFIX
             # it is important to have the ac-file names for cables different in "Pylons" and "Details/Objects",
             # because otherwise FG does not know which information to take from which stg-files, which results
@@ -1461,7 +1461,7 @@ def write_cable_clusters(cluster_container: cluster.ClusterContainer, coords_tra
             if details:
                 cluster_filename += 'd'
             cluster_filename += "c%i%i.ac" % (cl.grid_index.ix, cl.grid_index.iy)
-            path_to_stg = my_stg_mgr.add_object_static(cluster_filename + '.ac', center_tile, 0, 90,
+            path_to_stg = my_stg_mgr.add_object_static(cluster_filename + '.ac', cluster_center_global, 0, 90,
                                                        cluster_container.stg_verb_type)
 
             ac_file_lines = list()

@@ -1025,44 +1025,26 @@ def write_buildings_in_meshes(coords_transform: co.Transformation,
         my_clusters.write_statistics_for_buildings("cluster_%d" % handled_index)
 
         for ic, cl in enumerate(my_clusters):
+            cluster_center_global = co.Vec2d(coords_transform.to_global(cl.center))
             number_of_buildings = len(cl.objects)
             if number_of_buildings < parameters.CLUSTER_MIN_OBJECTS:
                 continue  # skip almost empty clusters
-
-            # calculate relative positions within cluster
-            min_elevation = 9999
-            max_elevation = -9999
-            min_x = 1000000000
-            min_y = 1000000000
-            max_x = -1000000000
-            max_y = -1000000000
-            for b in cl.objects:
-                min_elevation = min(min_elevation, b.ground_elev)
-                max_elevation = max(max_elevation, b.ground_elev)
-                min_x = min(min_x, b.anchor.x)
-                min_y = min(min_y, b.anchor.y)
-                max_x = max(max_x, b.anchor.x)
-                max_y = max(max_y, b.anchor.y)
-            cluster_elev = (max_elevation - min_elevation) / 2 + min_elevation
-            cluster_offset = co.Vec2d((max_x - min_x) / 2 + min_x, (max_y - min_y) / 2 + min_y)
-            center_global = co.Vec2d(coords_transform.to_global((cluster_offset.x, cluster_offset.y)))
-            logging.debug("Cluster center -> elevation: %d, position: %s", cluster_elev, cluster_offset)
 
             file_name = stg_manager.prefix + "b" + str(handled_index) + "%i%i" % (cl.grid_index.ix,
                                                                                   cl.grid_index.iy)
             logging.info("writing cluster %s with %d buildings" % (file_name, len(cl.objects)))
 
-            path_to_stg = stg_manager.add_object_static(file_name + '.ac', center_global, cluster_elev, 0,
+            path_to_stg = stg_manager.add_object_static(file_name + '.ac', cluster_center_global, 0., 0,
                                                         my_clusters.stg_verb_type)
 
             # -- write .ac and .xml
             building_lib.write(os.path.join(path_to_stg, file_name + ".ac"), cl.objects,
-                               cluster_elev, cluster_offset, prepare_textures.roofs, stats)
+                               cl.center, prepare_textures.roofs, stats)
             if parameters.OBSTRUCTION_LIGHT_MIN_LEVELS > 0:
                 obstr_file_name = file_name + '_o.xml'
-                has_models = _write_obstruction_lights(path_to_stg, obstr_file_name, cl.objects, cluster_offset)
+                has_models = _write_obstruction_lights(path_to_stg, obstr_file_name, cl.objects, cl.center)
                 if has_models:
-                    stg_manager.add_object_static(obstr_file_name, center_global, cluster_elev, 0,
+                    stg_manager.add_object_static(obstr_file_name, cluster_center_global, 0., 0,
                                                   stg_io2.STGVerbType.object_static)
             total_buildings_written += len(cl.objects)
 

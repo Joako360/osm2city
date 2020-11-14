@@ -384,12 +384,12 @@ class Building(object):
             self.roof_hint.inner_node = (self.roof_hint.inner_node[0] - cluster_offset.x,
                                          self.roof_hint.inner_node[1] - cluster_offset.y)
 
-    def set_ground_elev_and_offset(self, cluster_elev: float, cluster_offset: co.Vec2d) -> None:
+    def set_ground_elev_and_offset(self, cluster_offset: co.Vec2d) -> None:
         """Sets the ground elevations as difference between real elevation and cluster elevation.
         Additionally it takes into consideration that the world is round.
         Also translates x/y coordinates"""
         self._set_pts_all(cluster_offset)
-        self.ground_elev -= (cluster_elev + co.calc_horizon_elev(self.pts_all[0, 0], self.pts_all[0, 1]))
+        self.ground_elev -= co.calc_horizon_elev(self.pts_all[0, 0], self.pts_all[0, 1])
 
     def calc_building_list_type(self) -> Optional[BuildingListType]:
         """Determines the buildings list type. A return of None means it should be be handled in a mesh."""
@@ -1240,11 +1240,11 @@ class Building(object):
                         temp_roof_height = calc_level_height_for_settlement_type(self.zone.settlement_type)
                     self.roof_height = temp_roof_height
 
-    def write_to_ac(self, ac_object: ac3d.Object, cluster_elev: float, cluster_offset: co.Vec2d,
+    def write_to_ac(self, ac_object: ac3d.Object, cluster_offset: co.Vec2d,
                     roof_mgr: tex.RoofManager, face_mat_idx: int, roof_mat_idx: int,
                     stats: utilities.Stats) -> None:
         # get local medium ground elevation for each building
-        self.set_ground_elev_and_offset(cluster_elev, cluster_offset)
+        self.set_ground_elev_and_offset(cluster_offset)
 
         self.compute_roof_height()
 
@@ -1728,7 +1728,7 @@ def analyse(buildings: List[Building], fg_elev: utilities.FGElev, stg_manager: s
     return new_buildings
 
 
-def write(ac_file_name: str, buildings: List[Building], cluster_elev: float, cluster_offset: co.Vec2d,
+def write(ac_file_name: str, buildings: List[Building], cluster_offset: co.Vec2d,
           roof_mgr: tex.RoofManager, stats: utilities.Stats) -> None:
     """Write buildings across LOD for given tile.
        While writing, accumulate some statistics (totals stored in global stats object, individually also in building).
@@ -1760,7 +1760,7 @@ def write(ac_file_name: str, buildings: List[Building], cluster_elev: float, clu
         ac_object = lod_objects[b.LOD]
         face_mat_idx = 1  # needs to correspond with with a material that has r, g, b = 1.0
         roof_mat_idx = 1  # ditto
-        b.write_to_ac(ac_object, cluster_elev, cluster_offset, roof_mgr, face_mat_idx, roof_mat_idx, stats)
+        b.write_to_ac(ac_object, cluster_offset, roof_mgr, face_mat_idx, roof_mat_idx, stats)
 
     ac.write(ac_file_name)
 
