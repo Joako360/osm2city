@@ -12,7 +12,6 @@ into as few AC3D objects (drawables) as possible.
 @author: tom
 """
 import logging
-import os
 
 from osm2city import parameters
 import osm2city.utils.log_helper as ulog
@@ -33,12 +32,10 @@ class GridIndex(object):
 
 class Cluster(object):
     """A container for objects to be included in a single mesh and then written as an ac-file"""
-    def __init__(self, grid_index: GridIndex, center: Vec2d, size: int) -> None:
+    def __init__(self, grid_index: GridIndex, center: Vec2d) -> None:
         self.objects = []
         self.grid_index = grid_index  # holds the position in the n*m grid (zero-based)
         self.center = center  # -- center in local coordinates
-        self.min = center - size/2.
-        self.max = center + size/2.
         self.stats = osm2city.utils.utilities.Stats()
 
     def __str__(self) -> str:
@@ -72,9 +69,18 @@ class ClusterContainer(object):
         return self.__len
         
     def _init_cluster(self, grid_index: GridIndex) -> Cluster:
-        center = Vec2d(self.min.x + (grid_index.ix + 0.5) * self.size,
-                       self.min.y + (grid_index.iy + 0.5) * self.size)  # in meters
-        new_cluster = Cluster(grid_index, center, self.size)
+        """Initialize a cluster object for a specific grid index.
+        There can be situations, where the centre might get outside of the tile boundaries, which would lead to
+        a situation, where the cluster ac-file would get registered in another tile stg-file.
+        Therefore the center is moved to a save place - even though it is not the center of the cluster anymore."""
+        center_x = self.min.x + (grid_index.ix + 0.5) * self.size
+        if center_x >= self.max.x:
+            center_x = self.min.x + grid_index.ix * self.size
+        center_y = self.min.y + (grid_index.iy + 0.5) * self.size
+        if center_y >= self.max.y:
+            center_y = self.min.y + grid_index.iy * self.size
+        center = Vec2d(center_x, center_y)
+        new_cluster = Cluster(grid_index, center)
         return new_cluster
 
     def _coords_to_grid_index(self, object_anchor: Vec2d) -> GridIndex:
@@ -116,13 +122,3 @@ class ClusterContainer(object):
             except AttributeError:
                 pass
         return the_cluster
-
-    def write_statistics_for_buildings(self, clusters_name: str) -> None:
-        if ulog.log_level_debug_or_lower() and parameters.WRITE_CLUSTER_STATS:
-            my_file = open(os.path.join(parameters.PREFIX, clusters_name + ".dat"), "w")
-            for j in range(self.max_grid.iy):
-                for i in range(self.max_grid.ix):
-                    cl = self._clusters[i][j]
-                    my_file.write("%i %i %i\n" % (i, j, len(cl.objects)))
-                my_file.write("\n")
-            my_file.close()

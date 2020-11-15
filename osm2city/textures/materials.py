@@ -202,6 +202,7 @@ class Material(IntEnum):
     unlit = 0
     lit = 1
     cable = 2
+    facade = 3  # and roofs
 
 
 def create_materials_list() -> List[str]:
@@ -209,6 +210,7 @@ def create_materials_list() -> List[str]:
     materials_list.append(_create_material(Material.unlit.name, 0., 0., 0., 0, False))
     materials_list.append(_create_material(Material.lit.name, 1., 1., 1., 0, False))
     materials_list.append(_create_material(Material.cable.name, .3, .3, .3, 100, True))
+    materials_list.append(_create_material(Material.facade.name, 1., 1., 1., 0, False))
     return materials_list
 
 

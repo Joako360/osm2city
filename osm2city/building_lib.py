@@ -23,7 +23,6 @@ Call hierarchy (as of summer 2017) - building_lib is called from building.py:
 
 """
 
-import collections
 import copy
 from enum import IntEnum, unique
 import logging
@@ -36,7 +35,9 @@ from shapely import affinity
 import shapely.geometry as shg
 
 from osm2city import myskeleton, parameters, roofs
-from osm2city.textures import materials as mat, texture as tex
+from osm2city.textures import materials as mat
+from osm2city.textures import texture as tex
+from osm2city.textures import texturing as text
 import osm2city.types.enumerations as enu
 from osm2city.utils import coordinates as co
 from osm2city.utils import osmparser as op
@@ -111,7 +112,7 @@ class Building(object):
                  'body_height', 'levels', 'min_height', 'roof_shape', 'roof_height', 'roof_hint',
                  'refs', 'refs_inner', 'refs_shared', 'inner_rings_list', 'outer_nodes_closest', 'polygon', 'geometry',
                  'parent', 'pts_all', 'roof_height_pts', 'edge_length_pts', 'facade_texture',
-                 'roof_texture', 'roof_requires', 'LOD',
+                 'roof_texture', 'roof_requires', 'LOD', 'atlas_type',
                  'ground_elev', 'diff_elev'
                  )
 
@@ -171,6 +172,7 @@ class Building(object):
         self.roof_texture = None
         self.roof_requires = list()
         self.LOD = None  # see utils.utilities.LOD for values
+        self.atlas_type = text.AtlasTypes.building_rest
 
         self.ground_elev = 0.0  # the lowest elevation over sea of any point in the outer ring of the building
         self.diff_elev = 0.0  # the difference between the lowest elevation and the highest ground elevation og building
@@ -1644,6 +1646,8 @@ def decide_lod(buildings: List[Building], stats: utilities.Stats) -> None:
             lod = stg_io2.LOD.rough
 
         b.LOD = lod
+        if lod is not stg_io2.LOD.detail:
+            b.atlas_type = text.AtlasTypes.building_large_skyscrapers
         stats.count_LOD(lod)
 
 
@@ -1735,31 +1739,18 @@ def write(ac_file_name: str, buildings: List[Building], cluster_offset: co.Vec2d
        Offset accounts for cluster center
        All LOD in one file. Plus roofs. One ac3d.Object per LOD
     """
-    # prepare the colours list (materials in AC3D speech)
     texture_name = 'Textures/osm2city/atlas_facades.png'
-    colours = collections.OrderedDict()  # # hex_value: str, index: int
-    colours_index = 0
-    for building in buildings:
-        if s.K_BUILDING_COLOUR in building.tags:
-            if building.tags[s.K_BUILDING_COLOUR] not in colours:
-                colours[building.tags[s.K_BUILDING_COLOUR]] = colours_index
-                colours_index += 1
-        if s.K_ROOF_COLOUR in building.tags:
-            if building.tags[s.K_ROOF_COLOUR] not in colours:
-                colours[building.tags[s.K_ROOF_COLOUR]] = colours_index
-                colours_index += 1
-
     ac = ac3d.File(stats=stats)
 
     # create the main objects in AC3D
     lod_objects = list()  # a list of meshes, where each LOD has one mesh
-    lod_objects.append(ac.new_object('LOD_rough', texture_name, default_mat_idx=mat.Material.lit.value))
-    lod_objects.append(ac.new_object('LOD_detail', texture_name, default_mat_idx=mat.Material.lit.value))
+    lod_objects.append(ac.new_object('LOD_rough', texture_name, default_mat_idx=mat.Material.facade.value))
+    lod_objects.append(ac.new_object('LOD_detail', texture_name, default_mat_idx=mat.Material.facade.value))
 
     for ib, b in enumerate(buildings):
         ac_object = lod_objects[b.LOD]
-        face_mat_idx = 1  # needs to correspond with with a material that has r, g, b = 1.0
-        roof_mat_idx = 1  # ditto
+        face_mat_idx = mat.Material.facade.value
+        roof_mat_idx = mat.Material.facade.value
         b.write_to_ac(ac_object, cluster_offset, roof_mgr, face_mat_idx, roof_mat_idx, stats)
 
     ac.write(ac_file_name)

@@ -655,16 +655,16 @@ def _clean_building_zones_dangling_children(my_buildings: List[building_lib.Buil
                 zone.osm_buildings.remove(building)
 
 
-def _write_obstruction_lights(path: str, file_name: str,
-                              the_buildings: List[building_lib.Building], cluster_offset: co.Vec2d) -> bool:
-    """Add obstruction lights on top of high buildings. Return true if at least one obstruction light is added."""
+def _write_obstruction_lights(coords_transform: co.Transformation, stg_manager: stg_io2.STGManager,
+                              the_buildings: List[building_lib.Building]) -> None:
+    """Add obstruction lights on top of high buildings."""
     models_list = list()  # list of strings
     for b in the_buildings:
         if b.levels >= parameters.OBSTRUCTION_LIGHT_MIN_LEVELS:
             nodes_outer = np.array(b.pts_outer)
             for i in np.arange(0, b.pts_outer_count, b.pts_outer_count / 4.):
-                xo = nodes_outer[int(i + 0.5), 0] - cluster_offset.x
-                yo = nodes_outer[int(i + 0.5), 1] - cluster_offset.y
+                xo = nodes_outer[int(i + 0.5), 0]
+                yo = nodes_outer[int(i + 0.5), 1]
                 zo = b.top_of_roof_above_sea_level + 1.5
 
                 models_list.append(textwrap.dedent("""
@@ -679,16 +679,16 @@ def _write_obstruction_lights(path: str, file_name: str,
                   </offsets>
                 </model>""") % (-yo, xo, zo))
     if len(models_list) > 0:
-        xml = open(os.path.join(path, file_name), "w")
+        obstr_file_name = stg_manager.prefix + '_o.xml'
+        path_to_stg = stg_manager.add_object_static(obstr_file_name, coords_transform.anchor, 0., 0,
+                                                    stg_io2.STGVerbType.object_static)
+        xml = open(os.path.join(path_to_stg, obstr_file_name), "w")
         xml.write('<?xml version="1.0"?>\n<PropertyList>\n')
         xml.write('\n'.join(models_list))
         xml.write(textwrap.dedent("""
         </PropertyList>
         """))
         xml.close()
-        return True
-    else:
-        return False
 
 
 def construct_buildings_from_osm(coords_transform: co.Transformation) -> Tuple[List[building_lib.Building],
@@ -928,10 +928,10 @@ def _debug_building_list_lsme(coords_transform: co.Transformation, file_writer, 
     file_writer.write('\n')
 
 
-def write_buildings_in_lists(coords_transform: co.Transformation,
-                             list_buildings: Dict[building_lib.Building, building_lib.BuildingListType],
-                             stg_manager: stg_io2.STGManager,
-                             stats: utilities.Stats) -> None:
+def _write_buildings_in_lists(coords_transform: co.Transformation,
+                              list_buildings: Dict[building_lib.Building, building_lib.BuildingListType],
+                              stg_manager: stg_io2.STGManager,
+                              stats: utilities.Stats) -> None:
     min_elevation = 9999
     max_elevation = -9999
     for b in list_buildings:
@@ -995,10 +995,10 @@ def write_buildings_in_lists(coords_transform: co.Transformation,
     stats.random_buildings = len(list_buildings)
 
 
-def write_buildings_in_meshes(coords_transform: co.Transformation,
-                              mesh_buildings: List[building_lib.Building],
-                              stg_manager: stg_io2.STGManager,
-                              stats: utilities.Stats) -> None:
+def _write_buildings_in_meshes(coords_transform: co.Transformation,
+                               mesh_buildings: List[building_lib.Building],
+                               stg_manager: stg_io2.STGManager,
+                               stats: utilities.Stats) -> None:
     # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
     cmin, cmax = parameters.get_extent_global()
     logging.info("min/max " + str(cmin) + " " + str(cmax))
@@ -1009,21 +1009,31 @@ def write_buildings_in_meshes(coords_transform: co.Transformation,
     clusters_building_mesh_detailed = cluster.ClusterContainer(lmin, lmax,
                                                                stg_io2.STGVerbType.object_building_mesh_detailed)
     handled_clusters.append(clusters_building_mesh_detailed)
-    clusters_building_mesh_rough = cluster.ClusterContainer(lmin, lmax,
-                                                            stg_io2.STGVerbType.object_building_mesh_rough)
-    handled_clusters.append(clusters_building_mesh_rough)
+
+    rough_roofs = None
+    rough_buildings = None
+    clusters_building_mesh_rough = None
+
+    if parameters.FLAG_NEXT_GEN_TEXTURING:
+        rough_buildings = cluster.Cluster(cluster.GridIndex(0, 0), coords_transform.anchor_local)
+        rough_roofs = cluster.Cluster(cluster.GridIndex(0, 0), coords_transform.anchor_local)
+    else:
+        clusters_building_mesh_rough = cluster.ClusterContainer(lmin, lmax,
+                                                                stg_io2.STGVerbType.object_building_mesh_rough)
+        handled_clusters.append(clusters_building_mesh_rough)
     for b in mesh_buildings:
         if b.LOD is stg_io2.LOD.detail:
             clusters_building_mesh_detailed.append(b.anchor, b, stats)
         elif b.LOD is stg_io2.LOD.rough:
-            clusters_building_mesh_rough.append(b.anchor, b, stats)
+            if parameters.FLAG_NEXT_GEN_TEXTURING:
+                rough_buildings.objects.append(b)
+            else:
+                clusters_building_mesh_rough.append(b.anchor, b, stats)
 
     # -- write clusters
-    handled_index = 0
+    handled_index = 0  # makes sure that the ac-files for different clusters are not named the same
     total_buildings_written = 0
     for my_clusters in handled_clusters:
-        my_clusters.write_statistics_for_buildings("cluster_%d" % handled_index)
-
         for ic, cl in enumerate(my_clusters):
             cluster_center_global = co.Vec2d(coords_transform.to_global(cl.center))
             number_of_buildings = len(cl.objects)
@@ -1037,15 +1047,8 @@ def write_buildings_in_meshes(coords_transform: co.Transformation,
             path_to_stg = stg_manager.add_object_static(file_name + '.ac', cluster_center_global, 0., 0,
                                                         my_clusters.stg_verb_type)
 
-            # -- write .ac and .xml
             building_lib.write(os.path.join(path_to_stg, file_name + ".ac"), cl.objects,
                                cl.center, prepare_textures.roofs, stats)
-            if parameters.OBSTRUCTION_LIGHT_MIN_LEVELS > 0:
-                obstr_file_name = file_name + '_o.xml'
-                has_models = _write_obstruction_lights(path_to_stg, obstr_file_name, cl.objects, cl.center)
-                if has_models:
-                    stg_manager.add_object_static(obstr_file_name, cluster_center_global, 0., 0,
-                                                  stg_io2.STGVerbType.object_static)
             total_buildings_written += len(cl.objects)
 
         handled_index += 1
@@ -1128,12 +1131,13 @@ def process_buildings(coords_transform: co.Transformation, fg_elev: utilities.FG
             else:
                 buildings_in_meshes.append(building)
         if parameters.FLAG_BUILDINGS_LIST_SKIP is False:
-            write_buildings_in_lists(coords_transform, buildings_in_lists, stg_manager, stats)
+            _write_buildings_in_lists(coords_transform, buildings_in_lists, stg_manager, stats)
             last_time = utilities.time_logging("Time used in seconds to write buildings in lists", last_time)
     else:
         buildings_in_meshes = the_buildings[:]
     if parameters.FLAG_BUILDINGS_MESH_SKIP is False:
-        write_buildings_in_meshes(coords_transform, buildings_in_meshes, stg_manager, stats)
+        _write_buildings_in_meshes(coords_transform, buildings_in_meshes, stg_manager, stats)
+        _write_obstruction_lights(coords_transform, stg_manager, buildings_in_meshes)
         last_time = utilities.time_logging("Time used in seconds to write buildings in meshes", last_time)
 
     stg_manager.write(file_lock)

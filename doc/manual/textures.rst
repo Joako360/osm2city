@@ -203,3 +203,18 @@ Todo's and PoC's
 * Inclusion of ac-objects into mesh: read electrical pylons and combine them into mesh of cables. Significantly reduces number of nodes in scenery and proofs possibility. As a side effect if at some point the object would be removed from terrasync (or renamed), then the program would at least abort.
 * Split roofs into own texture atlas: structure program such that it "remembers" facades vs. roofs
 * Split buildings using skyscraper texture atlas into own mesh - but then generate tile-size meshes (one for facades and one for roofs): horizontal repeat, vertical extra nodes if very high building
+
+
+---------------
+Notes on Coding
+---------------
+
+New stuff:
+
+* parameter FLAG_NEXT_GEN_TEXTURING determines whether new or old scheme is used
+* module textures/texturing.py contains the new objects
+
+At some point clean-up needed:
+* modules textures/atlas.py and textures/texture.py will be obsolete
+* building_lib.Building.LOD will be obsolete (replaced by .atlas_type)
+* parameters LOD_ALWAYS_* will get obsolete

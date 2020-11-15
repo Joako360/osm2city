@@ -236,6 +236,11 @@ class Transformation(object):
         return Vec2d(self._lon, self._lat)
 
     @property
+    def anchor_local(self) -> Vec2d:
+        x, y = self.to_local((self._lon, self._lat))
+        return Vec2d(x, y)
+
+    @property
     def cos_lat_factor(self) -> float:
         return self._coslat
 
