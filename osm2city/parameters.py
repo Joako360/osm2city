@@ -228,6 +228,7 @@ C2P_PROCESS_WIND_TURBINES = True
 C2P_PROCESS_STREETLAMPS = False  # experimental and unsupported
 C2P_PROCESS_STORAGE_TANKS = True
 C2P_PROCESS_CHIMNEYS = True
+C2P_PROCESS_TREES = False  # Requires NEXT
 
 # The radius for the cable. The cable will be a triangle with side length 2*radius.
 # In order to be better visible the radius might be chosen larger than in real life
@@ -263,7 +264,7 @@ C2P_CATENARY_A_AERIALWAY_DRAG_LIFT = 1500
 C2P_CATENARY_A_AERIALWAY_GONDOLA = 1500
 C2P_CATENARY_A_AERIALWAY_GOODS = 1500
 C2P_CATENARY_A_OVERHEAD_LINE = 600
-C2P_CATENARY_A_MAX_SAGGING = 0.3  # the maximum sagging allowed no matter the catenary a realtive to lowest cable height
+C2P_CATENARY_A_MAX_SAGGING = 0.3  # the maximum sagging allowed no matter the catenary a relative to lowest cable height
 
 C2P_CATENARY_MIN_DISTANCE = 30
 
@@ -278,9 +279,13 @@ C2P_WIND_TURBINE_MAX_DISTANCE_WITHIN_WIND_FARM = 700
 C2P_WIND_TURBINE_MIN_DISTANCE_SHARED_OBJECT = 10
 
 C2P_CHIMNEY_BRICK_RATION = 0.2  # the ratio of chimneys being made of bricks (rest is cement etc.)
-C2P_CHIMNEY_MIN_HEIGHT = 30  # the minimum height a Chimney needs to have to be taken into account. Depends on available static models
-C2P_CHIMNEY_DEFAULT_HEIGHT = 100  # the default height of chimneys, where the height is not specified in OSM
-C2P_CHIMNEY_DEFAULT_HEIGHT_VARIATION = 20  # a random variation on top of the default height between 0 and value
+C2P_CHIMNEY_MIN_HEIGHT = 20  # the minimum height a Chimney needs to have to be taken into account
+C2P_CHIMNEY_DEFAULT_HEIGHT = 30  # the default height of chimneys, where the height is not specified in OSM
+C2P_CHIMNEY_DEFAULT_HEIGHT_VARIATION = 10  # a random variation on top of the default height between 0 and value
+
+C2P_TREES_DIST_BETWEEN_TREES_PARK = 15  # the average distance between trees in a park
+C2P_TREES_SKIP_RATE_TREES_PARK = 0.7  # the rate at which trees are skipped of generated (0.7 means 7 out of 10 skipped)
+C2P_TREES_DIST_BETWEEN_TREES_PARK_MAPPED = 100  # the average distance between trees in a park for testing manual
 
 # =============================================================================
 # PARAMETERS RELATED TO roads.py

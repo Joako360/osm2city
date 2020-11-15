@@ -209,6 +209,13 @@ class STGManager(object):
                                                           lon_lat.lon, lon_lat.lat, elev)
         return the_stg_file.add_line(line)
 
+    def add_tree_list(self, tree_list_name: str, material_name: str, lon_lat: Vec2d, elev: float) -> str:
+        """Adds a TREE_LIST line"""
+        the_stg_file = self._find_create_stg_file(lon_lat)
+        line = 'TREE_LIST %s %s %1.5f %1.5f %1.2f' % (tree_list_name, material_name,
+                                                      lon_lat.lon, lon_lat.lat, elev)
+        return the_stg_file.add_line(line)
+
     def write(self, file_lock: mp.Lock = None):
         """Writes all new scenery objects including the already existing back to stg-files.
         The file_lock object makes sure that only the current process is reading and writing stg-files in order

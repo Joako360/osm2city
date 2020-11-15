@@ -875,8 +875,10 @@ Parameter                                       Type       Default   Description
 =============================================   ========   =======   ==============================================================================
 C2P_PROCESS_POWERLINES                          Boolean    True      ``pylons``: Generate electrical power lines (incl. cables)
 C2P_PROCESS_WIND_TURBINES                       Boolean    True      ``pylons``: wind turbines
-C2P_PROCESS_STORAGE_TANKS                       Boolean    True      ``pylons``: storage tanks either mapped as nodes or ways in OSM
-C2P_PROCESS_CHIMNEYS                            Boolean    True      ``pylons``: chimneys either mapped as nodes or ways in OSM
+C2P_PROCESS_STORAGE_TANKS                       Boolean    True      ``pylons``: Storage tanks either mapped as nodes or ways in OSM
+C2P_PROCESS_CHIMNEYS                            Boolean    True      ``pylons``: Chimneys either mapped as nodes or ways in OSM
+C2P_PROCESS_TREES                               Boolean    False     ``pylons``: Trees as per OSM tagging or interpreted in parks, cemeteries etc.
+                                                                     This works only in FlightGear Next.
 C2P_PROCESS_POWERLINES_MINOR                    Boolean    False     ``details``: Only considered if C2P_PROCESS_POWERLINES is True
 C2P_PROCESS_AERIALWAYS                          Boolean    False     ``details``: Aerial ways is currently experimental and depends on local shared
                                                                      objects.

@@ -8,7 +8,8 @@ by Lauri Peltonen a.k.a. Zan
 Updated based on information in https://sourceforge.net/projects/xdraconian-fgscenery/
 and https://forum.flightgear.org/viewtopic.php?f=5&t=34736,
 especially FGBlenderTools/io_scene_flightgear/verticesfg_btg_io.py
-Materials interpreted as urban (see also http://wiki.flightgear.org/CORINE_to_materials_mapping):
+Materials interpreted as urban (see also http://wiki.flightgear.org/CORINE_to_materials_mapping and
+https://sourceforge.net/p/flightgear/terragear/ci/next/tree/src/BuildTiles/Main/default_priorities.txt):
   <name>BuiltUpCover</name>
   <name>Urban</name>
 

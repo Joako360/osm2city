@@ -28,7 +28,7 @@ import unittest
 import shapely.geometry as shg
 
 from osm2city import cluster, roads, parameters
-from osm2city.textures import  materials as mat
+from osm2city.textures import materials as mat
 from osm2city.utils import coordinates as co
 from osm2city.utils import utilities, stg_io2
 from osm2city.utils import osmparser as op
@@ -376,8 +376,8 @@ def _process_osm_chimneys_nodes(osm_nodes_dict: Dict[int, op.Node], coords_trans
     chimneys = list()
 
     for key, node in osm_nodes_dict.items():
-        probe_tuple = fg_elev.probe((node.lon, node.lat), True)
-        chimney = Chimney(key, node.lon, node.lat, probe_tuple[0], node.tags)
+        elev = fg_elev.probe_elev((node.lon, node.lat), True)
+        chimney = Chimney(key, node.lon, node.lat, elev, node.tags)
         chimney.x, chimney.y = coords_transform.to_local((node.lon, node.lat))
         if chimney.height >= parameters.C2P_CHIMNEY_MIN_HEIGHT:
             chimneys.append(chimney)
@@ -406,6 +406,126 @@ def _process_osm_chimneys_ways(nodes_dict, ways_dict, my_coord_transformator,
                     if chimney.height >= parameters.C2P_CHIMNEY_MIN_HEIGHT:
                         chimneys.append(chimney)
     return chimneys
+
+
+class TreeType(IntEnum):
+    """The tree type needs to correspond to the available types in the FG material for (OSM) trees."""
+    default = 0  # a typical full grown tree for the region - larger than a house.
+
+
+class Tree:
+    """A single tree from OSM or interpreted OSM data.
+
+    Cf. https://wiki.openstreetmap.org/wiki/Tag:natural=tree?uselang=en
+    Cf. https://wiki.openstreetmap.org/wiki/Key%3Adenotation
+    """
+    def __init__(self, osm_id: int, x: float, y: float, elev: float) -> None:
+        self.osm_id = osm_id
+        self.x = x
+        self.y = y
+        self.elev = elev
+        self.tree_type = TreeType.default
+
+    def parse_tags(self, tags: Dict[str, str]) -> None:
+        if s.K_DENOTATION in tags:  # significant trees should be at least normal
+            self.tree_type = TreeType.default
+
+
+def _process_osm_trees_nodes(osm_nodes_dict: Dict[int, op.Node], coords_transform: co.Transformation,
+                             fg_elev: utilities.FGElev) -> List[Tree]:
+    """Uses trees directly mapped in OSM."""
+    trees = list()
+
+    for key, node in osm_nodes_dict.items():
+        elev = fg_elev.probe_elev((node.lon, node.lat), True)
+        x, y = coords_transform.to_local((node.lon, node.lat))
+        tree = Tree(key, x, y, elev)
+        tree.parse_tags(node.tags)
+        trees.append(tree)
+    return trees
+
+
+def _process_osm_trees_ways(nodes_dict, ways_dict, trees: List[Tree], buildings: List[shg.Polygon], coord_transform,
+                            fg_elev: utilities.FGElev) -> None:
+    """Additional trees based on specific land-use (not woods) in urban areas.
+
+    NB: extends the existing list of trees from the input parameter.
+    """
+    additional_trees = list()  # not directly adding to trees due to spatial comparison
+    mapped_factor = math.pow(parameters.C2P_TREES_DIST_BETWEEN_TREES_PARK_MAPPED, 2)
+    for way in list(ways_dict.values()):
+        my_geometry = way.polygon_from_osm_way(nodes_dict, coord_transform)
+        trees_contained = 0
+        if my_geometry:
+            # check whether any of the existing manually mapped trees is within the area.
+            # if yes, then most probably all trees where manually mapped
+            for tree in trees:
+                if my_geometry.contains(shg.Point(tree.x, tree.y)):
+                    trees_contained += 1
+            if trees_contained == 0 or (my_geometry.area / trees_contained) > mapped_factor:
+                # we are good to try to add more trees
+                points = _random_points_in_polygon(my_geometry,
+                                                   buildings,
+                                                   parameters.C2P_TREES_DIST_BETWEEN_TREES_PARK,
+                                                   parameters.C2P_TREES_SKIP_RATE_TREES_PARK)
+                for point in points:
+                    elev = fg_elev.probe_elev((point.x, point.y), False)
+                    additional_trees.append(Tree(op.get_next_pseudo_osm_id(op.OSMFeatureType.generic_node),
+                                                 point.x, point.y, elev))
+    trees.extend(additional_trees)
+
+
+def _random_points_in_polygon(my_polygon: shg.Polygon, buildings: List[shg.Polygon],
+                              default_distance: int, skip_rate: float) -> List[shg.Point]:
+    """Creates a random set of points within a polygon based on an average distance and a skip rate.
+
+    This is not a very efficient algorithm, but it should be enough to give an ok distribution.
+
+    The trees are geometrically tested against the boundary box of buildings (not the whole tree, just the centre).
+    NB: in parks trees are often around open spaces and not just randomly distributed - this heuristic does
+    not take such things into account.
+    """
+    my_random_points = list()
+    my_bounds = my_polygon.bounds
+    max_x = int((my_bounds[2] - my_bounds[0]) // default_distance)
+    max_y = int((my_bounds[3] - my_bounds[1]) // default_distance)
+    for i in range(max_x):
+        for j in range(max_y):
+            if random.random() < skip_rate:
+                continue
+            x = my_bounds[0] + i * default_distance + random.uniform(-default_distance/3, default_distance/3)
+            y = my_bounds[1] + j * default_distance + random.uniform(-default_distance/3, default_distance/3)
+            my_point = shg.Point(x, y)
+            if my_polygon.contains(my_point):
+                my_random_points.append(my_point)
+    # now check against buildings
+    final_points = list()
+    for point in my_random_points:
+        cleared = True
+        for b in buildings:
+            if b.bounds[0] < point.x < b.bounds[1] and b.bounds[2] < point.y < b.bounds[3]:
+                cleared = False
+                break
+        if cleared:
+            final_points.append(point)
+    return my_random_points
+
+
+def _write_trees_in_list(coords_transform: co.Transformation,
+                         trees: List[Tree], stg_manager: stg_io2.STGManager) -> None:
+    material_name_shader = 'OSMTrees'
+    file_shader = stg_manager.prefix + "_trees_shader.txt"
+    path_to_stg = stg_manager.add_tree_list(file_shader, material_name_shader, coords_transform.anchor, 0.)
+    try:
+        with open(os.path.join(path_to_stg, file_shader), 'w') as shader:
+            for t in trees:
+                line = '{:.1f} {:.1f} {:.1f} {}'.format(-t.y, t.x, t.elev,
+                                                        t.tree_type.value)
+                shader.write(line)
+                shader.write('\n')
+    except IOError as e:
+        logging.warning('Could not write trees in list to file %s', e)
+    logging.info("Total number of shader trees written to a tree_list: %d", len(trees))
 
 
 class StorageTank(SharedPylon):
@@ -597,8 +717,9 @@ def _process_osm_wind_turbines(osm_nodes_dict: Dict[int, op.Node], coords_transf
                 shared_within_distance = False
                 for entry in stg_entries:
                     if entry.verb_type is stg_io2.STGVerbType.object_shared:
-                        if co.calc_distance_global(entry.lon, entry.lat, node.lon, node.lat) < parameters.C2P_WIND_TURBINE_MIN_DISTANCE_SHARED_OBJECT:
-                            logging.debug("Excluding turbine osm_id = {} due to overlap shared object.".format(node.osm_id))
+                        if co.calc_distance_global(entry.lon, entry.lat, node.lon, node.lat) < \
+                                parameters.C2P_WIND_TURBINE_MIN_DISTANCE_SHARED_OBJECT:
+                            logging.debug("Excluding turbine osm_id = {} - overlaps shared object.".format(node.osm_id))
                             shared_within_distance = True
                             break
                 if shared_within_distance:
@@ -1012,7 +1133,8 @@ class RailLine(Line):
         if my_length < RailLine.DEFAULT_MAST_DISTANCE:
             current_distance += (my_length / 2)
             point_on_line = self.linear.interpolate(current_distance)
-            mast_point = my_right_parallel.interpolate(my_right_parallel_length - current_distance * (my_right_parallel_length / my_length))
+            mast_point = my_right_parallel.interpolate(my_right_parallel_length - current_distance * (
+                    my_right_parallel_length / my_length))
             is_right = self.check_mast_left_right(mast_point, rail_lines_list)
             if is_right:
                 direction_type = PylonDirectionType.mirror
@@ -1023,7 +1145,8 @@ class RailLine(Line):
         else:
             current_distance += RailLine.OFFSET
             point_on_line = self.linear.interpolate(current_distance)
-            mast_point = my_right_parallel.interpolate(my_right_parallel_length - current_distance * (my_right_parallel_length / my_length))
+            mast_point = my_right_parallel.interpolate(my_right_parallel_length - current_distance * (
+                    my_right_parallel_length / my_length))
             is_right = self.check_mast_left_right(mast_point, rail_lines_list)
             if is_right:
                 direction_type = PylonDirectionType.mirror
@@ -1060,7 +1183,8 @@ class RailLine(Line):
                     else:
                         current_distance += RailLine.DEFAULT_MAST_DISTANCE
                 point_on_line = self.linear.interpolate(current_distance)
-                mast_point = my_right_parallel.interpolate(my_right_parallel_length - current_distance * (my_right_parallel_length / my_length))
+                mast_point = my_right_parallel.interpolate(my_right_parallel_length - current_distance *
+                                                           (my_right_parallel_length / my_length))
                 is_right = self.check_mast_left_right(mast_point, rail_lines_list)
                 if is_right:
                     direction_type = PylonDirectionType.mirror
@@ -1764,7 +1888,7 @@ def process_pylons(coords_transform: co.Transformation, fg_elev: utilities.FGEle
     # wind turbines
     wind_turbines = list()
     if parameters.C2P_PROCESS_WIND_TURBINES:
-        osm_nodes_dict = op.fetch_db_nodes_isolated(list(), ["generator:source=>wind"])
+        osm_nodes_dict = op.fetch_db_nodes_isolated(list(), [s.KV_GENERATOR_SOURCE_WIND])
         wind_turbines = _process_osm_wind_turbines(osm_nodes_dict, coords_transform, fg_elev, stg_entries)
         logging.info("Number of valid wind turbines found: {}".format(len(wind_turbines)))
     # chimneys
@@ -1779,6 +1903,22 @@ def process_pylons(coords_transform: co.Transformation, fg_elev: utilities.FGEle
         osm_ways_dict = osm_way_result.ways_dict
         chimneys.extend(_process_osm_chimneys_ways(osm_nodes_dict, osm_ways_dict, coords_transform, fg_elev))
         logging.info("Number of valid chimneys found: {}".format(len(chimneys)))
+
+    trees = list()
+    if parameters.C2P_PROCESS_TREES:
+        # start with trees tagged as node (we are not taking into account the few areas mapped as tree (wrong tagging)
+        osm_nodes_dict = op.fetch_db_nodes_isolated(list(), [s.KV_NATURAL_TREE])
+        trees = _process_osm_trees_nodes(osm_nodes_dict, coords_transform, fg_elev)
+        logging.info("Number of manually mapped trees found: {}".format(len(trees)))
+
+        # add trees to potential areas
+        # s.KV_LANDUSE_RECREATION_GROUND would be a possibility, but often has also swimming pools etc.
+        # making it a bit difficult
+        osm_way_result = op.fetch_osm_db_data_ways_key_values([s.KV_LEISURE_PARK])
+        osm_nodes_dict = osm_way_result.nodes_dict
+        osm_ways_dict = osm_way_result.ways_dict
+        _process_osm_trees_ways(osm_nodes_dict, osm_ways_dict, trees, building_refs, coords_transform, fg_elev)
+        logging.info("Total number of trees after artificial generation: {}".format(len(trees)))
 
     # free some memory
     del building_refs
@@ -1810,6 +1950,9 @@ def process_pylons(coords_transform: co.Transformation, fg_elev: utilities.FGEle
     if parameters.C2P_PROCESS_CHIMNEYS:
         for chimney in chimneys:
             chimney.make_stg_entry(stg_manager)
+
+    if parameters.C2P_PROCESS_TREES:
+        _write_trees_in_list(coords_transform, trees, stg_manager)
 
     stg_manager.write(file_lock)
 
