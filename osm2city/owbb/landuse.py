@@ -794,8 +794,11 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
             last_time = time_logging("Time used in seconds for processing BTG building zones", last_time)
 
         btg_polygons = btg.process_polygons_from_btg_faces(btg_reader, btg.WATER_MATERIALS, False, transformer)
+        last_time = time_logging("Time used in seconds for getting raw BTG water polygons", last_time)
         btg_transport = btg.process_polygons_from_btg_faces(btg_reader, btg.TRANSPORT_MATERIALS, False, transformer,
                                                             False)
+        last_time = time_logging("Time used in seconds for getting raw BTG transport polygons", last_time)
+
         water_areas = _merge_btg_transport_in_water(btg_polygons, btg_transport)
         last_time = time_logging("Time used in seconds for processing BTG water polygons", last_time)
         logging.info('Final count of BTG water polygons is: %i', len(water_areas))

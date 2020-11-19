@@ -533,7 +533,15 @@ class Roads(object):
         """Processes the OSM data until data can be clusterised."""
         self._remove_tunnels()
         self._replace_short_bridges_with_ways()
-        self._check_against_blocked_areas(water_areas, True)
+        # only use water areas, which are not small canals (if they would be broad, then there would be a bridge
+        # and we would also be fine - also after removing short bridges)
+        large_water_areas = list()
+        for water_area in water_areas:
+            # 20 is ca. a rectangle of length 100 and width 1
+            if water_area.length / math.sqrt(water_area.area) < 20:
+                large_water_areas.append(water_area)
+        logging.info('Reduced number of water areas from %i to %i', len(water_areas), len(large_water_areas))
+        self._check_against_blocked_areas(large_water_areas, True)
         self._check_ways_sanity('_check_against_blocked_areas_water')
         self._check_against_blocked_areas(blocked_areas)
         self._check_ways_sanity('_check_against_blocked_areas')
@@ -584,7 +592,10 @@ class Roads(object):
             my_list = [way]
             continue_loop = True
             loop_counter = 0  # a bit of a hack because the road could almost endlessly be split up
-            while continue_loop and my_list and loop_counter < 10:
+            while continue_loop and my_list:
+                if loop_counter >= 50:
+                    logging.info('loop broken for way %i after 50 loops', way.osm_id)
+                    break
                 loop_counter += 1
                 continue_loop = False  # only set to true if something changed
                 continue_intersect = True
@@ -597,13 +608,13 @@ class Roads(object):
                             continue_intersect = False
                             continue_loop = True
                             break
-                    if continue_intersect:
+                    if continue_intersect:  # i.e. is not within any of the merged_areas
                         for blocked_area in merged_areas:
+                            if my_line.disjoint(blocked_area) or my_line.touches(blocked_area):
+                                continue
                             if my_line.intersects(blocked_area):
                                 my_line_difference = my_line.difference(blocked_area)
-                                length_diff = my_line.length - my_line_difference.length
-                                if isinstance(my_line_difference, shg.LineString) and \
-                                        length_diff > parameters.TOLERANCE_MATCH_NODE:
+                                if isinstance(my_line_difference, shg.LineString):
                                     if my_line_difference.length < parameters.OVERLAP_CHECK_ROAD_MIN_REMAINING:
                                         my_list.remove(a_way)
                                         logging.debug('removed %d because too short', a_way.osm_id)
@@ -614,14 +625,15 @@ class Roads(object):
                                     break
                                 elif isinstance(my_line_difference, shg.MultiLineString):
                                     split_ways = self._split_way_for_object(my_line_difference, a_way)
-                                    if len(split_ways) > 0:
+                                    if not split_ways:
+                                        my_list.remove(a_way)
+                                        logging.debug('removed %d because too short', a_way.osm_id)
+                                    elif len(split_ways) > 0:
                                         for split_way in split_ways:
                                             my_list.append(split_way)
-                                        logging.debug('split %d into %d ways', a_way.osm_id, len(split_ways) + 1)
-                                    else:
-                                        my_list.remove(a_way)
-                                        continue_loop = True
-                                        break
+                                        logging.debug('split %d into %d additional ways', a_way.osm_id, len(split_ways))
+                                    continue_loop = True
+                                    break
             if my_list:
                 new_ways.extend(my_list)
 
@@ -737,11 +749,14 @@ class Roads(object):
         original_way.refs = utilities.match_local_coords_with_global_nodes(the_coordinates, prev_refs, self.nodes_dict,
                                                                            self.transform, original_way.osm_id, True)
 
-    def _split_way_for_object(self, my_multiline: shg.MultiLineString, original_way: op.Way) -> List[op.Way]:
+    def _split_way_for_object(self, my_multiline: shg.MultiLineString, original_way: op.Way) -> Optional[List[op.Way]]:
         """Processes an original linear_obj split by an object (blocked area, stg_entry) and creates additional
         linear_obj.
         If one of the line strings is shorter than parameter, then it is discarded to reduce the number of residuals.
-        The list of returned ways can be empty, in which case the original linear_obj should be removed after the call.
+        If the list of returned ways is empty, then it means that there were no additional ways created, which where
+        longer than the min length defined by a parameter.
+        If None is returned, then none of the split lines were long enough and also the original way needs to
+        be removed.
         """
         is_first = True
         additional_ways = list()
@@ -758,7 +773,9 @@ class Roads(object):
                     new_way = _init_way_from_existing(original_way, list())
                     new_way.refs = new_refs
                     additional_ways.append(new_way)
-        return additional_ways
+        if is_first is False:  # at least the original way was corrected
+            return additional_ways
+        return None
 
     def _remove_unused_nodes(self):
         """Remove all nodes which are not used in ways in order not to do elevation probing in vane."""
