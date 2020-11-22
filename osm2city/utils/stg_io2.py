@@ -118,11 +118,16 @@ class STGFile(object):
             self.other_list = self.other_list + lines[:ours_start]
             lines = lines[ours_end + 1:]
 
-    def add_object(self, stg_verb: str, ac_file_name: str, lon_lat, elev: float, hdg: float, once: bool = False) -> str:
+    def add_object(self, stg_verb: str, ac_file_name: str, lon_lat, elev: float, hdg: float,
+                   radius: Optional[float]) -> str:
         """add OBJECT_XXXXX line to our_list. Returns path to stg."""
-        line = "%s %s %1.5f %1.5f %1.2f %g\n" % (stg_verb.upper(),
-                                                 ac_file_name, lon_lat.lon, lon_lat.lat, elev, hdg)
-        if once is False or (ac_file_name not in self.our_ac_file_name_list):
+        line = "%s %s %1.5f %1.5f %1.2f %g" % (stg_verb.upper(),
+                                               ac_file_name, lon_lat.lon, lon_lat.lat, elev, hdg)
+        if parameters.FLAG_AFTER_2020_3 and radius is not None:
+            line += ' 0.0 0.0 ' + str(radius) + '\n'
+        else:
+            line += '\n'
+        if ac_file_name not in self.our_ac_file_name_list:
             self.our_list.append(line)
             self.our_ac_file_name_list.append(ac_file_name)
             logging.debug(self.file_name + ':' + line)
@@ -191,16 +196,16 @@ class STGManager(object):
             self.stg_dict[tile_index] = the_stg_file
         return the_stg_file
 
-    def add_object_static(self, ac_file_name: str, lon_lat: Vec2d, elev: float, hdg: float,
-                          stg_verb_type: STGVerbType = STGVerbType.object_static, once: bool = False) -> str:
+    def add_object_static(self, ac_file_name: str, lon_lat: Vec2d, elev: float, hdg: float, radius: float,
+                          stg_verb_type: STGVerbType = STGVerbType.object_static) -> str:
         """Adds OBJECT_STATIC line. Returns path to stg."""
         the_stg_file = self._find_create_stg_file(lon_lat)
-        return the_stg_file.add_object(stg_verb_type.name.upper(), ac_file_name, lon_lat, elev, hdg, once)
+        return the_stg_file.add_object(stg_verb_type.name.upper(), ac_file_name, lon_lat, elev, hdg, radius)
 
     def add_object_shared(self, ac_file_name: str, lon_lat: Vec2d, elev: float, hdg: float) -> None:
         """Adds OBJECT_SHARED line."""
         the_stg_file = self._find_create_stg_file(lon_lat)
-        the_stg_file.add_object('OBJECT_SHARED', ac_file_name, lon_lat, elev, hdg)
+        the_stg_file.add_object('OBJECT_SHARED', ac_file_name, lon_lat, elev, hdg, None)
 
     def add_building_list(self, building_list_name: str, material_name: str, lon_lat: Vec2d, elev: float) -> str:
         """Adds a BUILDING_LIST line"""

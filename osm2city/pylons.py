@@ -1591,7 +1591,8 @@ def write_cable_clusters(cluster_container: cluster.ClusterContainer, coords_tra
             if details:
                 cluster_filename += 'd'
             cluster_filename += "c%i%i.ac" % (cl.grid_index.ix, cl.grid_index.iy)
-            path_to_stg = my_stg_mgr.add_object_static(cluster_filename + '.ac', cluster_center_global, 0, 90,
+            path_to_stg = my_stg_mgr.add_object_static(cluster_filename, cluster_center_global, 0, 90,
+                                                       parameters.get_cluster_dimension_radius(),
                                                        cluster_container.stg_verb_type)
 
             ac_file_lines = list()
@@ -1609,7 +1610,7 @@ def write_cable_clusters(cluster_container: cluster.ClusterContainer, coords_tra
                     cable.translate_vertices_relative(cl.center.x, cl.center.y, 0)
                     ac_file_lines.append(cable.make_ac_entry(mat.Material.cable.value))
 
-            with open(os.path.join(path_to_stg, cluster_filename + ".ac"), 'w') as f:
+            with open(os.path.join(path_to_stg, cluster_filename), 'w') as f:
                 f.write("\n".join(ac_file_lines))
 
 
@@ -1935,10 +1936,7 @@ def process_pylons(coords_transform: co.Transformation, fg_elev: utilities.FGEle
                                      parameters.PREFIX)
 
     # Write to FlightGear
-    cmin, cmax = parameters.get_extent_global()
-    logging.info("min/max " + str(cmin) + " " + str(cmax))
-    lmin = co.Vec2d(coords_transform.to_local(cmin))
-    lmax = co.Vec2d(coords_transform.to_local(cmax))
+    lmin, lmax = parameters.get_extent_local(coords_transform)
     cluster_container = cluster.ClusterContainer(lmin, lmax, stg_io2.STGVerbType.object_building_mesh_detailed)
 
     if parameters.C2P_PROCESS_POWERLINES:

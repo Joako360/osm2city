@@ -1148,7 +1148,7 @@ class Roads(object):
         """Create cluster.
            Put objects in clusters based on their centroid.
         """
-        lmin, lmax = [co.Vec2d(self.transform.to_local(c)) for c in parameters.get_extent_global()]
+        lmin, lmax = parameters.get_extent_local(self.transform)
         self.roads_clusters = ClusterContainer(lmin, lmax)
         self.roads_rough_clusters = ClusterContainer(lmin, lmax)
         self.railways_clusters = ClusterContainer(lmin, lmax)
@@ -1237,6 +1237,7 @@ def _process_clusters(clusters, fg_elev: utilities.FGElev,
             else:
                 stg_verb_type = stg_io2.STGVerbType.object_road_rough
         path_to_stg = stg_manager.add_object_static(file_name + '.ac', center_global, cluster_elev, 0,
+                                                    parameters.get_cluster_dimension_radius(),
                                                     stg_verb_type)
         stg_paths.add(path_to_stg)
         ac.write(os.path.join(path_to_stg, file_name + '.ac'))

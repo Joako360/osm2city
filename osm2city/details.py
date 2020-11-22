@@ -19,12 +19,7 @@ OUR_MAGIC = "details"
 def process_details(coords_transform: co.Transformation, lit_areas: Optional[List[shg.Polygon]],
                     fg_elev: utilities.FGElev, file_lock: mp.Lock = None) -> None:
     stats = utilities.Stats()
-    # -- prepare transformation to local coordinates
-    cmin, cmax = parameters.get_extent_global()
-
-    # -- create (empty) clusters
-    lmin = co.Vec2d(coords_transform.to_local(cmin))
-    lmax = co.Vec2d(coords_transform.to_local(cmax))
+    lmin, lmax = parameters.get_extent_local(coords_transform)
     clusters = ClusterContainer(lmin, lmax)
 
     # piers
@@ -56,7 +51,8 @@ def process_details(coords_transform: co.Transformation, lit_areas: Optional[Lis
                     detail.write(obj, cl.center)
                 else:
                     detail.write(fg_elev, obj, cl.center)
-            path = stg_manager.add_object_static(ac_file_name, cluster_center_global, 0, 0)
+            path = stg_manager.add_object_static(ac_file_name, cluster_center_global, 0, 0,
+                                                 parameters.get_cluster_dimension_radius())
             file_name = os.path.join(path, ac_file_name)
             f = open(file_name, 'w')
             f.write(str(ac))

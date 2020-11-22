@@ -14,6 +14,7 @@ Ludomotico contributed a cleaner version of read_from_file().
 
 import argparse
 import logging
+import math
 import sys
 import traceback
 import types
@@ -428,10 +429,21 @@ def get_center_global():
     return (cmin + cmax) * 0.5
 
 
-def get_extent_global():
+def get_extent_local(transformer: co.Transformation) -> typing.Tuple[co.Vec2d, co.Vec2d]:
     cmin = co.Vec2d(BOUNDARY_WEST, BOUNDARY_SOUTH)
     cmax = co.Vec2d(BOUNDARY_EAST, BOUNDARY_NORTH)
-    return cmin, cmax
+    logging.info("min/max " + str(cmin) + " " + str(cmax))
+    lmin = co.Vec2d(transformer.to_local((cmin.x, cmin.y)))
+    lmax = co.Vec2d(transformer.to_local((cmax.x, cmax.y)))
+    return lmin, lmax
+
+
+def get_tile_radius() -> float:
+    return co.calc_distance_global(BOUNDARY_WEST, BOUNDARY_SOUTH, BOUNDARY_EAST, BOUNDARY_NORTH) * 0.5
+
+
+def get_cluster_dimension_radius() -> float:
+    return math.sqrt(2) * CLUSTER_DIMENSION
 
 
 def get_tile_index() -> int:

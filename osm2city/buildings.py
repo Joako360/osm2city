@@ -681,6 +681,7 @@ def _write_obstruction_lights(coords_transform: co.Transformation, stg_manager: 
     if len(models_list) > 0:
         obstr_file_name = stg_manager.prefix + '_o.xml'
         path_to_stg = stg_manager.add_object_static(obstr_file_name, coords_transform.anchor, 0., 0,
+                                                    parameters.get_tile_radius(),
                                                     stg_io2.STGVerbType.object_static)
         xml = open(os.path.join(path_to_stg, obstr_file_name), "w")
         xml.write('<?xml version="1.0"?>\n<PropertyList>\n')
@@ -1000,10 +1001,7 @@ def _write_buildings_in_meshes(coords_transform: co.Transformation,
                                stg_manager: stg_io2.STGManager,
                                stats: utilities.Stats) -> None:
     # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
-    cmin, cmax = parameters.get_extent_global()
-    logging.info("min/max " + str(cmin) + " " + str(cmax))
-    lmin = co.Vec2d(coords_transform.to_local(cmin))
-    lmax = co.Vec2d(coords_transform.to_local(cmax))
+    lmin, lmax = parameters.get_extent_local(coords_transform)
 
     handled_clusters = list()  # cluster.ClusterContainer objects
     clusters_building_mesh_detailed = cluster.ClusterContainer(lmin, lmax,
@@ -1045,6 +1043,7 @@ def _write_buildings_in_meshes(coords_transform: co.Transformation,
             logging.info("writing cluster %s with %d buildings" % (file_name, len(cl.objects)))
 
             path_to_stg = stg_manager.add_object_static(file_name + '.ac', cluster_center_global, 0., 0,
+                                                        parameters.get_cluster_dimension_radius(),
                                                         my_clusters.stg_verb_type)
 
             building_lib.write(os.path.join(path_to_stg, file_name + ".ac"), cl.objects,
