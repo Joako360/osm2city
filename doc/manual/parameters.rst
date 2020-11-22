@@ -507,8 +507,9 @@ Parameters for some light effects.
 =============================================   ========   =======   ==============================================================================
 Parameter                                       Type       Default   Description / Example
 =============================================   ========   =======   ==============================================================================
-OBSTRUCTION_LIGHT_MIN_LEVELS                    Integer    15        Puts red obstruction lights on buildings >= the specified number levels.
-                                                                     If you do not want this, then just set the value to 0.
+OBSTRUCTION_LIGHT_MIN_HEIGHT                    Integer    150       Puts red obstruction lights on buildings >= the specified number levels.
+                                                                     If you do not want this, then just set the value to 0. The official FAA
+                                                                     `source`_ specifies 499 feet (153 m) as a rule.
 
 BUILDING_FAKE_AMBIENT_OCCLUSION                 Boolean    True      Fake ambient occlusion by darkening facade textures towards the ground, using
                                                                      the formula 1 - VALUE * exp(- AGL / HEIGHT ) during texture atlas generation.
@@ -517,6 +518,8 @@ BUILDING_FAKE_AMBIENT_OCCLUSION_VALUE           Number     0.6       (see above)
 
 =============================================   ========   =======   ==============================================================================
 
+
+.. _`source`: https://www.faa.gov/documentlibrary/media/advisory_circular/ac_70_7460-1l_.pdf
 
 .. _chapter-parameters-building-generation:
 

@@ -16,7 +16,7 @@ TODO:
 @author: vanosten
 """
 
-from enum import IntEnum, unique
+from enum import Enum, IntEnum, unique
 import logging
 import math
 import multiprocessing as mp
@@ -26,6 +26,7 @@ from typing import Dict, List, Tuple
 import unittest
 
 import shapely.geometry as shg
+from shapely.prepared import prep
 
 from osm2city import cluster, roads, parameters
 from osm2city.textures import materials as mat
@@ -408,9 +409,9 @@ def _process_osm_chimneys_ways(nodes_dict, ways_dict, my_coord_transformator,
     return chimneys
 
 
-class TreeType(IntEnum):
+class TreeType(Enum):
     """The tree type needs to correspond to the available types in the FG material for (OSM) trees."""
-    default = 0  # a typical full grown tree for the region - larger than a house.
+    default = 'DeciduousBroadCover'  # a typical full grown tree for the region - larger than a house.
 
 
 class Tree:
@@ -453,18 +454,24 @@ def _process_osm_trees_ways(nodes_dict, ways_dict, trees: List[Tree], buildings:
     """
     additional_trees = list()  # not directly adding to trees due to spatial comparison
     mapped_factor = math.pow(parameters.C2P_TREES_DIST_BETWEEN_TREES_PARK_MAPPED, 2)
+    logging.info('Number of polygons for process for trees: %i', len(ways_dict))
+    tree_points_to_check = list()
+    for tree in trees:
+        tree_points_to_check.append(shg.Point(tree.x, tree.y))
     for way in list(ways_dict.values()):
         my_geometry = way.polygon_from_osm_way(nodes_dict, coord_transform)
         trees_contained = 0
-        if my_geometry:
+        if my_geometry and my_geometry.area > parameters.C2P_TREES_PARK_MIN_SIZE:
+            prep_geom = prep(my_geometry)
             # check whether any of the existing manually mapped trees is within the area.
             # if yes, then most probably all trees where manually mapped
-            for tree in trees:
-                if my_geometry.contains(shg.Point(tree.x, tree.y)):
+            for tree_point in reversed(tree_points_to_check):
+                if prep_geom.contains(tree_point):
                     trees_contained += 1
+                    tree_points_to_check.remove(tree_point)
             if trees_contained == 0 or (my_geometry.area / trees_contained) > mapped_factor:
                 # we are good to try to add more trees
-                points = _random_points_in_polygon(my_geometry,
+                points = _random_points_in_polygon(my_geometry, prep_geom,
                                                    buildings,
                                                    parameters.C2P_TREES_DIST_BETWEEN_TREES_PARK,
                                                    parameters.C2P_TREES_SKIP_RATE_TREES_PARK)
@@ -475,7 +482,7 @@ def _process_osm_trees_ways(nodes_dict, ways_dict, trees: List[Tree], buildings:
     trees.extend(additional_trees)
 
 
-def _random_points_in_polygon(my_polygon: shg.Polygon, buildings: List[shg.Polygon],
+def _random_points_in_polygon(my_polygon: shg.Polygon, prep_geom, buildings: List[shg.Polygon],
                               default_distance: int, skip_rate: float) -> List[shg.Point]:
     """Creates a random set of points within a polygon based on an average distance and a skip rate.
 
@@ -496,7 +503,7 @@ def _random_points_in_polygon(my_polygon: shg.Polygon, buildings: List[shg.Polyg
             x = my_bounds[0] + i * default_distance + random.uniform(-default_distance/3, default_distance/3)
             y = my_bounds[1] + j * default_distance + random.uniform(-default_distance/3, default_distance/3)
             my_point = shg.Point(x, y)
-            if my_polygon.contains(my_point):
+            if prep_geom.contains(my_point):
                 my_random_points.append(my_point)
     # now check against buildings
     final_points = list()
@@ -513,14 +520,13 @@ def _random_points_in_polygon(my_polygon: shg.Polygon, buildings: List[shg.Polyg
 
 def _write_trees_in_list(coords_transform: co.Transformation,
                          trees: List[Tree], stg_manager: stg_io2.STGManager) -> None:
-    material_name_shader = 'OSMTrees'
+    material_name_shader = TreeType.default.value
     file_shader = stg_manager.prefix + "_trees_shader.txt"
     path_to_stg = stg_manager.add_tree_list(file_shader, material_name_shader, coords_transform.anchor, 0.)
     try:
         with open(os.path.join(path_to_stg, file_shader), 'w') as shader:
             for t in trees:
-                line = '{:.1f} {:.1f} {:.1f} {}'.format(-t.y, t.x, t.elev,
-                                                        t.tree_type.value)
+                line = '{:.1f} {:.1f} {:.1f}'.format(-t.y, t.x, t.elev)
                 shader.write(line)
                 shader.write('\n')
     except IOError as e:
@@ -679,8 +685,8 @@ class WindFarm(object):
         self.turbines.add(turbine)
 
     def determine_shared_model(self):
-        """Stupidly assumes that all turbines actually belong to same farm and have same type.
-        In the end assignes shared model to all turbines in the farm"""
+        """Stupidly assumes that all turbines actually belong to same farm and have the same type.
+        In the end assigns shared model to all turbines in the farm."""
 
         # first do some statistics
         max_height = 0
@@ -1905,7 +1911,7 @@ def process_pylons(coords_transform: co.Transformation, fg_elev: utilities.FGEle
         logging.info("Number of valid chimneys found: {}".format(len(chimneys)))
 
     trees = list()
-    if parameters.C2P_PROCESS_TREES:
+    if parameters.C2P_PROCESS_TREES and parameters.FLAG_AFTER_2020_3:
         # start with trees tagged as node (we are not taking into account the few areas mapped as tree (wrong tagging)
         osm_nodes_dict = op.fetch_db_nodes_isolated(list(), [s.KV_NATURAL_TREE])
         trees = _process_osm_trees_nodes(osm_nodes_dict, coords_transform, fg_elev)
@@ -1951,7 +1957,7 @@ def process_pylons(coords_transform: co.Transformation, fg_elev: utilities.FGEle
         for chimney in chimneys:
             chimney.make_stg_entry(stg_manager)
 
-    if parameters.C2P_PROCESS_TREES:
+    if parameters.C2P_PROCESS_TREES and parameters.FLAG_AFTER_2020_3:
         _write_trees_in_list(coords_transform, trees, stg_manager)
 
     stg_manager.write(file_lock)

@@ -88,6 +88,7 @@ BUILDING_LIST_AREA_DEVIATION = 0.9
 BUILDING_LIST_DIST_DEVIATION = 0.8
 
 FLAG_NEXT_GEN_TEXTURING = False
+FLAG_AFTER_2020_3 = False
 
 # Debugging by plotting with Matplotlib to pdfs. See description about its use in the appendix of the manual
 DEBUG_PLOT_RECTIFY = False
@@ -204,7 +205,7 @@ LOD_ALWAYS_DETAIL_BELOW_LEVELS = 3  # -- below this number of levels, buildings 
 LOD_PERCENTAGE_DETAIL = 0.5         # -- of the remaining buildings, this percentage will be LOD detail,
                                     #    the rest will be LOD rough.
 
-OBSTRUCTION_LIGHT_MIN_LEVELS = 15   # -- put obstruction lights on buildings with >= given levels. 0 for no lights.
+OBSTRUCTION_LIGHT_MIN_HEIGHT = 150   # -- put obstruction lights on buildings with >= height. 0 for no lights.
 
 # discard cluster if too few objects. Do not go below 1, otherwise lots of empty ac-objects and useless STG entries.
 CLUSTER_MIN_OBJECTS = 5
@@ -286,6 +287,7 @@ C2P_CHIMNEY_DEFAULT_HEIGHT_VARIATION = 10  # a random variation on top of the de
 C2P_TREES_DIST_BETWEEN_TREES_PARK = 15  # the average distance between trees in a park
 C2P_TREES_SKIP_RATE_TREES_PARK = 0.7  # the rate at which trees are skipped of generated (0.7 means 7 out of 10 skipped)
 C2P_TREES_DIST_BETWEEN_TREES_PARK_MAPPED = 100  # the average distance between trees in a park for testing manual
+C2P_TREES_PARK_MIN_SIZE = 600  # the minimal size of a park to be taken into account
 
 # =============================================================================
 # PARAMETERS RELATED TO roads.py

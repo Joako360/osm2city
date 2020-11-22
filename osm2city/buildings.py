@@ -660,7 +660,7 @@ def _write_obstruction_lights(coords_transform: co.Transformation, stg_manager: 
     """Add obstruction lights on top of high buildings."""
     models_list = list()  # list of strings
     for b in the_buildings:
-        if b.levels >= parameters.OBSTRUCTION_LIGHT_MIN_LEVELS:
+        if b.building_height >= parameters.OBSTRUCTION_LIGHT_MIN_HEIGHT:
             nodes_outer = np.array(b.pts_outer)
             for i in np.arange(0, b.pts_outer_count, b.pts_outer_count / 4.):
                 xo = nodes_outer[int(i + 0.5), 0]
