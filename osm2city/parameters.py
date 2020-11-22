@@ -289,6 +289,8 @@ C2P_TREES_DIST_BETWEEN_TREES_PARK = 15  # the average distance between trees in 
 C2P_TREES_SKIP_RATE_TREES_PARK = 0.7  # the rate at which trees are skipped of generated (0.7 means 7 out of 10 skipped)
 C2P_TREES_DIST_BETWEEN_TREES_PARK_MAPPED = 100  # the average distance between trees in a park for testing manual
 C2P_TREES_PARK_MIN_SIZE = 600  # the minimal size of a park to be taken into account
+C2P_TREES_MAX_AVG_DIST_TREES_ROW = 25  # if average distance between mapped trees smaller, then replace with calculated
+C2P_TREES_DIST_TREES_ROW_CALCULATED = 20
 
 # =============================================================================
 # PARAMETERS RELATED TO roads.py

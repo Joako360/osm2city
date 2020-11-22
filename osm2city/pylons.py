@@ -431,6 +431,14 @@ class Tree:
         if s.K_DENOTATION in tags:  # significant trees should be at least normal
             self.tree_type = TreeType.default
 
+    @classmethod
+    def tree_from_node(cls, node: op.Node, coords_transform: co.Transformation, fg_elev: utilities.FGElev) -> 'Tree':
+        elev = fg_elev.probe_elev((node.lon, node.lat), True)
+        x, y = coords_transform.to_local((node.lon, node.lat))
+        tree = Tree(node.osm_id, x, y, elev)
+        tree.parse_tags(node.tags)
+        return tree
+
 
 def _process_osm_trees_nodes(osm_nodes_dict: Dict[int, op.Node], coords_transform: co.Transformation,
                              fg_elev: utilities.FGElev) -> List[Tree]:
@@ -438,11 +446,7 @@ def _process_osm_trees_nodes(osm_nodes_dict: Dict[int, op.Node], coords_transfor
     trees = list()
 
     for key, node in osm_nodes_dict.items():
-        elev = fg_elev.probe_elev((node.lon, node.lat), True)
-        x, y = coords_transform.to_local((node.lon, node.lat))
-        tree = Tree(key, x, y, elev)
-        tree.parse_tags(node.tags)
-        trees.append(tree)
+        trees.append(Tree.tree_from_node(node, coords_transform, fg_elev))
     return trees
 
 
@@ -516,6 +520,30 @@ def _random_points_in_polygon(my_polygon: shg.Polygon, prep_geom, buildings: Lis
         if cleared:
             final_points.append(point)
     return my_random_points
+
+
+def _process_osm_trees_along(nodes_dict, ways_dict, trees: List[Tree], coord_transform,
+                             fg_elev: utilities.FGElev) -> None:
+    """Additional trees based on specific land-use (not woods) in urban areas.
+
+    NB: extends the existing list of trees from the input parameter.
+    """
+    for way in list(ways_dict.values()):
+        my_geometry = way.line_string_from_osm_way(nodes_dict, coord_transform)
+        if my_geometry.length / len(way.refs) > parameters.C2P_TREES_MAX_AVG_DIST_TREES_ROW:
+            for i in range(0, int(my_geometry.length // parameters.C2P_TREES_DIST_TREES_ROW_CALCULATED)):
+                my_point = my_geometry.interpolate(i * parameters.C2P_TREES_DIST_TREES_ROW_CALCULATED)
+                my_id = op.get_next_pseudo_osm_id(op.OSMFeatureType.generic_node)
+                elev = fg_elev.probe_elev((my_point.x, my_point.y), False)
+                tree = Tree(my_id, my_point.x, my_point.y, elev)
+                trees.append(tree)
+            # and then always the last node
+            node = nodes_dict[way.refs[-1]]
+            trees.append(Tree.tree_from_node(node, coord_transform, fg_elev))
+        else:
+            for ref in way.refs:
+                node = nodes_dict[ref]
+                trees.append(Tree.tree_from_node(node, coord_transform, fg_elev))
 
 
 def _write_trees_in_list(coords_transform: co.Transformation,
@@ -1927,7 +1955,22 @@ def process_pylons(coords_transform: co.Transformation, fg_elev: utilities.FGEle
         _process_osm_trees_ways(osm_nodes_dict, osm_ways_dict, trees, building_refs, coords_transform, fg_elev)
         logging.info("Total number of trees after artificial generation: {}".format(len(trees)))
 
-    # free some memory
+        # add trees in a row
+        osm_way_result = op.fetch_osm_db_data_ways_key_values([s.KV_TREE_ROW])
+        osm_nodes_dict = osm_way_result.nodes_dict
+        osm_ways_dict = osm_way_result.ways_dict
+        _process_osm_trees_along(osm_nodes_dict, osm_ways_dict, trees, coords_transform, fg_elev)
+        logging.info("Total number of trees after trees along rows etc.: {}".format(len(trees)))
+
+        # add trees lined along a road
+        # osm_way_result = op.fetch_osm_db_data_ways_keys([s.KV_TREE_ROW])
+        # osm_nodes_dict = osm_way_result.nodes_dict
+        # osm_ways_dict = osm_way_result.ways_dict
+        # _process_osm_trees_along(osm_nodes_dict, osm_ways_dict, trees, coords_transform, fg_elev)
+        # logging.info("Total number of trees after trees lined road: {}".format(len(trees)))
+
+
+# free some memory
     del building_refs
 
     # -- initialize STGManager
