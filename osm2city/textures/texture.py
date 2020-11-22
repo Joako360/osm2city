@@ -9,7 +9,7 @@ import numpy as np
 
 from osm2city import parameters
 from osm2city.textures.materials import screen_texture_tags_for_colour_spelling, map_hex_colour
-from osm2city.types import osmstrings as s
+from osm2city.static_types import osmstrings as s
 from osm2city.utils.utilities import replace_with_os_separator, Stats
 
 

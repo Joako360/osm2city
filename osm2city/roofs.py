@@ -8,8 +8,8 @@ import numpy as np
 
 import osm2city.utils.ac3d as ac
 import osm2city.utils.coordinates as coord
-from osm2city.types import enumerations as enu
-from osm2city.types import osmstrings as s
+from osm2city.static_types import enumerations as enu
+from osm2city.static_types import osmstrings as s
 from osm2city.utils.utilities import Stats
 from osm2city.textures.texture import Texture, RoofManager
 

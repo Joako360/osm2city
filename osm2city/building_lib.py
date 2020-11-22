@@ -38,11 +38,11 @@ from osm2city import myskeleton, parameters, roofs
 from osm2city.textures import materials as mat
 from osm2city.textures import texture as tex
 from osm2city.textures import texturing as text
-import osm2city.types.enumerations as enu
+import osm2city.static_types.enumerations as enu
 from osm2city.utils import coordinates as co
 from osm2city.utils import osmparser as op
 from osm2city.utils import utilities, ac3d
-from osm2city.types import osmstrings as s
+from osm2city.static_types import osmstrings as s
 from osm2city.utils import stg_io2
 
 

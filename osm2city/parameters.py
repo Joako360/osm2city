@@ -25,7 +25,7 @@ import osm2city.textures.road
 import osm2city.utils.calc_tile as ct
 import osm2city.utils.coordinates as co
 import osm2city.utils.log_helper as ulog
-import osm2city.types.osmstrings as s
+import osm2city.static_types.osmstrings as s
 
 # default_args_start # DO NOT MODIFY THIS LINE
 # -*- coding: utf-8 -*-
@@ -443,7 +443,7 @@ def get_tile_radius() -> float:
 
 
 def get_cluster_dimension_radius() -> float:
-    return math.sqrt(2) * CLUSTER_DIMENSION
+    return math.sqrt(2) * CLUSTER_DIMENSION * 0.5
 
 
 def get_tile_index() -> int:

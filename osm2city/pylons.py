@@ -33,7 +33,7 @@ from osm2city.textures import materials as mat
 from osm2city.utils import coordinates as co
 from osm2city.utils import utilities, stg_io2
 from osm2city.utils import osmparser as op
-from osm2city.types import osmstrings as s
+from osm2city.static_types import osmstrings as s
 
 OUR_MAGIC = "pylons"  # Used in e.g. stg files to mark edits by osm2pylon
 OUT_MAGIC_DETAILS = "pylonsDetails"

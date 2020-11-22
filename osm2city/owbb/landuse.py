@@ -12,14 +12,14 @@ from shapely.geometry import box, LineString, MultiPolygon, Polygon, CAP_STYLE, 
 from shapely.ops import unary_union
 from shapely.prepared import prep
 
-import osm2city.types.enumerations as enu
+import osm2city.static_types.enumerations as enu
 from osm2city import building_lib as bl
 from osm2city import buildings as bu
 from osm2city.owbb import models as m
 import osm2city.owbb.plotting as plotting
 import osm2city.owbb.would_be_buildings as wbb
 import osm2city.parameters as parameters
-import osm2city.types.osmstrings as s
+import osm2city.static_types.osmstrings as s
 import osm2city.utils.aptdat_io as aptdat_io
 import osm2city.utils.btg_io as btg
 import osm2city.utils.osmparser as op

@@ -20,7 +20,7 @@ from shapely.geometry.linestring import LineString
 from osm2city import parameters
 from osm2city.utils import coordinates as co
 from osm2city.utils import utilities, ac3d, osmparser, stg_io2
-from osm2city.types import osmstrings as s
+from osm2city.static_types import osmstrings as s
 
 
 class Pier(object):

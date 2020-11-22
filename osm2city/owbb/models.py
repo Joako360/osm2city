@@ -16,11 +16,11 @@ from shapely.geometry import box, Point, LineString, Polygon, MultiPolygon
 import shapely.affinity as saf
 from shapely.prepared import prep
 
-import osm2city.types.enumerations as enu
+import osm2city.static_types.enumerations as enu
 from osm2city import parameters
 from osm2city import building_lib as bl
 from osm2city.utils import osmparser as op
-from osm2city.types import osmstrings as s
+from osm2city.static_types import osmstrings as s
 from osm2city.utils import coordinates as co
 from osm2city.utils import json_io as wio
 

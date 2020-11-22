@@ -11,14 +11,14 @@ import sys
 from shapely.geometry import box
 from shapely.geometry import LineString, MultiLineString, Polygon
 
-import osm2city.types.enumerations as enu
+import osm2city.static_types.enumerations as enu
 from osm2city import parameters
 from osm2city.owbb import plotting
 import osm2city.building_lib as bl
 import osm2city.owbb.models as m
 import osm2city.utils.coordinates as co
 import osm2city.utils.osmparser as op
-import osm2city.types.osmstrings as s
+import osm2city.static_types.osmstrings as s
 from osm2city.utils.utilities import time_logging, random_value_from_ratio_dict_parameter
 
 

@@ -73,7 +73,7 @@ from osm2city import linear, parameters
 from osm2city.cluster import ClusterContainer
 import osm2city.textures.road
 from osm2city.textures import materials as mat
-from osm2city.types import osmstrings as s
+from osm2city.static_types import osmstrings as s
 import osm2city.utils.osmparser as op
 from osm2city.utils import utilities, ac3d, graph, stg_io2
 import osm2city.utils.coordinates as co

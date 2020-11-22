@@ -8,7 +8,7 @@ import shapely.geometry as shg
 from osm2city import parameters, piers, platforms, pylons
 from osm2city.cluster import ClusterContainer
 from osm2city.textures import materials as mat
-from osm2city.types import osmstrings as s
+from osm2city.static_types import osmstrings as s
 from osm2city.utils import coordinates as co
 from osm2city.utils import ac3d, utilities, stg_io2
 

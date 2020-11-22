@@ -11,7 +11,7 @@ from shapely.geometry import MultiPolygon, Polygon
 
 import osm2city.building_lib as bl
 import osm2city.owbb.models as m
-import osm2city.types.enumerations as enu
+import osm2city.static_types.enumerations as enu
 import osm2city.utils.plot_utilities as pu
 
 

@@ -15,7 +15,7 @@ from osm2city.textures import road
 from osm2city.utils import ac3d
 from osm2city.utils import coordinates as co
 from osm2city.utils import osmparser as op
-from osm2city.types import osmstrings as s
+from osm2city.static_types import osmstrings as s
 from osm2city.utils.utilities import FGElev
 
 

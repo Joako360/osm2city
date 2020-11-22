@@ -2,7 +2,7 @@ from enum import unique, IntEnum
 import logging
 from typing import Dict, Optional, Union
 
-from osm2city.types import osmstrings as s
+from osm2city.static_types import osmstrings as s
 
 
 KeyValueDict = Dict[str, str]

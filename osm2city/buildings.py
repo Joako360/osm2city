@@ -29,8 +29,8 @@ import osm2city.utils.coordinates as co
 import osm2city.utils.osmparser as op
 from osm2city.utils import utilities, stg_io2
 from osm2city.owbb import plotting as p
-from osm2city.types import osmstrings as s
-from osm2city.types import enumerations as enu
+from osm2city.static_types import osmstrings as s
+from osm2city.static_types import enumerations as enu
 
 OUR_MAGIC = "osm2city"  # Used in e.g. stg files to mark edits by osm2city
 
