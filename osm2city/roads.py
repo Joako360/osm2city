@@ -85,10 +85,6 @@ def is_tunnel(tags: Dict[str, str]) -> bool:
     return s.K_TUNNEL in tags and tags[s.K_TUNNEL] not in [s.V_NO]
 
 
-# specifies a linear_obj that was originally a bridge, but due to length was changed
-REPLACED_BRIDGE_KEY = 'replaced_bridge'
-
-
 def _is_bridge(tags: Dict[str, str]) -> bool:
     """Returns true if the tags for this linear_obj contains the OSM key for bridge."""
     if s.K_MAN_MADE in tags and tags[s.K_MAN_MADE] == s.V_BRIDGE:
@@ -103,14 +99,14 @@ def _replace_bridge_tags(tags: Dict[str, str]) -> None:
         tags.pop(s.K_BRIDGE)
     if s.K_MAN_MADE in tags and tags[s.K_MAN_MADE] == s.V_BRIDGE:
         tags.pop(s.K_MAN_MADE)
-    tags[REPLACED_BRIDGE_KEY] = s.V_YES
+    tags[s.K_REPLACED_BRIDGE_KEY] = s.V_YES
 
 
 def _is_replaced_bridge(tags: Dict[str, str]) -> bool:
     """Returns true is this linear_obj was originally a bridge, but was changed to a non-bridge due to length.
     See method Roads._replace_short_bridges_with_ways.
     The reason to keep a replaced_tag is because else the linear_obj might be split if a node is in the water."""
-    return REPLACED_BRIDGE_KEY in tags
+    return s.K_REPLACED_BRIDGE_KEY in tags
 
 
 def _is_highway(way: op.Way) -> bool:
@@ -288,27 +284,28 @@ def highway_type_from_osm_tags(tags: Dict[str, str]) -> Optional[HighwayType]:
 
     if value in [s.V_MOTORWAY]:
         return HighwayType.motorway
-    elif value in ["trunk"]:
+    elif value in [s.V_TRUNK]:
         return HighwayType.trunk
-    elif value in ["primary"]:
+    elif value in [s.V_PRIMARY]:
         return HighwayType.primary
-    elif value in ["secondary"]:
+    elif value in [s.V_SECONDARY]:
         return HighwayType.secondary
-    elif value in ["tertiary", "tertiary_link", "secondary_link", "primary_link", "motorway_link", "trunk_link"]:
+    elif value in [s.V_TERTIARY,
+                   s.V_TERTIARY_LINK, s.V_SECONDARY_LINK, s.V_PRIMARY_LINK, s.V_MOTORWAY_LINK, s.V_TRUNK_LINK]:
         return HighwayType.tertiary
-    elif value == "unclassified":
+    elif value == s.V_UNCLASSIFIED:
         return HighwayType.unclassified
-    elif value == "road":
+    elif value == s.V_ROAD:
         return HighwayType.road
-    elif value == "residential":
+    elif value == s.V_RESIDENTIAL:
         return HighwayType.residential
-    elif value == "living_street":
+    elif value == s.V_LIVING_STREET:
         return HighwayType.living_street
-    elif value == "service":
+    elif value == s.V_SERVICE:
         return HighwayType.service
-    elif value == "pedestrian":
+    elif value == s.V_PEDESTRIAN:
         return HighwayType.pedestrian
-    elif value in ["track", "footway", "cycleway", "bridleway", "steps", "path"]:
+    elif value in [s.V_TRACK, s.V_FOOTWAY, s.V_CYCLEWAY, s.V_BRIDLEWAY, s.V_STEPS, s.V_PATH]:
         return HighwayType.slow
     else:
         return None

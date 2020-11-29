@@ -252,21 +252,22 @@ class OpenSpace(OSMFeatureArea):
             return None
         elif s.K_PUBLIC_TRANSPORT in tags_dict:
             return OpenSpaceType.transport
-        elif (s.K_RAILWAY in tags_dict) and (tags_dict[s.K_RAILWAY] == "station"):
+        elif (s.K_RAILWAY in tags_dict) and (tags_dict[s.K_RAILWAY] == s.V_STATION):
             return OpenSpaceType.transport
         elif s.K_LANDUSE in tags_dict:  # must be in sync with BuildingZone
-            if tags_dict[s.K_LANDUSE] == "railway":
+            if tags_dict[s.K_LANDUSE] == s.V_RAILWAY:
                 return OpenSpaceType.transport
             elif BuildingZone.is_building_zone_value(tags_dict[s.K_LANDUSE]):
                 return None
             else:
                 return OpenSpaceType.landuse
         elif s.K_AMENITY in tags_dict:
-            if tags_dict[s.K_AMENITY] in ["grave_yard", "parking"]:
+            if tags_dict[s.K_AMENITY] in [s.V_GRAVE_YARD, s.V_PARKING]:
                 return OpenSpaceType.amenity
         elif s.K_LEISURE in tags_dict:
-            if tags_dict[s.K_LEISURE] in ['beach_resort', 'common', 'dog_park', 'garden', 'horse_riding', 'marina',
-                                          'nature_reserve', 'park', 'pitch', 'playground', 'swimming_area', 'track']:
+            if tags_dict[s.K_LEISURE] in [s.V_BEACH_RESORT, s.V_COMMON, s.V_DOG_PARK, s.V_GARDEN, s.V_HORSE_RIDING,
+                                          s.V_MARINA, s.V_NATURE_RESERVE, s.V_PARK, s.V_PITCH, s.V_PLAYGROUND,
+                                          s.V_SWIMMING_AREA, s.V_TRACK]:
                 return OpenSpaceType.leisure
         elif s.K_NATURAL in tags_dict:
             return OpenSpaceType.natural
@@ -590,14 +591,14 @@ class OSMFeatureLinear(OSMFeature):
 
     @staticmethod
     def _parse_tags_embankment(tags_dict: KeyValueDict) -> bool:
-        return "embankment" in tags_dict or "cutting" in tags_dict
+        return s.K_EMBANKMENT in tags_dict or s.K_CUTTING in tags_dict
 
     @staticmethod
     def _parse_tags_tunnel(tags_dict: KeyValueDict) -> bool:
         """If this is tagged with tunnel, then _type = None.
         Thereby the object is invalid and will not be added. Because tunnels do not interfere with buildings.
         """
-        if ("tunnel" in tags_dict) and (tags_dict["tunnel"] == "yes"):
+        if (s.K_TUNNEL in tags_dict) and (tags_dict[s.K_TUNNEL] == s.V_YES):
             return True
         return False
 
@@ -618,9 +619,9 @@ class Waterway(OSMFeatureLinear):
     @staticmethod
     def parse_tags(tags_dict: KeyValueDict) -> Union[WaterwayType, None]:
         value = tags_dict[s.K_WATERWAY]
-        if value in ["river", "canal"]:
+        if value in [s.V_RIVER, s.V_CANAL]:
             return WaterwayType.large
-        elif value in ["stream", "wadi", "drain", "ditch"]:
+        elif value in [s.V_STREAM, s.V_WADI, s.V_DRAIN, s.V_DITCH]:
             return WaterwayType.narrow
         return None
 
@@ -772,35 +773,35 @@ class Highway(OSMFeatureLinearWithTunnel):
     def parse_tags(tags_dict: KeyValueDict) -> Union[None, HighwayType]:
         if s.K_HIGHWAY in tags_dict:
             value = tags_dict[s.K_HIGHWAY]
-            if value in ["motorway", "motorway_link"]:
+            if value in [s.V_MOTORWAY, s.V_MOTORWAY_LINK]:
                 return HighwayType.motorway
-            elif value in ["trunk", "trunk_link"]:
+            elif value in [s.V_TRUNK, s.V_TRUNK_LINK]:
                 return HighwayType.trunk
-            elif value in ["primary", "primary_link"]:
+            elif value in [s.V_PRIMARY, s.V_PRIMARY_LINK]:
                 return HighwayType.primary
-            elif value in ["secondary", "secondary_link"]:
+            elif value in [s.V_SECONDARY, s.V_SECONDARY_LINK]:
                 return HighwayType.secondary
-            elif value in ["tertiary", "tertiary_link"]:
+            elif value in [s.V_TERTIARY, s.V_TERTIARY_LINK]:
                 return HighwayType.tertiary
-            elif value == "unclassified":
+            elif value == s.V_UNCLASSIFIED:
                 return HighwayType.unclassified
-            elif value == "road":
+            elif value == s.V_ROAD:
                 return HighwayType.road
-            elif value == "residential":
+            elif value == s.V_RESIDENTIAL:
                 return HighwayType.residential
-            elif value == "living_street":
+            elif value == s.V_LIVING_STREET:
                 return HighwayType.living_street
-            elif value == "service":
+            elif value == s.V_SERVICE:
                 return HighwayType.service
-            elif value == "pedestrian":
+            elif value == s.V_PEDESTRIAN:
                 return HighwayType.pedestrian
-            elif value in ["tack", "footway", "cycleway", "bridleway", "steps", "path"]:
+            elif value in [s.V_TRACK, s.V_FOOTWAY, s.V_CYCLEWAY, s.V_BRIDLEWAY, s.V_STEPS, s.V_PATH]:
                 return HighwayType.slow
             return None
 
     @staticmethod
     def _parse_tags_roundabout(tags_dict: KeyValueDict) -> bool:
-        if (s.K_JUNCTION in tags_dict) and (tags_dict[s.K_JUNCTION] == "roundabout"):
+        if (s.K_JUNCTION in tags_dict) and (tags_dict[s.K_JUNCTION] == s.V_ROUNDABOUT):
             return True
         return False
 
