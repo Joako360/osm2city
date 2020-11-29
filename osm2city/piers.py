@@ -23,7 +23,10 @@ from osm2city.utils import utilities, ac3d, osmparser, stg_io2
 from osm2city.static_types import osmstrings as s
 
 
-class Pier(object):
+class Pier:
+    __slots__ = ('osm_id', 'tags', 'refs', 'typ', 'nodes', 'elevation', 'osm_nodes', 'anchor',
+                 'segment_len', 'dist')
+
     def __init__(self, transform, osm_id, tags, refs, nodes_dict):
         self.osm_id = osm_id
         self.tags = tags

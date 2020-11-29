@@ -43,6 +43,7 @@ class Bounds(object):
 
 
 class OSMFeature(abc.ABC):
+    __slots__ = ('osm_id', 'type_', 'geometry')
     """The base class for OSM Map Features cf. http://wiki.openstreetmap.org/wiki/Map_Features"""
     def __init__(self, osm_id: int, geometry, feature_type) -> None:
         self.osm_id = osm_id
@@ -175,6 +176,8 @@ class Place(OSMFeature):
 
 
 class SettlementCluster:
+    __slots__ = ('linked_places', 'geometry')
+
     """A polygon based on lit_area representing a settlement cluster.
     Built-up areas can sprawl and a coherent area can contain several cities and towns."""
     def __init__(self, linked_places: List[Place], geometry: Polygon) -> None:
@@ -202,7 +205,9 @@ class BlockedAreaType(IntEnum):
     railway = 13
 
 
-class BlockedArea(object):
+class BlockedArea:
+    __slots__ = ('type_', 'polygon', 'original_type')
+
     """An object representing a specific type of blocked area - blocked for new generated buildings"""
     def __init__(self, type_: BlockedAreaType, polygon: Polygon, original_type=None) -> None:
         self.type_ = type_
@@ -274,6 +279,9 @@ class OpenSpace(OSMFeatureArea):
 
 class CityBlock:
     """A special land-use derived from many kinds of land-use info and enclosed by streets (kind of)."""
+    __slots__ = ('osm_id', 'geometry', 'prep_geom', 'type_', 'osm_buildings',
+                 '__settlement_type', 'settlement_type_changed', '__building_levels')
+
     def __init__(self, osm_id: int, geometry: Polygon, feature_type: Union[None, enu.BuildingZoneType]) -> None:
         self.osm_id = osm_id
         self.geometry = geometry
@@ -474,6 +482,8 @@ class BuildingZone(OSMFeatureArea):
 
 
 class BTGBuildingZone(object):
+    __slots__ = ('id', 'type_', 'geometry')
+
     """A land-use from materials in FlightGear read from BTG-files"""
     def __init__(self, external_id, type_, geometry) -> None:
         self.id = str(external_id)  # String
@@ -483,6 +493,8 @@ class BTGBuildingZone(object):
 
 class GeneratedBuildingZone(BuildingZone):
     """A fake OSM Land-use for buildings based on heuristics"""
+    __slots__ = 'from_buildings'
+
     def __init__(self, generated_id, geometry, building_zone_type) -> None:
         super().__init__(generated_id, geometry, building_zone_type)
         self.from_buildings = self.type_ is enu.BuildingZoneType.non_osm
@@ -557,6 +569,8 @@ class GeneratedBuildingZone(BuildingZone):
 
 
 class OSMFeatureLinear(OSMFeature):
+    __slots__ = 'has_embankment'
+
     def __init__(self, osm_id: int, geometry: LineString, tags_dict: KeyValueDict) -> None:
         feature_type = self.parse_tags(tags_dict)
         super().__init__(osm_id, geometry, feature_type)
@@ -628,6 +642,8 @@ class Waterway(OSMFeatureLinear):
 
 
 class OSMFeatureLinearWithTunnel(OSMFeatureLinear):
+    __slots__ = 'is_tunnel'
+
     def __init__(self, osm_id: int, geometry: LineString, tags_dict: KeyValueDict) -> None:
         super().__init__(osm_id, geometry, tags_dict)
         self.is_tunnel = self._parse_tags_tunnel(tags_dict)
@@ -652,6 +668,8 @@ class RailwayLineType(IntEnum):
 
 class RailwayLine(OSMFeatureLinearWithTunnel):
     """A 'Railway' OSM map feature (only tracks, not land-use etc)"""
+    __slots__ = ('tracks', 'is_service_spur')
+
     def __init__(self, osm_id: int, geometry: LineString, tags_dict: KeyValueDict) -> None:
         super().__init__(osm_id, geometry, tags_dict)
         self.tracks = self._parse_tags_tracks(tags_dict)
@@ -730,6 +748,8 @@ class HighwayType(IntEnum):
 
 
 class Highway(OSMFeatureLinearWithTunnel):
+    __slots__ = ('is_roundabout', 'is_oneway', 'lanes', 'refs', 'along_city_block', 'reversed_city_block')
+
     def __init__(self, osm_id: int, geometry: LineString, tags_dict: KeyValueDict, refs: List[int]) -> None:
         super().__init__(osm_id, geometry, tags_dict)
         self.is_roundabout = self._parse_tags_roundabout(tags_dict)
@@ -852,6 +872,7 @@ class BuildingModel(object):
     All geometry information is either in the AC3D model or in tags.
 
     Tags contains e.g. roof type, number of levels etc. according to OSM tagging."""
+    __slots__ = ('width', 'depth', 'model_type', 'regions', 'model', 'facade_id', 'roof_id', 'tags')
 
     def __init__(self, width: float, depth: float, model_type: enu.BuildingType, regions: List[str],
                  model: Optional[str], facade_id: int, roof_id: int, tags: KeyValueDict) -> None:
@@ -884,6 +905,8 @@ class BuildingModel(object):
 
 
 class SharedModel(object):
+    __slots__ = ('building_model', '_front_buffer', '_back_buffer', '_side_buffer')
+
     def __init__(self, building_model: BuildingModel) -> None:
         self.building_model = building_model
         self._front_buffer = 0
@@ -1040,8 +1063,11 @@ class SharedModelsLibrary(object):
         return True
 
 
-class GenBuilding(object):
+class GenBuilding:
     """An object representing a generated non-OSM building"""
+    __slots__ = ('gen_id', 'shared_model', 'area_polygon', 'buffer_polygon', 'distance_to_street',
+                 'x', 'y', 'angle', 'zone')
+
     def __init__(self, gen_id: int, shared_model: SharedModel, highway_width: float,
                  settlement_type: enu.SettlementType) -> None:
         self.gen_id = gen_id
@@ -1116,8 +1142,11 @@ class GenBuilding(object):
         return my_building
 
 
-class TempGenBuildings(object):
+class TempGenBuildings:
     """Stores generated buildings temporarily before validations shows that they can be committed"""
+    __slots__ = ('bounding_box', 'generated_blocked_areas', 'generated_buildings',
+                 'blocked_areas_along_objects', 'blocked_areas_along_sequence')
+
     def __init__(self, bounding_box) -> None:
         self.bounding_box = bounding_box
         self.generated_blocked_areas = list()  # List of BlockedArea objects from temp generated buildings

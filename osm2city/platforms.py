@@ -19,6 +19,9 @@ from osm2city.static_types import osmstrings as s
 
 
 class Platform(object):
+    __slots__ = ('osm_id', 'tags', 'refs', 'typ', 'nodes', 'osm_nodes', 'is_area', 'line_string', 'anchor',
+                 'segment_len', 'dist')
+
     def __init__(self, transform, osm_id, tags, refs, nodes_dict):
         self.osm_id = osm_id
         self.tags = tags

@@ -22,6 +22,8 @@ from osm2city.utils import utilities as u
 
 
 class SceneryTile(object):
+    __slots__ = ('boundary_west', 'boundary_south', 'boundary_north', 'boundary_east', 'tile_index', 'prefix')
+
     def __init__(self, my_boundary_west: float, my_boundary_south: float,
                  my_boundary_east: float, my_boundary_north: float,
                  my_tile_index: int, prefix: str) -> None:
