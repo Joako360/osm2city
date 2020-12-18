@@ -74,6 +74,7 @@ from osm2city.cluster import ClusterContainer
 import osm2city.textures.road
 from osm2city.textures import materials as mat
 from osm2city.static_types import osmstrings as s
+from osm2city.static_types import enumerations as e
 import osm2city.utils.osmparser as op
 from osm2city.utils import utilities, ac3d, graph, stg_io2
 import osm2city.utils.coordinates as co
@@ -81,20 +82,10 @@ import osm2city.utils.coordinates as co
 OUR_MAGIC = "osm2roads"  # Used in e.g. stg files to mark our edits
 
 
-def is_tunnel(tags: Dict[str, str]) -> bool:
-    return s.K_TUNNEL in tags and tags[s.K_TUNNEL] not in [s.V_NO]
-
-
-def _is_bridge(tags: Dict[str, str]) -> bool:
-    """Returns true if the tags for this linear_obj contains the OSM key for bridge."""
-    if s.K_MAN_MADE in tags and tags[s.K_MAN_MADE] == s.V_BRIDGE:
-        return True
-    if s.K_BRIDGE in tags and tags not in [s.V_NO]:
-        return True
-    return False
-
-
 def _replace_bridge_tags(tags: Dict[str, str]) -> None:
+    """Transforms an original bridge to a non-bridge.
+    Needs to be in sync with method osmstrings.is_bridge().
+    """
     if s.K_BRIDGE in tags:
         tags.pop(s.K_BRIDGE)
     if s.K_MAN_MADE in tags and tags[s.K_MAN_MADE] == s.V_BRIDGE:
@@ -102,43 +93,28 @@ def _replace_bridge_tags(tags: Dict[str, str]) -> None:
     tags[s.K_REPLACED_BRIDGE_KEY] = s.V_YES
 
 
-def _is_replaced_bridge(tags: Dict[str, str]) -> bool:
-    """Returns true is this linear_obj was originally a bridge, but was changed to a non-bridge due to length.
-    See method Roads._replace_short_bridges_with_ways.
-    The reason to keep a replaced_tag is because else the linear_obj might be split if a node is in the water."""
-    return s.K_REPLACED_BRIDGE_KEY in tags
-
-
-def _is_highway(way: op.Way) -> bool:
-    return s.K_HIGHWAY in way.tags
-
-
-def is_railway(way: op.Way) -> bool:
-    return s.K_RAILWAY in way.tags
-
-
 def _compatible_ways(way1: op.Way, way2: op.Way) -> bool:
     """Returns True if both ways are either a railway, a bridge or a highway - and have common type attributes"""
     logging.debug("trying join %i %i", way1.osm_id, way2.osm_id)
-    if is_railway(way1) != is_railway(way2):
+    if s.is_railway(way1.tags) != s.is_railway(way2.tags):
         logging.debug("Nope, either both or none must be railway")
         return False
-    elif _is_bridge(way1.tags) != _is_bridge(way2.tags):
+    elif s.is_bridge(way1.tags) != s.is_bridge(way2.tags):
         logging.debug("Nope, either both or none must be a bridge")
         return False
-    elif _is_highway(way1) != _is_highway(way2):
+    elif s.is_highway(way1.tags) != s.is_highway(way2.tags):
         logging.debug("Nope, either both or none must be a highway")
         return False
-    elif _is_highway(way1) and _is_highway(way2):
+    elif s.is_highway(way1.tags) and s.is_highway(way2.tags):
         # check type
-        if highway_type_from_osm_tags(way1.tags) != highway_type_from_osm_tags(way2.tags):
+        if e.highway_type_from_osm_tags(way1.tags) != e.highway_type_from_osm_tags(way2.tags):
             logging.debug("Nope, both must be of same highway type")
             return False
         # check lit
         if s.is_lit(way1.tags) != s.is_lit(way2.tags):
             logging.debug("Nope, both must be lit or not")
             return False
-    elif is_railway(way1) and is_railway(way2):
+    elif s.is_railway(way1.tags) and s.is_railway(way2.tags):
         if railway_type_from_osm_tags(way1.tags) != railway_type_from_osm_tags(way2.tags):
             logging.debug("Nope, both must be of same railway type")
             return False
@@ -227,88 +203,39 @@ def railway_type_from_osm_tags(tags: Dict[str, str]) -> Optional[RailwayType]:
         return None
 
 
-@enum.unique
-class HighwayType(enum.IntEnum):
-    roundabout = 13
-    motorway = 12
-    trunk = 11
-    primary = 10
-    secondary = 9
-    tertiary = 8
-    unclassified = 7
-    road = 6
-    residential = 5
-    living_street = 4
-    service = 3
-    pedestrian = 2
-    slow = 1  # cycle ways, tracks, footpaths etc
-
-
-def get_highway_attributes(highway_type: HighwayType) -> Tuple[Tuple[float, float], float]:
-    """This must be aligned with HighwayType as well as textures.road and Roads.create_linear_objects."""
-    if highway_type is HighwayType.roundabout:
+def get_highway_attributes(highway_type: e.HighwayType) -> Tuple[Tuple[float, float], float]:
+    """This must be aligned with enumerations.HighwayType as well as textures.road and Roads.create_linear_objects."""
+    if highway_type is e.HighwayType.roundabout:
         tex = osm2city.textures.road.ROAD_1
         width = 6.
-    elif highway_type is HighwayType.motorway:
+    elif highway_type is e.HighwayType.motorway:
         tex = osm2city.textures.road.ROAD_3
         width = 6.
-    elif highway_type in [HighwayType.primary, HighwayType.trunk]:
+    elif highway_type in [e.HighwayType.primary, e.HighwayType.trunk]:
         tex = osm2city.textures.road.ROAD_2
         width = 6.
-    elif highway_type in [HighwayType.secondary]:
+    elif highway_type in [e.HighwayType.secondary]:
         tex = osm2city.textures.road.ROAD_2
         width = 6.
-    elif highway_type in [HighwayType.tertiary, HighwayType.unclassified, HighwayType.road]:
+    elif highway_type in [e.HighwayType.tertiary, e.HighwayType.unclassified, e.HighwayType.road]:
         tex = osm2city.textures.road.ROAD_1
         width = 6.
-    elif highway_type in [HighwayType.residential, HighwayType.service]:
+    elif highway_type in [e.HighwayType.one_way_multi_lane]:
+        tex = osm2city.textures.road.ROAD_2  # fake now because texture/shader not available
+        width = 6.
+    elif highway_type in [e.HighwayType.one_way_large]:
+        tex = osm2city.textures.road.ROAD_1  # fake now because texture/shader not available
+        width = 4.
+    elif highway_type in [e.HighwayType.one_way_normal]:
+        tex = osm2city.textures.road.ROAD_1  # fake now because texture/shader not available
+        width = 3.
+    elif highway_type in [e.HighwayType.residential, e.HighwayType.service]:
         tex = osm2city.textures.road.ROAD_1
         width = 4.
     else:
         tex = osm2city.textures.road.ROAD_1
         width = 4.
     return tex, width
-
-
-def highway_type_from_osm_tags(tags: Dict[str, str]) -> Optional[HighwayType]:
-    """Based on OSM tags deducts the HighwayType.
-    Returns None if not a highway are unknown value.
-    """
-    if s.K_HIGHWAY in tags:
-        value = tags[s.K_HIGHWAY]
-    else:
-        return None
-
-    if s.K_JUNCTION in tags and tags[s.K_JUNCTION] in [s.V_ROUNDABOUT, s.V_CIRCULAR]:
-        return HighwayType.roundabout
-
-    if value in [s.V_MOTORWAY]:
-        return HighwayType.motorway
-    elif value in [s.V_TRUNK]:
-        return HighwayType.trunk
-    elif value in [s.V_PRIMARY]:
-        return HighwayType.primary
-    elif value in [s.V_SECONDARY]:
-        return HighwayType.secondary
-    elif value in [s.V_TERTIARY,
-                   s.V_TERTIARY_LINK, s.V_SECONDARY_LINK, s.V_PRIMARY_LINK, s.V_MOTORWAY_LINK, s.V_TRUNK_LINK]:
-        return HighwayType.tertiary
-    elif value == s.V_UNCLASSIFIED:
-        return HighwayType.unclassified
-    elif value == s.V_ROAD:
-        return HighwayType.road
-    elif value == s.V_RESIDENTIAL:
-        return HighwayType.residential
-    elif value == s.V_LIVING_STREET:
-        return HighwayType.living_street
-    elif value == s.V_SERVICE:
-        return HighwayType.service
-    elif value == s.V_PEDESTRIAN:
-        return HighwayType.pedestrian
-    elif value in [s.V_TRACK, s.V_FOOTWAY, s.V_CYCLEWAY, s.V_BRIDLEWAY, s.V_STEPS, s.V_PATH]:
-        return HighwayType.slow
-    else:
-        return None
 
 
 def max_slope_for_road(obj):
@@ -583,7 +510,7 @@ class Roads(object):
 
         new_ways = list()
         for way in reversed(self.ways_list):
-            if is_water and (_is_bridge(way.tags) or _is_replaced_bridge(way.tags)):
+            if is_water and (s.is_bridge(way.tags) or s.is_replaced_bridge(way.tags)):
                 new_ways.append(way)
                 continue
             my_list = [way]
@@ -884,13 +811,13 @@ class Roads(object):
     def _remove_tunnels(self):
         """Remove tunnels."""
         for the_way in reversed(self.ways_list):
-            if is_tunnel(the_way.tags):
+            if s.is_tunnel(the_way.tags):
                 self.ways_list.remove(the_way)
 
     def _replace_short_bridges_with_ways(self):
         """Remove bridge tag from short bridges, making them a simple linear_obj."""
         for the_way in self.ways_list:
-            if _is_bridge(the_way.tags):
+            if s.is_bridge(the_way.tags):
                 bridge = self._line_string_from_way(the_way)
                 if bridge.length < parameters.BRIDGE_MIN_LENGTH:
                     _replace_bridge_tags(the_way.tags)
@@ -931,8 +858,8 @@ class Roads(object):
                         between = 0
                     else:
                         between = 1
-                    if _is_highway(the_way):
-                        type_factor = highway_type_from_osm_tags(the_way.tags)
+                    if s.is_highway(the_way.tags):
+                        type_factor = e.highway_type_from_osm_tags(the_way.tags)
                     else:
                         type_factor = railway_type_from_osm_tags(the_way.tags) * 100  # 100 -> railway on top of roads
                     way_tuples.append((the_way, between, type_factor, the_way.osm_id))
@@ -962,27 +889,27 @@ class Roads(object):
         self.G = graph.Graph()
 
         for the_way in self.ways_list:
-            if _is_highway(the_way):
-                highway_type = highway_type_from_osm_tags(the_way.tags)
+            if s.is_highway(the_way.tags):
+                highway_type = e.highway_type_from_osm_tags(the_way.tags)
                 # in method Roads.store_way smaller highways already got removed
 
                 tex, width = get_highway_attributes(highway_type)
 
-            elif is_railway(the_way):
+            elif s.is_railway(the_way.tags):
                 railway_type = railway_type_from_osm_tags(the_way.tags)
                 tex, width = _get_railway_attributes(railway_type, the_way.tags)
             else:
                 continue
 
             try:
-                if _is_bridge(the_way.tags):
+                if s.is_bridge(the_way.tags):
                     obj = linear.LinearBridge(self.transform, self.fg_elev, the_way, self.nodes_dict, lit_areas,
                                               width, tex_coords=tex)
                     self.bridges_list.append(obj)
                 else:
                     obj = linear.LinearObject(self.transform, the_way, self.nodes_dict, lit_areas,
                                               width, tex_coords=tex)
-                    if is_railway(the_way):
+                    if s.is_railway(the_way.tags):
                         self.railway_list.append(obj)
                     else:
                         self.roads_list.append(obj)
@@ -1151,12 +1078,12 @@ class Roads(object):
         self.railways_clusters = ClusterContainer(lmin, lmax)
 
         for the_object in self.bridges_list + self.roads_list + self.railway_list:
-            if is_railway(the_object.way):
+            if s.is_railway(the_object.way.tags):
                 cluster_ref = self.railways_clusters.append(co.Vec2d(the_object.center.centroid.coords[0]),
                                                             the_object, stats)
             else:
-                if _is_highway(the_object.way):
-                    if highway_type_from_osm_tags(the_object.way.tags).value < parameters.HIGHWAY_TYPE_MIN_ROUGH_LOD:
+                if s.is_highway(the_object.way.tags):
+                    if e.highway_type_from_osm_tags(the_object.way.tags).value < parameters.HIGHWAY_TYPE_MIN_ROUGH_LOD:
                         cluster_ref = self.roads_clusters.append(co.Vec2d(the_object.center.centroid.coords[0]),
                                                                  the_object, stats)
                     else:
@@ -1179,13 +1106,13 @@ def _process_osm_ways(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, op.Wa
             logging.debug("SKIPPING OSM_ID %i", way.osm_id)
             continue
 
-        if _is_highway(way):
-            highway_type = highway_type_from_osm_tags(way.tags)
+        if s.is_highway(way.tags):
+            highway_type = e.highway_type_from_osm_tags(way.tags)
             if highway_type is None:
                 continue
             elif highway_type.value < parameters.HIGHWAY_TYPE_MIN:
                 continue
-        elif is_railway(way):
+        elif s.is_railway(way.tags):
             railway_type = railway_type_from_osm_tags(way.tags)
             if railway_type is None:
                 continue

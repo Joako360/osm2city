@@ -274,6 +274,84 @@ class BuildingZoneType(IntEnum):  # element names must match OSM values apart fr
     btg_port = 223
 
 
+@unique
+class HighwayType(IntEnum):
+    """Highway types the numbers need to be higher for priority - e.g. for layering.
+    _link types are only for the situation, when they are one-way (which they do not have to be
+    cf. https://wiki.openstreetmap.org/wiki/Highway_link.)
+    A _link stays the same as its highway counterpart unless it is one-way. And if it is a motorway or trunk
+    link, then it is downgraded to a primary road.
+
+    https://gitlab.com/osm2city/osm2city/-/issues/127: there are options missing, which is way some highways
+    are crammed into one type
+    """
+    roundabout = 16
+    motorway = 15
+    trunk = 14
+    primary = 13  # can also be a non-one-way motorway link, trunk link or primary link
+    secondary = 12  # can also be a non-one-way secondary link
+    tertiary = 11  # can also be a non-one-way tertiary link
+    unclassified = 10
+    road = 9
+    one_way_multi_lane = 8  # for now assumed to be 2 lanes
+    one_way_large = 7  # for one-way links of motorway and trunk
+    one_way_normal = 6
+    residential = 5
+    living_street = 4
+    service = 3
+    pedestrian = 2
+    slow = 1  # cycle ways, tracks, footpaths etc
+
+
+def highway_type_from_osm_tags(tags: Dict[str, str]) -> Optional[HighwayType]:
+    """Based on OSM tags deducts the HighwayType.
+    Returns None if not a highway are unknown value.
+    """
+    if s.K_HIGHWAY in tags:
+        value = tags[s.K_HIGHWAY]
+    else:
+        return None
+
+    if s.is_roundabout(tags):
+        return HighwayType.roundabout
+
+    if s.is_oneway(tags):
+        if s.parse_tags_lanes(tags) > 1:
+            return HighwayType.one_way_multi_lane
+        if value in [s.V_TRUNK, s.V_MOTORWAY_LINK, s.V_TRUNK_LINK]:
+            return HighwayType.one_way_large
+        else:
+            return HighwayType.one_way_normal
+
+    # now we can assume it is not one-way
+    if value in [s.V_MOTORWAY]:
+        return HighwayType.motorway
+    elif value in [s.V_TRUNK]:
+        return HighwayType.trunk
+    elif value in [s.V_PRIMARY, s.V_PRIMARY_LINK, s.V_MOTORWAY_LINK, s.V_TRUNK_LINK]:
+        return HighwayType.primary
+    elif value in [s.V_SECONDARY, s.V_SECONDARY_LINK]:
+        return HighwayType.secondary
+    elif value in [s.V_TERTIARY, s.V_TERTIARY_LINK]:
+        return HighwayType.tertiary
+    elif value == s.V_UNCLASSIFIED:
+        return HighwayType.unclassified
+    elif value == s.V_ROAD:
+        return HighwayType.road
+    elif value == s.V_RESIDENTIAL:
+        return HighwayType.residential
+    elif value == s.V_LIVING_STREET:
+        return HighwayType.living_street
+    elif value == s.V_SERVICE:
+        return HighwayType.service
+    elif value == s.V_PEDESTRIAN:
+        return HighwayType.pedestrian
+    elif value in [s.V_TRACK, s.V_FOOTWAY, s.V_CYCLEWAY, s.V_BRIDLEWAY, s.V_STEPS, s.V_PATH]:
+        return HighwayType.slow
+    else:
+        return None
+
+
 # ================================ CONSTANTS =========================================
 # Should not be changed unless all dependencies have been thoroughly checked.
 

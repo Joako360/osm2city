@@ -342,15 +342,6 @@ def parse_generator_output(str_output: str) -> float:
         return 0.
 
 
-def parse_int(str_int: str, default_value: int) -> int:
-    """If string can be parsed then return int, otherwise return the default value."""
-    try:
-        x = int(str_int)
-        return x
-    except ValueError:
-        return default_value
-
-
 def parse_multi_int_values(str_value: str) -> int:
     """Parse int values for tags, where values can be separated by semi-colons.
     E.g. for building levels, 'cables' and 'voltage' for power cables, which can have multiple values.
@@ -371,14 +362,6 @@ def parse_multi_int_values(str_value: str) -> int:
 def is_parsable_float(str_float: str) -> bool:
     try:
         float(str_float)
-        return True
-    except ValueError:
-        return False
-
-
-def is_parsable_int(str_int: str) -> bool:
-    try:
-        int(str_int)
         return True
     except ValueError:
         return False
@@ -769,11 +752,6 @@ class TestOSMParser(unittest.TestCase):
         self.assertFalse(is_parsable_float('1,2'))
         self.assertFalse(is_parsable_float('x'))
         self.assertTrue(is_parsable_float('1.2'))
-
-    def test_is_parsable_int(self):
-        self.assertFalse(is_parsable_int('1.2'))
-        self.assertFalse(is_parsable_int('x'))
-        self.assertTrue(is_parsable_int('1'))
 
     def test_parse_hstore_tags(self):
         self.assertEqual(0, len(_parse_hstore_tags('', 1)), "Empty string")

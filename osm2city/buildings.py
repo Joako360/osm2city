@@ -64,11 +64,11 @@ def _is_underground(tags: Dict[str, str]) -> bool:
         if s.K_TUNNEL in tags and tags[s.K_TUNNEL] != s.V_NO:
             return True
     if parameters.BUILDING_UNDERGROUND_LEVEL_NEGATIVE:
-        if s.K_LEVEL in tags and op.parse_int(tags[s.K_LEVEL], 0) < 0:
+        if s.K_LEVEL in tags and s.parse_int(tags[s.K_LEVEL], 0) < 0:
             non_negative_levels = False
-            if s.K_LEVELS in tags and op.parse_int(tags[s.K_LEVELS], 0) >= 0:
+            if s.K_LEVELS in tags and s.parse_int(tags[s.K_LEVELS], 0) >= 0:
                 non_negative_levels = True
-            if s.K_BUILDING_LEVELS in tags and op.parse_int(tags[s.K_BUILDING_LEVELS], 0) >= 0:
+            if s.K_BUILDING_LEVELS in tags and s.parse_int(tags[s.K_BUILDING_LEVELS], 0) >= 0:
                 non_negative_levels = True
             if non_negative_levels is False:
                 return True

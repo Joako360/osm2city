@@ -29,11 +29,12 @@ import shapely.geometry as shg
 from shapely.prepared import prep
 
 from osm2city import cluster, roads, parameters
+from osm2city.static_types import osmstrings as s
+from osm2city.static_types import enumerations as e
 from osm2city.textures import materials as mat
 from osm2city.utils import coordinates as co
 from osm2city.utils import utilities, stg_io2
 from osm2city.utils import osmparser as op
-from osm2city.static_types import osmstrings as s
 
 OUR_MAGIC = "pylons"  # Used in e.g. stg files to mark edits by osm2pylon
 OUT_MAGIC_DETAILS = "pylonsDetails"
@@ -857,7 +858,7 @@ class StreetlampWay(LineWithoutCables):
 
     @staticmethod
     def has_lamps(highway_type):
-        if highway_type is roads.HighwayType.slow:
+        if highway_type is e.HighwayType.slow:
             return False
         return True
 
@@ -873,8 +874,8 @@ class StreetlampWay(LineWithoutCables):
             model = "Models/StreetFurniture/Streetlamp2.xml"
             default_distance = parameters.C2P_STREETLAMPS_OTHER_DISTANCE
             parallel_offset = self.highway.get_width()/2
-            if self.highway.type_ in [roads.HighwayType.service, roads.HighwayType.residential,
-                                      roads.HighwayType.living_street, roads.HighwayType.pedestrian]:
+            if self.highway.type_ in [e.HighwayType.service, e.HighwayType.residential,
+                                      e.HighwayType.living_street, e.HighwayType.pedestrian]:
                 model = "Models/StreetFurniture/Streetlamp1.xml"
                 default_distance = parameters.C2P_STREETLAMPS_RESIDENTIAL_DISTANCE
 
@@ -1275,7 +1276,7 @@ def process_osm_rail_overhead(fg_elev: utilities.FGElev, my_coord_transformator)
 
     railway_candidates = list()
     for way_key, way in ways_dict.items():
-        if roads.is_railway(way):
+        if s.is_railway(way.tags):
             railway_type = roads.railway_type_from_osm_tags(way.tags)
             if railway_type is None:
                 continue
@@ -1292,7 +1293,7 @@ def process_osm_rail_overhead(fg_elev: utilities.FGElev, my_coord_transformator)
                 railway_type = roads.railway_type_from_osm_tags(way.tags)
                 if railway_type is None:
                     is_challenged = True
-            elif roads.is_tunnel(way.tags):
+            elif s.is_tunnel(way.tags):
                 is_challenged = True
         if is_electrified and (not is_challenged):
             # Process the Nodes
@@ -1724,6 +1725,7 @@ def process_osm_building_refs(my_coord_transformator, fg_elev: utilities.FGElev,
     clipping_border = shg.Polygon(parameters.get_clipping_border())
 
     for way in list(ways_dict.values()):
+        my_node = None
         for key in way.tags:
             if s.K_BUILDING == key:
                 my_coordinates = list()
@@ -1754,7 +1756,7 @@ def process_osm_building_refs(my_coord_transformator, fg_elev: utilities.FGElev,
 class LinearOSMFeature(object):
     def __init__(self, osm_id):
         self.osm_id = osm_id
-        self.type_ = 0
+        self.type_ = None
         self.linear = None  # The LinearString of the line
 
     def get_width(self):
@@ -1815,7 +1817,7 @@ def process_osm_highways(my_coord_transformator) -> Dict[int, Highway]:
             value = way.tags[key]
             if s.K_HIGHWAY == key:
                 valid_highway = True
-                my_highway.type_ = roads.highway_type_from_osm_tags(way.tags)
+                my_highway.type_ = e.highway_type_from_osm_tags(way.tags)
                 if None is my_highway.type_:
                     valid_highway = False
             elif (s.K_TUNNEL == key) and (s.V_YES == value):

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Objects and enumerations used as models across the owbb package.
 
 Stored in its own module to minimize circular references and separate processing from data.
@@ -21,6 +20,7 @@ from osm2city import parameters
 from osm2city import building_lib as bl
 from osm2city.utils import osmparser as op
 from osm2city.static_types import osmstrings as s
+from osm2city.static_types import enumerations as e
 from osm2city.utils import coordinates as co
 from osm2city.utils import json_io as wio
 
@@ -109,7 +109,7 @@ class Place(OSMFeature):
 
     def parse_tags_additional(self, tags_dict: KeyValueDict) -> None:
         if s.K_POPULATION in tags_dict:
-            self.population = op.parse_int(tags_dict[s.K_POPULATION], 0)
+            self.population = s.parse_int(tags_dict[s.K_POPULATION], 0)
         elif s.K_WIKIDATA in tags_dict:
             my_id = tags_dict[s.K_WIKIDATA]
             my_population = wio.query_population_wikidata(my_id)
@@ -680,7 +680,7 @@ class RailwayLine(OSMFeatureLinearWithTunnel):
     def _parse_tags_tracks(tags_dict: KeyValueDict) -> int:
         my_tracks = 1
         if s.K_TRACKS in tags_dict:
-            my_tracks = op.parse_int(tags_dict[s.K_TRACKS], 1)
+            my_tracks = s.parse_int(tags_dict[s.K_TRACKS], 1)
         return my_tracks
 
     @staticmethod
@@ -732,30 +732,14 @@ class RailwayLine(OSMFeatureLinearWithTunnel):
         return obj
 
 
-@unique
-class HighwayType(IntEnum):
-    motorway = 11
-    trunk = 12
-    primary = 13
-    secondary = 14
-    tertiary = 15
-    unclassified = 16
-    road = 17
-    residential = 18
-    living_street = 19
-    service = 20
-    pedestrian = 21
-    slow = 30  # cycle ways, tracks, footpaths etc
-
-
 class Highway(OSMFeatureLinearWithTunnel):
     __slots__ = ('is_roundabout', 'is_oneway', 'lanes', 'refs', 'along_city_block', 'reversed_city_block')
 
     def __init__(self, osm_id: int, geometry: LineString, tags_dict: KeyValueDict, refs: List[int]) -> None:
         super().__init__(osm_id, geometry, tags_dict)
-        self.is_roundabout = self._parse_tags_roundabout(tags_dict)
-        self.is_oneway = self._parse_tags_oneway(tags_dict)
-        self.lanes = self._parse_tags_lanes(tags_dict)
+        self.is_roundabout = s.is_roundabout(tags_dict)
+        self.is_oneway = s.is_oneway(tags_dict)
+        self.lanes = s.parse_tags_lanes(tags_dict)
         self.refs = refs
         self.along_city_block = None  # for building generation city block along line on right side
         self.reversed_city_block = None  # ditto reversed line
@@ -770,93 +754,52 @@ class Highway(OSMFeatureLinearWithTunnel):
         return obj
 
     @staticmethod
-    def parse_tags(tags_dict: KeyValueDict) -> Union[None, HighwayType]:
-        if s.K_HIGHWAY in tags_dict:
-            value = tags_dict[s.K_HIGHWAY]
-            if value in [s.V_MOTORWAY, s.V_MOTORWAY_LINK]:
-                return HighwayType.motorway
-            elif value in [s.V_TRUNK, s.V_TRUNK_LINK]:
-                return HighwayType.trunk
-            elif value in [s.V_PRIMARY, s.V_PRIMARY_LINK]:
-                return HighwayType.primary
-            elif value in [s.V_SECONDARY, s.V_SECONDARY_LINK]:
-                return HighwayType.secondary
-            elif value in [s.V_TERTIARY, s.V_TERTIARY_LINK]:
-                return HighwayType.tertiary
-            elif value == s.V_UNCLASSIFIED:
-                return HighwayType.unclassified
-            elif value == s.V_ROAD:
-                return HighwayType.road
-            elif value == s.V_RESIDENTIAL:
-                return HighwayType.residential
-            elif value == s.V_LIVING_STREET:
-                return HighwayType.living_street
-            elif value == s.V_SERVICE:
-                return HighwayType.service
-            elif value == s.V_PEDESTRIAN:
-                return HighwayType.pedestrian
-            elif value in [s.V_TRACK, s.V_FOOTWAY, s.V_CYCLEWAY, s.V_BRIDLEWAY, s.V_STEPS, s.V_PATH]:
-                return HighwayType.slow
-            return None
+    def parse_tags(tags_dict: KeyValueDict) -> Union[None, e.HighwayType]:
+        return e.highway_type_from_osm_tags(tags_dict)
 
-    @staticmethod
-    def _parse_tags_roundabout(tags_dict: KeyValueDict) -> bool:
-        if (s.K_JUNCTION in tags_dict) and (tags_dict[s.K_JUNCTION] == s.V_ROUNDABOUT):
-            return True
-        return False
-
-    def _parse_tags_oneway(self, tags_dict: KeyValueDict) -> bool:
-        if self.type_ == HighwayType.motorway:
-            if (s.K_ONEWAY in tags_dict) and (tags_dict[s.K_ONEWAY] == s.V_NO):
-                return False
-            else:
-                return True  # in motorways oneway is implied
-        elif (s.K_ONEWAY in tags_dict) and (tags_dict[s.K_ONEWAY] == s.V_YES):
-            return True
-        return False
-
-    @staticmethod
-    def _parse_tags_lanes(tags_dict: KeyValueDict) -> int:
-        my_lanes = 1
-        if s.K_LANES in tags_dict:
-            my_lanes = op.parse_int(tags_dict[s.K_LANES], 1)
-        return my_lanes
-
-    def get_width(self) -> float:  # FIXME: replace with parameters
-        if self.type_ in [HighwayType.service, HighwayType.residential, HighwayType.living_street,
-                          HighwayType.pedestrian]:
+    def get_width(self) -> float:
+        """Assumed width of highway to do diverse calculations like buffer etc.
+        This is not the same as roads.get_highway_attributes, because there it is about the real texture
+        mapping, which has different dimensions - amongst others due to a limited set of textures.
+        Must be kept in line with enumerations.HighwayType.
+        """
+        if self.type_ in [e.HighwayType.service, e.HighwayType.residential, e.HighwayType.living_street,
+                          e.HighwayType.pedestrian]:
             my_width = 5.0
-        elif self.type_ in [HighwayType.road, HighwayType.unclassified, HighwayType.tertiary]:
+        elif self.type_ in [e.HighwayType.road, e.HighwayType.unclassified, e.HighwayType.tertiary]:
             my_width = 6.0
-        elif self.type_ in [HighwayType.secondary, HighwayType.primary, HighwayType.trunk]:
+        elif self.type_ in [e.HighwayType.secondary, e.HighwayType.primary, e.HighwayType.trunk]:
             my_width = 7.0
-        elif self.type_ in [HighwayType.motorway]:
+        elif self.type_ in [e.HighwayType.motorway]:
             my_width = 12.0  # motorway is tagged for each direction. Assuming 2 lanes plus emergency lane
+        elif self.type_ in [e.HighwayType.one_way_multi_lane]:
+            my_width = 3.5  # will be enhanced with more lanes below
+        elif self.type_ in [e.HighwayType.one_way_large]:
+            my_width = 4.
+        elif self.type_ in [e.HighwayType.one_way_normal]:
+            my_width = 3.
         else:  # HighwayType.slow
             my_width = 3.0
 
-        if self.type_ == HighwayType.motorway:
+        if self.type_ == e.HighwayType.motorway:
             if self.lanes > 2:
                 my_width += 3.5*(self.lanes-2)
             if not self.is_oneway:
-                my_width *= 1.75
+                my_width *= 1.5  # assuming no hard shoulders, not much middle stuff
         else:
             if self.lanes > 1:
-                my_width += 0.8*(self.lanes-1)*my_width
-            if self.is_oneway:
-                my_width *= 0.6
+                my_width += 0.8*(self.lanes-1) * my_width
         if self.has_embankment:
-            my_width += 6.0
-        # FIXME: has sidewalk (K=sidewalk, v=both / left / right / no)
+            my_width += 4.0
         return my_width
 
     def is_sideway(self) -> bool:
         """Not a main street in an urban area. I.e. residential, walking or service"""
-        return self.type_ < HighwayType.road
+        return self.type_ <= e.HighwayType.residential
 
     def populate_buildings_along(self) -> bool:
         """The type of highway determines where buildings are built. E.g. motorway would be false"""
-        return self.type_ not in (HighwayType.motorway, HighwayType.trunk)
+        return self.type_ not in (e.HighwayType.motorway, e.HighwayType.trunk)
 
     @classmethod
     def create_from_way(cls, way: op.Way, nodes_dict: Dict[int, op.Node],

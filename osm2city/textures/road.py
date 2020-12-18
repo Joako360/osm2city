@@ -1,10 +1,10 @@
 # road texture coordinates in osm2city-data/tex/roads.png
-TRACK = (0/8., 1/8.)
-ROAD_1 = (1/8., 2/8.)
-ROAD_2 = (2/8., 3/8.)
+TRACK = (0/8., 1/8.)  # railway
+ROAD_1 = (1/8., 2/8.)  # no stripes in middle of road
+ROAD_2 = (2/8., 3/8.)  # with strips in middle of road
 BRIDGE_1 = (3/8., 4/8.)
 EMBANKMENT_1 = (4/8., 5/8.)
-ROAD_3 = (5/8., 6/8.)
+ROAD_3 = (5/8., 6/8.)  # motorway like (but no hard shoulder)
 EMBANKMENT_2 = (6/8., 7/8.)
 TRAMWAY = (7/8., 8/8.)
 

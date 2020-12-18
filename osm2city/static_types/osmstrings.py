@@ -2,6 +2,9 @@
 
 from typing import Dict
 
+# type aliases
+KeyValueDict = Dict[str, str]
+
 # ========================= NON OSM KEYS AND VALUES ==============================================================
 K_OWBB_GENERATED = 'owbb_generated'
 K_REPLACED_BRIDGE_KEY = 'replaced_bridge'  # a linear_obj that was originally a bridge, but due to length was changed
@@ -253,8 +256,20 @@ KV_TREE_ROW = 'natural=>tree_row'
 KV_ROUTE_FERRY = 'route=>ferry'
 
 
+# ======================= VALUE PARSING ==========================================================================
+
+
+def parse_int(str_int: str, default_value: int) -> int:
+    """If string can be parsed then return int, otherwise return the default value."""
+    try:
+        x = int(str_int)
+        return x
+    except ValueError:
+        return default_value
+
+
 # ========================= CHECKS TO DIFFERENTIATE STUFF, e.g. processing in buildings vs. pylons ===============
-def _is_glasshouse(tags: Dict[str, str], is_building_part: bool) -> bool:
+def _is_glasshouse(tags: KeyValueDict, is_building_part: bool) -> bool:
     """Whether this is a glasshouse or a greenhouse.
     Is not yet processed cf. https://gitlab.com/osm2city/osm2city/-/issues/37."""
     building_key = K_BUILDING_PART if is_building_part else K_BUILDING
@@ -262,19 +277,19 @@ def _is_glasshouse(tags: Dict[str, str], is_building_part: bool) -> bool:
             K_AMENITY in tags and tags[K_AMENITY] in L_GLASS_H)
 
 
-def is_storage_tank(tags: Dict[str, str], is_building_part: bool) -> bool:
+def is_storage_tank(tags: KeyValueDict, is_building_part: bool) -> bool:
     """Whether this is a storage tank (or similar) and processed in pylons.py."""
     building_key = K_BUILDING_PART if is_building_part else K_BUILDING
     return (building_key in tags and tags[building_key] in L_STORAGE_TANK) or (
             K_MAN_MADE in tags and tags[K_MAN_MADE] in L_STORAGE_TANK)
 
 
-def is_chimney(tags: Dict[str, str]) -> bool:
+def is_chimney(tags: KeyValueDict) -> bool:
     """Whether this is a chimney and processed in pylons.py."""
     return K_MAN_MADE in tags and tags[K_MAN_MADE] in [V_CHIMNEY]
 
 
-def is_small_building_land_use(tags: Dict[str, str], is_building_part: bool) -> bool:
+def is_small_building_land_use(tags: KeyValueDict, is_building_part: bool) -> bool:
     """Whether this is a building used for determining land-use, but not used in rendering.
 
     See also enumerations.py -> BuildingType and get_building_class()."""
@@ -283,7 +298,7 @@ def is_small_building_land_use(tags: Dict[str, str], is_building_part: bool) -> 
         _is_glasshouse(tags, is_building_part))
 
 
-def is_small_building_detail(tags: Dict[str, str], is_building_part: bool) -> bool:
+def is_small_building_detail(tags: KeyValueDict, is_building_part: bool) -> bool:
     """Small buildings, which are not rendered as buildings (but might get rendered as 'Details' some day).
     As they are not used for land-use either, they can be excluded immediately."""
     building_key = K_BUILDING_PART if is_building_part else K_BUILDING
@@ -293,13 +308,21 @@ def is_small_building_detail(tags: Dict[str, str], is_building_part: bool) -> bo
                                                            'roof']
 
 
-def is_lit(tags: Dict[str, str]) -> bool:
+def is_highway(tags: KeyValueDict) -> bool:
+    return K_HIGHWAY in tags
+
+
+def is_railway(tags: KeyValueDict) -> bool:
+    return K_RAILWAY in tags
+
+
+def is_lit(tags: KeyValueDict) -> bool:
     if K_LIT in tags and tags[K_LIT] == V_YES:
         return True
     return False
 
 
-def is_rack_railway(tags: Dict[str, str]) -> bool:
+def is_rack_railway(tags: KeyValueDict) -> bool:
     """Rack can have different values, so just excluding no.
 
     cf. https://wiki.openstreetmap.org/wiki/Key:rack?uselang=en
@@ -309,7 +332,7 @@ def is_rack_railway(tags: Dict[str, str]) -> bool:
     return False
 
 
-def is_electrified_railway(tags: Dict[str, str]) -> bool:
+def is_electrified_railway(tags: KeyValueDict) -> bool:
     """Whether this is an electrified railway with overhead contact line.
 
     Cf. https://wiki.openstreetmap.org/wiki/Key:electrified?uselang=en
@@ -318,3 +341,45 @@ def is_electrified_railway(tags: Dict[str, str]) -> bool:
     if K_ELECTRIFIED in tags and tags[K_ELECTRIFIED] in [V_CONTACT_LINE, V_YES]:
         return True
     return False
+
+
+def is_oneway(tags_dict: KeyValueDict, is_motorway: bool = False) -> bool:
+    if is_motorway:
+        if (K_ONEWAY in tags_dict) and (tags_dict[K_ONEWAY] == V_NO):
+            return False
+        else:
+            return True  # in motorways oneway is implied
+    elif (K_ONEWAY in tags_dict) and (tags_dict[K_ONEWAY] == V_YES):
+        return True
+    return False
+
+
+def is_roundabout(tags: KeyValueDict) -> bool:
+    return K_JUNCTION in tags and tags[K_JUNCTION] in [V_ROUNDABOUT, V_CIRCULAR]
+
+
+def parse_tags_lanes(tags_dict: KeyValueDict, default_lanes: int = 1) -> int:
+    my_lanes = default_lanes
+    if K_LANES in tags_dict:
+        my_lanes = parse_int(tags_dict[K_LANES], default_lanes)
+    return my_lanes
+
+
+def is_tunnel(tags: KeyValueDict) -> bool:
+    return K_TUNNEL in tags and tags[K_TUNNEL] not in [V_NO]
+
+
+def is_bridge(tags: KeyValueDict) -> bool:
+    """Returns true if the tags for this linear_obj contains the OSM key for bridge."""
+    if K_MAN_MADE in tags and tags[K_MAN_MADE] == V_BRIDGE:
+        return True
+    if K_BRIDGE in tags and tags not in [V_NO]:
+        return True
+    return False
+
+
+def is_replaced_bridge(tags: KeyValueDict) -> bool:
+    """Returns true is this linear_obj was originally a bridge, but was changed to a non-bridge due to length.
+    See method Roads._replace_short_bridges_with_ways.
+    The reason to keep a replaced_tag is because else the linear_obj might be split if a node is in the water."""
+    return K_REPLACED_BRIDGE_KEY in tags
