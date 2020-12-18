@@ -16,9 +16,10 @@ from osm2city import parameters
 from osm2city.owbb import plotting
 import osm2city.building_lib as bl
 import osm2city.owbb.models as m
+import osm2city.static_types.enumerations as e
+import osm2city.static_types.osmstrings as s
 import osm2city.utils.coordinates as co
 import osm2city.utils.osmparser as op
-import osm2city.static_types.osmstrings as s
 from osm2city.utils.utilities import time_logging, random_value_from_ratio_dict_parameter
 
 
@@ -110,7 +111,7 @@ def _prepare_building_zone_with_highways(building_zone, highways_dict):
         del highways_dict[key]
 
 
-HIGHWAYS_FOR_ZONE_SPLIT = [m.HighwayType.motorway, m.HighwayType.trunk]
+HIGHWAYS_FOR_ZONE_SPLIT = [e.HighwayType.motorway, e.HighwayType.trunk]
 
 
 def _generate_extra_buildings(building_zone: m.BuildingZone, shared_models_library: m.SharedModelsLibrary,

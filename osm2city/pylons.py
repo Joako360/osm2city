@@ -1148,9 +1148,9 @@ class RailLine(Line):
         current_distance = 0  # the distance from the origin of the current mast
         my_length = self.linear.length  # omit recalculating length all the time
         # offset must be same as create_rail_power_vertices()
-        my_right_parallel = self.linear.parallel_offset(-1*RAIL_MAST_DIST, 'right', join_style=1)
+        my_right_parallel = self.linear.parallel_offset(-1*RAIL_MAST_DIST, side='right', join_style=1)
         my_right_parallel_length = my_right_parallel.length
-        my_left_parallel = self.linear.parallel_offset(-1*RAIL_MAST_DIST, 'left', join_style=1)
+        my_left_parallel = self.linear.parallel_offset(-1*RAIL_MAST_DIST, side='left', join_style=1)
         my_left_parallel_length = my_left_parallel.length
 
         # virtual start point
@@ -1340,8 +1340,8 @@ def process_osm_rail_overhead(fg_elev: utilities.FGElev, my_coord_transformator)
                     my_railways.remove(second_line)
                     del my_shared_nodes[key]
                     logging.debug("Merged two lines with node osm_id: %s", key)
-        except Exception as e:
-            logging.error(e)
+        except Exception as exc:
+            logging.error(exc)
 
     # get LineStrings and remove those lines, which are less than the minimal requirement
     for the_railway in my_railways:
@@ -1494,8 +1494,8 @@ def process_osm_power_aerialway(req_keys: List[str], fg_elev: utilities.FGElev, 
                 del my_powerlines[my_osm_id]
                 del my_shared_nodes[key]
                 logging.debug("Merged two lines with node osm_id: %s", key)
-            except Exception as e:
-                logging.error(e)
+            except Exception as exc:
+                logging.error(exc)
         elif len(shared_node) > 2:
             logging.debug("WARNING: node referenced in more than 2 ways. Most likely OSM problem. Node osm_id: %s", key)
 
