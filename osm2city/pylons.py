@@ -1958,18 +1958,13 @@ def process_pylons(coords_transform: co.Transformation, fg_elev: utilities.FGEle
         logging.info("Total number of trees after artificial generation: {}".format(len(trees)))
 
         # add trees in a row
+        # not adding tree_lined=* (https://wiki.openstreetmap.org/wiki/Key:tree_lined) because there are
+        # as of end 2020 < 4000 and often they conflict with also mapped trees or natural=tree_row
         osm_way_result = op.fetch_osm_db_data_ways_key_values([s.KV_TREE_ROW])
         osm_nodes_dict = osm_way_result.nodes_dict
         osm_ways_dict = osm_way_result.ways_dict
         _process_osm_trees_along(osm_nodes_dict, osm_ways_dict, trees, coords_transform, fg_elev)
         logging.info("Total number of trees after trees along rows etc.: {}".format(len(trees)))
-
-        # add trees lined along a road
-        # osm_way_result = op.fetch_osm_db_data_ways_keys([s.KV_TREE_ROW])
-        # osm_nodes_dict = osm_way_result.nodes_dict
-        # osm_ways_dict = osm_way_result.ways_dict
-        # _process_osm_trees_along(osm_nodes_dict, osm_ways_dict, trees, coords_transform, fg_elev)
-        # logging.info("Total number of trees after trees lined road: {}".format(len(trees)))
 
 
 # free some memory

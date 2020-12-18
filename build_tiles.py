@@ -290,25 +290,34 @@ if __name__ == '__main__':
                                         boundary_east, boundary_north)
 
     start_time = time.time()
-    mp.set_start_method('spawn')  # use safe approach to make sure e.g. parameters module is initialized separately
-    # max tasks per child: see https://docs.python.org/3.5/library/multiprocessing.html#module-multiprocessing.pool
-    max_tasks_per_child = None  # the default, meaning a worker processes will live as long as the pool
-    if args.max_tasks:
-        max_tasks_per_child = args.max_tasks
-    pool = mp.Pool(processes=args.processes, maxtasksperchild=max_tasks_per_child,
-                   initializer=pool_initializer, initargs=(my_log_level, args.log_to_file))
-    with pool:
+    progress = 1
+    total = len(scenery_tiles_list)
+    if args.processes > 1:
+        mp.set_start_method('spawn')  # use safe approach to make sure e.g. parameters module is initialized separately
+        # max tasks per child: see https://docs.python.org/3.5/library/multiprocessing.html#module-multiprocessing.pool
+        max_tasks_per_child = None  # the default, meaning a worker processes will live as long as the pool
+        if args.max_tasks:
+            max_tasks_per_child = args.max_tasks
+        pool = mp.Pool(processes=args.processes, maxtasksperchild=max_tasks_per_child,
+                       initializer=pool_initializer, initargs=(my_log_level, args.log_to_file))
+        the_file_lock = mp.Manager().Lock()  # must be after "set_start_method"
+        with pool:
+            for my_scenery_tile in scenery_tiles_list:
+                progress_str = '{}/{}'.format(progress, total)
+                pool.apply_async(process_scenery_tile, (my_scenery_tile, args.filename,
+                                                        exec_procedure, airports, the_file_lock, progress_str),
+                                 callback=counter_callback())
+                progress += 1
+            pool.close()
+            pool.join()
+
+    else:  # do it linearly, which is easier to debug and profile
         the_file_lock = mp.Manager().Lock()
-        total = len(scenery_tiles_list)
-        progress = 1
         for my_scenery_tile in scenery_tiles_list:
             progress_str = '{}/{}'.format(progress, total)
-            pool.apply_async(process_scenery_tile, (my_scenery_tile, args.filename,
-                                                    exec_procedure, airports, the_file_lock, progress_str),
-                             callback=counter_callback())
+            process_scenery_tile(my_scenery_tile, args.filename,
+                                 exec_procedure, airports, the_file_lock, progress_str)
             progress += 1
-        pool.close()
-        pool.join()
 
     u.time_logging("Total time used", start_time)
     logging.info('Processed %i tiles', counter)
