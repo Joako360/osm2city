@@ -523,28 +523,81 @@ def _random_points_in_polygon(my_polygon: shg.Polygon, prep_geom, buildings: Lis
     return my_random_points
 
 
-def _process_osm_trees_along(nodes_dict, ways_dict, trees: List[Tree], coord_transform,
-                             fg_elev: utilities.FGElev) -> None:
-    """Additional trees based on specific land-use (not woods) in urban areas.
+def _process_osm_tree_row(nodes_dict, ways_dict, trees: List[Tree], coords_transform: co.Transformation,
+                          fg_elev: utilities.FGElev) -> None:
+    """Trees in a row as mapped in OSM (natural=tree_row).
 
     NB: extends the existing list of trees from the input parameter.
     """
+    potential_trees = list()
     for way in list(ways_dict.values()):
-        my_geometry = way.line_string_from_osm_way(nodes_dict, coord_transform)
+        my_geometry = way.line_string_from_osm_way(nodes_dict, coords_transform)
         if my_geometry.length / len(way.refs) > parameters.C2P_TREES_MAX_AVG_DIST_TREES_ROW:
             for i in range(0, int(my_geometry.length // parameters.C2P_TREES_DIST_TREES_ROW_CALCULATED)):
                 my_point = my_geometry.interpolate(i * parameters.C2P_TREES_DIST_TREES_ROW_CALCULATED)
                 my_id = op.get_next_pseudo_osm_id(op.OSMFeatureType.generic_node)
                 elev = fg_elev.probe_elev((my_point.x, my_point.y), False)
                 tree = Tree(my_id, my_point.x, my_point.y, elev)
-                trees.append(tree)
+                potential_trees.append(tree)
             # and then always the last node
             node = nodes_dict[way.refs[-1]]
-            trees.append(Tree.tree_from_node(node, coord_transform, fg_elev))
+            potential_trees.append(Tree.tree_from_node(node, coords_transform, fg_elev))
         else:
             for ref in way.refs:
                 node = nodes_dict[ref]
-                trees.append(Tree.tree_from_node(node, coord_transform, fg_elev))
+                potential_trees.append(Tree.tree_from_node(node, coords_transform, fg_elev))
+    _extend_trees_if_dist_ok(potential_trees, trees)
+
+
+def _process_osm_trees_lined(nodes_dict, ways_dict, trees: List[Tree], coords_transform: co.Transformation,
+                             fg_elev: utilities.FGElev) -> None:
+    """Trees in a line as mapped in OSM (tree_lined=*).
+
+    NB: extends the existing list of trees from the input parameter.
+    """
+    potential_trees = list()
+    for way in list(ways_dict.values()):
+        if s.K_NATURAL in way.tags and way.tags[s.K_NATURAL] == s.V_TREE_ROW:
+            continue  # was already processed in _process_osm_tree_row()
+        tag_value = way.tags[s.K_TREE_LINED]
+        if tag_value == s.V_NO:
+            continue
+        orig_line = way.line_string_from_osm_way(nodes_dict, coords_transform)
+        tree_lines = list()
+        if tag_value != s.V_RIGHT:
+            line_geoms = orig_line.parallel_offset(4.0, 'left')
+            if isinstance(line_geoms, shg.LineString):
+                tree_lines.append(line_geoms)
+            elif isinstance(line_geoms, shg.MultiLineString):
+                for geom in line_geoms.geoms:
+                    tree_lines.append(geom)
+        if tag_value != s.V_LEFT:
+            line_geoms = orig_line.parallel_offset(4.0, 'right')
+            if isinstance(line_geoms, shg.LineString):
+                tree_lines.append(line_geoms)
+            elif isinstance(line_geoms, shg.MultiLineString):
+                for geom in line_geoms.geoms:
+                    tree_lines.append(geom)
+        for my_line in tree_lines:
+            for i in range(0, int(my_line.length // parameters.C2P_TREES_DIST_TREES_ROW_CALCULATED) - 1):
+                # i+0.5 such that start and end no direct tree -> often connect to other tree_lines or itself
+                my_point = my_line.interpolate((i + 0.5) * parameters.C2P_TREES_DIST_TREES_ROW_CALCULATED)
+                my_id = op.get_next_pseudo_osm_id(op.OSMFeatureType.generic_node)
+                elev = fg_elev.probe_elev((my_point.x, my_point.y), False)
+                tree = Tree(my_id, my_point.x, my_point.y, elev)
+                potential_trees.append(tree)
+    _extend_trees_if_dist_ok(potential_trees, trees)
+
+
+def _extend_trees_if_dist_ok(potential_trees: List[Tree], trees: List[Tree]) -> None:
+    """Extend the existing list of trees with new trees if the new trees have a minimal dest from the existing ones."""
+    for a_tree in reversed(potential_trees):
+        for other_tree in trees:
+            if co.calc_distance_local(a_tree.x, a_tree.y, other_tree.x, other_tree.y)\
+                    < parameters.C2P_TREES_DIST_MINIMAL:
+                potential_trees.remove(a_tree)
+                break
+    trees.extend(potential_trees)
 
 
 def _write_trees_in_list(coords_transform: co.Transformation,
@@ -558,8 +611,8 @@ def _write_trees_in_list(coords_transform: co.Transformation,
                 line = '{:.1f} {:.1f} {:.1f}'.format(-t.y, t.x, t.elev)
                 shader.write(line)
                 shader.write('\n')
-    except IOError as e:
-        logging.warning('Could not write trees in list to file %s', e)
+    except IOError as exc:
+        logging.warning('Could not write trees in list to file %s', exc)
     logging.info("Total number of shader trees written to a tree_list: %d", len(trees))
 
 
@@ -1948,23 +2001,27 @@ def process_pylons(coords_transform: co.Transformation, fg_elev: utilities.FGEle
         trees = _process_osm_trees_nodes(osm_nodes_dict, coords_transform, fg_elev)
         logging.info("Number of manually mapped trees found: {}".format(len(trees)))
 
+        # add trees in a row
+        osm_way_result = op.fetch_osm_db_data_ways_key_values([s.KV_NATURAL_TREE_ROW])
+        osm_nodes_dict = osm_way_result.nodes_dict
+        osm_ways_dict = osm_way_result.ways_dict
+        _process_osm_tree_row(osm_nodes_dict, osm_ways_dict, trees, coords_transform, fg_elev)
+        logging.info("Total number of trees after trees in rows etc.: {}".format(len(trees)))
+        # add tree_lined=* (https://wiki.openstreetmap.org/wiki/Key:tree_lined)
+        osm_way_result = op.fetch_osm_db_data_ways_keys([s.K_TREE_LINED])
+        osm_nodes_dict = osm_way_result.nodes_dict
+        osm_ways_dict = osm_way_result.ways_dict
+        _process_osm_trees_lined(osm_nodes_dict, osm_ways_dict, trees, coords_transform, fg_elev)
+        logging.info("Total number of trees after trees in line etc.: {}".format(len(trees)))
+
         # add trees to potential areas
         # s.KV_LANDUSE_RECREATION_GROUND would be a possibility, but often has also swimming pools etc.
         # making it a bit difficult
         osm_way_result = op.fetch_osm_db_data_ways_key_values([s.KV_LEISURE_PARK])
         osm_nodes_dict = osm_way_result.nodes_dict
         osm_ways_dict = osm_way_result.ways_dict
-        _process_osm_trees_ways(osm_nodes_dict, osm_ways_dict, trees, building_refs, coords_transform, fg_elev)
+        # _process_osm_trees_ways(osm_nodes_dict, osm_ways_dict, trees, building_refs, coords_transform, fg_elev)
         logging.info("Total number of trees after artificial generation: {}".format(len(trees)))
-
-        # add trees in a row
-        # not adding tree_lined=* (https://wiki.openstreetmap.org/wiki/Key:tree_lined) because there are
-        # as of end 2020 < 4000 and often they conflict with also mapped trees or natural=tree_row
-        osm_way_result = op.fetch_osm_db_data_ways_key_values([s.KV_TREE_ROW])
-        osm_nodes_dict = osm_way_result.nodes_dict
-        osm_ways_dict = osm_way_result.ways_dict
-        _process_osm_trees_along(osm_nodes_dict, osm_ways_dict, trees, coords_transform, fg_elev)
-        logging.info("Total number of trees after trees along rows etc.: {}".format(len(trees)))
 
 
 # free some memory

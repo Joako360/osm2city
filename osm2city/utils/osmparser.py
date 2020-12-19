@@ -489,7 +489,7 @@ def fetch_all_query_into_tuple(query: str, db_connection) -> List[Tuple]:
     return cur.fetchall()
 
 
-def fetch_osm_db_data_ways(required: List[str], is_key_values: bool = False) -> OSMReadResult:
+def _fetch_osm_db_data_ways(required: List[str], is_key_values: bool = False) -> OSMReadResult:
     """Given a list of required keys or key/value pairs get the ways plus the linked nodes from an OSM database."""
     start_time = time.time()
 
@@ -510,12 +510,12 @@ def fetch_osm_db_data_ways(required: List[str], is_key_values: bool = False) -> 
 
 def fetch_osm_db_data_ways_key_values(req_key_values: List[str]) -> OSMReadResult:
     """Given a list of required key/value pairs get the ways plus the linked nodes from an OSM database."""
-    return fetch_osm_db_data_ways(req_key_values, True)
+    return _fetch_osm_db_data_ways(req_key_values, True)
 
 
 def fetch_osm_db_data_ways_keys(req_keys: List[str]) -> OSMReadResult:
     """Given a list of required keys get the ways plus the linked nodes from an OSM database."""
-    return fetch_osm_db_data_ways(req_keys, False)
+    return _fetch_osm_db_data_ways(req_keys, False)
 
 
 def fetch_osm_db_data_relations_keys(input_read_result: OSMReadResult, first_part: str,
