@@ -453,7 +453,7 @@ def _process_osm_trees_nodes(osm_nodes_dict: Dict[int, op.Node], coords_transfor
     return trees
 
 
-def _process_osm_trees_areas(nodes_dict, ways_dict, trees: List[Tree], city_blocks: Set[CityBlock], coord_transform,
+def _process_osm_trees_parks(parks: List[shg.Polygon], trees: List[Tree], city_blocks: Set[CityBlock],
                              fg_elev: utilities.FGElev) -> None:
     """Additional trees based on specific land-use (not woods) in urban areas.
 
@@ -461,45 +461,65 @@ def _process_osm_trees_areas(nodes_dict, ways_dict, trees: List[Tree], city_bloc
     """
     additional_trees = list()  # not directly adding to trees due to spatial comparison
     mapped_factor = math.pow(parameters.C2P_TREES_DIST_BETWEEN_TREES_PARK_MAPPED, 2)
-    logging.info('Number of area polygons for process for trees: %i', len(ways_dict))
+    logging.info('Number of area polygons for process for trees: %i', len(parks))
     tree_points_to_check = list()
     for tree in trees:
         tree_points_to_check.append(shg.Point(tree.x, tree.y))
-    for way in list(ways_dict.values()):
-        my_geometry = way.polygon_from_osm_way(nodes_dict, coord_transform)
+    for my_geometry in parks:
         trees_contained = 0
-        if my_geometry and my_geometry.area > parameters.C2P_TREES_PARK_MIN_SIZE:
-            prep_geom = prep(my_geometry)
-            # check whether any of the existing manually mapped trees is within the area.
-            # if yes, then most probably all trees where manually mapped
-            for tree_point in tree_points_to_check:
-                if prep_geom.contains(tree_point):
-                    trees_contained += 1
-                    # not removing from to be checked as probably takes more time to remove than check again
-            if trees_contained == 0 or (my_geometry.area / trees_contained) > mapped_factor:
-                # we are good to try to add more trees
-                points = _random_points_in_polygon(my_geometry, prep_geom,
-                                                   city_blocks,
-                                                   parameters.C2P_TREES_DIST_BETWEEN_TREES_PARK,
-                                                   parameters.C2P_TREES_SKIP_RATE_TREES_PARK)
-                for point in points:
-                    elev = fg_elev.probe_elev((point.x, point.y), False)
-                    additional_trees.append(Tree(op.get_next_pseudo_osm_id(op.OSMFeatureType.generic_node),
-                                                 point.x, point.y, elev))
+        prep_geom = prep(my_geometry)
+        # check whether any of the existing manually mapped trees is within the area.
+        # if yes, then most probably all trees where manually mapped
+        for tree_point in tree_points_to_check:
+            if prep_geom.contains(tree_point):
+                trees_contained += 1
+                # not removing from to be checked as probably takes more time to remove than check again
+        if trees_contained == 0 or (my_geometry.area / trees_contained) > mapped_factor:
+            # we are good to try to add more trees
+            points = _random_trees_in_area(my_geometry, prep_geom,
+                                           city_blocks,
+                                           parameters.C2P_TREES_DIST_BETWEEN_TREES_PARK,
+                                           parameters.C2P_TREES_SKIP_RATE_TREES_PARK)
+            for point in points:
+                elev = fg_elev.probe_elev((point.x, point.y), False)
+                additional_trees.append(Tree(op.get_next_pseudo_osm_id(op.OSMFeatureType.generic_node),
+                                             point.x, point.y, elev))
     logging.info('Number of trees added in areas: %i', len(additional_trees))
     trees.extend(additional_trees)
 
 
-def _random_points_in_polygon(my_polygon: shg.Polygon, prep_geom, city_blocks: Set[CityBlock],
-                              default_distance: int, skip_rate: float) -> List[shg.Point]:
-    """Creates a random set of points within a polygon based on an average distance and a skip rate.
+def _process_osm_trees_gardens(trees: List[Tree], city_blocks: Set[CityBlock], parks: List[shg.Polygon],
+                               fg_elev: utilities.FGElev) -> None:
+    additional_trees = list()
+    for city_block in city_blocks:
+        if city_block.type_ is e.BuildingZoneType.special_processing:
+            continue
+        prep_geom = prep(city_block.geometry)
+        my_random_points = _generate_random_tree_points_in_polygon(city_block.geometry, prep_geom,
+                                                                   parameters.C2P_TREES_DIST_BETWEEN_TREES_GARDEN,
+                                                                   parameters.C2P_TREES_SKIP_RATE_TREES_GARDEN)
 
-    This is not a very efficient algorithm, but it should be enough to give an ok distribution.
+        for point in my_random_points:
+            exclude = False
+            for park in parks:  # need to check for parks
+                if point.within(park):
+                    exclude = True
+                    break
+            if exclude:
+                continue
+            if not _test_point_in_building(point, {city_block}, 2.0):
+                elev = fg_elev.probe_elev((point.x, point.y), False)
+                additional_trees.append(Tree(op.get_next_pseudo_osm_id(op.OSMFeatureType.generic_node),
+                                             point.x, point.y, elev))
+    logging.info('Number of trees added in gardens: %i', len(additional_trees))
+    trees.extend(additional_trees)
 
-    The trees are geometrically tested against the boundary box of buildings (not the whole tree, just the centre).
-    NB: in parks trees are often around open spaces and not just randomly distributed - this heuristic does
-    not take such things into account.
-    """
+
+def _generate_random_tree_points_in_polygon(my_polygon: shg.Polygon, prep_geom,
+                                            default_distance: int, skip_rate: float) -> List[shg.Point]:
+    """Creates a random set of points for trees within a polygon based on an average distance and a skip rate.
+
+    This is not a very efficient algorithm, but it should be enough to give an ok distribution."""
     my_random_points = list()
     my_bounds = my_polygon.bounds
     max_x = int((my_bounds[2] - my_bounds[0]) // default_distance)
@@ -508,11 +528,23 @@ def _random_points_in_polygon(my_polygon: shg.Polygon, prep_geom, city_blocks: S
         for j in range(max_y):
             if random.random() < skip_rate:
                 continue
-            x = my_bounds[0] + i * default_distance + random.uniform(-default_distance/3, default_distance/3)
-            y = my_bounds[1] + j * default_distance + random.uniform(-default_distance/3, default_distance/3)
+            x = my_bounds[0] + i * default_distance + random.uniform(-default_distance/3., default_distance/3.)
+            y = my_bounds[1] + j * default_distance + random.uniform(-default_distance/3., default_distance/3.)
             my_point = shg.Point(x, y)
             if prep_geom.contains(my_point):
                 my_random_points.append(my_point)
+    return my_random_points
+
+
+def _random_trees_in_area(my_polygon: shg.Polygon, prep_geom, city_blocks: Set[CityBlock],
+                          default_distance: int, skip_rate: float) -> List[shg.Point]:
+    """Creates random trees in an area respecting the presence of buildings.
+
+    The trees are geometrically tested against the boundary box of buildings (not the whole tree, just the centre).
+    NB: in parks trees are often around open spaces and not just randomly distributed - this heuristic does
+    not take such things into account.
+    """
+    my_random_points = _generate_random_tree_points_in_polygon(my_polygon, prep_geom, default_distance, skip_rate)
     # now check against buildings
     if not my_random_points:
         return my_random_points
@@ -2066,7 +2098,13 @@ def process_pylons(coords_transform: co.Transformation, fg_elev: utilities.FGEle
         osm_way_result = op.fetch_osm_db_data_ways_key_values([s.KV_LEISURE_PARK])
         osm_nodes_dict = osm_way_result.nodes_dict
         osm_ways_dict = osm_way_result.ways_dict
-        _process_osm_trees_areas(osm_nodes_dict, osm_ways_dict, trees, city_blocks, coords_transform, fg_elev)
+        parks = list()
+        for way in list(osm_ways_dict.values()):
+            my_geometry = way.polygon_from_osm_way(osm_nodes_dict, coords_transform)
+            if my_geometry and my_geometry.area > parameters.C2P_TREES_PARK_MIN_SIZE:
+                parks.append(my_geometry)
+        _process_osm_trees_parks(parks, trees, city_blocks, fg_elev)
+        _process_osm_trees_gardens(trees, city_blocks, parks, fg_elev)
         logging.info("Total number of trees after artificial generation: {}".format(len(trees)))
 
     # free some memory
