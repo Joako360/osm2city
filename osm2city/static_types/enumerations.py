@@ -273,6 +273,8 @@ class BuildingZoneType(IntEnum):  # element names must match OSM values apart fr
     btg_industrial = 222
     btg_port = 223
 
+    special_processing = 999  # can be used to mark special processing
+
 
 @unique
 class HighwayType(IntEnum):

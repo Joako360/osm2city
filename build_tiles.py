@@ -124,8 +124,7 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
         my_stg_entries = stg_io2.read_stg_entries_in_boundary(the_coords_transform, False)
 
         # run programs
-        if exec_argument is Procedures.pylons or (exec_argument is Procedures.details and
-                                                  parameters.C2P_PROCESS_STREETLAMPS is False):
+        if exec_argument is Procedures.details and parameters.C2P_PROCESS_STREETLAMPS is False:
             lit_areas = None
             water_areas = None
             osm_buildings = None
@@ -155,8 +154,8 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
             the_stg_entries = stg_io2.read_stg_entries_in_boundary(the_coords_transform, True)
             roads.process_roads(the_coords_transform, my_fg_elev, blocked_apt_areas, lit_areas, water_areas,
                                 the_stg_entries, file_lock)
-        if exec_argument in [Procedures.pylons, Procedures.main, Procedures.all]:
-            pylons.process_pylons(the_coords_transform, my_fg_elev, my_stg_entries, file_lock)
+        if exec_argument in [Procedures.pylons, Procedures.main, Procedures.all] and process_built_stuff:
+            pylons.process_pylons(the_coords_transform, my_fg_elev, my_stg_entries, osm_buildings, file_lock)
         if exec_argument in [Procedures.details, Procedures.all]:
             details.process_details(the_coords_transform, lit_areas, my_fg_elev, file_lock)
 

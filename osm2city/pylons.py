@@ -22,13 +22,15 @@ import math
 import multiprocessing as mp
 import os
 import random
-from typing import Dict, List, Tuple
+from typing import Dict, List, Set, Tuple
 import unittest
 
 import shapely.geometry as shg
 from shapely.prepared import prep
 
 from osm2city import cluster, roads, parameters
+from osm2city import building_lib as bl
+from osm2city.owbb.models import Bounds, CityBlock
 from osm2city.static_types import osmstrings as s
 from osm2city.static_types import enumerations as e
 from osm2city.textures import materials as mat
@@ -451,15 +453,15 @@ def _process_osm_trees_nodes(osm_nodes_dict: Dict[int, op.Node], coords_transfor
     return trees
 
 
-def _process_osm_trees_ways(nodes_dict, ways_dict, trees: List[Tree], buildings: List[shg.Polygon], coord_transform,
-                            fg_elev: utilities.FGElev) -> None:
+def _process_osm_trees_areas(nodes_dict, ways_dict, trees: List[Tree], city_blocks: Set[CityBlock], coord_transform,
+                             fg_elev: utilities.FGElev) -> None:
     """Additional trees based on specific land-use (not woods) in urban areas.
 
     NB: extends the existing list of trees from the input parameter.
     """
     additional_trees = list()  # not directly adding to trees due to spatial comparison
     mapped_factor = math.pow(parameters.C2P_TREES_DIST_BETWEEN_TREES_PARK_MAPPED, 2)
-    logging.info('Number of polygons for process for trees: %i', len(ways_dict))
+    logging.info('Number of area polygons for process for trees: %i', len(ways_dict))
     tree_points_to_check = list()
     for tree in trees:
         tree_points_to_check.append(shg.Point(tree.x, tree.y))
@@ -470,24 +472,25 @@ def _process_osm_trees_ways(nodes_dict, ways_dict, trees: List[Tree], buildings:
             prep_geom = prep(my_geometry)
             # check whether any of the existing manually mapped trees is within the area.
             # if yes, then most probably all trees where manually mapped
-            for tree_point in reversed(tree_points_to_check):
+            for tree_point in tree_points_to_check:
                 if prep_geom.contains(tree_point):
                     trees_contained += 1
-                    tree_points_to_check.remove(tree_point)
+                    # not removing from to be checked as probably takes more time to remove than check again
             if trees_contained == 0 or (my_geometry.area / trees_contained) > mapped_factor:
                 # we are good to try to add more trees
                 points = _random_points_in_polygon(my_geometry, prep_geom,
-                                                   buildings,
+                                                   city_blocks,
                                                    parameters.C2P_TREES_DIST_BETWEEN_TREES_PARK,
                                                    parameters.C2P_TREES_SKIP_RATE_TREES_PARK)
                 for point in points:
                     elev = fg_elev.probe_elev((point.x, point.y), False)
                     additional_trees.append(Tree(op.get_next_pseudo_osm_id(op.OSMFeatureType.generic_node),
                                                  point.x, point.y, elev))
+    logging.info('Number of trees added in areas: %i', len(additional_trees))
     trees.extend(additional_trees)
 
 
-def _random_points_in_polygon(my_polygon: shg.Polygon, prep_geom, buildings: List[shg.Polygon],
+def _random_points_in_polygon(my_polygon: shg.Polygon, prep_geom, city_blocks: Set[CityBlock],
                               default_distance: int, skip_rate: float) -> List[shg.Point]:
     """Creates a random set of points within a polygon based on an average distance and a skip rate.
 
@@ -511,16 +514,19 @@ def _random_points_in_polygon(my_polygon: shg.Polygon, prep_geom, buildings: Lis
             if prep_geom.contains(my_point):
                 my_random_points.append(my_point)
     # now check against buildings
+    if not my_random_points:
+        return my_random_points
+
+    # find the city blocks, which might have buildings which could interfere
+    test_list = set()
+    for city_block in city_blocks:
+        if not prep_geom.disjoint(city_block.geometry):
+            test_list.add(city_block)
     final_points = list()
     for point in my_random_points:
-        cleared = True
-        for b in buildings:
-            if b.bounds[0] < point.x < b.bounds[1] and b.bounds[2] < point.y < b.bounds[3]:
-                cleared = False
-                break
-        if cleared:
+        if not _test_point_in_building(point, test_list, 3.0):
             final_points.append(point)
-    return my_random_points
+    return final_points
 
 
 def _process_osm_tree_row(nodes_dict, ways_dict, trees: List[Tree], coords_transform: co.Transformation,
@@ -1951,8 +1957,46 @@ def process_highways_for_streetlamps(my_highways: Dict[int, Highway], lit_areas:
     return list(my_streetlamps.values())
 
 
+def _prepare_city_blocks(the_buildings: List[bl.Building], coords_transform: co.Transformation) -> Set[CityBlock]:
+    """Extracts all city blocks from existing buildings.
+    If the zone linked to a building is not a CityBlock, then use a generic one spanning the whole tile.
+    """
+    city_blocks = set()
+    bounds = Bounds.create_from_parameters(coords_transform)
+    bounding_box = shg.box(bounds.min_point.x, bounds.min_point.y, bounds.max_point.x, bounds.max_point.y)
+    remaining_block = CityBlock(0, bounding_box, e.BuildingZoneType.special_processing)
+    for building in the_buildings:
+        if building.zone:
+            if isinstance(building.zone, CityBlock):
+                city_blocks.add(building.zone)
+            else:
+                remaining_block.relate_building(building)
+    city_blocks.add(remaining_block)
+
+    # in buildings._clean_building_zones_dangling_children there is also come cleanup of not valid buildings
+    # However, that uses significant runtime and e.g. for Edinburgh out of ca. 110k buildings only ca.
+    # 150 would be removed - which does not matter for what buildings are used here (collision detection)
+
+    return city_blocks
+
+
+def _test_point_in_building(point: shg.Point, city_blocks: Set[CityBlock], min_dist: float) -> bool:
+    """Tests whether a point is within a building respectively not at least min_distance away.
+    The use of CityBlocks should speed up the process considerably by using fewer geometric calculations."""
+    for city_block in city_blocks:
+        if city_block.geometry.bounds[0] < point.x < city_block.geometry.bounds[1] and \
+                city_block.geometry.bounds[2] < point.y < city_block.geometry.bounds[3]:
+            # point is within bounds of city block - now check each building of city block
+            for b in city_block.osm_buildings:
+                if b.geometry.bounds[0] - min_dist < point.x < b.geometry.bounds[1] + min_dist and \
+                        b.geometry.bounds[2] - min_dist < point.y < b.geometry.bounds[3] + min_dist:
+                    return True  # return immediately
+    return False
+
+
 def process_pylons(coords_transform: co.Transformation, fg_elev: utilities.FGElev,
-                   stg_entries: List[stg_io2.STGEntry], file_lock: mp.Lock = None) -> None:
+                   stg_entries: List[stg_io2.STGEntry], the_buildings: List[bl.Building],
+                   file_lock: mp.Lock = None) -> None:
     # Transform to real objects
     logging.info("Transforming OSM data to Line and Pylon objects")
 
@@ -1995,6 +2039,8 @@ def process_pylons(coords_transform: co.Transformation, fg_elev: utilities.FGEle
         logging.info("Number of valid chimneys found: {}".format(len(chimneys)))
 
     trees = list()
+    city_blocks = _prepare_city_blocks(the_buildings, coords_transform)
+    logging.info("Working with %i city blocks", len(city_blocks))
     if parameters.C2P_PROCESS_TREES and parameters.FLAG_AFTER_2020_3:
         # start with trees tagged as node (we are not taking into account the few areas mapped as tree (wrong tagging)
         osm_nodes_dict = op.fetch_db_nodes_isolated(list(), [s.KV_NATURAL_TREE])
@@ -2020,11 +2066,10 @@ def process_pylons(coords_transform: co.Transformation, fg_elev: utilities.FGEle
         osm_way_result = op.fetch_osm_db_data_ways_key_values([s.KV_LEISURE_PARK])
         osm_nodes_dict = osm_way_result.nodes_dict
         osm_ways_dict = osm_way_result.ways_dict
-        # _process_osm_trees_ways(osm_nodes_dict, osm_ways_dict, trees, building_refs, coords_transform, fg_elev)
+        _process_osm_trees_areas(osm_nodes_dict, osm_ways_dict, trees, city_blocks, coords_transform, fg_elev)
         logging.info("Total number of trees after artificial generation: {}".format(len(trees)))
 
-
-# free some memory
+    # free some memory
     del building_refs
 
     # -- initialize STGManager
