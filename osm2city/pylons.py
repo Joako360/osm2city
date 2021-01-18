@@ -2016,12 +2016,12 @@ def _test_point_in_building(point: shg.Point, city_blocks: Set[CityBlock], min_d
     """Tests whether a point is within a building respectively not at least min_distance away.
     The use of CityBlocks should speed up the process considerably by using fewer geometric calculations."""
     for city_block in city_blocks:
-        if city_block.geometry.bounds[0] < point.x < city_block.geometry.bounds[1] and \
-                city_block.geometry.bounds[2] < point.y < city_block.geometry.bounds[3]:
+        if city_block.geometry.bounds[0] < point.x < city_block.geometry.bounds[2] and \
+                city_block.geometry.bounds[1] < point.y < city_block.geometry.bounds[3]:
             # point is within bounds of city block - now check each building of city block
             for b in city_block.osm_buildings:
-                if b.geometry.bounds[0] - min_dist < point.x < b.geometry.bounds[1] + min_dist and \
-                        b.geometry.bounds[2] - min_dist < point.y < b.geometry.bounds[3] + min_dist:
+                if b.geometry.bounds[0] - min_dist < point.x < b.geometry.bounds[2] + min_dist and \
+                        b.geometry.bounds[1] - min_dist < point.y < b.geometry.bounds[3] + min_dist:
                     return True  # return immediately
     return False
 
