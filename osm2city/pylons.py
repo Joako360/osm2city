@@ -16,7 +16,7 @@ TODO:
 @author: vanosten
 """
 
-from enum import Enum, IntEnum, unique
+from enum import IntEnum, unique
 import logging
 import math
 import multiprocessing as mp
@@ -412,11 +412,6 @@ def _process_osm_chimneys_ways(nodes_dict, ways_dict, my_coord_transformator,
     return chimneys
 
 
-class TreeType(Enum):
-    """The tree type needs to correspond to the available types in the FG material for (OSM) trees."""
-    default = 'DeciduousBroadCover'  # a typical full grown tree for the region - larger than a house.
-
-
 class Tree:
     """A single tree from OSM or interpreted OSM data.
 
@@ -428,11 +423,11 @@ class Tree:
         self.x = x
         self.y = y
         self.elev = elev
-        self.tree_type = TreeType.default
+        self.tree_type = e.TreeType.default
 
     def parse_tags(self, tags: Dict[str, str]) -> None:
         if s.K_DENOTATION in tags:  # significant trees should be at least normal
-            self.tree_type = TreeType.default
+            self.tree_type = e.TreeType.default
 
     @classmethod
     def tree_from_node(cls, node: op.Node, coords_transform: co.Transformation, fg_elev: utilities.FGElev) -> 'Tree':
@@ -488,10 +483,13 @@ def _process_osm_trees_parks(parks: List[shg.Polygon], trees: List[Tree], city_b
     trees.extend(additional_trees)
 
 
-def _process_osm_trees_gardens(trees: List[Tree], city_blocks: Set[CityBlock], parks: List[shg.Polygon],
-                               fg_elev: utilities.FGElev) -> None:
-    additional_trees = list()
+def _process_osm_trees_gardens(city_blocks: Set[CityBlock], parks: List[shg.Polygon],
+                               fg_elev: utilities.FGElev) -> Dict[e.TreeType, List[Tree]]:
+    suburban_trees = list()
+    town_trees = list()
+    urban_trees = list()
     for city_block in city_blocks:
+        tree_type = e.map_tree_type_from_settlement_type_garden(city_block.settlement_type)
         if city_block.type_ is e.BuildingZoneType.special_processing:
             continue
         prep_geom = prep(city_block.geometry)
@@ -509,10 +507,24 @@ def _process_osm_trees_gardens(trees: List[Tree], city_blocks: Set[CityBlock], p
                 continue
             if not _test_point_in_building(point, {city_block}, 2.0):
                 elev = fg_elev.probe_elev((point.x, point.y), False)
-                additional_trees.append(Tree(op.get_next_pseudo_osm_id(op.OSMFeatureType.generic_node),
-                                             point.x, point.y, elev))
-    logging.info('Number of trees added in gardens: %i', len(additional_trees))
-    trees.extend(additional_trees)
+                my_tree = Tree(op.get_next_pseudo_osm_id(op.OSMFeatureType.generic_node),
+                               point.x, point.y, elev)
+                if tree_type is e.TreeType.suburban:
+                    suburban_trees.append(my_tree)
+                elif tree_type is e.TreeType.town:
+                    town_trees.append(my_tree)
+                else:
+                    urban_trees.append(my_tree)
+
+    garden_trees = dict()
+    if suburban_trees:
+        garden_trees[e.TreeType.suburban] = suburban_trees
+    if town_trees:
+        garden_trees[e.TreeType.town] = town_trees
+    if urban_trees:
+        garden_trees[e.TreeType.urban] = urban_trees
+    logging.info('Number of trees added in gardens: %i', len(suburban_trees) + len(town_trees) + len(urban_trees))
+    return garden_trees
 
 
 def _generate_random_tree_points_in_polygon(my_polygon: shg.Polygon, prep_geom,
@@ -638,11 +650,10 @@ def _extend_trees_if_dist_ok(potential_trees: List[Tree], trees: List[Tree]) -> 
     trees.extend(potential_trees)
 
 
-def _write_trees_in_list(coords_transform: co.Transformation,
+def _write_trees_in_list(coords_transform: co.Transformation, material_name: str,
                          trees: List[Tree], stg_manager: stg_io2.STGManager) -> None:
-    material_name_shader = TreeType.default.value
-    file_shader = stg_manager.prefix + "_trees_shader.txt"
-    path_to_stg = stg_manager.add_tree_list(file_shader, material_name_shader, coords_transform.anchor, 0.)
+    file_shader = stg_manager.prefix + "_" + material_name + "_trees_shader.txt"
+    path_to_stg = stg_manager.add_tree_list(file_shader, material_name, coords_transform.anchor, 0.)
     try:
         with open(os.path.join(path_to_stg, file_shader), 'w') as shader:
             for t in trees:
@@ -2070,7 +2081,8 @@ def process_pylons(coords_transform: co.Transformation, fg_elev: utilities.FGEle
         chimneys.extend(_process_osm_chimneys_ways(osm_nodes_dict, osm_ways_dict, coords_transform, fg_elev))
         logging.info("Number of valid chimneys found: {}".format(len(chimneys)))
 
-    trees = list()
+    trees = list()  # single trees, parks, trees in line
+    garden_trees = dict()  # key = TreeType, value = list of trees of TreeType
     city_blocks = _prepare_city_blocks(the_buildings, coords_transform)
     logging.info("Working with %i city blocks", len(city_blocks))
     if parameters.C2P_PROCESS_TREES and parameters.FLAG_AFTER_2020_3:
@@ -2104,7 +2116,7 @@ def process_pylons(coords_transform: co.Transformation, fg_elev: utilities.FGEle
             if my_geometry and my_geometry.area > parameters.C2P_TREES_PARK_MIN_SIZE:
                 parks.append(my_geometry)
         _process_osm_trees_parks(parks, trees, city_blocks, fg_elev)
-        _process_osm_trees_gardens(trees, city_blocks, parks, fg_elev)
+        garden_trees = _process_osm_trees_gardens(city_blocks, parks, fg_elev)
         logging.info("Total number of trees after artificial generation: {}".format(len(trees)))
 
     # free some memory
@@ -2136,7 +2148,10 @@ def process_pylons(coords_transform: co.Transformation, fg_elev: utilities.FGEle
             chimney.make_stg_entry(stg_manager)
 
     if parameters.C2P_PROCESS_TREES and parameters.FLAG_AFTER_2020_3:
-        _write_trees_in_list(coords_transform, trees, stg_manager)
+        if trees:
+            _write_trees_in_list(coords_transform, e.TreeType.default.value, trees, stg_manager)
+        for tree_type, tree_list in garden_trees.items():
+            _write_trees_in_list(coords_transform, tree_type.value, tree_list, stg_manager)
 
     stg_manager.write(file_lock)
 

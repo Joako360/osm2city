@@ -1,4 +1,4 @@
-from enum import unique, IntEnum
+from enum import unique, Enum, IntEnum
 import logging
 from typing import Dict, Optional, Union
 
@@ -176,6 +176,27 @@ class SettlementType(IntEnum):
     dense = 7
     periphery = 6  # default within lit area
     rural = 5  # only implicitly used for building zones without city blocks.
+
+
+class TreeType(Enum):
+    """The tree type needs to correspond to the available types in the FG material for (OSM) trees."""
+    default = 'DeciduousBroadCover'  # a typical full grown tree for the region - larger than a house.
+
+    # used for gardens
+    suburban = 'SubUrban'
+    town = 'Town'
+    urban = 'Urban'
+
+
+def map_tree_type_from_settlement_type_garden(s_type: SettlementType) -> TreeType:
+    if s_type is None:
+        return TreeType.suburban
+    elif s_type in (SettlementType.centre, SettlementType.block):
+        return TreeType.urban
+    elif s_type is SettlementType.dense:
+        return TreeType.town
+    else:
+        return TreeType.suburban
 
 
 @unique
