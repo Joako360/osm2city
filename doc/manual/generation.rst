@@ -88,6 +88,8 @@ Optional arguments:
   + ``pylons``: generates pylons and cables between them for (major) power lines. Also creates wind turbines, storage tanks and chimneys.
   + ``main``: all of the above
   + ``details``: generates (railway) platforms, piers and boats as well as minor power lines, aerial ways, railway overhead lines as well as street-lamps.
+  + ``trees``: generates trees mapped in OSM as well as heuristics for trees in parks and gardens
+  + ``all``: all of the above
 
 
 You might want to consider setting parameter ``FG_ELEV_CACHE`` to ``False`` in case you build a huge area due to disk usage.

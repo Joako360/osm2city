@@ -51,6 +51,7 @@ class SceneryType(enum.IntEnum):
     roads = 2
     pylons = 3
     details = 4
+    trees = 5
     # other types
     objects = 11
     terrain = 12

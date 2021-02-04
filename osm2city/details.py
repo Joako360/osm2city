@@ -111,7 +111,7 @@ def _process_pylon_details(coords_transform: co.Transformation, lit_areas: Optio
             rail_line.calc_and_map(fg_elev, coords_transform, rail_lines)
     # street lamps
     streetlamp_ways = list()
-    if False:  # FIXME parameters.C2P_PROCESS_STREETLAMPS:
+    if False:  # FIXME parameters.C2P_PROCESS_STREETLAMPS: lit_areas must also be provided and corrected in build_tiles
         highways = pylons.process_osm_highways(coords_transform)
         streetlamp_ways = pylons.process_highways_for_streetlamps(highways, lit_areas)
         logging.info('Reduced number of streetlamp ways: %s', len(streetlamp_ways))

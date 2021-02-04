@@ -11,7 +11,7 @@ import traceback
 from typing import List
 import unittest
 
-from osm2city import details, pylons, roads, buildings, parameters
+from osm2city import details, pylons, roads, buildings, parameters, trees
 from osm2city.owbb import landuse as ol
 import osm2city.utils.aptdat_io as aio
 import osm2city.utils.btg_io as bio
@@ -52,7 +52,8 @@ class Procedures(IntEnum):
     roads = 3
     pylons = 4
     details = 5
-    owbb = 6  # only land-use
+    trees = 6
+    owbb = 10  # only land-use
 
 
 def _parse_exec_for_procedure(exec_argument: str) -> Procedures:
@@ -124,7 +125,8 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
         my_stg_entries = stg_io2.read_stg_entries_in_boundary(the_coords_transform, False)
 
         # run programs
-        if exec_argument is Procedures.details and parameters.C2P_PROCESS_STREETLAMPS is False:
+        if (exec_argument is Procedures.details and parameters.C2P_PROCESS_STREETLAMPS is False) or (
+            exec_argument is Procedures.pylons):
             lit_areas = None
             water_areas = None
             osm_buildings = None
@@ -155,9 +157,11 @@ def process_scenery_tile(scenery_tile: SceneryTile, params_file_name: str,
             roads.process_roads(the_coords_transform, my_fg_elev, blocked_apt_areas, lit_areas, water_areas,
                                 the_stg_entries, file_lock)
         if exec_argument in [Procedures.pylons, Procedures.main, Procedures.all] and process_built_stuff:
-            pylons.process_pylons(the_coords_transform, my_fg_elev, my_stg_entries, osm_buildings, file_lock)
+            pylons.process_pylons(the_coords_transform, my_fg_elev, my_stg_entries, file_lock)
         if exec_argument in [Procedures.details, Procedures.all]:
             details.process_details(the_coords_transform, lit_areas, my_fg_elev, file_lock)
+        if exec_argument in [Procedures.trees, Procedures.all]:
+            trees.process_trees(the_coords_transform, my_fg_elev, osm_buildings, file_lock)
 
     except:
         logging.exception('Exception occurred while processing tile {}.'.format(scenery_tile.tile_index))
@@ -193,24 +197,25 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="build-tiles generates a whole scenery of osm2city objects \
     based on a lon/lat defined area")
     parser.add_argument("-f", "--file", dest="filename",
-                        help="read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
+                        help="Read parameters from FILE (e.g. params.ini)", metavar="FILE", required=True)
     parser.add_argument("-b", "--boundary", dest="boundary",
                         help="set the boundary as WEST_SOUTH_EAST_NORTH like *9.1_47.0_11_48.8 (. as decimal)",
                         required=True)
     parser.add_argument("-p", "--processes", dest="processes", type=int,
-                        help="number of parallel processes (should not be more than number of cores/CPUs)",
+                        help="Number of parallel processes (should not be more than number of cores/CPUs)",
                         required=True)
     parser.add_argument('-m', '--maxtasksperchild', dest='max_tasks', type=int,
-                        help='the number of tasks a worker process completes before it will exit (default: unlimited)',
+                        help='The number of tasks a worker process completes before it will exit (default: unlimited)',
                         required=False)
     parser.add_argument("-e", "--execute", dest="exec",
-                        help="execute only the given procedure[s] (buildings, pylons, roads, details, main, owbb, all)",
+                        help="Execute only the given procedure[s] (buildings, pylons, roads, details, trees, main, " +
+                              "owbb, all)",
                         required=False)
     parser.add_argument("-l", "--loglevel", dest="logging_level",
-                        help="set loggging level. Valid levels are DEBUG, INFO (default), WARNING, ERROR, CRITICAL",
+                        help="Set loggging level. Valid levels are DEBUG, INFO (default), WARNING, ERROR, CRITICAL",
                         required=False)
     parser.add_argument('-o', '--logtofile', dest='log_to_file', action='store_true',
-                        help='write the logging output to files in addition to stderr')
+                        help='Write the logging output to files in addition to stderr')
 
     args = parser.parse_args()
 
