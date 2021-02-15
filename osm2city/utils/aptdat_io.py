@@ -13,7 +13,7 @@ import logging
 import os
 from osm2city import parameters
 import time
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from shapely.affinity import rotate
 from shapely.geometry import box, CAP_STYLE, LineString, Point, Polygon
@@ -90,6 +90,10 @@ class LandRunway(Runway):
         return line.buffer(self.width / 2.0, cap_style=CAP_STYLE.flat)
 
 
+class WaterRunway(LandRunway):
+    pass
+
+
 class Helipad(Runway):
     def __init__(self, length: float, width: float, center: co.Vec2d, orientation: float) -> None:
         self.length = length
@@ -110,8 +114,10 @@ class Helipad(Runway):
 
 
 class Airport(object):
-    def __init__(self, code: str) -> None:
+    def __init__(self, code: str, name: str, kind: int) -> None:
         self.code = code
+        self.name = name
+        self.kind = kind  # as per apt_dat definition: 1 = land airport, 16 = seaplane base, 17 = heliport
         self.runways = list()  # LandRunways, Helipads
         self.airport_boundary = None
         self.pavements = list()  # Pavement of type Boundary
@@ -133,6 +139,24 @@ class Airport(object):
                 and self.airport_boundary.within_boundary(min_lon, min_lat, max_lon, max_lat):
             return True
         return False
+
+    def calculate_centre(self) -> Tuple[float, float]:
+        """There is no abstract lon/lat for the airport, therefore calculate it from other data"""
+        total_lon = 0.
+        total_lat = 0.
+        counter = 0
+        for runway in self.runways:
+            if isinstance(runway, Helipad):
+                total_lon += runway.center.x
+                total_lat += runway.center.y
+                counter += 1
+            else:
+                total_lon += runway.start.x + runway.end.x
+                total_lat += runway.start.y + runway.end.y
+                counter += 2
+        if counter == 0:  # just to be sure and not getting a div by zero exception
+            return 0, 0
+        return total_lon / counter, total_lat / counter
 
     def create_blocked_areas(self, coords_transform: co.Transformation,
                              for_buildings: bool) -> List[Polygon]:
@@ -161,7 +185,7 @@ class Airport(object):
 
 
 def read_apt_dat_gz_file(min_lon: float, min_lat: float,
-                         max_lon: float, max_lat: float) -> List[Airport]:
+                         max_lon: float, max_lat: float, read_water_runways: bool = False) -> List[Airport]:
     apt_dat_gz_file = os.path.join(utilities.get_fg_root(), 'Airports', 'apt.dat.gz')
     start_time = time.time()
     airports = list()
@@ -189,12 +213,17 @@ def read_apt_dat_gz_file(min_lon: float, min_lat: float,
                     airports.append(my_airport)
                 # and then create a new empty airport
                 if not parts[0] == '99':
-                    my_airport = Airport(parts[4])
+                    my_airport = Airport(parts[4], parts[5], int(parts[0]))
                     total_airports += 1
             elif parts[0] == '100':
                 my_runway = LandRunway(float(parts[1]), co.Vec2d(float(parts[10]), float(parts[9])),
                                        co.Vec2d(float(parts[19]), float(parts[18])))
                 my_airport.append_runway(my_runway)
+            elif parts[0] == '101':
+                if read_water_runways:
+                    my_runway = WaterRunway(float(parts[1]), co.Vec2d(float(parts[5]), float(parts[4])),
+                                            co.Vec2d(float(parts[8]), float(parts[7])))
+                    my_airport.append_runway(my_runway)
             elif parts[0] == '102':
                 my_helipad = Helipad(float(parts[5]), float(parts[6]), co.Vec2d(float(parts[3]), float(parts[2])),
                                      float(parts[4]))
