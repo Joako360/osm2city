@@ -124,7 +124,7 @@ class STGFile(object):
         """add OBJECT_XXXXX line to our_list. Returns path to stg."""
         line = "%s %s %1.5f %1.5f %1.2f %g" % (stg_verb.upper(),
                                                ac_file_name, lon_lat.lon, lon_lat.lat, elev, hdg)
-        if parameters.FLAG_AFTER_2020_3 and radius is not None:
+        if parameters.FLAG_AFTER_2020_3 and parameters.FLAG_STG_LOD_RADIUS and radius is not None:
             line += ' 0.0 0.0 ' + str(radius) + '\n'
         else:
             line += '\n'

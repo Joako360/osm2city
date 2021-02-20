@@ -90,6 +90,7 @@ BUILDING_LIST_DIST_DEVIATION = 0.8
 
 FLAG_NEXT_GEN_TEXTURING = False
 FLAG_AFTER_2020_3 = False
+FLAG_STG_LOD_RADIUS = False  # requires FLAG_AFTER_2020_3
 
 # Debugging by plotting with Matplotlib to pdfs. See description about its use in the appendix of the manual
 DEBUG_PLOT_RECTIFY = False
@@ -230,7 +231,7 @@ C2P_PROCESS_WIND_TURBINES = True
 C2P_PROCESS_STREETLAMPS = False  # experimental and unsupported
 C2P_PROCESS_STORAGE_TANKS = True
 C2P_PROCESS_CHIMNEYS = True
-C2P_PROCESS_TREES = False  # Requires NEXT
+C2P_PROCESS_TREES = False  # Requires FLAG_AFTER_2020_3
 
 # The radius for the cable. The cable will be a triangle with side length 2*radius.
 # In order to be better visible the radius might be chosen larger than in real life
