@@ -146,19 +146,51 @@ class Way(OSMElement):
                 return my_polygon
         return None
 
-    def line_string_from_osm_way(self, nodes_dict: Dict[int, Node], my_coord_transformator: Transformation) \
+    def line_string_from_osm_way(self, nodes_dict: Dict[int, Node], transformer: Transformation) \
             -> Optional[shg.LineString]:
         my_coordinates = list()
         for ref in self.refs:
             if ref in nodes_dict:
                 my_node = nodes_dict[ref]
-                x, y = my_coord_transformator.to_local((my_node.lon, my_node.lat))
+                x, y = transformer.to_local((my_node.lon, my_node.lat))
                 my_coordinates.append((x, y))
         if len(my_coordinates) >= 2:
             my_geometry = shg.LineString(my_coordinates)
             if my_geometry.is_valid and not my_geometry.is_empty:
                 return my_geometry
         return None
+
+    def simplify(self, nodes_dict: Dict[int, Node], transformer: Optional[Transformation],
+                 tolerance: float) -> None:
+        """Simplifies a Way. The only topology that is preserved are the start and end points.
+        If the way is e.g. a road and some notes inside the way are related to other roads, then those
+        intersections will topologically go away, since all inner nodes will be new."""
+        if len(self.refs) < 3:
+            return
+        if transformer is None:
+            lon_1 = nodes_dict[self.refs[0]].lon
+            lon_2 = nodes_dict[self.refs[-1]].lon
+            lat_1 = nodes_dict[self.refs[0]].lat
+            lat_2 = nodes_dict[self.refs[-1]].lat
+            transformer = Transformation((lon_2 - (lon_2 - lon_1) / 2, lat_2 - (lat_2 - lat_1) / 2))
+        # create a line_string in local coordinates
+        line_string = self.line_string_from_osm_way(nodes_dict, transformer)
+        # simplify it
+        line_simplified = line_string.simplify(tolerance, preserve_topology=True)
+        # port the simplification back
+        old_refs = self.refs[:]
+        self.refs = list()
+        line_coords = list(line_simplified.coords)
+        for i, x_y in enumerate(line_coords):
+            if i == 0:
+                self.refs.append(old_refs[0])
+            elif i == len(line_coords) - 1:
+                self.refs.append(old_refs[-1])
+            else:
+                lon, lat = transformer.to_global((x_y[0], x_y[1]))
+                new_node = Node(get_next_pseudo_osm_id(OSMFeatureType.generic_node), lat, lon)
+                nodes_dict[new_node.osm_id] = new_node
+                self.refs.append(new_node.osm_id)
 
     def is_closed(self) -> bool:
         if len(self.refs) < 3:
