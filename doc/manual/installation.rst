@@ -59,6 +59,10 @@ Then:
     user$ python3 -m venv /home/pingu/bin/virtualenvs/o2c38
     user$ source /home/pingu/bin/virtualenvs/o2c38/bin/activate
     (o2c38) user$ cd /home/pingu/osm2city
+
+    (o2c38) user$ pip install --upgrade pip
+    (o2c38) user$ pip install --upgrade setuptools
+
     (o2c36) user$ pip install -r requirements.txt
 
 .. _Virtualenv: https://virtualenv.pypa.io/en/stable/
