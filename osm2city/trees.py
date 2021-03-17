@@ -295,12 +295,13 @@ def _prepare_city_blocks(the_buildings: List[bl.Building], coords_transform: co.
     bounds = Bounds.create_from_parameters(coords_transform)
     bounding_box = shg.box(bounds.min_point.x, bounds.min_point.y, bounds.max_point.x, bounds.max_point.y)
     remaining_block = CityBlock(0, bounding_box, e.BuildingZoneType.special_processing)
-    for building in the_buildings:
-        if building.zone:
-            if isinstance(building.zone, CityBlock):
-                city_blocks.add(building.zone)
-            else:
-                remaining_block.relate_building(building)
+    if the_buildings != None:
+        for building in the_buildings:
+            if building.zone:
+                if isinstance(building.zone, CityBlock):
+                    city_blocks.add(building.zone)
+                else:
+                    remaining_block.relate_building(building)
     city_blocks.add(remaining_block)
 
     # in buildings._clean_building_zones_dangling_children there is also come cleanup of not valid buildings
