@@ -171,6 +171,7 @@ def get_building_class(tags: KeyValueDict) -> BuildingClass:
 
 @unique
 class SettlementType(IntEnum):
+    """Values must be set such that centre has the highest value"""
     centre = 9  # elsewhere in the code the value is used for comparison, so centre should be highest
     block = 8
     dense = 7

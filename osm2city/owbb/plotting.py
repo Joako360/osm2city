@@ -65,8 +65,6 @@ def _draw_settlement_zones(building_zones: List[m.BuildingZone], ax: maxs.Axes) 
             elif block.settlement_type is enu.SettlementType.periphery:
                 colour = 'yellow'
             patch = PolygonPatch(block.geometry, facecolor=colour, edgecolor=colour)
-            if block.settlement_type_changed:
-                patch.set_hatch('/')
             ax.add_patch(patch)
 
 

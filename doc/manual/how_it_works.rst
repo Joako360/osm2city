@@ -42,13 +42,13 @@ The FlightGear scenery is also used to determine, where there is water (the land
 Land-use Handling
 -----------------
 
-Land-use processing is a bit intricate, because OSM data is often insufficient or even lacking. Also for building heuristics it is necessary to have some idea about whether a built-up area is close to a centre and/or the type of area (e.g. village vs. town).
+Land-use processing is a bit intricate, because OSM data is often insufficient or even lacking. Also for building heuristics it is necessary to have some idea about whether a built-up area is close to a centre and/or the type of settlement (e.g. village vs. town).
 
 To understand the following it is important to first read chapter about :ref:`Land-use <chapter-parameters-landuse-label>` parameters.
 
 Once the land-use zone for built-up areas are read from OSM and/or generated (called "building_zones" in the code), lit areas are created by buffering all building zones and then merging as far as possible. These lit areas are not only used to determine, which streets should be lit, but are also used as a settlement clusters for cities and towns.
 
-Only settlement areas tagged in OSM with ``place=city`` or ``place=town`` are considered for further processing of built-up areas, where apartments etc. exist. This is because the rural types are used as default, ``place=farm`` is treated specially and values for ``place`` like ``quarter``, ``suburb``, ``neighbourhood`` do not provide extra information. For ``city`` and ``town`` feature types Node, Way and Relation are read from OSM, however Way and Relation are reduced to a node by using the area's centroid. Note that a pre-requisite for this to work is that the mapping in OSM has been done as instructed in `Key Place`_.
+Only settlement areas tagged in OSM with ``place=city`` or ``place=town`` are considered for further processing of built-up areas, where apartments etc. exist. This is because the rural types are used as default, ``place=farm`` is treated specially and values for ``place`` like ``quarter``, ``suburb``, ``neighbourhood`` do not provide extra information. For ``city`` and ``town`` feature types Node, Way and Relation are read from OSM for ``key=place``, however Way and Relation are reduced to a node by using the area's centroid. Note that a pre-requisite for this to work is that the mapping in OSM has been done as instructed in `Key Place`_.
 
 In a first step all city or town places are linked to lit areas extended with specific water areas [#water]_. Then the zones are split into city_block objects, i.e. areas surrounded by streets — some of the polygons will be real city blocks, others will be border areas (the "city" part is not really true here - even a hamlet could in osm2city get divided into several city_blocks). The city blocks take over the land-use type (type can be ``non-osm`` if generated and therefore without real meaning).
 
@@ -57,7 +57,7 @@ Finally depending on the place type and the distance to the centroid a given cit
 * ``centre``: the centre of a city (not available for towns). Max distance = population^(1/2)
 * ``block``: an area in the center of a city, where streets define blocks, and the buildings within the blocks most often are apartment like buildings, where the facades are aligned with the street and most often buildings are connected. Max distance = population^(5/8).
 * ``dense``: an area with dense population mostly living in apartments, but the apartment houses are not necessarily connected. Max distance = population^(2/3).
-* ``periphery``: an area with mostly (detached) houses. Outside of max distance for ``dense``.
+* ``periphery``: an area with mostly (detached) houses. Outside of max distance for ``dense``, but inside the boundaries of a settlement cluster for city/town (i.e. anything not centre/block or dense inside a settlement cluster is by default periphery).
 
 There is also settlement type ``rural``, which is the default for all those building zones, which re not within a lit area that is linked to a city or town place. In theory the main difference between ``periphery`` and ``rural`` is the ratio between a property's lot size and the floor plan, where in rural regions the same family house size typically has more surrounding ground.
 
@@ -76,7 +76,7 @@ City     200 000       447       2056     3419
 City     1 000 000     1000      5623     10000
 =====    ==========    ======    =====    ======
 
-I.e. all city blocks linked to building zones are tested against these circles and if intersecting/within, then the most "centric" one is linked to the city block.
+I.e. all city blocks linked to building zones are tested against these circles and if intersecting/within, then the most "centric" one is linked to the city block. The building zone gets the maximum settlement type of all related city blocks.
 
 The following plots illustrate this around tile with 3088986 LSZH, where in most plots the city centre of Zurich is in the lower left corner and the smaller city of Winterthur is in the upper right corner.
 
@@ -84,7 +84,7 @@ Lit areas:
 
 .. image:: lit_areas_lszh.png
 
-Settlement types (blue: centre, green: block, matenta: dense, yellow: periphery, grey: rural, brown: farmyard)
+Settlement types (blue: centre, green: block, magenta: dense, yellow: periphery, grey: rural, brown: farmyard)
 
 .. image:: settlement_types_lszh.png
 

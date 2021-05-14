@@ -66,6 +66,21 @@ class OSMFeature(abc.ABC):
         """Parses the raw tags (key / values) from OSM to pick the relevant and cast them to internal fields."""
 
 
+class PreparedSettlementTypePoly:
+    """A polygon (circle) representing a settlement type centre, block or dense.
+
+    It is the total area and not the 'donut': e.g. dense is only the actual ring around centre/block, but here to
+    ease processing it is the whole. Therefore, matching against these polygons must be done in hierarchy:
+    first centre, then block, then dense.
+    """
+    __slots__ = ('geometry', 'prep_poly', 'grid_indices')
+
+    def __init__(self, geometry: Polygon) -> None:
+        self.geometry = geometry
+        self.prep_poly = prep(geometry)
+        self.grid_indices = set()
+
+
 class Place(OSMFeature):
     """ A 'Places' OSM Map Feature
     A Place can either be of element type Node -> Point geometry or Way -> Area -> LinearString
@@ -174,15 +189,25 @@ class Place(OSMFeature):
             dense_circle = self.geometry.buffer(radius)
         return centre_circle, block_circle, dense_circle
 
+    def create_prepared_place_polys(self) -> Tuple[PreparedSettlementTypePoly, PreparedSettlementTypePoly,
+                                                   PreparedSettlementTypePoly]:
+        centre_circle, block_circle, dense_circle = self.create_settlement_type_circles()
+        return (PreparedSettlementTypePoly(centre_circle), PreparedSettlementTypePoly(block_circle),
+                PreparedSettlementTypePoly(dense_circle))
+
 
 class SettlementCluster:
-    __slots__ = ('linked_places', 'geometry')
+    __slots__ = ('linked_places', 'geometry', 'grid_indices')
 
     """A polygon based on lit_area representing a settlement cluster.
-    Built-up areas can sprawl and a coherent area can contain several cities and towns."""
+    Built-up areas can sprawl and a coherent area can contain several cities and towns.
+    Must contain at least one place recognized as city or town - 'contain' here means that the dense circle
+    around the place somehow intersects with the lit_area. 
+    All other lit areas or not Settlement clusters but simple rural areas."""
     def __init__(self, linked_places: List[Place], geometry: Polygon) -> None:
         self.linked_places = linked_places
         self.geometry = geometry
+        self.grid_indices = set()
 
 
 class OSMFeatureArea(OSMFeature):
@@ -281,7 +306,7 @@ class OpenSpace(OSMFeatureArea):
 class CityBlock:
     """A special land-use derived from many kinds of land-use info and enclosed by streets (kind of)."""
     __slots__ = ('osm_id', 'geometry', 'prep_geom', 'type_', 'osm_buildings',
-                 '__settlement_type', 'settlement_type_changed', '__building_levels')
+                 '__settlement_type', '__building_levels')
 
     def __init__(self, osm_id: int, geometry: Polygon, feature_type: Union[None, enu.BuildingZoneType]) -> None:
         self.osm_id = osm_id
@@ -291,7 +316,6 @@ class CityBlock:
         self.osm_buildings = list()  # List of already existing osm buildings
         self.__settlement_type = None
         self.settlement_type = enu.SettlementType.periphery
-        self.settlement_type_changed = False
         self.__building_levels = 0
 
     def relate_building(self, building: bl.Building) -> None:
@@ -323,7 +347,7 @@ class BuildingZone(OSMFeatureArea):
     Cf. http://wiki.openstreetmap.org/wiki/Map_Features#Landuse
     """
     __slots__ = ('linked_blocked_areas', 'osm_buildings', 'generated_buildings', 'linked_genways',
-                 'linked_city_blocks', 'settlement_type')
+                 'linked_city_blocks', '__settlement_type', 'grid_indices')
 
     def __init__(self, osm_id: int, geometry: MPoly, feature_type: Union[None, enu.BuildingZoneType]) -> None:
         super().__init__(osm_id, geometry, feature_type)
@@ -335,7 +359,21 @@ class BuildingZone(OSMFeatureArea):
         self.generated_buildings = list()  # List of GenBuilding objects for generated non-osm buildings
         self.linked_genways = list()  # List of Highways that are available for generating buildings
         self.linked_city_blocks = list()
-        self.settlement_type = enu.SettlementType.rural
+        self.__settlement_type = enu.SettlementType.rural
+        self.grid_indices = set()  # used to accelerate spatial calculations
+
+    @property
+    def settlement_type(self) -> enu.SettlementType:
+        return self.__settlement_type
+
+    @settlement_type.setter
+    def settlement_type(self, value):
+        self.__settlement_type = value
+
+    def set_max_settlement_type(self, new_type: enu.SettlementType) -> None:
+        """Make sure that a settlement type set previously does not get overwritten by a lower type."""
+        if new_type.value > self.settlement_type.value:
+            self.__settlement_type = new_type
 
     @property
     def density(self) -> float:
@@ -1238,6 +1276,9 @@ def _add_extension_to_tile_border(transformer: co.Transformation) -> None:
 def process_osm_place_refs(transformer: co.Transformation) -> Tuple[List[Place], List[Place]]:
     """Reads both nodes and areas from OSM, but then transforms areas to nodes.
     We trust that there is no double tagging of a place as both node and area.
+
+    Only urban places (city, town) and farms are looked at. The rest in between (e.g. villages)
+    are not taken as places.
     """
     urban_places = list()
     farm_places = list()
