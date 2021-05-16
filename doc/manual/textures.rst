@@ -68,7 +68,7 @@ Needed Texture Atlases
 Ideas, Constraints and Random Thoughts
 ......................................
 
-* Older graphic cards might have difficulties with textures larger than 4k x 4k. On the other hand side the current texture atlas is 16k x 256 without people complaining. By the time new osm2city atlases get mainstream (i.e. next LTS after 2020.3) another year or so will have passed and many "older" graphics cards still can manage 8k x 8k. Whoever runs osm2city might not have an old PC anyway. => Going with 8k per dimension max.
+* Older graphic cards might have difficulties with textures larger than 4k x 4k. On the other hand side the current texture atlas is 16k x 256 without people complaining. By the time new osm2city atlases get mainstream (i.e. next LTS after 2020.3) another year or so will have passed and many "older" graphics cards still can manage 8k x 8k. Whoever runs osm2city might not have an old PC anyway. => Going with 8k (8192 pixels) per dimension max.
 * Using a transparent texture and letting the underlying model's colours shine through is very bad for performance, unless a shader is used. I.e. using a few textures and then doing the variety by using colours in the ac-file is not a viable way.
 * Bigger objects/meshes are better for graphics cards. Level of details settings in FG rendering preferences can play a bit against it. So there is a sweet spot between mesh dimensions (as large as possible) and LOD settings. I.e. when arriving close to a border of a large mesh (e.g. 8x8 km) and a small LOD setting (e.g 4 km) then even though buildings at the border of that mesh would be within the LOD distance, they will first appear, when the viewer is below LOD distance to the centre of the mesh.
 * FG seems to support only one texture per ac-file - even though the `AC3D file format <https://www.inivis.com/ac3d/man/ac3dfileformat.html>`_ does support several textures (one texture per object, but there can be many objects).
@@ -77,6 +77,7 @@ Ideas, Constraints and Random Thoughts
     * Put new BUILDING_LIST buildings and new texture atlases into FG version specific scenery directories to avoid compatibility issues. Each FG version then knows which directory to reference.
     * Put the files into Terrasync/Models instead and make sure that as the atlas evolves only new stuff is added and each sub-texture has a "known FG minimal version" number.
 
+`The WikiPedia list of the largest buildings <https://en.wikipedia.org/wiki/List_of_largest_buildings>`_ has buildings with up to 2000 m in one direction. 1000 m in one direction is still unusual, but down to 500 m it gets more common - and therefore osm2city should be able to handle it consistently.
 
 .....................................
 High Office Buildings and Skyscrapers
@@ -122,23 +123,95 @@ Special handling in osm2city:
 * Do not have roofs -> separate mesh
 
 
-.........................
-Roofs for Large Buildings
-.........................
+..............................
+Roofs for Large Flat Buildings
+..............................
 
-Contains textures for the roofs of large buildings, because the textures for skyscrapers / large buildings do not have space for roof textures.
+Contains textures for the roofs of large buildings with flat roofs, because the textures for skyscrapers / large buildings do not have space for roof textures.
 
 Proposal:
 
-* 1 special atlas file (? x ? pixels)
-* 20 cm per pixel (but can be made stretchable as an attribute of th individual textures)
+* 1 special atlas file (8192 x 256 pixels)
+* 10 cm per pixel such that some lines (connections) and dirt can be modelled (but can be made stretchable as an attribute of the individual textures)
 * Repeatable in x-direction
+* 8 materials:
+    * Concrete
+    * Gravel
+    * Solar panels
+    * ?
+    * 4 different coloured and sized sheets
 
-Additionally, in the future it might be possible to handle these roofs with shaders to:
+Additionally, in the future it might be possible to handle these roofs with shaders:
 
-* show some structure like pipes, air conditioning, etc.
-* show obstruction lights instead of using the the current xml-file to show ``Models/Effects/pos_lamp_red_light_2st.xml`` on the top of high buildings.
+* to show some structure like pipes, air conditioning, etc.
+* to show obstruction lights instead of using the the current xml-file to show ``Models/Effects/pos_lamp_red_light_2st.xml`` on the top of high buildings.
 * if the concept of "roof" is a bit abused, then this mesh could also include surfaces for signs/logos to be displayed in some variety during day and night instead of backing these into the facade textures (incl. light-map) of large buildings.
+
+
+..........
+Roof Tiles
+..........
+
+`Roof tiles <https://en.wikipedia.org/wiki/Roof_tiles>`_ come in different forms, colours etc. and are quite visible from above.
+
+File ``osm2city-data/tex.src/roof_red3.png`` uses 8 pixels in width per tile and allows distinctive forms plus some dirt. Such a tile has a visible width of around 20 cm, so ca. 3 cm per pixel.
+
+There are buildings with roof tiles, which are very long, but it is quite uncommon, that buildings with tiles are long along the gable. 20 metres might be pretty much the maximum (e.g. the abbey of St. Gallen), because many large roofs of churches are not made of tiles (e.g. copper, lead). Most of the time 10+ metres is enough (including considering steep roofs on large buildings. Therefore it should be enough to have only a few roof textures for up to 20 metres and the rest for up to 10 metres.
+
+Proposed texture file:
+
+* 1 pixel per 3 cm
+* Repeatable in x-direction, fixed in y direction (if needed more than the max, then just stretch - should be very rare)
+* Width: 256 pixel (ca. 8 metres, ca. 30 smaller tiles) -> allows to have some dirt and variation, but still small
+* Height: 8192 pixels (8k):
+    * 4 textures with ca. 700 pixels (20+ m) - e.g. one black and 3 different red
+    * 12 textures with ca. 400 pixels (12 m)
+* Leaves still e.g. 4 pixels per texture at the bottom to visualize a gutter
+
+
+......................................
+Other Roof Materials for Sloping Roofs
+......................................
+
+``osm2city-data/tex.src/roofs_default.py`` has the following materials:
+
+* roof_tiles
+* slate
+* stone
+* metal
+* grass
+* copper
+* glass
+
+Other material are e.g.:
+
+* straw, seagrass
+* laminated glass
+* wood shakes and shingles
+* asphalt, PVC, asbestos
+
+See also `OSM roof:material <https://wiki.openstreetmap.org/wiki/Key:roof:material>`_ and `OSM tag info for roof:material<https://taginfo.openstreetmap.org/keys/?key=roof%3Amaterial#values>`_
+
+``osm2city-data/tex.src/roof_gen_grey.png`` is an example of a metallic looking texture with ca. 1 cm per pixel. The same effect should be achievable with ca. 2 cm per pixel. For stone, wood, grass, straw the same might be needed.
+
+Proposed texture file:
+
+* 1 pixel per 3 cm
+* repeatable in x-direction, fixed in y direction (if needed more than the max, then just stretch - should work for metal)
+* Width: 256 pixel (ca. 5 metres) -> allows to have some dirt and variation for natural materials, but still small
+* Height: 8192 pixels (8k)
+    * 17 x 348 (ca. 7 metres):
+        * 1 Grass
+        * 2 Straw / seagrass
+        * 3 wooden shingles
+        * 1 glass
+        * 1 waved PVC / plastic
+        * 3 asbestos / eternit tiles / waved
+        * 3 stone
+        * 1 waved metal
+        * 2 asphalt / rubber / tar paper
+    * 4 x 512 pixels (ca. 10 metres):
+        * 4 variations of metal (colour, size of plates)
 
 
 ........
@@ -148,7 +221,6 @@ The Rest
 Contains textures for a variety of objects:
 
 * (European) city buildings / apartment buildings / smaller buildings (like family houses)
-* The roof textures for these buildings
 * special stuff modelled in code by osm2city (e.g. water towers, greenhouses, chimneys).
 
 Proposal:
