@@ -197,15 +197,14 @@ class Place(OSMFeature):
 
 
 class SettlementCluster:
-    __slots__ = ('linked_places', 'geometry', 'grid_indices')
+    __slots__ = ('geometry', 'grid_indices')
 
     """A polygon based on lit_area representing a settlement cluster.
     Built-up areas can sprawl and a coherent area can contain several cities and towns.
     Must contain at least one place recognized as city or town - 'contain' here means that the dense circle
     around the place somehow intersects with the lit_area. 
     All other lit areas or not Settlement clusters but simple rural areas."""
-    def __init__(self, linked_places: List[Place], geometry: Polygon) -> None:
-        self.linked_places = linked_places
+    def __init__(self, geometry: Polygon) -> None:
         self.geometry = geometry
         self.grid_indices = set()
 

@@ -376,7 +376,7 @@ def _test_highway_intersection_area(building_zone: m.BuildingZone,
 
 
 def _assign_city_blocks(building_zone: m.BuildingZone, highways_dict: Dict[int, m.Highway],
-                        grid_highways: Optional[List[GridHighway]]) -> None:
+                        grid_highways: List[GridHighway]) -> None:
     """Splits the land-use into (city) blocks, i.e. areas surrounded by streets.
     Brute force by buffering all highways, then take the geometry difference, which splits the zone into
     multiple polygons. Some of the polygons will be real city blocks, others will be border areas.
@@ -548,35 +548,6 @@ def _fetch_osm_water_areas(transformer: Transformation) -> List[Polygon]:
     return osm_water_areas
 
 
-def _create_settlement_clusters(lit_areas: List[Polygon], osm_water_areas: List[Polygon],
-                                urban_places: List[m.Place]) -> List[m.SettlementCluster]:
-    """Settlement clusters based lit areas and specific water areas.
-
-    The reason for using specific water areas is that in cities with much water (e.g. Stockholm) otherwise
-    the parts of the city would get too isolated and less density - often there is only one clear city center
-    from OSM data, but the city stretches longer.
-    The reason to use OSM water data instead of BTG data is that the OSM data has better tagging."""
-    clusters = list()
-
-    candidate_settlements = _process_landuse_for_settlement_areas(lit_areas, osm_water_areas)
-    for polygon in candidate_settlements:
-        candidate_places = list()
-        towns = 0
-        cities = 0
-        for place in urban_places:
-            centre_circle, block_circle, dense_circle = place.create_settlement_type_circles()
-            if not dense_circle.disjoint(polygon):
-                candidate_places.append(place)
-                if place.type_ is enu.PlaceType.city:
-                    cities += 1
-                else:
-                    towns += 1
-        if candidate_places:
-            logging.debug('New settlement cluster with %i cities and %i towns', cities, towns)
-            clusters.append(m.SettlementCluster(candidate_places, polygon))
-    return clusters
-
-
 def _create_clusters_of_settlements(lit_areas: List[Polygon], osm_water_areas: List[Polygon],
                                     dense_circles: List[m.PreparedSettlementTypePoly]) -> List[m.SettlementCluster]:
     """Settlement clusters based lit areas and specific water areas.
@@ -589,10 +560,9 @@ def _create_clusters_of_settlements(lit_areas: List[Polygon], osm_water_areas: L
 
     candidate_settlements = _process_landuse_for_settlement_areas(lit_areas, osm_water_areas)
     for polygon in candidate_settlements:
-        candidate_places = list()
         for dense_circle in dense_circles:
             if not dense_circle.geometry.disjoint(polygon):
-                clusters.append(m.SettlementCluster(candidate_places, polygon))
+                clusters.append(m.SettlementCluster(polygon))
     return clusters
 
 
@@ -622,15 +592,15 @@ def _assign_grid_indices(building_zones: List[m.BuildingZone], settlement_cluste
             for settlement_cluster in settlement_clusters:
                 if not my_box.disjoint(settlement_cluster.geometry):
                     settlement_cluster.grid_indices.add(index)
-            for circle in centre_circles:
-                if not my_box.disjoint(circle.geometry):
-                    circle.grid_indices.add(index)
-            for circle in block_circles:
-                if not my_box.disjoint(circle.geometry):
-                    circle.grid_indices.add(index)
-            for circle in dense_circles:
-                if not my_box.disjoint(circle.geometry):
-                    circle.grid_indices.add(index)
+            for centre_circle in centre_circles:
+                if not my_box.disjoint(centre_circle.geometry):
+                    centre_circle.grid_indices.add(index)
+            for block_circle in block_circles:
+                if not my_box.disjoint(block_circle.geometry):
+                    block_circle.grid_indices.add(index)
+            for dense_circle in dense_circles:
+                if not my_box.disjoint(dense_circle.geometry):
+                    dense_circle.grid_indices.add(index)
             for grid_highway in grid_highways:
                 if not my_box.disjoint(grid_highway.geometry):
                     grid_highway.grid_indices.add(index)
@@ -677,78 +647,8 @@ def _assign_urban_settlement_type(building_zones: List[m.BuildingZone], current_
                                 city_block.settlement_type = current_settlement_type
 
 
-def _link_building_zones_with_settlements(settlement_clusters: List[m.SettlementCluster],
-                                          building_zones: List[m.BuildingZone],
-                                          highways_dict: Dict[int, m.Highway]) -> None:
-    """As the name says. Plus also creates city blocks.
-    A building zone can only be in one settlement cluster.
-    Per default a building zone has SettlementType = rural."""
-    zones_processed_in_settlement = list()
-    x = 0
-    x_number = len(settlement_clusters)
-    for settlement in settlement_clusters:
-        x += 1
-        logging.info('Processing %i out of %i settlement clusters', x, x_number)
-        # create the settlement type circles
-        centre_circles = list()
-        block_circles = list()
-        dense_circles = list()
-        for place in settlement.linked_places:
-            centre_circle, block_circle, dense_circle = place.create_settlement_type_circles()
-            if not centre_circle.is_empty:
-                centre_circles.append(centre_circle)
-            if not block_circle.is_empty:
-                block_circles.append(block_circle)
-            dense_circles.append(dense_circle)
-        z = 0
-        z_number = len(building_zones)
-        for zone in building_zones:
-            z += 1
-            if z % 20 == 0:
-                logging.debug('Processing %i out of %i building_zones', z, z_number)
-            if zone.type_ is enu.BuildingZoneType.aerodrome:
-                continue
-
-            if zone not in zones_processed_in_settlement:
-                # using "within" instead of "intersect" because lit-areas are always larger than zones due to buffering
-                # and therefore a zone can always only be within one lit-area/settlement and not another
-                if zone.geometry.within(settlement.geometry):
-                    zones_processed_in_settlement.append(zone)
-                    zone.set_max_settlement_type(enu.SettlementType.periphery)
-                    # create city blocks
-                    _assign_city_blocks(zone, highways_dict, None)
-                    # Test for being within a settlement type circle beginning with the highest ranking circles.
-                    # Make sure not to overwrite higher rankings, if already set from different cluster
-                    # If yes, then assign settlement type to city block
-                    for city_block in zone.linked_city_blocks:
-                        prep_geom = prep(city_block.geometry)
-                        if city_block.settlement_type.value < enu.SettlementType.centre.value:
-                            for circle in centre_circles:
-                                if prep_geom.intersects(circle):
-                                    city_block.settlement_type = enu.SettlementType.centre
-                                    zone.set_max_settlement_type(enu.SettlementType.centre)
-                                    break
-                        if city_block.settlement_type.value < enu.SettlementType.block.value:
-                            for circle in block_circles:
-                                if prep_geom.intersects(circle):
-                                    city_block.settlement_type = enu.SettlementType.block
-                                    zone.set_max_settlement_type(enu.SettlementType.block)
-                                    break
-                        if city_block.settlement_type.value < enu.SettlementType.dense.value:
-                            for circle in dense_circles:
-                                if prep_geom.intersects(circle):
-                                    city_block.settlement_type = enu.SettlementType.dense
-                                    zone.set_max_settlement_type(enu.SettlementType.dense)
-                                    break
-
-    # now make sure that also zones outside of settlements get city blocks
-    for zone in building_zones:
-        if zone not in zones_processed_in_settlement and zone.type_ is not enu.BuildingZoneType.aerodrome:
-            _assign_city_blocks(zone, highways_dict, None)
-
-
 def _sanity_check_settlement_types(building_zones: List[m.BuildingZone], highways_dict: Dict[int, m.Highway],
-                                   grid_highways: Optional[List[GridHighway]]) -> None:
+                                   grid_highways: List[GridHighway]) -> None:
     upgraded = 0
     downgraded = 0
     for zone in building_zones:
@@ -992,49 +892,39 @@ def process(transformer: Transformation, airports: List[aptdat_io.Airport]) -> T
     _sanitize_building_zones(building_zones, 'after split major lines')
 
     # =========== Link urban places with settlement_area buffers ==================================
-    if parameters.FLAG_FAST_LANDUSE:
-        highways_dict_copy1 = highways_dict.copy()
-        grid_highways = list()
-        for highway in highways_dict_copy1.values():
-            if not highway.populate_buildings_along():
-                continue
-            grid_highways.append(GridHighway(highway.geometry))
-        centre_circles = list()
-        block_circles = list()
-        dense_circles = list()
-        for place in urban_places:
-            centre_circle, block_circle, dense_circle = place.create_prepared_place_polys()
-            centre_circles.append(centre_circle)
-            block_circles.append(block_circle)
-            dense_circles.append(dense_circle)
+    highways_dict_copy1 = highways_dict.copy()
+    grid_highways = list()
+    for highway in highways_dict_copy1.values():
+        if not highway.populate_buildings_along():
+            continue
+        grid_highways.append(GridHighway(highway.geometry))
+    centre_circles = list()
+    block_circles = list()
+    dense_circles = list()
+    for place in urban_places:
+        centre_circle, block_circle, dense_circle = place.create_prepared_place_polys()
+        centre_circles.append(centre_circle)
+        block_circles.append(block_circle)
+        dense_circles.append(dense_circle)
 
-        settlement_clusters = _create_clusters_of_settlements(lit_areas, osm_water_areas, dense_circles)
-        last_time = time_logging('Time used in seconds for creating settlement_clusters', last_time)
-        _count_zones_related_buildings(osm_buildings, 'after settlement clusters')
-        _assign_grid_indices(building_zones, settlement_clusters, centre_circles, block_circles, dense_circles,
-                             grid_highways, transformer)
-        last_time = time_logging('Time used in seconds assigning grid indices', last_time)
-        _assign_minimum_settlement_type_to_zones(building_zones, settlement_clusters)
-        last_time = time_logging('Time used in seconds assigning minimum settlement type', last_time)
-        _assign_city_blocks_to_zones(building_zones, highways_dict, grid_highways)
-        _assign_urban_settlement_type(building_zones, enu.SettlementType.centre, centre_circles)
-        last_time = time_logging('Time used in seconds assigning centre settlement type', last_time)
-        _assign_urban_settlement_type(building_zones, enu.SettlementType.block, block_circles)
-        last_time = time_logging('Time used in seconds assigning block settlement type', last_time)
-        _assign_urban_settlement_type(building_zones, enu.SettlementType.dense, dense_circles)
-        last_time = time_logging('Time used in seconds assigning dense settlement type', last_time)
-        if parameters.OWBB_PLACE_CHECK_DENSITY:
-            _sanity_check_settlement_types(building_zones, highways_dict, grid_highways)
-            last_time = time_logging('Time used in seconds for sanity checking settlement types', last_time)
-    else:
-        settlement_clusters = _create_settlement_clusters(lit_areas, osm_water_areas, urban_places)
-        last_time = time_logging('Time used in seconds for creating settlement_clusters', last_time)
-        _count_zones_related_buildings(osm_buildings, 'after settlement clusters')
-        _link_building_zones_with_settlements(settlement_clusters, building_zones, highways_dict)
-        last_time = time_logging('Time used in seconds for linking building zones with settlement_clusters', last_time)
-        if parameters.OWBB_PLACE_CHECK_DENSITY:
-            _sanity_check_settlement_types(building_zones, highways_dict, None)
-            last_time = time_logging('Time used in seconds for sanity checking settlement types', last_time)
+    settlement_clusters = _create_clusters_of_settlements(lit_areas, osm_water_areas, dense_circles)
+    last_time = time_logging('Time used in seconds for creating settlement_clusters', last_time)
+    _count_zones_related_buildings(osm_buildings, 'after settlement clusters')
+    _assign_grid_indices(building_zones, settlement_clusters, centre_circles, block_circles, dense_circles,
+                         grid_highways, transformer)
+    last_time = time_logging('Time used in seconds assigning grid indices', last_time)
+    _assign_minimum_settlement_type_to_zones(building_zones, settlement_clusters)
+    last_time = time_logging('Time used in seconds assigning minimum settlement type', last_time)
+    _assign_city_blocks_to_zones(building_zones, highways_dict, grid_highways)
+    _assign_urban_settlement_type(building_zones, enu.SettlementType.centre, centre_circles)
+    last_time = time_logging('Time used in seconds assigning centre settlement type', last_time)
+    _assign_urban_settlement_type(building_zones, enu.SettlementType.block, block_circles)
+    last_time = time_logging('Time used in seconds assigning block settlement type', last_time)
+    _assign_urban_settlement_type(building_zones, enu.SettlementType.dense, dense_circles)
+    last_time = time_logging('Time used in seconds assigning dense settlement type', last_time)
+    if parameters.OWBB_PLACE_CHECK_DENSITY:
+        _sanity_check_settlement_types(building_zones, highways_dict, grid_highways)
+        last_time = time_logging('Time used in seconds for sanity checking settlement types', last_time)
 
     _count_zones_related_buildings(osm_buildings, 'after settlement linking', True)
 
