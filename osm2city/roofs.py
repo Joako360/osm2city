@@ -10,8 +10,7 @@ import osm2city.utils.ac3d as ac
 import osm2city.utils.coordinates as coord
 from osm2city.static_types import enumerations as enu
 from osm2city.static_types import osmstrings as s
-from osm2city.utils.utilities import Stats
-from osm2city.textures.texture import Texture, RoofManager
+import osm2city.textures.managers as mgr
 
 GAMBREL_ANGLE_LOWER_PART = 70
 GAMBREL_HEIGHT_RATIO_LOWER_PART = 0.75
@@ -54,8 +53,8 @@ def roof_looks_square(circumference: float, area: float) -> bool:
     return False
 
 
-def flat(ac_object: ac.Object, index_first_node_in_ac_obj: int, b, roof_mgr: RoofManager, roof_mat_idx: int,
-         stats: Stats) -> None:
+def flat(ac_object: ac.Object, index_first_node_in_ac_obj: int, b, roof_mgr: mgr.RoofManager,
+         roof_mat_idx: int) -> None:
     """Flat roof. Also works for relations."""
     #   3-----------------2  Outer is CCW: 0 1 2 3
     #   |                /|  Inner[0] is CW: 4 5 6 7
@@ -74,7 +73,7 @@ def flat(ac_object: ac.Object, index_first_node_in_ac_obj: int, b, roof_mgr: Roo
         if "compat:roof-pitched" in b.roof_requires:
             b.roof_requires.remove("compat:roof-pitched")
         b.roof_requires.append("compat:roof-flat")
-        b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_length, stats)
+        b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_length)
 
     if b.polygon.interiors:
         outer_closest = copy.copy(b.outer_nodes_closest)
@@ -97,9 +96,6 @@ def flat(ac_object: ac.Object, index_first_node_in_ac_obj: int, b, roof_mgr: Roo
         nodes = list(range(b.pts_outer_count))
 
     uv = _face_uv_flat_roof(nodes, b.pts_all, b.roof_texture)
-    nodes = np.array(nodes) + b.pts_all_count
-
-    assert(len(nodes) == b.pts_all_count + 2 * len(b.polygon.interiors))
 
     nodes_uv_list = []
     for i, node in enumerate(nodes):
@@ -857,7 +853,7 @@ def separate_skillion(ac_object: ac.Object, b, roof_mat_idx: int):
     return
 
 
-def face_uv(nodes: List[int], pts_all, texture: Texture, angle=None):
+def face_uv(nodes: List[int], pts_all, texture: mgr.RoofTexture, angle=None):
     """return list of uv coordinates for given face"""
     pts_all = pts_all[nodes]
     pts_all = (pts_all - pts_all[0])
@@ -867,13 +863,12 @@ def face_uv(nodes: List[int], pts_all, texture: Texture, angle=None):
     rotation = np.array([[cos(angle), -sin(angle)],
                         [sin(angle),  cos(angle)]])
     uv = np.dot(pts_all, rotation.transpose())
-
     uv[:, 0] = texture.x(uv[:, 0] / texture.h_size_meters)
     uv[:, 1] = texture.y(uv[:, 1] / texture.v_size_meters)
     return uv
 
 
-def _face_uv_flat_roof(nodes: List[int], pts_all, texture: Texture):
+def _face_uv_flat_roof(nodes: List[int], pts_all, texture: mgr.RoofTexture):
     """Special handling for flat roofs."""
     pts_all = pts_all[nodes]
 
@@ -888,27 +883,14 @@ def _face_uv_flat_roof(nodes: List[int], pts_all, texture: Texture):
     # make sure all is translated to positive values
     min_x = 99999.
     min_y = 99999.
-    max_x = -99999.
-    max_y = -99999.
     for pt in uv:
         min_x = min(min_x, pt[0])
         min_y = min(min_y, pt[1])
-        max_x = max(max_x, pt[0])
-        max_y = max(max_y, pt[1])
     min_pt = np.array([min_x, min_y])
     uv = (uv - min_pt)
-    max_x -= min_x
-    max_y -= min_y
 
-    # check whether texture might be smaller in one or the other dimension
-    h_ratio = max_x / texture.h_size_meters
-    v_ratio = max_y / texture.v_size_meters
-    max_ratio = max(h_ratio, v_ratio)
-    scale_factor = 1.
-    if max_ratio > 1.:
-        scale_factor = max_ratio  # meaning we artifically make the texture larger
-    uv[:, 0] = texture.x(uv[:, 0] / (texture.h_size_meters * scale_factor))
-    uv[:, 1] = texture.y(uv[:, 1] / (texture.v_size_meters * scale_factor))
+    uv[:, 0] = texture.x(uv[:, 0] / texture.h_size_meters)
+    uv[:, 1] = texture.y(uv[:, 1] / texture.v_size_meters)
     return uv
 
 

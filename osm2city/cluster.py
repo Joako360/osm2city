@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Thu Feb 28 23:39:23 2013
 
@@ -14,8 +13,6 @@ into as few AC3D objects (drawables) as possible.
 import logging
 
 from osm2city import parameters
-import osm2city.utils.log_helper as ulog
-import osm2city.utils.utilities
 from osm2city.utils.coordinates import Vec2d
 from osm2city.utils.stg_io2 import STGVerbType
 
@@ -36,7 +33,6 @@ class Cluster(object):
         self.objects = []
         self.grid_index = grid_index  # holds the position in the n*m grid (zero-based)
         self.center = center  # -- center in local coordinates
-        self.stats = osm2city.utils.utilities.Stats()
 
     def __str__(self) -> str:
         return "cl" + str(self.grid_index)
@@ -108,17 +104,9 @@ class ClusterContainer(object):
             for item in each_list:
                 yield item
 
-    def append(self, anchor: Vec2d, obj, stats: osm2city.utils.utilities.Stats = None) -> Cluster:
+    def append(self, anchor: Vec2d, obj) -> Cluster:
         """Finds the cluster within the cluster grid where a given object's anchor point is situated and then
         adds the object to that cluster."""
         the_cluster = self(anchor)
         the_cluster.objects.append(obj)
-        if stats is not None:
-            try:
-                # Local stats
-                self(anchor).stats.count(obj)
-                # Global stats
-                stats.count(obj)
-            except AttributeError:
-                pass
         return the_cluster

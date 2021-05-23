@@ -273,8 +273,12 @@ Todo's and PoC's
 ----------------
 
 * Inclusion of ac-objects into mesh: read electrical pylons and combine them into mesh of cables. Significantly reduces number of nodes in scenery and proofs possibility. As a side effect if at some point the object would be removed from terrasync (or renamed), then the program would at least abort.
-* Split roofs into own texture atlas: structure program such that it "remembers" facades vs. roofs
+* Redo old methods _analyse_facade_roof_requirements and analyse_textures
+* Introduce h_cuts, _calculate_vertical_texture_coords and FacadeTexture.closest_h_match
+* Make texture analysis late, such that buildings attached to each other as well as BuildingParents can be analyzed.
 * Split buildings using skyscraper texture atlas into own mesh - but then generate tile-size meshes (one for facades and one for roofs): horizontal repeat, vertical extra nodes if very high building
+* Check requirements.txt: e.g. PIL might not be needed anymore
+* Read the whole manual and update
 
 
 ---------------
@@ -288,5 +292,4 @@ New stuff:
 
 At some point clean-up needed:
 * modules textures/atlas.py and textures/texture.py will be obsolete
-* building_lib.Building.LOD will be obsolete (replaced by .atlas_type)
-* parameters LOD_ALWAYS_* will get obsolete
+* PATH_TO_OSM2CITY_DATA, prepare_textures.py

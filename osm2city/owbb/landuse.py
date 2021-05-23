@@ -1,6 +1,4 @@
-# -*- coding: utf-8 -*-
-"""Handles land-use related stuff, especially generating new land-use where OSM data is not sufficient.
-"""
+"""Handles land-use related stuff, especially generating new land-use where OSM data is not sufficient."""
 
 import logging
 import math

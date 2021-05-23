@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Parser for OpenStreetMap data based on standard Python SAX library for processing XML.
 Other formats than XML are not available for parsing OSM input data.

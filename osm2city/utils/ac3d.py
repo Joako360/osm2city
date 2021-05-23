@@ -50,13 +50,12 @@ class Object(object):
          0x00: single-sided poly
     The default_mat 0 is for unlit objects and 1 is for lit objects -> cf. File.__str__
     """
-    def __init__(self, name=None, stats=None, texture=None, texrep=None, texoff=None, rot=None, loc=None, crease=None,
+    def __init__(self, name=None, texture=None, texrep=None, texoff=None, rot=None, loc=None, crease=None,
                  url=None, default_type=0x00, default_mat_idx: int = mat.Material.default.value,
                  default_swap_uv: bool = False, kids: int = 0) -> None:
         self._nodes = []
         self._faces = []
         self.name = name
-        self.stats = stats
         self.texture = texture
         self.texrep = texrep
         self.texoff = texoff
@@ -75,8 +74,6 @@ class Object(object):
     def node(self, x, y, z) -> int:
         """Add new node. Return its index."""
         self._nodes.append(Node(x, y, z))
-        if self.stats:
-            self.stats.vertices += 1
         return len(self._nodes) - 1
 
     def nodes_as_array(self):
@@ -102,8 +99,6 @@ class Object(object):
             swap_uv = self.default_swap_uv
         my_face = Face(nodes_uv_list, typ, mat_idx, swap_uv)
         self._faces.append(my_face)
-        if self.stats:
-            self.stats.surfaces += 1
         return len(self._faces) - 1
 
     def is_empty(self):
@@ -194,21 +189,20 @@ class File(object):
     a common source of bugs. Can also add 3d labels (useful for debugging, disabled
     by default)
     """
-    def __init__(self, file_name=None, stats=None, show_labels=False, materials_list: List[str] = None) -> None:
+    def __init__(self, file_name=None, show_labels=False, materials_list: List[str] = None) -> None:
         """If file_name not None, then read ac3d data from file_name if given. Otherwise create empty ac3d object."""
         self.objects = []
         self.materials_list = materials_list
         if self.materials_list is None:
             self.materials_list = list()
         self.show_labels = show_labels
-        self.stats = stats
         self._current_object = None
         self.label_object = None
         if file_name is not None:
             self.read(file_name)
 
     def new_object(self, name: str, texture: str, **kwargs) -> Object:
-        o = Object(name, self.stats, texture, **kwargs)
+        o = Object(name, texture, **kwargs)
         self.objects.append(o)
         self._current_object = o
         return o

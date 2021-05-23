@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Manage I/O for .stg files. There are two classes, STGManager and STGFile.
 

@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 graph support stuff
 """

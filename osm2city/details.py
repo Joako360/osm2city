@@ -18,7 +18,6 @@ OUR_MAGIC = "details"
 
 def process_details(coords_transform: co.Transformation, lit_areas: Optional[List[shg.Polygon]],
                     fg_elev: utilities.FGElev, file_lock: mp.Lock = None) -> None:
-    stats = utilities.Stats()
     lmin, lmax = parameters.get_extent_local(coords_transform)
     clusters = ClusterContainer(lmin, lmax)
 
@@ -26,7 +25,7 @@ def process_details(coords_transform: co.Transformation, lit_areas: Optional[Lis
     the_piers = piers.process_osm_piers(coords_transform)
     logging.info("number of piers: %i", len(the_piers))
     for pier in the_piers:
-        clusters.append(pier.anchor, pier, stats)
+        clusters.append(pier.anchor, pier)
     for pier in the_piers:
         pier.calc_elevation(fg_elev)
 
@@ -34,7 +33,7 @@ def process_details(coords_transform: co.Transformation, lit_areas: Optional[Lis
     the_platforms = platforms.process_osm_platform(coords_transform)
     logging.info("number of platforms: %i", len(the_platforms))
     for platform in the_platforms:
-        clusters.append(platform.anchor, platform, stats)
+        clusters.append(platform.anchor, platform)
 
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
@@ -44,7 +43,7 @@ def process_details(coords_transform: co.Transformation, lit_areas: Optional[Lis
         if cl.objects:
             cluster_center_global = co.Vec2d(coords_transform.to_global(cl.center))
             ac_file_name = "%sd%i%i.ac" % (parameters.PREFIX, cl.grid_index.ix, cl.grid_index.iy)
-            ac = ac3d.File(stats=stats)
+            ac = ac3d.File()
             obj = ac.new_object('details', 'Textures/Terrain/asphalt.png', default_mat_idx=mat.Material.unlit.value)
             for detail in cl.objects[:]:
                 if isinstance(detail, piers.Pier):

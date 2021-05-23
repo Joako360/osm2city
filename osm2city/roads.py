@@ -452,8 +452,7 @@ class Roads(object):
             logging.info('No ways with only one node after "%s"', prev_method_name)
 
     def process(self, blocked_areas: List[shg.Polygon],
-                lit_areas: List[shg.Polygon], water_areas: List[shg.Polygon],
-                stats: utilities.Stats) -> None:
+                lit_areas: List[shg.Polygon], water_areas: List[shg.Polygon]) -> None:
         """Processes the OSM data until data can be clusterised."""
         self._remove_tunnels()
         self._replace_short_bridges_with_ways()
@@ -490,7 +489,7 @@ class Roads(object):
         if parameters.CREATE_BRIDGES_ONLY:
             self._keep_only_bridges_and_embankments()
 
-        self._clusterize(stats)
+        self._clusterize()
 
     def _check_against_blocked_areas(self, blocked_areas: List[shg.Polygon], is_water: bool = False) -> None:
         """Makes sure that there are no ways, which go across a blocked area (e.g. airport runway).
@@ -1068,7 +1067,7 @@ class Roads(object):
                 return the_way
         raise ValueError("linear_obj %i not found" % osm_id)
 
-    def _clusterize(self, stats: utilities.Stats):
+    def _clusterize(self) -> None:
         """Create cluster.
            Put objects in clusters based on their centroid.
         """
@@ -1080,18 +1079,17 @@ class Roads(object):
         for the_object in self.bridges_list + self.roads_list + self.railway_list:
             if s.is_railway(the_object.way.tags):
                 cluster_ref = self.railways_clusters.append(co.Vec2d(the_object.center.centroid.coords[0]),
-                                                            the_object, stats)
+                                                            the_object)
             else:
                 if s.is_highway(the_object.way.tags):
                     if e.highway_type_from_osm_tags(the_object.way.tags).value < parameters.HIGHWAY_TYPE_MIN_ROUGH_LOD:
                         cluster_ref = self.roads_clusters.append(co.Vec2d(the_object.center.centroid.coords[0]),
-                                                                 the_object, stats)
+                                                                 the_object)
                     else:
                         cluster_ref = self.roads_rough_clusters.append(co.Vec2d(the_object.center.centroid.coords[0]),
-                                                                       the_object, stats)
+                                                                       the_object)
                 else:
-                    cluster_ref = self.roads_clusters.append(co.Vec2d(the_object.center.centroid.coords[0]), the_object,
-                                                             stats)
+                    cluster_ref = self.roads_clusters.append(co.Vec2d(the_object.center.centroid.coords[0]), the_object)
             the_object.cluster_ref = cluster_ref
 
 
@@ -1126,7 +1124,7 @@ def _process_osm_ways(nodes_dict: Dict[int, op.Node], ways_dict: Dict[int, op.Wa
 
 def _process_clusters(clusters, fg_elev: utilities.FGElev,
                       stg_manager, stg_paths, do_railway,
-                      coords_transform: co.Transformation, stats: utilities.Stats, is_rough_lod: bool) -> None:
+                      coords_transform: co.Transformation, is_rough_lod: bool) -> None:
     for cl in clusters:
         if len(cl.objects) < parameters.CLUSTER_MIN_OBJECTS:
             continue  # skip almost empty clusters
@@ -1145,7 +1143,7 @@ def _process_clusters(clusters, fg_elev: utilities.FGElev,
         # -- Now write cluster to disk.
         #    First create ac object. Write cluster's objects. Register stg object.
         #    Write ac to file.
-        ac = ac3d.File(stats=stats, show_labels=True)
+        ac = ac3d.File(show_labels=True)
         ac3d_obj = ac.new_object(file_name, 'Textures/osm2city/roads.png',
                                  default_swap_uv=True, default_mat_idx=mat.Material.unlit.value)
         for rd in cl.objects:
@@ -1175,7 +1173,6 @@ def process_roads(transform: co.Transformation, fg_elev: utilities.FGElev,
                   blocked_apt_areas: List[shg.Polygon], lit_areas: List[shg.Polygon], water_areas: List[shg.Polygon],
                   stg_entries: List[stg_io2.STGEntry], file_lock: mp.Lock = None) -> None:
     random.seed(42)
-    stats = utilities.Stats()
 
     osm_way_result = op.fetch_osm_db_data_ways_keys([s.K_HIGHWAY, s.K_RAILWAY])
     osm_nodes_dict = osm_way_result.nodes_dict
@@ -1202,7 +1199,7 @@ def process_roads(transform: co.Transformation, fg_elev: utilities.FGElev,
 
     path_to_output = parameters.get_output_path()
 
-    roads.process(extended_blocked_areas, lit_areas, water_areas, stats)  # does the heavy lifting incl. clustering
+    roads.process(extended_blocked_areas, lit_areas, water_areas)  # does the heavy lifting incl. clustering
 
     stg_manager = stg_io2.STGManager(path_to_output, stg_io2.SceneryType.roads, OUR_MAGIC, parameters.PREFIX)
 
@@ -1210,18 +1207,16 @@ def process_roads(transform: co.Transformation, fg_elev: utilities.FGElev,
     stg_paths = set()
 
     _process_clusters(roads.railways_clusters, fg_elev, stg_manager, stg_paths, True,
-                      transform, stats, True)
+                      transform, True)
     _process_clusters(roads.roads_clusters, fg_elev, stg_manager, stg_paths, False,
-                      transform, stats, False)
+                      transform, False)
     _process_clusters(roads.roads_rough_clusters, fg_elev, stg_manager, stg_paths, False,
-                      transform, stats, True)
+                      transform, True)
 
     if parameters.DEBUG_PLOT_ROADS:
         roads.debug_plot(show=True, clusters=roads.roads_clusters)
 
     stg_manager.write(file_lock)
-
-    utilities.troubleshoot(stats)
 
 
 # ================ UNITTESTS =======================

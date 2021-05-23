@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 shamelessly translated from calc-tile.pl
 """

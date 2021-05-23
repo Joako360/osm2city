@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Central place to store parameters / settings / variables in osm2city.
 All length, height etc. parameters are in meters, square meters (m2) etc.
@@ -77,8 +76,6 @@ PROBE_FOR_WATER = True  # only possible with FGElev version after 9th of Novembe
 
 # length/width in meters for clustering of meshes; has to be at least 3000. 4000 leads to max 5x5 meshes
 CLUSTER_DIMENSION = 4000
-
-WRITE_CLUSTER_STATS = False
 
 FLAG_STG_BUILDING_LIST = False  # use BUILDING_LIST in stg-files in 2019.2+ format
 FLAG_BUILDINGS_LIST_SKIP = False
@@ -197,15 +194,6 @@ BUILDING_ROOF_DEFAULT_COLOUR = '#B22222'  # e.g. #b22222 - firebrick
 
 BUILDING_NUMBER_LEVELS_AEROWAY = 2
 BUILDING_LEVEL_HEIGHT_AEROWAY = 3.5
-
-# -- The more buildings end up in LOD rough, the more work for your GPU.
-#    Increasing any of the following parameters will decrease GPU load.
-LOD_ALWAYS_DETAIL_BELOW_AREA = 150  # -- below this area, buildings will always be LOD detail
-LOD_ALWAYS_ROUGH_ABOVE_AREA = 500   # -- above this area, buildings will always be LOD rough
-LOD_ALWAYS_ROUGH_ABOVE_LEVELS = 6   # -- above this number of levels, buildings will always be LOD rough
-LOD_ALWAYS_DETAIL_BELOW_LEVELS = 3  # -- below this number of levels, buildings will always be LOD detail
-LOD_PERCENTAGE_DETAIL = 0.5         # -- of the remaining buildings, this percentage will be LOD detail,
-                                    #    the rest will be LOD rough.
 
 OBSTRUCTION_LIGHT_MIN_HEIGHT = 150   # -- put obstruction lights on buildings with >= height. 0 for no lights.
 

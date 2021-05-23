@@ -7,7 +7,6 @@
 
 import numpy as np
 from osm2city import roofs
-from osm2city.textures import materials as mat
 from osm2city.utils.coordinates import Vec2d
 import osm2city.utils.ac3d
 
@@ -54,12 +53,8 @@ class Mesh:
         self.nf += 1
         return self.nf-1
 
-    def to_out(self, out: osm2city.utils.ac3d.File, b, offset_xy=Vec2d(0, 0), offset_z=0., header=False) -> bool:
+    def to_out(self, out: osm2city.utils.ac3d.File, b, offset_xy=Vec2d(0, 0), offset_z=0.) -> bool:
         """create 3d object"""
-        if header:
-            out.new_object(b.roof_ac_name, b.roof_texture.filename + '.png',
-                           default_mat_idx=mat.Material.lit.value)
-
         X = []
         o = out.next_node_index()
         for p in self.vertices:

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 buildings.py aims at generating 3D city models for FG, using OSM data.
 Currently, it generates 3D textured buildings.
@@ -23,11 +22,12 @@ import shapely.ops as sho
 from shapely.prepared import prep
 
 import numpy as np
-from osm2city import building_lib, prepare_textures, cluster, parameters
-import osm2city.textures.materials
+from osm2city import building_lib, parameters
+from osm2city.textures import materials as mat
+import osm2city.textures.managers as mgr
 import osm2city.utils.coordinates as co
 import osm2city.utils.osmparser as op
-from osm2city.utils import utilities, stg_io2
+from osm2city.utils import ac3d, utilities, stg_io2
 from osm2city.owbb import plotting as p
 from osm2city.static_types import osmstrings as s
 from osm2city.static_types import enumerations as enu
@@ -931,8 +931,7 @@ def _debug_building_list_lsme(coords_transform: co.Transformation, file_writer, 
 
 def _write_buildings_in_lists(coords_transform: co.Transformation,
                               list_buildings: Dict[building_lib.Building, building_lib.BuildingListType],
-                              stg_manager: stg_io2.STGManager,
-                              stats: utilities.Stats) -> None:
+                              stg_manager: stg_io2.STGManager) -> None:
     min_elevation = 9999
     max_elevation = -9999
     for b in list_buildings:
@@ -993,65 +992,72 @@ def _write_buildings_in_lists(coords_transform: co.Transformation,
     except IOError as e:
         logging.warning('Could not write buildings in list to file %s', e)
     logging.info("Total number of shader buildings written to a building_list: %d", len(list_buildings))
-    stats.random_buildings = len(list_buildings)
 
 
-def _write_buildings_in_meshes(coords_transform: co.Transformation,
-                               mesh_buildings: List[building_lib.Building],
-                               stg_manager: stg_io2.STGManager,
-                               stats: utilities.Stats) -> None:
-    # -- put buildings into clusters, decide LOD, shuffle to hide LOD borders
-    lmin, lmax = parameters.get_extent_local(coords_transform)
+def _write_buildings_in_meshes_ng(coords_transform: co.Transformation,
+                                  mesh_buildings: List[building_lib.Building],
+                                  stg_manager: stg_io2.STGManager,
+                                  facade_manager: mgr.FacadeManager,
+                                  roof_manager: mgr.RoofManager) -> None:
+    all_facades = list()
 
-    handled_clusters = list()  # cluster.ClusterContainer objects
-    clusters_building_mesh_detailed = cluster.ClusterContainer(lmin, lmax,
-                                                               stg_io2.STGVerbType.object_building_mesh_detailed)
-    handled_clusters.append(clusters_building_mesh_detailed)
-
-    rough_roofs = None
-    rough_buildings = None
-    clusters_building_mesh_rough = None
-
-    if parameters.FLAG_NEXT_GEN_TEXTURING:
-        rough_buildings = cluster.Cluster(cluster.GridIndex(0, 0), coords_transform.anchor_local)
-        rough_roofs = cluster.Cluster(cluster.GridIndex(0, 0), coords_transform.anchor_local)
-    else:
-        clusters_building_mesh_rough = cluster.ClusterContainer(lmin, lmax,
-                                                                stg_io2.STGVerbType.object_building_mesh_rough)
-        handled_clusters.append(clusters_building_mesh_rough)
     for b in mesh_buildings:
-        if b.LOD is stg_io2.LOD.detail:
-            clusters_building_mesh_detailed.append(b.anchor, b, stats)
-        elif b.LOD is stg_io2.LOD.rough:
-            if parameters.FLAG_NEXT_GEN_TEXTURING:
-                rough_buildings.objects.append(b)
-            else:
-                clusters_building_mesh_rough.append(b.anchor, b, stats)
+        all_facades.append(b)
 
-    # -- write clusters
-    handled_index = 0  # makes sure that the ac-files for different clusters are not named the same
     total_buildings_written = 0
-    for my_clusters in handled_clusters:
-        for ic, cl in enumerate(my_clusters):
-            cluster_center_global = co.Vec2d(coords_transform.to_global(cl.center))
-            number_of_buildings = len(cl.objects)
-            if number_of_buildings < parameters.CLUSTER_MIN_OBJECTS:
-                continue  # skip almost empty clusters
+    ac_file_name_f = stg_manager.prefix + 'bf_all' + '.ac'
+    ac_file_name_r = stg_manager.prefix + 'br_all' + '.ac'
 
-            file_name = stg_manager.prefix + "b" + str(handled_index) + "%i%i" % (cl.grid_index.ix,
-                                                                                  cl.grid_index.iy)
-            logging.info("writing cluster %s with %d buildings" % (file_name, len(cl.objects)))
+    path_to_stg_f = stg_manager.add_object_static(ac_file_name_f, coords_transform.anchor, 0., 0,
+                                                  parameters.get_cluster_dimension_radius(),
+                                                  stg_io2.STGVerbType.object_building_mesh_rough)
+    path_to_stg_r = stg_manager.add_object_static(ac_file_name_r, coords_transform.anchor, 0., 0,
+                                                  parameters.get_cluster_dimension_radius(),
+                                                  stg_io2.STGVerbType.object_building_mesh_rough)
 
-            path_to_stg = stg_manager.add_object_static(file_name + '.ac', cluster_center_global, 0., 0,
-                                                        parameters.get_cluster_dimension_radius(),
-                                                        my_clusters.stg_verb_type)
+    cluster_offset = co.Vec2d(0, 0)
 
-            building_lib.write(os.path.join(path_to_stg, file_name + ".ac"), cl.objects,
-                               cl.center, prepare_textures.roofs, stats)
-            total_buildings_written += len(cl.objects)
+    facades_texture_name = facade_manager.fallback_facades.file_path
+    ac_f = ac3d.File()
+    ac_object_f = ac_f.new_object('all_facades', facades_texture_name, default_mat_idx=mat.Material.facade.value)
 
-        handled_index += 1
-    logging.info("Total number of buildings written to a cluster *.ac files: %d", total_buildings_written)
+    roof_texture_name = roof_manager.large_flat_roofs.file_path
+    ac_r = ac3d.File()
+    ac_object_r = ac_r.new_object('all_roofs', roof_texture_name, default_mat_idx=mat.Material.facade.value)
+
+    for b in mesh_buildings:
+        face_mat_idx = mat.Material.facade.value
+        roof_mat_idx = mat.Material.facade.value
+        if b.anchor.x < -5000 or b.anchor.x > -3500 or b.anchor.y < 4000 or b.anchor.y > 5500:
+            continue
+
+        b.set_ground_elev_and_offset(cluster_offset)
+
+        b.compute_roof_height()
+
+        index_first_node_in_ac_obj = ac_object_f.next_node_index()
+        b.write_vertices_for_ac_ground(ac_object_f)
+        b.write_vertices_for_ac_under_roof(ac_object_f)
+
+        number_prev_ring_nodes = 0
+        number_prev_ring_nodes += b.write_faces_for_ac(ac_object_f, b.polygon.exterior,
+                                                       index_first_node_in_ac_obj, number_prev_ring_nodes,
+                                                       face_mat_idx)
+
+        for inner in b.polygon.interiors:
+            number_prev_ring_nodes += b.write_faces_for_ac(ac_object_f, inner,
+                                                           index_first_node_in_ac_obj, number_prev_ring_nodes,
+                                                           face_mat_idx)
+
+        # roof stuff
+        b.write_roof_for_ac(ac_object_r, roof_manager, roof_mat_idx, face_mat_idx,
+                            cluster_offset)
+
+        total_buildings_written += 1
+
+    ac_f.write(os.path.join(path_to_stg_f, ac_file_name_f))
+    ac_r.write(os.path.join(path_to_stg_r, ac_file_name_r))
+    logging.info("Total number of buildings written to mesh %s: %d", ac_file_name_f, total_buildings_written)
 
 
 def process_buildings(coords_transform: co.Transformation, fg_elev: utilities.FGElev,
@@ -1069,7 +1075,7 @@ def process_buildings(coords_transform: co.Transformation, fg_elev: utilities.FG
 
     # clean up "color" in tags
     for b in the_buildings:
-        osm2city.textures.materials.screen_osm_keys_for_colour_material_variants(b.tags)
+        mat.screen_osm_keys_for_colour_material_variants(b.tags)
 
     # check for buildings on airport runways etc.
     before = list()
@@ -1101,9 +1107,14 @@ def process_buildings(coords_transform: co.Transformation, fg_elev: utilities.FG
         logging.info("No buildings after overlap check etc. Stopping further processing.")
         return
 
-    stats = utilities.Stats()
+    #for building in reversed(the_buildings):
+    #    if building.osm_id not in [95726397,  # 95726723,  # 95726609, 95726441,
+    #                               # 95726594
+    #                               ]:
+    #        the_buildings.remove(building)
 
-    prepare_textures.init(stats)
+    facade_manager = mgr.FacadeManager()
+    roof_manager = mgr.RoofManager()
 
     # -- initialize STGManager
     path_to_output = parameters.get_output_path()
@@ -1113,11 +1124,10 @@ def process_buildings(coords_transform: co.Transformation, fg_elev: utilities.FG
 
     # the heavy lifting: analysis
     the_buildings = building_lib.analyse(the_buildings, fg_elev, stg_manager, coords_transform,
-                                         prepare_textures.facades, prepare_textures.roofs, stats)
+                                         facade_manager, roof_manager)
     last_time = utilities.time_logging("Time used in seconds for analyse", last_time)
 
     # split between buildings in meshes and in buildings lists
-    building_lib.decide_lod(the_buildings, stats)
     buildings_in_meshes = list()
     buildings_in_lists = dict()  # key = building, value = building list type
     if parameters.FLAG_STG_BUILDING_LIST:
@@ -1130,16 +1140,14 @@ def process_buildings(coords_transform: co.Transformation, fg_elev: utilities.FG
             else:
                 buildings_in_meshes.append(building)
         if parameters.FLAG_BUILDINGS_LIST_SKIP is False:
-            _write_buildings_in_lists(coords_transform, buildings_in_lists, stg_manager, stats)
+            _write_buildings_in_lists(coords_transform, buildings_in_lists, stg_manager)
             last_time = utilities.time_logging("Time used in seconds to write buildings in lists", last_time)
     else:
         buildings_in_meshes = the_buildings[:]
     if parameters.FLAG_BUILDINGS_MESH_SKIP is False:
-        _write_buildings_in_meshes(coords_transform, buildings_in_meshes, stg_manager, stats)
+        _write_buildings_in_meshes_ng(coords_transform, buildings_in_meshes, stg_manager, facade_manager, roof_manager)
         _write_obstruction_lights(coords_transform, stg_manager, buildings_in_meshes)
         last_time = utilities.time_logging("Time used in seconds to write buildings in meshes", last_time)
 
     stg_manager.write(file_lock)
     _ = utilities.time_logging("Time used in seconds to write stg file", last_time)
-    stats.print_summary()
-    utilities.troubleshoot(stats)

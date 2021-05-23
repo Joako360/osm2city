@@ -36,16 +36,6 @@ If you followed the :ref:`directory structure <chapter-creating-directory-struct
 Adjusting Visibility of Scenery Objects
 =======================================
 
-The ``osm2city`` related programs and especially ``buildings.py`` are using heuristics and parameters to determine at what level of detail (LOD) scenery objects should be visible. This is done by adding the objects to one of the three FlightGear LOD schemes: "rough" or "detailed" ("bare" is not used).
-
-For ``buildings.py`` before creating a scenery you can influence into which of the two LOD ranges the objects are placed by using the following :ref:`Parameters <chapter-parameters-lod-label>`:
-
-* LOD_ALWAYS_DETAIL_BELOW_AREA
-* LOD_ALWAYS_ROUGH_ABOVE_AREA
-* LOD_ALWAYS_ROUGH_ABOVE_LEVELS
-* LOD_ALWAYS_DETAIL_BELOW_LEVELS
-* LOD_PERCENTAGE_DETAIL
-
 In FlightGear as a scenery user you influence the actual distance (in meters) for the respective ranges by one of the following ways:
 
 #. In The FlightGear user interface use menu ``View`` > menu item ``Adjust LOD Ranges`` and then change the values manually.
@@ -53,9 +43,9 @@ In FlightGear as a scenery user you influence the actual distance (in meters) fo
 
 ::
 
-    --prop:double:/sim/rendering/static-lod/detailed=5000
-    --prop:double:/sim/rendering/static-lod/rough=10000
-    --prop:/sim/rendering/max-paged-lod=400
+    --prop:double:/sim/rendering/static-lod/detailed=10000
+    --prop:double:/sim/rendering/static-lod/rough=20000
+    --prop:/sim/rendering/max-paged-lod=1024
 
 See also PagedLOD_.
 

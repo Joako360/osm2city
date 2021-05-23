@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Ugly, highly experimental code.
 

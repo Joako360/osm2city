@@ -178,31 +178,6 @@ BUILDING_SIMPLIFY_TOLERANCE_AWAY                Number     2.5       The 2 point
 =============================================   ========   =======   ==============================================================================
 
 
-.. _chapter-parameters-lod-label:
-
------------------------------
-Level of Details of Buildings
------------------------------
-
-The more buildings you have in LOD detailed, the less resources for rendering are used. However you might find it "irritating" the more buildings suddenly appear. Experiment with the settings in FlightGear, see also :ref:`Adjusting Visibility of Scenery Objects <chapter-lod-label>`. 
-
-=============================================   ========   =======   ==============================================================================
-Parameter                                       Type       Default   Description / Example
-=============================================   ========   =======   ==============================================================================
-LOD_ALWAYS_DETAIL_BELOW_AREA                    Integer    150       Below this area, buildings will always be LOD detailed
-
-LOD_ALWAYS_ROUGH_ABOVE_AREA                     Integer    500       Above this area, buildings will always be LOD rough
-
-LOD_ALWAYS_ROUGH_ABOVE_LEVELS                   Integer    6         Above this number of levels, buildings will always be LOD rough
-
-LOD_ALWAYS_DETAIL_BELOW_LEVELS                  Integer    3         Below this number of levels, buildings will always be LOD detailed
-
-LOD_PERCENTAGE_DETAIL                           Decimal    0.5       Of the remaining buildings, this percentage will be LOD detailed,
-                                                                     the rest will be LOD rough.
-
-=============================================   ========   =======   ==============================================================================
-
-
 .. _chapter-parameters-buildings-level-height:
 
 --------------------------
