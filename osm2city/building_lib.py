@@ -532,7 +532,7 @@ class Building(object):
         if not self.facade_texture:
             logging.warning("Skipping building with osm_id %d: (no matching facade texture)" % self.osm_id)
             return False
-        self.roof_texture = roof_mgr.find_matching_roof(self.roof_requires, self.longest_edge_length)
+        self.roof_texture = roof_mgr.find_matching_roof(self.roof_shape)
         if not self.roof_texture:
             logging.warning('WARNING: no matching roof texture for osm_id {} <{}>'.format(self.osm_id,
                                                                                           str(self.roof_requires)))
@@ -1234,7 +1234,7 @@ class Building(object):
                 if "compat:roof-pitched" in self.roof_requires:
                     self.roof_requires.remove("compat:roof-pitched")
                 self.roof_requires.append("compat:roof-flat")
-            self.roof_texture = roof_mgr.find_matching_roof(self.roof_requires, self.longest_edge_length)
+            self.roof_texture = roof_mgr.find_matching_roof(self.roof_shape)
 
         ac_object = roof_mgr.map_ac_object_for_texture(self.roof_texture)
         node_index = ac_object.next_node_index()

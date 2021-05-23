@@ -6,6 +6,7 @@ import random
 from typing import Dict, List
 
 from osm2city import parameters
+import osm2city.static_types.enumerations as enu
 from osm2city.textures import materials as mat
 from osm2city.utils import ac3d, stg_io2, coordinates
 
@@ -106,22 +107,45 @@ class RoofTexture:
 
 
 class RoofManager:
+    """Handles textures for roofs as well as writing ac3d meshes to disk.
+
+
+    Cf. https://wiki.openstreetmap.org/wiki/Simple_3D_Buildings#Roof for materials, colours etc.
+    """
     # The atlas of RoofTextures
     # u coordinate is from left to right side of the texture (0.0 - 1.0)
     # v coordinate is from bottom to top of the texture (0.0 - 1.0) - opposite to Gimp, which has 0 at top
 
     large_flat_roofs = TexturesFile('Textures for large flat roofs', 'lfr', 'large_flat_roofs.png', 256, 8192)
+    tiled_roofs = TexturesFile('Textures for tiled roofs', 'tr', 'tiled_roofs.png', 256, 8192)
 
     roof_texture_atlas = [
         # ---- large_flat_roofs
-        RoofTexture(large_flat_roofs, 'pink', 256, 1024, 0.1, 7*1024, SlopedType.flat_or_sloped),
-        RoofTexture(large_flat_roofs, 'red', 256, 1024, 0.1, 6*1024, SlopedType.flat_or_sloped),
-        RoofTexture(large_flat_roofs, 'light green', 256, 1024, 0.1, 5*1024, SlopedType.flat_or_sloped),
-        RoofTexture(large_flat_roofs, 'blue', 256, 1024, 0.1, 4*1024, SlopedType.flat_or_sloped),
-        RoofTexture(large_flat_roofs, 'yellow', 256, 1024, 0.1, 3*1024, SlopedType.flat_or_sloped),
-        RoofTexture(large_flat_roofs, 'orange', 256, 1024, 0.1, 2*1024, SlopedType.flat_or_sloped),
-        RoofTexture(large_flat_roofs, 'cyan', 256, 1024, 0.1, 1*1024, SlopedType.flat_or_sloped),
-        RoofTexture(large_flat_roofs, 'dark green', 256, 1024, 0.1, 0*1024, SlopedType.flat_or_sloped)
+        RoofTexture(large_flat_roofs, 'pink', 256, 1024, 0.1, 7*1024, SlopedType.flat_only),
+        RoofTexture(large_flat_roofs, 'red', 256, 1024, 0.1, 6*1024, SlopedType.flat_only),
+        RoofTexture(large_flat_roofs, 'light green', 256, 1024, 0.1, 5*1024, SlopedType.flat_only),
+        RoofTexture(large_flat_roofs, 'blue', 256, 1024, 0.1, 4*1024, SlopedType.flat_only),
+        RoofTexture(large_flat_roofs, 'yellow', 256, 1024, 0.1, 3*1024, SlopedType.flat_only),
+        RoofTexture(large_flat_roofs, 'orange', 256, 1024, 0.1, 2*1024, SlopedType.flat_only),
+        RoofTexture(large_flat_roofs, 'cyan', 256, 1024, 0.1, 1*1024, SlopedType.flat_only),
+        RoofTexture(large_flat_roofs, 'dark green', 256, 1024, 0.1, 0*1024, SlopedType.flat_only),
+        # ---- tiles
+        RoofTexture(tiled_roofs, 'short 12', 256, 406, 0.3, 4*831 + 11*406, SlopedType.sloped_only),
+        RoofTexture(tiled_roofs, 'short 11', 256, 406, 0.3, 4*831 + 10*406, SlopedType.sloped_only),
+        RoofTexture(tiled_roofs, 'short 10', 256, 406, 0.3, 4*831 + 9*406, SlopedType.sloped_only),
+        RoofTexture(tiled_roofs, 'short 9', 256, 406, 0.3, 4*831 + 8*406, SlopedType.sloped_only),
+        RoofTexture(tiled_roofs, 'short 8', 256, 406, 0.3, 4*831 + 7*406, SlopedType.sloped_only),
+        RoofTexture(tiled_roofs, 'short 7', 256, 406, 0.3, 4*831 + 6*406, SlopedType.sloped_only),
+        RoofTexture(tiled_roofs, 'short 6', 256, 406, 0.3, 4*831 + 5*406, SlopedType.sloped_only),
+        RoofTexture(tiled_roofs, 'short 5', 256, 406, 0.3, 4*831 + 4*406, SlopedType.sloped_only),
+        RoofTexture(tiled_roofs, 'short 4', 256, 406, 0.3, 4*831 + 3*406, SlopedType.sloped_only),
+        RoofTexture(tiled_roofs, 'short 3', 256, 406, 0.3, 4*831 + 2*406, SlopedType.sloped_only),
+        RoofTexture(tiled_roofs, 'short 2', 256, 406, 0.3, 4*831 + 1*406, SlopedType.sloped_only),
+        RoofTexture(tiled_roofs, 'short 1', 256, 406, 0.3, 4*831, SlopedType.sloped_only),
+        RoofTexture(tiled_roofs, 'long 4', 256, 831, 0.3, 3*831, SlopedType.sloped_only),
+        RoofTexture(tiled_roofs, 'long 3', 256, 831, 0.3, 2*831, SlopedType.sloped_only),
+        RoofTexture(tiled_roofs, 'long 2', 256, 831, 0.3, 1*831, SlopedType.sloped_only),
+        RoofTexture(tiled_roofs, 'long 1', 256, 831, 0.3, 0, SlopedType.sloped_only),
     ]
 
     __slots__ = ('_roof_textures', '_ac_files')
@@ -138,8 +162,16 @@ class RoofManager:
         if not self._roof_textures:
             raise ValueError('There must be at least 1 validated RoofTexture in roof_texture_atlas')
 
-    def find_matching_roof(self, requires: List[str], max_dimension: float) -> RoofTexture:
-        my_texture = random.choice(self._roof_textures)
+    def find_matching_roof(self, roof_shape: enu.RoofShape) -> RoofTexture:
+        candidates = list()
+        for tex in self._roof_textures:
+            if roof_shape is enu.RoofShape.flat:
+                if tex.sloped_type in [SlopedType.flat_or_sloped, SlopedType.flat_only]:
+                    candidates.append(tex)
+            else:
+                if tex.sloped_type in [SlopedType.flat_or_sloped, SlopedType.sloped_only]:
+                    candidates.append(tex)
+        my_texture = random.choice(candidates)
         return my_texture
 
     def map_ac_object_for_texture(self, roof_texture: RoofTexture) -> ac3d.Object:

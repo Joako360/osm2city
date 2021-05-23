@@ -164,8 +164,8 @@ Proposed texture file:
 * Repeatable in x-direction, fixed in y direction (if needed more than the max, then just stretch - should be very rare)
 * Width: 256 pixel (ca. 8 metres, ca. 30 smaller tiles) -> allows to have some dirt and variation, but still small
 * Height: 8192 pixels (8k):
-    * 4 textures with ca. 700 pixels (20+ m) - e.g. one black and 3 different red
-    * 12 textures with ca. 400 pixels (12 m)
+    * 4 textures with 825 pixels (24+ m) plus 6 pixels = 3324 (e.g. one black and 3 different red)
+    * 12 textures with 400 pixels (12 m) plus 6 pixels for gutter = 4872
 * Leaves still e.g. 4 pixels per texture at the bottom to visualize a gutter
 
 
