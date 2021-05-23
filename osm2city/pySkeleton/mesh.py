@@ -53,7 +53,7 @@ class Mesh:
         self.nf += 1
         return self.nf-1
 
-    def to_out(self, out: osm2city.utils.ac3d.File, b, offset_xy=Vec2d(0, 0), offset_z=0.) -> bool:
+    def to_out(self, out: osm2city.utils.ac3d.Object, b, offset_xy=Vec2d(0, 0), offset_z=0.) -> bool:
         """create 3d object"""
         X = []
         o = out.next_node_index()

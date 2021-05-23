@@ -1134,7 +1134,7 @@ class Building(object):
                         temp_roof_height = calc_level_height_for_settlement_type(self.zone.settlement_type)
                     self.roof_height = temp_roof_height
 
-    def write_vertices_for_ac_ground(self, ac_object: ac3d.Object) -> None:
+    def _write_vertices_for_ac_ground(self, ac_object: ac3d.Object) -> None:
         """Write the vertices for each node along bottom of the building to the ac3d object."""
         z = self.ground_elev + self.min_height
 
@@ -1142,7 +1142,7 @@ class Building(object):
         for pt in self.pts_all:
             ac_object.node(-pt[1], z, -pt[0])
 
-    def write_vertices_for_ac_under_roof(self, ac_object: ac3d.Object) -> None:
+    def _write_vertices_for_ac_under_roof(self, ac_object: ac3d.Object) -> None:
         """Write the vertices for each node under the roof of the building to the ac3d object."""
         if self.roof_shape is enu.RoofShape.skillion:
             # skillion
@@ -1167,8 +1167,8 @@ class Building(object):
             for pt in self.pts_all:
                 ac_object.node(-pt[1], self.beginning_of_roof_above_sea_level, -pt[0])
 
-    def write_faces_for_ac(self, ac_object: ac3d.Object, ring: shg.LinearRing,
-                           index_first_node_in_ac_obj: int, number_prev_ring_nodes: int, mat_idx: int) -> int:
+    def _write_faces_for_ac(self, ac_object: ac3d.Object, ring: shg.LinearRing,
+                            index_first_node_in_ac_obj: int, number_prev_ring_nodes: int, mat_idx: int) -> int:
         """Writes all the faces for one building's exterior or interior ring to an ac3d object."""
         tex_coord_bottom, tex_coord_top = _calculate_vertical_texture_coords(self.body_height, self.facade_texture)
         tex_coord_bottom = self.facade_texture.y(tex_coord_bottom)  # -- to atlas coordinates
@@ -1210,26 +1210,51 @@ class Building(object):
                            swap_uv=self.facade_texture.v_can_repeat)
         return number_ring_nodes
 
-    def _write_flat_roof(self, ac_object: ac3d.Object, roof_mgr: mgr.RoofManager, roof_mat_idx: int) -> None:
-        self.roof_shape = enu.RoofShape.flat  # shape might have been reset to flat
-        node_index = ac_object.next_node_index()
-        self.write_vertices_for_ac_under_roof(ac_object)
-        roofs.flat(ac_object, node_index, self, roof_mgr, roof_mat_idx)
+    def write_facades_for_ac(self, ac_object: ac3d.Object, face_mat_idx: int) -> None:
+        index_first_node_in_ac_obj = ac_object.next_node_index()
+        self._write_vertices_for_ac_ground(ac_object)
+        self._write_vertices_for_ac_under_roof(ac_object)
 
-    def _write_skillion_roof(self, ac_object: ac3d.Object, roof_mat_idx: int) -> None:
-        self.write_vertices_for_ac_under_roof(ac_object)
+        number_prev_ring_nodes = 0
+        number_prev_ring_nodes += self._write_faces_for_ac(ac_object, self.polygon.exterior,
+                                                           index_first_node_in_ac_obj, number_prev_ring_nodes,
+                                                           face_mat_idx)
+
+        for inner in self.polygon.interiors:
+            number_prev_ring_nodes += self._write_faces_for_ac(ac_object, inner,
+                                                               index_first_node_in_ac_obj, number_prev_ring_nodes,
+                                                               face_mat_idx)
+
+    def _write_flat_roof(self, roof_mgr: mgr.RoofManager, roof_mat_idx: int, override: bool = False) -> None:
+        if override:  # meaning we do a flat roof despite a non-flat was requested
+            self.roof_shape = enu.RoofShape.flat  # shape might have been reset to flat
+            if "compat:roof-flat" not in self.roof_requires:
+                # flat roof might have gotten required later in process, so we must find a new roof texture
+                logging.debug("Replacing texture for flat roof despite " + str(self.roof_requires))
+                if "compat:roof-pitched" in self.roof_requires:
+                    self.roof_requires.remove("compat:roof-pitched")
+                self.roof_requires.append("compat:roof-flat")
+            self.roof_texture = roof_mgr.find_matching_roof(self.roof_requires, self.longest_edge_length)
+
+        ac_object = roof_mgr.map_ac_object_for_texture(self.roof_texture)
+        node_index = ac_object.next_node_index()
+        self._write_vertices_for_ac_under_roof(ac_object)
+        roofs.flat(ac_object, node_index, self, roof_mat_idx)
+
+    def _write_skillion_roof(self, roof_mgr: mgr.RoofManager, roof_mat_idx: int) -> None:
+        ac_object = roof_mgr.map_ac_object_for_texture(self.roof_texture)
+        self._write_vertices_for_ac_under_roof(ac_object)
         print('skillion', self.osm_id)
         roofs.separate_skillion(ac_object, self, roof_mat_idx)
 
-    def write_roof_for_ac(self, ac_object: ac3d.Object,
-                          roof_mgr: mgr.RoofManager, roof_mat_idx: int, facade_mat_idx: int,
+    def write_roof_for_ac(self, roof_mgr: mgr.RoofManager, roof_mat_idx: int, facade_mat_idx: int,
                           cluster_offset: co.Vec2d) -> None:
         """Writes the roof vertices and faces to an ac3d object."""
         if self.roof_shape is enu.RoofShape.flat:
-            self._write_flat_roof(ac_object, roof_mgr, roof_mat_idx)
+            self._write_flat_roof(roof_mgr, roof_mat_idx)
         elif 4 <= self.pts_all_count <= 6 and (
                     self.roof_hint is not None and self.roof_hint.inner_node is not None):
-            roofs.separate_gable_with_corner(ac_object, self, roof_mat_idx, facade_mat_idx)
+            roofs.separate_gable_with_corner(roof_mgr, self, roof_mat_idx, facade_mat_idx)
         else:
             my_cluster_offset = cluster_offset
             # try to see whether we can reduce the number of nodes - and maybe get the count down - such that fewer
@@ -1258,40 +1283,42 @@ class Building(object):
             # -- pitched roof for exactly 4 ground nodes
             if self.pts_all_count == 4:
                 if self.roof_shape in [enu.RoofShape.gabled, enu.RoofShape.gambrel]:
-                    roofs.separate_gable(ac_object, self, roof_mat_idx, facade_mat_idx)
+                    roofs.separate_gable(roof_mgr, self, roof_mat_idx, facade_mat_idx)
                 elif self.roof_shape is enu.RoofShape.hipped:
-                    roofs.separate_hipped(ac_object, self, roof_mat_idx)
+                    roofs.separate_hipped(roof_mgr, self, roof_mat_idx)
                 elif self.roof_shape is enu.RoofShape.pyramidal:
-                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
+                    roofs.separate_pyramidal(roof_mgr, self, roof_mat_idx)
                 elif self.roof_shape is enu.RoofShape.dome:
-                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
+                    roofs.separate_pyramidal(roof_mgr, self, roof_mat_idx)
                 elif self.roof_shape is enu.RoofShape.onion:
-                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
+                    roofs.separate_pyramidal(roof_mgr, self, roof_mat_idx)
                 elif self.roof_shape is enu.RoofShape.skillion:
-                    self._write_skillion_roof(ac_object, roof_mat_idx)
+                    self._write_skillion_roof(roof_mgr, roof_mat_idx)
                 else:
                     logging.warning("Roof type %s seems to be unsupported, but is mapped: replaced by flat roof",
                                     self.roof_shape.name)
-                    self._write_flat_roof(ac_object, roof_mgr, roof_mat_idx)
+                    self._write_flat_roof(roof_mgr, roof_mat_idx, True)
             # -- pitched roof for > 4 ground nodes
             elif self.pts_all_count > 4:
                 if self.roof_shape is enu.RoofShape.skillion:
-                    self._write_skillion_roof(ac_object, roof_mat_idx)
+                    self._write_skillion_roof(roof_mgr, roof_mat_idx)
                 elif self.roof_shape is enu.RoofShape.pyramidal:
-                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
+                    roofs.separate_pyramidal(roof_mgr, self, roof_mat_idx)
                 elif self.roof_shape is enu.RoofShape.dome:
-                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
+                    roofs.separate_pyramidal(roof_mgr, self, roof_mat_idx)
                 elif self.roof_shape is enu.RoofShape.onion:
-                    roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
+                    roofs.separate_pyramidal(roof_mgr, self, roof_mat_idx)
                 else:
+                    ac_object = roof_mgr.map_ac_object_for_texture(self.roof_texture)
                     skeleton_possible = myskeleton.myskel(ac_object, self, offset_xy=my_cluster_offset,
                                                           offset_z=self.beginning_of_roof_above_sea_level,
                                                           max_height=parameters.BUILDING_SKEL_ROOF_MAX_HEIGHT)
                     if not skeleton_possible:  # something went wrong - fall back to flat roof
-                        self._write_flat_roof(ac_object, roof_mgr, roof_mat_idx)
+                        logging.warning('Tried skeleton, but does not work: replaced by flat roof')
+                        self._write_flat_roof(roof_mgr, roof_mat_idx, True)
             else:  # fall back to pyramidal
                 self.roof_shape = enu.RoofShape.pyramidal
-                roofs.separate_pyramidal(ac_object, self, roof_mat_idx)
+                roofs.separate_pyramidal(roof_mgr, self, roof_mat_idx)
 
     def __str__(self):
         return "<OSM_ID %d at %s>" % (self.osm_id, hex(id(self)))

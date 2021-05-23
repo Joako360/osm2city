@@ -1,8 +1,13 @@
 from dataclasses import dataclass
 import enum
+import logging
 import os.path as osp
 import random
 from typing import Dict, List
+
+from osm2city import parameters
+from osm2city.textures import materials as mat
+from osm2city.utils import ac3d, stg_io2, coordinates
 
 
 PATH_TO_TEXTURES = '/home/vanosten/bin/TerraSync/Models/osm2city'  # FIXME: should be relative once published
@@ -13,6 +18,7 @@ class TexturesFile:
     """The essential data for a physical file on the file system containing a set of textures"""
 
     name: str  # a descriptive name for the texture file
+    identifier: str  # unique short name to be reflected in ac_file name
     file_name: str  # relative to the base directory for osm2city texture files
     width_px: int  # the width in pixels. 0 is left
     height_px: int  # the height in pixels. 0 is top (like in Gimp)
@@ -104,7 +110,7 @@ class RoofManager:
     # u coordinate is from left to right side of the texture (0.0 - 1.0)
     # v coordinate is from bottom to top of the texture (0.0 - 1.0) - opposite to Gimp, which has 0 at top
 
-    large_flat_roofs = TexturesFile('Textures for large flat roofs', 'large_flat_roofs.png', 256, 8192)
+    large_flat_roofs = TexturesFile('Textures for large flat roofs', 'lfr', 'large_flat_roofs.png', 256, 8192)
 
     roof_texture_atlas = [
         # ---- large_flat_roofs
@@ -118,11 +124,12 @@ class RoofManager:
         RoofTexture(large_flat_roofs, 'dark green', 256, 1024, 0.1, 0*1024, SlopedType.flat_or_sloped)
     ]
 
-    __slots__ = '_roof_textures'
+    __slots__ = ('_roof_textures', '_ac_files')
 
     def __init__(self) -> None:
         self._roof_textures = list()  # list of RoofTexture objects
         self._read_texture_atlas()
+        self._ac_files = dict()  # key = TexturesFile, value = Tuple[ac3d.File(), ac3d.Object]
 
     def _read_texture_atlas(self) -> None:
         """Reads the global texture atlas and validates the values."""
@@ -134,6 +141,29 @@ class RoofManager:
     def find_matching_roof(self, requires: List[str], max_dimension: float) -> RoofTexture:
         my_texture = random.choice(self._roof_textures)
         return my_texture
+
+    def map_ac_object_for_texture(self, roof_texture: RoofTexture) -> ac3d.Object:
+        """For a given roof texture find the corresponding ac_file.
+
+        AC-files are created as late as possible based on actual use, such that no ac-files are written without content.
+        """
+        if roof_texture.textures_file not in self._ac_files:
+            roof_texture_name = roof_texture.textures_file.file_path
+            ac_file = ac3d.File()
+            ac_object = ac_file.new_object('all_roofs', roof_texture_name, default_mat_idx=mat.Material.facade.value)
+            self._ac_files[roof_texture.textures_file] = (ac_file, ac_object)
+        return self._ac_files[roof_texture.textures_file][1]
+
+    def write_ac_files(self, stg_manager: stg_io2.STGManager, anchor: coordinates.Vec2d) -> None:
+        """Write the final ac-file(s) to disk."""
+        for texture_file, ac_tuple in self._ac_files.items():
+            ac_file_name = '{}_r_{}.ac'.format(stg_manager.prefix, texture_file.identifier)
+            path_to_stg = stg_manager.add_object_static(ac_file_name, anchor, 0., 0.,
+                                                        parameters.get_cluster_dimension_radius(),
+                                                        stg_io2.STGVerbType.object_building_mesh_rough)
+
+            ac_tuple[0].write(osp.join(path_to_stg, ac_file_name))
+            logging.info('Writing roofs to mesh %s:', ac_file_name)
 
 
 class FacadeTexture:
@@ -206,7 +236,7 @@ class FacadeManager:
     # u coordinate is from left to right side of the texture (0.0 - 1.0)
     # v coordinate is from bottom to top of the texture (0.0 - 1.0) - opposite to Gimp, which has 0 at top
 
-    fallback_facades = TexturesFile('Texture a fallback for facades', 'fallback_facades.png', 1024, 1024)
+    fallback_facades = TexturesFile('Texture a fallback for facades', 'fbf', 'fallback_facades.png', 1024, 1024)
 
     texture_atlas = [
         # ---- large_flat_roofs

@@ -53,7 +53,7 @@ def roof_looks_square(circumference: float, area: float) -> bool:
     return False
 
 
-def flat(ac_object: ac.Object, index_first_node_in_ac_obj: int, b, roof_mgr: mgr.RoofManager,
+def flat(ac_object: ac.Object, index_first_node_in_ac_obj: int, b,
          roof_mat_idx: int) -> None:
     """Flat roof. Also works for relations."""
     #   3-----------------2  Outer is CCW: 0 1 2 3
@@ -66,14 +66,6 @@ def flat(ac_object: ac.Object, index_first_node_in_ac_obj: int, b, roof_mgr: mgr
     #   0---->>-----------1
     if b.roof_texture is None:
         raise ValueError("Roof texture None")
-
-    if "compat:roof-flat" not in b.roof_requires:
-        # flat roof might have gotten required later in process, so we must find a new roof texture
-        logging.debug("Replacing texture for flat roof despite " + str(b.roof_requires))
-        if "compat:roof-pitched" in b.roof_requires:
-            b.roof_requires.remove("compat:roof-pitched")
-        b.roof_requires.append("compat:roof-flat")
-        b.roof_texture = roof_mgr.find_matching_roof(b.roof_requires, b.longest_edge_length)
 
     if b.polygon.interiors:
         outer_closest = copy.copy(b.outer_nodes_closest)
@@ -111,7 +103,7 @@ def sanity_roof_height_complex(b, roof_type: str) -> float:
         return enu.BUILDING_LEVEL_HEIGHT_RURAL
 
 
-def separate_gable_with_corner(ac_object, b, roof_mat_idx: int, facade_mat_idx: int) -> None:
+def separate_gable_with_corner(roof_mgr: mgr.RoofManager, b, roof_mat_idx: int, facade_mat_idx: int) -> None:
     """Create a gabled roof around a corner - there can be 4, 5, or 6 nodes.
     By convention counting of nodes starts at the inner node (0) and is counter clockwise.
     The nodes on the top are numbered as follows:
@@ -122,6 +114,7 @@ def separate_gable_with_corner(ac_object, b, roof_mat_idx: int, facade_mat_idx: 
     See e.g. https://en.wikipedia.org/wiki/Roof#/media/File:Roof_diagram.jpg for the meaning of ridge, hip and eaves.
     """
     t = b.roof_texture
+    ac_object = roof_mgr.map_ac_object_for_texture(t)
     roof_height = sanity_roof_height_complex(b, 'gable_with_corner')
 
     # find the point closest to the RoofHint.inner_node
@@ -463,13 +456,14 @@ def _add_sides_gabled_facade_tex(ac_object, t, object_node_index: int, idx_offse
                    mat_idx=facade_mat_idx)
 
 
-def separate_hipped(ac_object: ac.Object, b, roof_mat_idx: int) -> None:
-    return separate_gable(ac_object, b, roof_mat_idx, roof_mat_idx, inward_meters=2.)
+def separate_hipped(roof_mgr: mgr.RoofManager, b, roof_mat_idx: int) -> None:
+    return separate_gable(roof_mgr, b, roof_mat_idx, roof_mat_idx, inward_meters=2.)
 
 
-def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_meters=0.) -> None:
+def separate_gable(roof_mgr: mgr.RoofManager, b, roof_mat_idx: int, facade_mat_idx: int, inward_meters=0.) -> None:
     """Gabled or gambrel roof (or hipped if inward_meters > 0) with 4 nodes."""
     t = b.roof_texture
+    ac_object = roof_mgr.map_ac_object_for_texture(t)
 
     my_type = 'separate_gable'
     if inward_meters > 0:
@@ -680,10 +674,11 @@ def separate_gable(ac_object, b, roof_mat_idx: int, facade_mat_idx: int, inward_
                        mat_idx=roof_mat_idx)
 
 
-def separate_pyramidal(ac_object: ac.Object, b, roof_mat_idx: int) -> None:
+def separate_pyramidal(roof_mgr: mgr.RoofManager, b, roof_mat_idx: int) -> None:
     """Pyramidal, dome or onion roof."""
     shape = b.roof_shape
     roof_texture = b.roof_texture
+    ac_object = roof_mgr.map_ac_object_for_texture(roof_texture)
         
     roof_height = sanity_roof_height_complex(b, 'pyramidal')
 

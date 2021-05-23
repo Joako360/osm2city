@@ -273,7 +273,7 @@ Todo's and PoC's
 ----------------
 
 * Inclusion of ac-objects into mesh: read electrical pylons and combine them into mesh of cables. Significantly reduces number of nodes in scenery and proofs possibility. As a side effect if at some point the object would be removed from terrasync (or renamed), then the program would at least abort.
-* Redo old methods _analyse_facade_roof_requirements and analyse_textures
+* Redo old methods _analyse_facade_roof_requirements and analyse_textures -> building.roof_requires
 * Introduce h_cuts, _calculate_vertical_texture_coords and FacadeTexture.closest_h_match
 * Make texture analysis late, such that buildings attached to each other as well as BuildingParents can be analyzed.
 * Split buildings using skyscraper texture atlas into own mesh - but then generate tile-size meshes (one for facades and one for roofs): horizontal repeat, vertical extra nodes if very high building

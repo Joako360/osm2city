@@ -1006,12 +1006,7 @@ def _write_buildings_in_meshes_ng(coords_transform: co.Transformation,
 
     total_buildings_written = 0
     ac_file_name_f = stg_manager.prefix + 'bf_all' + '.ac'
-    ac_file_name_r = stg_manager.prefix + 'br_all' + '.ac'
-
-    path_to_stg_f = stg_manager.add_object_static(ac_file_name_f, coords_transform.anchor, 0., 0,
-                                                  parameters.get_cluster_dimension_radius(),
-                                                  stg_io2.STGVerbType.object_building_mesh_rough)
-    path_to_stg_r = stg_manager.add_object_static(ac_file_name_r, coords_transform.anchor, 0., 0,
+    path_to_stg_f = stg_manager.add_object_static(ac_file_name_f, coords_transform.anchor, 0., 0.,
                                                   parameters.get_cluster_dimension_radius(),
                                                   stg_io2.STGVerbType.object_building_mesh_rough)
 
@@ -1020,10 +1015,6 @@ def _write_buildings_in_meshes_ng(coords_transform: co.Transformation,
     facades_texture_name = facade_manager.fallback_facades.file_path
     ac_f = ac3d.File()
     ac_object_f = ac_f.new_object('all_facades', facades_texture_name, default_mat_idx=mat.Material.facade.value)
-
-    roof_texture_name = roof_manager.large_flat_roofs.file_path
-    ac_r = ac3d.File()
-    ac_object_r = ac_r.new_object('all_roofs', roof_texture_name, default_mat_idx=mat.Material.facade.value)
 
     for b in mesh_buildings:
         face_mat_idx = mat.Material.facade.value
@@ -1035,28 +1026,14 @@ def _write_buildings_in_meshes_ng(coords_transform: co.Transformation,
 
         b.compute_roof_height()
 
-        index_first_node_in_ac_obj = ac_object_f.next_node_index()
-        b.write_vertices_for_ac_ground(ac_object_f)
-        b.write_vertices_for_ac_under_roof(ac_object_f)
+        b.write_facades_for_ac(ac_object_f, face_mat_idx)
 
-        number_prev_ring_nodes = 0
-        number_prev_ring_nodes += b.write_faces_for_ac(ac_object_f, b.polygon.exterior,
-                                                       index_first_node_in_ac_obj, number_prev_ring_nodes,
-                                                       face_mat_idx)
-
-        for inner in b.polygon.interiors:
-            number_prev_ring_nodes += b.write_faces_for_ac(ac_object_f, inner,
-                                                           index_first_node_in_ac_obj, number_prev_ring_nodes,
-                                                           face_mat_idx)
-
-        # roof stuff
-        b.write_roof_for_ac(ac_object_r, roof_manager, roof_mat_idx, face_mat_idx,
-                            cluster_offset)
+        b.write_roof_for_ac(roof_manager, roof_mat_idx, face_mat_idx, cluster_offset)
 
         total_buildings_written += 1
 
     ac_f.write(os.path.join(path_to_stg_f, ac_file_name_f))
-    ac_r.write(os.path.join(path_to_stg_r, ac_file_name_r))
+    roof_manager.write_ac_files(stg_manager, coords_transform.anchor)
     logging.info("Total number of buildings written to mesh %s: %d", ac_file_name_f, total_buildings_written)
 
 
